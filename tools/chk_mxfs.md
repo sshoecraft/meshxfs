@@ -1,4 +1,4 @@
-# chk_mxfs -- MXFS Filesystem Validation Tool
+# chk_mxfs -- MeshXFS Filesystem Validation Tool
 
 ## Overview
 
@@ -29,7 +29,7 @@ Single-file C program (`chk_mxfs.c`), no libmxfs linkage. Uses POSIX `pread()` a
 
 ### Validation Stages
 
-1. **MXFS On-Disk Super** (first 4KB at offset 0)
+1. **MeshXFS On-Disk Super** (first 4KB at offset 0)
    - Magic (0x5346584D), version (1), CRC32C
    - Region offset/size bounds within device_size
    - Region non-overlapping (super, journal, disklock, xfs_data)

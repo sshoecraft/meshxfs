@@ -1,4 +1,42 @@
-## 2026-10-12 — 0.90.124 — restored multipath for 2–16-node SANs, multiple filesystems per host, and multi-resource DRBD recovery
+## 2026-10-12 — 0.90.125 — the product is MeshXFS; lab VMs are built by osimager, not cloned
+
+- **The product is named MeshXFS.**  "MXFS" is taken in search (Object
+  Matrix's MatrixStore file system, Huawei's XMFS), and no search for this
+  project found it.  MeshXFS names the product everywhere a person reads it:
+  the README, this changelog, the manual pages, the shipped guides, the
+  package descriptions, `modinfo`'s description and release titles
+  (`scripts/release.sh`).  `mxfs` stays the name of everything on a system —
+  the module, the filesystem type, the tools, the packages, the paths, the
+  services and every symbol — and the on-disk format and its magics are
+  unchanged.  The README opens with what MeshXFS is and says that it goes by
+  `mxfs` on a system.  The repository moves to `sshoecraft/meshxfs`
+  (`release.sh`, `scripts/pve_pair_from_guide.sh` and the clone instructions
+  follow).  `scripts/rebrand_prose.py` makes the prose change: the bare word
+  only, never code, an identifier, a path, a URL or the on-disk "MXFS super".
+- `scripts/lab_clone_node.sh` is removed.  It grew a platform's set by
+  cloning a verified node, which meant picking each clone's address, writing
+  its dnsmasq reservation, and rewriting its hostname, machine-id and iSCSI
+  initiator on the image from the host (twice broken: lost SELinux labels,
+  a shared serial log).  Every lab node is now built with `mkosimage` and
+  takes its address from dnsmasq; the row's "after the build" steps bring it
+  to the kernel the platform claims.  `lab/README.md`, `lab/vms.md` and the
+  awareness docs no longer offer cloning.
+- `scripts/pve_nested_pair.sh` takes host names only (`NESTED_PAIR="pve9-3
+  pve9-4"`).  `build` runs the README's own `mkosimage` command with no
+  address, from PATH rather than a source checkout, then
+  `vm_reclaim_disk.sh`; the `define` phase that replaced osimager's libvirt
+  definition is gone, and a `start` phase boots each VM and waits until it
+  resolves in the lab's DNS and answers ssh.  It refuses a name that still
+  resolves, because osimager pins a resolving name's address statically.
+- The lab file gains `dns domain=<domain>`, and `tools/mxfs_lab.sh addr`
+  resolves `<node>.<domain>`, never the bare name.  With the `addr` pins
+  gone, `alma9-1` resolved through clyde's search list to
+  `alma9-1.localdomain`, 192.168.1.191 — a VM on the physical Proxmox pair,
+  not the lab node at 192.168.120.100 — so a harness would have run against
+  the wrong host.  `tests/full_verify.sh` carries the line into each
+  platform's lab file.
+
+## 2026-10-12 — 0.90.124 — Multipath SAN Support, Stronger Recovery, Better Scalability
 
 What changed for someone upgrading from 0.90.116, the last published
 release (0.90.117 to 0.90.123 were never published; their work ships here):
@@ -13,11 +51,11 @@ release (0.90.117 to 0.90.123 were never published; their work ships here):
   fenced and could not open a file, its `open()` retrying for ever and
   impossible to kill; an open that can never be granted now fails with EIO,
   and a killed open always returns.
-- **More than one MXFS filesystem on a host** (0.90.120): the filesystems no
+- **More than one MeshXFS filesystem on a host** (0.90.120): the filesystems no
   longer cross each other's lock traffic, and the new mount option
   `transport=tcp|caw` picks each one's lock manager, so a host can keep a
   DRBD resource mounted beside a SAN LUN.
-- **A DRBD pair with several MXFS resources recovers every one** (0.90.121,
+- **A DRBD pair with several MeshXFS resources recovers every one** (0.90.121,
   0.90.122): a dead host is fenced and recovered on each resource under its
   own evidence; one failed link cuts the peer off on every shared resource;
   the module is loaded before DRBD connects.
@@ -112,7 +150,7 @@ of SIGKILL.  D-OPEN-PROTECT-RESTART-LOOP-UNBOUNDED-AND-UNKILLABLE is removed
 from the defect queue.
 
 **The 4-node `mpath` sequential-write slowdowns were clyde's disk, not
-MXFS** (D-4NODE-MPATH-SEQ-WRITE-COLLAPSE, disproved and removed).  With
+MeshXFS** (D-4NODE-MPATH-SEQ-WRITE-COLLAPSE, disproved and removed).  With
 clyde's `/` back to 74% used, six host-sampled `fio_perf` laps on 4
 `disk/caw/mpath` nodes passed at 1801-3503 MiB/s sequential write (the low
 runs read 243-761, all taken with `/` 92-100% full), and in every lap the
@@ -148,12 +186,12 @@ meanwhile, and the drive is a DRAM-less TLC SSD on a 79%-full filesystem
 taking 13.7 GB every few minutes.  D-MPATH-SEQ-WRITE-LOW-RUN-RECURS-WITH-
 DISK-NOT-FULL is disproved and removed, and that FAIL is amended on the
 board as the detector's (`fio_perf_vs_xfs` at 8/disk/caw/mpath,
-2026-10-12T03:22:57Z: it graded the host's disk, not MXFS).
+2026-10-12T03:22:57Z: it graded the host's disk, not MeshXFS).
 **`tools/path_io_latency.py`** reads
 `path_io_sampler.sh` captures: per device, the seconds it wrote, MiB/s and
 time per write (median, p95, worst).
 
-**The allocation witness now measures MXFS, not what earlier rows left
+**The allocation witness now measures MeshXFS, not what earlier rows left
 behind** (`tests/tooling/alloc_witness.sh`).  In one of nine 16-node release
 repeats `alloc_witness` read `coverage=INSUFFICIENT` on its `overlap` floor,
 and `chk_clean` followed with `release=VACUOUS`, `errors=0`
@@ -276,7 +314,7 @@ it); `--compact` then rewrites each image offline, verified with
 beside every node's paths (`path_io_sampler.sh` takes a device pattern).  Its
 first low run (seqW 586 MiB/s) showed every node's writes on one path of two,
 each taking 60-970 ms at 32 in flight: the device under the guests is slow,
-not MXFS idle.
+not MeshXFS idle.
 
 **Verified, and removed from the defect queue:**
 D-DIR-RELOAD-CHILD-INACTIVATION-DEADLOCK (the hang above).  On 0.90.124, with
@@ -301,11 +339,11 @@ They are carried unchanged and have not been run against this tree.
 `.gitignore` now excludes Claude Code's worktree, checkpoint and mailbox
 directories, which hold whole copies of the tree.
 
-## 2026-10-11 — 0.90.122 — NOT RELEASED (its work ships with 0.90.124): a DRBD pair with several MXFS resources survives one link failing, and the module is loaded before DRBD connects
+## 2026-10-11 — 0.90.122 — NOT RELEASED (its work ships with 0.90.124): a DRBD pair with several MeshXFS resources survives one link failing, and the module is loaded before DRBD connects
 
 **One resource's exclusion now takes the peer off every resource the two
 hosts share** (`tools/mxfs_drbd_fence_self.py`).  The built-in authority's
-isolation drops MXFS's ports to the peer, and those ports carry every MXFS
+isolation drops MeshXFS's ports to the peer, and those ports carry every MeshXFS
 filesystem on the host, but it dropped only the DRBD port of the resource
 whose link failed.  On a pair with six resources, one missed keepalive left
 the other five Connected and Primary on both hosts with their lock traffic
@@ -317,8 +355,8 @@ that resource's own handler, which excludes the peer under the resource's own
 episode.  Never a graceful disconnect: DRBD runs no handler for one, and the
 peer would carry on as Primary.
 
-**A node that loses the tie-break restarts whenever MXFS holds anything on
-it.**  It restarted only when MXFS was mounted on the resource whose link
+**A node that loses the tie-break restarts whenever MeshXFS holds anything on
+it.**  It restarted only when MeshXFS was mounted on the resource whose link
 failed, so a mount still in progress (in no mount table yet) blocked for ever
 on the frozen device.  The test is now the module's reference count, which a
 mount in progress holds.
@@ -352,8 +390,8 @@ counts the DRBD links lost meanwhile.
 
 **Removed from the defect queue:**
 
-- **On a DRBD pair with several MXFS resources under the built-in authority,
-  one resource losing its replication link isolated the peer from every MXFS
+- **On a DRBD pair with several MeshXFS resources under the built-in authority,
+  one resource losing its replication link isolated the peer from every MeshXFS
   port while every other resource stayed Connected, Primary/Primary and
   unexcluded** (D-DRBD-ONE-RESOURCE-EXCLUSION-CUTS-EVERY-RESOURCES-MXFS-TRAFFIC)
   — FIXED AND VERIFIED.  The cause and the fix are above.
@@ -381,7 +419,7 @@ counts the DRBD links lost meanwhile.
   dropped no link in 20 probe loads; loading first removes the exposure either
   way.
 
-- **A node that lost the tie-break with an MXFS mount still in progress left
+- **A node that lost the tie-break with an MeshXFS mount still in progress left
   the mount blocked for ever on the frozen device**
   (D-DRBD-LOSER-MOUNT-IN-PROGRESS-HANGS-UNKILLABLE-NO-RESTART) — FIXED AND
   VERIFIED.  The cause and the fix are above.  `multi-death-test` with
@@ -495,12 +533,12 @@ message is wrong, nothing is corrupted).
   test1's clock being stepped mid-row** (the measurement above): with the
   366.5 s step taken out, its "383 s" operation took 16.7 s.
 
-## 2026-10-11 — 0.90.121 — NOT RELEASED (its work ships with 0.90.124): a DRBD pair with two MXFS resources recovers both when a host dies
+## 2026-10-11 — 0.90.121 — NOT RELEASED (its work ships with 0.90.124): a DRBD pair with two MeshXFS resources recovers both when a host dies
 
 **The built-in fence authority answers for the resource that asks.**
 `mxfs-drbd-fence-self` excludes a dead peer once per resource, each under its
 own episode, but `status <peer>` answered with the first inhibit it listed for
-that host.  On a pair with two MXFS resources the witness of the other one
+that host.  On a pair with two MeshXFS resources the witness of the other one
 compared that episode with its own receipt, the module never judged the peer
 excluded, and that filesystem never recovered the dead node: on the nested
 pair, pve9-4 destroyed with `/mnt/shared` and `/mnt/shared2` mounted,
@@ -515,8 +553,8 @@ protocol is unchanged).  With the fixed pair installed on the stuck survivor,
 
 **`scripts/pve_pair_update.sh` updates a pair with more than one resource.**
 It stopped only `mxfs-drbd@$RES` before unloading the module, which does not
-unload with any MXFS filesystem mounted.  It now stops every `mxfs-drbd@`
-unit active on either host, refuses the swap while an MXFS mount no unit owns
+unload with any MeshXFS filesystem mounted.  It now stops every `mxfs-drbd@`
+unit active on either host, refuses the swap while an MeshXFS mount no unit owns
 is left, and waits for every resource to come back mounted, Primary/Primary
 and UpToDate on the new build, each at its unit's `MOUNTPOINT`.  `CHECK` and
 `REFORMAT` still act on `RES` alone.
@@ -535,7 +573,7 @@ and UpToDate on the new build, each at its unit's `MOUNTPOINT`.  `CHECK` and
   episode, and pve9-4 came back on both in 31 s and 53 s, each exclusion
   released on its own resource's evidence.
 
-- **Two MXFS mounts on one host opened two sockets on each fixed port, and
+- **Two MeshXFS mounts on one host opened two sockets on each fixed port, and
   Linux routed each connection or unicast datagram by address hash, not by
   filesystem** (D-MULTIMOUNT-SHARED-PORTS-MISROUTE-PER-MOUNT-TRAFFIC) — FIXED
   AND VERIFIED.  Before the fix (0.90.120's first build), `tests/multi_mount.sh`
@@ -555,7 +593,7 @@ and UpToDate on the new build, each at its unit's `MOUNTPOINT`.  `CHECK` and
 `mxfs-drbd@` unit is not enabled: the victim's rejoin is its units starting at
 boot, and a unit that never starts would read as a failed rejoin.
 
-## 2026-10-10 — 0.90.120 — NOT RELEASED (its work ships with 0.90.124): more than one MXFS filesystem mounted on a host
+## 2026-10-10 — 0.90.120 — NOT RELEASED (its work ships with 0.90.124): more than one MeshXFS filesystem mounted on a host
 
 **One socket per port per host** (`pal/linux/kern.c`).  Every mount opened
 its own sockets on the fixed ports (TCP 7600, UDP 7601-7603) with
@@ -584,7 +622,7 @@ default, instead of being refused.
 
 **The DRBD fence helper's peer evidence is per resource**
 (`tools/mxfs_drbd_fence_self.py`).  Releasing an exclusion needed the peer to
-have no MXFS mount at all and a module reference count of 0.  With two
+have no MeshXFS mount at all and a module reference count of 0.  With two
 resources on the pair, the first one remounted held the other excluded for
 ever.  It now asks about the resource's own device: no mount of it and no
 `/sys/fs/mxfs/<dev>` (which outlives a lazy unmount).  Participant 1's wait
@@ -592,7 +630,7 @@ for participant 0, and the wait for the peer's recovery, count the same way.
 
 **The Proxmox test scripts stop taking `/mnt/shared` down.**
 `scripts/pve_mxfs_spare_disk.sh` stopped the pair's own `mxfs-drbd@mxfs`
-before building its second DRBD resource, so one MXFS mount ran at a time and
+before building its second DRBD resource, so one MeshXFS mount ran at a time and
 `/mnt/shared` stayed down through every leg; it now stays mounted beside the
 second one (`ALONE=1` stops it, for a measurement that wants the pair to
 itself), its refusal looks only at its own device, and `THIN="<vg>/<pool>
@@ -638,11 +676,11 @@ may name more than two, `MEM_MIB` sets their memory; the cluster phase joins
 them one at a time, and its key write is retried until `/etc/pve` takes it,
 where `[ -w ]` had answered for root while the cluster filesystem refused the
 write); `scripts/pve_tree_install.sh` builds and installs this tree on hosts
-with no MXFS; `scripts/pve_caw_lun.sh` exported a 30 GiB CAW LUN
+with no MeshXFS; `scripts/pve_caw_lun.sh` exported a 30 GiB CAW LUN
 (`pve-caw-02`) from 192.168.120.1 to the three; `scripts/pve_mxfs_san_disk.sh`
 mounts on every listed host (it checked only the first two) and gains `join`
 (mount a host back without formatting); `scripts/pve_cloud_guest.sh` makes a
-source guest from the Debian 12 cloud image on the MXFS storage, whose clones'
+source guest from the Debian 12 cloud image on the MeshXFS storage, whose clones'
 cloud-init sets the lab root password from the secrets store and installs the
 QEMU agent.
 
@@ -655,7 +693,7 @@ after every lap (305 written), no bad line in any host's or the guest's
 kernel log (`tests/evidence/pve_live_migrate/20261011T013404Z`).
 
 **HA failover on three hosts: PASS** (`tests/pve_ha_failover.sh`, new).  An
-HA guest on the MXFS storage, its fsynced writer running, and a second
+HA guest on the MeshXFS storage, its fsynced writer running, and a second
 "bystander" guest on a host that survives, writing a new fsynced 1 MiB file
 every 0.2 s.  pve9-5, running the HA guest, was powered off (`virsh
 destroy`): Proxmox HA restarted the guest on pve9-6 144 s later (its agent
@@ -699,8 +737,8 @@ one shared shortform directory at once, so the directory's lock changes hands
 on nearly every operation; the directory must end as exactly the expected
 names on both hosts, with the volume check above clean.
 
-- **MXFS on the physical Proxmox pair over clyde's shared iSCSI LUN (CAW transport, 0.90.118 E8B6C853D1BD97C4133E304), seven concurrent VM installs: pve1 held directory ino 8388736 in core BEHIND the platter (incore nlink=6 size=50 chg=12, disk nlink=8 size=72 chg=10) at its BAST drain, and P189-RELOG-BEHIND-DISK refused to re-log it.** — DISPROVED (the backstop refused a genuinely stale copy; nothing was owed and nothing was lost): `tests/pve_dir_rmdir_handoff.sh` on the same pair and LUN, 0.90.119, 240 s of both hosts' rmdir/ls/mkdir (8744 + 9032 operations, no error), reproduced the same signature (in-core nlink 8 < 9, size 66 < 76, changecount 15570 > 15565) and printed what it was: publication pending = durable = flush (no committed change of this node unlanded), lock mode NL with the cache marked stale at that release, and the one name the in-core copy lacked, `b2`, was the peer's own subdirectory, recreated by pve2.  The copy was behind, the refusal was right, and the in-core changecount is not comparable with the platter's, which is why 183 past hits read as "ahead".  Both hosts then listed exactly the expected eight names, the whole-tree listings matched and `chk_mxfs -n` was clean; no I/O error, hang or kernel warning (`tests/evidence/pve_dir_rmdir_handoff/20261011T000045Z-p189-rmdir-0.90.119`).  The 8-node `run_chk_clean` runs that carried such hits had all ended `chk_clean` PASS.
-- **On the physical pair's Samsung 850 EVO DRBD (`pve_build_compare_850_20261009T205922Z`, leg 3 mxfs, 3+4 concurrent AlmaLinux installs), one install (alma9-6, VM 107 on pve2) never answered as installed and was cancelled at 1626 s while its six siblings installed in 667-1109 s.** — DISPROVED (not MXFS): the build's boot command processing failed, and the guest's own counters agree: it read 176 MB of its install ISO from the host's local storage and stopped, and its MXFS-backed disk saw only 150 small probe reads, all completed, and no write.  The other MXFS leg and both LVM legs of that run installed all seven.
+- **MeshXFS on the physical Proxmox pair over clyde's shared iSCSI LUN (CAW transport, 0.90.118 E8B6C853D1BD97C4133E304), seven concurrent VM installs: pve1 held directory ino 8388736 in core BEHIND the platter (incore nlink=6 size=50 chg=12, disk nlink=8 size=72 chg=10) at its BAST drain, and P189-RELOG-BEHIND-DISK refused to re-log it.** — DISPROVED (the backstop refused a genuinely stale copy; nothing was owed and nothing was lost): `tests/pve_dir_rmdir_handoff.sh` on the same pair and LUN, 0.90.119, 240 s of both hosts' rmdir/ls/mkdir (8744 + 9032 operations, no error), reproduced the same signature (in-core nlink 8 < 9, size 66 < 76, changecount 15570 > 15565) and printed what it was: publication pending = durable = flush (no committed change of this node unlanded), lock mode NL with the cache marked stale at that release, and the one name the in-core copy lacked, `b2`, was the peer's own subdirectory, recreated by pve2.  The copy was behind, the refusal was right, and the in-core changecount is not comparable with the platter's, which is why 183 past hits read as "ahead".  Both hosts then listed exactly the expected eight names, the whole-tree listings matched and `chk_mxfs -n` was clean; no I/O error, hang or kernel warning (`tests/evidence/pve_dir_rmdir_handoff/20261011T000045Z-p189-rmdir-0.90.119`).  The 8-node `run_chk_clean` runs that carried such hits had all ended `chk_clean` PASS.
+- **On the physical pair's Samsung 850 EVO DRBD (`pve_build_compare_850_20261009T205922Z`, leg 3 mxfs, 3+4 concurrent AlmaLinux installs), one install (alma9-6, VM 107 on pve2) never answered as installed and was cancelled at 1626 s while its six siblings installed in 667-1109 s.** — DISPROVED (not MeshXFS): the build's boot command processing failed, and the guest's own counters agree: it read 176 MB of its install ISO from the host's local storage and stopped, and its MXFS-backed disk saw only 150 small probe reads, all completed, and no write.  The other MeshXFS leg and both LVM legs of that run installed all seven.
 
 ## 2026-10-10 — 0.90.118 — NOT RELEASED (its work ships with the next release): an allocation stops asking a host that has left one of its AG lock tries unanswered
 
@@ -749,7 +787,7 @@ not name (D-DRBD-GUEST-WRITE-ILOCK-HOLDER-UNKNOWN-30S-0-90-118): both arms
 graded FAIL, and the defect stays open.
 
 **A shared iSCSI LUN with CAW for the physical Proxmox pair**, so the pair
-can run MXFS the SAN way (`2/disk/caw/direct`) beside DRBD:
+can run MeshXFS the SAN way (`2/disk/caw/direct`) beside DRBD:
 `scripts/pve_caw_lun.sh setup` makes (or grows, and has SCST and both hosts
 re-read) a fully allocated 120 GiB image outside
 the rig's LUN pool (`/home/steve/disks/pve/pvecaw01.img`), exports it from
@@ -759,32 +797,32 @@ host in to that target without touching any other session.  Verified from
 both hosts (`/dev/sdd`, one WWID `eui.313862343731362d`): a CAW write on each
 read back on the other, a miscompare refused with the block unchanged, and a
 reservation key registered on pve1 read on pve2 and removed.  120 GiB because
-Proxmox's shared LVM, the leg MXFS is compared against, is thick: seven
+Proxmox's shared LVM, the leg MeshXFS is compared against, is thick: seven
 16 GiB build disks are 112 GiB reserved at creation.
 
 `scripts/pve_build_compare.sh` legs `san` (`scripts/pve_mxfs_san_disk.sh`:
-MXFS formatted from pve1, both hosts mounting it on the CAW transport,
+MeshXFS formatted from pve1, both hosts mounting it on the CAW transport,
 Proxmox storage `mxfssan`) and `sanlvm` (`scripts/pve_lvm_san_baseline.sh`,
 storage `sanlvm`); `tests/pve_build_leg_kmsg.sh` takes them as `LEGS=`.
 `scripts/pve_pair_builds.sh` samples every VM's QEMU run state (an ENOSPC
 pauses a guest as `io-error`) and every storage's usage each minute.  The
 first `san` leg, on the 20 GiB LUN, finished no install in 45 min.
 
-- **On the physical Proxmox pair with MXFS on clyde's shared iSCSI LUN (CAW transport, scripts/pve_mxfs_san_disk.sh, 0.90.118 076200B2F7C1F961F0139E8) none of seven concurrent AlmaLinux installs answered as installed: every packer build 'Timeout waiting for SSH' after 45 min 28 s (the same builds finish in 1639-2698 s on MXFS-on-DRBD).** — DISPROVED (sizing, not MXFS): the same seven-install workload on the same MXFS-on-CAW-iSCSI setup, rerun on a 120 GiB LUN (tests/evidence/pve_build_leg_kmsg/20261010T224329Z-san-sanlvm-120g-0.90.118/compare/leg1-san/blockstat.txt, STORE sampled every 60 s on both hosts), peaked at 20.4 GiB used at 18:00 — more than the 18 GiB the 20 GiB LUN had free after mkfs, so the first run's guests ran out of space. On 120 GiB all 7 installed (765-1115 s), every VM state sample read running, and both hosts' kernel logs held 0 I/O error / hung task / WARNING / BUG lines.
+- **On the physical Proxmox pair with MeshXFS on clyde's shared iSCSI LUN (CAW transport, scripts/pve_mxfs_san_disk.sh, 0.90.118 076200B2F7C1F961F0139E8) none of seven concurrent AlmaLinux installs answered as installed: every packer build 'Timeout waiting for SSH' after 45 min 28 s (the same builds finish in 1639-2698 s on MXFS-on-DRBD).** — DISPROVED (sizing, not MeshXFS): the same seven-install workload on the same MXFS-on-CAW-iSCSI setup, rerun on a 120 GiB LUN (tests/evidence/pve_build_leg_kmsg/20261010T224329Z-san-sanlvm-120g-0.90.118/compare/leg1-san/blockstat.txt, STORE sampled every 60 s on both hosts), peaked at 20.4 GiB used at 18:00 — more than the 18 GiB the 20 GiB LUN had free after mkfs, so the first run's guests ran out of space. On 120 GiB all 7 installed (765-1115 s), every VM state sample read running, and both hosts' kernel logs held 0 I/O error / hung task / WARNING / BUG lines.
 
-**MXFS against Proxmox shared LVM on the same iSCSI LUN** (one leg each,
+**MeshXFS against Proxmox shared LVM on the same iSCSI LUN** (one leg each,
 `tests/evidence/pve_build_leg_kmsg/20261010T224329Z-san-sanlvm-120g-0.90.118`,
 both PASS, no I/O error, hung task, kernel warning or withdrawal on either
 host).  Seven concurrent AlmaLinux 9.7 installs, three on pve1 and four on
 pve2, seconds to installed:
 
-| host | MXFS on CAW (`san`) | shared LVM (`sanlvm`) |
+| host | MeshXFS on CAW (`san`) | shared LVM (`sanlvm`) |
 |---|---|---|
 | pve1 | 1056, 1115, 1018 (mean 1063) | 1059, 1037, 1012 (mean 1036) |
 | pve2 | 765, 850, 824, 814 (mean 813) | 878, 850, 824, 813 (mean 841) |
 | all seven | 6442 | 6473 |
 
-Level within 0.5%, with MXFS's sparse images peaking at 20.4 GiB used where
+Level within 0.5%, with MeshXFS's sparse images peaking at 20.4 GiB used where
 the LVM leg reserves 112 GiB at creation.  One leg each, on a LUN that clyde
 serves from its page cache (flushes averaged 1.2 ms), so the absolute times
 flatter both; not a published claim while the finding below is open.
@@ -804,7 +842,7 @@ holder (D-DRBD-GUEST-WRITE-ILOCK-HOLDER-UNKNOWN-30S-0-90-118).
 
 ## 2026-10-10 — 0.90.117 — NOT RELEASED (its work ships with the next release): two-host Proxmox VE on DRBD: less wasted lock work under heavy VM load; misleading kernel warning removed
 
-**For a two-host Proxmox VE pair running MXFS on DRBD dual-primary
+**For a two-host Proxmox VE pair running MeshXFS on DRBD dual-primary
 (`2/net/mesh/drbd`), upgrading from 0.90.116:**
 
 - **Under heavy load each host stops spending its lock commits on requests
@@ -879,7 +917,7 @@ a quarter of the requester's attempt or more, split into the ledger page's
 preparation and the rest) and `P-TAUTH-TAKEOVER-DEAD-TARGET` (a page prepared
 to a target that died before consuming it, taken over).
 
-**Physical pair:** MXFS on DRBD on the Kingston spare disks, 7 concurrent
+**Physical pair:** MeshXFS on DRBD on the Kingston spare disks, 7 concurrent
 AlmaLinux installs, build 03981811B7B40A706D4DC1A
 (`tests/evidence/pve_build_leg_kmsg/20261010T131113Z-rrq-workers-0.90.117`).
 - PASS: 7 of 7 installed (pve1 2302–2498 s, pve2 1839–2134 s, the same range
@@ -952,7 +990,7 @@ counts.
 
 ## 2026-10-10 — 0.90.116 — two-host Proxmox VE on DRBD: VM disks no longer freeze on slow SSDs, and a host that leaves, fails or rejoins comes back cleanly
 
-**For a two-host Proxmox VE pair running MXFS on DRBD dual-primary
+**For a two-host Proxmox VE pair running MeshXFS on DRBD dual-primary
 (`2/net/mesh/drbd`), upgrading from 0.90.107, the last release:**
 
 - **VM disk writes no longer freeze under heavy load on slow disks.** With
@@ -1030,7 +1068,7 @@ Verified two ways:
   at 1, the request answers in 0 ms. On an unready page nobody holds, it
   answers in 0 ms with no ledger commit; the worker's pass then prepares the
   page, and the next no-queue request is granted.
-- **Physical pair:** MXFS on DRBD on the TRIMmed Kingston spare disks, 7
+- **Physical pair:** MeshXFS on DRBD on the TRIMmed Kingston spare disks, 7
   concurrent AlmaLinux installs. The would-block path ran on both hosts
   (pve1 24, pve2 17), and the worker prepared those pages in 5 and 6 passes.
   - No slow preparation: the knob-0 legs on these disks had up to 4.3 s.
@@ -1119,7 +1157,7 @@ which hold nothing while they wait, take the AG. Knob
 New probe `P-ACQ-NOQUEUE-PREPARE` (debug). The exhaustion line now carries
 `flags`, `age_ms` and `comm`, and says what a no-queue caller does with it
 instead of claiming the operation fails.
-Verified on the physical pair, MXFS on DRBD on the TRIMmed Kingston spare
+Verified on the physical pair, MeshXFS on DRBD on the TRIMmed Kingston spare
 disks, 7 concurrent AlmaLinux installs per leg, the same build with the knob
 set per leg, in the order 0 1 1 0: in both knob-0 legs pve2 parked no-queue
 requests on an unready page (144, 159), some used up the budget (4, 3), and
@@ -1136,7 +1174,7 @@ mean of 877-941 vs 846-926 ms per write and 63 vs 60-65 ms per flush on pve1.
   — FIXED AND VERIFIED by the change above (knob 0, two legs: 7 exhausted
   budgets, 30 hung-task reports; knob 1, two legs: none).
 
-**`tests/pve_build_leg_kmsg.sh`** runs one MXFS build leg on the physical
+**`tests/pve_build_leg_kmsg.sh`** runs one MeshXFS build leg on the physical
 pair's spare disks (`scripts/pve_build_compare.sh <dir> mxfs`) and keeps each
 host's kernel log for the leg beside it, counting the lines that grade the
 pair and the no-queue probes, so `tests/pve_knob_ab.sh` can A/B a knob over
@@ -1588,7 +1626,7 @@ deeper queue than the 500 ms target allows. A window that cut on an
 (lone 22.6 / 19.9 MB/s, flood swaps max 3.4 / 2.8 s) and not kept: it
 bought no rate.
 
-## 2026-10-08 — 0.90.107 — MXFS on DRBD dual-primary is released again, verified on two physical Proxmox VE 9 hosts; seven configurations are claimed
+## 2026-10-08 — 0.90.107 — MeshXFS on DRBD dual-primary is released again, verified on two physical Proxmox VE 9 hosts; seven configurations are claimed
 
 **What this release claims.** `2/net/mesh/drbd` again, withdrawn on
 2026-10-06 and now verified three ways:
@@ -1609,12 +1647,12 @@ every change since is in the entries below, 0.90.43 to 0.90.107. For DRBD the
 substance is in 0.90.55 to 0.90.106: what eight concurrent VM installs on the
 physical pair found, fixed one cause at a time.
 
-**The DRBD rig no longer releases a fenced node before the survivor's MXFS
+**The DRBD rig no longer releases a fenced node before the survivor's MeshXFS
 has proved it excluded.** The fence and split tests in `scripts/drbd_rig.sh`
-run with MXFS mounted, and they released the loser's inhibit as soon as DRBD
+run with MeshXFS mounted, and they released the loser's inhibit as soon as DRBD
 on the survivor had settled. That was 1–2 s after the fence in
 `tests/drbd_release_verify.sh` on 0.90.106 (clyde's authority log: fenced
-10:03:06, released 10:03:08). The survivor's MXFS recovers a dead peer's
+10:03:06, released 10:03:08). The survivor's MeshXFS recovers a dead peer's
 journal slice only after its witness sees the peer off and still inhibited
 under the fence's episode. Every answer it got was `running, inhibit none`,
 because the loser was already booting again. So it never certified the
@@ -1623,7 +1661,7 @@ next step's unmount on it never finished: `test1 would not release mxfs`,
 and the remaining steps of the run failed behind it. That refusal is the
 designed behaviour. A product pair's guard releases a fenced peer only after
 the survivor's recovery completes, as `tests/pve_pair_failover.sh`
-(answering-restart) checks. Both tests now wait, when MXFS is mounted, for
+(answering-restart) checks. Both tests now wait, when MeshXFS is mounted, for
 the survivor's `P163-RECOVERY-COMPLETE` and its `P238-DRBD-FENCE-WITNESSED`
 before releasing, as the death test and `rejoin_node` already did. With it,
 each survivor recovered the fenced peer's slice under the witness 12 s into
@@ -1778,9 +1816,9 @@ depth, punt mask and punt count. The leak itself is not found yet; it stays in
 the queue (`D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED`).
 
 **Measured: the DRBD write bound holds a lone writer to half of XFS's
-speed.** On the physical pair, one buffered 3 GiB write with fsync took MXFS
+speed.** On the physical pair, one buffered 3 GiB write with fsync took MeshXFS
 215 s against 104 s for XFS on a scratch DRBD resource on the same disks. With
-the 4 MiB / 64-request bound lifted, MXFS wrote 1 GiB at 68–74 MB/s against
+the 4 MiB / 64-request bound lifted, MeshXFS wrote 1 GiB at 68–74 MB/s against
 19–20 MB/s bounded. Delayed vs write-time allocation and thin vs thick backing
 were measured and are not the cause. Defect queue:
 `D-DRBD-WRITE-BOUND-HOLDS-LONE-WRITER-TO-HALF-XFS`.
@@ -1805,8 +1843,8 @@ gives the fixed bound.
 **Measured: off DRBD, a lone buffered writer keeps pace with XFS.** The
 board's `fio_perf` rows write with O_DIRECT, so they never covered the
 buffered path that 0.90.104's write-time allocation changed. On the rig's
-shared LUN (2/net/mesh/direct, test2 mounted), 1 GiB buffered with fsync: MXFS
-0.96–1.07 s, MXFS with delayed allocation 0.88–0.89 s, native XFS on the same
+shared LUN (2/net/mesh/direct, test2 mounted), 1 GiB buffered with fsync: MeshXFS
+0.96–1.07 s, MeshXFS with delayed allocation 0.88–0.89 s, native XFS on the same
 LUN 0.92–0.97 s. The first write after a mount is slow in either mode
 (1.4–2.8 s). `tests/rig_buffered_write_vs_xfs.sh` runs all three; it
 reformats the LUN.
@@ -1820,7 +1858,7 @@ reformats the LUN.
 - `tests/pve_drbd_bound_sweep.sh`: per bound value, the lone-writer rate and
   `tests/pve_pair_write_bound.sh`'s swap latency under both hosts' load.
 - `scripts/pve_drbd_xfs_storage.sh` takes `THIN_POOL`, so the yardstick can
-  sit on a thin volume like the MXFS resource's.
+  sit on a thin volume like the MeshXFS resource's.
 - Defect queue: `D-DRBD-ENOSPC-WRITER-WAITS-FOR-WHOLE-DIRTY-SET-HUNG-TASK`
   (the flush above, open until the physical pair passes at full size).
 
@@ -1964,7 +2002,7 @@ commit was three steps: a swap that writes a ticket over the spare copy's
 first sector, the body written separately, a swap that publishes the final
 first sector. The ticket exists because a SCSI COMPARE AND WRITE covers one
 sector, so the body has to land outside any swap with the copy marked
-invalid meanwhile. On DRBD every swap is MXFS's own emulation under a
+invalid meanwhile. On DRBD every swap is MeshXFS's own emulation under a
 two-host lock, so one acquisition can cover the whole page: compare the
 spare's first sector as the commit read it, and on a match write the whole
 4 KiB image with FUA (`mxfs_pal_bdev_compare_and_write_span`). Two writers
@@ -2049,7 +2087,7 @@ enrollment sector keeps its version, so existing filesystems still mount.
 **Two DRBD-pair stability records closed.** Under 45 minutes of seven
 concurrent VM installs on pve1/pve2, neither host withdrew or self-fenced,
 and no swap failed. No witness ran beside a connected primary peer, and
-neither MXFS nor the host kernel refused or failed an I/O. The 60 s DRBD
+neither MeshXFS nor the host kernel refused or failed an I/O. The 60 s DRBD
 lease (0.90.81) and the witness gate (0.90.77) are what removed those
 failures. A heartbeat cycle over 8 s still happens on pve2 under that load,
 three times in the run. By the owner's decision it is tracked as a
@@ -2227,7 +2265,7 @@ verdict.
 
 **New tool: `scripts/pve_drbd_xfs_storage.sh up|down|status`.** It builds
 plain XFS on a scratch DRBD resource of the physical pair, both hosts
-Primary as for MXFS, and adds it as a Proxmox storage on one host. The same
+Primary as for MeshXFS, and adds it as a Proxmox storage on one host. The same
 VM builds can then run on XFS over the same replication
 (`scripts/pve_pair_builds.sh STORAGE=drbdxfs`).
 
@@ -2253,7 +2291,7 @@ unauthorized image(s); partial apply would tear` line and one
   and still names each image.
 
 **New test: `tests/pve_wedged_umount_reboot.sh`.** It holds one nested host's
-next MXFS unmount in the kernel (`dbg_teardown_lease_hold_ms`), requests a
+next MeshXFS unmount in the kernel (`dbg_teardown_lease_hold_ms`), requests a
 reboot and does nothing else to it. It fails when:
 - the host's `mxfs-drbd@` stop takes longer than 180 s, or never says the
   unmount is stuck;
@@ -2387,7 +2425,7 @@ departure leaves no slot, so that boot waits for nothing.
 
 **Measured, not changed:** real-time I/O priority for DRBD coordination writes.
 Under unbounded bulk it cut pve1's 512 B replicated write from 38.8 s to 2.3 s
-max, but under the 4 MiB-per-host load MXFS's write bound leaves, priority on
+max, but under the 4 MiB-per-host load MeshXFS's write bound leaves, priority on
 the probe and on both hosts' DRBD receiver threads did not help (max 0.83 ->
 1.24 s and 1.69 -> 2.30 s): the queue is already short.
 `scripts/drbd_write_latency_probe.sh` gained `PROBE_PRIOCLASS` and
@@ -2400,7 +2438,7 @@ the probe and on both hosts' DRBD receiver threads did not help (max 0.83 ->
   the fix passes; on the physical pair the load that froze pve1 passed with
   every block verified and eight idle grant-holding records released cleanly
   (tests/evidence/pve_pair_write_bound/20261007T192413Z).
-- **MXFS kernel messages carried non-ASCII characters the console prints as
+- **MeshXFS kernel messages carried non-ASCII characters the console prints as
   garbage** — FIXED AND VERIFIED: no byte above 0x7f in any mxfs line on either
   physical host after the install, 16 of them printing `--` where an em dash was.
 - **after a peer withdraws, the survivor held its recovery complete for up to
@@ -2417,7 +2455,7 @@ the probe and on both hosts' DRBD receiver threads did not help (max 0.83 ->
   platter had moved past; this build's gate followed the platter all 10 times,
   every durable line of both hosts survived the reset, and `chk_mxfs -n` was
   clean (`tests/pve_replay_gate_lag.sh`, nested pair).
-- **a host whose MXFS unmount was stuck in the kernel took ~13 min to
+- **a host whose MeshXFS unmount was stuck in the kernel took ~13 min to
   reboot** — FIXED AND VERIFIED: with the unmount held stuck and a reboot
   requested, the unit's stop gave up at 170 s and said why, and the host came
   back by itself 435-439 s after the request, three runs on two nested pairs.
@@ -2498,7 +2536,7 @@ does not occur on this path.
 
 **`scripts/drbd_rig.sh up` clears a stale SCSI reservation on each node's
 backing disk before creating DRBD's metadata.** A pool LUN last used by a
-shared-LUN MXFS group still carries that group's persistent reservation
+shared-LUN MeshXFS group still carries that group's persistent reservation
 (Write Exclusive, all registrants, kept across logins by APTPL), so every
 write of a node that is not a registrant is refused, and `create-md` failed
 with "Invalid exchange" on test17 and test18 (lun04 held 8 keys, lun08 16).
@@ -2711,7 +2749,7 @@ tickets of dead writers too, and after both hosts rebooted all three did.
   sampling each loop's kernel stack, to measure how long participant 1 waits.
 - `scripts/drbd_write_latency_probe.sh` reads the mount's own log counters
   (log writes, log blocks, log forces) before and after its writer, the same
-  way on MXFS and on XFS.
+  way on MeshXFS and on XFS.
 
 ## 2026-10-07 — 0.90.91 — a lock cancellation's re-send no longer reads or frees a record another thread has freed
 
@@ -2996,7 +3034,7 @@ lines per host per scan.
 
 **`scripts/pve_pair_from_guide.sh` (new) sets the physical pair up from
 `docs/drbd-setup.md` alone, from a fresh clone of the public repository, and
-checks it.** `teardown` takes both hosts back to Proxmox with no MXFS on them,
+checks it.** `teardown` takes both hosts back to Proxmox with no MeshXFS on them,
 `guide` runs sections 1-6 with the guide's own commands (each checked against
 the guide's text first), `finish` resumes after the first sync, and `verify`
 requires both hosts mounted, Primary/Primary, UpToDate, the units and guard
@@ -3017,7 +3055,7 @@ operations, not the release a node skips to a master that just died.
 - The failover suite's answering-restart step syncs participant 1's unit mask
   to disk before resetting it. Unsynced, the mask was lost with the reset on
   the physical pair, participant 1 came back with DRBD connected, and
-  participant 0 was never alone, so the step failed on the test, not on MXFS.
+  participant 0 was never alone, so the step failed on the test, not on MeshXFS.
 - `tests/pve_pair_profile.sh` profiles one host when `PVE_PAIR` names one: a
   host a crash step resets cannot be read while it is down.
 
@@ -3057,7 +3095,7 @@ lease.
 
 **Also:**
 - `tools/pve_power.sh` (new) powers a host of the physical pair "off" by
-  resetting it into a boot isolated from its peer, with DRBD and the MXFS
+  resetting it into a boot isolated from its peer, with DRBD and the MeshXFS
   units held, and "on" again. The failover steps that keep a host down
   (survivor-restart, released-restart, stale-promotion) can now run on
   pve1/pve2, which have no remote power control.
@@ -3065,18 +3103,18 @@ lease.
   `tests/evidence/pve_pair_builds/owned_vms`, each found by the kickstart ISO
   its build uploaded), runs on one host as well as two, and with
   `STOP_INSTALLED=1` counts an installed build as a success.
-- Data writes on the pair are bound by DRBD, not MXFS. The same 256 KiB direct
+- Data writes on the pair are bound by DRBD, not MeshXFS. The same 256 KiB direct
   writes at queue depth 8: local ext4 147 MiB/s, raw DRBD 11.0, XFS on DRBD
-  11.8, MXFS on DRBD 13-16. `scripts/drbd_write_latency_probe.sh` gained the
+  11.8, MeshXFS on DRBD 13-16. `scripts/drbd_write_latency_probe.sh` gained the
   raw-DRBD and XFS-on-DRBD phases (`seqdio`, `seqdio-xfs`).
-- QEMU asks a cache=none image's direct-I/O alignment with an ioctl MXFS does
+- QEMU asks a cache=none image's direct-I/O alignment with an ioctl MeshXFS does
   not answer, so a guest's 512-byte writes reach the image as sub-block
-  direct writes that drain the file's writes first. Measured on MXFS on DRBD,
+  direct writes that drain the file's writes first. Measured on MeshXFS on DRBD,
   that costs nothing (it halves throughput on local ext4); the record was
   removed as disproved.
 - New probes: `tests/pve_trace_calls.sh` (calls of chosen module functions on
   a host, by caller, from a private ftrace instance, nothing in the kernel
-  log), `tests/pve_pair_profile.sh` (where a workload's time goes, per MXFS
+  log), `tests/pve_pair_profile.sh` (where a workload's time goes, per MeshXFS
   function, on both hosts), `tests/pve_unaligned_dio.sh`,
   `tests/pve_dio_alloc_cost.sh`, and `tests/pve_chk_unreplayed.sh` (chk_mxfs
   on journals no mount has replayed, on the pair).
@@ -3143,7 +3181,7 @@ now would break every clone that already built.
   process holding the dead mount at once.
 - Defect queue: a VM create on the shared storage failed under guest load
   (Proxmox's 60 s storage lock ran out). Removed, verified on PVE 9 today:
-  - **a mount MXFS refuses for a stated reason (no fencing, no PR support)
+  - **a mount MeshXFS refuses for a stated reason (no fencing, no PR support)
     returns ENOTCONN, so mount(8) prints 'Transport endpoint is not connected'
     and the reason exists only in dmesg** — fixed in 0.90.65/0.90.66. On pve9-2
     (util-linux 2.41) a mount of a loop device formatted with `mkfs.mxfs`
@@ -3156,10 +3194,10 @@ now would break every clone that already built.
 
 ## 2026-10-06 — 0.90.79 — `2/net/mesh/drbd` is withdrawn from release
 
-**MXFS on DRBD dual-primary is no longer a released configuration.** It was
+**MeshXFS on DRBD dual-primary is no longer a released configuration.** It was
 released in 0.90.41, verified on two Ubuntu 24.04 VMs on the test rig. On the
 owner's two physical Proxmox VE 9 hosts, eight concurrent VM installs on the
-shared filesystem shut both hosts' MXFS mounts down, and guests whose disks were
+shared filesystem shut both hosts' MeshXFS mounts down, and guests whose disks were
 on it got I/O errors. Installers failed and one guest's kernel panicked.
 - 20 open defects block this configuration's release, 13 of them critical
   (`tools/defects.py 2/net/mesh/drbd --release`).
@@ -3371,7 +3409,7 @@ the race too, when its unit was restarted by hand at 14:34:38.
 - `tests/pve_pair_concurrency.sh` is an instrument for the physical pair's
   hosts writing one at a time. Both hosts' loads are armed over ssh to start
   at the same second, so a slow launch cannot pass for a host waiting.
-  Participant 1 samples, into tmpfs, its MXFS stat latency, its root-disk
+  Participant 1 samples, into tmpfs, its MeshXFS stat latency, its root-disk
   fsync latency and its tasks in D.
 
 ## 2026-10-06 — 0.90.74 — a refused writeback no longer ends its ioend twice, and the rejoin's last-resort restart happens
@@ -3388,7 +3426,7 @@ showed up there as a folio lock nobody held.
 **The fix.** From 6.17, iomap leaves `wpc->wb_ctx` for the filesystem to
 clear. After a failed `->writeback_submit` in `iomap_add_to_ioend` it returns
 the error with the ended ioend still cached. An fsync's pass then goes on and
-submits that ioend again for its next folio, and once more at the end. MXFS
+submits that ioend again for its next folio, and once more at the end. MeshXFS
 now clears `wb_ctx` after every hand-off to `iomap_ioend_writeback_submit`
 (`mxfs_ioend_hand_off`), as iomap did itself before 6.17. Both refusals take
 that path: the authority gate's and the DRBD write cap's. `P294` stays in place
@@ -3436,7 +3474,7 @@ From 6.17, iomap keeps the ioend it is building in `wpc->wb_ctx`. When
 `->writeback_submit` fails inside `iomap_add_to_ioend`, iomap returns the
 error without replacing `wb_ctx`. An fsync's pass (WB_SYNC_ALL) goes on to the
 next folio, finds the same ioend there and submits it again, and once more at
-the end of the pass. MXFS ends a refused ioend through its bio, so each return
+the end of the pass. MeshXFS ends a refused ioend through its bio, so each return
 ends it again, after its completion may already have freed it. Before 6.17,
 iomap cleared its own pointer after every submission.
 
@@ -3537,7 +3575,7 @@ also DRBD 8.4's largest bio).
   submitted ahead of the last bio are charged to that bio's first piece.
 
 **Also:**
-- `tests/pve_pair_write_bound.sh`: both hosts write through MXFS at once while
+- `tests/pve_pair_write_bound.sh`: both hosts write through MeshXFS at once while
   ftrace times every DRBD swap (`mxfs_pal_drbd_cas_emulate`) and register
   write (`mxfs_drbd_reg_put`). Then every block is checked from both hosts.
   Each writer writes its whole file: a time-limited writer leaves the tail of
@@ -3555,14 +3593,14 @@ also DRBD 8.4's largest bio).
 ## 2026-10-06 — 0.90.70 — on DRBD, a mount holds back its own writes so its heartbeat never queues behind them
 
 **Both hosts shut `/mnt/shared` down under eight VM installs.** On DRBD,
-MXFS's coordination writes (the bakery registers and the heartbeat
+MeshXFS's coordination writes (the bakery registers and the heartbeat
 compare-and-swap) are ordinary writes on the same device as the guests' data.
 DRBD carries them in one ordered stream to the peer, which writes them to a
 disk its own guests are also writing. DRBD has no priority to lift one past
 data queued ahead of it. On the physical pair's SATA SSDs (no command
 queuing, queue depth 1), eight installs made each heartbeat write wait 8–9 s
 (`P278-HB-STALL stage=CASWRITE`). No heartbeat landed for 30 s, and both
-authority leases expired 9 s apart. With MXFS out of the picture, a scratch
+authority leases expired 9 s apart. With MeshXFS out of the picture, a scratch
 DRBD resource on the same disks and link (`scripts/drbd_write_latency_probe.sh`)
 took up to 21–34 s for one 512-byte write under 4 writers × QD16 × 1 MiB per
 host. Capping each host at 4 MiB of bulk writes in flight brought that to
@@ -3682,7 +3720,7 @@ powered off during the survivor's mount, so the guard never got an answer.
 **A survivor that restarted with its peer still down never mounted again.**
 pve1 excluded pve2 at 22:57 on 2026-10-05 and carried on alone. At 23:56 its
 guard released pve2: pve2 had come back with DRBD down (a crash had left its
-unit files empty) and reported no MXFS mount. pve2 then died again before it
+unit files empty) and reported no MeshXFS mount. pve2 then died again before it
 ever connected. Every time pve1 restarted after that, its boot program waited
 for a connected peer. Yet DRBD's own record on pve1 held pve2 Outdated
 (UpToDate/Outdated: pve1 has the newest replica). The release had deleted the
@@ -3716,7 +3754,7 @@ allow-two-primaries off. Each reason ends with a pointer to
 `docs/drbd-setup.md`.
 
 **README:** a notice at the top says this repository is the development tree,
-not a release, and that MXFS is installed from a package on the Releases page.
+not a release, and that MeshXFS is installed from a package on the Releases page.
 
 **New tests:**
 - `scripts/drbd_rig.sh self-restart-test`: the survivor restarts with its peer
@@ -3802,7 +3840,7 @@ the pair would have needed an operator.
 - The failure line carries mount(8)'s message, which now holds the module's
   reason (below).
 
-**A refused mount says why.** A mount MXFS refuses for a stated reason (no
+**A refused mount says why.** A mount MeshXFS refuses for a stated reason (no
 fence handler on the DRBD resource, no persistent reservations on the device,
 a peer that cannot be proven quiescent) failed with "Transport endpoint is not
 connected". The reason was only in the kernel log. Now the first error-level
@@ -3811,7 +3849,7 @@ permitted" (EPERM) instead. A failure with no stated reason still returns
 ENOTCONN.
 
 **`make install` syncs what it wrote.** pve2 crashed about 2 s after an
-install and came back with its MXFS units, the fence handler, the witness and
+install and came back with its MeshXFS units, the fence handler, the witness and
 `mkfs.mxfs` all zero bytes long. The units then read as masked, and the node
 could neither fence nor mount until the install was run again. The install
 now syncs before it reloads udev and restarts the guard.
@@ -3909,7 +3947,7 @@ disks UpToDate, and four DRBD rules carry the argument:
 
 So no incarnation is alive on the peer, and every write an earlier one made is
 on this disk. On this host a block device has one superblock, so no earlier
-MXFS of the device is alive either. Kind 27 is a death certificate, not a
+MeshXFS of the device is alive either. Kind 27 is a death certificate, not a
 fence: nothing re-checks it, and nothing clears the peer's swap register under
 it. It is accepted for the startup check, for every victim's certificate, for
 a bootstrap takeover's old owner, and for the bootstrap's completion check.
@@ -3926,12 +3964,12 @@ The reasoning and its limits are decision 9 in
 - **`mxfs-drbd-fence-self boot` orders the two nodes.** Two nodes promoting
   together leave neither able to prove the other Secondary. So, connected,
   participant 1 promotes only once participant 0 reports over ssh that it has
-  MXFS mounted, or that its boot program has not been running for 30 s.
+  MeshXFS mounted, or that its boot program has not been running for 30 s.
 - **A refused mount steps down to Secondary and is retried,** with a backoff
   doubling from 15 s to 120 s, six attempts.
 - **The boot program publishes its state** in `/run/mxfs/drbd-boot.<resource>`.
 - **New test: `scripts/drbd_rig.sh self-outage-test`.** It cuts the pair's
-  power with MXFS mounted and both slices dirty, and brings both nodes back
+  power with MeshXFS mounted and both slices dirty, and brings both nodes back
   only through the boot program. `SELF_OUTAGE_HOLD_TICKET=1` kills participant
   1 while it holds the swap lock.
 - **`tests/setup/prep_node.sh` takes `MXFS_NO_MOUNT=1`:** load the module and
@@ -3947,7 +3985,7 @@ The reasoning and its limits are decision 9 in
     pair could never prove its old incarnations gone.
   - *Baseline,* on the previous kernel code (module C8357D90990B020BAFC369D):
     `scripts/drbd_rig.sh self-outage-test` destroys both rig nodes at once
-    with MXFS mounted, and recovers them only through `mxfs-drbd-fence-self
+    with MeshXFS mounted, and recovers them only through `mxfs-drbd-fence-self
     boot`. In tests/evidence/drbd_rig/20261006T094910Z-self-outage-test, both
     nodes logged `P-DRBD-STARTUP-FENCE-ASKED ... 'Connected', not
     disconnected`, then `P-BOOT-MOUNT-REFUSED`. Neither mounted within 480 s.
@@ -4113,7 +4151,7 @@ one.
   `P163-RECOVERY-COMPLETE` 24247.45 while the loads ran on to +180 s; all five
   survivor loads error=0, every fsynced file of both nodes intact, the rejoined
   node reads them identically, cold `chk_mxfs` clean.
-- **on the DRBD attachment MXFS declares a dead peer dead ~55 s after DRBD's
+- **on the DRBD attachment MeshXFS declares a dead peer dead ~55 s after DRBD's
   fence authority has already excluded it** — FIXED AND VERIFIED, 0.90.58.
   Same run: fence-peer EXCLUDED 24177.70, `P-DRBD-EXCL-NOTICE` 24178.77,
   `P-DRBD-EXCL-DEATH notice_age_ms=186` at 24179.35, 1.6 s after the exclusion
@@ -4121,9 +4159,9 @@ one.
 
 ## 2026-10-06 — 0.90.57 — the DRBD unit's stop step finds a broken mount; crash diagnostics for physical hosts
 
-**`mxfs-drbd@` stopped without unmounting a broken MXFS mount.**  Its stop step
+**`mxfs-drbd@` stopped without unmounting a broken MeshXFS mount.**  Its stop step
 asked `mountpoint -q`, which stats the path; a withdrawn or recovery-blocked
-MXFS mount answers that with ESTALE or EIO, so the step read it as unmounted,
+MeshXFS mount answers that with ESTALE or EIO, so the step read it as unmounted,
 skipped the umount, `drbdadm secondary` and `down` then failed under the live
 mount, and the unit still reported itself stopped (measured on pve1).  The
 step is now `mxfs-drbd-fence-self stop`, which finds the mount in
@@ -4138,7 +4176,7 @@ when any of that fails.
   OVERWRITE=1` finished 23:53:30 and the guard's ActiveEnterTimestamp read
   23:53:30; on pve1 the guard running the 0.90.56 program, which authenticates
   the peer with the PVE per-node `ssh_known_hosts`, logged at 23:56:37
-  "released pve2 ... pve2 answers: DRBD Unconfigured, no MXFS mount, module
+  "released pve2 ... pve2 answers: DRBD Unconfigured, no MeshXFS mount, module
   refcnt 0" and recorded `result=RELEASED`; the stale-code guard had logged
   "no answer from pve2 over ssh (rc=255)" every 5 s instead.
 
@@ -4201,12 +4239,12 @@ a design consult (`docs/rulings/drbd-two-node-self-exclusion.md`):
 - **One fixed tie-break.** The endpoint with the lower DRBD address wins every
   uncoordinated split.
 - **The winner excludes the peer before DRBD resumes I/O:**
-  - nftables drops the DRBD and MXFS ports to and from the peer;
+  - nftables drops the DRBD and MeshXFS ports to and from the peer;
   - a durable inhibit and an EXCLUDED receipt are written;
   - the resource goes StandAlone.
 
   `mxfs-drbd-guard` re-applies the isolation after a reboot, and releases the
-  peer only when the peer answers over ssh that it holds no live MXFS
+  peer only when the peer answers over ssh that it holds no live MeshXFS
   superblock and is not DRBD Primary.
 - **The loser stays frozen,** logs why, and restarts.
 - **A planned restart of the winner is not a loss:** the same ssh evidence lets
@@ -4218,7 +4256,7 @@ The module certifies a peer excluded this way as a new fence kind, 26
 (`DRBD_REPLICA_EXCLUDED_V1`), never as 25 (powered off). A bootstrap takeover
 still requires 25.
 
-`mxfs-drbd@<resource>.service` mounts MXFS on DRBD at boot only when it is
+`mxfs-drbd@<resource>.service` mounts MeshXFS on DRBD at boot only when it is
 safe: Connected with both disks UpToDate, or as the survivor of an exclusion.
 At shutdown it unmounts and steps down.
 
@@ -4244,7 +4282,7 @@ identical to 0.90.42's.  An existing `/etc/modprobe.d/mxfs.conf` is kept;
 `make install OVERWRITE=1` replaces it with the shipped one and saves the old
 one as `mxfs.conf.backup` (modprobe reads only `*.conf`).
 `make install` refuses, before installing anything, on a host that already has
-an MXFS .deb, rpm or DKMS module, naming it and the command that removes it;
+an MeshXFS .deb, rpm or DKMS module, naming it and the command that removes it;
 measured on the pve1 host, which still has the 0.11.39 .deb: refused, rc=1.
 The rpm still carries its own copy of the list in its spec.
 
@@ -4564,7 +4602,7 @@ declined transitions).  The survivor now activates a page prepared for itself.
 its paths.**  The reservation key was registered through the multipath device,
 which registers on every path and undoes all of them when one cannot be
 reached, so a node could not mount during a path outage (rc 32 in 0.5 s).
-MXFS now registers on each path itself: at mount on every path that answers;
+MeshXFS now registers on each path itself: at mount on every path that answers;
 on a path that appears later, from the reservation worker, only while the node
 still holds its authority and only if its key is still on the target before
 and after; at unmount, a path that cannot be reached is retired from one that
@@ -4975,11 +5013,11 @@ kernel log and grades a tombstone-arm B as a same-boot resume;
 regwindow).  `mxfs.bootstrap_inject=17` and `=18` (TEST ONLY) hold a TCP
 mount after its bootstrap peek and after its PR registration.
 
-## 2026-10-02 — 0.90.40 — 2/net/mesh/drbd works end to end: MXFS on DRBD dual-primary mounts, remounts, survives a node crash, a link cut, a split and a power cut of both nodes, with every fsynced file intact; a stacked device is never resolved to the disk under it; a compare-and-swap never falls back to a plain write
+## 2026-10-02 — 0.90.40 — 2/net/mesh/drbd works end to end: MeshXFS on DRBD dual-primary mounts, remounts, survives a node crash, a link cut, a split and a power cut of both nodes, with every fsynced file intact; a stacked device is never resolved to the disk under it; a compare-and-swap never falls back to a plain write
 
-**MXFS runs on DRBD dual-primary.**  The configuration is `2/net/mesh/drbd`:
+**MeshXFS runs on DRBD dual-primary.**  The configuration is `2/net/mesh/drbd`:
 two nodes, a local disk each, DRBD 8.4 replicating them on protocol C, and
-MXFS on `/dev/drbd0` mounted on both.  The design is
+MeshXFS on `/dev/drbd0` mounted on both.  The design is
 `docs/attachment-methods.md` ("DRBD dual-primary"); the consult rulings and the
 decisions taken on them are `docs/rulings/drbd-dual-primary-attachment.md`.
 A DRBD device has no SCSI underneath, so the attachment supplies what the
@@ -5519,7 +5557,7 @@ window, so the carry-over can only make a board stricter.
 **Documents.**  `conditions.md` is gone, replaced by
 `docs/attachment-methods.md` (the grammar; both DLM classes and every method,
 implemented or not; each attachment and what it needs from the device; DRBD
-dual-primary; fabric; device layers MXFS refuses) and `docs/fencing.md` (the
+dual-primary; fabric; device layers MeshXFS refuses) and `docs/fencing.md` (the
 design for pluggable fencing methods).  `docs/condition4_multipath_scope.md`
 is now `docs/multipath-attach.md`.  The README names the six released
 configurations.  The man page (`mxfs.5`) and `docs/iscsi_setup.md` no longer
@@ -5824,7 +5862,7 @@ same at 4 and 2).
 
 **How the LUN reached each node.**  Every node of every verification ran its
 own iSCSI initiator and logged into the shared target on one portal: a
-single-path SCSI disk, with nothing between MXFS and the target.  Neither
+single-path SCSI disk, with nothing between MeshXFS and the target.  Neither
 dm-multipath nor a hypervisor's SCSI passthrough carried the lock or fencing
 commands in any run of this release, on either transport.  What the rig names
 `cawd` is CAW on that single-path attachment; the 2- and 4-node CAW releases
@@ -7125,7 +7163,7 @@ backstop.  Found by reading the flag table; never driven on the rig.
 - The flag-test helpers return truth values instead of a word narrowed to
   32 bits.
 - `xfs/xfs_inode.h` carries compile-time checks that the sum of every
-  `MXFS_IF_` flag equals their OR (no shared bit) and that no MXFS flag
+  `MXFS_IF_` flag equals their OR (no shared bit) and that no MeshXFS flag
   overlaps an upstream XFS flag.
 - `scripts/inode_flag_bits_audit.py` parses every stored `i_flags` bit in
   the header and fails on a duplicate; it runs in `tests/full_verify.sh`.
@@ -7281,7 +7319,7 @@ What 0.90.7 passed (`tests/full_verify.sh 0.90.7`, module srcversion
   (fixed below; it then PASSed on the same build, `fua=ok caw=ok`).
 - the CAW board grades `alloc_witness`, `chk_clean` and `crash_audit` FLAKY,
   not PASS: each failed in this campaign's first CAW runs, and each failure
-  was the harness (below), not MXFS.  The board keeps a failure for eleven
+  was the harness (below), not MeshXFS.  The board keeps a failure for eleven
   runs and has no way to discount a harness defect, so they read FLAKY until
   the window is clean.
 - the release packages, built in the oldest container each targets, after the
@@ -7388,7 +7426,7 @@ with the options it had when the image was built.  A node switched to
 `force_transport=0` came back on TCP after every reboot (measured on
 AlmaLinux 9.8).  The RPM now installs `/etc/dracut.conf.d/mxfs.conf`
 (`omit_drivers+=" mxfs "`), and on install rebuilds any initramfs that still
-contains mxfs.  Nothing mounts MXFS before the real root.
+contains mxfs.  Nothing mounts MeshXFS before the real root.
 
 Verified on the AlmaLinux 9.8 pair (5.14.0-687.49.1.el9_8) with the 0.90.7
 RPM: the CAW packaged round switched the transport the README's way and
@@ -7489,24 +7527,24 @@ declared about 60 s earlier).
   and so is the `own_ag` floor (it read 0 for a node that carved 17 times in
   AG 32).
 
-## 2026-09-26 — 0.90.0 — MXFS has its own on-disk magic numbers (format break)
+## 2026-09-26 — 0.90.0 — MeshXFS has its own on-disk magic numbers (format break)
 
-A reviewer on the linux-xfs list asked that MXFS use different magic numbers,
-so that an MXFS image found in the wild is never mistaken for XFS.  Until
-now, past the MXFS envelope every structure carried XFS's own magics.  Only
+A reviewer on the linux-xfs list asked that MeshXFS use different magic numbers,
+so that an MeshXFS image found in the wild is never mistaken for XFS.  Until
+now, past the MeshXFS envelope every structure carried XFS's own magics.  Only
 the envelope's offset kept XFS tools away, and that was not enough:
 
 - `blkid -p` through a loop device at the region's offset reported
   `TYPE="xfs"`.
 - `xfs_repair -n` on the whole device ran its secondary-superblock scan and
-  found two candidate secondaries, MXFS's per-AG superblock copies.  A repair
+  found two candidate secondaries, MeshXFS's per-AG superblock copies.  A repair
   without `-n` that accepted one would write an XFS superblock over LBA 0,
   destroying the envelope and the lock table.
 - `xfs_repair` and a stock `xfs.ko` mount at the offset refused the volume
   only because of one incompat feature bit (0x40000000) that upstream XFS may
   assign at any time.
 
-Every XFS-derived on-disk magic is now MXFS's own, with an `MXFS_` name
+Every XFS-derived on-disk magic is now MeshXFS's own, with an `MXFS_` name
 (`MXFS_SB_MAGIC`, `MXFS_DINODE_MAGIC`, `MXFS_LOG_HEADER_MAGIC_NUM`, ...):
 
 | structure | was | now |
@@ -7525,7 +7563,7 @@ Every XFS-derived on-disk magic is now MXFS's own, with an `MXFS_` name
 
 The inode magic is `MN`, not `MI`, so that no 32-bit magic begins with the
 inode's two bytes (`MIAB`/`MIA3` do).  The log header magic stays in the
-high range, where it can never be a valid cycle number.  A mounted MXFS also
+high range, where it can never be a valid cycle number.  A mounted MeshXFS also
 reports `MXSB` as its VFS magic (`statfs` `f_type`), so `xfs_io`, `xfs_fsr`
 and `xfsdump` stop treating it as XFS.  The handle ioctls check the same
 value.
@@ -7534,7 +7572,7 @@ The userspace tools (`mkfs_mxfs`, `chk_mxfs`, `resize_mxfs`, `mxfs_admin`)
 and the dump and probe scripts carry the new values.  The kernel's byte-wise
 magic checks in the diagnostic probes now compare against the symbols.
 
-**Volumes formatted by an earlier MXFS do not mount on 0.90.0.**  Reformat
+**Volumes formatted by an earlier MeshXFS do not mount on 0.90.0.**  Reformat
 with `mkfs_mxfs`.
 
 Verified: `tests/mxfs_magic_isolation.sh` on a new volume, recognised 0/4.
@@ -7638,7 +7676,7 @@ clyde's boot of 2026-09-21: `/etc/scst.conf` names `/home/steve/disk-1.img`
 and `disk-2.img`, and neither file exists.  It is left as it is.  The QNAP
 LUN the TCP rig already uses implements COMPARE AND WRITE (`sg_vpd -p bl`:
 maximum compare and write length 1 block, 512-byte logical blocks; it rejects
-the FUA bit on READ(16), which MXFS already falls back from), and
+the FUA bit on READ(16), which MeshXFS already falls back from), and
 `run.sh` takes its device from `MXFS_DEV` for every condition, so
 `MXFS_DEV=/dev/disk/by-id/wwn-0x6e843b6393a5a6ed918bd4f4fdb8e7d6 ./run.sh 2 cawd`
 brings up two nodes on the CAW transport (`force_transport=0`), mounted and
@@ -7751,7 +7789,7 @@ srcversion for it on Debian too.
 
 ### MAP_SYNC was accepted on ordinary files (Proxmox VE 9 on 6.17)
 
-From 6.15 MXFS sets `FOP_MMAP_SYNC`, but below 6.19 its `->mmap` is the older
+From 6.15 MeshXFS sets `FOP_MMAP_SYNC`, but below 6.19 its `->mmap` is the older
 `xfs_file_mmap`, which had no DAX check, so `mmap(MAP_SHARED_VALIDATE |
 MAP_SYNC)` of an ordinary file succeeded.  `MAP_SYNC` promises that a write
 fault leaves the metadata needed to reach the data durable; an application
@@ -7838,7 +7876,7 @@ from `/proc/<pid>/task/*/children`.
 
 ### Platform priority
 
-`data/platforms.json`: Proxmox VE 9 first (MXFS is what lets it compete with
+`data/platforms.json`: Proxmox VE 9 first (MeshXFS is what lets it compete with
 VMware), then RHEL 9, Ubuntu 24.04, Debian 13.
 
 ## 2026-09-25 — 0.89.90 — the three giant DLM functions are split into phases; the default log carries operator events only
@@ -8069,7 +8107,7 @@ is 2048). Working through them found four real bugs:
   A 4 KB directory block holds at most 252 entries, so only filesystems with
   larger directory blocks could reach this.
 - **A zoned filesystem could mount on Proxmox kernels and corrupt memory.**
-  The zoned allocator is not built into MXFS; its entry point is a stub. The
+  The zoned allocator is not built into MeshXFS; its entry point is a stub. The
   mount refused zoned devices only on kernels without the iomap hooks
   (6.8, RHEL 9), so on 6.17 and 7.0 a zoned filesystem mounted, and the stub
   (declared `(void *, struct bio *)` while callers pass
@@ -8129,7 +8167,7 @@ the fix; it is in the defect queue.
   module (srcversion `D483B47F4740427DADB3906`) loaded with no transport option
   reports `force_transport=1`.
 - **`MODULE_AUTHOR` names Silicon Graphics, Inc. again**, as upstream XFS
-  does, with MXFS's author listed alongside. It had been replaced outright.
+  does, with MeshXFS's author listed alongside. It had been replaced outright.
 - **README:** the fork is described as what it is: XFS from the Linux 6.19
   development tree, heavily modified, with no exact upstream commit recorded
   (the old "6.19-rc0" was not a real tag, and "the entire `xfs/` tree is
@@ -8230,7 +8268,7 @@ create and remote delete, `chk_mxfs`, `peer=` with multicast dropped, O_DIRECT
 read with stable writes, reboot with the module auto-loaded and data intact.
 Proxmox also ran `peers=` and the storage plugin. RHEL 9.8 (on AlmaLinux 9.8)
 also ran with firewalld on and SELinux enforcing, a hung node declared dead at
-+60 s with the survivor writing at +71 s, and a libvirt sVirt guest on MXFS.
++60 s with the survivor writing at +71 s, and a libvirt sVirt guest on MeshXFS.
 Ubuntu also ran the full 2/tcp suite.
 
 ### A peer's GOODBYE during unmount wrote through a freed lease context
@@ -8251,7 +8289,7 @@ freelist pointer as its count.
   unmounting 0.89.84 (`RIP: memmove+0x24`, `Comm: mxfs-worker`, length
   `0x8359fd200`; `tests/evidence/packaged_round/ubuntu2404_0.89.84_20260924T094458`).
   The registers alone fit: a 64-byte stride is `struct mxfs_node_lease`, the
-  destination was page-aligned `nodes[1]`, and no other `memmove` in MXFS's
+  destination was page-aligned `nodes[1]`, and no other `memmove` in MeshXFS's
   own code has that element size (`struct v5_depart_req` is 48 bytes).
 - **Reproduced on demand** by `tests/concurrent_umount_lease.sh`, which holds
   the victim's teardown just past the lease stop with the new one-shot knob
@@ -8363,7 +8401,7 @@ run the release verification without editing them.
 This release is verified on exactly these kernels, each installed from these
 packages on two x86-64 nodes sharing an iSCSI LUN, in the released
 configuration (2 nodes, TCP transport). Any other kernel is untested, even on
-the same distribution — MXFS builds against each kernel's own API, and a RHEL
+the same distribution — MeshXFS builds against each kernel's own API, and a RHEL
 9 minor release or an Ubuntu HWE kernel is a different build.
 
 | platform | kernel verified | package |
@@ -8375,7 +8413,7 @@ the same distribution — MXFS builds against each kernel's own API, and a RHEL
 RHEL 9.8 was verified on AlmaLinux 9.8, which rebuilds Red Hat's 9.8 kernel:
 DKMS install, firewalld, mount with no options, cross-node checksums,
 create and remote delete, `chk_mxfs`, `peer=` with multicast dropped, reboot,
-SELinux enforcing including a libvirt sVirt guest on MXFS, and a hung node
+SELinux enforcing including a libvirt sVirt guest on MeshXFS, and a hung node
 declared dead and fenced while the survivor keeps writing
 (`tests/evidence/packaged_round/alma_0.89.84_*`,
 `tests/evidence/tcp_peer_freeze_death/20260924T070058`).
@@ -8427,7 +8465,7 @@ print the kernel APIs the probes found.
   `mnt_t`, new files inherit it, `chcon virt_image_t` sticks and the other
   node reads it from the platter, no AVC denials. A confined guest works:
   `tests/selinux_svirt_mxfs.sh` has libvirt start a KVM guest from an image on
-  MXFS — QEMU in `svirt_t:s0:c91,c378`, the image relabeled
+  MeshXFS — QEMU in `svirt_t:s0:c91,c378`, the image relabeled
   `svirt_image_t:s0:c91,c378` and restored on destroy, no AVC denials. A fresh
   filesystem's root is `unlabeled_t` until `restorecon`, exactly as a fresh XFS
   on the same host (`tests/evidence/selinux_svirt/`). Record:
@@ -8456,7 +8494,7 @@ print the kernel APIs the probes found.
   name and `kernels` now list exactly the kernels verified, and the README
   lists them in a table and says any other kernel is untested: Proxmox VE 9 on
   6.17.2-1-pve and 7.0.14-19-pve, Ubuntu 24.04 on its 6.8 GA kernel, RHEL /
-  AlmaLinux / Rocky 9.8 on 5.14.0-687.49.1.el9_8. MXFS probes each kernel's
+  AlmaLinux / Rocky 9.8 on 5.14.0-687.49.1.el9_8. MeshXFS probes each kernel's
   API at build time, so kernels that differ compile different code — every
   RHEL 9 minor reports 5.14 and carries different backports, and Ubuntu point
   releases install HWE kernels. `docs/platforms.md` holds the rule, and the
@@ -8478,7 +8516,7 @@ print the kernel APIs the probes found.
 
 - **The 2/tcp rig suite passes 30 of 30** on this build (srcversion
   `10A5B93816D92E3B84B6FFE`, `tests/evidence/suite_2tcp_0.89.84.log`).
-  crash_audit first failed at 241 s of its 300 s budget with every MXFS
+  crash_audit first failed at 241 s of its 300 s budget with every MeshXFS
   assertion of its death oracle passing — fence certified, replay complete 78 s
   after the kill, 200 of 200 acknowledged files verified — because the
   rebooted victim took 2 min 31 s to boot: its iSCSI node records still logged
@@ -8504,7 +8542,7 @@ print the kernel APIs the probes found.
 ### Tests
 
 - **`tests/packaged_round.sh` measured the harness on its first runs, not
-  MXFS**, four times, each fixed: it asserted a module version the module does
+  MeshXFS**, four times, each fixed: it asserted a module version the module does
   not declare (the loaded build is now identified by srcversion against the
   DKMS tree); it gave `peer=` a hostname, which the mount correctly refuses
   (addresses are resolved now); it left the QNAP login manual, so the LUN did
@@ -8520,11 +8558,11 @@ print the kernel APIs the probes found.
   verification: install, mount, checksums, create/delete, `chk_mxfs`, `peer=`,
   the stable-writes read, SELinux (alma), `pvesm` and `peers=` (pve), reboot.
 - `tests/rpm_post_dkms_failure.sh` — the RPM install with a failing DKMS build.
-- `tests/selinux_svirt_mxfs.sh` — a libvirt sVirt guest whose disk is on MXFS.
+- `tests/selinux_svirt_mxfs.sh` — a libvirt sVirt guest whose disk is on MeshXFS.
 
 ## 2026-09-24 — 0.89.82 — the module builds on RHEL 9; the platform roadmap is in the registry
 
-`data/platforms.json` now carries every platform MXFS intends to support, in
+`data/platforms.json` now carries every platform MeshXFS intends to support, in
 order:
 
 | priority | platform | status | kernel |
@@ -8552,7 +8590,7 @@ RHEL and build checks run on all three. SLES 15 (6.4 with SUSE's own
 backports) is left out. macOS will be a kernel extension: it needs Apple's
 kext-signing entitlement, notarization, and on Apple Silicon a one-time
 Reduced Security setting on every Mac, and macOS has no built-in iSCSI
-initiator, so MXFS either sits on a third-party initiator or ships one.
+initiator, so MeshXFS either sits on a third-party initiator or ships one.
 
 ### The module builds on RHEL 9 (AlmaLinux, Rocky)
 
@@ -8577,7 +8615,7 @@ at the first header.
   `super_set_sysfs_name_id`, `generic_atomic_write_valid`, the three-argument
   `generic_fill_statx_atomic_writes`, `iomap_last_written_block` and an
   exported `iomap_write_delalloc_release`, which RHEL now uses in place of
-  MXFS's own variant.
+  MeshXFS's own variant.
 - **What RHEL 9.8 keeps from before, and the port for each:**
   - `->update_time(inode, timespec64 *, int)`: a wrapper drops the time
     argument. The body sets the current time itself, which is how the VFS
@@ -8631,7 +8669,7 @@ at the first header.
 - **`priority`** orders the work within a status, and the listing sorts by it.
   `set` also takes `--priority`, `--kernels` and `--packages`.
 
-## 2026-09-24 — 0.89.81 — the vSphere failures were the guests' clock, not MXFS
+## 2026-09-24 — 0.89.81 — the vSphere failures were the guests' clock, not MeshXFS
 
 No module change. Three vSphere-only records (a lone mount that never renewed
 its lease, a survivor that declared its peer dead after 836 s and then
@@ -8644,7 +8682,7 @@ kernel jiffies clock.
   resuming at uptime ~630.7 s against the ~632 s the jump predicts. Both
   CPUs kept taking timer interrupts, userspace kept running, and uptime
   tracked clyde's clock. Every jiffies-timed sleep in the guest stalls through
-  that window, and every MXFS thread sat asleep with a flat wake count. MXFS
+  that window, and every MeshXFS thread sat asleep with a flat wake count. MeshXFS
   then did what it is built to do: a node whose heartbeat stops landing
   self-fences at lease expiry, and a node whose peer goes silent recovers it.
   In the same run the peer whose clock did not jump dropped the stalled node
@@ -8657,7 +8695,7 @@ kernel jiffies clock.
   long before the late death declaration.
 - **`tests/vsphere_lone_mount_stall.sh` records the guest's clock.** Each
   sampler tick now carries jiffies, each CPU's local-timer interrupt count
-  and each MXFS thread's last CPU and voluntary context switches. The verdict
+  and each MeshXFS thread's last CPU and voluntary context switches. The verdict
   reports the longest stretch over which jiffies or any CPU's count stood
   still.
 - **0.89.80 builds on 6.8.0-53.** The DKMS build installed and loaded on both
@@ -8670,7 +8708,7 @@ kernel jiffies clock.
   and a reboot after which the module auto-loaded and every checksum matched
   from both nodes (`tests/evidence/ubuntu2404_release_0.89.80`). Together
   with the rig's 2/tcp suite, that is what `platforms.py` now requires there.
-  A reboot of these guests takes about 3 minutes, and not because of MXFS:
+  A reboot of these guests takes about 3 minutes, and not because of MeshXFS:
   with the module unloaded, `lvm2-monitor`'s stop still ran 2 min 40 s,
   scanning the iSCSI LUN after its session had logged out.
 - **`tools/platforms.py set`** changes a platform's status, `build_check`,
@@ -8691,7 +8729,7 @@ kernel jiffies clock.
   D-FIRST-MOUNT-HEARTBEAT-LEASE-NEVER-RENEWED-SELF-FENCES-VSPHERE-6.8.0-53,
   D-SURVIVOR-TAKES-836S-TO-DECLARE-HUNG-PEER-DEAD-THEN-CANNOT-FENCE-MOUNT-EIO,
   D-JOIN-MOUNT-STUCK-UNKILLABLE-IN-SURVIVOR-SCAN-PAST-ITS-WINDOW (disproved as
-  MXFS defects), and
+  MeshXFS defects), and
   D-MODULE-DOES-NOT-BUILD-ON-UBUNTU-6.8.0-53-FALLOC-CONSTANTS-ABSENT (fixed in
   0.89.79; its verification had been recorded but the record never removed).
 
@@ -8819,7 +8857,7 @@ Proxmox VE, the product's target.
   Both are now 8 vCPUs on 8 physical cores of their own socket (`0-7,28-35`,
   `14-21,42-49`). vstest1/vstest2 at 4 vCPUs on those hosts soft-locked on
   every CPU; at 2 vCPUs vstest1 booted clean 5 of 5.
-- **The vSphere guest lockups are the nested platform, not MXFS.** With the
+- **The vSphere guest lockups are the nested platform, not MeshXFS.** With the
   mxfs module file moved out of the module tree (kernel "Not tainted"),
   vstest2 soft-locked anyway under NFS and raw-LUN load: CPU 0 stuck 48 s in
   `smp_call_function_many_cond` waiting on a TLB-flush IPI while CPU 1 ran
@@ -8857,7 +8895,7 @@ Record: D-PVE9-DKMS-BUILD-FAILS-ON-PROXMOX-KERNELS-6.17-AND-7.0-0.89.77.
   `ERR_PTR` return, which the old call could also produce and the code used as
   a dentry. `destroy_timer_on_stack()` became `timer_destroy_on_stack()`;
   `xfs_platform.h` maps the new name back for older kernels.
-- **7.0:** `i_state` is a struct behind accessors. Every MXFS read now goes
+- **7.0:** `i_state` is a struct behind accessors. Every MeshXFS read now goes
   through `mxfs_istate()` (`xfs_platform.h`), which returns the flags as an
   unsigned long on every kernel, so the `%lx` diagnostics print correctly
   instead of passing a struct through varargs (41 reads); the three writes use
@@ -9114,9 +9152,9 @@ generations says which is older. Two gates believed otherwise.
   ("Could not update APTPL" in the target's log), so the initiator saw an
   error, persistence stayed inactive (PTPL_C=1, PTPL_A=0,
   `tests/evidence/20260922T181531Z_aptpl_s160a`), and the key it never got an
-  acknowledgement for stayed in the table. MXFS's next mount on that node then
+  acknowledgement for stayed in the table. MeshXFS's next mount on that node then
   refused, correctly, on a registration on its own nexus it could not classify
-  (P305-PR-SELF-SUCCESSION-REFUSED, register failed -17). Not an MXFS defect;
+  (P305-PR-SELF-SUCCESSION-REFUSED, register failed -17). Not an MeshXFS defect;
   the target was under-provisioned. Verified after the fix: a REGISTER with
   APTPL from test1 read back PTPL_A=1 and the target wrote the file. `status`
   lists that directory instead of a hard-coded `/var/target/pr`.
@@ -9302,7 +9340,7 @@ generations says which is older. Two gates believed otherwise.
   sessions' return, PR state after — the survivor's key present, the fenced
   victim's key still absent, the reservation held, the generation recorded
   and never compared — then the replay completing and the victim's files
-  byte-identical; or, if the database did not persist, MXFS graded on
+  byte-identical; or, if the database did not persist, MeshXFS graded on
   failing closed (SELF_GONE, withdrawal, hold ended on the shutdown, no
   completion). The host-mode reconnect bound (300 s) is an assumption the
   first appliance reboot must replace.
@@ -9700,7 +9738,7 @@ four PASSes are measurements of the cooperative path only.
   that makes the peer suspect the node through a UDP drop before the
   closure.
 
-- **First run of the crash/replay arm tests/tmpfile_churn_kill.sh (sess402, 0.23.15 sv 0D0D43580C6DA3629EEBF17, 32/caw, 25 AGs, fossil injector iunl_fossil_inject=20 armed on every node, per-node O_TMPFILE create->write->linkat->unlink->close churn): test9 (disklock slot 13) and test23 (slot 2) virsh-destroyed at +5 s/+11 s into the churn. The survivor that took recovery (test1) logged 'MXFS: foreign replay of dead slot 13 (slice 13/32) offset=52027304 bblks=130432' then 'foreign replay of slot 13 failed: error -117', and the same for slot 2 (offset=50592552) 6 s later; zero 'foreign replay ... complete' lines; no shutdown, no in-memory corruption anywhere (sd=0 dc=0 on 30 survivors), P53=0 insf=0 am=ar=0. Consequences: test8's churn got 1008 x EIO on open(O_TMPFILE) in its PRIVATE dir (maxit 64.9 s, done=993/2000) — the only survivor that did not complete; after a clean 30-node unmount chk_mxfs reports AG 13: inobt total free=62 != AGI freecount=63 (the victim's affine AG, +1 = the D-399 signature left on the platter by a log slice that was never replayed / partially replayed) plus the SB lazy totals (#0133). Two committed log slices of dead nodes are therefore NOT recovered by the cluster: every transaction in them (iunlink inserts/removes, ifrees, AGI/inobt updates, dir adds) is lost to the filesystem while the survivors keep running on the un-replayed platter — a durability + consistency violation (crash recovery is the invariant crash_consistency rests on). Injector caveat stated, not excusing: iunl_fossil_inject plants prior-life fossils in di_next_unlinked (odd counts also logged in the buffer); the natural producer of the same state exists (P-IUNL-PRECOMMIT-INSERT-FOSSIL ~100/lap/node in sess398 laps), so a replay that cannot cope with a logged fossil is a production hazard either way. Evidence tests/evidence/sess402_v02315/kill1/ (churn.txt, sweep.txt, chk.txt, kills.txt) and kill1.log; test1 dmesg forensics in tests/evidence/sess402_v02315/kill1_forensics/.** — FIXED AND VERIFIED. The cause was proven by instrument on the 2-node TCP rig at 0.89.27 (laps s97/s98, tests/evidence/20260920T211703Z_authunwind_s98): P239-DINO-NOAUTH bli_flags=0x5a comm=unlink showed the sticky XFS_BLI_INODE_ALLOC_BUF flag excluding every inode-cluster image whose buffer had once served an allocation from the producer's authority classification, so the replayer's census read dino_none=2 dino_agsib=2, one classless image ATOMIC-SKIPped the committed transaction, and the slice was terminally refused (-117, P241-RECOV-TERMINAL, P240-QUAR-IMPORT) - the exact signature filed from sess402. The patch (0.89.28, pal/linux/xfs_buf_item.c mxfs_buf_iunlink_ag_authorized) targets that cause: the ALLOC_BUF term is dropped, STALE_INODE added beside STALE, the gate keyed on xfs_has_v3inodes() like the formatter it reasons about, with the replay-side mirror in xfs/xfs_log_recover.c (a class-AG DINODE token is malformed without XFS_BLF_INODE_BUF or with XFS_BLF_CANCEL). Verified under unchanged acceptance criteria on every producer of the state: the injector reproducer (s100/s101: census classless=0 dino_none=0, foreign replay complete, P163-RECOVERY-COMPLETE), a REAL VM kill at 0.89.41 (board row crash_audit PASS, all 263 fsync-acknowledged files back at their md5 after drop_caches, cold chk_mxfs clean with no inobt/AGI freecount disagreement - the record's own on-platter signature absent), and the two durable-write injection arms at 0.89.43 where the replay-side guards refuse a wild agino and a straddling cluster by name and a healthy slice still replays (s115d, s115e, s115f). The last open item, a crash-order matrix around the replay, is exercised by fence_crash_cuts cut 7 (replay-partial: a nonempty durable prefix, a nonempty unissued suffix, no completion durable, then a successor's full recovery, unmount/remount and cold check with churn oracles), PASS on s130-c7 and s133e7, and every remaining crash point of that matrix is enumerated and tracked by D-FENCE-CRASH-MATRIX-UNTESTED, which stays open; the whole fence lineage was re-banked on 0.89.65 today (s145, 6 of 6 PASS). Nothing about this record's defect - a dead peer's committed log slice lost to a terminal refusal - has reproduced on any build since 0.89.28.
+- **First run of the crash/replay arm tests/tmpfile_churn_kill.sh (sess402, 0.23.15 sv 0D0D43580C6DA3629EEBF17, 32/caw, 25 AGs, fossil injector iunl_fossil_inject=20 armed on every node, per-node O_TMPFILE create->write->linkat->unlink->close churn): test9 (disklock slot 13) and test23 (slot 2) virsh-destroyed at +5 s/+11 s into the churn. The survivor that took recovery (test1) logged 'MeshXFS: foreign replay of dead slot 13 (slice 13/32) offset=52027304 bblks=130432' then 'foreign replay of slot 13 failed: error -117', and the same for slot 2 (offset=50592552) 6 s later; zero 'foreign replay ... complete' lines; no shutdown, no in-memory corruption anywhere (sd=0 dc=0 on 30 survivors), P53=0 insf=0 am=ar=0. Consequences: test8's churn got 1008 x EIO on open(O_TMPFILE) in its PRIVATE dir (maxit 64.9 s, done=993/2000) — the only survivor that did not complete; after a clean 30-node unmount chk_mxfs reports AG 13: inobt total free=62 != AGI freecount=63 (the victim's affine AG, +1 = the D-399 signature left on the platter by a log slice that was never replayed / partially replayed) plus the SB lazy totals (#0133). Two committed log slices of dead nodes are therefore NOT recovered by the cluster: every transaction in them (iunlink inserts/removes, ifrees, AGI/inobt updates, dir adds) is lost to the filesystem while the survivors keep running on the un-replayed platter — a durability + consistency violation (crash recovery is the invariant crash_consistency rests on). Injector caveat stated, not excusing: iunl_fossil_inject plants prior-life fossils in di_next_unlinked (odd counts also logged in the buffer); the natural producer of the same state exists (P-IUNL-PRECOMMIT-INSERT-FOSSIL ~100/lap/node in sess398 laps), so a replay that cannot cope with a logged fossil is a production hazard either way. Evidence tests/evidence/sess402_v02315/kill1/ (churn.txt, sweep.txt, chk.txt, kills.txt) and kill1.log; test1 dmesg forensics in tests/evidence/sess402_v02315/kill1_forensics/.** — FIXED AND VERIFIED. The cause was proven by instrument on the 2-node TCP rig at 0.89.27 (laps s97/s98, tests/evidence/20260920T211703Z_authunwind_s98): P239-DINO-NOAUTH bli_flags=0x5a comm=unlink showed the sticky XFS_BLI_INODE_ALLOC_BUF flag excluding every inode-cluster image whose buffer had once served an allocation from the producer's authority classification, so the replayer's census read dino_none=2 dino_agsib=2, one classless image ATOMIC-SKIPped the committed transaction, and the slice was terminally refused (-117, P241-RECOV-TERMINAL, P240-QUAR-IMPORT) - the exact signature filed from sess402. The patch (0.89.28, pal/linux/xfs_buf_item.c mxfs_buf_iunlink_ag_authorized) targets that cause: the ALLOC_BUF term is dropped, STALE_INODE added beside STALE, the gate keyed on xfs_has_v3inodes() like the formatter it reasons about, with the replay-side mirror in xfs/xfs_log_recover.c (a class-AG DINODE token is malformed without XFS_BLF_INODE_BUF or with XFS_BLF_CANCEL). Verified under unchanged acceptance criteria on every producer of the state: the injector reproducer (s100/s101: census classless=0 dino_none=0, foreign replay complete, P163-RECOVERY-COMPLETE), a REAL VM kill at 0.89.41 (board row crash_audit PASS, all 263 fsync-acknowledged files back at their md5 after drop_caches, cold chk_mxfs clean with no inobt/AGI freecount disagreement - the record's own on-platter signature absent), and the two durable-write injection arms at 0.89.43 where the replay-side guards refuse a wild agino and a straddling cluster by name and a healthy slice still replays (s115d, s115e, s115f). The last open item, a crash-order matrix around the replay, is exercised by fence_crash_cuts cut 7 (replay-partial: a nonempty durable prefix, a nonempty unissued suffix, no completion durable, then a successor's full recovery, unmount/remount and cold check with churn oracles), PASS on s130-c7 and s133e7, and every remaining crash point of that matrix is enumerated and tracked by D-FENCE-CRASH-MATRIX-UNTESTED, which stays open; the whole fence lineage was re-banked on 0.89.65 today (s145, 6 of 6 PASS). Nothing about this record's defect - a dead peer's committed log slice lost to a terminal refusal - has reproduced on any build since 0.89.28.
 
 - **The authority lease is a node-wide admission condition, and nothing checks that an admitted mutation still owns the RESOURCE it is about to change - so an unexpired lease says yes to a write whose AG grant this node has already published as free, or whose WITHDRAWN record it has already published to its peers.** — DISPROVED by measurement on the 2-node TCP rig: an admitted mutation cannot outlive this node's publication of its AG grants, because put_super cannot reach the publication while one is in flight, for every class the gate names that is reachable on this rig. The lap is tests/admitted_write_parked_across_unmount.sh, which holds ONE admitted submission between the gate's yes and the layer below it (dbg_admit_park, 120 s) and reports which of three orderings it got, by the module's own line stamps. data (buffered writeback's ioend, no descriptor held) s138c, 0.89.59+, tests/evidence/20260921T223659Z_admumnt_s138c: ORDER=barrier - ADMIT-PARK-END at 1283172 ms, P482-UMOUNT-AGREL 39 ms after it; put_super waited 94 s on the parked ioend before publishing; platter R1=R2=R3, a fresh mount decides the same way, cold check clean. log without a descriptor (the create committed and closed, the unmount's own log force parked) s146g, 0.89.66 A46A495ED258EA96F46EDDD, tests/evidence/20260922T042354Z_admumnt_s146g: ORDER=barrier - ADMIT-PARK-END 2249815 ms, AGREL 2249859 ms, 44 ms after; put_super waited 78 s on the parked iclog; the peer then allocated 2000 files, cold check clean, no BUG/Oops/shutdown. dio s130d (20260921T103504Z_admumnt_s130d) and log with fsync s140e (20260922T010626Z_admumnt_s140e): ORDER=vfs-busy - the unmount is refused (rc=32) while the write's descriptor is open, so put_super is never entered; a user direct write or fsync in flight always holds its file, which makes this a structural barrier, and the record's own concern was the descriptor-free classes. meta: the only class inside the departure drain's own account, asserted quiescent at the release point and counted by P483-AGFREE-WINDOW, which has always read zero. dio-zoned: unreachable, no zoned device on this rig. The WITHDRAWN half is bounded by the fence rather than the lease and is measured in D-OLD-EPOCH-IO-BELOW-THE-AUTHORITY-GATE-IS-UNBOUNDED schedule (A): every class parked across a fence and released was refused by the target (dio s130a EBADE, data s138d EBADE, log s138k EIO) with the platter unchanged at R2 and after a later remount at R3. Step 3's first option - after grant publication the only remaining producers are permitted journal-retirement and coordination producers - is established by measurement for the clean-unmount half and by the target's exclusion for the withdrawal half; the capability-on-the-operation alternative is not needed because no barrier is missing.
 
@@ -9807,7 +9845,7 @@ negative control.
 
 - **On kernels before 7.0 the lazytime branch of xfs_vn_update_time calls inode_update_time(inode, flags), which on those kernels is the VFS dispatcher that calls inode->i_op->update_time — i.e. xfs_vn_update_time itself. The first timestamp update on a lazytime mount recurses until the kernel stack guard page is hit and the node panics. The 7.0+ helper of that name returns the I_DIRTY_* flags; the fork carried the 7.x call under the pre-7.0 signature.** — FIXED AND VERIFIED. Cause proven from the panic itself (test1 serial capture, s140a: 169 alternating frames of xfs_vn_update_time and inode_update_time under a 4 KiB dd, stack guard page hit, fatal exception) and from both kernels' sources: below 7.0 inode_update_time(inode, flags) is the VFS dispatcher that calls ->update_time, so the fork's lazytime branch, written against the 7.x helper of the same name, called itself. Fix (0.89.63, pal/linux/xfs_iops.c): under the pre-7.0 signature the branch takes upstream 6.8's shape — generic_update_time() unless the caller's queried version must be bumped, in which case the inode is logged with XFS_ILOG_CORE. Verified live: tests/lazytime_timestamp_durability.sh s141a on build 06AC7CB42624D7E279F66AF, kernel 6.8.0-101-generic, 2/tcp (tests/evidence/20260922T012118Z_lazyts_s141a, console tests/evidence/lapq_s141_1.console): the subject arm's in-place overwrite plus fsync on the lazytime mount returned rc=0 in under a second (was: never returned, node panicked), the in-core mtime advanced 1790040149 -> 1790040152, no BUG or Oops, RESULT PASS fails=0.
 - **After the live-prover armambig injection - the arm CAS lands and is reported to the prover as having FAILED - the prover's own mount stopped answering a bare mountpoint check, and eight minutes later the node still could not release mxfs. The fence never certified, and the node that was doing the fencing is the one that hung.** — FIXED AND VERIFIED. Cause, read in the tree and confirmed by the fix's own lap: after the ambiguous arm scsipr returns before issuing (P304-FENCE-NOARM), the attempt is classified PRECOMMAND and the retry latch is armed; the worker's mxfs_disklock_recovery_fence_retryable() then read the durable MAY_HAVE_RUN flag off the descriptor and answered 0 ('ambiguous - needs reconciliation, not retry'), the worker disarmed, and because the PRECOMMAND classification never set the in-memory blocked record the proof resume never revisited the slot either - FENCING with may_have_run on the platter, no latch, no fail-fast block, the victim's grants frozen, and every path operation on the prover that needed one blocked (s133c3: 20 s stat bound, module unreleasable 8 min later; s138m: stat unanswered in 5 s, after settle kind=NONE fence_term=1). The durable arm is written before the command so a crash reads conservatively; it cannot say whether a command was issued under it, but the incarnation that wrote it can. Fix (0.89.63): struct mxfs_v5_dlm keeps, per slot, the (victim, incarnation, term) under which an attempt of this incarnation returned with phase MAY_HAVE_SUBMITTED, set where every fence leg converges in v5_pr_fence_prove_locked; retryable() returns 2 for 'ours and armed' (dlm/disklock.c) and the worker re-drives when that witness does not match (P304-FENCE-RETRY-ARMLANDED; the idempotent arm step now logs P304-FENCE-ARM-STANDING) and disarms when it does; the same witness under the single-prover guard refuses a second command under an unresolved arm (P238-FENCE-BOUNDARY-HELD). Verified: tests/fence_live_prover_faults.sh mode 3 s141c, build 06AC7CB42624D7E279F66AF, 2/tcp, tests/evidence/20260922T012402Z_flpf3_s141c, console tests/evidence/lapq_s141_3.console - the arm landed before the prover was told it failed, the injected attempt recorded command_may_have_run=no and certified nothing, the retry recognised the standing arm as its own (P304-FENCE-RETRY-ARMLANDED 1), the completing command met its own boundary first (P304-FENCE-ARM-STANDING at +15, PREEMPT AND ABORT at +17), the certificate followed the command (+19) on a real receipt (PREEMPT_ABORT_PROVEN_V1, pr_gen 0x1a44 -> 0x1a45, victim key consumed), a stat on the prover's mount was SERVED (was blocked past 5 s and 20 s), no shutdown, BUG or Oops across the settle window; RESULT PASS fails=0. The harness's mode-3 assertions, which had encoded the hang as the expected outcome, now require the re-drive, a certificate that follows a completed command, and a served path operation.
-- **Buffered writes never revalidate their cached extent mapping on this kernel. xfs_iomap_valid() is written, correct, and referenced by nothing the 6.8 build compiles, so the compiler drops it; the validity_cookie it would check is stamped on every mapping and read by nobody.** — FIXED AND VERIFIED. Cause (proven by the compiler, tools/warn_sweep.sh on 0.89.60: 'xfs_iomap_valid defined but not used'): the hook was installed only in the 6.15+ iomap_write_ops, which the pre-6.15 call macro expands away, so on 6.8 nothing referenced it and it was not in the module. Fix (0.89.60, pal/linux/xfs_iomap.c): below 6.15 a static iomap_folio_ops holding .iomap_valid is assigned to iomap->folio_ops beside the validity_cookie in xfs_bmbt_to_iomap, which is the hook this kernel's iomap consults. Verified in the three steps the record demanded. (a) The compiler: the post-fix sweep no longer reports the function unused, and P312-IOMAP-REVALIDATED / P312-IOMAP-STALE are strings in mxfs.ko (tools/probe_audit.sh --gate, build 06AC7CB42624D7E279F66AF). (b) The hook is CALLED: tests/iomap_revalidation_hook_reached.sh arm 1, s138a (DDAEDE2AE6EF6DA6E290F29) and s141b (06AC7CB42624D7E279F66AF), kernel 6.8.0-101-generic, 2/tcp: P312-IOMAP-REVALIDATED fired on an ordinary 64 MiB buffered write. (c) The case the hook exists for: arm 2 (s141b, tests/evidence/20260922T012241Z_iomapreval_s141b, console tests/evidence/lapq_s141_2.console) ran one 256 MiB write() with a second thread fsyncing the same file continuously (4 fsyncs raced it), the schedule having first been proven to make a cached mapping stale on native 6.8 XFS (tests/iomap_stale_loop_control.sh s140x: xfs_iomap_invalid fired 12 times): MXFS's hook refused 3 stale mappings (P312-IOMAP-STALE ino=132 at pos 0, 37617664 and 56623104, cookie 0x1->0x2, 0x5->0x7, 0x9->0xb), the write completed rc=0, and after unmount and remount every one of the 65536 pages read back cold with its own stamp (CHECKED=65536 BAD=0). No BUG or Oops. RESULT PASS fails=0 on both arms.
+- **Buffered writes never revalidate their cached extent mapping on this kernel. xfs_iomap_valid() is written, correct, and referenced by nothing the 6.8 build compiles, so the compiler drops it; the validity_cookie it would check is stamped on every mapping and read by nobody.** — FIXED AND VERIFIED. Cause (proven by the compiler, tools/warn_sweep.sh on 0.89.60: 'xfs_iomap_valid defined but not used'): the hook was installed only in the 6.15+ iomap_write_ops, which the pre-6.15 call macro expands away, so on 6.8 nothing referenced it and it was not in the module. Fix (0.89.60, pal/linux/xfs_iomap.c): below 6.15 a static iomap_folio_ops holding .iomap_valid is assigned to iomap->folio_ops beside the validity_cookie in xfs_bmbt_to_iomap, which is the hook this kernel's iomap consults. Verified in the three steps the record demanded. (a) The compiler: the post-fix sweep no longer reports the function unused, and P312-IOMAP-REVALIDATED / P312-IOMAP-STALE are strings in mxfs.ko (tools/probe_audit.sh --gate, build 06AC7CB42624D7E279F66AF). (b) The hook is CALLED: tests/iomap_revalidation_hook_reached.sh arm 1, s138a (DDAEDE2AE6EF6DA6E290F29) and s141b (06AC7CB42624D7E279F66AF), kernel 6.8.0-101-generic, 2/tcp: P312-IOMAP-REVALIDATED fired on an ordinary 64 MiB buffered write. (c) The case the hook exists for: arm 2 (s141b, tests/evidence/20260922T012241Z_iomapreval_s141b, console tests/evidence/lapq_s141_2.console) ran one 256 MiB write() with a second thread fsyncing the same file continuously (4 fsyncs raced it), the schedule having first been proven to make a cached mapping stale on native 6.8 XFS (tests/iomap_stale_loop_control.sh s140x: xfs_iomap_invalid fired 12 times): MeshXFS's hook refused 3 stale mappings (P312-IOMAP-STALE ino=132 at pos 0, 37617664 and 56623104, cookie 0x1->0x2, 0x5->0x7, 0x9->0xb), the write completed rc=0, and after unmount and remount every one of the 65536 pages read back cold with its own stamp (CHECKED=65536 BAD=0). No BUG or Oops. RESULT PASS fails=0 on both arms.
 - **On a lazytime mount xfs_vn_update_time defers the timestamp by setting I_DIRTY_TIME and returning 0. The hook that is supposed to persist it later does not exist on this build: the fork carries the 6.19+ replacement (inode_operations.sync_lazytime), version-gated out, and dropped the hook this kernel actually has (super_operations.dirty_inode) with it.** — FIXED AND VERIFIED. Two faults, both read in the source and both fixed in 0.89.63: (1) the completion hook this kernel has, super_operations->dirty_inode, was installed in 0.89.60 but with the pre-5.12 guard 'flags != I_DIRTY_SYNC || !(i_state & I_DIRTY_TIME)', which is false on every call since 5.12 because __mark_inode_dirty clears I_DIRTY_TIME from i_state and passes it in flags (fs/fs-writeback.c, unchanged on 6.8) — the guard is now 'flags != (I_DIRTY_SYNC | I_DIRTY_TIME)'; (2) the deferral branch itself recursed and panicked the node before the completion could be measured (the record above, fixed in the same version). Verified live by the lap this record specified, tests/lazytime_timestamp_durability.sh s141a, build 06AC7CB42624D7E279F66AF, kernel 6.8.0-101-generic, 2/tcp (tests/evidence/20260922T012118Z_lazyts_s141a, console tests/evidence/lapq_s141_1.console): control arm (no lazytime) base=1790040137 incore=1790040139 after_remount=1790040139; subject arm (lazytime, confirmed in /proc/mounts) base=1790040149 incore=1790040152 after_remount=1790040152 — the acknowledged timestamp survived the unmount and remount on the lazytime mount, which before the fix it could not (the write is an in-place overwrite of allocated blocks so nothing else carries the inode core to the platter). RESULT PASS fails=0.
 
 ---
@@ -9886,19 +9924,19 @@ even page and only the odd pages the manifest marks, and reports the rest as
 `UNTOUCHED`. It also grew an optional live checker (`check`) that `pread`s the
 manifest's pages during the pass and marks the kernel trace the instant one
 reads back wrong. With the manifest, native XFS passes 3/3 (s139h1-3;
-`UNTOUCHED` 7, 0, 3 — the old oracle's "lost" pages) and the 2-node MXFS lap
+`UNTOUCHED` 7, 0, 3 — the old oracle's "lost" pages) and the 2-node MeshXFS lap
 passes twice (s139j, s139k: P313-DELALLOC-KEEP ×60, 2001 and 2002 toucher pages
 verified on the platter, 0 lost).
 
 - **On kernels below 6.12 the compat macro for iomap_write_delalloc_release() punches the ENTIRE unwritten range of a short buffered write in one blind call, with no page-cache scan. Upstream's function exists precisely to skip the sub-ranges that still hold dirty folios; the shim keeps none of that.** — FIXED AND VERIFIED. Cause: the pre-0.89.60 compat macro for iomap_write_delalloc_release punched the whole tail blind; 0.89.60 replaced it with upstream's page-cache scan (xfs/xfs_platform.h) and the P313-DELALLOC-KEEP probe at the keep decision. Verified live on the 2-node TCP rig, 0.89.60 module DDAEDE2AE6EF6DA6E290F29, tests/delalloc_dirty_tail_durability.sh s139j and s139k (tests/evidence/20260922T002956Z_ddtr_s139j, 20260922T003239Z_ddtr_s139k): the scan took the KEEP decision 60 times per run under the deterministic short-write/mmap race, and after unmount+remount 2001 and 2002 mmap-dirtied pages plus every write()-page read back correct, 0 lost. The s138b2 FAIL that preceded this was the reproducer's oracle: it assumed the toucher stores every odd page in the closing pass; the toucher lags the writer at the pass restart and the pages below where it catches up are holes, not lost data. Native 6.8 XFS reproduced the identical false verdict (s139a,b,d-g), kprobes on the folio's per-block state showed every block dirty, submitted and written, and the reproducer's own trace marker showed its first closing-pass store at page 4039. The reproducer now writes a manifest of stored pages and tests/ddtr_verify.py checks against it; with it native XFS passes 3/3 (s139h1-3).
 
 **Two things learned about the rig on the way, recorded so they are not
-re-learned.** A loop device cannot host a single-node MXFS mount on 0.89.60
+re-learned.** A loop device cannot host a single-node MeshXFS mount on 0.89.60
 even on the TCP transport: admission needs `fence_capability_override=1` AND
 `single_node_exclusive=1` together, and then the page-authority ledger writes
 its records with COMPARE AND WRITE, which a loop device does not have
 (`P304-CAS-NOCAW`, rc=-95); the first inode lock fails and the mount shuts
-itself down. The MXFS side of a single-node question is answered on the real
+itself down. The MeshXFS side of a single-node question is answered on the real
 LUN. And on 6.8 `DELAYSTARTBLOCK` is -1 and `HOLESTARTBLOCK` is -2 in the
 `xfs_iomap_found` tracepoint's `startblock` field, not the other way round.
 
@@ -9995,7 +10033,7 @@ was stamped on every mapping `xfs_bmbt_to_iomap()` returned and read by nobody.
 
 Upstream added that check mid-cycle because a cached iomap goes stale under a
 long-running buffered write when writeback converts the delalloc extent beneath
-it. MXFS widens that window rather than narrowing it: a peer node's activity
+it. MeshXFS widens that window rather than narrowing it: a peer node's activity
 changes this inode's extent map too.
 
 `xfs_bmbt_to_iomap()` now sets `iomap->folio_ops` beside the cookie, so both
@@ -10756,7 +10794,7 @@ it did not have before; it is not the same arm at a longer bound.
 **A surviving iSCSI session does not make `iscsiadm -m node --login` a no-op.**
 The storage arm assumed it did, in those words. It does not: with the session
 already restored (`SESSIONS_BEFORE=1`) the login never returned, and the arm
-died at rc=124 with every MXFS verdict before it already PASSed — the fence,
+died at rc=124 with every MeshXFS verdict before it already PASSed — the fence,
 the certificate, the unchanged reservation, the completed slice replay. The
 login is now attempted only when the LUN does not already answer, every
 `iscsiadm` and `dd` runs under its own node-local bound, and which of the two
@@ -10959,7 +10997,7 @@ bounds each harness derives in its own header. None of them has run yet.
 all.** The whole-cluster bootstrap is the only route to a mount after a total
 outage, and it refused: `P-BOOT-KEY-UNCLASSIFIED 1 victim record(s) carry no
 identity block — a victim without a key cannot be fenced; bootstrap refused`,
-then `P-BOOT-MOUNT-REFUSED rc=-1` and `MXFS DLM init failed — aborting mount of
+then `P-BOOT-MOUNT-REFUSED rc=-1` and `MeshXFS DLM init failed — aborting mount of
 cluster (envelope) volume`. `MOUNT_RC=32` after 64.6 s on every attempt, both
 dead nodes' slices unreplayed on the platter, and the 64 files the victim had
 fsynced before its death coming back different.
@@ -11430,7 +11468,7 @@ Nothing crashed, hung or corrupted; the filesystem is simply unmountable, with
 acknowledged data unreachable, and each node is the other's reason it cannot
 certify.
 
-**The cause, which the lap proves by what it does NOT contain.**  MXFS has a
+**The cause, which the lap proves by what it does NOT contain.**  MeshXFS has a
 whole-cluster bootstrap built for exactly this shape — survivor scan, term claim,
 sealed victim manifest, fence and certify every victim, adopt one slot as its own
 log, replay the rest, publish RECOVERY_COMPLETE, admit the others only then — and
@@ -11720,7 +11758,7 @@ a beat only the thread blocked in it could issue.
 
 Measured on the 2/tcp rig (crash_audit, run 20260921T000602Z): the reset was
 issued at 11319.139 and WITNESSED at 11319.196 with the command path answering
-22 ms later, and then not one beat landed for 30.2 s.  MXFS's own stall
+22 ms later, and then not one beat landed for 30.2 s.  MeshXFS's own stall
 detector caught it — `P278-HB-STALL stage=MONITOR hb_pid=9566` with the
 heartbeat task's stack inside `mxfs_v5_dlm_lu_reset_barrier`, and
 `P-HB-MONSLOW monitor_ms=30487`.  The lease expired at exactly its 30 s
@@ -11977,7 +12015,7 @@ LUN.
 
 ## 2026-09-20 — 0.89.30 — the module can now ask the target to retire a dead node's work, and check the answer
 
-MXFS has had no way to issue a task-management function, so once the target
+MeshXFS has had no way to issue a task-management function, so once the target
 purged a dead node's registration there was no operation left that retired the
 work it had already accepted — and since the deployment clause was withdrawn,
 no certificate could be minted without one. On the shipping LUN that is every
@@ -13294,7 +13332,7 @@ bound and never a timeout kill, and the prover's slot reaches
 with `P304-FENCE-BLOCKED-DURABLE` on the platter, after which path operations
 needing the dead node's grants fail fast with EIO instead of waiting — that the
 surviving node stays mounted and keeps serving its own domain, that no BUG,
-Oops or filesystem shutdown appeared on either node, and that MXFS issued no
+Oops or filesystem shutdown appeared on either node, and that MeshXFS issued no
 LOGICAL UNIT RESET (it has no path to one, and a bystander initiator is
 destroyed by one: measured in `tests/lu_reset_probe.sh` as D state in
 `blk_io_schedule` with no error, no timeout and no retry).
@@ -13428,7 +13466,7 @@ it supersedes the previous one where they differ.
   that **this** registration disappeared **because the nexus was lost**. No
   initiator can establish that: the target does not report why a registration
   left its table. So the same clause was authorising replay after any absence,
-  including one that MXFS itself caused by replacing the key — the exact case
+  including one that MeshXFS itself caused by replacing the key — the exact case
   the previous version refuses outright under its own kind. The clause is now
   written about the thing that can be observed
   (`unreplaced-registration-absence-retires-before-purge`), the prover
@@ -13440,7 +13478,7 @@ it supersedes the previous one where they differ.
   `unknown`, which every clause refuses rather than treating as the covered
   one. None of them is a retirement claim on its own. In particular a boot
   boundary is not a target-side ordering witness: an iSCSI connection, an iSCSI
-  session, a SCSI I_T nexus and an MXFS boot identity are four identifiers with
+  session, a SCSI I_T nexus and an MeshXFS boot identity are four identifiers with
   four different lifetimes, and an initiator instance outside the restarted
   component can outlive all of them. The certificate's log line now names the
   basis, the claim and the observation, so what a certificate stood on is one
@@ -13471,7 +13509,7 @@ it supersedes the previous one where they differ.
   established — the refusal names the clause and says why it can never apply.
   `data/rigs.json` re-asserts the rig's qualification under the new wording,
   with what the four probe laps actually measured (power cuts: nexus losses
-  with no MXFS replacement) and what the clause additionally requires (no agent
+  with no MeshXFS replacement) and what the clause additionally requires (no agent
   outside the cluster issuing persistent-reservation commands against this
   LUN), stated rather than assumed.
 
@@ -13773,7 +13811,7 @@ measurement, two design rulings, and the harness corrections they forced.
   proof became available, nothing looked. Measured before the fix: the victim's
   slice was never replayed, and **the returning victim could not mount its own
   filesystem** — 32 inline replay rounds, `P236-CLAIM-UNCERTIFIED … fencing
-  ATTEMPT only`, then `MXFS mount ABORTED … after 30038 ms`, `MOUNT_RC=32`.
+  ATTEMPT only`, then `MeshXFS mount ABORTED … after 30038 ms`, `MOUNT_RC=32`.
   The fix revisits the slot when the attempt's holder is proven to be this
   node's own current incarnation, issuing **no state-changing command**: the
   sole-survivor gate is unreachable from it, and it asks only the questions
@@ -13898,7 +13936,7 @@ capture-gate work below carries no kernel change and was measured on
 9DEAC25CCBE89317A188124.
 
 - **The capture-contract instrument is closed on the release configuration.** A
-  harness could print FAIL, VACUOUS or PASS about MXFS from a capture nothing
+  harness could print FAIL, VACUOUS or PASS about MeshXFS from a capture nothing
   wrote (the shared ssh helper discarded the remote command's stderr, so a
   failed measurement and a clean system produced the same count), and a second
   producer of the same signature could acquire a well-formed measurement from a
@@ -13992,7 +14030,7 @@ capture-gate work below carries no kernel change and was measured on
   the reporting block instead would have returned the right value while omitting
   a log line the real path emits — an observable difference between the injected
   state and the state being modelled. The real result is printed as a witness for
-  the test alone; no MXFS path reads it and it is never delivered later.
+  the test alone; no MeshXFS path reads it and it is never delivered later.
   tests/fence_lost_response.sh implements the ruling's two-part verdict, because
   "a certificate or a named block" would pass an implementation that always
   blocks.
@@ -14278,14 +14316,14 @@ E1FD3D436BFACCF0C4F9C68, the first build carrying the fence crash-cut knob).
   The setup scripts that CREATE a fileio target from an image
   (scripts/scst_setup.sh, scripts/lio_tcm_setup.sh) and the host headroom
   check in scripts/clyde_preflight.sh keep their image path: they define or
-  size the host's storage, they do not measure MXFS through it.
+  size the host's storage, they do not measure MeshXFS through it.
 - tests/d0356_stranded_prover_return.sh, d0932_fence_takeover_probe.sh,
   d0932_owner_depart_takeover.sh, d0932_platter_fallback.sh,
   d0932_retire_pending_takeover.sh, sole_survivor_gate_probe.sh (ledger
   D-A-TEST-HARNESS-CAN-REPORT-A-VERDICT-ABOUT-MXFS; harness lint HL003):
   each waited for its kernel marker with `rs ... | grep -c X | grep -qv
   '^0$'`, a textual predicate that reads an ssh that never ran as "the line
-  never appeared" and then prints a FAIL or VACUOUS about MXFS. Each now
+  never appeared" and then prints a FAIL or VACUOUS about MeshXFS. Each now
   echoes a kernel marker on the node before the trigger and waits through
   wait_for_into, whose every poll is a status-checked window; only a valid
   window that lacks the line yields the timeout. Same bounds as before
@@ -15126,7 +15164,7 @@ every volume is re-formatted (prep does it) and a gen-19 node cannot join.
   the rest of its reservation belongs to the directory entry and parent
   pointer it still has to write, which the allocator cannot see, and
   `xfs_trans_roll` carries only the remainder forward.  Upstream never
-  carves twice because after a carve the pick cannot fail; MXFS's
+  carves twice because after a carve the pick cannot fail; MeshXFS's
   candidate refusals can make it fail, and the swept retry then carved
   again on every re-sweep with the same transaction.  Proven by
   instrument on the two-node TCP rig (s60a, 0.87.22): one create carved 24
@@ -15303,7 +15341,7 @@ prep happened to select would certify the wrong disk after formatting it.
   which is also the fixture for the wrong-instrument rejection case.
 - tests/setup/dev_identity.sh runs on the node and prints the device's
   resolved path, major:minor, WWID (sysfs, or the multipath map's dm uuid,
-  or the parent disk's for a partition), the MXFS envelope superblock's
+  or the parent disk's for a partition), the MeshXFS envelope superblock's
   filesystem uuid by a direct read of sector 0, where it is mounted, and the
   node's live mxfs mount.  tests/lib/rig.sh ships it inline over ssh so a
   node without the share still answers.
@@ -15376,7 +15414,7 @@ assertions.  Most moved mechanically; the shapes that needed a decision:
 - A POLLING wait that ended in a verdict (`t=$(waitfor node PAT 60)`, 24
   sites in four harnesses) could not tell a line the kernel never logged
   from an ssh that never ran — every failed poll read as a count of zero
-  and the harness printed a FAIL about MXFS.  `wait_for_into` (tests/lib/
+  and the harness printed a FAIL about MeshXFS.  `wait_for_into` (tests/lib/
   rig.sh) polls the same way, then makes the FINAL window cross the boundary
   (status, WINDOW_END, the mark present) before it may say `timeout`.
 - A command that IS the workload — the read of the file under test, its
@@ -15597,7 +15635,7 @@ contract tests of the library against a real node with real commands
   before recovery and ALLOCATED after; the lone-mount crash harness passed
   its same-node and peer arms under the boundary earlier this session (s54o,
   s54p, s54t).  The boundary also caught a real instrument failure the old
-  verdicts would have reported as a FAIL about MXFS: the variant arm's
+  verdicts would have reported as a FAIL about MeshXFS: the variant arm's
   planted-image write from test2 was refused by the target (EBADE, the SCSI
   reservation conflict: test2 is unmounted and unregistered while the dead
   incarnation's write-exclusive reservation stands), and the lap ABORTed
@@ -16648,7 +16686,7 @@ zero.  Evidence: `tests/evidence/20260918T035403Z_dwcd_fin_ext1`,
 ## 2026-09-18 — 0.87.3 — a buffered read that had to load a file's extent map asked the cluster for EX under its own shared lock and hung both nodes
 
 `xfs_ilock_for_iomap` open-coded the upstream extent-load rule — take
-`ILOCK_EXCL` when the extents are not yet read — without the MXFS tag that asks
+`ILOCK_EXCL` when the extents are not yet read — without the MeshXFS tag that asks
 the cluster for PR instead, and without the re-check after the acquire that the
 shared data-map helper carries.  On a clustered mount `ILOCK_EXCL` is a cluster
 EX, and every caller that starts at a shared mapping already holds its IOLOCK
@@ -16751,7 +16789,7 @@ then sees zero under a live holder.  Every internal site of this shape was
 paired earlier.  Two more were not, and both are reachable from userspace.
 
 `xfs_ilock_for_iomap` takes the ILOCK nowait under `IOMAP_NOWAIT`, and all
-five of its callers release it with `xfs_iunlock`.  MXFS never sets
+five of its callers release it with `xfs_iunlock`.  MeshXFS never sets
 `FMODE_NOWAIT`, so `RWF_NOWAIT` is refused at the syscall, but io_uring treats
 any file opened `O_NONBLOCK` as nowait-capable and issues its first attempt of
 a read or write with `IOCB_NOWAIT`, which iomap turns into `IOMAP_NOWAIT`.  The
@@ -16767,7 +16805,7 @@ mapping of the request has submitted nothing, and io_uring reissues from a
 worker through the blocking, counted arm.  A counted DLM try inside the helper
 would keep the nowait fast path, but it would have to prove a non-blocking end
 path and correct handling of a failure on a later mapping of a multi-extent
-direct I/O; MXFS does not advertise nowait I/O, so that optimisation is not
+direct I/O; MeshXFS does not advertise nowait I/O, so that optimisation is not
 worth those risks.  After the change: 184 and 88 refusals, zero underflows,
 every operation completed.
 
@@ -16984,11 +17022,11 @@ band: it withdrew 4 s later through the existing self-gone inspection, its peer
 was unaffected, and both nodes ended with zero kernel splats.
 
 Two harness defects were fixed to get those numbers, and both had been
-reporting confidently about MXFS while observing nothing.
+reporting confidently about MeshXFS while observing nothing.
 tests/pr_reservation_ownership_probe.sh and tests/resv_health_detect.sh
 hardcoded the multipath rig's /dev/mapper/mpatha, which does not exist on the
 TCP rig; sg_persist errored, the parser found no reservation stanza, and the
-probe printed "RESERVATION: NONE HELD" — an assertion about MXFS's state — from
+probe printed "RESERVATION: NONE HELD" — an assertion about MeshXFS's state — from
 a capture of an error message.  Both now take the device from a node's own live
 mount, and the probe reports UNKNOWN and exits non-zero when the target did not
 answer a PERSISTENT RESERVE IN at all.  The detect harness also gained a
@@ -17187,10 +17225,10 @@ failed residue build also no longer points at a capture file that a timeout
 leaves empty; it reports the wall against the budget where the numbers are.
 ## 2026-09-17 — 0.85.7 — only the write completion may defer the AG-metadata reclaim, and it now says so instead of being guessed from a string
 
-A buf log item retirement drops the MXFS AG-metadata tracking token unless the
+A buf log item retirement drops the MeshXFS AG-metadata tracking token unless the
 caller is the I/O completion continuation, which leaves it for bp->b_iodone to
 consume moments later.  The funnel decided that by comparing the caller tag
-against "iodone".  That tag is stamped by xfs_buf_item_done — and the MXFS
+against "iodone".  That tag is stamped by xfs_buf_item_done — and the MeshXFS
 overlay calls xfs_buf_item_done directly from nine release-drain and
 acquire-evict arms that retire a log item with no I/O whatsoever.  On any of
 them the tag read "iodone", nothing ran b_iodone, and nothing returned the
@@ -17951,7 +17989,7 @@ splat sweep that greps for it counted the 71 declines as 71 splats
 Measured on 2 nodes / TCP, srcversion F1BFDAC2EABAB82C8DF3A29, s608c
 (tests/evidence/20260912T220017Z_d0932pf_s608c, console
 tests/evidence/d0932pf_s608c.console, PASS fails=0, wall 613 s; s608b on
-175B4482 measured the same MXFS behaviour with the two harness rows above
+175B4482 measured the same MeshXFS behaviour with the two harness rows above
 scoring falsely):
 - Setup: test1 laid a durable FENCING intent for test2's dead incarnation
   and parked (`P236-FENCE-INTENT-HOLD`); destroyed there.  Platter before
@@ -20027,7 +20065,7 @@ writable window. Liveness, and no exclusion semantics needed changing.
 ## 2026-09-11 — 0.82.3 — A recovery-takeover harness stops answering from captures it never took, and immediately reproduces a critical defect
 
 The owner-departure takeover harness could not measure the thing it exists to
-measure, and it said so as a result about MXFS rather than as a failure of its
+measure, and it said so as a result about MeshXFS rather than as a failure of its
 own. Two defects, both in the same family: something absent was being read as
 something proved.
 
@@ -21111,7 +21149,7 @@ cannot come back is a failure of this test and says so, because leaving the
 fleet unmounted after an audit would silently poison every row that follows.
 
 The audit now also carries the cold `Superblock icount` and the chunk/free-space
-aliasing verdict onto the board. MXFS keeps `sb_icount` lazily and writes it at
+aliasing verdict onto the board. MeshXFS keeps `sb_icount` lazily and writes it at
 unmount, so that moment — every node out — is the only point in a run where
 reading it means anything.
 
@@ -21173,7 +21211,7 @@ waits for the membership transition to actually be observed rather than assumed,
 and then alternates the knob in place across rounds on the survivor.
 
 `tests/d0949_sole_survivor_chunkfree.sh` no longer gates on a mid-flight inode
-count. MXFS keeps `sb_icount` lazily and writes it at unmount, so `chk_mxfs`
+count. MeshXFS keeps `sb_icount` lazily and writes it at unmount, so `chk_mxfs`
 sampling a live mount reports the value from the previous unmount: the first
 verification lap read 64 three times while the run it was measuring carved 187
 chunks, and reported itself VACUOUS. The carve gate is now the count of files
@@ -21183,7 +21221,7 @@ both nodes unmounted. The create budget is 180 s, twice the 85.5 s measured for
 
 ## 2026-09-10 — 0.75.125 — The keep-the-chunk guard now covers the survivor of a peer's departure
 
-MXFS keeps a fully-free inode chunk instead of deleting it, so its blocks can
+MeshXFS keeps a fully-free inode chunk instead of deleting it, so its blocks can
 never re-enter the AG free pool where a directory would reallocate them and
 write its data over an inode cluster some node still believes in. The guard
 asked `mxfs_v5_dlm_is_single_node()`, which is dynamic membership, not
@@ -21259,7 +21297,7 @@ passes every test it has. The verdict was silent on this class, not evidence
 against it.
 
 What the source does show is a guard that turns itself off at the worst moment.
-MXFS keeps a fully-free inode chunk rather than deleting it, so its blocks can
+MeshXFS keeps a fully-free inode chunk rather than deleting it, so its blocks can
 never re-enter the AG free pool and directory data can never alias an inode
 cluster — the comment on that guard names the resulting shutdown in the exact
 words of the observed failure. But the guard asks `mxfs_v5_dlm_is_single_node()`,
@@ -25097,7 +25135,7 @@ path — the generic completion entry runs the terminal completion, which
 retires the submission's departure token, and then wakes the waiter; the
 waiter's wait loop, inherited from upstream, then runs the terminal completion
 a second time and finds nothing to retire. Upstream has the same two passes
-and tolerates them because its second pass changes nothing; the MXFS terminal
+and tolerates them because its second pass changes nothing; the MeshXFS terminal
 accounting (departure token, inode-cluster write token, committed-obligation
 disposition, flush-epoch stamps) is not idempotent, and every stack trace of
 an unattributed retire sat in the wait loop under xfs_bwrite with the write
@@ -26211,7 +26249,7 @@ except where noted.
 ## 0.11.360 (sess44) — 2026-08-02 — ifree revalidate: find the real bucket (strand root)
 
 - D-OUTAGE-REMOUNT-MUTUAL-IFREE-SKIP-STRAND root PROVEN + fixed: the revalidate's
-  bucket fallback agino%64 is an upstream-ism (MXFS parks unlink entries on the
+  bucket fallback agino%64 is an upstream-ism (MeshXFS parks unlink entries on the
   UNLINKER'S SLOT bucket), so an adopted mirror (i_unlinked_bucket unset — the
   post-outage reload shape) computed the wrong bucket, read it empty, and every
   node skipped the free forever ("bucket-empty-peer-freeing" mutual skip). Now an
@@ -26682,7 +26720,7 @@ except where noted.
 - D-EVICT-RETENTION-WIRE-EX-LEAK: FIXED AND VERIFIED (bulk repro 190 orphans -> 0; board green).
 - D-RELEASE-BARRIER-OPEN: FIXED AND VERIFIED (cluster census: ~130K unlocks, obligation=0 on all
   32 nodes across the full board; defer backstop engaged 2x and correctly withheld).
-- D-DIR-REUSE-COHERENCY-32-FLAKY: DISPROVED as an MXFS defect — the run-over-run degradation
+- D-DIR-REUSE-COHERENCY-32-FLAKY: DISPROVED as an MeshXFS defect — the run-over-run degradation
   (fresh 8-9 rounds PASS, consecutive-run plateau 7, ~25min idle recovery, reproduced 3 laps on
   schedule) is host-rig storage-path latency: pure-host 4K O_DSYNC probe degrades p90 26->95ms
   max 164->1806ms during plateau runs; nvme0n1 write await grows p50 1.19->4.29ms below the
@@ -26987,7 +27025,7 @@ log-force/flush congestion at the shared target, not a per-op bug.
   prior scripted "shutdown -f" against mxfs (incl. the sess36
   teardown repro cycles) did nothing.  XFS_IOC_GOINGDOWN is now
   implemented in the xfs_file_ioctl stub (capable + get_user +
-  xfs_fs_goingdown; everything else stays ENOTTY by design — MXFS
+  xfs_fs_goingdown; everything else stays ENOTTY by design — MeshXFS
   ships its own tools).  NEW tests/mxfs_shutdown.sh issues the raw
   ioctl (0x8004587d, flags 2 = -f); teardown_leak_repro.sh switched
   to it.
@@ -27621,9 +27659,9 @@ log-force/flush congestion at the shared target, not a per-op bug.
 
 # Changelog
 
-All notable changes to MXFS, newest first.
+All notable changes to MeshXFS, newest first.
 
-This is the single-page view of MXFS's history. It aggregates the per-subsystem
+This is the single-page view of MeshXFS's history. It aggregates the per-subsystem
 `## History` / `## Version History` sections that live in each subsystem's own
 doc (`tools/*.md`, `dlm/*.md`, `packaging/*.md`); those sections remain in place
 and are reproduced here verbatim. The authoritative current version lives in
@@ -28169,7 +28207,7 @@ Repository normalization and first public release. No functional code changes.
 - 2026-02-19: Fixed lease monitor not detecting dead peers (Bug 30). Two root causes: (1) `peer_disconnect_cb` called `remove_node()` which unregistered the peer from the lease system, preempting the lease monitor from ever detecting the dead node. Since lease renewals are sent over TCP, the renew thread's sends would eventually fail and trigger `peer_disconnect_cb`, removing the node before the 180s lease timeout fired. Fix: `peer_disconnect_cb` now calls `purge_node_dlm()` (new helper) instead of `remove_node()`, keeping the node in the lease table. Only definitive events (graceful NODE_LEAVE, lease_expire_cb) call `remove_node()` which unregisters from lease. (2) Related lease.c fix: JOINING nodes were not monitored for expiry (monitor only checked ACTIVE state). Changes: mount.c (new `purge_node_dlm()` helper, updated `peer_disconnect_cb`).
 - 2026-02-19: Fixed DLM dead master re-mastering hang (Bug AA). After a node dies and `peer_disconnect_cb` fires, new lock requests whose FNV-1a hash mapped to the dead node entered an infinite retry loop, causing `ls -la` to hang in D-state. Root cause: `purge_node_dlm()` called `mxfs_lease_get_active_nodes()` to refresh the DLM active node list, but the dead node was still registered as ACTIVE in the lease system (by design -- lease expiry runs independently via timeout). The DLM's FNV-1a hash therefore still included the dead node as a candidate master, and new lock requests sent to it would fail. Fix: `purge_node_dlm()` now filters the dead node out of the active node list before passing it to `mxfs_dlm_update_active_nodes()`, so the DLM immediately recomputes mastering without the dead node. Changes: mount.c.
 - 2026-02-22: Bug 45 fix take 2 -- REVERTED dir_add_entry retry loops from take 1 in mxfs_create/mkdir/symlink. The retry loop caused two regressions: (1) duplicate directory entries — retrying dir_add_entry without checking if the first attempt already committed the entry produced 200 duplicates in a 4-node 200-file-each test (535/800 unique, worse than 766/800 before); (2) D-state deadlock — the retry thread held the dir cache rwsem read lock longer than expected, starving the membership callback (mxfs_dir_cache_drop_all) and lookup (mxfs_dir_lookup) waiting for write lock on ino 128. Fix: removed retry loops entirely. All three functions now make a single mxfs_dir_add_entry call. On any error (including -ETIMEDOUT), the orphan inode is freed back to the allocator with error logging. The 120s DLM timeout (MXFS_LOCK_WAIT_TIMEOUT_MS) provides ample time for legitimate contention to resolve without retries. Changes: mount.c.
-- 2026-02-19: Added `mxfs_sync_fs()` public API function. Flushes all dirty dir cache entries, all dirty inodes, all dirty blocks, and issues a device flush. Called by the Linux VFS `sync_fs` superblock operation to implement `sync(2)` and `syncfs(2)`. Without this, `sync` had no effect on MXFS and dirty inode metadata (size, extents, timestamps) stayed only in memory until BAST, eviction, or unmount.
+- 2026-02-19: Added `mxfs_sync_fs()` public API function. Flushes all dirty dir cache entries, all dirty inodes, all dirty blocks, and issues a device flush. Called by the Linux VFS `sync_fs` superblock operation to implement `sync(2)` and `syncfs(2)`. Without this, `sync` had no effect on MeshXFS and dirty inode metadata (size, extents, timestamps) stayed only in memory until BAST, eviction, or unmount.
 - 2026-02-19: Fixed multi-node direct I/O (oflag=direct) D-state hang. Added `mxfs_write_bulk()` and internal `mxfs_write_pinned()` functions -- the write analog of `mxfs_read_bulk()`/`mxfs_read_pinned()`. `mxfs_write_bulk()` acquires the DLM EX lock once for the entire write and delivers data via callback in chunks, avoiding per-chunk DLM round-trips that caused BAST storms under multi-node load. For a 256MB write with 4MB chunks, DLM lock acquisitions reduced from 64 to 1. `mxfs_write_pinned()` extracts the core write logic from `mxfs_write()` into a helper that operates on an already-locked cached inode, supporting both the single-node direct path and the multi-node block cache path. `mxfs_write()` is preserved for backward compatibility with existing callers. Added `mxfs_write_chunk_fn` callback type and `mxfs_write_bulk()` declaration to mxfs.h public API.
 - 2026-02-19: BAST deferral -- moved blocking local BAST processing off the DLM recv thread to a dedicated worker thread (`bast_worker_fn`). Previously, `dlm_bast_cb()` directly called `mxfs_dir_cache_bast_cb()` and `mxfs_inode_cache_bast_cb()` inline on the DLM recv thread. These cache flush handlers do disk I/O (writing dirty inodes, flushing block cache), which blocks the recv thread for milliseconds. Under heavy 4-node write load, the resulting TCP read stalls cause buffer overflow and peer disconnects. Fix: local BASTs are now queued as `struct bast_work_item` entries on a lock-protected linked list (`mnt->bast_head/bast_tail`). The `bast_worker_fn` thread drains the queue and processes items serially, calling the same cache flush handlers but in its own thread context. Allocation failure falls back to inline processing. Worker thread is started during DLM init (before callbacks are wired) and stopped during unmount (before DLM lock release), draining any remaining items. Changes: mount.h (6 new fields), mount.c (struct bast_work_item, bast_worker_fn, dlm_bast_cb rewrite, init/shutdown).
 - 2026-02-23: Bug 50 fix -- membership change handler dropped dirty cache entries without flushing to disk, causing silent data loss of this node's modifications. Root cause: `dlm_membership_cb()` called `dir_cache_drop_all()` first, whose internal `dir_cache_flush_all()` calls `mxfs_inode_cache_get()` which triggers epoch-mismatch detection in `cache_get_locked()` (the DLM epoch was advanced by `update_active_nodes()` before calling the membership callback). The epoch mismatch evicts dirty inode cache entries and reloads from stale disk data, silently losing this node's modifications. Fix: added explicit flush-before-drop in both `dlm_membership_cb()` and `recover_dead_node_journal()`. Flushes inode cache first (direct `bdev_write`, no DLM needed), then block cache, then dir cache. After inode flush, on-disk data is current so any subsequent inode reload by `dir_cache_flush_all` gets correct data. The drop_all calls then find everything clean and just discard entries. This mirrors the unmount path which also flushes all three caches before teardown. Changes: mount.c (`dlm_membership_cb`, `recover_dead_node_journal`).
@@ -28188,13 +28226,13 @@ Repository normalization and first public release. No functional code changes.
 - 2026-03-05: Bug 88 fix -- CAW transport discovery callback bailed out completely. `discovery_peer_cb()` had `if (!mnt->peer) return;` at the top, which returned immediately when CAW transport was active (CAW sets `mnt->peer = NULL` since it has no TCP peer connections). This meant discovered nodes were never registered with the lease system, never monitored by disklock, and the allocator never exited single-node mode. Symptoms: continuous "lease: renewal from unregistered node NNNN" messages in dmesg, mkdir hanging forever (CAW DLM lock acquisition could never coordinate with unregistered peers). Fix: restructured `discovery_peer_cb()` to move the early bail-out inside a conditional `if (mnt->peer)` block that wraps only the TCP-specific operations (peer_add, peer_connect). The common operations (volume/self check, alloc single-node exit, lease register, disklock monitor, queue_membership_update) now execute regardless of transport. For CAW dedup, uses `mxfs_lease_has_node()` instead of the TCP peer table's EEXIST return code. Changes: mount.c (`discovery_peer_cb`).
 - 2026-03-07: Page cache support API -- added 7 new public API functions for kernel page cache integration. `mxfs_set_page_invalidate_cb()` registers a callback invoked from `complete_bast()` to flush/invalidate page cache before DLM lock release. `mxfs_inode_lock_shared()`/`mxfs_inode_lock_exclusive()` acquire PR/EX DLM locks on inodes and return file size (lock stays cached until BAST). `mxfs_inode_unlock()` releases the reference via new `mxfs_inode_cache_put_by_ino()` helper. `mxfs_get_block_map()` translates logical file blocks to physical disk blocks using the cached extent map (returns HOLE/UNWRITTEN flags). `mxfs_update_inode_size()` updates ci->size and marks dirty when a write extends the file. `mxfs_alloc_file_block()` allocates a single block via `mxfs_alloc_blocks()`, inserts into extent map, and marks inode dirty. These functions enable the Linux VFS frontend to use the kernel page cache for data I/O while libmxfs manages DLM coherency, replacing the custom block cache for data reads/writes. Changes: mount.c (7 new functions), inode_cache.h/inode_cache.c (`mxfs_inode_cache_put_by_ino`), mxfs.h (declarations already present).
 - 2026-03-08: Adaptive speculative preallocation -- `mxfs_alloc_file_block()` now uses tiered preallocation: 16 blocks (64KB) for first 64KB, 256 blocks (1MB) for 64KB-1MB, 2048 blocks (8MB) beyond 1MB. Previously fixed at 256 blocks. On first call for a file offset, allocates a full 256-block extent and inserts into the extent map. Subsequent calls within the same extent return the already-mapped block without DLM or allocator overhead. Fixed sequential write regression caused by page cache integration (8.5 MiB/s → 258 MiB/s, 30x improvement). Random write also improved via page cache absorption (539 → 31,500 IOPS). The preallocation size (256 blocks = 1MB) matches the kernel readahead window and XFS default extent hint. Changes: mount.c (`mxfs_alloc_file_block`).
-- 2026-03-08: Bug 98 fix -- multi-LUN SO_REUSEPORT. Added SO_REUSEPORT to UDP discovery/lease sockets (pal_linux_kern.c) and TCP listen sockets (pal_linux_kern.c, pal_linux_user.c). Added `volume_id` field to NODE_JOIN peer handshake (peer.c/h) to reject cross-LUN connections. `mount.c` passes `volume_id` to `peer_init()`. Enables multiple MXFS mounts on the same node binding the same ports. Tested: 3 LUNs on 5 nodes, test2 dual-mount simultaneous — PASS. Changes: pal_linux_kern.c, pal_linux_user.c, peer.c, peer.h, mxfs_dlm.h, mount.c.
+- 2026-03-08: Bug 98 fix -- multi-LUN SO_REUSEPORT. Added SO_REUSEPORT to UDP discovery/lease sockets (pal_linux_kern.c) and TCP listen sockets (pal_linux_kern.c, pal_linux_user.c). Added `volume_id` field to NODE_JOIN peer handshake (peer.c/h) to reject cross-LUN connections. `mount.c` passes `volume_id` to `peer_init()`. Enables multiple MeshXFS mounts on the same node binding the same ports. Tested: 3 LUNs on 5 nodes, test2 dual-mount simultaneous — PASS. Changes: pal_linux_kern.c, pal_linux_user.c, peer.c, peer.h, mxfs_dlm.h, mount.c.
 - 2026-03-08: Bug 100 fix -- use-after-free in mxfs_disklock_purge_node during unmount. Root cause: unmount destroyed disklock (step 14) BEFORE shutting down peer networking (step 15). Peer recv threads still running could call peer_disconnect_cb → disklock_purge_node on freed memory. Crashed with `preempt_count 1` in `mutex_unlock`. Fix: (1) moved `mxfs_peer_shutdown()` BEFORE `mxfs_disklock_stop_heartbeat/destroy` in mxfs_unmount(), (2) added `!mnt->mounted` early-return guard in peer_disconnect_cb, disklock_expire_cb, and lease_expire_cb to prevent callback processing during teardown. Verified: 5-node mount/unmount, zero kernel errors, zero D-state. Changes: mount.c.
 - 2026-03-08: TCP DLM scale warning -- added `check_tcp_scale_warning()` helper and `tcp_scale_warned` flag to `struct mxfs_mount`. When a new node registers via `peer_connect_cb` or `discovery_peer_cb` and the TCP DLM cluster exceeds 16 nodes, emits a one-shot WARN-level dmesg message recommending CAW DLM. Based on 32-node test results: TCP DLM correct but only 27% metadata completion at 32 nodes due to single lock-master-per-resource bottleneck. 16-node tested at 100% pass. Changes: mount.h (`tcp_scale_warned` field), mount.c (`check_tcp_scale_warning`, calls in `peer_connect_cb` and `discovery_peer_cb`), docs/architecture.md (DLM Transport Scalability section).
 - 2026-03-10: Bug 107 fix -- TCP disconnect now calls remove_node() for TCP DLM transport. Previously, peer_disconnect_cb only called purge_node_dlm() (keeping the dead node in active_nodes and lease table), which was correct for CAW DLM (disk-based transport independent of TCP) but wrong for TCP DLM (TCP connection IS the transport). With TCP DLM, the dead node stays in active_nodes, DLM routes lock requests to the dead master, gets ENOTCONN, and the filesystem is unavailable until lease timeout (~5 min). Fix: conditional dispatch -- TCP DLM calls remove_node() (lease_unregister + purge_dlm + disklock_unmonitor) for immediate re-mastering; CAW DLM keeps current purge_node_dlm() behavior. Verified: 4-node hard crash test, surviving nodes resumed I/O within seconds, zero ENOTCONN errors. Changes: mount.c (peer_disconnect_cb, remove_node comment).
 - 2026-03-10: Bug 115 -- mknod support for device nodes, FIFOs, and sockets. Added `mxfs_mknod()` public API function. For block/char devices: uses XFS_DINODE_FMT_DEV format with sysv-encoded rdev stored as big-endian uint32_t at start of data fork, forkoff=1 (matching XFS behavior). For FIFOs/sockets: uses XFS_DINODE_FMT_EXTENTS with 0 extents. Uses compound journal transactions. Added `rdev` field to `struct mxfs_stat` and `struct mxfs_cached_inode`. Changes: mount.c (mxfs_mknod, mxfs_stat rdev), mxfs.h (mxfs_mknod decl, mxfs_stat rdev field), inode_cache.h (rdev field), inode_cache.c (FMT_DEV load/flush, get_be32 helper), mxfs_inode.c (VFS mknod wrapper, dir_iops .mknod), mxfs_super.c (init_special_inode for special files), mxfs_common.h (version 0.9.2).
 - 2026-03-10: Bug 116 fix -- long symlink support (FMT_EXTENTS). Previously, `mxfs_symlink()` only created FMT_LOCAL (inline) symlinks and `mxfs_readlink()` rejected FMT_EXTENTS symlinks with -EIO. XFS supports symlink targets up to 1024 bytes (XFS_SYMLINK_MAXLEN), but the inline data fork capacity is typically ~336 bytes for V5 inodes. Targets exceeding this must be stored in extent-based data blocks. Fix: (1) `mxfs_symlink()` now checks if `target_len <= dfork_size`. If it fits, uses FMT_LOCAL (unchanged). If not, allocates data blocks, builds an extent map, writes the symlink target into the blocks (with per-block `xfs_dsymlink_hdr` headers for V5 CRC filesystems, raw data for V4), and sets the inode to FMT_EXTENTS. Added `symlink_write_remote_blocks()` and `build_symlink_hdr_v5()` static helpers. (2) `mxfs_readlink()` now handles FMT_LOCAL (inline, unchanged), FMT_EXTENTS, and FMT_BTREE symlinks. Added `readlink_remote()` helper that walks the extent map, reads data blocks, validates V5 headers (magic check), and copies the target data. The inode size field determines the target length. (3) Added XFS symlink constants to `xfs_format.h`: `XFS_SYMLINK_MAGIC`, `XFS_SYMLINK_MAXLEN`, `XFS_DSYMLINK_HDR_SIZE`, `XFS_SYMLINK_CRC_OFF`, and helper functions `mxfs_xfs_symlink_buf_space()` and `mxfs_xfs_symlink_blocks()`. Also added `ENAMETOOLONG` validation for target_len > 1024 in `mxfs_symlink()`. Changes: mount.c (mxfs_symlink, mxfs_readlink, 4 new static helpers), xfs_format.h (symlink constants and helpers), mxfs_common.h (version 0.9.3).
-- 2026-03-06: Layout refactor -- MXFS metadata regions moved to start of device. On-disk layout changed from `[XFS][journal][disklock][super]` to `[super][journal][disklock][XFS]`. MXFS super now at offset 0 (prevents `mount -t xfs` mounting the raw device). XFS data region grows toward end (enables future resize). Changes: (1) **mxfs_super.h**: added `xfs_data_offset` field. (2) **mxfs.h**: added `xfs_data_offset` to `struct mxfs_mount_opts`. (3) **mount.h**: added `mxfs_bdev_t *xfs_dev` to `struct mxfs_mount`. (4) **pal.h**: added `mxfs_pal_bdev_clone_with_offset()` and `mxfs_pal_bdev_close_clone()`. (5) **pal_linux_kern.c / pal_linux_user.c**: added `base_offset` and `is_clone` to `struct mxfs_bdev`, applied base_offset in all I/O paths, implemented clone functions. (6) **mount.c**: auto-detect reads offset 0 (not end), extracts `xfs_data_offset`, creates `xfs_dev` clone, passes `xfs_dev` to block_cache/inode_cache/dir_cache/alloc (XFS data subsystems), keeps `mnt->dev` for journal/disklock/DLM/SCSI PR. Direct bdev_read/write in file I/O paths changed to use `xfs_dev`. Unmount closes clone before device. (7) **journal.h/journal.c**: added `xfs_dev` to journal ctx for replay writes through offset device. (8) **mkfs_mxfs.c**: reversed layout calculation, `format_xfs_native()` takes `base_offset` parameter, UUID generated upfront, version bumped to 0.7.1.
+- 2026-03-06: Layout refactor -- MeshXFS metadata regions moved to start of device. On-disk layout changed from `[XFS][journal][disklock][super]` to `[super][journal][disklock][XFS]`. MXFS super now at offset 0 (prevents `mount -t xfs` mounting the raw device). XFS data region grows toward end (enables future resize). Changes: (1) **mxfs_super.h**: added `xfs_data_offset` field. (2) **mxfs.h**: added `xfs_data_offset` to `struct mxfs_mount_opts`. (3) **mount.h**: added `mxfs_bdev_t *xfs_dev` to `struct mxfs_mount`. (4) **pal.h**: added `mxfs_pal_bdev_clone_with_offset()` and `mxfs_pal_bdev_close_clone()`. (5) **pal_linux_kern.c / pal_linux_user.c**: added `base_offset` and `is_clone` to `struct mxfs_bdev`, applied base_offset in all I/O paths, implemented clone functions. (6) **mount.c**: auto-detect reads offset 0 (not end), extracts `xfs_data_offset`, creates `xfs_dev` clone, passes `xfs_dev` to block_cache/inode_cache/dir_cache/alloc (XFS data subsystems), keeps `mnt->dev` for journal/disklock/DLM/SCSI PR. Direct bdev_read/write in file I/O paths changed to use `xfs_dev`. Unmount closes clone before device. (7) **journal.h/journal.c**: added `xfs_dev` to journal ctx for replay writes through offset device. (8) **mkfs_mxfs.c**: reversed layout calculation, `format_xfs_native()` takes `base_offset` parameter, UUID generated upfront, version bumped to 0.7.1.
 - 2026-03-10: Rename flags support (RENAME_NOREPLACE, RENAME_EXCHANGE). Extended `mxfs_rename()` with a `flags` parameter. RENAME_NOREPLACE (MXFS_RENAME_NOREPLACE): checks if destination exists and returns -EEXIST. RENAME_EXCHANGE (MXFS_RENAME_EXCHANGE): atomically swaps two directory entries by removing both and re-adding with swapped inodes and ftypes; no nlink changes since both entries continue to exist. Added `mxfs_mode_to_ftype()` static helper (extracts MXFS_FT_DIR/SYMLINK/REG_FILE from inode mode). Classic rename (flags=0) behavior is unchanged. Added `MXFS_RENAME_NOREPLACE` and `MXFS_RENAME_EXCHANGE` constants to mxfs.h (matching Linux RENAME_* values). Changes: mount.c (mxfs_rename, mxfs_mode_to_ftype), mxfs.h (flags constants, updated declaration).
 - 2026-03-11: Replaced hostname-based UUID fallback with random UUID generation. `load_node_uuid()` now calls `mxfs_generate_random_uuid()` (which uses `mxfs_pal_get_random_bytes()`) when `/etc/mxfs/node.uuid` is missing, instead of deriving a deterministic UUID from the hostname. Eliminates the risk of UUID collisions when multiple nodes have similar hostnames. The old `generate_uuid_from_hostname()` function is removed entirely. Changes: mount.c (mxfs_generate_random_uuid replaces generate_uuid_from_hostname, load_node_uuid fallback path updated).
 - 2026-03-10: Bug 113 -- fallocate support. Added `mxfs_fallocate()` public API for preallocating and deallocating file space. Three modes: (1) **mode=0**: basic preallocation -- allocates blocks covering [offset, offset+len), updates file size if the range extends past EOF, tries to allocate large contiguous extents to minimize fragmentation (primary use case for QEMU VM disk images). (2) **MXFS_FALLOC_FL_KEEP_SIZE**: same preallocation but does not change file size (preallocation beyond EOF). (3) **MXFS_FALLOC_FL_PUNCH_HOLE|KEEP_SIZE**: deallocates blocks in range, zeroes partial blocks at boundaries, does not change file size. Implementation: `fallocate_prealloc()` walks the logical block range, skipping already-allocated blocks, and allocates hole runs via `mxfs_alloc_blocks()`. `fallocate_punch_hole()` handles partial-block zeroing at boundaries via block cache writes, then calls `mxfs_extent_map_punch()` to remove/trim/split extents, and frees the physical blocks via `mxfs_free_blocks()`. Both paths acquire EX DLM lock, update timestamps, mark inode dirty, and flush to disk. VFS wrapper `mxfs_kern_fallocate()` in mxfs_file.c maps Linux FALLOC_FL_* flags, flushes/invalidates page cache, calls `mxfs_fallocate()`, and refreshes VFS inode size. Added `mxfs_extent_map_punch()` and `struct mxfs_freed_extent` to extent.h/extent.c. Changes: mxfs.h (MXFS_FALLOC_FL_* flags, mxfs_fallocate decl), mount.c (mxfs_fallocate, fallocate_prealloc, fallocate_punch_hole), extent.h (mxfs_freed_extent, mxfs_extent_map_punch), extent.c (mxfs_extent_map_punch), mxfs_file.c (mxfs_kern_fallocate, .fallocate in file_operations).
@@ -28342,7 +28380,7 @@ Repository normalization and first public release. No functional code changes.
 - 2026-02-20: **Fixed use-after-free crash in recv thread (Bug 43).** NULL pointer dereference in `remove_wait_queue` called from `sk_wait_data` -> `tcp_recvmsg_locked` -> `mxfs_pal_tcp_recv` -> `mxfs_peer_recv_fn`. Root cause: three code paths called `mxfs_pal_tcp_close()` on a peer socket while the recv thread was still blocking in `mxfs_pal_tcp_recv()` inside `sk_wait_data()`. Since `tcp_close` frees the socket structure, the recv thread's wait queue entry referenced freed memory. Fix: all three locations now call `mxfs_pal_tcp_shutdown()` first (sends SHUT_RDWR, unblocks the recv thread from `sk_wait_data`), join the recv thread to ensure it has exited, then call `mxfs_pal_tcp_close()` to safely free the socket. The three locations fixed: (1) accept thread connection replacement — old socket shutdown before close, recv thread joined between shutdown and close; (2) `peer_connect_impl` stale socket cleanup — same shutdown-join-close pattern; (3) `mxfs_peer_send` failure path — uses shutdown-only (not close), leaves `peer->sock` non-NULL so `peer_connect_impl` (called via `peer_connect_force` reconnect) can find and properly clean it up with the full shutdown-join-close sequence.
 - 2026-03-03: **Bug 83: Eliminated inline send retries in mxfs_peer_send().** The previous implementation retried 5 times with 200-1000ms delays (holding send_lock during the total ~35s retry window), then called peer_connect_force inline (blocking for thread join + TCP handshake). At 8+ nodes, this stalled all DLM traffic to the peer for 30+ seconds, causing cascading timeouts on other peers. Fix: on first send failure, immediately shutdown socket, set DISCONNECTED, unlock send_lock, fire disconnect_cb, return -ENOTCONN. No retries, no inline reconnect. Reconnection happens via discovery announcements (every ~2s) which already call peer_connect_force. Changes: peer.c (mxfs_peer_send). Also reduced PAL-level EAGAIN retry from 6 to 3 and sk_sndtimeo from 5s to 2s in pal_linux_kern.c, reducing worst-case PAL send time from 30s to 6s.
 - 2026-03-03: **Restored short peer-level send retries in mxfs_peer_send().** Bug 83 removed ALL peer-level retries (immediate disconnect on first PAL send failure), which was too aggressive — a single TCP hiccup killed the connection. Added back a short retry loop: 3 retries with delays of 200ms, 500ms, 1000ms (1.7s total), compared to the old 5 retries with 3.2s total. Critically, the send_lock is dropped during sleep to avoid stalling DLM traffic to this peer. After each sleep, re-validates peer state (ACTIVE + sock non-NULL) before retrying. On success, returns immediately. If all 3 retries fail, falls through to the existing disconnect logic (shutdown, set DISCONNECTED, fire disconnect_cb, return -ENOTCONN). Changes: peer.c (mxfs_peer_send).
-- 2026-03-08: **Multi-LUN SO_REUSEPORT support (Bug 98).** Added SO_REUSEPORT to the TCP listen socket in both kernel and userspace PAL, allowing multiple MXFS mounts on the same node to share TCP port 7600. Added `volume_id` field to `mxfs_peer_ctx` and `mxfs_dlm_node_msg` (NODE_JOIN handshake). The accept loop validates inbound volume_id against its own — connections for a different volume are rejected immediately (closed), forcing the sender to retry via SO_REUSEPORT routing. Outbound connect validates the reply volume_id similarly. The `mxfs_peer_init()` signature now takes a `volume_id` parameter, passed from `mnt->volume_id` in mount.c. Tested: 3 LUNs across 5 nodes with test2 holding 2 simultaneous mounts (vdb + vdc), cross-node data integrity verified, concurrent 64MB writes on all 3 LUNs. Changes: mxfs_dlm.h (node_msg struct), peer.h/c (volume_id in ctx, handshake, validation), pal_linux_kern.c (TCP SO_REUSEPORT), pal_linux_user.c (TCP SO_REUSEPORT), mount.c (pass volume_id).
+- 2026-03-08: **Multi-LUN SO_REUSEPORT support (Bug 98).** Added SO_REUSEPORT to the TCP listen socket in both kernel and userspace PAL, allowing multiple MeshXFS mounts on the same node to share TCP port 7600. Added `volume_id` field to `mxfs_peer_ctx` and `mxfs_dlm_node_msg` (NODE_JOIN handshake). The accept loop validates inbound volume_id against its own — connections for a different volume are rejected immediately (closed), forcing the sender to retry via SO_REUSEPORT routing. Outbound connect validates the reply volume_id similarly. The `mxfs_peer_init()` signature now takes a `volume_id` parameter, passed from `mnt->volume_id` in mount.c. Tested: 3 LUNs across 5 nodes with test2 holding 2 simultaneous mounts (vdb + vdc), cross-node data integrity verified, concurrent 64MB writes on all 3 LUNs. Changes: mxfs_dlm.h (node_msg struct), peer.h/c (volume_id in ctx, handshake, validation), pal_linux_kern.c (TCP SO_REUSEPORT), pal_linux_user.c (TCP SO_REUSEPORT), mount.c (pass volume_id).
 - 2026-03-02: **Fixed duplicate connection race causing use-after-free (Bug 80).** Kernel oops (NULL pointer dereference) in `remove_wait_queue` -> `_raw_spin_lock_irqsave` from `sk_wait_data` in a recv thread, where RDI=0 (the spinlock address was NULL). Root cause: race between `peer_connect_impl` (outbound reconnect via send failure auto-reconnect) and the accept thread (inbound reconnect). After `peer_connect_impl` joined the old recv thread, it dropped `send_lock` to close the old socket. During that window, the accept thread could accept a new inbound connection, install a new socket, and start a new recv thread. Then `peer_connect_impl` would overwrite `peer->sock` with its outbound socket (leaking the accept thread's socket) and overwrite `peer->recv_thread` (orphaning the accept thread's recv thread). The orphaned recv thread was still blocked in `kernel_recvmsg` on the leaked socket. When the leaked socket was eventually freed, `remove_wait_queue` hit a NULL wait queue head from `sock_orphan`. Fix: (1) After joining the old recv thread in `peer_connect_impl`, re-check `peer->state` and `peer->sock` under `send_lock` -- if the accept thread already reconnected (ACTIVE state with valid sock), skip the outbound connect. (2) Before installing the new outbound socket, check again under `send_lock` for accept-thread reconnection and discard the outbound socket if so. (3) Changed `peer_handle_disconnect` to use `mxfs_pal_tcp_shutdown` instead of `mxfs_pal_tcp_close` -- the socket pointer is kept non-NULL so the next connection setup properly joins the recv thread before freeing the socket. Changes: peer.c (peer_handle_disconnect, peer_connect_impl).
 
 ### journal — per-node journal slicing
@@ -28518,7 +28556,7 @@ Repository normalization and first public release. No functional code changes.
 Recovered from the session notes that recorded it at the time; this tree's
 changelog began after these versions shipped.
 
-# MXFS v5 Version History (v0.2.X - v0.3.22)
+# MeshXFS v5 Version History (v0.2.X - v0.3.22)
 
 ## v0.2.X — Initial v5 setup (post-mxfs.4)
 

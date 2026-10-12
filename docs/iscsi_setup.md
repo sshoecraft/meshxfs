@@ -1,21 +1,21 @@
-# MXFS Shared-Storage Requirements & iSCSI/SAN Setup
+# MeshXFS Shared-Storage Requirements & iSCSI/SAN Setup
 
-**Audience:** operators deploying MXFS on a real shared SCSI LUN (iSCSI, FC or
-SAS; NVMe and NVMe-oF cannot carry MXFS, see
+**Audience:** operators deploying MeshXFS on a real shared SCSI LUN (iSCSI, FC or
+SAS; NVMe and NVMe-oF cannot carry MeshXFS, see
 [`attachment-methods.md`](attachment-methods.md)). This is the "what the storage has to provide, and how to prove it
 before you trust data to it" guide.
 
-MXFS is a shared-LUN clustered filesystem: every node opens the **same** block
+MeshXFS is a shared-LUN clustered filesystem: every node opens the **same** block
 device read/write at the same time. Correctness depends on the storage target
 providing a few SCSI behaviours that ordinary single-initiator setups never
-exercise. If those behaviours are missing or faked, MXFS cannot coordinate the
+exercise. If those behaviours are missing or faked, MeshXFS cannot coordinate the
 nodes and you will get silent corruption. **Read this before formatting a LUN.**
 
 ---
 
 ## 1. Pick a transport: TCP DLM or CAW
 
-MXFS coordinates nodes with a distributed lock manager (DLM) that runs over one
+MeshXFS coordinates nodes with a distributed lock manager (DLM) that runs over one
 of two transports.  With each node reaching the LUN over its own iSCSI login on
 one path (the `direct` attachment), CAW is released for 2-, 4-, 8- and 16-node
 clusters, TCP for 2 and 4.  With two paths per node through dm-multipath
@@ -77,13 +77,13 @@ must:
 
 > ⚠️ **Targets that *fake* CAW are the #1 cause of silent corruption.** Some
 > targets accept opcode 0x89 and return success **without** doing an atomic
-> compare-and-swap (they report CAS-success without persisting). MXFS then
+> compare-and-swap (they report CAS-success without persisting). MeshXFS then
 > believes it holds a lock it does not hold, and two nodes scribble the same
 > blocks. Advertising CAW is **not** proof — you must run the cross-node
 > `caw_verify` check in §4.2.
 
 ### 2.2 SCSI Persistent Reservations (PR) — for fencing
-MXFS fences dead/partitioned nodes with SCSI-3 PR. The cluster uses
+MeshXFS fences dead/partitioned nodes with SCSI-3 PR. The cluster uses
 **type 7 — WRITE EXCLUSIVE, ALL REGISTRANTS**: every live initiator registers a
 key; a write from an unregistered nexus returns **RESERVATION CONFLICT (0x18)**.
 The target must implement PR **per I-T nexus** (each initiator session is one
@@ -101,7 +101,7 @@ pair `fence_capability_override=1 single_node_exclusive=1`, which asserts that
 no second initiator can write the device; the override alone is refused.
 
 ### 2.3 Durable writes — no volatile target-side write cache
-MXFS's coherency protocol releases a lock only after the data is on stable
+MeshXFS's coherency protocol releases a lock only after the data is on stable
 media; a peer then reads it back. If the target buffers writes in a volatile
 cache that a peer's read can miss, coherency breaks. Configure the backstore for
 **write-through**, i.e. **disable the volatile write cache**:
@@ -109,9 +109,9 @@ cache that a peer's read can miss, coherency breaks. Configure the backstore for
 - LIO fileio/iblock: `emulate_write_cache=0`.
 
 ### 2.4 FUA reads must reach media
-MXFS issues **SCSI READ(16) with the FUA bit** to force-refresh metadata after a
+MeshXFS issues **SCSI READ(16) with the FUA bit** to force-refresh metadata after a
 peer writes. Some targets **silently drop the FUA bit** and serve a stale
-per-initiator read cache — a peer's fresh write is then invisible. MXFS has an
+per-initiator read cache — a peer's fresh write is then invisible. MeshXFS has an
 internal workaround (`_XBF_FUA_FRESH` gating via a PAL SCSI READ(16) passthrough)
 but it only helps if the target actually re-reads media on FUA. Prove it with
 `fua_verify` (§4.3).
@@ -245,9 +245,9 @@ tools/mkfs_mxfs /dev/sdX            # format (writes the MXFS envelope + XFS reg
 mount -t mxfs /dev/sdX /mnt/shared  # on every node
 ```
 
-Use **MXFS's own tools** to inspect an MXFS device — `tools/chk_mxfs -v` for
+Use **MeshXFS's own tools** to inspect an MeshXFS device — `tools/chk_mxfs -v` for
 fsck+geometry, `tools/resize_mxfs` to grow. Do **not** use `xfs_db`/`xfs_info`/
-`xfs_repair`: MXFS wraps the XFS region in an on-disk envelope (a slot table +
+`xfs_repair`: MeshXFS wraps the XFS region in an on-disk envelope (a slot table +
 journal slice precede the XFS superblock), so stock XFS tools read the wrong
 sectors and return empty/garbage.
 
@@ -269,7 +269,7 @@ sectors and return empty/garbage.
 
 ## Related docs
 - `docs/dlm-protocol.md` — DLM transport internals (CAW + TCP).
-- `docs/architecture.md` — overall MXFS design.
+- `docs/architecture.md` — overall MeshXFS design.
 - `docs/test_infra_lio_tcm.md` — the project's LIO/tcm_loop **test** rig (TCP DLM
   testing; LIO fakes CAW, so it is not a CAW reference).
 - `SCST_PROBLEM.md` — deep dive on the SCST serialization/wedge behaviour behind §5.1/§6.

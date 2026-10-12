@@ -1,11 +1,11 @@
-# MXFS on two hosts with DRBD dual-primary
+# MeshXFS on two hosts with DRBD dual-primary
 
 `2/net/mesh/drbd` is released from 0.90.107 (see the top of the README):
 verified on two physical Proxmox VE 9 hosts with DRBD 8.4.11, installed exactly
 as below.
 
 Two hosts, each with a local disk, and no shared storage: DRBD keeps the two
-disks identical and MXFS runs on top of both at once. This is the `2/net/mesh/drbd`
+disks identical and MeshXFS runs on top of both at once. This is the `2/net/mesh/drbd`
 configuration. It works with exactly two hosts and nothing else: no SAN, no
 third machine, no IPMI.
 
@@ -19,7 +19,7 @@ On both nodes, from the same version of the source:
 
 ```
 apt install drbd-utils git build-essential proxmox-headers-$(uname -r)
-git clone --branch v0.90.107 https://github.com/sshoecraft/mxfs && cd mxfs
+git clone --branch v0.90.107 https://github.com/sshoecraft/meshxfs && cd meshxfs
 make && make install
 ```
 
@@ -36,12 +36,12 @@ headers installed).
 
 `make install` installs the module, `mkfs.mxfs` and the other tools, the DRBD
 fence handler and its built-in fence authority, and two systemd units. If it
-refuses because an older MXFS package or DKMS module is installed, remove that
+refuses because an older MeshXFS package or DKMS module is installed, remove that
 first with the command it prints. If it warns that the loaded module is not the
-one just installed, unmount any MXFS filesystem and run
+one just installed, unmount any MeshXFS filesystem and run
 `rmmod mxfs && modprobe mxfs`.
 
-Both nodes must run the same MXFS version. Check with
+Both nodes must run the same MeshXFS version. Check with
 `cat /sys/module/mxfs/srcversion` on each.
 
 ## 2. A backing device on each node
@@ -96,7 +96,7 @@ resource mxfs {
 }
 ```
 
-MXFS refuses to mount unless `protocol`, `allow-two-primaries`, every
+MeshXFS refuses to mount unless `protocol`, `allow-two-primaries`, every
 `after-sb-*`, `fencing` and `fence-peer` are exactly as above. Do not add
 `become-primary-on`: the `mxfs-drbd@` unit promotes the node only once it is
 safe.
@@ -147,7 +147,7 @@ systemctl enable --now mxfs-drbd@mxfs
 disks UpToDate, promotes the node, and mounts; pve1, if it was running alone,
 gives pve2 30 s and then mounts without it (section 7). At shutdown it unmounts and
 steps down, so the other node carries on. Check it with
-`systemctl status mxfs-drbd@mxfs`, and see why MXFS admitted or refused the
+`systemctl status mxfs-drbd@mxfs`, and see why MeshXFS admitted or refused the
 mount with `dmesg | grep P-DRBD-ARM`.
 
 Proxmox starts the guests marked "start at boot" and its HA services only once
@@ -189,10 +189,10 @@ DRBD address (here `pve1`) is participant 0; the other is participant 1.
 
 - **pve2 dies, or loses its network.** pve1's writes stop until DRBD notices
   (up to ~7 s with the `ping-int` above). Then pve1 isolates pve2 from itself
-  (the DRBD port and MXFS's ports, nothing else), takes DRBD StandAlone, and
-  carries on, and MXFS replays pve2's journal; a VM on pve1 that needs a file
+  (the DRBD port and MeshXFS's ports, nothing else), takes DRBD StandAlone, and
+  carries on, and MeshXFS replays pve2's journal; a VM on pve1 that needs a file
   pve2 was writing waits for that replay too, ~17 s after pve2's death in our
-  tests. When pve2 is back and reports MXFS unmounted, pve1 releases it, DRBD
+  tests. When pve2 is back and reports MeshXFS unmounted, pve1 releases it, DRBD
   resyncs pve2 from pve1, and `mxfs-drbd@mxfs` mounts it again.
   pve1's fence handler resumes pve1's frozen I/O itself (`drbdadm
   resume-io`) once pve2 is isolated, before it answers DRBD. Left to resume
@@ -222,7 +222,7 @@ DRBD address (here `pve1`) is participant 0; the other is participant 1.
   alone. DRBD's record of which copy is newer can be left stale on disk by a
   crash, and only pve1 may ever take the pair alone, so pve2 cannot trust that
   record. Bring pve1 back.
-- **A node's mount shuts down while the node stays up.** MXFS withdraws a
+- **A node's mount shuts down while the node stays up.** MeshXFS withdraws a
   node that lost its standing: no heartbeat of its own landed within its
   60 s authority lease, because its writes to the shared device stalled for
   that long. From then on every access to `/mnt/shared` on that node fails

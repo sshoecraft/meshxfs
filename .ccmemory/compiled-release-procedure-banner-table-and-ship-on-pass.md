@@ -1,6 +1,6 @@
 ---
 name: compiled-release-procedure-banner-table-and-ship-on-pass
-description: Release rules: ship a gated version before further changes; user-facing headline (ask GPT); configurations table; no "and nothing else".
+description: Release rules: ship a gated version before further changes; GPT writes the banner from the changelog section; configurations table; no "and nothing else".
 metadata:
   type: feedback
 tags: [compiled, release, changelog, readme, feedback]
@@ -23,16 +23,20 @@ Release procedure corrections, all from the user on 2026-10-10 around the 0.90.1
 [[feedback-release-headline-sells-the-whole-release-to-its-users-not-the-last-internal-fix]]: the published 0.90.116 headline was an engineering note about the allocator trylock (the last fix), for a release carrying eight versions of DRBD two-node work. User reaction: how is that a selling point to Proxmox users.
 
 - `scripts/release.sh --publish` takes the version's CHANGELOG section as the GitHub release notes and its heading as the headline. Intermediate versions (marked "IN PROGRESS, NOT RELEASED") never reach users on their own, so the released section is the only announcement of their work.
-- Rewrite the heading for USERS, covering everything since the previous RELEASE, e.g. "two-host Proxmox VE on DRBD: VM disks no longer freeze on slow SSDs, and a host that leaves, fails or rejoins comes back cleanly".
+- The heading covers everything since the previous RELEASE, and it is written by GPT from the changelog section (section 3), never drafted by us.
 - Open the section with a plain-language summary for someone upgrading from the last release: one bullet per user-visible improvement with the version that made it, then what it was validated on. Engineering detail follows under "### <version> in detail".
 - Never write "and nothing else" / "no other X was tested" after a validation list; scope is implied. Name only configurations explicitly NOT claimed, when it matters.
 - Already shipped with a bad headline: `gh release edit v<V> --title ... --notes-file <section>`.
 
-## 3. Ask GPT about the banner before publishing
+## 3. GPT writes the banner from the changelog
 
-[[feedback-when-you-release-ask-gpt-for-advice-on-the-release-banner]]: on every release, consult GPT (`mcp__ask_gpt__query`) on the banner: the GitHub release headline, the released version's CHANGELOG heading, and the README release-section heading.
+[[feedback-when-you-release-ask-gpt-for-advice-on-the-release-banner]] (procedure revised by the user 2026-10-12: "whatever you did to get this result is what I want to see in the future"). Before publishing, `mcp__ask_gpt__query` with:
 
-- Give GPT every user-visible improvement since the previous RELEASE (not just the last version), who the users are (e.g. Proxmox admins running a two-host DRBD pair), and the draft banner; ask what would make it a reason to upgrade.
+- the prompt **"Write a banner describing the enhancements made in this release. Here is the changelog for the release, MXFS <version>:"**, then
+- the version's CHANGELOG section WITHOUT its `##` heading (that is the banner being written): user-facing summary and configurations table verbatim; the "in detail" part with test-tooling and lab-host paragraphs dropped and the lab host named generically;
+- nothing else: no draft of ours, no audience description, no length limit.
+
+GPT's title line becomes the GitHub release title, the CHANGELOG heading and the README release heading. 0.90.124's run gave "MXFS 0.90.124 — Multipath SAN Support, Stronger Recovery, Better Scalability", which the user liked. What failed before: sending our draft for polishing produced "restored multipath for 2–16-node SANs, ..."; "restored/returns/is back" is our history and tells users it was broken; outcome sentences read as banners for managers.
 - The "consult another model when stuck / never consult another model" rule in CLAUDE.md was REMOVED by the user on 2026-10-10 to allow this. Older memories saying never to consult another model describe the retired rule.
 
 ## 4. Released configurations go in a table

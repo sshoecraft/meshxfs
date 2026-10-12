@@ -52,7 +52,7 @@ Depends: dkms, python3, proxmox-default-headers | linux-headers-generic | linux-
 Recommends: open-iscsi
 Section: kernel
 Priority: optional
-Description: MXFS — Multinode XFS shared filesystem
+Description: MeshXFS — clustered XFS shared filesystem
  Shared/clustered filesystem for concurrent multi-node access to
  XFS-formatted block devices. Features DLM-based coordination with
  CAW (disk) or TCP (network) transport, per-inode lock caching,

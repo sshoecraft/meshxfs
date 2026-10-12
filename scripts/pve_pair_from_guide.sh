@@ -62,7 +62,7 @@ SSHP="$REPO/tools/mxfs_sshpass.sh"
 GUIDE="$REPO/docs/drbd-setup.md"
 read -r -a PAIR <<<"${PVE_PAIR:-192.168.1.80 192.168.1.81}"
 [ "${#PAIR[@]}" = 2 ] || { echo "pve_pair_from_guide: PVE_PAIR must name two hosts"; exit 2; }
-REPO_URL=${REPO_URL:-https://github.com/sshoecraft/mxfs}
+REPO_URL=${REPO_URL:-https://github.com/sshoecraft/meshxfs}
 SYNC_BUDGET=${SYNC_BUDGET:-2700}
 MOUNT_BUDGET=${MOUNT_BUDGET:-300}
 LV_SIZE=${LV_SIZE:-40G}
@@ -147,10 +147,10 @@ guide() {
     local c
     # 1. Install (both nodes)
     for c in "apt install drbd-utils git build-essential proxmox-headers-\$(uname -r)" \
-             "git clone https://github.com/sshoecraft/mxfs && cd mxfs" "make && make install"; do
+             "git clone https://github.com/sshoecraft/meshxfs && cd meshxfs" "make && make install"; do
         guide_has "$c"
     done
-    local src="cd /root && git clone $REPO_URL > /dev/null 2>&1 && cd mxfs" h
+    local src="cd /root && git clone $REPO_URL > /dev/null 2>&1 && cd meshxfs" h
     if [ "${FROM_TREE:-0}" = 1 ]; then
         # the sources `make install` reads, no build products
         tar -C "$REPO" -czf "$EVID/mxfs-tree.tar.gz" \

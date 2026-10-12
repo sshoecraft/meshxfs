@@ -1,6 +1,6 @@
 # Attachment methods and configurations
 
-What MXFS is tested and released as, and why it is named the way it is. A
+What MeshXFS is tested and released as, and why it is named the way it is. A
 **configuration** names everything about a cluster that changes which code runs
 and what the storage has to do:
 
@@ -21,7 +21,7 @@ configuration is `tools/configuration.py`, and every harness, the board
 (`tools/criteria.py`) and the defect queue (`tools/defects.py`) ask it.
 
 The native-XFS single-node baseline that the performance ceiling is measured
-against is not a configuration of MXFS (no module, no DLM, no cluster) and is
+against is not a configuration of MeshXFS (no module, no DLM, no cluster) and is
 spelled `1/xfs`.
 
 ## Vocabulary
@@ -61,7 +61,7 @@ The old codes are refused by name, and the tools say what replaces each one:
 ## What every configuration needs from the device
 
 Both DLM classes use the shared LUN for more than data. A device that cannot do
-these things cannot carry MXFS, whichever lock manager is chosen:
+these things cannot carry MeshXFS, whichever lock manager is chosen:
 
 1. **SCSI persistent reservations, including PREEMPT AND ABORT.** This is how a
    dead or partitioned node is fenced before its journal slice is replayed
@@ -75,7 +75,7 @@ these things cannot carry MXFS, whichever lock manager is chosen:
 4. **A distinct initiator identity per node.** A reservation key fences an I_T
    nexus. Two nodes that share one nexus are fenced together.
 
-MXFS checks these at mount and refuses a device that fails them, rather than
+MeshXFS checks these at mount and refuses a device that fails them, rather than
 mounting unfenced:
 
 - no reservations (virtio-blk, anything without SCSI PR): `P303-FENCECAP-UNREGISTERED`;
@@ -131,7 +131,7 @@ Each attachment has its own way of breaking the requirements above:
 
 Two nodes, each with a local disk, and DRBD keeping them identical: a shared
 filesystem with no shared storage array and no third server. Mainline DRBD
-(`drivers/block/drbd/`) gives MXFS two properties it needs and lacks one:
+(`drivers/block/drbd/`) gives MeshXFS two properties it needs and lacks one:
 
 - it refuses `allow-two-primaries` unless the replication protocol is C
   (`drbd_nl.c`), so a write completes only once both disks hold it;
@@ -278,7 +278,7 @@ in `docs/rulings/drbd-dual-primary-attachment.md`):
 
 Coherency reads need nothing special: a device with no SCSI device underneath
 takes the plain bio read, and under protocol C a read of the local replica after
-a completed peer write is coherent. What must hold instead is that MXFS never
+a completed peer write is coherent. What must hold instead is that MeshXFS never
 reaches a DRBD device's backing disk directly: SCSI passthrough resolves a
 stacked device by content only when it is device-mapper (multipath), and only
 to a disk that is a direct slave of that device, because DRBD's LBA 0 equals
@@ -291,7 +291,7 @@ freed by a removed device is handed to the next one created.
 The rig builds and exercises the whole attachment with `scripts/drbd_rig.sh`:
 each node of a rig group gets a pool LUN of its own as its local disk, DRBD
 comes up dual-primary with the rig's fence authority (`tools/rig_fence_virsh.sh`,
-the hypervisor fence for test VMs), and MXFS, the suite, fio and the death,
+the hypervisor fence for test VMs), and MeshXFS, the suite, fio and the death,
 fence and split tests run on `/dev/drbd0`. Because it has no pool LUN to share
 and no SCSI fence, it is verified by that rig and not by the suite's ordinary
 board columns: its results go to a board of their own
@@ -309,11 +309,11 @@ shared dual-ported enclosure), or NVMe over Fabrics. The rig on clyde builds
 iSCSI only, so a release names its fabric ("verified on iSCSI") and lists the
 others as unverified. FC and SAS need hardware clyde does not have. NVMe of any
 kind fails requirement 1 (above) today, and NVMe/TCP could be built with the
-kernel's NVMe target only once MXFS supports NVMe.
+kernel's NVMe target only once MeshXFS supports NVMe.
 
 ## Device layers
 
-A layer stacked between MXFS and the LUN has to pass all four requirements
+A layer stacked between MeshXFS and the LUN has to pass all four requirements
 through, or it is refused at mount:
 
 - **refused**: NVMe; virtio-blk; md RAID (no reservations, and plain md on shared
@@ -324,7 +324,7 @@ through, or it is refused at mount:
   exactly one device, which is why dm-multipath works).  DRBD dual-primary is
   not refused: it is its own attachment, with its own fencing (above).
 - **fine behind a single target**: RAID inside the storage array; md or DRBD
-  active/passive as the backend of one SCSI target. MXFS then sees an ordinary
+  active/passive as the backend of one SCSI target. MeshXFS then sees an ordinary
   LUN and the attachment is `direct` or `mpath`. What has to hold is that the
   reservation state survives the target failing over.
 

@@ -100,7 +100,7 @@ cat > "$RPMBUILD/SPECS/mxfs.spec" << SPECEOF
 Name:           mxfs
 Version:        ${VERSION}
 Release:        1%{?dist}
-Summary:        MXFS — Multinode XFS shared filesystem
+Summary:        MeshXFS — clustered XFS shared filesystem
 License:        GPL-2.0-only
 Source0:        mxfs-${VERSION}.tar.gz
 

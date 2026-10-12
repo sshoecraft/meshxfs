@@ -51,7 +51,7 @@ Maintainer: MXFS Project
 Depends: mxfs (>= ${VERSION}), proxmox-ve
 Section: admin
 Priority: optional
-Description: MXFS storage plugin for Proxmox VE
+Description: MeshXFS storage plugin for Proxmox VE
  Adds MXFS as a storage type in the Proxmox VE web interface.
  Enables shared VM/container storage on MXFS-formatted block devices
  across all nodes in a PVE cluster. Supports VM disk images, ISOs,

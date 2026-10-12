@@ -1,4 +1,4 @@
-# MXFS Test Lab
+# MeshXFS Test Lab
 
 The **lab** = the libvirt/QEMU VM fleet on clyde + the shared-LUN rigs the
 clustered filesystem runs on. This directory is the **entry point / map**: the
@@ -56,11 +56,9 @@ rig's prep has formed a cluster short of that node because of it.
    each guest held about 5 GB. The script adds `discard='unmap'`, cold-starts
    the VM and trims it. If a build left the guest running inside Packer's
    QEMU instead of libvirt, `scripts/libvirt_adopt_qemu_guest.sh` moves it
-   under libvirt on the same disk, MAC and PCI layout. Once one node of a
-   platform is built and finished, `scripts/lab_clone_node.sh` clones it into
-   the set's further nodes (disk, hostname, address, iSCSI initiator name);
-   an SELinux-enforcing clone is relabeled afterwards, because a file the host
-   rewrote is a new unlabeled inode.
+   under libvirt on the same disk, MAC and PCI layout. Build every node of a
+   set this way, all at once: each gets its own identity and address, and
+   nothing is cloned.
 3. **Do the row's "after the build" steps**, and boot the kernel
    `data/platforms.json` claims for the platform. Then on every node:
    - headers for the running kernel (DKMS compiles the module against them)
@@ -68,7 +66,7 @@ rig's prep has formed a cluster short of that node because of it.
    - root SSH with the password in your secrets store (below)
 4. **Give the set a shared LUN of its own.** An iSCSI LUN that supports SCSI
    persistent reservations (and COMPARE AND WRITE, for the CAW transport),
-   reachable from every node of the set. MXFS fences a dead node through the
+   reachable from every node of the set. MeshXFS fences a dead node through the
    reservation, so a target without one cannot verify a release. The harness
    logs each node in to it. One LUN per platform lets the platforms verify in
    parallel without one set's format touching another's; on the dev host
@@ -90,6 +88,7 @@ site's alone, so they are never in the tree. The harness reads them from
 storage portal=<ip> target=<iqn> lun=/dev/disk/by-id/<id> also=<nodes>
 nodes ubuntu2404=<n1>,<n2>,<n3>,<n4> rhel9=<n1>,<n2>,<n3>,<n4>
 pair ubuntu2404=<nodeA>,<nodeB> rhel9=<nodeA>,<nodeB>
+dns domain=<domain>
 addr <node>=<ipv4>
 qemu monitor_dir=<dir>
 group <g>=<n1>,<n2>,... <g2>=...
@@ -105,7 +104,10 @@ both are present. With one lab file per platform (`~/.config/mxfslab/lab.<platfo
 selected with `$MXFS_LAB`), each file holds that platform's `nodes` line and
 its own `storage` line.
 `also=` lists nodes outside the sets that attach to the same LUN; they are
-unmounted before the harness formats it. `addr` is only for a node no
+unmounted before the harness formats it. `dns domain` is the domain your
+DHCP server registers the nodes under; the harness resolves `<node>.<domain>`
+and never the bare name, which the host's search list can match to another
+host of the same name in a different domain. `addr` is only for a node no
 resolver knows. `qemu monitor_dir` is only for a guest started outside
 libvirt, which `tests/tcp_peer_freeze_death.sh` freezes through its QMP
 socket. `group` names rig groups — disjoint slices of the rig's nodes, each of
@@ -216,8 +218,6 @@ anything allocates.
 - `verify_infra.sh <configuration>` — infra-only bring-up +
   verify (no `mkfs`/mount/module — pure substrate check; runs `tools/caw_verify`).
 - `cluster_reset_n.sh` — reset N VMs.
-- `lab_clone_node.sh <source> <clone> <ip> ...` — grow a platform's set by
-  cloning a verified node of it.
 - `lab_power.sh up|down|state <set> ...` — power whole sets (`<platform>`,
   `rig:<N>`, `group:<name>`, or a domain). The host cannot hold the 8-node rig and four
   8-node sets at once, so a verification powers up only what each step needs

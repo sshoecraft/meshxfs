@@ -1,10 +1,10 @@
 .\" mxfs_admin(8) man page
-.\" Copyright (c) 2026 MXFS Project
+.\" Copyright (c) 2026 MeshXFS Project
 .\" SPDX-License-Identifier: GPL-2.0
 .\"
-.TH MXFS_ADMIN 8 "2026-09-22" "MXFS 0.89" "System Administration"
+.TH MXFS_ADMIN 8 "2026-09-22" "MeshXFS 0.89" "System Administration"
 .SH NAME
-mxfs_admin \- show and change MXFS filesystem parameters
+mxfs_admin \- show and change MeshXFS filesystem parameters
 .SH SYNOPSIS
 .B mxfs_admin
 .RB [ \-liuV ]
@@ -17,10 +17,10 @@ mxfs_admin \- show and change MXFS filesystem parameters
 .I device
 .SH DESCRIPTION
 .B mxfs_admin
-is the MXFS counterpart of
+is the MeshXFS counterpart of
 .BR xfs_admin (8).
-The stock XFS tools read the wrong sectors on an MXFS device, because the
-XFS superblock sits behind the MXFS envelope; use this tool instead.
+The stock XFS tools read the wrong sectors on an MeshXFS device, because the
+XFS superblock sits behind the MeshXFS envelope; use this tool instead.
 .PP
 The print options only read, and work while the filesystem is mounted.
 Every change is refused unless the tool can prove that no node can write
@@ -70,7 +70,7 @@ Creating a sharded directory also needs the module parameter
 .BR dirshard_mkdir_enable=1 .
 .TP
 .B \-i
-Print every MXFS setting: label, UUID, cluster name, format and protocol
+Print every MeshXFS setting: label, UUID, cluster name, format and protocol
 generation, node limit, geometry, and directory sharding state.
 .TP
 .B \-V
@@ -100,4 +100,4 @@ mount \-t mxfs \-o cluster=prod /dev/sdb /mnt/shared   # on every node
 .BR resize_mxfs (8),
 .BR xfs_admin (8)
 .SH AUTHORS
-MXFS Project.
+MeshXFS Project.

@@ -1,8 +1,8 @@
 .\" chk_mxfs(8) man page
-.\" Copyright (c) 2026 MXFS Project
+.\" Copyright (c) 2026 MeshXFS Project
 .\" SPDX-License-Identifier: GPL-2.0
 .\"
-.TH CHK_MXFS 8 "2026-03-10" "MXFS 0.10.0" "System Administration"
+.TH CHK_MXFS 8 "2026-03-10" "MeshXFS 0.10.0" "System Administration"
 .SH NAME
 chk_mxfs \- validate an MXFS-formatted block device
 .SH SYNOPSIS
@@ -17,7 +17,7 @@ it safe to run on a mounted filesystem (though results may be
 inconsistent if the filesystem is actively being modified).
 .PP
 The checker verifies four categories of on-disk structures:
-.SS 1. MXFS Superblock
+.SS 1. MeshXFS Superblock
 Reads the first 4 KB at offset 0 and validates:
 .IP \(bu 3
 Magic number (0x5346584D)
@@ -64,7 +64,7 @@ Verbose output.  Show detailed information for each check as it passes,
 including per-slot journal status, heartbeat slot details, and XFS
 geometry fields.
 .SH EXAMPLES
-Check an MXFS filesystem:
+Check an MeshXFS filesystem:
 .PP
 .RS
 .nf
@@ -117,7 +117,7 @@ The tool is standalone with no libmxfs linkage.  It uses POSIX
 for all I/O.
 .IP \(bu 3
 CRC verification uses the Castagnoli polynomial (CRC32C, 0x82F63B78).
-MXFS structures use seed ~0U without complement; XFS structures use
+MeshXFS structures use seed ~0U without complement; XFS structures use
 seed ~0U with final complement.
 .IP \(bu 3
 .B fsck.mxfs
@@ -139,4 +139,4 @@ Symlink to chk_mxfs for fstab integration.
 .BR fsck (8),
 .BR xfs_repair (8)
 .SH AUTHORS
-MXFS Project.
+MeshXFS Project.

@@ -1,8 +1,8 @@
-# resize_mxfs -- MXFS Resize Tool
+# resize_mxfs -- MeshXFS Resize Tool
 
 ## Overview
 
-`resize_mxfs` grows an MXFS filesystem after the underlying block device has been expanded. It appends new XFS allocation groups at the end of the XFS data area, then updates the XFS and MXFS superblocks to reflect the new geometry.
+`resize_mxfs` grows an MeshXFS filesystem after the underlying block device has been expanded. It appends new XFS allocation groups at the end of the XFS data area, then updates the XFS and MXFS superblocks to reflect the new geometry.
 
 ## How Growing Works
 
@@ -34,7 +34,7 @@ Returns 0 on success, 1 on error.
 ## How It Works
 
 1. Opens device and reads MXFS super from offset 0
-2. Validates MXFS magic (0x5346584D), version, and CRC32C
+2. Validates MeshXFS magic (0x5346584D), version, and CRC32C
 3. Gets new device size via `BLKGETSIZE64` (block device) or `fstat` (regular file)
 4. Validates new size > old size (stored in MXFS super `device_size`)
 5. Reads existing XFS superblock at `xfs_data_offset`

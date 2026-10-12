@@ -1,10 +1,10 @@
 .\" mkfs.mxfs(8) man page
-.\" Copyright (c) 2026 MXFS Project
+.\" Copyright (c) 2026 MeshXFS Project
 .\" SPDX-License-Identifier: GPL-2.0
 .\"
-.TH MKFS.MXFS 8 "2026-03-10" "MXFS 0.10.0" "System Administration"
+.TH MKFS.MXFS 8 "2026-03-10" "MeshXFS 0.10.0" "System Administration"
 .SH NAME
-mkfs.mxfs \- format a block device for MXFS (Multinode XFS)
+mkfs.mxfs \- format a block device for MeshXFS (Multinode XFS)
 .SH SYNOPSIS
 .B mkfs.mxfs
 .RB [ \-f ]
@@ -16,9 +16,9 @@ mkfs.mxfs \- format a block device for MXFS (Multinode XFS)
 .I device
 .SH DESCRIPTION
 .B mkfs.mxfs
-creates an MXFS filesystem on
+creates an MeshXFS filesystem on
 .IR device .
-MXFS (Multinode XFS) is a shared/clustered filesystem that enables
+MeshXFS (Multinode XFS) is a shared/clustered filesystem that enables
 concurrent multi-node read/write access to a single block device.
 .PP
 The tool creates the following on-disk layout:
@@ -39,7 +39,7 @@ require
 or any libmxfs linkage.  All XFS structures are written natively.
 .SS On-Disk Regions
 .TP
-.B MXFS Superblock (4 KB)
+.B MeshXFS Superblock (4 KB)
 Contains magic number (0x5346584D), format version, filesystem UUID,
 and byte offsets to the journal, disklock, and XFS data regions.
 Protected by CRC32C.
@@ -97,7 +97,7 @@ step, including per-slot journal initialization.
 .BR \-V
 Print the version string and exit.
 .SH EXAMPLES
-Format a shared iSCSI LUN for use with MXFS:
+Format a shared iSCSI LUN for use with MeshXFS:
 .PP
 .RS
 .nf
@@ -160,4 +160,4 @@ for fstab fsck dispatch.
 .BR mount (8),
 .BR mkfs.xfs (8)
 .SH AUTHORS
-MXFS Project.
+MeshXFS Project.

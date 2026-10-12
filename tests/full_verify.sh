@@ -145,7 +145,7 @@ pool_lab() {
     [ -n "$set" ] || return 1
     portal=$(lab_need storage portal) || return 1
     line=$(tools/lun_pool.sh alloc --owner "$BASHPID" --what "full_verify $V $key" $set) || return 1
-    { grep -E '^#|^addr|^qemu|^paths' "$MXFS_LAB"
+    { grep -E '^#|^addr|^dns|^qemu|^paths' "$MXFS_LAB"
       echo "storage portal=$portal target=$(sed -n 's/.* target=\([^ ]*\).*/\1/p' <<<"$line") lun=$(sed -n 's/.* dev=\([^ ]*\).*/\1/p' <<<"$line")"
       echo "nodes $key=$(echo $set | tr ' ' ',')"; } > "$lab"
     echo "$line"

@@ -7040,6 +7040,6 @@ module_exit(exit_xfs_fs);
 
 MODULE_AUTHOR("Silicon Graphics, Inc.");
 MODULE_AUTHOR("Stephen P. Shoecraft (MXFS)");
-MODULE_DESCRIPTION("MXFS -- Multinode XFS with " XFS_BUILD_OPTIONS " enabled");
+MODULE_DESCRIPTION("MeshXFS -- clustered XFS with " XFS_BUILD_OPTIONS " enabled");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(MXFS_KMOD_VERSION);

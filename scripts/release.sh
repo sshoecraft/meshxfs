@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# MXFS — build every release package, and optionally publish a GitHub release
+# MeshXFS — build every release package, and optionally publish a GitHub release
 #
 # Usage: scripts/release.sh [--publish] [--notes-file FILE]
 #        scripts/release.sh --publish --version V [--notes-file FILE]
@@ -25,7 +25,7 @@
 # manual pages, the module-options file and the module's parameter text are
 # checked against the release data, and a disagreement stops the run.
 #
-# --publish creates GitHub release v<version> on sshoecraft/mxfs with the
+# --publish creates GitHub release v<version> on sshoecraft/meshxfs with the
 # packages attached.  If dist/<version>/ already holds a build, --publish
 # checks it against its SHA256SUMS and publishes it without rebuilding.  Release notes are this version's CHANGELOG.md section
 # unless --notes-file is given.  Commit and push first: the tag is created
@@ -48,7 +48,7 @@ source "$SRCDIR/packaging/common.sh"
 
 DEB_IMAGE="debian:bookworm"
 RPM_IMAGE="almalinux:8"
-REPO="sshoecraft/mxfs"
+REPO="sshoecraft/meshxfs"
 
 publish=0
 notes=""
@@ -105,14 +105,14 @@ if [ "$built" = 0 ]; then
     checks=$(python3 "$SRCDIR/tools/platforms.py" build-checks) || exit 1
     while IFS= read -r check; do
         [ -n "$check" ] || continue
-        echo "=== MXFS $VERSION — platform build check: $check ==="
+        echo "=== MeshXFS $VERSION — platform build check: $check ==="
         (cd "$SRCDIR" && eval "$check") || {
             echo "ERROR: '$check' failed; no packages built" >&2
             exit 1
         }
     done <<< "$checks"
 
-    echo "=== MXFS $VERSION — .deb packages in $DEB_IMAGE ==="
+    echo "=== MeshXFS $VERSION — .deb packages in $DEB_IMAGE ==="
     docker run --rm --network host -v "$SRCDIR:/src/mxfs:ro" -v "$OUT:/out" "$DEB_IMAGE" bash -ec "
         apt-get update -qq
         DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gcc make rsync dpkg-dev >/dev/null
@@ -121,7 +121,7 @@ if [ "$built" = 0 ]; then
         chown $owner /out/*.deb
     "
 
-    echo "=== MXFS $VERSION — .rpm package in $RPM_IMAGE ==="
+    echo "=== MeshXFS $VERSION — .rpm package in $RPM_IMAGE ==="
     docker run --rm --network host -v "$SRCDIR:/src/mxfs:ro" -v "$OUT:/out" "$RPM_IMAGE" bash -ec "
         dnf install -y -q gcc make rsync rpm-build tar gzip >/dev/null
         /src/mxfs/packaging/mkrpm.sh /out
@@ -180,5 +180,5 @@ if [ -z "$notes" ]; then
 fi
 
 gh release create "v$VERSION" -R "$REPO" --target "$target" \
-    --title "MXFS $VERSION" --notes-file "$notes" \
+    --title "MeshXFS $VERSION" --notes-file "$notes" \
     "$OUT"/*.deb "$OUT"/*.rpm "$OUT/SHA256SUMS"

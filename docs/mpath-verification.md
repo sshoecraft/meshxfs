@@ -3,7 +3,7 @@
 A configuration on the `mpath` attachment (`<nodes>/<class>/<method>/mpath`) is
 released only when everything in this document has passed on the build being
 released. Passing the ordinary suite on a multipath map with every path healthy
-proves that MXFS works *through* dm-multipath. It does not prove multipath, whose
+proves that MeshXFS works *through* dm-multipath. It does not prove multipath, whose
 whole purpose is what happens when a path is lost. A site that is told `mpath`
 works will pull a cable on day one; this is the list of things that must have
 been done to them first.
@@ -34,7 +34,7 @@ A path is only a path if it can fail alone.
 
 **The one rule the settings must satisfy:** the longest time a node's I/O can
 stall when a path is lost (path-failure detection, plus the transport's
-recovery timeout, plus multipath's switch) must be well under MXFS's death
+recovery timeout, plus multipath's switch) must be well under MeshXFS's death
 window, the time after which peers declare a silent node dead and fence it.
 A stall longer than that turns a survivable path loss into a fenced node.
 The harness measures the stall and fails a row on it; it is not assumed.
@@ -103,7 +103,7 @@ per initiator-target nexus, and a multipathed node has one nexus per path. Every
 way a path can be absent at the moment a registration is made, preempted or
 retired is a way for the fence to have a hole in it.
 
-**How a node's registrations follow its paths.** MXFS registers its key on each
+**How a node's registrations follow its paths.** MeshXFS registers its key on each
 path separately. At mount, one path that answers is enough. A path that was
 absent then (down, or not yet logged in) is registered when it appears, by the
 node's reservation worker, and only while the node still holds its authority
@@ -130,7 +130,7 @@ Two things this does not close, stated so they are not assumed:
   would have to be stalled there for longer than the death window, or be
   fenced while still heartbeating), the key is back on the late path until
   the second read undoes it, a few milliseconds. A write of that node already
-  queued below MXFS could be delivered down that path in that interval.
+  queued below MeshXFS could be delivered down that path in that interval.
 
 **The sole registrant, on more than one path.** A survivor that must recover a
 node whose key is already absent has nothing to preempt, and proves the dead
@@ -157,7 +157,7 @@ authority lease and is never checked afterwards.
 
 **`disk/caw` adds one hazard to every row above.** A COMPARE AND WRITE that was
 in flight when its path died has an unknown outcome: the target may have applied
-it before the path failed. MXFS sends its lock commands down one path of the
+it before the path failed. MeshXFS sends its lock commands down one path of the
 map itself (a SCSI command of this kind cannot be carried through the
 multipath device), so dm-multipath never resends one; the lock manager does,
 down a surviving path, and a command that had already succeeded then reports

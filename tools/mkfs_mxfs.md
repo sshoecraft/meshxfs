@@ -1,8 +1,8 @@
-# mkfs.mxfs — MXFS Format Tool
+# mkfs.mxfs — MeshXFS Format Tool
 
 ## Overview
 
-`mkfs.mxfs` formats a block device for use with MXFS (Multinode XFS). It creates the on-disk layout that enables `mount -t mxfs /dev/sdX /mnt/shared` without any manual offset options.
+`mkfs.mxfs` formats a block device for use with MeshXFS (Multinode XFS). It creates the on-disk layout that enables `mount -t mxfs /dev/sdX /mnt/shared` without any manual offset options.
 
 ## Disk Layout
 
@@ -11,7 +11,7 @@
 0                 journal_offset        disklock_offset         xfs_data_offset          dev_end
 ```
 
-- **MXFS super**: 4KB on-disk superblock at the very start of the device (sector 0 has MXFS magic, not XFSB)
+- **MXFS super**: 4KB on-disk superblock at the very start of the device (sector 0 has MeshXFS magic, not XFSB)
 - **Journal**: Per-node circular journals (64 slots x 1MB = 64MB + 512B super)
 - **Disklock/CAW**: Heartbeat region (32KB) + lock slots (32MB) for disk-based DLM
 - **XFS data**: Standard XFS v5 filesystem formatted natively (no external tools), grows toward end of device
@@ -36,14 +36,14 @@ Options:
 5. Writes journal super + 64 slot headers
 6. Zeros disklock region
 7. Formats XFS v5 natively at xfs_data_offset: writes superblock, AGF/AGI/AGFL per AG, btree roots, inode chunk, zeroes log
-8. Writes MXFS on-disk superblock (4KB) at offset 0
+8. Writes MeshXFS on-disk superblock (4KB) at offset 0
 9. Syncs and closes
 
 ## Mount Auto-Detection
 
 When `mount -t mxfs /dev/sdX /mnt` is called without offset options, the kernel module:
 1. Reads the first 4KB of the device (offset 0)
-2. Validates MXFS magic (0x5346584D), version, and CRC32C
+2. Validates MeshXFS magic (0x5346584D), version, and CRC32C
 3. Extracts `journal_offset`, `disklock_offset`, and `xfs_data_offset` from the superblock
 4. Creates an xfs_dev clone (PAL bdev with base_offset = xfs_data_offset) for all XFS I/O
 5. Proceeds with normal mount using the detected offsets

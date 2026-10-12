@@ -1991,8 +1991,8 @@ nodes of every platform, never fewer. Each platform has its own lab file
 carrying `nodes <platform>=<n1>,<n2>,...`;
 `tools/mxfs_lab.sh nodes <platform>` prints the set, `pair` its first two,
 `addr <node>` an address. The sets: ubuntu2404 = test5..test8, pve9 =
-pve9-1..4, rhel9 = alma9-1..4, debian13 = debian13-1..4 (the -3/-4 nodes are
-clones of a built node, `scripts/lab_clone_node.sh`).
+pve9-1..4, rhel9 = alma9-1..4, debian13 = debian13-1..4.  Every node is built
+with `mkosimage` and takes its address from dnsmasq; nodes are never cloned.
 `tests/packaged_round.sh <platform> [version]` (`TRANSPORT=tcp|caw`, `KERNEL=`
 on pve) installs the packages on every node of the set, formats from the
 first node, mounts every node, cross-node checksums, create/remote-delete,

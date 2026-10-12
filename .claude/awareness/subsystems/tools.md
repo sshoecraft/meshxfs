@@ -1690,10 +1690,6 @@ capturing the same state.
 - `tools/criteria.py amend <row> --at <N>/<dlm> --iso <run-iso>
   --detector-defect "<why>"` — keeps a FAIL on the board but records it as
   the detector's, so the flake window counts genuine failures only.
-- `scripts/lab_clone_node.sh` — clones a built platform node into a new one
-  (disk, hostname, address, iSCSI initiator name); an enforcing RHEL clone
-  needs a relabel afterwards, because a file rewritten from a host without
-  SELinux is a new unlabeled inode.
 
 ### chk_mxfs: link counts (0.90.37)
 

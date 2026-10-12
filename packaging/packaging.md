@@ -1,8 +1,8 @@
-# MXFS Packaging
+# MeshXFS Packaging
 
 ## Overview
 
-The packaging system builds distributable packages for MXFS. Each package contains:
+The packaging system builds distributable packages for MeshXFS. Each package contains:
 - **DKMS kernel module source** — auto-compiles on install and on kernel updates
 - **Userspace tools** — mkfs.mxfs, chk_mxfs, resize_mxfs, fsck.mxfs (symlink)
 - **Boot config** — /etc/modules-load.d/mxfs.conf for auto-loading the module
@@ -57,17 +57,17 @@ Separate package: `pve-storage-mxfs_X.Y.Z_all.deb`
 
 Built by: `packaging/mkdeb_pve.sh`
 
-Installs `PVE::Storage::Custom::MXFSPlugin` which adds MXFS as a storage type
+Installs `PVE::Storage::Custom::MXFSPlugin` which adds MeshXFS as a storage type
 in the Proxmox web UI. After install:
 
 ```bash
 pvesm add mxfs mxfs-shared --blockdevice /dev/sdX --path /mnt/pve/mxfs-shared --shared 1 --content images,rootdir,iso,backup
 ```
 
-Or via web UI: Datacenter -> Storage -> Add -> MXFS
+Or via web UI: Datacenter -> Storage -> Add -> MeshXFS
 
 The plugin handles modprobe, mount/unmount, and storage activation. It delegates
-volume operations (disk images, ISOs, backups) to the directory plugin since MXFS
+volume operations (disk images, ISOs, backups) to the directory plugin since MeshXFS
 presents a POSIX filesystem.
 
 ## How It Works

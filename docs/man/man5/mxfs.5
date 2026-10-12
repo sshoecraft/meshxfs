@@ -1,8 +1,8 @@
 .\" mxfs(5) man page
-.\" Copyright (c) 2026 MXFS Project
+.\" Copyright (c) 2026 MeshXFS Project
 .\" SPDX-License-Identifier: GPL-2.0
 .\"
-.TH MXFS 5 "2026-03-10" "MXFS 0.10.0" "File Formats"
+.TH MeshXFS 5 "2026-03-10" "MeshXFS 0.10.0" "File Formats"
 .SH NAME
 mxfs \- Multinode XFS shared/clustered filesystem
 .SH SYNOPSIS
@@ -18,7 +18,7 @@ and writes the XFS on-disk format directly through its own DLM-aware
 caching engine, delivering native XFS compatibility with full cluster
 coordination.
 .PP
-MXFS is implemented as a single Linux kernel module
+MeshXFS is implemented as a single Linux kernel module
 .RB ( mxfs.ko )
 with no userspace daemon required.  All cluster coordination
 (distributed locking, peer discovery, lease management, heartbeating,
@@ -38,7 +38,7 @@ primitives (block I/O, threads, sockets, memory, time).
 .B Linux VFS frontend
 \(em translates VFS operations into libmxfs API calls.
 .SS DLM Transports
-MXFS supports two DLM (Distributed Lock Manager) transports, named in a configuration
+MeshXFS supports two DLM (Distributed Lock Manager) transports, named in a configuration
 by class and method (see
 .I docs/attachment-methods.md
 in the source tree):
@@ -159,13 +159,13 @@ runs TCP, the only transport it has.
 .B noatime
 Do not update inode access times on reads.  This is the
 .B default
-for MXFS, as atime updates on shared storage trigger journal
+for MeshXFS, as atime updates on shared storage trigger journal
 transactions and device flushes that cause significant read performance
 regression.
 .TP
 .B relatime
 Update atime only if it is older than mtime or ctime, or more than 24
-hours old.  On MXFS, this option is treated as
+hours old.  On MeshXFS, this option is treated as
 .B noatime
 for performance.  Use
 .B strictatime
@@ -178,7 +178,7 @@ Do not update directory access times.
 Update atime on every read.  Overrides the default noatime behavior.
 Warning: may reduce read performance by up to 20% on shared storage.
 .SH MODULE PARAMETERS
-Settings that apply to every MXFS mount on the host are parameters of the
+Settings that apply to every MeshXFS mount on the host are parameters of the
 .B mxfs
 module (\fBmodprobe mxfs\fR \fIname\fR\fB=\fR\fIvalue\fR, or
 .IR /sys/module/mxfs/parameters/ ).
@@ -299,7 +299,7 @@ claimed by the current release, which open defects found since then reach.
 .B DRBD dual-primary, two nodes, no shared LUN
 \(em verified (attachment
 .BR drbd ,
-TCP only).  DRBD has no SCSI reservations; MXFS fences through the site's
+TCP only).  DRBD has no SCSI reservations; MeshXFS fences through the site's
 fence authority and admits the mount through its DRBD witness.  See the
 README, "DRBD dual-primary".
 .IP \(bu 3
@@ -311,10 +311,10 @@ README, "DRBD dual-primary".
 \(em not verified.
 .IP \(bu 3
 .B NVMe, NVMe-oF, virtio-blk, md RAID
-\(em not supported: none carries SCSI persistent reservations, and MXFS
+\(em not supported: none carries SCSI persistent reservations, and MeshXFS
 refuses to mount them.
 .SH KERNEL COMPATIBILITY
-MXFS supports Linux kernels 5.x through 6.17 with compile-time version
+MeshXFS supports Linux kernels 5.x through 6.17 with compile-time version
 guards for API differences.  Released, each verified from the release
 packages: Proxmox VE 9, RHEL/AlmaLinux/Rocky 9.8, Ubuntu 24.04 and Debian 13,
 on the kernels the README lists.
@@ -326,4 +326,4 @@ on the kernels the README lists.
 .BR fstab (5),
 .BR xfs (5)
 .SH AUTHORS
-MXFS Project.
+MeshXFS Project.

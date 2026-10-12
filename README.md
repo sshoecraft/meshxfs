@@ -1,12 +1,23 @@
-# MXFS — Multinode XFS
+# MeshXFS
+
+**MeshXFS is a clustered filesystem for Linux, built on XFS.** Many nodes
+mount the same block device read-write at once: a shared iSCSI SAN LUN (over
+dm-multipath, up to 16 nodes) or a two-host DRBD dual-primary pair. It is made
+for shared VM storage on Proxmox VE, with a storage plugin included, as an
+alternative to GFS2 and OCFS2.
+
+On a system, MeshXFS goes by its short name `mxfs`: the `mxfs.ko` module,
+`mount -t mxfs`, the tools `mkfs.mxfs`, `chk_mxfs` (`fsck.mxfs`),
+`resize_mxfs` and `mxfs_admin`, and the `mxfs` and `pve-storage-mxfs`
+packages.
 
 > **⚠️ THIS REPOSITORY IS THE DEVELOPMENT TREE, NOT A RELEASE. DO NOT INSTALL
-> MXFS FROM IT.**
+> MeshXFS FROM IT.**
 >
 > **The code on this branch is work in progress. It has not been verified to
 > release quality and cannot be considered production quality. To install
-> MXFS, use a release package from the
-> [Releases page](https://github.com/sshoecraft/mxfs/releases). Clone and build
+> MeshXFS, use a release package from the
+> [Releases page](https://github.com/sshoecraft/meshxfs/releases). Clone and build
 > this repository only to run the latest development code, knowing it is not
 > a release.**
 
@@ -14,13 +25,13 @@
 >
 > Every line of the clustering, coordination, distributed-lock, fencing, and
 > on-disk-envelope code in this repository was written by an autonomous AI agent
-> (Anthropic's Claude Code) — **not** by a human using an AI tool. MXFS starts
+> (Anthropic's Claude Code) — **not** by a human using an AI tool. MeshXFS starts
 > from the upstream Linux kernel **XFS** code, written by the XFS developers,
 > and the AI has since modified much of it heavily (see "How this was built").
 > Everything that turns XFS into a filesystem many machines can mount at once
 > is AI-authored.
 
-> ## 0.90.124: restored multipath for 2–16-node SANs, multiple filesystems per host, and multi-resource DRBD recovery
+> ## 0.90.124: Multipath SAN Support, Stronger Recovery, Better Scalability
 >
 > What changed for someone upgrading from 0.90.116, the last published
 > release:
@@ -38,13 +49,13 @@
 >   after being fenced could fail to open a file, its `open()` retrying for
 >   ever and impossible to kill; and an open that can never be granted now
 >   fails with EIO, while a killed open always returns.
-> - **More than one MXFS filesystem can be mounted on a host** (0.90.120).
+> - **More than one MeshXFS filesystem can be mounted on a host** (0.90.120).
 >   Before, two filesystems on the same hosts crossed each other's lock
 >   traffic: connections were reset, one filesystem could miss its peer's
 >   heartbeat, and fsyncs took 17 s instead of 0.6 s.  A new mount option,
 >   `transport=tcp|caw`, picks each filesystem's lock manager, so one host can
 >   keep a DRBD resource mounted beside a SAN LUN.
-> - **A DRBD pair with several MXFS resources recovers every one of them**
+> - **A DRBD pair with several MeshXFS resources recovers every one of them**
 >   (0.90.121, 0.90.122).  When a host died, only one resource recovered and
 >   the others stayed blocked; now each is fenced and recovered under its own
 >   evidence.  When one replication link fails, the peer is cut off on every
@@ -115,7 +126,7 @@
 > hung, and all seven installs finished (`CHANGELOG.md`, 0.90.115 and
 > 0.90.116).
 >
-> **A host whose MXFS mount is shut down and then
+> **A host whose MeshXFS mount is shut down and then
 > rejoins no longer hangs or stalls.**  When a host's heartbeat writes stop
 > long enough, the other host declares its mount dead, recovers it, and the
 > host's guard unmounts and remounts it with no restart.  On two physical
@@ -146,20 +157,20 @@
 >   nested Proxmox VE 9 pair through every step of
 >   `tests/pve_pair_failover.sh` (crashes, power cuts, restarts, promotions, a
 >   slow heartbeat and the withdrawals), and the two physical Proxmox VE 9.1
->   hosts: seven concurrent AlmaLinux 9.7 installs at a time on MXFS on DRBD,
+>   hosts: seven concurrent AlmaLinux 9.7 installs at a time on MeshXFS on DRBD,
 >   on both the hosts' Samsung 850 EVO and their older Kingston SATA SSDs,
 >   and repeated dropout-and-rejoin laps under load.
 >
 > `8/net/mesh/direct`, `16/net/mesh/direct` and every `mpath` configuration
 > were not tested on this release and are not claimed.
 
-> ## 0.90.107: MXFS on DRBD dual-primary is released again, verified on two physical Proxmox VE 9 hosts
+> ## 0.90.107: MeshXFS on DRBD dual-primary is released again, verified on two physical Proxmox VE 9 hosts
 >
 > **`2/net/mesh/drbd` is released again**: two hosts, each with its own local
-> disk, replicated by DRBD dual-primary, with MXFS mounted read/write on both
+> disk, replicated by DRBD dual-primary, with MeshXFS mounted read/write on both
 > and no shared storage at all.  It was withdrawn on 2026-10-06, after eight
 > concurrent VM installs on two physical Proxmox VE 9 hosts shut both hosts'
-> MXFS mounts down and gave the guests I/O errors.  What that load found was
+> MeshXFS mounts down and gave the guests I/O errors.  What that load found was
 > fixed (`CHANGELOG.md`, 0.90.55 to 0.90.107), and this release was verified
 > on those same two hosts as well as on the test rig:
 >
@@ -182,12 +193,12 @@
 >
 > **What it is not: fast under heavy writes on modest disks.**  Both disks
 > write everything and every write waits for both, so a pair has one disk's
-> write capacity.  On the physical pair one AlmaLinux install on MXFS takes
+> write capacity.  On the physical pair one AlmaLinux install on MeshXFS takes
 > 1.4–1.9 times as long as on a local disk, and XFS on the same DRBD takes
-> about three quarters of MXFS's time.  Seven installs at once did not finish
+> about three quarters of MeshXFS's time.  Seven installs at once did not finish
 > in 43 minutes, and under that load one heartbeat write took 8.6 s (the lease
 > is 60 s).  A lone sequential writer gets about three quarters of what XFS
-> gets on the same DRBD: MXFS bounds its own writes in flight on DRBD so that
+> gets on the same DRBD: MeshXFS bounds its own writes in flight on DRBD so that
 > its coordination writes are never starved.  Size the VMs on a pair to its
 > disks.  Each of these is an open record in the defect queue.
 >
@@ -258,27 +269,27 @@
 > the abandoned wait's own registration was left behind, which stalls every
 > other node's readers of that lock.  See `CHANGELOG.md`.
 
-> ## 0.90.41: MXFS on DRBD dual-primary — a clustered filesystem with no shared storage
+> ## 0.90.41: MeshXFS on DRBD dual-primary — a clustered filesystem with no shared storage
 >
 > **Two nodes, a local disk each, no SAN, no iSCSI target, no third server.**
 > DRBD replicates the two disks synchronously (protocol C) with both nodes
-> Primary at once, and MXFS mounts `/dev/drbd0` read/write on both.  The
-> configuration is **`2/net/mesh/drbd`**.  This is the smallest possible MXFS
+> Primary at once, and MeshXFS mounts `/dev/drbd0` read/write on both.  The
+> configuration is **`2/net/mesh/drbd`**.  This is the smallest possible MeshXFS
 > cluster: two Proxmox hosts with local NVMe can share one filesystem for VM
 > images and live migration without buying storage.
 >
 > DRBD has no SCSI underneath, so it has neither persistent reservations (how
-> MXFS fences a dead node) nor COMPARE AND WRITE (how it claims heartbeat and
-> recovery records).  MXFS supplies both from the attachment itself:
+> MeshXFS fences a dead node) nor COMPARE AND WRITE (how it claims heartbeat and
+> recovery records).  MeshXFS supplies both from the attachment itself:
 >
 > - **Fencing through an authority outside both nodes.**  DRBD's
 >   `fencing resource-and-stonith` freezes I/O when a node loses its peer and
->   runs MXFS's handler, which has the site's fence authority (IPMI, a PDU, the
+>   runs MeshXFS's handler, which has the site's fence authority (IPMI, a PDU, the
 >   hypervisor) power the peer off and hold it off.  The authority grants one
 >   winner per split.  The survivor proves the peer is off, disconnected and
 >   Outdated (fence proof kind 25) before every irreversible recovery step.
 > - **Admission by a witness.**  A mount is refused unless DRBD is on protocol
->   C with two primaries, MXFS's fence handler, every split-brain policy set to
+>   C with two primaries, MeshXFS's fence handler, every split-brain policy set to
 >   `disconnect`, no suspended I/O, and this node a working, UpToDate Primary.
 > - **A compare-and-swap on the replicated device**: a two-party one-bit lock
 >   in reserved sectors, with swaps group-committed under one acquisition.
@@ -323,7 +334,7 @@
 
 > ## 0.90.39: `mkfs.mxfs` is no longer slow
 >
-> **If you tried MXFS before and the format alone put you off, try it again.**
+> **If you tried MeshXFS before and the format alone put you off, try it again.**
 > `mkfs.mxfs` used to take tens of seconds on a small LUN and minutes on a
 > large one, where `mkfs.xfs` takes a moment.  It now formats a 20 GB LUN in a
 > quarter of a second.
@@ -505,7 +516,7 @@
 >
 > **Verified attachments on shared storage: `direct` and `mpath`**, over
 > iSCSI.  With `direct` each node ran its own iSCSI initiator and reached the
-> shared LUN on one path with nothing between MXFS and the target.  With
+> shared LUN on one path with nothing between MeshXFS and the target.  With
 > `mpath` each node reached it through a dm-multipath map over two paths to
 > the same target (Ubuntu 24.04, multipath-tools 0.9.4, the settings of
 > `tools/mpath_settings.sh`), with paths taken away under load as
@@ -558,13 +569,13 @@
 > | RHEL / AlmaLinux / Rocky 9.8 | 5.14.0-687.49.1.el9_8 |
 > | Debian 13 | 6.12.107+deb13-amd64 (Debian 13.7) |
 >
-> **Any other kernel is untested, even on the same distribution.** MXFS builds
+> **Any other kernel is untested, even on the same distribution.** MeshXFS builds
 > against each kernel's own API, and a distribution's kernels differ: every
 > RHEL 9 minor release reports 5.14 but carries different backports (9.2 has
 > far fewer than 9.8), and Ubuntu 24.04 point releases install newer HWE
 > kernels. The module may not build, or may build different code, on a kernel
 > not listed here. On RHEL the RPM builds the module with DKMS (from EPEL) and
-> installs an SELinux rule that labels MXFS files as XFS files are labeled.
+> installs an SELinux rule that labels MeshXFS files as XFS files are labeled.
 > Other platforms are in development or planned — see `data/platforms.json`.
 >
 > **Storage:** the shared storage's write cache must survive a power loss
@@ -589,9 +600,9 @@
 
 ---
 
-## What MXFS is
+## What MeshXFS is
 
-MXFS ("Multinode XFS") lets **multiple nodes mount the same block device at the
+MeshXFS ("Multinode XFS") lets **multiple nodes mount the same block device at the
 same time**, read/write, with coherent caching and crash consistency — a
 shared-disk clustered filesystem in the family of GFS2 and OCFS2, but built as a
 fork of XFS.
@@ -601,7 +612,7 @@ fork of XFS.
   read/write, concurrently. NVMe, NVMe-oF included, is not supported: the
   fencing and lock commands are SCSI's.
 - **Or two nodes and no shared storage at all.** Two hosts with a local disk
-  each, replicated by DRBD dual-primary, mount one MXFS filesystem read/write
+  each, replicated by DRBD dual-primary, mount one MeshXFS filesystem read/write
   on both (`2/net/mesh/drbd`, "DRBD dual-primary" under Quick start).
   Released in 0.90.107, verified on two physical Proxmox VE 9 hosts.
 - **Coherent and consistent.** A write on one node becomes visible to the
@@ -610,18 +621,18 @@ fork of XFS.
   discovery, membership, heartbeat, fencing — runs in-kernel inside a single
   module, `mxfs.ko`. There is no userspace cluster daemon to run.
 - **XFS on disk.** File data is stored in a standard XFS v5 filesystem, wrapped
-  in an MXFS coordination envelope (see below).
+  in an MeshXFS coordination envelope (see below).
 
 ## How it works
 
-MXFS is a fork of upstream Linux **XFS**, taken from the Linux 6.19
+MeshXFS is a fork of upstream Linux **XFS**, taken from the Linux 6.19
 development tree (no exact upstream commit was recorded), plus a coordination
 overlay.
 
 - **Forked and heavily modified XFS.** `xfs/` began as upstream XFS and has been
   changed throughout, not only extended: it is about 314k lines against about
   226k in upstream `fs/xfs`, and core files such as `xfs_inode.c` and
-  `xfs_buf.c` are several times their upstream size. The MXFS overlay
+  `xfs_buf.c` are several times their upstream size. The MeshXFS overlay
   (`xfs/xfs_mxfs_dlm.c` plus per-allocation-group and per-inode hooks)
   intercepts the points where nodes would otherwise collide — allocation-group
   metadata, the inode cache, the buffer cache — and coordinates them across the
@@ -658,14 +669,14 @@ overlay.
   4 KB MXFS super carries its own magic so the device is never mistaken for — or
   mounted as — plain XFS.
 
-### ⚠️ Use the MXFS tools, never the stock XFS tools
+### ⚠️ Use the MeshXFS tools, never the stock XFS tools
 
 `xfs_db`, `xfs_info`, `xfs_repair`, and `xfs_admin` are the **stock XFS tools
 from `xfsprogs`** (installed system-wide under `/usr/sbin`) — they are *not* part
-of MXFS. Because of the envelope above, they read the wrong sectors and return
-empty or garbage output on an MXFS device. MXFS ships its own equivalents:
+of MeshXFS. Because of the envelope above, they read the wrong sectors and return
+empty or garbage output on an MeshXFS device. MeshXFS ships its own equivalents:
 
-| Job | Stock XFS — do **not** use | MXFS tool |
+| Job | Stock XFS — do **not** use | MeshXFS tool |
 |---|---|---|
 | Format | `mkfs.xfs` | `mkfs.mxfs` |
 | Check / repair (fsck) | `xfs_repair` | `chk_mxfs -a` / `-p` / `-y` |
@@ -680,12 +691,12 @@ equivalent to `xfs_db`. Tool names follow the standard Linux `mkfs.TYPE` /
 
 ## How this was built
 
-MXFS was written **entirely by AI** — specifically Anthropic's **Claude Code**,
+MeshXFS was written **entirely by AI** — specifically Anthropic's **Claude Code**,
 an autonomous AI coding agent — across many development sessions. No human wrote,
 hand-edited, or line-by-line reviewed the clustering code. The human/AI boundary
 is clean:
 
-- **Human-written:** the upstream Linux kernel **XFS** source MXFS forked,
+- **Human-written:** the upstream Linux kernel **XFS** source MeshXFS forked,
   written by the XFS developers (their copyright notices are kept in every
   forked file).
 - **AI-written:** everything that makes it *multinode* — the DLM (`dlm/`), the
@@ -834,7 +845,7 @@ built.
 
 ## Build
 
-MXFS builds as an out-of-tree kernel module against the running kernel's headers.
+MeshXFS builds as an out-of-tree kernel module against the running kernel's headers.
 
 ```
 make             # build the kernel module -> mxfs.ko
@@ -851,7 +862,7 @@ tools (`mkfs.mxfs`, `chk_mxfs` with its `fsck.mxfs` link, `resize_mxfs`,
 fence-peer handler `/usr/sbin/mxfs-drbd-fence-peer`, the man pages,
 `/etc/modprobe.d/mxfs.conf` (an existing one is kept; `make install OVERWRITE=1`
 replaces it and saves the old one as `mxfs.conf.backup`), `/etc/modules-load.d/mxfs.conf`
-and the udev rule. It refuses to run on a host that already has an MXFS
+and the udev rule. It refuses to run on a host that already has an MeshXFS
 package or DKMS module installed: remove that first, or two versions of the
 module and the tools end up installed under the same names.
 
@@ -867,9 +878,9 @@ Installed by `make install` and by the packages.
 
 | Tool | Installed as | Purpose |
 |---|---|---|
-| `mkfs_mxfs` | `/usr/sbin/mkfs.mxfs` | Format a block device for MXFS. |
-| `chk_mxfs` | `/usr/sbin/chk_mxfs` | Check / repair and report geometry — the MXFS `fsck`. |
-| `resize_mxfs` | `/usr/sbin/resize_mxfs` | Grow an MXFS filesystem after the device has been expanded. |
+| `mkfs_mxfs` | `/usr/sbin/mkfs.mxfs` | Format a block device for MeshXFS. |
+| `chk_mxfs` | `/usr/sbin/chk_mxfs` | Check / repair and report geometry — the MeshXFS `fsck`. |
+| `resize_mxfs` | `/usr/sbin/resize_mxfs` | Grow an MeshXFS filesystem after the device has been expanded. |
 | `fua_verify` | — | Verify SCSI READ/WRITE **FUA** semantics across nodes on a shared LUN. |
 | `caw_verify` | — | Verify SCSI **COMPARE AND WRITE** (`0x89`) persistence across nodes (built separately). |
 
@@ -889,7 +900,7 @@ The released configurations are 2, 4, 8 and 16 nodes with either lock manager
 `tools/mpath_settings.sh`), and two nodes with no shared storage on DRBD
 dual-primary (`2/net/mesh/drbd`, its own section below). Install
 the release package from the
-[Releases page](https://github.com/sshoecraft/mxfs/releases) on every node; it
+[Releases page](https://github.com/sshoecraft/meshxfs/releases) on every node; it
 loads the module with `force_transport=1 target_cache_protected=1`, i.e.
 `net/mesh`, and every node must run the same version. A source build of this
 tree (`make && make install`) installs the development code, which is not a
@@ -937,7 +948,7 @@ mount -t mxfs -o peer=10.0.0.11 /dev/sdX /mnt/shared      # on 10.0.0.12
 `peers=A/B/...` replaces multicast with exactly that list and drops every
 other sender. See `mxfs(5)` and [`docs/discovery.md`](docs/discovery.md).
 
-A host can mount more than one MXFS filesystem at once, each shared with its
+A host can mount more than one MeshXFS filesystem at once, each shared with its
 own set of hosts (this development branch, 0.90.122; not in a release yet).
 They share the host's ports: a lock-manager connection or datagram reaches the
 filesystem it is for.  Each filesystem may run its own transport with the
@@ -998,7 +1009,7 @@ cat /sys/module/mxfs/parameters/force_transport     # 0
 The setting survives a reboot on every released platform. On RHEL the RPM
 keeps `mxfs` out of the initramfs (`/etc/dracut.conf.d/mxfs.conf`), so the
 module is always loaded with the file on the root filesystem rather than a
-copy baked into the boot image; an initramfs built by an earlier MXFS
+copy baked into the boot image; an initramfs built by an earlier MeshXFS
 package is rebuilt when the package is installed.
 
 One filesystem can name its own lock manager with a mount option instead,
@@ -1025,7 +1036,7 @@ For any other target, prove it first with `caw_verify` from both nodes
 ([`docs/iscsi_setup.md`](docs/iscsi_setup.md) §4).
 
 **Before trusting data, verify the storage.** The shared LUN must honor durable
-(FUA) writes and SCSI Persistent Reservations, which MXFS uses to fence a failed
+(FUA) writes and SCSI Persistent Reservations, which MeshXFS uses to fence a failed
 node. See [`docs/iscsi_setup.md`](docs/iscsi_setup.md) for the storage
 requirements, and use `fua_verify` from both nodes to prove them before you
 format.
@@ -1034,7 +1045,7 @@ format.
 
 | Path | Contents |
 |---|---|
-| `xfs/` | XFS forked from the Linux 6.19 development tree and heavily modified, plus the MXFS coordination overlay — the bulk of the code. |
+| `xfs/` | XFS forked from the Linux 6.19 development tree and heavily modified, plus the MeshXFS coordination overlay — the bulk of the code. |
 | `dlm/` | Distributed lock managers `net/mesh` and `disk/caw`, discovery, membership, lease, disklock heartbeat, SCSI-PR fencing, journal slicing. |
 | `pal/` | Platform abstraction layer — kernel/userspace split, VFS + block-I/O glue, module init. |
 | `mxfs_clayer/` | Cluster-layer helpers (pinned resources, adaptive yield quantum). |
@@ -1048,10 +1059,10 @@ format.
 
 ## License
 
-MXFS is licensed under the **GNU General Public License, version 2** (`GPL-2.0-only`)
+MeshXFS is licensed under the **GNU General Public License, version 2** (`GPL-2.0-only`)
 — see [`LICENSE`](LICENSE).
 
-MXFS is a fork of the Linux kernel **XFS** filesystem, which is GPL-2.0. As a
+MeshXFS is a fork of the Linux kernel **XFS** filesystem, which is GPL-2.0. As a
 derivative work, the combined kernel module (`mxfs.ko`) is necessarily licensed
 under the same terms: you are free to use, study, modify, and redistribute it,
 including commercially, provided derivative works are distributed under GPL-2.0

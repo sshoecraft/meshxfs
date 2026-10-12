@@ -29,6 +29,12 @@
 #       from the pool for each run, so several configurations can run at once
 #       (`run.sh <configuration> --group <name>`).  A group is not a
 #       platform: nothing that walks the platform sets sees it.
+#   dns domain=<domain>
+#       the DNS domain the lab's DHCP server registers its guests under.  A
+#       node is resolved as <node>.<domain> before its bare name: a bare name
+#       goes through the host's search list, and another domain on it can hold
+#       a different host of the same name (clyde: alma9-1.localdomain is a VM
+#       on the physical Proxmox pair, alma9-1.vm.localdomain the lab node).
 #   addr <node>=<ipv4> ...
 #       a node no resolver knows.  peer= takes addresses, never names.
 #   qemu monitor_dir=<dir>
@@ -100,10 +106,14 @@ lab_groups() {  # every rig group's name, once each
         | awk '!seen[$0]++'
 }
 
-lab_addr() {  # <node> -> IPv4: the lab file, the resolver, then libvirt's view
-    local a src
+lab_addr() {  # <node> -> IPv4: the lab file, the lab's DNS domain, the resolver, then libvirt's view
+    local a src d
     a=$(lab_get addr "$1" 2>/dev/null) && { echo "$a"; return 0; }
-    a=$(getent ahostsv4 "$1" | awk 'NR == 1 {print $1}')
+    # With the lab's domain known, the bare name is never looked up: a node
+    # that is off has no lease and does not resolve, and its bare name would
+    # then find the other domain's host of the same name.
+    d=$(lab_get dns domain 2>/dev/null) || d=""
+    a=$(getent ahostsv4 "$1${d:+.$d}" | awk 'NR == 1 {print $1}')
     [ -n "$a" ] && { echo "$a"; return 0; }
     # A local guest no lab line and no resolver names (the nested Proxmox
     # guests pve9-3..7): the address libvirt sees on its NIC, from the DHCP
@@ -114,7 +124,7 @@ lab_addr() {  # <node> -> IPv4: the lab file, the resolver, then libvirt's view
             | awk '$3 == "ipv4" {sub("/.*", "", $4); print $4; exit}')
         [ -n "$a" ] && { echo "$a"; return 0; }
     done
-    echo "$1"
+    echo "$1${d:+.$d}"
 }
 
 lab_lun_nodes() {  # every node named by a pair, plus storage also=

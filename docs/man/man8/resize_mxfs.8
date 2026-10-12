@@ -1,10 +1,10 @@
 .\" resize_mxfs(8) man page
-.\" Copyright (c) 2026 MXFS Project
+.\" Copyright (c) 2026 MeshXFS Project
 .\" SPDX-License-Identifier: GPL-2.0
 .\"
-.TH RESIZE_MXFS 8 "2026-03-10" "MXFS 0.10.0" "System Administration"
+.TH RESIZE_MXFS 8 "2026-03-10" "MeshXFS 0.10.0" "System Administration"
 .SH NAME
-resize_mxfs \- grow an MXFS filesystem to fill an expanded device
+resize_mxfs \- grow an MeshXFS filesystem to fill an expanded device
 .SH SYNOPSIS
 .B resize_mxfs
 .RB [ \-n ]
@@ -13,7 +13,7 @@ resize_mxfs \- grow an MXFS filesystem to fill an expanded device
 .I device
 .SH DESCRIPTION
 .B resize_mxfs
-grows an MXFS filesystem after the underlying block device has been
+grows an MeshXFS filesystem after the underlying block device has been
 expanded (e.g., after an iSCSI LUN resize or LVM
 .BR lvextend (8)).
 .PP
@@ -27,11 +27,11 @@ only supports growing.  Shrinking a filesystem is not supported.
 .SS How Growing Works
 .nf
 Before:
-  [MXFS reserved ~96MB] [XFS data (AG 0, AG 1)]
+  [MeshXFS reserved ~96MB] [XFS data (AG 0, AG 1)]
   0                      xfs_data_offset          old_dev_end
 
 After:
-  [MXFS reserved ~96MB] [XFS data (AG 0, AG 1, AG 2, AG 3, ...)]
+  [MeshXFS reserved ~96MB] [XFS data (AG 0, AG 1, AG 2, AG 3, ...)]
   0                      xfs_data_offset                          new_dev_end
 .fi
 .SS New AG Structure
@@ -143,4 +143,4 @@ The resize tool binary.
 .BR lvextend (8),
 .BR iscsiadm (8)
 .SH AUTHORS
-MXFS Project.
+MeshXFS Project.

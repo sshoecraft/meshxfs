@@ -1,14 +1,35 @@
 ---
 name: feedback-when-you-release-ask-gpt-for-advice-on-the-release-banner
-description: USER directive: when you release, ask GPT for advice on the release banner. RULE: CONSULT ANOTHER MODEL WHEN STUCK (never consult another model) was removed for this, 2026-10-10.
+description: USER: release banner = GPT writes it from the version's changelog section, prompt "write a banner describing the enhancements", no draft of ours.
 metadata:
   type: feedback
 ---
 
-USER 2026-10-10: "remove rule 5 and add a memory that says 'when you release ask gpt for advice on the release banner' ... because NO ONE I MEAN _NO ONE_ is going to [be] excited about '2026-10-10 — 0.90.116 — the allocator's trylock no longer does ledger I/O while it holds a VM image's lock' ... ever".
+USER 2026-10-10: "when you release ask gpt for advice on the release banner" — NO ONE is excited by an engineering headline like "the allocator's trylock no longer does ledger I/O...".
 
-**When you release, ask GPT (`mcp__ask_gpt__query`) for advice on the release banner** — the headline on the GitHub release page, the released version's CHANGELOG heading, and the README's release section heading — before publishing.
+USER 2026-10-12, after testing the method below on 0.90.124: "whatever you did to get this result is what I want to see in the future."
 
-- Give GPT what users get from the release (every user-visible improvement since the previous RELEASE, not just the last version), who the users are (e.g. Proxmox admins running a two-host DRBD pair), and the draft banner; ask what would make it a reason to upgrade.
-- RULE: CONSULT ANOTHER MODEL WHEN STUCK in CLAUDE.md ("never consult another model") was REMOVED by the user on 2026-10-10 to allow this. Older memories that say never to consult another model (compiled-model-consults-policy-and-handling-consult-output, feedback notes from 2026-09-04 and 2026-10-06) describe the retired rule.
-- Related: feedback-release-headline-sells-the-whole-release-to-its-users-not-the-last-internal-fix, feedback-every-release-lists-its-released-configurations-in-a-table.
+## The procedure (exactly this)
+
+Before publishing, call `mcp__ask_gpt__query` with:
+
+1. The prompt, first: **"Write a banner describing the enhancements made in this release. Here is the changelog for the release, MXFS <version>:"**
+2. Then the released version's `CHANGELOG.md` section:
+   - **Without its `## ...` heading line** (the heading is the banner being written; sending it seeds the answer).
+   - The user-facing summary and the released-configurations table **verbatim**.
+   - The "### <version> in detail" part with test-tooling and lab-host paragraphs dropped (harness fixes, evidence/space tools, recovered scripts) and the defect write-ups shortened; refer to the lab host generically ("the test host"), not by name.
+3. **Nothing else.** No draft banner, no audience description, no length limit, no "what would make users upgrade". GPT reads the changelog and writes the banner.
+
+Use GPT's title line as the banner: the GitHub release title, the CHANGELOG heading, the README release heading.
+
+0.90.124's result, which the user liked: **"MXFS 0.90.124 — Multipath SAN Support, Stronger Recovery, Better Scalability"** — short category labels an admin scans in a second.
+
+## What failed and why (do not repeat)
+
+- Sending GPT OUR draft plus our change list and asking it to improve it (0.90.124, session d49bdcf7): GPT polished our framing into "restored multipath for 2–16-node SANs, multiple filesystems per host, and multi-resource DRBD recovery". User: the worst selling point of a release they had ever seen.
+- "Restored"/"returns"/"is back": history only we know (claimed in 0.90.51, withdrawn). To a user it says it was broken. It comes from the changelog's own "released again ... Last claimed in 0.90.51" wording, so keep version history out of the user-facing summary.
+- Rewriting it ourselves did not fix it: outcome sentences ("lose a cable... and your cluster keeps running") were "banners for managers"; feature-list lines were just as bad.
+- Do not take GPT's output and ship it unread; but when it comes from this procedure, its title line is the banner.
+
+The old "never consult another model" rule was REMOVED by the user on 2026-10-10 to allow this.
+Related: feedback-release-headline-sells-the-whole-release-to-its-users-not-the-last-internal-fix, feedback-every-release-lists-its-released-configurations-in-a-table.

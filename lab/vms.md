@@ -15,8 +15,7 @@ other kernel verifies nothing. It is not repeated here, so the two cannot
 disagree.
 
 The `nodes` column is the size of the verification set: two, a node and a
-peer to fence (the second built from the spec, or cloned from the first with
-`scripts/lab_clone_node.sh`, both on one LUN of their own). Every fault a
+peer to fence (both built from the spec, on one LUN of their own). Every fault a
 platform node has caught — a kernel API, the fence on that kernel, packaging —
 shows at two; a release's node count is verified on the development rig.
 
@@ -54,7 +53,7 @@ configuration problem": its `early_command` found no `/media/debian.fix`
 (the `media` CD was not mounted when it ran), so the stock media scan ran and
 failed. Watch the build's VNC console if it waits on SSH past the install.
 
-**Firewalls.** Where the row says firewalld is running, open only what MXFS
+**Firewalls.** Where the row says firewalld is running, open only what MeshXFS
 uses: 7600/tcp (DLM), 7601/udp (discovery), 7602/udp (CAW lock-release requests),
 7603/udp (lease heartbeat). Verifying with the firewall on is the point: a
 user's RHEL node has it on.
