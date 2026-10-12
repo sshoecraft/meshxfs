@@ -34,7 +34,7 @@
 #   MEM_MIB      each VM's memory (default 4096; guests run inside it)
 #   CPUS         each VM's vCPUs (default 8)
 #   CLUSTER      the Proxmox cluster name (default mxfslab9b)
-#   OSI_SPEC     the osimager location/spec (default qemu/lab/proxmox-ve-9.1-x86_64,
+#   OSI_SPEC     the osimager location/spec (default qemu/lab/proxmox-ve-9-latest-x86_64,
 #                the pve9 row of lab/vms.md)
 #   BUILD_BUDGET seconds for the installs, run at once (default 700: two
 #                finished in 5 min 37 s on clyde, packer's ssh wait included)
@@ -50,7 +50,7 @@ REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 SSHP="$REPO/tools/mxfs_sshpass.sh"
 VIRSH="virsh -c qemu:///system"
 VMS_DIR=$(lab_get paths qemu_root 2>/dev/null) || VMS_DIR=/home/steve/vms/qemu
-OSI_SPEC=${OSI_SPEC:-qemu/lab/proxmox-ve-9.1-x86_64}
+OSI_SPEC=${OSI_SPEC:-qemu/lab/proxmox-ve-9-latest-x86_64}
 CLUSTER=${CLUSTER:-mxfslab9b}
 BUILD_BUDGET=${BUILD_BUDGET:-700}
 BOOT_BUDGET=${BOOT_BUDGET:-120}

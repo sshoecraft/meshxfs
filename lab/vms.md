@@ -21,17 +21,17 @@ shows at two; a release's node count is verified on the development rig.
 
 | platform | osimager spec | nodes | after the build | role |
 |---|---|---|---|---|
-| `ubuntu2404` | `ubuntu-24.04.3-x86_64` | 2 | boot the GA kernel `platforms.json` claims, not an HWE one | runtime |
-| `pve9` | `proxmox-ve-9.1-x86_64` | 2 | install `proxmox-default-kernel` so both claimed kernels are present; `proxmox-headers-<krel>` for each | runtime, one round per claimed kernel |
-| `rhel9` | `alma-9.7-x86_64`, then updated to 9.8 | 2 | `dnf -y update` to 9.8 and boot the claimed kernel; enable EPEL (DKMS comes from there); firewalld running, SELinux enforcing; a clone is relabeled (`touch /.autorelabel`) before its first use | runtime |
-| `debian13` | `debian-13.3-x86_64` (the local DVD), then upgraded | 2 | replace the DVD-only `sources.list` with deb.debian.org `trixie`, `trixie-updates` and `trixie-security`; `apt full-upgrade` and boot the claimed kernel; install `linux-headers-amd64 dkms open-iscsi sg3-utils` | runtime |
-| `ubuntu2604` | `ubuntu-26.04-x86_64` | 2 | | runtime |
-| `rhel10` | `alma-10.1-x86_64` | 2 | enable EPEL; firewalld running, SELinux enforcing | runtime |
-| `debian12` | `debian-12.13-x86_64` | 2 | | runtime |
-| `rhel8` | `alma-8.10-x86_64` | 2 | enable EPEL; firewalld running, SELinux enforcing | runtime |
-| `debian11` | `debian-11.11-x86_64` | 2 | replace the DVD-only `sources.list` with deb.debian.org `bullseye` and `bullseye-updates`, and `bullseye-security` from archive.debian.org (deb.debian.org's security index still lists packages whose files have moved to the archive, so installs 404); install `linux-headers-$(uname -r) linux-headers-amd64 dkms build-essential open-iscsi sg3-utils` | runtime |
-| `sles16` | `sles-16.0-x86_64` | 2 | | runtime |
-| `freebsd14` | `freebsd-14.4-x86_64` | 2 | | runtime (a port; no package exists yet) |
+| `ubuntu2404` | `ubuntu-24.04-latest-x86_64` | 2 | boot the GA kernel `platforms.json` claims, not an HWE one | runtime |
+| `pve9` | `proxmox-ve-9-latest-x86_64` | 2 | install each kernel `platforms.json` claims by its exact version (`proxmox-default-kernel` for the newest), so every claimed kernel is present; `proxmox-headers-<krel>` for each | runtime, one round per claimed kernel |
+| `rhel9` | `alma-9-latest-x86_64` | 2 | boot the claimed kernel, installed by its exact version if the build brought a newer one; enable EPEL (DKMS comes from there); firewalld running, SELinux enforcing | runtime |
+| `debian13` | `debian-13-latest-x86_64` | 2 | replace the DVD-only `sources.list` with deb.debian.org `trixie`, `trixie-updates` and `trixie-security`; `apt full-upgrade` and boot the claimed kernel; install `linux-headers-amd64 dkms open-iscsi sg3-utils` | runtime |
+| `ubuntu2604` | `ubuntu-26.04-latest-x86_64` | 2 | | runtime |
+| `rhel10` | `alma-10-latest-x86_64` | 2 | enable EPEL; firewalld running, SELinux enforcing | runtime |
+| `debian12` | `debian-12-latest-x86_64` | 2 | | runtime |
+| `rhel8` | `alma-8-latest-x86_64` | 2 | enable EPEL; firewalld running, SELinux enforcing | runtime |
+| `debian11` | `debian-11-latest-x86_64` | 2 | replace the DVD-only `sources.list` with deb.debian.org `bullseye` and `bullseye-updates`, and `bullseye-security` from archive.debian.org (deb.debian.org's security index still lists packages whose files have moved to the archive, so installs 404); install `linux-headers-$(uname -r) linux-headers-amd64 dkms build-essential open-iscsi sg3-utils` | runtime |
+| `sles16` | `sles-16-latest-x86_64` | 2 | | runtime |
+| `freebsd14` | `freebsd-14-latest-x86_64` | 2 | | runtime (a port; no package exists yet) |
 | `raspios11` | none — a Raspberry Pi | 2 | | runtime on real hardware |
 | `macos26` | none — a Mac | 2 | | runtime on real hardware |
 
@@ -39,11 +39,12 @@ shows at two; a release's node count is verified on the development rig.
 container by the platform's `build_check` (`scripts/rhel_kbuild_check.sh -i
 rockylinux:9`); only the runtime platform above gets a set of nodes.
 
-**`rhel9` has no 9.8 spec yet.** osimager 1.9.1 ships AlmaLinux up to 9.7, so
-the set is built from the 9.7 spec and updated in place. AlmaLinux's
-repositories serve the current minor release, so the update lands on 9.8; the
-claimed kernel must then be installed by its exact version if the update brought a
-newer one. A 9.8 spec in osimager would remove the update step.
+**A spec names an OS major line, never a point release.**
+`<dist>-<major>-latest-<arch>` builds the newest point release osimager has
+for that major (`mkosimage --latest alma-9` shows which). The install media
+decides nothing a release claims: the kernel comes from `platforms.json` and
+the row's after-build steps, which install it by its exact version when the
+newest media brings a later one.
 
 **`debian13` from the DVD ends with no mirror.** The install uses only the
 DVD, so the node's `sources.list` names the DVD and nothing else; until the
@@ -65,4 +66,4 @@ libvirt domains named `test1`..`testN` (up to 32), built from the `ubuntu2404`
 spec above. The name pattern is fixed — `run.sh` finds the fleet by it. The
 rig's storage conditions (LIO, SCST, multipath) are in `README.md`. A rig
 node is never a member of a platform's set, so the `ubuntu2404` set is nodes
-of its own, cloned from a rig node that had verified the platform.
+of its own, built from the same spec.

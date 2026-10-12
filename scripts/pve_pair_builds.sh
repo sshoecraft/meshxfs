@@ -13,7 +13,7 @@
 #   per-host  builds per host (default 4); names <PREFIX>1..<PREFIX>N, dealt
 #             to the hosts in turn (with the default two, odd ones on pve1,
 #             even ones on pve2)
-#   spec      default alma-9.7-x86_64
+#   spec      default alma-9-latest-x86_64
 # Env:
 #   PREFIX        build name prefix (default alma9-)
 #   LOCATIONS     "pve1 pve2" (mkosimage locations, in host order)
@@ -90,7 +90,7 @@ set -u
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 SSHP="$REPO/tools/mxfs_sshpass.sh"
 PER=${1:-4}
-SPEC=${2:-alma-9.7-x86_64}
+SPEC=${2:-alma-9-latest-x86_64}
 PREFIX=${PREFIX:-alma9-}
 read -r -a LOCS <<<"${LOCATIONS:-pve1 pve2}"
 read -r -a HOSTS <<<"${HOSTS:-192.168.1.80 192.168.1.81}"

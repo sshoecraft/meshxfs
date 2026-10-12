@@ -11,6 +11,13 @@
   secrets store when it runs.  It used to spell out the password's first
   four characters as its search pattern.
 - `notes/2node.md` names the repository as `sshoecraft/meshxfs`.
+- **Lab VM specs name an OS major line, not a point release.**  osimager now
+  resolves `<dist>-<major>-latest-<arch>` (`alma-9-latest-x86_64` is 9.8,
+  `debian-11-latest-x86_64` 11.11), so every row of `lab/vms.md` and the
+  defaults of `scripts/pve_nested_pair.sh` and `scripts/pve_pair_builds.sh`
+  use it.  `rhel9` no longer builds 9.7 and updates to 9.8; `pve9`'s
+  after-build step installs each claimed kernel by its exact version, since
+  the newest install media may boot a later one.
 - **Install instructions name no version.**  `docs/drbd-setup.md` told new
   users to `git clone --branch v0.90.107` and build from source, two releases
   behind; it and the README's DRBD section now say to install the latest
