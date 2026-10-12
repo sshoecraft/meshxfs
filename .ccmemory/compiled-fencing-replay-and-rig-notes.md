@@ -16,7 +16,7 @@ learned the hard way. Organized below by those actual groupings.
 
 ## Cluster 1: replay has no durable partial state
 
-[[reference-a-foreign-slice-replay-writes-nothing-until-the-end-of-the-pass-so-there-is-no-incremental-durable-prefix]] —
+`reference-a-foreign-slice-replay-writes-nothing-until-the-end-of-the-pass-so-there-is-no-incremental-durable-prefix` —
 On an MXFS untrusted/foreign replay, `xfs_log_recover.c` skips the mid-pass
 `xfs_buf_delwri_submit` and instead does `log->l_mxfs_drain_deferred++`; every
 replayed image stays in core until one `xfs_buf_delwri_submit` at the end of
@@ -54,7 +54,7 @@ not treat recovery as published.
 Chronological design chain, all Astra design-consult rulings, each correcting
 or extending the previous:
 
-**s75 — [[design-a-fence-certificate-needs-admission-and-retirement-and-they-are-separate-facts]]:**
+**s75 — `design-a-fence-certificate-needs-admission-and-retirement-and-they-are-separate-facts`:**
 A fence certificate must establish two separate facts: ADMISSION (dead
 incarnation can't get write permission — a WE reservation or gone registration
 proves this) and RETIREMENT (writes the target already accepted from that
@@ -88,7 +88,7 @@ succession tied to *that* victim (differing boot ids alone prove no ordering),
 complete nexus coverage, a completed target-side retirement boundary, and
 publication of the durable successor witness only after that boundary.
 
-**s83 — [[reference-there-is-no-in-kernel-scsi-task-management-path-for-an-out-of-tree-module-on-6-8]]:**
+**s83 — `reference-there-is-no-in-kernel-scsi-task-management-path-for-an-out-of-tree-module-on-6-8`:**
 Confirmed against the deployed 6.8.0-101-generic kernel: `scsi_ioctl_reset` is
 global in kallsyms but has no `EXPORT_SYMBOL` (absent from Module.symvers, so
 modpost rejects it) and takes `int __user *`; `scsi_try_bus_device_reset` and
@@ -119,7 +119,7 @@ witness's clothes" ambiguity — but the same handler also calls
 `fail_scsi_tasks(conn, lun, DID_ERROR)`, failing the issuer's own outstanding
 commands, which is why the issuer survives a reset and a bystander does not.
 
-**s82 — [[design-the-three-routes-to-a-retirement-witness-and-why-only-a-matched-target-response-counts]]:**
+**s82 — `design-the-three-routes-to-a-retirement-witness-and-why-only-a-matched-target-response-counts`:**
 Ranking: implement witnessed LOGICAL UNIT RESET as the general mechanism,
 keep early PREEMPT AND ABORT as an optimization only, make refusal the
 terminal fallback. A qualification built from probe laps that saw no late
@@ -157,7 +157,7 @@ all fail to. CLEAR TASK SET / an ORDERED cross-nexus barrier are genuine
 alternatives only after establishing the LU's task-set model — with per-nexus
 task sets, clearing ours says nothing about the victim's.
 
-**s82 — [[design-a-deployment-contract-is-a-conditional-and-its-premise-is-an-observation-the-code-must-classify]]:**
+**s82 — `design-a-deployment-contract-is-a-conditional-and-its-premise-is-an-observation-the-code-must-classify`:**
 Corrects the previous ruling and the 0.89.13 package it had shipped. 0.89.13's
 deployment clause ("for this LUN, every command accepted from a lost nexus
 completed or aborted before that nexus's registration disappears") is an
@@ -195,7 +195,7 @@ an applicable clause exists is "no replay-authorizing certificate" — never
 
 ## Standalone infra/host facts (no shared topic)
 
-[[clyde-taint-512-is-a-boot-time-dma-direct-map-page-warn-not-campaign-induced]] —
+`clyde-taint-512-is-a-boot-time-dma-direct-map-page-warn-not-campaign-induced` —
 clyde's `/proc/sys/kernel/tainted` reads 12800 = `TAINT_OOT_MODULE` (4096) +
 `TAINT_UNSIGNED_MODULE` (8192) + `TAINT_WARN` (512); the nodes only show the
 first two. The 512 is a single `dma_direct_map_page` WARNING 4 seconds after
@@ -226,7 +226,7 @@ definition anyway — not because inheritance fails, but because a rule written
 this session hasn't propagated yet, and a constraint next to the task is
 obeyed more reliably than one 400 lines up the file.
 
-[[infra-mpath-up-sh-quoting-regression-fixed]] — `scripts/mpath_up.sh
+`infra-mpath-up-sh-quoting-regression-fixed` — `scripts/mpath_up.sh
 status|up N` broke with `line 117: syntax error near unexpected token '('`
 after a post-sess6 edit (iscsid.conf startup=automatic feature) introduced two
 raw-single-quote bugs inside the single-quoted `NODE_ENSURE` block: an

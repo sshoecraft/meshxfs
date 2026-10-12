@@ -19,7 +19,7 @@ a proven fact.
 
 ## sess578 — co-occurrence is not causation (D-0932)
 
-[[trap-co-occurrence-of-two-probes-is-not-a-race-waking-is-not-acting]]: a
+`trap-co-occurrence-of-two-probes-is-not-a-race-waking-is-not-acting`: a
 check of the form `event_A>=1 && event_B>=1` scored "two actors under one
 attempt" when neither actor had acted — `RETIRE_PENDING` was never published
 (an earlier assertion already said so), the resumed worker issued nothing,
@@ -33,7 +33,7 @@ derive timeouts from the injection's own duration plus slack.
 
 ## sess579 — master locality must be established, not assumed
 
-[[trap-which-node-masters-a-resource-is-a-hash-so-a-two-node-lap-must-establish-locality]]:
+`trap-which-node-masters-a-resource-is-a-hash-so-a-two-node-lap-must-establish-locality`:
 which node masters a DLM resource is a hash of the resource id, so a harness
 using whatever inode a create() happens to return silently coin-flips between
 the remote-master (wire) and local-master (no wire) code paths across laps —
@@ -47,7 +47,7 @@ than from role names (H/W), and gate against zero explicitly.
 
 ## sess580 — PR-gate obligation set, and four measurement traps in one day
 
-[[trap-a-per-lun-exclusive-reservation-has-more-than-one-recovery-depending-on-it]]
+`trap-a-per-lun-exclusive-reservation-has-more-than-one-recovery-depending-on-it`
 (D-0932, architecture): one SCSI PR reservation per LUN can have two
 recoveries running under it at once — a node returning alone must both
 recover its own prior incarnation and fence the peer that had been recovering
@@ -64,7 +64,7 @@ which journal generation/records it deletes), and control-plane publication
 (grant-release/completion messages) needs fencing too, not just the
 reservation check.
 
-[[trap-master-assignment-moves-across-a-module-reload-so-locality-is-per-epoch]]:
+`trap-master-assignment-moves-across-a-module-reload-so-locality-is-per-epoch`:
 which node masters an inode is re-decided when the cluster re-forms, so a
 locality established before a `module_swap_deploy.sh` is void after it — same
 inode mastered by test2 pre-swap, test1 post-swap. Re-establish locality
@@ -78,7 +78,7 @@ neither is UNDETERMINED, skip it). Also scope every notification count by
 and never compare `pr_warn_ratelimited` line counts across laps as if they
 were event counts.
 
-[[trap-a-design-consults-hazard-ranking-is-hypotheses-not-findings-measure-before-redesigning]]:
+`trap-a-design-consults-hazard-ranking-is-hypotheses-not-findings-measure-before-redesigning`:
 a consult ranked a shared-acquisition-record key #1 and urged a redesign;
 instrumented, it showed 114 collisions per 240s wait at zero cost (sharing is
 what makes N waiters cost the holder one notification stream instead of N),
@@ -92,7 +92,7 @@ consult's ranking as a list of things to instrument, not a work order; prove
 the instrument can fire before trusting its silence; run controlled pairs
 (one variable differing) so the delta is attributable.
 
-[[trap-never-derive-a-count-from-a-capture-you-have-not-proven-non-empty]]: an
+`trap-never-derive-a-count-from-a-capture-you-have-not-proven-non-empty`: an
 ssh helper (`rs() { timeout ... $SSH ... 2>/dev/null | filt; }`) swallows the
 remote command's stderr inside the helper, so a caller's own `2>&1` redirect
 is a no-op and a failed remote command produces a zero-byte capture. A
@@ -104,7 +104,7 @@ before counting (an error message is non-empty too); on failure exit
 ABORT/INFRA, never FAIL/VACUOUS — a zero from a broken instrument and a zero
 from a clean system are the same number.
 
-[[trap-a-set-built-from-validation-holds-nothing-for-an-obligation-not-yet-started]]
+`trap-a-set-built-from-validation-holds-nothing-for-an-obligation-not-yet-started`
 (sess580/581, D-0932 continuation): a consult said "account for all
 outstanding obligations, not merely currently running threads"; 0.82.4 built
 the dependent set from recoveries that had validated exclusion (the running-
@@ -118,7 +118,7 @@ were actually built before marking the record fixed.
 
 ## sess581 — a budgeted probe's line index is not an event index
 
-[[trap-the-nth-printed-line-of-a-budgeted-probe-is-not-the-nth-event]]:
+`trap-the-nth-printed-line-of-a-budgeted-probe-is-not-the-nth-event`:
 `P912-DROP-LOCKREQ` prints only its first 8 hits and every 64th after; a
 harness took the (baseline+1)-th printed line as "the first armed drop" and
 actually read the 64th event, scoring latency as -8s against a correct build.
@@ -128,7 +128,7 @@ of which other lines happened to print.
 
 ## sess582 — timing windows, per-load counters, incarnation awareness
 
-[[trap-a-cause-reproduced-outside-its-timing-window-lands-in-the-second-defence-and-reads-as-unreachable]]
+`trap-a-cause-reproduced-outside-its-timing-window-lands-in-the-second-defence-and-reads-as-unreachable`
 (D-0945): a positive control disabled the poison gate and reproduced the
 cause, but the release reached the master 0.2s after the fence had sealed, so
 the next line of defense (`P-TAUTH-SEALED-RELEASE-REFUSED`) absorbed it and
@@ -139,7 +139,7 @@ than wait for a periodic worker), prove it landed inside the window with a
 second-line counter of zero plus a direct effect, and report which line of
 defense actually answered.
 
-[[trap-a-per-load-counter-read-from-the-per-boot-ring-and-the-mount-line-that-anchors-it]]:
+`trap-a-per-load-counter-read-from-the-per-boot-ring-and-the-mount-line-that-anchors-it`:
 `dmesg` is a per-BOOT ring; MXFS probe counters and print budgets are per-
 LOAD (static, reset on insmod). Reading a budgeted probe against the whole
 ring after a same-boot module reload gave two false FAILs — a filler
@@ -151,7 +151,7 @@ every mount prints first (`MXFS-MEMBERSHIP local=<id> active_count=1`):
 the anchor without resetting the counter — under-counts, never produces a
 false PASS.
 
-[[trap-a-changecount-regression-probe-must-be-incarnation-aware-and-the-root-cluster-passengers-are-the-rt-inodes]]
+`trap-a-changecount-regression-probe-must-be-incarnation-aware-and-the-root-cluster-passengers-are-the-rt-inodes`
 (D-0955): `mxfs_dino_clobber_probe` flagged "memory changecount below
 platter" as a revert on slots where a sole survivor had simply allocated a
 new file over a departed peer's freed inode number (changecount restarts at
@@ -168,7 +168,7 @@ compare answers "stale."
 
 ## sess583 — sole-survivor ownership protocol (D-0955/D-0957)
 
-[[trap-a-ruling-that-says-take-path-x-exactly-as-multi-node-assumes-every-premise-of-x]]:
+`trap-a-ruling-that-says-take-path-x-exactly-as-multi-node-assumes-every-premise-of-x`:
 a consult ruled a sole survivor should take
 `mxfs_submit_partial_inode_write()` exactly as under multi-node membership.
 Landed alone, it stranded a freshly created directory (799/800 creates
@@ -191,7 +191,7 @@ durability evidence is a cold-cache readback from another node, never the
 absence of a clobber line (an omission bug fires no clobber probe on bytes
 never written).
 
-[[trap-platter-live-memory-free-different-gen-is-not-a-revert-unless-the-slot-is-unheld]]
+`trap-platter-live-memory-free-different-gen-is-not-a-revert-unless-the-slot-is-unheld`
 (D-0955/D-0957): the clobber probe's "platter LIVE, memory FREE, different
 gen = live revert" class fired three false positives in one session: a
 96-byte detail buffer truncated the generation mid-number (fixed: 160
@@ -207,7 +207,7 @@ discriminator was blind there and every own-churn write misread as a revert.
 
 ## sess584 — first-join freeze design (D-0959)
 
-[[trap-a-join-time-flush-that-races-the-local-workload-and-answers-with-a-shutdown-is-the-data-loss]]:
+`trap-a-join-time-flush-that-races-the-local-workload-and-answers-with-a-shutdown-is-the-data-loss`:
 the incumbent's `peer_joined` flush ran 5 rounds of log-force + AIL-push +
 cache invalidation on a protocol thread against its own live create/append
 workload, never converged (buffers kept getting re-dirtied), and the fifth
@@ -226,7 +226,7 @@ to the newcomer until positive readiness, never a timer — a shared read
 served early is a stale base for a later EX with no BAST able to fix it,
 since the incumbent held nothing.
 
-[[trap-a-join-lap-that-lets-the-incumbent-re-touch-its-objects-after-the-flip-measures-nothing]]:
+`trap-a-join-lap-that-lets-the-incumbent-re-touch-its-objects-after-the-flip-measures-nothing`:
 three earlier join laps read clean because the incumbent's modification loop
 touched every object again after the membership flip, so the first post-flip
 write went through a real re-acquired grant instead of exercising the never-
@@ -245,7 +245,7 @@ silently return 0.
 
 ## sess585 — remote-acquire abandonment ruling (D-0958), probe scope
 
-[[ruling-remote-acquire-abandonment-protocol-status-cancel-fallible-boundaries]]:
+`ruling-remote-acquire-abandonment-protocol-status-cancel-fallible-boundaries`:
 consult verdict on bounding a remote inode acquire whose live master never
 answers. For a caller that cannot unwind (dirty transaction, writeback,
 inactivation) there is no safe bounded completion under persistent request
@@ -269,7 +269,7 @@ consecutive NOT_FOUND presented as fact. K and the silence bound are policy —
 never derive them from drain duration, holder I/O latency, membership
 timeouts, or a test's window.
 
-[[trap-a-locality-probe-scoped-to-low-inode-numbers-goes-blind-on-an-aged-filesystem]]:
+`trap-a-locality-probe-scoped-to-low-inode-numbers-goes-blind-on-an-aged-filesystem`:
 `P7S-BAST-FIRE` (dlm/dlm.c fire_bast_records) prints only for `ino<=256` —
 fine on a fresh filesystem's low inode numbers, silently blind on an aged one
 (candidates 3713+ after a module swap). All eight candidates read
@@ -283,7 +283,7 @@ inode number.
 
 ## sess586 — departure-worker teardown ruling (D-0953), control-arm and knob discipline
 
-[[ruling-departure-worker-teardown-cancel-between-pages-unbounded-join-no-quarantine-by-deadline]]:
+`ruling-departure-worker-teardown-cancel-between-pages-unbounded-join-no-quarantine-by-deadline`:
 consult verdict on the UAF panic where unmount ignored the departure worker's
 30s join timeout mid-takeover and destroyed the engine under it. Cancel only
 between page-transaction boundaries (prepare→activate→mark-MINE→purge→import
@@ -308,7 +308,7 @@ that stays mounted (mount-settle sweep alone is not enough) — trigger a sweep
 on every processed membership-change departure, not just "someone might
 remount."
 
-[[trap-a-control-arms-expected-behaviour-written-from-reasoning-hides-the-second-defence]]
+`trap-a-control-arms-expected-behaviour-written-from-reasoning-hides-the-second-defence`
 (D-0958): a control arm's header asserted, from code-reading at design time
 and never measured, that a master's undelivered grant without LOCK_CANCEL
 "blocks the writer 40s forever." Measured: it blocked 10s then completed,
@@ -323,9 +323,9 @@ duration; the treatment arm must also assert the second defense did NOT fire,
 or a lap where both retire the grant proves nothing about which one the
 write actually waited on. Run a control arm once before shipping its checks.
 
-[[technique-a-test-knob-a-harness-selects-by-must-expose-a-counter-that-resets-on-write]]:
+`technique-a-test-knob-a-harness-selects-by-must-expose-a-counter-that-resets-on-write`:
 third occurrence of the budgeted-probe-line trap (after
-[[trap-the-nth-printed-line-of-a-budgeted-probe-is-not-the-nth-event]] and
+`trap-the-nth-printed-line-of-a-budgeted-probe-is-not-the-nth-event` and
 the sess580 selection-step variant) — a candidate search counted
 `P912-DROP-LOCKREQ` lines (budgeted: first 8 + every 64th, per module load)
 to find a remotely-mastered inode; once the budget was spent by an earlier

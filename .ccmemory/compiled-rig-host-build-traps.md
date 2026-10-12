@@ -64,7 +64,7 @@ via `D-MASS-UMOUNT-ROOT-EX-SERIALIZE-100S-526B`) — unmount the fleet
 yourself, in parallel, before prepping.
 
 ### sess440 — a top-level `make dlm/foo.o` silently builds a user-mode object
-[[trap-toplevel-make-dlm-o-builds-usermode-objects-breaks-make-modules]]:
+`trap-toplevel-make-dlm-o-builds-usermode-objects-breaks-make-modules`:
 `make -s dlm/scsipr.o ...` run at the repo root (not through kbuild)
 compiles user-mode objects into `dlm/*.o` with no `.o.cmd` — no build error,
 just implicit-function warnings for `READ_ONCE`/`WRITE_ONCE`. The next `make
@@ -76,7 +76,7 @@ the specific stale `dlm/*.o` and `dlm/.*.o.cmd` by full name (no glob, RULE
 2b) and rebuild through kbuild.
 
 ### sess445 — never edit a bash script a live process is executing
-[[trap-never-edit-a-bash-script-while-it-is-running-run-sh-offset-shift]]:
+`trap-never-edit-a-bash-script-while-it-is-running-run-sh-offset-shift`:
 bash reads a script incrementally by file offset; parsed function bodies are
 safe, but every top-level command after the current read position is
 re-read from the saved offset, so inserting/deleting bytes above it makes
@@ -90,7 +90,7 @@ carrying that same script path, killing itself before it could dump
 can't match its own text.)
 
 ### sess452 — a root-owned sshpass passfile hangs the whole fleet silently
-[[trap-sudo-mpath-up-leaves-root-owned-passfile]]: any harness step run
+`trap-sudo-mpath-up-leaves-root-owned-passfile`: any harness step run
 under `sudo` (e.g. `mpath_up.sh`) materializes `/tmp/.mxfs_pass` as
 `root:600`. The unprivileged caller's `[ -s ]` check on it is true (stat
 still works), so `mxfs_sshpass.sh` hands it to sshpass — which for
@@ -106,7 +106,7 @@ the canonical one is owned by someone else and inaccessible. Diagnostic:
 sudo'd step ran.
 
 ### sess465 — a scratch compile silently links the TREE's old objects
-[[trap-scratch-compile-rsync-copies-mxfs-mod-links-tree-objects]]: an
+`trap-scratch-compile-rsync-copies-mxfs-mod-links-tree-objects`: an
 `rsync -a /src/mxfs/ $S/` scratch copy (excluding `*.o`/`*.cmd`/`*.ko`)
 still copies `mxfs.mod` — kbuild's generated absolute-path object list. On
 the first scratch build the command string differs so kbuild regenerates it
@@ -122,7 +122,7 @@ scratch copy, delete `mxfs.mod`, `mxfs.mod.c`, `mxfs.mod.o`,
 `make modules`. Never rsync the other direction.
 
 ### sess468 — killing a chain's process group leaves its `timeout` child alive, holding the run lock
-[[trap-timeout-child-escapes-pgroup-kill-run-lock-collision]]: `kill -TERM
+`trap-timeout-child-escapes-pgroup-kill-run-lock-collision`: `kill -TERM
 -- -<pgid>; kill -KILL -- -<pgid>` on a setsid chain kills the chain and its
 `lap()` shells, but GNU `timeout` runs the wrapped command in its OWN
 process group specifically so it CAN signal that tree without hitting

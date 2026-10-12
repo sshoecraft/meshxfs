@@ -16,7 +16,7 @@ of its instruments could be trusted.
 ## The defect and its repro
 
 state.md's open item said heavy tests needed re-running after a storm on the
-current build but gave no recipe. [[aged-mount-coherency-repro-recipe]]
+current build but gave no recipe. `aged-mount-coherency-repro-recipe`
 supplied one: on ONE mount, without re-prepping, run ~12x `dirent_durability`
 @32/caw plus 2-3 full correctness boards, then `cache_coherency` +
 `strong_consistency`. Result: aged mount FAILs `cache_coherency` 0/32
@@ -35,7 +35,7 @@ D-DIRENT-INODE-TYPE-MISMATCH.
 
 Generalizing the foreign-drain-defer predicate in `mxfs_foreign_demoter()`
 from its original one-slot form to a two-slot form dropped the self-exemption
-check. [[demoter-predicate-self-exemption-invariant]]: the broken form
+check. `demoter-predicate-self-exemption-invariant`: the broken form
 `(d1 && d1 != current) || (d2 && d2 != current)` defers to a foreign drain
 even when `current` itself owns the other slot — a state measured 30-152
 times per run, not an edge case. Cost: `cache_coherency` FAIL 0/32
@@ -55,7 +55,7 @@ Three separate instruments this session produced a confident wrong verdict
 before being validated against a known invariant.
 
 1. **Genuine vs. artifact `dirent_durability` loss** —
-   [[dirent-durability-failure-mode-discriminator]]. `durable_loss=8` appears
+   `dirent-durability-failure-mode-discriminator`. `durable_loss=8` appears
    in both a real loss and a straggler-timeout artifact; the discriminators
    are `late_ok` (nonzero in a healthy run; 0 means reconciliation never got
    to run) and the wall (~116-124s genuine vs 240s/240s cutoff artifact).
@@ -64,7 +64,7 @@ before being validated against a known invariant.
    ./run.sh N caw prep_cluster` after killing any harness mid-run.
 
 2. **Loser-vs-peers differential, invalidated by rank1 role** —
-   [[differential-invalid-when-loser-is-rank1]]. The same differential
+   `differential-invalid-when-loser-is-rank1`. The same differential
    technique that correctly found the P6-MIDTENURE lead for
    D-SILENT-MKDIR-LOSS (ordinary-peer loser) produced a false lead
    (AG-wait/inactivation-defer backlog) when the loser was rank1: its
@@ -73,7 +73,7 @@ before being validated against a known invariant.
    rank1-passing (same node, same role, different run), never against peers.
 
 3. **Probe counts are per-module-load and capped** —
-   [[probe-counts-are-per-module-load-and-capped]]. Retrying the
+   `probe-counts-are-per-module-load-and-capped`. Retrying the
    rank1-vs-rank1 method above by diffing a late-in-mount-life failing run
    against a just-after-prep passing run produced rows that were pure cap
    saturation (`P170-CLWR` 800 vs 0 — 800 is its documented cap), not
@@ -82,7 +82,7 @@ before being validated against a known invariant.
    node-vs-node *within one run* is always valid.
 
 4. **Kernel log source choice, corrected mid-session** —
-   [[kernel-log-retention-varies-per-node-pick-best-source]]. An earlier
+   `kernel-log-retention-varies-per-node-pick-best-source`. An earlier
    sess26 claim ("dmesg retains ~112s, journalctl -k retains ~50min, always
    use journalctl") was itself wrong: retention varies up to ~60x, in *either*
    direction, per node, because both are size-capped rings and nodes log at
@@ -93,7 +93,7 @@ before being validated against a known invariant.
    re-queried sources — capture once, count locally.
 
 5. **Global refcount balance for the unmount inode leak, disproven** —
-   [[unmount-leak-global-refcount-balance-cannot-work]]. A per-inode
+   `unmount-leak-global-refcount-balance-cannot-work`. A per-inode
    grab/release balance (`P205-REFBAL`) was built to attribute an unmount
    inode leak; two instrumented rounds still left `net=78` unexplained
    against `icount=1`, because VFS-side references (`dput`->`iput`, `evict`,

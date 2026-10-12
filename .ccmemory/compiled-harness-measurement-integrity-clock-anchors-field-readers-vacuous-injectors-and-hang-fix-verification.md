@@ -10,7 +10,7 @@ Five harness and measurement-integrity techniques share one theme: a number or a
 
 ## Cross-node timestamps (clock anchoring)
 
-[[technique-reconcile-two-nodes-module-timestamps-through-proc-uptime-and-check-the-anchor-against-the-same-lines-dmesg-prefix]]
+`technique-reconcile-two-nodes-module-timestamps-through-proc-uptime-and-check-the-anchor-against-the-same-lines-dmesg-prefix`
 
 - Every `*_ms` field the module prints (`deadline_ms`, `now_ms`, `anchor_ms`, `issued_ms`, `last_ok_ms`) is `mxfs_pal_time_ms()` = `ktime_get_boottime_ns()/1e6` (`pal/linux/kern.c:2970`). It is boot-relative, so two nodes' values are on unrelated origins. Subtracting one node's value from another's yields a number that looks like seconds and means nothing.
 - Anchor each node in ONE remote command: `printf 'ANCHOR up=%s wall=%s\n' "$(cut -d' ' -f1 /proc/uptime)" "$(date +%s.%N)"`. `wall_at_boot = wall - up`; any boottime-ms value becomes wall seconds as `wall_at_boot + ms/1000`. `/proc/uptime` is the same clock as boottime. NTP skew of a few ms is irrelevant against windows of seconds.
@@ -19,7 +19,7 @@ Five harness and measurement-integrity techniques share one theme: a number or a
 
 ## Harness field readers
 
-[[trap-a-line-anchored-field-reader-silently-empties-every-field-after-the-first-on-a-multi-field-line]]
+`trap-a-line-anchored-field-reader-silently-empties-every-field-after-the-first-on-a-multi-field-line`
 
 - Sixteen fence harnesses carried `field(){ grep -ao "^$2=[^ ]*" ... }`. The `measure` convention prints several fields per line (`SEEN=1 PAUSED=1`); the `^` anchor makes only the first readable and every later field comes back empty.
 - `ck` correctly refuses to grade an empty value and aborts the lap, so a healthy lap aborted at an assertion about a subsystem that worked (`PAUSED=1` was sitting in the capture file). The reader lied, not `ck`.
@@ -27,7 +27,7 @@ Five harness and measurement-integrity techniques share one theme: a number or a
 
 ## Fault injectors that can be armed into a no-op
 
-[[technique-a-fault-injector-that-can-be-armed-into-a-no-op-must-decline-loudly-and-before-the-destructive-step]]
+`technique-a-fault-injector-that-can-be-armed-into-a-no-op-must-decline-loudly-and-before-the-destructive-step`
 
 - Case: the partial-replay cut (submit N of the queued buffers, withhold the rest). If N >= queued there is no suffix and the experiment silently becomes its own control.
 - The module counts the queue, refuses a cut that leaves no suffix or no prefix, prints `P-DBG-REPLAY-CUT-VACUOUS` with both numbers, then submits normally so the filesystem stays consistent. The harness checks for that line between capturing the prover's window and destroying the prover VM.
@@ -37,7 +37,7 @@ Five harness and measurement-integrity techniques share one theme: a number or a
 
 ## Verifying a hang fix
 
-[[technique-verify-a-hang-fix-by-timing-the-operation-that-hung-not-by-the-absence-of-the-hang]]
+`technique-verify-a-hang-fix-by-timing-the-operation-that-hung-not-by-the-absence-of-the-hang`
 
 - A lap that completes without hanging is weak evidence; it may never have attempted the blocking operation. Run the exact operation that hung, bounded by a derived `timeout`, and record wall time and rc on both builds.
 - D-FENCE-POSTSUBMIT-AMBIGUITY-NO-RECONCILIATION-381: `stat` through the mount retried 764 693 ms and climbing before, EIO in 4 s after. `umount`+`rmmod` hung before (module unreleasable, only `virsh destroy` cleared it), after `UMOUNT_RC=0 MOUNTED_AFTER=0 RMMOD_RC=0 MODULE_PRESENT=0` in 3 s.
@@ -46,7 +46,7 @@ Five harness and measurement-integrity techniques share one theme: a number or a
 
 ## Attributing an inode to a lap round after the volume is gone
 
-[[technique-a-single-node-directory-rotor-anchors-which-lap-round-created-an-ags-first-inode]]
+`technique-a-single-node-directory-rotor-anchors-which-lap-round-created-an-ags-first-inode`
 
 - D-0957: a cold `chk_mxfs` found AG 4 agino 128 (ino 33554560) inobt-allocated with a chunk-init core (mode 0, changecount 0); the volume had been re-mkfs'd many times and dmesg had rotated.
 - agino 128 is the first inode of an AG's first aligned chunk on this geometry (512-byte inodes, 8-block alignment, first chunk at agblock 16). In `xfs_ialloc.c` the directory AG is pinned to the node slot under multi-node membership and steps `(node_slot + m_agirotor++) % maxagi` only when single-node. During a sole-survivor phase every mkdir advances the AG by one, including a harness `mkdir -p probe && rmdir probe`. The rotor is per mount and survives across laps while mounted.

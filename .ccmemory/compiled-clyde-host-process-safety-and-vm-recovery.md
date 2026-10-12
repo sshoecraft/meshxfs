@@ -17,7 +17,7 @@ node power control is `virsh -c qemu:///system destroy/start` (the default
 three host-side things must be rebuilt before SSH/run works at all: the LIO
 LUN (`lio_tcm_setup.sh setup`), the persistent SSH password copy
 (`/home/steve/.mxfs/pass` → `/tmp/.mxfs_pass`, since `/tmp` does not survive
-reboot), and the test1/test2 VMs — [[env-cluster-bringup-after-host-reboot]].
+reboot), and the test1/test2 VMs — `env-cluster-bringup-after-host-reboot`.
 
 ## The mmap_lock wedge (2026-08-07): the incident that set the rule
 
@@ -37,7 +37,7 @@ reset it was meant to avoid. `pgrep -x`/bare `pgrep NAME` match on `comm`
 only and are safe; only `-f` and full `ps` listings read cmdline. The fix
 landed as `tools/mxfs_pgrep.sh`, which reads `/proc/<pid>/stat` first and
 skips any D-state task before ever opening cmdline. Full detail, stack
-traces and the patched call sites: [[never-pgrep-f-on-clyde-mmap-lock-wedge]].
+traces and the patched call sites: `never-pgrep-f-on-clyde-mmap-lock-wedge`.
 
 Diagnosing an already-wedged host safely reduces to one rule, proven again in
 the libvirt incident below: `/proc/*/comm`, `/proc/*/stat`, and
@@ -59,7 +59,7 @@ own command text* rather than the intended target:
   assuming a wedge, kill stale prep trees by an *anchored* pattern (`^/bin/bash
   \./run\.sh`, never `"run.sh 32 caw"` — that substring appears in the
   wrapping `bash -c` and kills its own shell), and remount `/src` by hand.
-  Full detail: [[rig-prep-spurious-powercycle-under-host-load]].
+  Full detail: `rig-prep-spurious-powercycle-under-host-load`.
 - **sess593**: `pids=$(tools/mxfs_pgrep.sh 'join_during_takeover.sh s593b');
   for p in $pids; do kill $p; done` matched the Bash tool's own `sh -c`
   chain (the command text carries the pattern), killing the invoking shell
@@ -70,7 +70,7 @@ own command text* rather than the intended target:
   `kill $(cat …pid)`), or wait for the lap's own WANT= match instead of
   killing anything; a `kill` belongs last in a chain, or in its own call, so
   a self-kill can't skip cleanup. Full detail:
-  [[trap-a-kill-list-from-mxfs-pgrep-includes-the-shell-that-ran-it-and-kills-the-harness-mid-lap]].
+  `trap-a-kill-list-from-mxfs-pgrep-includes-the-shell-that-ran-it-and-kills-the-harness-mid-lap`.
 
 Net rule across both: never match a live target by command-line substring on
 clyde. Use a pidfile you control, or an anchored pattern that cannot appear
@@ -95,7 +95,7 @@ and let a 32-node cluster re-prep clean. It never touches the host (RULE: NEVER 
 This incident is also why every `virsh` call in `run.sh`'s
 `power_cycle_node()` is now wrapped in `timeout 60` — unbounded, it hangs an
 unattended prep forever against a deadlocked domain, the same shape as the
-sess25 flap loop above. Detail: [[libvirt-domain-deadlock-recovery-without-host-reset]].
+sess25 flap loop above. Detail: `libvirt-domain-deadlock-recovery-without-host-reset`.
 
 ## Rig work must survive session/relay teardown, and liveness checks are snapshots only
 
@@ -111,7 +111,7 @@ check for a live orphan with `tools/mxfs_pgrep.sh` and harvest its evidence
 first — but its output is a point-in-time snapshot with no liveness
 guarantee; always confirm `/proc/<pid>` still exists before treating a
 listed pid as a live run. Detail:
-[[trap-harness-survives-session-exit-check-mxfs-pgrep-before-rig-work]].
+`trap-harness-survives-session-exit-check-mxfs-pgrep-before-rig-work`.
 
 ## Resource exhaustion produces the same symptom class: background work silently dies
 
@@ -128,7 +128,7 @@ vanishes mid-flight with the intermediate state left behind:
   background job and shut VMs the job doesn't need; a killed wrapper does
   NOT kill the chain it launched — check `tools/mxfs_pgrep.sh` before
   assuming the rig is idle. Detail:
-  [[trap-32-idle-vms-running-exhausts-clyde-ram-harness-kills-background-tasks-shut-idle-vms]].
+  `trap-32-idle-vms-running-exhausts-clyde-ram-harness-kills-background-tasks-shut-idle-vms`.
 - **sess594**: the same kill fired with 62GB genuinely available (`free -m`:
   650MB "free" but 63GB buff/cache) — the tool host's OOM threshold reads the
   cache-heavy `free` column, not the kernel's actual pressure. A deploy
@@ -139,7 +139,7 @@ vanishes mid-flight with the intermediate state left behind:
   background rig task, check both nodes' srcversion, mount count, and the
   script's log tail before trusting any marker — do not read "low on memory"
   as a clyde problem to fix. Detail:
-  [[trap-the-tool-host-kills-a-long-background-rig-task-under-its-own-memory-threshold-mid-deploy]].
+  `trap-the-tool-host-kills-a-long-background-rig-task-under-its-own-memory-threshold-mid-deploy`.
 
 ## Cross-cutting rules
 

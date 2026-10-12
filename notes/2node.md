@@ -94,7 +94,7 @@ is precisely the sort of thing that could give you two simultaneously active MXF
 
 And unlike my earlier suggestion, there is no XFS underneath MXFS in this model. DRBD is sitting directly beneath the MXFS filesystem.
 
-sshoecraft/mxfs
+sshoecraft/meshxfs
 
 Ah — now that I've looked at the actual MXFS repo, I need to correct my correction. 😄
 

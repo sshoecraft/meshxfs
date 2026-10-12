@@ -1,3 +1,21 @@
+## 2026-10-12 — 0.90.126 — the project's working memory sheds what its summaries already hold
+
+- `scripts/memory_prune_folded.py` deletes each raw `.ccmemory` note that a
+  `compiled-` article already carries, and turns the article's link to it
+  into plain provenance text.  The compactor folds notes into articles but
+  never deletes them, so the store only grew: 637 of 650 raw notes were
+  already carried by one of the 101 articles.  114 memory files remain and
+  the notes went from about 4 MB to 1.3 MB; git history keeps every deleted
+  note.
+- The memory's pre-commit password check reads the password from the lab
+  secrets store when it runs.  It used to spell out the password's first
+  four characters as its search pattern.
+- `notes/2node.md` names the repository as `sshoecraft/meshxfs`.
+- The README opens with a banner — "A POSIX clustered filesystem built on
+  XFS" — and a paragraph on what MeshXFS does, naming no one operating
+  system: the platform layer exists so that MeshXFS is not tied to one, and
+  Proxmox VE is a supported platform with a plugin, not what it was built for.
+
 ## 2026-10-12 — 0.90.125 — the product is MeshXFS; lab VMs are built by osimager, not cloned
 
 - **The product is named MeshXFS.**  "MXFS" is taken in search (Object

@@ -12,7 +12,7 @@ Three behavior notes about how a ccloop-run session starts, ends and depends on 
 
 ## Budget: the relay fires at the run's cutoff file, not at the context window
 
-From [[trap-the-ccloop-relay-fires-at-the-runs-cutoff-file-not-at-the-context-window-so-read-it-at-session-start]]:
+From `trap-the-ccloop-relay-fires-at-the-runs-cutoff-file-not-at-the-context-window-so-read-it-at-session-start`:
 
 - The context tool showed 46% of a 1M window used, which reads as plenty. `.ccloop/runs/<run-id>/cutoff` held `500000`, and `hook-events.log` showed the previous session `fired` and `halt` at exactly that number. The session had about 40K tokens left, not 540K, when it found out. That was after a 348 s module build and a deploy, with rig verification still to launch.
 - At session start read `.ccloop/runs/$CCLOOP_RUN_ID/cutoff` and plan against that number. Orientation (memory list, prior transcript digest, files that must be understood) measured about 150K.
@@ -22,7 +22,7 @@ From [[trap-the-ccloop-relay-fires-at-the-runs-cutoff-file-not-at-the-context-wi
 
 ## Handoff: there is no handoff file
 
-From [[handoff-md-removed-context-is-auto-derived]] (user directive):
+From `handoff-md-removed-context-is-auto-derived` (user directive):
 
 - ccloop derives the next session's starting context automatically from the transcript. Every mention of a handoff document was removed from ccloop, and the old CLAUDE.md rule that required maintaining `handoff.md` was deleted. The resulting numbering gap is deliberate; do not renumber.
 - Do not create, write or update `.ccloop/handoff.md` or any equivalent (`state.md`, `HANDOFF.md`, `resume.md`, a session-summary file). Do not spend a turn on an end-of-session summary. The transcript is the handoff.
@@ -33,7 +33,7 @@ Together with the budget note: since the next session starts from the transcript
 
 ## ccmemory unavailable is a hard stop
 
-From [[feedback-ccmemory-unavailable-is-hard-stop]] (user directive):
+From `feedback-ccmemory-unavailable-is-hard-stop` (user directive):
 
 - If ccmemory or the MCP interface exposing it drops or reports "disconnected" mid-session, stop. Report that ccmemory is unavailable and halt. This applies every time.
 - A prior session saw the harness drop the MCP transport (ccmemory batched with several other servers) and concluded it was not a hard stop because the data is flat `.md` files on disk. The user explicitly overrode that conclusion.

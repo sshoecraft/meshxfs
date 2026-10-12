@@ -15,14 +15,14 @@ layer. Each was found once, cost a rig rebuild or a diagnosis detour, and got
 a standing rule. Chronological.
 
 ### 2026-06-14 — never `find /` on clyde
-[[never-find-root-nfs-mounts]]: `find /` crawls clyde's NFS mounts (`/src`,
+`never-find-root-nfs-mounts`: `find /` crawls clyde's NFS mounts (`/src`,
 `/data` on QNAP 192.168.1.4) and hammers the NFS server for the whole
 cluster. Absolute, unconditional ban — no "scoped" exception. To find a
 binary: `command -v`/`which`/`dpkg -L`, or look in the VM that actually needs
 it, never the host root.
 
 ### 2026-07-05 — `/src` must not be an fstab auto-mount on test VMs
-[[feedback-src-nfs-not-fstab-automount]]: guest `/etc/fstab` entries for
+`feedback-src-nfs-not-fstab-automount`: guest `/etc/fstab` entries for
 `/src` (QNAP NFS) default to a `hard` mount; if the QNAP is unreachable at
 boot the mount retries forever and can hang VM boot. `/src` must be mounted
 only by the buildup/prep step (`tools/prep_node.sh`,
@@ -31,7 +31,7 @@ fstab. As of that date the fleet was inconsistent (~16/32 auto-mounted) and
 had to be swept clean.
 
 ### sess25 — `prep_cluster` misreads host load as a wedged node and power-cycles it
-[[rig-prep-spurious-powercycle-under-host-load]]: `prep_cluster` requires
+`rig-prep-spurious-powercycle-under-host-load`: `prep_cluster` requires
 both `MXFS_CLEAN` and `SRC_OK` inside a 150 s per-node ssh window; under
 unrelated clyde host load (measured loadavg 8-29, per-ssh latency
 669-1101 ms) 32 parallel connections push the script past 150 s, prep treats
@@ -51,7 +51,7 @@ and re-establish `/src` as part of power-cycle recovery — not done as of this
 writing.
 
 ### sess26 — kernel-log retention varies ~60x per NODE, not by source
-[[kernel-log-retention-varies-per-node-pick-best-source]]: corrects an
+`kernel-log-retention-varies-per-node-pick-best-source`: corrects an
 earlier same-session claim that `journalctl -k` is always longer-retention
 than `dmesg`. Measured on two nodes minutes apart: test19 dmesg 112 s /
 journalctl ~50 min (journalctl wins); test5 dmesg 1407 s/17 MB / journalctl
@@ -64,7 +64,7 @@ different windows presented as one measurement — caught before running it).
 same failure family sess429 hit again at board scale — see below.
 
 ### ~2026-08-03 — recovering the 32-node CAW rig after a clyde reboot: `scst.service` is a red herring
-[[rig-recovery-after-clyde-reboot-scst-mpath]]: post-reboot,
+`rig-recovery-after-clyde-reboot-scst-mpath`: post-reboot,
 `MXFS_FORCE_PREP=1 ./run.sh 32 caw prep_cluster` power-cycles all 32 nodes
 and fails with `/dev/mapper/mpatha never appeared` — host-side, not an MXFS
 or node fault. `systemctl status scst` looks like the cause (fails at boot
@@ -79,7 +79,7 @@ prints `MPATH_OK 2` per node as the readiness gate) →
 condition-3 rig; CAW's condition-4 board needs both portals.
 
 ### sess386 — `sudo mpath_up.sh` leaves a root-owned passfile, sshpass hangs silently
-[[trap-sudo-mpath-up-leaves-root-owned-passfile]]: `tools/mxfs_secrets.sh
+`trap-sudo-mpath-up-leaves-root-owned-passfile`: `tools/mxfs_secrets.sh
 passfile` materializes `/tmp/.mxfs_pass` as whatever user calls it first.
 `sudo -E bash scripts/mpath_up.sh up 32` — the documented post-reboot rig
 recovery step — creates it `root:600`; the unprivileged harness's sshpass
@@ -93,7 +93,7 @@ any harness call, and verify with `ls -la /tmp/.mxfs_pass` (must be
 `steve:steve 600`) whenever recovery started with a `sudo` step.
 
 ### sess396 — `make clean` silently deletes the userspace tools
-[[trap-make-clean-removes-userspace-tools-run-make-tools]]: the top-level
+`trap-make-clean-removes-userspace-tools-run-make-tools`: the top-level
 `clean` target also runs `make -C tools clean`, removing `mkfs_mxfs`,
 `chk_mxfs`, `resize_mxfs`, `fua_verify`. `run.sh ... prep_cluster` then fails
 with `FS_PREP_FAIL: mkfs tool not found` only after the fleet has already been
@@ -101,7 +101,7 @@ rmmod'd — costing a full rig-agent round. Rule: any `make clean && make
 modules` chain must end with `make tools` (2s) before deploy/prep.
 
 ### 2026-08-07 — `pgrep -f`/`ps -e` host-locally wedges clyde unkillably
-[[never-pgrep-f-on-clyde-mmap-lock-wedge]]: `pgrep -f`/`ps -e`/`ps aux` read
+`never-pgrep-f-on-clyde-mmap-lock-wedge`: `pgrep -f`/`ps -e`/`ps aux` read
 every `/proc/<pid>/cmdline`, which takes that task's `mmap_lock`. One task
 wedged while holding its own `mmap_lock` (root cause here: an orphaned bio in
 a `dm-delay` device from the fence harness, cascading through jbd2 →
@@ -136,7 +136,7 @@ ccloop's own numbering across a reboot — disambiguate evidence dirs by
 transcript/session id when in doubt.
 
 ### sess402 — `grep -v authorized` deletes the evidence it was filtering for
-[[trap-grep-v-authorized-deletes-unauthorized-image-kernel-lines]]: every
+`trap-grep-v-authorized-deletes-unauthorized-image-kernel-lines`: every
 harness pipeline stripped the ssh login banner ("Unauthorized access...")
 with `grep -v authorized`, which also matches **un**authorized — silently
 deleting the one kernel line that named the actual mechanism
@@ -152,7 +152,7 @@ on the node with **no filter** first. Fixed across 22 call sites
 `iunl_mismatch_negative.sh`, etc.).
 
 ### sess403 — rebuilding mxfs.ko while a rig run is in flight splits srcversion
-[[trap-never-rebuild-mxfs-ko-while-rig-run-in-flight]]: `prep_cluster` insmods
+`trap-never-rebuild-mxfs-ko-while-rig-run-in-flight`: `prep_cluster` insmods
 `/src/mxfs/mxfs.ko` from the NFS-shared tree on every node. Running `make
 modules` again while a dispatched rig-runner/agent is still prepping means a
 node mid-insmod (or the run's second arm) can pick up the new `.ko`, splitting
@@ -163,7 +163,7 @@ worktree copy. Always cite the per-run srcversion the harness/agent reports
 (`test1 /sys/module/mxfs/srcversion`), never the tree's `modinfo`.
 
 ### sess405 — sub-sector-length PAL bio writes hang (not fail) on dm-multipath
-[[trap-pal-bdev-write-must-be-sector-aligned-subsector-bio-hangs-dm]]: a
+`trap-pal-bdev-write-must-be-sector-aligned-subsector-bio-hangs-dm`: a
 `mxfs_pal_bdev_write` of a non-sector-multiple length (96 B) hung in
 `submit_bio_wait` on `/dev/mapper/mpatha`, in D-state, on 6/30 nodes — and
 critically, on the disklock heartbeat thread (`disklock_hb_fn` →
@@ -179,7 +179,7 @@ heartbeat thread — any stall there past the lease turns the prover into the
 next fencing victim, so keep that path's I/O bounded and aligned.
 
 ### sess413 — a rig harness launched as a Bash child dies at relay teardown
-[[trap-harness-survives-session-exit-check-mxfs-pgrep-before-rig-work]]:
+`trap-harness-survives-session-exit-check-mxfs-pgrep-before-rig-work`:
 corrects the sess410 assumption below. A harness launched as a plain Bash
 child of the claude process — foreground OR `run_in_background`, directly or
 via a rig-runner agent's Bash — DIES when the session is torn down at a relay
@@ -229,7 +229,7 @@ instead. And `rman_matrix.sh`'s `$1` is the evidence dir, not an arm name:
 writing into `./base_shared`.
 
 ### sess418 — the `tcp` board condition is wired to a rig that no longer exists on this fleet
-[[trap-32-tcp-condition-device-is-xml-sda-use-mxfs-dev-mpatha-and-mxfs-crit]]:
+`trap-32-tcp-condition-device-is-xml-sda-use-mxfs-dev-mpatha-and-mxfs-crit`:
 `run.sh`'s `tcp` condition (condition 1) targets TCP DLM over the old LIO
 tcm_loop rig with the shared LUN XML-wired as `/dev/sda` in the guests;
 `caw` (condition 4) targets CAW over dm-multipath. The fleet today is the
@@ -246,7 +246,7 @@ force_transport==1`) is transport, not rig, so it's satisfied either way —
 nothing stops you from silently measuring the wrong rig.
 
 ### sess428 — never write source into a /tmp scratch copy, even to dodge a build race
-[[feedback-never-write-source-in-tmp-scratch-copy-even-during-rig-runs]]:
+`feedback-never-write-source-in-tmp-scratch-copy-even-during-rig-runs`:
 to avoid racing an in-flight rig chain's build (sess403 trap above), a
 session kept a modified copy of the tree in the session scratchpad
 (`.../scratchpad/w038`) and wrote NEW source there (`dlm/tauth_view.{c,h}`,
@@ -262,7 +262,7 @@ RULE: A SCRIPT IS NEVER A TEMP FILE violation as any other file in `/tmp`, just 
 the motive (avoiding a race) sounds responsible.
 
 ### sess429 — the dmesg ring wraps within minutes under a 32-node board; marker-bounded sweeps silently read zero
-[[trap-dmesg-ring-wraps-under-board-kmsg-marker-sweeps-read-zero-use-journalctl-since]]:
+`trap-dmesg-ring-wraps-under-board-kmsg-marker-sweeps-read-zero-use-journalctl-since`:
 after a 22-minute 32/caw board, test1's dmesg ring held only its last ~2
 minutes (22,703 lines starting at monotonic 1353s); the kmsg marker written
 before the board was already gone, so `dmesg | sed -n '/MARK/,$p'` printed
@@ -309,7 +309,7 @@ after "Ending clean mount" fails `Allocated a known in-use inode 0x83!`,
 instrumented as P-DIALLOC-VERIFY in 0.39.10.)
 
 ### sess433 — node journald is volatile; a post-reboot sweep of the victim proves nothing
-[[trap-node-journald-volatile-rebooted-node-kernel-log-gone]]: on the test
+`trap-node-journald-volatile-rebooted-node-kernel-log-gone`: on the test
 nodes, `journalctl --list-boots` shows only boots from 2026-07-01 plus the
 live boot — `/var/log/journal/*` files are stale from image build,
 `Storage=` is effectively unset, and the live journal lives only in

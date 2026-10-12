@@ -16,7 +16,7 @@ each was hit.
 
 ## sess383 — `mountpoint -q` reads a quarantine as unmounted
 
-[[never-mountpoint-q-on-a-quarantined-mxfs-mount]]: `mountpoint -q /mnt/shared`
+`never-mountpoint-q-on-a-quarantined-mxfs-mount`: `mountpoint -q /mnt/shared`
 works by `stat()`ing the mount root. On MXFS the root inode is ino 128, which
 lives in AG 0, so any AG-scoped quarantine covering AG 0 makes the stat EIO —
 correctly, that's the quarantine working — and `mountpoint -q` reports "not
@@ -44,7 +44,7 @@ refusal is close to fs-wide, and that's intended.
 
 ## sess432 — an unconditional shutdown ioctl hit the wrong filesystem
 
-[[trap-the-goingdown-ioctl-shut-down-the-node-root-filesystem]]: `vergate.sh`
+`trap-the-goingdown-ioctl-shut-down-the-node-root-filesystem`: `vergate.sh`
 issued `XFS_IOC_GOINGDOWN` (`0x8004587d`) on `/mnt/vgate` right after a mount
 attempt, without checking whether that mount had actually succeeded. The mount
 had in fact been refused (`P303-FENCECAP-NOCAPS`, pre-dating the
@@ -63,7 +63,7 @@ return code wasn't checked.
 
 ## sess570 — `mount_rc=` matched as a substring of `umount_rc=`
 
-[[trap-bare-mount-rc-grep-matches-inside-umount-rc-and-reports-every-lap-as-success]]:
+`trap-bare-mount-rc-grep-matches-inside-umount-rc-and-reports-every-lap-as-success`:
 a death/rejoin harness extracted the per-lap verdict with
 `grep -ao 'mount_rc=[0-9]*' "$OUT/lap_$i.log" | head -1`. The log always
 printed an `UNLOAD umount_rc=0 ...` line before the `REJOIN mount_rc=N ...`
@@ -85,7 +85,7 @@ field in the same stream ends with that field's name.
 
 ## sess573 — present in `/proc/mounts` is not the same as usable
 
-[[trap-a-mount-in-proc-mounts-is-not-a-working-mount-and-two-shell-counter-bugs]]:
+`trap-a-mount-in-proc-mounts-is-not-a-working-mount-and-two-shell-counter-bugs`:
 this is the direct sequel to the sess383 fix — `/proc/mounts` is the safe
 channel for "is something mounted here," but it is not sufficient for "is it
 usable." `d0949_sole_survivor_chunkfree.sh` used

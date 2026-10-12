@@ -34,7 +34,7 @@ transiently, let the existing reservation cooldown be the retry delay —
 progress is still guaranteed without waiting under the grant. Lesson: when a
 ruling gives a procedure and a hazard list, re-read the hazards against the
 diff line by line before building, not after a board row fails
-([[trap-i-built-the-synchronous-flush-under-the-ag-grant-the-ruling-warned-against]]).
+(`trap-i-built-the-synchronous-flush-under-the-ag-grant-the-ruling-warned-against`).
 
 ## An individually-true inference chain is not proof; act and re-observe
 
@@ -52,7 +52,7 @@ fix: where inference can't separate two causes, act and re-observe —
 `xfs_log_force(SYNC)` + `xfs_ail_push_all`, then re-read; ours now carries
 magic, not-ours still doesn't, so refuse transiently instead of picking one of
 the two terminal blanket answers
-([[trap-no-inode-magic-does-not-mean-nothing-was-ever-written-there]]). The
+(`trap-no-inode-magic-does-not-mean-nothing-was-ever-written-there`). The
 identical fix (drive publication, re-check) is the async version from the
 ruling trap above — same investigation, same correction landing twice for the
 sync/async reason and the inference reason independently.
@@ -69,9 +69,9 @@ before trusting any whole-log count — if the first retained line isn't the
 boot/mount banner, every total is a lower bound; read a probe's own print
 condition (`<= N`, `% 500`, ratelimited) before quoting its count; never
 divide two counts truncated by different rules
-([[trap-a-probe-count-is-meaningless-when-the-print-budget-and-the-ring-buffer-both-truncate-it]]).
+(`trap-a-probe-count-is-meaningless-when-the-print-budget-and-the-ring-buffer-both-truncate-it`).
 The detour this produced led to the real finding
-([[trap-no-inode-magic-does-not-mean-nothing-was-ever-written-there]]).
+(`trap-no-inode-magic-does-not-mean-nothing-was-ever-written-there`).
 
 ## Reproduction technique: the captured object's own fields name it
 
@@ -84,7 +84,7 @@ directory that outgrew shortform, not a file — the object being raced was the
 churn *directory*, removed by `rm -rf`. Reading that one field converted the
 reproducer from a 150s-per-attempt death/rejoin harness (3 hits in 16 laps)
 into a bare `mkdir`/fill/`rm -rf` loop with no fault injection at all
-([[technique-read-the-shell-dump-fields-to-identify-what-object-the-defect-needs]]).
+(`technique-read-the-shell-dump-fields-to-identify-what-object-the-defect-needs`).
 Once the object was known, closing the reproduction gap required scoring the
 harness's own gate-fire count, not just its outcome: `sync -f` between passes
 was publishing every owed free before the next round could race it, and
@@ -97,7 +97,7 @@ one rate-limit counter, so the treatment arm burned all the slots in round 1
 and the control arm's real, frequent firing printed nothing — one rate-limit
 counter per arm, or the louder arm silences the other and the A/B reads
 backwards
-([[technique-a-vacuous-clean-run-is-detected-by-counting-the-gate-not-the-outcome]]).
+(`technique-a-vacuous-clean-run-is-detected-by-counting-the-gate-not-the-outcome`).
 
 ## Harness/tooling bugs that faked clean or null results
 
@@ -109,7 +109,7 @@ backwards
   script had already unmounted and rmmod'd every node with no way back. The
   failing run is never the one that looks broken; a script that reads a
   field from a state file and rewrites that file must write the value back
-  ([[trap-module-swap-deploy-dropped-dev-from-marker-and-killed-the-rig-on-its-second-run]]).
+  (`trap-module-swap-deploy-dropped-dev-from-marker-and-killed-the-rig-on-its-second-run`).
 - **A mount entry in `/proc/mounts` proves presence, not usability.** A
   precondition of `grep -c ' /mnt/shared mxfs '` = 1 passed against a
   filesystem already self-fenced (`P305-RESV-SELF-GONE`) and EIO on
@@ -122,7 +122,7 @@ backwards
   ceiling, not `sb_icount` — it read the same 25991808 before and after
   12000 creates. The counter that actually reports allocated inodes is
   `tools/chk_mxfs -v <dev>`'s `Superblock icount` / inobt sum
-  ([[trap-a-mount-in-proc-mounts-is-not-a-working-mount-and-two-shell-counter-bugs]]).
+  (`trap-a-mount-in-proc-mounts-is-not-a-working-mount-and-two-shell-counter-bugs`).
   That same counter turned out to have its own staleness trap one session
   later: MXFS keeps `sb_icount`/`sb_ifree`/`sb_fdblocks` lazily and only
   writes them to platter at unmount, so three live-mount `chk_mxfs` samples
@@ -132,7 +132,7 @@ backwards
   Never gate a verdict on a live-mount superblock counter or diff two of
   them; gate on what the workload itself produced (a created-file count) or
   a cold post-unmount read
-  ([[trap-chk-mxfs-superblock-icount-lags-a-live-mount-by-one-unmount]]). Third
+  (`trap-chk-mxfs-superblock-icount-lags-a-live-mount-by-one-unmount`). Third
   instance of the same shape as the truncated-probe trap above: `df
   --output=itotal` (wrong metric), `P133-ICLUSTER-SYNCINIT` (print budget),
   and now `chk_mxfs` live icount (write-at-unmount only) are three different
@@ -149,13 +149,13 @@ backwards
   epoch, LSN, boot id); without one, "clean now" and "clean then" are
   indistinguishable, and the failure mode is the dangerous direction — it
   retires a true hypothesis. Time-shifted twin of
-  [[trap-a-silent-instrument-and-a-clean-system-are-the-same-observation]]
+  `trap-a-silent-instrument-and-a-clean-system-are-the-same-observation`
   (a loud instrument read at the wrong moment, instead of a silent one read
   at the right moment). The PR key itself is derived from `{host, boot,
   LUN}`, not incarnation, so a fence aimed at a dead incarnation's key lands
   on the live successor's identical registration — observed as a mounted
   node logging its own key as unregistered and self-fencing
-  ([[trap-a-pr-snapshot-only-proves-anything-about-the-generation-it-was-taken-at]]).
+  (`trap-a-pr-snapshot-only-proves-anything-about-the-generation-it-was-taken-at`).
 - **A probe guarded by the complement of its enclosing branch cannot fire.**
   `P103-CHUNKFREE` sat inside a `!D || S` (not-multi-node) branch but itself
   required `D && !S` (multi-node) — the exact complement — so every
@@ -168,7 +168,7 @@ backwards
   plausibly running is a standing candidate for this bug — worse than the
   merely-unexercised silent-instrument case because no workload could ever
   have fired it
-  ([[trap-a-probe-whose-condition-is-the-complement-of-its-branch-never-fires]]).
+  (`trap-a-probe-whose-condition-is-the-complement-of-its-branch-never-fires`).
 
 ## Host observability: silence is not evidence the host stayed healthy
 
@@ -188,7 +188,7 @@ node. Guest `console_loglevel=1` means ordinary probe output won't reach
 netconsole (so it can't flood) and a plain `echo x > /dev/kmsg` (level 4)
 also won't show — verify with `<0>` level explicitly, not by echoing an
 arbitrary line and seeing nothing
-([[trap-nothing-ever-listened-to-the-nodes-netconsole-so-every-guest-panic-was-discarded]]).
+(`trap-nothing-ever-listened-to-the-nodes-netconsole-so-every-guest-panic-was-discarded`).
 
 ## Defect-record discipline: the record can be closed while the defect isn't
 
@@ -206,7 +206,7 @@ defect's root is a predicate or idiom rather than a line, closing it needs a
 census of every use (`grep -rc` the unsafe and safe forms, compare counts —
 369:5 is itself the finding), not a fix at the one reported site; a
 class-level record stays open naming the census until the sweep is done
-([[trap-closing-a-defect-on-one-call-site-leaves-the-class-open-368-to-5]]).
+(`trap-closing-a-defect-on-one-call-site-leaves-the-class-open-368-to-5`).
 
 Related discipline failure on the same tooling: `tools/defects.py`'s
 `nodes`/`dlm` fields (fail-closed default `1`/`any`, blocking every release
@@ -220,7 +220,7 @@ as narrowing a configuration field "just to see if the flag works" —
 exercise CLI flags on a throwaway record, and read a record's own evidence
 field (never its id, summary prose, or a keyword sweep) before ever setting
 its narrowest reach
-([[trap-i-narrowed-a-defects-configuration-while-smoke-testing-the-flag]]).
+(`trap-i-narrowed-a-defects-configuration-while-smoke-testing-the-flag`).
 
 ## The shape, again
 

@@ -10,7 +10,7 @@ ic Recovery from an ambiguous or contested SCSI-PR fence/registration state — 
 
 ## 1. A PRESENT key/registration proves nothing about the past or future (D-0965, 0.87.11)
 
-[[design-the-mount-threads-retire-grace-lives-inside-the-admission-barriers-bound]]
+`design-the-mount-threads-retire-grace-lives-inside-the-admission-barriers-bound`
 
 A clean unmount leaves its disklock slot RETIRE_PENDING, naming its per-boot PR key. A same-boot remount re-registers the IDENTICAL key before the predecessor's RETIRE_PENDING record settles (P305-RETIRE-SETTLED-OWN lands ~40ms-8s after REGISTER, gated by a 1.5s READ KEYS delay). The target cannot distinguish "departure never unregistered" from "successor registered the same key," and the live-member guard can't see a successor that hasn't claimed a slot yet. A peer that withdrew a PRESENT key immediately fenced the live successor (P303-FENCECAP-SELFABSENT, measured 2/2 on 0.87.10).
 
@@ -24,7 +24,7 @@ Related, same design: `mxfs_scsipr_own_registration_proven` re-brackets only whe
 
 ## 2. The fail-fast gate: two "blocked" structures, only one stops a waiter hanging (0.89.11, D-381)
 
-[[design-the-acquire-path-fail-fast-gate-was-reachable-only-from-the-precommand-fence-leg]]
+`design-the-acquire-path-fail-fast-gate-was-reachable-only-from-the-precommand-fence-leg`
 
 `dlm/v5_mount.c` has two structures that both sound like "this slice is blocked" and do unrelated jobs:
 - `ctx->blocked[slot]` (`v5_blocked_set`) is a REPORT only — feeds `/sys/kernel/debug/mxfs/<dev>/recovery_blocked`, changes no behavior.
@@ -43,7 +43,7 @@ Principle: refusing to recover a slice without proof of exclusion is the invaria
 
 ## 3. Three operations, not two — and the sole-survivor gate is not a free pass (Astra s74)
 
-[[design-fence-outcome-legs-are-precommand-retryable-ambiguous-terminal-and-the-third-operation-is-proof-resume]]
+`design-fence-outcome-legs-are-precommand-retryable-ambiguous-terminal-and-the-third-operation-is-proof-resume`
 
 Ruling on D-FENCE-POSTSUBMIT-AMBIGUITY-NO-RECONCILIATION-381 after the lost-response entry (the case in §2) was measured live on 2/tcp.
 

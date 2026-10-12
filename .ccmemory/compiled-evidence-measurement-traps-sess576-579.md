@@ -33,7 +33,7 @@ still fires even before the victim's record is marked not-live. General rule:
 when a predicate names "self" — own key/slot/incarnation/node — ask what it
 looks like with any other live member substituted, and enforce at the
 primitive all call sites funnel through, not at the one call site that showed
-the bug. See [[trap-a-guard-written-for-the-self-direction-leaves-the-symmetric-peer-direction-open]].
+the bug. See `trap-a-guard-written-for-the-self-direction-leaves-the-symmetric-peer-direction-open`.
 
 **READ KEYS does not say WHICH nexus holds a key; READ FULL STATUS does**
 (surfaced by design consult on D-0950). A ledger record's root-cause chain was
@@ -51,7 +51,7 @@ stays durably dirty; `holder_key=0x0` under an all-registrants reservation is
 expected, not evidence of a foreign holder. General shape: never let "key we
 selected", "registration observed", "registration proven on our own nexus",
 "completed fence", and "durable certificate of that fence" substitute for one
-another. See [[trap-read-keys-does-not-say-which-nexus-holds-a-key-and-lost-registration-has-four-causes]].
+another. See `trap-read-keys-does-not-say-which-nexus-holds-a-key-and-lost-registration-has-four-causes`.
 
 ## Harness/probe traps (sess578, one D-0912/D-0932 campaign)
 
@@ -68,7 +68,7 @@ baseline sampled immediately before the measurement, never against zero —
 setup phases fire the same probes. Second bug in the same script: an `ssh`
 inside a `while read` loop reading the same stdin swallowed the remaining
 candidates; use `done 3<file` / `read ... <&3` and `</dev/null` on the ssh.
-See [[trap-a-selection-step-keyed-on-a-cumulative-dmesg-count-picks-the-previous-runs-target]].
+See `trap-a-selection-step-keyed-on-a-cumulative-dmesg-count-picks-the-previous-runs-target`.
 
 **A budgeted probe must carry its own true total on every line** (same
 D-0912 lap). A 16-line print budget on `P912-QACK-RX` is correct — an
@@ -81,7 +81,7 @@ budgeted line, so a truncated sample is self-describing; when reading
 someone else's probe, check the source for a budget before trusting a line
 count as an event count — `n=` values stopping at a round number (16, 20, 64,
 200) are the tell; prefer a derived assertion over a raw count wherever one
-exists. See [[technique-a-budgeted-probe-must-carry-its-own-true-total-on-every-line]].
+exists. See `technique-a-budgeted-probe-must-carry-its-own-true-total-on-every-line`.
 
 **Co-occurrence of two probes is not evidence they interacted** (D-0932). A
 check of the form `event_A_count >= 1 && event_B_count >= 1 → FAIL` asserts a
@@ -99,7 +99,7 @@ hold ("a bound that races an injected delay measures the injection, not the
 system" — derive it from the injection, `HOLD_MS/1000 + slack`), and when the
 unmount blocking turned out to be the *correct* safety behavior, the right
 move was to assert the safe property directly rather than delete the test.
-See [[trap-co-occurrence-of-two-probes-is-not-a-race-waking-is-not-acting]].
+See `trap-co-occurrence-of-two-probes-is-not-a-race-waking-is-not-acting`.
 
 **A clean unmount blocks on this node's own parked fence/recovery work**
 (measured 3x, one build, two knobs). `put_super` does not return while a
@@ -116,7 +116,7 @@ retire worker retries 3x, is refused by its own parked worker each time
 (`P304-FENCE-PROVE-BUSY`), and exits leaving the slot `ACTIVE`, so peers must
 fence a node that left normally. `recov_desc_names_node` compares only
 `d->victim_node`, so the purge-freeze gate covers descriptors naming a node
-as victim, never as holder. See [[technique-a-clean-unmount-waits-for-this-nodes-own-parked-recovery-or-fencing-work]].
+as victim, never as holder. See `technique-a-clean-unmount-waits-for-this-nodes-own-parked-recovery-or-fencing-work`.
 
 **A suite detector executes on the test node, which has no ssh credentials
 for its peers.** `tools/mxfs_rig_tag.sh` fell back to ssh-reading a peer's
@@ -132,7 +132,7 @@ build artifacts) reach over the `/src` NFS mount nodes already have; a
 peer-node fact is unreachable from a detector — record it in the cluster
 marker at prep time instead. Verify a new helper by running it *from* a node
 (`tools/mxfs_sshpass.sh test1 ...`), not just from clyde.
-See [[trap-suite-detectors-run-on-the-nodes-where-no-ssh-credentials-exist]].
+See `trap-suite-detectors-run-on-the-nodes-where-no-ssh-credentials-exist`.
 
 ## Locality and predicate-strength traps (sess579, design)
 
@@ -150,7 +150,7 @@ locality via a probe that only fires on the path being tested (here,
 it can't be gotten; derive which node to count on from established locality,
 never from the H/W role label; gate against zero explicitly when an
 instrument can only read 0 by pointing at the wrong object.
-See [[trap-which-node-masters-a-resource-is-a-hash-so-a-two-node-lap-must-establish-locality]].
+See `trap-which-node-masters-a-resource-is-a-hash-so-a-two-node-lap-must-establish-locality`.
 
 **A predicate whose two branches demand different evidence is itself the
 defect.** `mxfs_dlm_resource_wait_is_live()` gates whether a stalled acquire
@@ -175,7 +175,7 @@ transactions) have no safe error boundary; failure must be opt-in per call
 site, scoped per-task (not per-inode, or two threads on one inode read each
 other's verdict), only where nothing is dirty and no transaction is open —
 `open()` qualified, already had a fail-closed `-EIO` path.
-See [[technique-a-predicate-whose-two-branches-demand-different-evidence-is-the-defect]].
+See `technique-a-predicate-whose-two-branches-demand-different-evidence-is-the-defect`.
 
 ## Repair-at-the-measurement-point (sess577, D-0496)
 
@@ -201,7 +201,7 @@ nodes/TCP) got 36 censuses matching 36 repairs, zero divergence, but 81
 further rebuilds declined on directory format (single-leaf only) and the
 diff ran in-core, not against platter — a clean census under those limits is
 a bounded negative, not a disproof.
-See [[trap-a-repair-sitting-at-the-measurement-point-destroys-the-evidence-it-would-have-produced]].
+See `trap-a-repair-sitting-at-the-measurement-point-destroys-the-evidence-it-would-have-produced`.
 
 ## Tooling sweep verification (2026-09-10 memory triage)
 
@@ -223,4 +223,4 @@ verifier that does not reuse the sweep's own path/name handling. Also:
 collapsing `.md.md` to `.md` via one non-repeating regex substitution is not
 idempotent (`.md.md.md` → `.md.md`) — replace `(?:\.md){2,}` in one pass, or
 loop to a fixed point.
-See [[trap-a-sweep-keyed-on-one-name-and-a-path-scan-that-eats-dot-directories]].
+See `trap-a-sweep-keyed-on-one-name-and-a-path-scan-that-eats-dot-directories`.

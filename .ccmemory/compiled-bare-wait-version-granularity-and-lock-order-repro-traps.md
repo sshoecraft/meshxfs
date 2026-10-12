@@ -10,7 +10,7 @@ Assorted group (kind: assorted, no single topic): three lessons from the 0.90.12
 
 ## Version granularity (user correction)
 
-[[feedback-one-version-per-piece-of-work-not-per-defect-found]]: the mpath run went 0.90.122 -> 0.90.123 (16-node dir-reload hang) -> 0.90.124 (rejoined node cannot open files). The user's correction: bump once per thing being worked on, "even if you use 300 sessions, that's one version."
+`feedback-one-version-per-piece-of-work-not-per-defect-found`: the mpath run went 0.90.122 -> 0.90.123 (16-node dir-reload hang) -> 0.90.124 (rejoined node cannot open files). The user's correction: bump once per thing being worked on, "even if you use 300 sessions, that's one version."
 - Unit of a version = the piece of work (the ccloop task, e.g. "test and release mpath support"), not each defect found. A new defect joins the open version's CHANGELOG entry as another paragraph.
 - "A change that needs an entry of its own" means different work, not a different bug inside the same work.
 - Do not renumber backwards to undo an extra bump (stay on 124, just do not increase again); renumbering forces a rebuild and re-gate of a verified build.
@@ -18,7 +18,7 @@ Assorted group (kind: assorted, no single topic): three lessons from the 0.90.12
 
 ## run.sh bare `wait` traps every `&` job in the shell
 
-[[trap-a-background-job-started-in-run-sh-is-waited-on-by-run-coords-bare-wait]]: a per-row host-disk sampler started with `&` in run.sh made every fio_perf row stall for the sampler's whole lifetime (180 s at budget+60, ~11 min at 3*budget+300) before fio started. Row-elapsed still read 36 s, so only the wall looked wrong.
+`trap-a-background-job-started-in-run-sh-is-waited-on-by-run-coords-bare-wait`: a per-row host-disk sampler started with `&` in run.sh made every fio_perf row stall for the sampler's whole lifetime (180 s at budget+60, ~11 min at 3*budget+300) before fio started. Row-elapsed still read 36 s, so only the wall looked wrong.
 - Cause: run_coord launches node jobs in the background and collects them with a bare `wait`, which waits on EVERY job in the shell's table, including earlier caller-started helpers.
 - The sampler expired just before fio began, so the sample was empty (peak 14 MiB/s while the disk took 13 GB at 1.0-1.6 GB/s). An instrument that ends before the event reads as "the device was idle."
 - Fix: `disown "$!"` immediately after starting any helper in run.sh (or any script whose callees use a bare `wait`). A `$(...)` subshell cannot reset globals for the caller; reset them in the caller.
@@ -27,7 +27,7 @@ Assorted group (kind: assorted, no single topic): three lessons from the 0.90.12
 
 ## Two-inode lock-order deadlock repros need the hang's inode-number order
 
-[[trap-a-two-inode-deadlock-repro-needs-the-hangs-inode-number-order]]: a directed reproducer for D-DIR-RELOAD-CHILD-INACTIVATION-DEADLOCK (rmdir held child LOCK 33569536, waited on parent `shared` 92813250) ran clean on BOTH the fix and an inline-shrink control until the geometry matched.
+`trap-a-two-inode-deadlock-repro-needs-the-hangs-inode-number-order`: a directed reproducer for D-DIR-RELOAD-CHILD-INACTIVATION-DEADLOCK (rmdir held child LOCK 33569536, waited on parent `shared` 92813250) ran clean on BOTH the fix and an inline-shrink control until the geometry matched.
 - xfs_lock_two_inodes locks the lower inode number first. The hang needs the child BELOW the parent. A fresh parent at the top of the mount sat at ino 131 (bottom of AG 0), so every LOCK was above it and the ABBA order could never form.
 - MXFS places a node's new directories in that node's AG, and the AG moves between mounts: eight candidates from one node landed at 131-138; one candidate per node spread across AGs. Choose the highest-numbered as parent, then CALIBRATE (each locker makes one LOCK and reports its ino) and retry setup until at least one locker is below; tests/dir_reload_child_inact.sh does this.
 - No per-iteration `stat` in the lock loop: it cut cycles from ~700 to ~7 per minute and the window was never reached. Calibrate once before the window.

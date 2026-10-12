@@ -10,7 +10,7 @@ Three traps share one shape: a debug/injector module parameter armed or cleared 
 
 ## 1. A u32 id in an `int` param is refused and reads back 0
 
-[[trap-a-module-param-holding-a-u32-node-id-must-be-uint-or-half-of-all-ids-are-refused-and-read-back-zero]]
+`trap-a-module-param-holding-a-u32-node-id-must-be-uint-or-half-of-all-ids-are-refused-and-read-back-zero`
 
 - `mxfs_node_id_t` is `uint32_t`; ids on this rig are uniform over the range, so about half exceed `INT_MAX`.
 - `pr_fence_submit_inject_victim` was `module_param int`. `kstrtoint` refuses e.g. `2585738898` with `-ERANGE`, the stored value stays 0, and 0 means "any victim". The victim-filtered one-shot silently became a global one-shot. Two laps (~9 min of rig each) died on it. The MODE param beside it read back fine, which made it look like a harness arming bug.
@@ -20,7 +20,7 @@ Three traps share one shape: a debug/injector module parameter armed or cleared 
 
 ## 2. A 64-bit PR key through bash `$(( ))` goes negative
 
-[[trap-a-pr-key-overflows-bash-signed-arithmetic-so-half-of-them-silently-fail-to-arm-a-ullong-knob]]
+`trap-a-pr-key-overflows-bash-signed-arithmetic-so-half-of-them-silently-fail-to-arm-a-ullong-knob`
 
 - PR keys are random 64-bit; about half have the top bit set. `$(( 0xf5413d536ca66aed ))` is negative in bash.
 - Echoing that into a `ullong` param (`dbg_prout_lose_key`) makes `param_set_ullong` reject it; the knob stays 0 and the lap runs disarmed (`got=ARMED=0x0 want=ARMED=0xf541...`). `normkey()` built on `printf '0x%016x' "$(( $1 ))"` also cannot render it.
@@ -29,7 +29,7 @@ Three traps share one shape: a debug/injector module parameter armed or cleared 
 
 ## 3. A `charp` param cleared with `echo ''` holds a newline
 
-[[trap-a-charp-module-parameter-cleared-with-echo-empty-holds-a-newline-and-stays-armed]]
+`trap-a-charp-module-parameter-cleared-with-echo-empty-holds-a-newline-and-stays-armed`
 
 - A sysfs store hands a `charp` param the bytes written; `echo ''` writes `"\n"`. `tests/lu_reset_fence.sh` cleared `lu_reset_krel_probe` that way, the module's `!p || !p[0]` disarm test saw a non-empty string, and the refusal injector stayed armed with a substitute release of `"\n"`.
 - Effect: later fences refused `kernel-unaudited` with an empty release in the log, indistinguishable from an operator-cleared knob. The LOGICAL UNIT RESET arm never reached admission (`admit_run=0`), so the clause under test went unmeasured and the harness aborted on an empty field instead of a filesystem verdict.

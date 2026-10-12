@@ -10,7 +10,7 @@ Release procedure corrections, all from the user on 2026-10-10 around the 0.90.1
 
 ## 1. A version that passed its gates ships before any further change
 
-[[feedback-a-version-that-passed-every-gate-ships-before-any-further-change]]: 0.90.116 passed RELEASE_RIG_GATES (DRBD verify + 6/6 boards 31/31) and a clean physical-pair leg, then was not released. The no-git rule was read as a reason to wait, and the ccloop "keep working" framing led to further defect fixes in `dlm/dlm.c`, `dlm.h`, `v5_mount.c` under the same unreleased version. The verified build became unshippable from the tree; cost ~2 hours plus a manual restore.
+`feedback-a-version-that-passed-every-gate-ships-before-any-further-change`: 0.90.116 passed RELEASE_RIG_GATES (DRBD verify + 6/6 boards 31/31) and a clean physical-pair leg, then was not released. The no-git rule was read as a reason to wait, and the ccloop "keep working" framing led to further defect fixes in `dlm/dlm.c`, `dlm.h`, `v5_mount.c` under the same unreleased version. The verified build became unshippable from the tree; cost ~2 hours plus a manual restore.
 
 - A verified build is the deliverable; more fixes are the next version.
 - The no-git rule is a reason to ASK (one line: go to commit, push, publish), never a reason to sit on a verified release. The loop's "keep working" never outranks shipping what passed.
@@ -20,7 +20,7 @@ Release procedure corrections, all from the user on 2026-10-10 around the 0.90.1
 
 ## 2. The headline sells the whole release to its users
 
-[[feedback-release-headline-sells-the-whole-release-to-its-users-not-the-last-internal-fix]]: the published 0.90.116 headline was an engineering note about the allocator trylock (the last fix), for a release carrying eight versions of DRBD two-node work. User reaction: how is that a selling point to Proxmox users.
+`feedback-release-headline-sells-the-whole-release-to-its-users-not-the-last-internal-fix`: the published 0.90.116 headline was an engineering note about the allocator trylock (the last fix), for a release carrying eight versions of DRBD two-node work. User reaction: how is that a selling point to Proxmox users.
 
 - `scripts/release.sh --publish` takes the version's CHANGELOG section as the GitHub release notes and its heading as the headline. Intermediate versions (marked "IN PROGRESS, NOT RELEASED") never reach users on their own, so the released section is the only announcement of their work.
 - The heading covers everything since the previous RELEASE, and it is written by GPT from the changelog section (section 3), never drafted by us.
@@ -30,7 +30,7 @@ Release procedure corrections, all from the user on 2026-10-10 around the 0.90.1
 
 ## 3. GPT writes the banner from the changelog
 
-[[feedback-when-you-release-ask-gpt-for-advice-on-the-release-banner]] (procedure revised by the user 2026-10-12: "whatever you did to get this result is what I want to see in the future"). Before publishing, `mcp__ask_gpt__query` with:
+`feedback-when-you-release-ask-gpt-for-advice-on-the-release-banner` (procedure revised by the user 2026-10-12: "whatever you did to get this result is what I want to see in the future"). Before publishing, `mcp__ask_gpt__query` with:
 
 - the prompt **"Write a banner describing the enhancements made in this release. Here is the changelog for the release, MXFS <version>:"**, then
 - the version's CHANGELOG section WITHOUT its `##` heading (that is the banner being written): user-facing summary and configurations table verbatim; the "in detail" part with test-tooling and lab-host paragraphs dropped and the lab host named generically;
@@ -41,7 +41,7 @@ GPT's title line becomes the GitHub release title, the CHANGELOG heading and the
 
 ## 4. Released configurations go in a table
 
-[[feedback-every-release-lists-its-released-configurations-in-a-table]]: the README's prose "What 0.90.116 was validated on" list crammed six shared-LUN configurations into one run-on bullet. On every release, in both the README release section and the CHANGELOG section used as release notes:
+`feedback-every-release-lists-its-released-configurations-in-a-table`: the README's prose "What 0.90.116 was validated on" list crammed six shared-LUN configurations into one run-on bullet. On every release, in both the README release section and the CHANGELOG section used as release notes:
 
 - One table row per released configuration (`2/net/mesh/direct` ... `16/disk/caw/direct`, `2/net/mesh/drbd`), columns: nodes, how nodes reach storage, what it was validated on (rig suite, platforms with installed packages, physical hosts / failover suite).
 - Pertinent context (rig details, platform list shared by all rows, configurations explicitly NOT claimed, the same-version-on-every-host rule) goes in short text immediately before or after the table, not in run-on bullets.

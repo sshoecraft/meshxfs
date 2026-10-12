@@ -12,7 +12,7 @@ Three notes share one shape: the rig reports success or absence while the proper
 
 ## Healing a partition restores reachability, not the session
 
-[[trap-healing-a-storage-partition-by-removing-the-firewall-rule-does-not-bring-the-path-back-and-the-absence-reads-as-safety]]
+`trap-healing-a-storage-partition-by-removing-the-firewall-rule-does-not-bring-the-path-back-and-the-absence-reads-as-safety`
 
 - `iscsid` tears a dropped session down at `node.session.timeo.replacement_timeout` = 120 s. A partition long enough to outlast the 62 s dead window plus the fence (180 s) is past that. Removing the iptables rules afterwards restores reachability only.
 - A lap that then reads the keys scores "key absent" as safety and "no write from the fenced incarnation" as containment. Both are vacuous: the node simply has no path.
@@ -21,7 +21,7 @@ Three notes share one shape: the rig reports success or absence while the proper
 
 ## A deploy script that reads a state-file field and then drops it
 
-[[trap-module-swap-deploy-dropped-dev-from-marker-and-killed-the-rig-on-its-second-run]]
+`trap-module-swap-deploy-dropped-dev-from-marker-and-killed-the-rig-on-its-second-run`
 
 - `scripts/module_swap_deploy.sh` resolves the LUN from `MXFS_DEV`, else the `dev` field of `.cluster_marker.json`, else `/dev/mapper/mpatha` (nonexistent on the QNAP rig). It rewrote the marker with `jq -n '{nodes, dlm, srcversion, node_list, iso}'`, omitting `dev`.
 - The first swap after `prep_cluster` worked; the second fell through to the nonexistent default after it had already unmounted and rmmod'd every node, leaving a SCSI-PR reservation-conflict state that cost a full re-prep.
@@ -30,7 +30,7 @@ Three notes share one shape: the rig reports success or absence while the proper
 
 ## Stall observations on this rig need more than ten minutes
 
-[[trap-the-scsi-command-timeout-on-this-rig-is-180s-set-by-mxfs-own-prep-so-a-stall-observation-under-ten-minutes-proves-nothing]]
+`trap-the-scsi-command-timeout-on-this-rig-is-180s-set-by-mxfs-own-prep-so-a-stall-observation-under-ten-minutes-proves-nothing`
 
 - The SCSI command timeout is 180 s, not 30: `/sys/block/sda/device/timeout` is set by `scripts/verify_infra.sh:87` and `tools/prep_tcm_node_scst.sh:58`. The VMware udev rule does not apply to the iSCSI LUN.
 - A defect was opened on a 3m39s (219 s) D-state observation reasoned as "far longer than the 30 s timeout". That is 1.2 expiries. `iscsi_eh_cmd_timed_out()` answers the first expiry with "making progress, more time", so nothing had failed to rescue it; the watching stopped first.

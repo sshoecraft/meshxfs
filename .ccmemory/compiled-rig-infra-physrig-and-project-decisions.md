@@ -19,7 +19,7 @@ opening a ledger entry.
   node md5s an empty file, and every peer reports a size/content mismatch — indistinguishable
   from a read-coherency bug, and the victim is always in the 9..32 range.
   **Diagnostic tell: an `.md5` containing `d41d8cd98f00b204e9800998ecf8427e` is the md5 of empty
-  — the SOURCE was empty at write time** ([[infra-node-root-disks-fill-and-fabricate-victim-failures]]).
+  — the SOURCE was empty at write time** (`infra-node-root-disks-fill-and-fabricate-victim-failures`).
 - **ccloop leaves predecessor sessions ALIVE and WORKING.** At relay it spawns the next session
   but does not terminate the previous `claude`, which is orphaned to PPID=1 and keeps executing
   its Stop-hook loop — launching rival `run.sh` invocations that power-cycle nodes mid-run.
@@ -28,7 +28,7 @@ opening a ledger entry.
 - **…but a run-lock conflict is more often your OWN orphans.** A long stretch was spent hunting a
   "rival ccloop session" contending for `/tmp/mxfs_run.lock` with a fresh PID every 1-2 minutes.
   It was timeout-orphaned per-node ssh children. `readlink /proc/<pid>/cwd` settles it in seconds
-  ([[infra-timeout-orphans-hold-run-lock-not-rival-session]]).
+  (`infra-timeout-orphans-hold-run-lock-not-rival-session`).
 - **Kernel ring drift.** test19-23 had booted without `log_buf_len=16M`, so their 256KB ring wraps
   in ~40s under MXFS print load — poisoning every dmesg-window scan and producing a persistent
   5-node FAIL that had a multi-build "history" ([[rig-test19-23-log-ring-drift-fixed]]).
@@ -36,12 +36,12 @@ opening a ledger entry.
   script gets re-tokenised across three quoting layers. An embedded `sed -i "s/.../"` arrived as
   `sed -ie` and **mangled `/etc/default/grub` on 17 nodes**. Rule: remote one-liners only; for
   anything complex, build the script locally, SCP it, then `bash` it
-  ([[infra-sshpass-wrapper-flattens-args-no-complex-scripts]]).
+  (`infra-sshpass-wrapper-flattens-args-no-complex-scripts`).
 - **Calling that wrapper with the passfile omitted wrote the lab password into command-named
-  files and directory trees in the repo root** ([[infra-sshpass-2arg-litters-repo-with-password-files]]).
+  files and directory trees in the repo root** (`infra-sshpass-2arg-litters-repo-with-password-files`).
 - **`/src/mxfs` is NFS with root-squash behaviour** — files display root-owned regardless of who
   wrote them, and during one incident all client writes were silently denied
-  ([[infra-src-mxfs-is-nfs-root-squash]]).
+  (`infra-src-mxfs-is-nfs-root-squash`).
 - **Host neighbours move the numbers.** Proven with a raw dd-direct probe **with MXFS not in the
   path**: guest RTT p50 1.85ms idle → 6.6ms during a 32-node storm. Per-op wall is ≈5.5-6.5
   round-trips × RTT at every measured point, and the build under suspicion issued the *same*
@@ -67,7 +67,7 @@ The backend has been mischaracterised twice, in opposite directions:
   ([[storage-backend-is-lio-fileio-not-scst]]).
 - **And LIO fakes CAW** — it reports CAS success without persisting — so CAW cannot be validated
   on it at all. TCP DLM work was deliberately put on LIO as a *known quantity* while CAW requires
-  the SCST rebuild ([[infra-lio-for-tcp-scst-for-caw-rationale]]).
+  the SCST rebuild (`infra-lio-for-tcp-scst-for-caw-rationale`).
 
 ## 3. The physical rig — QNAP and Proxmox
 
@@ -165,16 +165,16 @@ direction ([[gpt-consult-dir_reuse32-architectural-review]]).
 
 - **CAW is the priority transport.** The shipping target is enterprises migrating off VMware onto
   Proxmox, running VM images on a shared enterprise SAN LUN — exactly the CAW use case. TCP DLM is
-  the must-keep fallback ([[project-caw-priority-enterprise-vmware-proxmox-san]]).
+  the must-keep fallback (`project-caw-priority-enterprise-vmware-proxmox-san`).
 - **MXFS is public** at `github.com/sshoecraft/mxfs`, **GPL-2.0-only** (mandatory — it is a
   GPL-2.0 Linux-XFS derivative), copyright under the full legal name. The README states it was
   *"written entirely by AI… not by a human using an AI tool"*, reworded deliberately after the
   first phrasing was judged ambiguous. Full-tree publication was the user's informed choice after
-  the leak risk was flagged ([[github-public-repo-mxfs]]).
+  the leak risk was flagged (`github-public-repo-mxfs`).
 - **mxfs.1 and v5 are NOT mirror images** — a framing the user explicitly corrected. mxfs.1 is a
   bespoke hand-written XFS-like filesystem with its own cache layer (so it can drop and re-parse
   on BAST); v5 is a fork of the **actual** upstream Linux XFS tree
-  ([[mxfs1-vs-v5-not-mirror-images]]).
+  (`mxfs1-vs-v5-not-mirror-images`).
 
 ## 7. Open/unresolved items carried here
 

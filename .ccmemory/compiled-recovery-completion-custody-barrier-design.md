@@ -14,7 +14,7 @@ being leaned on as a barrier by accident.
 
 ## sess610 — audit before design: the assumed-missing primitive already exists
 
-[[trap-the-sess575-rulings-missing-base-stable-primitive-already-exists-as-images-replayed-plus-homeflush]]:
+`trap-the-sess575-rulings-missing-base-stable-primitive-already-exists-as-images-replayed-plus-homeflush`:
 the sess575 Astra ruling named BASE_STABLE ("victim base images replayed and durable,
 never re-replay") as a missing primitive to build. Grep proved it already in the tree:
 `xfs_log.c` does `blkdev_issue_flush` after a clean shadow replay (`P226-FR-HOMEFLUSH`)
@@ -32,7 +32,7 @@ victim's AG answering EIO.
 
 ## sess611-614 — built the TCP custody model: AG-lock choke point, not a CAW transfer
 
-[[design-tcp-obligation-custody-freeze-at-the-ag-lock-choke-point-not-a-caw-transfer]]
+`design-tcp-obligation-custody-freeze-at-the-ag-lock-choke-point-not-a-caw-transfer`
 (0.85.0/0.85.1): the sess463 CAW ruling's transfer/receipt machinery does not fit TCP —
 a dead node keeps mastership plus ledger EX holds until the remaster/purge trio runs, so
 a custodian cannot even acquire a victim-mastered AG before that trio completes; and the
@@ -51,7 +51,7 @@ certificate as sole live member (`v5_gate_reprove`). Verified fails=0 across thr
 
 ## 2026-09-17 — ruling: the bulk authority takeover is not part of the barrier
 
-[[ruling-background-the-bulk-authority-takeover-instead-of-holding-recovery-completion-behind-it]]
+`ruling-background-the-bulk-authority-takeover-instead-of-holding-recovery-completion-behind-it`
 (D-0962): a *different* instance of the same coarse-reservation pattern. Recovery
 completion ran `v5_handoff_takeover` inline — 7984 ledger pages × ~13ms = 103-107s —
 before publishing `P163-RECOVERY-COMPLETE`/`P-PR-GATE-RESTORE`, holding a single-holder

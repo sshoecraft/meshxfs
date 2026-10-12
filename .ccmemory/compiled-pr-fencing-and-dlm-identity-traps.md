@@ -33,7 +33,7 @@ death/rejoin cycle, breaks.
   40-bit-random node id colliding with a retired one is ~k/2^32 — but a
   harness rule: never reuse a departed node id in the same run; cycle
   IDs or the peer's mount between reuses
-  ([[trap-reused-node-id-override-is-a-retired-identity-p164-dead-reject-peer-never-admitted]]).
+  (`trap-reused-node-id-override-is-a-retired-identity-p164-dead-reject-peer-never-admitted`).
 
 - **sess576**: the mount path's slot fence (`dlm/v5_mount.c`,
   `P238-FENCE-OWN-KEY`) compares a victim's PR key against the fencer's own
@@ -54,7 +54,7 @@ death/rejoin cycle, breaks.
   predicate looks like with any other live member substituted, and whether
   that path is reachable. Test such a guard in both directions — a guard
   that refuses every fence also passes the naive positive test
-  ([[trap-a-guard-written-for-the-self-direction-leaves-the-symmetric-peer-direction-open]]).
+  (`trap-a-guard-written-for-the-self-direction-leaves-the-symmetric-peer-direction-open`).
 
 ## PR evidence: a confident read is often a substitution error
 
@@ -86,7 +86,7 @@ evidence:
   registration confirmed on our own nexus, fence completed, fence
   durably certified} stand in for another — most wrong turns here are one
   silently substituting for another
-  ([[trap-read-keys-does-not-say-which-nexus-holds-a-key-and-lost-registration-has-four-causes]]).
+  (`trap-read-keys-does-not-say-which-nexus-holds-a-key-and-lost-registration-has-four-causes`).
   Same family as the generation-snapshot trap already compiled elsewhere
   (`trap-a-pr-snapshot-only-proves-anything-about-the-generation-it-was-taken-at`,
   in `compiled-allocator-campaign-traps`): a PR read is evidence about the
@@ -106,7 +106,7 @@ on TCP — a 2/tcp-only campaign hit a gap CAW-era work never saw. Fixed in
 sites. Lesson: grep both `dlm/dlm.c` and `dlm/dlm_caw.c` for a lock flag's
 handling before relying on it — a flag implemented in one DLM engine is not
 implemented in the other until proven so
-([[trap-mxfs-lkf-demand-was-caw-only-tcp-noqueue-deny-never-basts-the-holder]]).
+(`trap-mxfs-lkf-demand-was-caw-only-tcp-noqueue-deny-never-basts-the-holder`).
 
 ## An unbound shell variable can present as a fencing regression
 

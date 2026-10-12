@@ -35,7 +35,7 @@ of enumeration:
   Found the cooperative-release path had the nine-step drain pipeline and the
   unmount path had one of nine — a live candidate for a defect whose mechanism
   had been unknown for twelve days
-  ([[technique-audit-by-primitive-every-caller-of-the-thing-that-must-not-be-called-unprepared]]).
+  (`technique-audit-by-primitive-every-caller-of-the-thing-that-must-not-be-called-unprepared`).
   Same session, companion finding: an oracle that has never once reported a
   mismatch across hundreds of evidence directories can be silently exiting
   early on four different conditions, none of them counted — a zero from an
@@ -51,7 +51,7 @@ of enumeration:
   it does not prove the violating branch *executes* — a printk count is not a
   denominator unless the branch's own precondition is also counted, so file
   the fix as landed-and-unverified until it is
-  ([[technique-audit-a-stated-invariant-against-every-site-that-must-honour-it]]).
+  (`technique-audit-a-stated-invariant-against-every-site-that-must-honour-it`).
 
 - **By funnel.** A leak with 11+ clean laps and no reproduction is bounded, not
   chased, by proving its deallocator has exactly one caller, enumerating that
@@ -64,7 +64,7 @@ of enumeration:
   `ASSERT` that is compiled out in the shipping build is not a guard, and
   reproducing the real route needs concurrency (two transactions racing a
   brelse), not just a shutdown
-  ([[technique-enumerate-the-single-free-funnel-instead-of-hunting-the-leak]]).
+  (`technique-enumerate-the-single-free-funnel-instead-of-hunting-the-leak`).
 
 - **By choke point.** An invariant enforced at N callers has N chances to be
   forgotten — 7 of 8 release wrappers had the "no release once poisoned" gate,
@@ -76,7 +76,7 @@ of enumeration:
   the same call can be legitimate from one caller (a survivor purging a dead
   peer's slots) and a defect from another; the wrapper enforces, the choke
   point names the site so the disposition is made per call
-  ([[technique-ask-the-invariant-at-the-choke-point-not-at-each-caller]]).
+  (`technique-ask-the-invariant-at-the-choke-point-not-at-each-caller`).
   Same underlying idea, applied to evidence rather than to code: when a
   producer "never reproduces," enumerate *every* repair path that can touch
   the object, not only the ones the defect record already names — a third,
@@ -85,7 +85,7 @@ of enumeration:
   merely masking the symptom. The fix was not to remove the repair (behavior
   change, risk) but to make it report a pre/post diff of what it repaired, so
   the repair count becomes free coverage accounting
-  ([[trap-a-repair-sitting-at-the-measurement-point-destroys-the-evidence-it-would-have-produced]]).
+  (`trap-a-repair-sitting-at-the-measurement-point-destroys-the-evidence-it-would-have-produced`).
 
 ## Negative claims need the same rigor as positive ones
 
@@ -100,7 +100,7 @@ phrase "before dialloc dirties the transaction" was mesread as "before the
 call to dialloc" when the operand's existence tied it to "inside." A one-line
 tree-wide grep would have found it in seconds; grepping one file only found
 what the session happened to already be reading in
-([[trap-absence-in-one-file-is-not-absence-in-the-tree-containment-was-implemented]]).
+(`trap-absence-in-one-file-is-not-absence-in-the-tree-containment-was-implemented`).
 
 ## Sampling and distribution-blind measurement
 
@@ -114,7 +114,7 @@ what the session happened to already be reading in
   unsupported until a full-population histogram (one `grep -c`) is run,
   exactly the discipline RULE: DELEGATE ITERATIVE GRIND already requires of a subagent report's own
   negatives
-  ([[trap-a-truncated-subagent-table-is-a-sample-never-generalize-a-field-from-the-shown-rows]]).
+  (`trap-a-truncated-subagent-table-is-a-sample-never-generalize-a-field-from-the-shown-rows`).
 
 - **A ratio-to-a-statistic-of-itself detector goes blind exactly when it
   matters most.** A "≥10× the median" spike detector reported *fewer* spikes
@@ -127,7 +127,7 @@ what the session happened to already be reading in
   a baseline fixed outside the run under test, and never let a verdict line be
   the *only* thing a detector emits — the raw per-index means, printed
   alongside, are what caught this
-  ([[trap-ratio-to-median-detector-goes-blind-when-the-baseline-is-what-degraded]]).
+  (`trap-ratio-to-median-detector-goes-blind-when-the-baseline-is-what-degraded`).
 
 - **A fixed-order parameter ladder on un-reset state measures elapsed time as
   well as the parameter.** Sweeping F (files/node) 8→128 in one pass produced
@@ -141,7 +141,7 @@ what the session happened to already be reading in
   variable F, so "cost rises with outstanding work" while sweeping F was
   simply the wrong claim; and a censored arm's mean (guard fired, 3611 of 4096
   samples returned) is a lower bound, never "the mean" — publish n per point
-  ([[technique-run-the-ladder-backwards-a-fixed-order-sweep-is-confounded-with-elapsed-time]]).
+  (`technique-run-the-ladder-backwards-a-fixed-order-sweep-is-confounded-with-elapsed-time`).
 
 ## Instruments and gates that report success while measuring nothing
 
@@ -153,7 +153,7 @@ what the session happened to already be reading in
   own stated prediction. The general check for any liveness/anti-vacuity gate:
   does the key it watches for exist on the outcome you are hoping for? A gate
   only ever exercised against failures has never actually been tested
-  ([[trap-anti-vacuity-gate-keyed-on-a-failure-artefact-refuses-to-score-a-pass]]).
+  (`trap-anti-vacuity-gate-keyed-on-a-failure-artefact-refuses-to-score-a-pass`).
 
 - **Fixing a vacuous probe can invert the vacuity instead of removing it.** A
   probe found vacuous (`d_time=0` on 100% of lines, discriminating nothing)
@@ -167,7 +167,7 @@ what the session happened to already be reading in
   needs: trace every field in the new predicate to its writer and confirm that
   writer is reachable from the population being sampled, not just that the
   fix compiles or the log quiets down
-  ([[trap-fixing-a-vacuous-probe-can-invert-the-vacuity-not-remove-it]]).
+  (`trap-fixing-a-vacuous-probe-can-invert-the-vacuity-not-remove-it`).
 
 - **Cumulative vs. last-value probe fields cannot be divided against each
   other**, and a subtracted residue is not a measurement of whatever you
@@ -182,7 +182,7 @@ what the session happened to already be reading in
   numerator; does a direct probe for the suspected mechanism already exist
   (often it does, already shipping); if the answer is a residue, print it
   labeled as a residue, never as the mechanism
-  ([[trap-check-cumulative-vs-last-value-before-dividing-probe-fields]]).
+  (`trap-check-cumulative-vs-last-value-before-dividing-probe-fields`).
 
 - **Re-running a create workload on a mount the previous failed row already
   populated measures overwrites, not creates** — every `dd oflag=sync` became
@@ -190,7 +190,7 @@ what the session happened to already be reading in
   of magnitude fewer lines than the planned population, which is the tell:
   read the probe's *count* against the planned population before trusting any
   per-sample statistic derived from it
-  ([[trap-rerunning-a-create-workload-on-the-same-mount-measures-overwrites-not-creates]]).
+  (`trap-rerunning-a-create-workload-on-the-same-mount-measures-overwrites-not-creates`).
 
 - **A crash-durability control built on a one-block directory cannot lose
   anything**, because every create re-logs the whole block and the AIL push
@@ -203,7 +203,7 @@ what the session happened to already be reading in
   crash/durability control: state which block's last write is unprotected and
   show the census proving the crash landed after that write, and count
   reappeared-after-unlink as a loss too, not just missing files
-  ([[trap-a-one-block-directory-crash-control-cannot-lose-the-last-create-relogs-the-whole-block]]).
+  (`trap-a-one-block-directory-crash-control-cannot-lose-the-last-create-relogs-the-whole-block`).
 
 - **A second, "tolerant" parser for a format the producer already parses is a
   standing bug**, caught here only by luck. A hand-written parser for
@@ -216,7 +216,7 @@ what the session happened to already be reading in
   record before reading anything else from it; and treat any measurement that
   numerically equals an experiment parameter (n, F, a loop bound) as a
   fingerprint of reading a counter instead of a measurement
-  ([[trap-never-write-a-second-parser-for-a-format-the-producer-already-parses]]).
+  (`trap-never-write-a-second-parser-for-a-format-the-producer-already-parses`).
 
 ## Harness sequencing that fabricates the population it measures
 
@@ -230,7 +230,7 @@ what the session happened to already be reading in
   reachable *and* `/mnt/shared` mounted, polled to a derived ceiling) before
   arming anything cluster-wide, not an inference from the previous stage's
   verdict
-  ([[trap-arming-a-fleet-that-is-still-rebooting-from-the-previous-lap]]).
+  (`trap-arming-a-fleet-that-is-still-rebooting-from-the-previous-lap`).
 
 - **Two bash shell facts, each burned a rig lap.** `( list ) &` inside a
   non-interactive shell double-forks — `$!` is a wrapper whose *child* runs
@@ -245,7 +245,7 @@ what the session happened to already be reading in
   means the harness, not the kernel. Fix: write setup as its own statement
   before backgrounding the list, and verify what a node command *did* via
   `/proc` or a read-back, never what it printed it intended
-  ([[trap-background-subshell-double-fork-and-and-list-precedence-in-ssh-node-commands]]).
+  (`trap-background-subshell-double-fork-and-and-list-precedence-in-ssh-node-commands`).
 
 ## The shape, again
 

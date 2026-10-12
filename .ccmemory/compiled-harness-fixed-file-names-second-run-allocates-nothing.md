@@ -6,7 +6,7 @@ metadata:
 tags: [compiled, test-harness, alloc_witness, mkfs]
 ---
 
-Assorted group (single note, no wider topic): a harness trap about repeating allocation-measuring rows on one filesystem. Source: [[trap-a-harness-with-fixed-file-names-allocates-nothing-on-its-second-run-on-one-mkfs]].
+Assorted group (single note, no wider topic): a harness trap about repeating allocation-measuring rows on one filesystem. Source: `trap-a-harness-with-fixed-file-names-allocates-nothing-on-its-second-run-on-one-mkfs`.
 
 - Failure mode: a test that "creates" files with fixed names (`: > $D/x$i`, `r<rank>_<i>`, `u<i>`) and runs twice on the same filesystem without an intervening mkfs allocates nothing the second time. `: >` opens and truncates the predecessor's file. Anything measuring allocation (carves, finobt transitions, inode reuse, occupant manifests built by globbing the directory) reads vacuous or wrong.
 - Evidence (16/disk/caw/mpath, 0.90.124): alloc_witness+chk_clean three times after one prep. Run 1 passed. Runs 2 and 3: 12 of 16 nodes had zero phase-1 carves (each re-touched exactly the 192 files from run 1); own_ag and overlap INSUFFICIENT; chk_clean release=VACUOUS. Release gates never exposed it because every repeat there followed a fresh mkfs.

@@ -10,14 +10,14 @@ tags: [compiled, harness, measurement-integrity, scsi-pr, rig, qnap]
 
 Three notes share one theme: a harness reported a verdict about MXFS or the rig from a capture that observed nothing, or observed something other than what the predicate assumed. The third is a one-off rig anomaly kept for its recurrence procedure.
 
-## 1. A pre-filter is part of the instrument ([[trap-sg-persist-says-no-reservation-held-in-capitals-and-a-case-sensitive-filter-throws-the-decisive-line-away]])
+## 1. A pre-filter is part of the instrument (`trap-sg-persist-says-no-reservation-held-in-capitals-and-a-case-sensitive-filter-throws-the-decisive-line-away`)
 
 - `sg_persist -i -r <dev>` reports an unreserved LUN as `PR generation=0x16d2, there is NO reservation held` (NO capitalised).
 - A remote-side `grep -a 'Key=\|type:\|no reservation'` discards that line. The downstream `resv_none()` predicate, even case-insensitive, then inspects a file with the evidence already removed. Case-folding at the predicate cannot repair a case-sensitive capture.
 - Cost: lap s87b (fence_late_detection) polled 120 s, never saw the string, exited VACUOUS on a lap where the condition had in fact been reached. About 5 minutes plus a VM boot.
 - Rule: grep case-insensitively (`grep -ai`), match on the noun (`reservation held`), and confirm against the tool's real output once rather than what it "would" print.
 
-## 2. Defaults written on another rig report error text as an observation ([[trap-a-harness-hardcoding-one-rigs-device-parses-the-error-text-and-reports-it-as-an-mxfs-observation]])
+## 2. Defaults written on another rig report error text as an observation (`trap-a-harness-hardcoding-one-rigs-device-parses-the-error-text-and-reports-it-as-an-mxfs-observation`)
 
 - `tests/resv_health_detect.sh` and `tests/pr_reservation_ownership_probe.sh` defaulted to `/dev/mapper/mpatha` (CAW multipath rig). On the 2-node TCP rig MXFS is on `/dev/sda`; every `sg_persist` errored.
 - The parser found no reservation stanza in the error text and printed `RESERVATION: NONE HELD keys=0 distinct=0`. That asserted MXFS fencing state from a capture of an error message, failed two assertions on a cluster whose reservation was healthy WE-AR with 2 registrants, and the remount step on the same absent device silently left a node unmounted for the rest of the run.
@@ -28,7 +28,7 @@ Three notes share one theme: a harness reported a verdict about MXFS or the rig 
   `DEV="${MXFS_DEV:-}"; [ -n "$DEV" ] || DEV=$(ssh_helper "$OBS" "awk '\$3==\"mxfs\" {print \$1; exit}' /proc/mounts")`, then FATAL exit 2 if still empty.
 - General rule: for any default device/path/host, ask which rig it was written on. A default right on one of four rig conditions fails by reporting, not by erroring.
 
-## 3. QNAP mkfs zero_region verify FAIL right after fleet unmount ([[trap-qnap-mkfs-zero-region-verify-fail-transient-right-after-fleet-unmount]])
+## 3. QNAP mkfs zero_region verify FAIL right after fleet unmount (`trap-qnap-mkfs-zero-region-verify-fail-transient-right-after-fleet-unmount`)
 
 - Chain s513b prep failed in 13 s: `mkfs.mxfs: zero_region verify FAIL @67119616 byte 2560 = 0x4b`, one second after test1's clean unmount (test2 had shut down on an EDEADLK-NL livelock minutes earlier).
 - `sg_persist -k/-r` afterwards: no keys, no reservation, so not the stale-PR-blocks-mkfs shape. Rerun 90 s later prepped fine.

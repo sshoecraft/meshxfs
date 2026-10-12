@@ -59,7 +59,7 @@ legitimately consumes the reference via `iput` on its error paths without
 creating a dentry, so that outcome must be counted too or the result stays
 ambiguous.
 
-See [[unmount-leak-global-refcount-balance-cannot-work]].
+See `unmount-leak-global-refcount-balance-cannot-work`.
 
 ## The `site=fileN:lineM` decoder (reference probe instrumentation)
 
@@ -94,7 +94,7 @@ failure dump, `P566-GRABST`, `P566-REFEV`, `P566-GRABST-SUMMARY`, added
 sess566). This machinery predates and underlies all the unmount-busy-inode
 work above — reach for it whenever a probe reports a count but not a holder.
 
-See [[reference-mxfs-igrab-call-site-file-id-mapping-for-refev-and-grabst-probes]].
+See `reference-mxfs-igrab-call-site-file-id-mapping-for-refev-and-grabst-probes`.
 
 ## Harness trap (sess42): `dmesg --follow` ring-buffer staleness in `drc_cap2.sh`
 
@@ -127,7 +127,7 @@ Rule for all future dmesg-correlation work:
    create-start..verify-done PHASE markers and trust only P-lines inside that
    window.
 
-See [[dmesg-follow-ringbuffer-staleness-trap-drc-cap2-fix]].
+See `dmesg-follow-ringbuffer-staleness-trap-drc-cap2-fix`.
 
 ## Harness trap (sess43): killing `drc_cap2`/`run.sh` mid-flight leaks the module refcount
 
@@ -157,4 +157,4 @@ behavior instead of aborting a run, pass `MXFS_EXTRA_MODARGS` (exported
 through `run.sh` → `prep_node.sh`), e.g.
 `MXFS_EXTRA_MODARGS="dir_force_block=1" bash tests/drc_cap2.sh`.
 
-See [[trap-killing-a-harness-run-midflight-leaks-the-module-refcount]].
+See `trap-killing-a-harness-run-midflight-leaks-the-module-refcount`.

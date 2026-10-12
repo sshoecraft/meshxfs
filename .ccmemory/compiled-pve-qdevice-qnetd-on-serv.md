@@ -6,7 +6,7 @@ metadata:
 tags: [compiled, pve, qdevice, quorum, rig]
 ---
 
-Assorted group of one note: the QDevice (quorum tie-breaker) arrangement for Proxmox clusters on the lab rig. Source: [[reference-pve-pair-qdevice-is-qnetd-on-serv]].
+Assorted group of one note: the QDevice (quorum tie-breaker) arrangement for Proxmox clusters on the lab rig. Source: `reference-pve-pair-qdevice-is-qnetd-on-serv`.
 
 - serv (192.168.1.5, Debian 11) runs `corosync-qnetd` on port 5403, ffsplit, tls on. User-approved as QDevice for the physical pair pve1 (192.168.1.80) / pve2 (192.168.1.81), cluster `mxfs-cluster`, and for nested PVE clusters built as VMs on clyde. One qnetd serves many clusters provided each has a distinct cluster name.
 - Setup: from pve1, `pvecm qdevice remove` then `pvecm qdevice setup 192.168.1.5 --force`, after pve1's root key is in serv's /root/.ssh/authorized_keys.

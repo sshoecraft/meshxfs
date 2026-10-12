@@ -39,7 +39,7 @@ never in the repo), resolved by `tools/mxfs_secrets.sh` /
 
 ### Shared-LUN stack: superseded, do not follow the old recovery steps literally
 
-[[test-environment]] and [[env-cluster-bringup-after-host-reboot]] both
+[[test-environment]] and `env-cluster-bringup-after-host-reboot` both
 document an EARLIER rig generation: a single shared LUN via **LIO
 fileio + tcm_loop, no iSCSI** (`/home/steve/disk.img` → `/dev/mxfs-shared`
 → `/dev/sda` in guests), rebuilt post-reboot with
@@ -76,7 +76,7 @@ on these VMs, so use `virsh screenshot` + Read the PNG to see actual state.
 
 ### `/src` NFS rig rules (still current)
 
-[[infra-src-is-qnap-nfs-do-not-touch-exports]]: `/src` on clyde AND every
+`infra-src-is-qnap-nfs-do-not-touch-exports`: `/src` on clyde AND every
 test VM is an NFS mount **from the QNAP** (`192.168.1.4:/src`), not served
 by clyde — clyde re-mounts it too. Never touch clyde's `/etc/exports` or
 `exportfs` for this, never repoint `NFS_SERVER` away from `192.168.1.4`,
@@ -123,7 +123,7 @@ class.
 
 ### Design-comparison reference sources (still current)
 
-[[reference-clustered-fs-sources]]: local paths for comparing MXFS's
+`reference-clustered-fs-sources`: local paths for comparing MXFS's
 coherency model against established clustered filesystems —
 `~/src/linux/fs/gfs2/` (glock demote: synchronous `go_sync`+`go_inval`
 before DLM unlock; anti-starvation via min hold-time + DLM queue
@@ -172,7 +172,7 @@ and apply to both versions equally.
 
 ### Closed performance investigation: mxfs-vs-XFS single-node fio gap
 
-[[mkfs-mxfs-vs-mkfs-xfs-agcount-geometry-difference]]: an apparent "mxfs is
+`mkfs-mxfs-vs-mkfs-xfs-agcount-geometry-difference`: an apparent "mxfs is
 2.5x faster than XFS" single-node fio result was a TEST METHODOLOGY bug,
 not a real mxfs advantage or a benchmark artifact — every comparison used a
 fresh file each time, so both sides were being measured at first-touch
