@@ -955,7 +955,7 @@ mount -t mxfs -o peer=10.0.0.11 /dev/sdX /mnt/shared      # on 10.0.0.12
 other sender. See `mxfs(5)` and [`docs/discovery.md`](docs/discovery.md).
 
 A host can mount more than one MeshXFS filesystem at once, each shared with its
-own set of hosts (this development branch, 0.90.122; not in a release yet).
+own set of hosts.
 They share the host's ports: a lock-manager connection or datagram reaches the
 filesystem it is for.  Each filesystem may run its own transport with the
 `transport=tcp|caw` mount option, so a DRBD resource and a SAN LUN can be
@@ -963,12 +963,14 @@ mounted side by side; see "Choosing the transport".
 
 ### DRBD dual-primary (`2/net/mesh/drbd`)
 
-**Released in 0.90.107** (see the top of this file).  Install the release's
-source, not this development branch: check out its tag, `v0.90.107`.
+A released configuration (see the top of this file).  Install the latest
+release's package from the
+[Releases page](https://github.com/sshoecraft/meshxfs/releases), not this
+development branch.
 
 Two hosts, each with a local disk, and no shared storage, no third machine and
 no fence hardware. The complete, tested setup is in
-[`docs/drbd-setup.md`](docs/drbd-setup.md): `make install` on both, an LVM
+[`docs/drbd-setup.md`](docs/drbd-setup.md): the release package on both, an LVM
 volume per host, the DRBD resource (protocol C, two primaries, every
 `after-sb-*` `disconnect`, `fencing resource-and-stonith` with
 `/usr/sbin/mxfs-drbd-fence-peer`), `mkfs.mxfs` once, and

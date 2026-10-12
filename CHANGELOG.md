@@ -11,6 +11,11 @@
   secrets store when it runs.  It used to spell out the password's first
   four characters as its search pattern.
 - `notes/2node.md` names the repository as `sshoecraft/meshxfs`.
+- **Install instructions name no version.**  `docs/drbd-setup.md` told new
+  users to `git clone --branch v0.90.107` and build from source, two releases
+  behind; it and the README's DRBD section now say to install the latest
+  release's package from the Releases page.  The README no longer says
+  several filesystems per host are "not in a release yet".
 - The README opens with a left-aligned banner — "A POSIX clustered
   filesystem built on XFS" — and a paragraph on what MeshXFS does, the way
   the large infrastructure projects on GitHub open theirs, naming no one

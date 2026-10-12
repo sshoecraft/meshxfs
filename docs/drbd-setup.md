@@ -1,6 +1,6 @@
 # MeshXFS on two hosts with DRBD dual-primary
 
-`2/net/mesh/drbd` is released from 0.90.107 (see the top of the README):
+`2/net/mesh/drbd` is a released configuration (see the top of the README):
 verified on two physical Proxmox VE 9 hosts with DRBD 8.4.11, installed exactly
 as below.
 
@@ -15,31 +15,24 @@ Every command below is run as root. "Both nodes" means run it on each host;
 
 ## 1. Install
 
-On both nodes, from the same version of the source:
+On both nodes, download the latest release's `mxfs` package from the
+[Releases page](https://github.com/sshoecraft/meshxfs/releases) and install it
+with DRBD's tools:
 
 ```
-apt install drbd-utils git build-essential proxmox-headers-$(uname -r)
-git clone --branch v0.90.107 https://github.com/sshoecraft/meshxfs && cd meshxfs
-make && make install
+apt install drbd-utils proxmox-headers-$(uname -r) ./mxfs_<version>_amd64.deb
 ```
 
-`--branch` names the release; the repository's default branch is the
-development tree and is not a release.  To move to a later release, `git fetch
---tags && git checkout v<version>` in the clone, then `make && make install`
-again on both nodes.
-
-A Proxmox VE host ships with none of `git`, a compiler or the kernel headers.
 On Debian or Ubuntu the headers package is `linux-headers-$(uname -r)`
-instead. The module is built for the kernel that is running, so after a
-kernel update and reboot, run `make && make install` again (with that kernel's
-headers installed).
+instead. The package installs the module (built by DKMS against the running
+kernel's headers, and rebuilt after a kernel update), `mkfs.mxfs` and the
+other tools, the DRBD fence handler and its built-in fence authority, and two
+systemd units. To move to a later release, install that release's package on
+both nodes the same way.
 
-`make install` installs the module, `mkfs.mxfs` and the other tools, the DRBD
-fence handler and its built-in fence authority, and two systemd units. If it
-refuses because an older MeshXFS package or DKMS module is installed, remove that
-first with the command it prints. If it warns that the loaded module is not the
-one just installed, unmount any MeshXFS filesystem and run
-`rmmod mxfs && modprobe mxfs`.
+If a MeshXFS filesystem is mounted while you upgrade, the new module takes
+effect once every MeshXFS filesystem is unmounted and the module is reloaded
+(`rmmod mxfs && modprobe mxfs`).
 
 Both nodes must run the same MeshXFS version. Check with
 `cat /sys/module/mxfs/srcversion` on each.
