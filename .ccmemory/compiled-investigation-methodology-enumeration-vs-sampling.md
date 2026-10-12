@@ -112,7 +112,7 @@ what the session happened to already be reading in
   Position-selected rows carry zero information about a field's distribution;
   any "every row has X" / "no row has Y" claim from a capped report is
   unsupported until a full-population histogram (one `grep -c`) is run,
-  exactly the discipline RULE 10 already requires of a subagent report's own
+  exactly the discipline RULE: DELEGATE ITERATIVE GRIND already requires of a subagent report's own
   negatives
   ([[trap-a-truncated-subagent-table-is-a-sample-never-generalize-a-field-from-the-shown-rows]]).
 

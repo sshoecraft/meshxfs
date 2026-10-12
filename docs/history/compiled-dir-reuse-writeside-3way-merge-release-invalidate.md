@@ -21,7 +21,7 @@ claimed READ-SIDE staleness, "proven" by a targeted platter guard in
 clean=1, dir_gen==loaded_gen=52 → missed handoff gen-bump). A read-side fix
 `mxfs_dir_addname_coherent_refresh` (build 9AB8E8AE, param `dir_addname_coherent`
 default 1) was built for all three addname formats (node/leaf/block), gated on a CLEAN
-buffer, with a RULE-0 dedup via a new `b_mxfs_coherent_gen` xfs_buf field, doing a SAFE
+buffer, with a RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS dedup via a new `b_mxfs_coherent_gen` xfs_buf field, doing a SAFE
 invalidate (clear XBF_DONE, brelse, verified cold re-read) rather than an in-place
 memcpy — the memcpy form (build E40CD553) was REFUTED (bypasses the read verifier →
 shut=3000+ SHUTDOWN cascade). See `docs/history/compiled-dir-reuse-writeside-3way-merge-release-invalidate.md`.
@@ -113,7 +113,7 @@ read-side release-invalidation fix is strictly better.
 
 ### sess29: the WINNING fix — release-time invalidation (read-side)
 
-GPT-5.5 RULE-5 consult gave the unifying invariant
+GPT-5.5 RULE: CONSULT ANOTHER MODEL WHEN STUCK consult gave the unifying invariant
 `docs/history/compiled-dir-reuse-writeside-3way-merge-release-invalidate.md`:
 > No old-epoch XFS buffer (dirty/pinned/in-AIL/delwri) covered by a DLM resource may reach
 > disk after that resource is released. If it can't be drained+invalidated, the unlock

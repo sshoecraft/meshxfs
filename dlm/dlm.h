@@ -874,6 +874,12 @@ struct mxfs_dlm_ctx {
 			uint64_t            sent_ms;
 		} attempt[MXFS_DLM_ACQ_ATTEMPTS];
 		uint8_t                 attempt_next;
+		/* Its caller asked not to queue and gave up with no answer: the
+		 * record stays only to adopt a late grant for the next try, and no
+		 * wait goes on under it.  The idle scan retires it as abandoned,
+		 * never as a live wait lost; a later try that finds it starts a new
+		 * age. */
+		uint8_t                 gave_up;
 		/*
 		 * A GRANT THIS WAIT SOLICITED THAT ARRIVED BETWEEN TWO OF ITS
 		 * ATTEMPTS.  The requester registers a pending entry only for the
@@ -916,6 +922,8 @@ struct mxfs_dlm_ctx {
 	uint64_t                acq_key_collide; /* record reused by a 2nd task */
 	uint64_t                acq_evict_live;  /* in-use record evicted, full */
 	uint64_t                acq_idle_live;   /* in-use record retired as idle */
+	uint64_t                acq_gave_up;     /* no-queue tries given up unanswered */
+	uint64_t                acq_gave_up_retired; /* their records retired idle */
 	/* Grants that arrived between two attempts of a live wait. */
 	uint64_t                acq_grant_adopted;  /* kept for the wait */
 	uint64_t                acq_grant_claimed;  /* taken by its next attempt */
@@ -966,6 +974,14 @@ int mxfs_dlm_lock_retries(struct mxfs_dlm_ctx *ctx,
 		  const struct mxfs_resource_id *resource,
 		  uint8_t mode, uint32_t flags,
 		  uint8_t *granted_mode, int max_retries);
+
+/* a no-queue acquire that names the master, if any, that left it unanswered
+ * (see dlm.c) */
+int mxfs_dlm_lock_noqueue(struct mxfs_dlm_ctx *ctx,
+			  const struct mxfs_resource_id *resource,
+			  uint8_t mode, uint32_t flags,
+			  uint8_t *granted_mode,
+			  mxfs_node_id_t *unanswered_master);
 
 /* 0.74.0: locally-mastered resource granted to a dead node whose recovery is
  * RECOVERY_BLOCKED (see recovery_blocked_cb), or (0.75.21) a resource
@@ -1128,6 +1144,9 @@ int mxfs_dlm_update_active_nodes(struct mxfs_dlm_ctx *ctx,
 				 const mxfs_node_id_t *nodes, int count);
 bool mxfs_dlm_is_single_node(struct mxfs_dlm_ctx *ctx);
 bool mxfs_dlm_node_in_view(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t node);
+/* Has a recovery purged this node id (one incarnation)?  Nothing it sent
+ * before its death may be decided after that purge. */
+bool mxfs_dlm_owner_purged(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t node);
 /* sess-tcp: highest mode THIS node holds for `resource` in its local mirror
  * (GRANTED/CONVERTING entry owned by local_node), or MXFS_LOCK_NL if none.
  * Used to detect a phantom-EX on the TCP transport. */

@@ -205,7 +205,7 @@ density/lag chain that ultimately REFUTED the pure acquire-side epoch approach:
    66<66 false → not flagged → stale read proceeds. FIX: use the master's
    AUTHORITATIVE per-inode epoch `mxfs_v5_dlm_inode_dir_epoch(mp->m_mxfs_dlm,
    ino)` (bumped on EVERY cross-node handoff, NOT gated by keep-guards) as BOTH
-   stamp and compare value everywhere. Watch RULE-0 cost (one hash lookup per
+   stamp and compare value everywhere. Watch RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS cost (one hash lookup per
    dir create/modify/read; cache per-op if hot).
 6. `docs/history/docs/history/docs/history/compiled-dirreuse-8tcp-tenure-epoch-ex-handoff-lostupdate.md` (build
    `E3CDB9F1`, COMPILES, all gated → INERT/safe baseline): master-epoch swap
@@ -252,7 +252,7 @@ MANY× (covering block0); P-DIRWR daddr=120 count MONOTONIC (no 126→77);
 dir_reuse 8/tcp PASS across ≥5 clean-reboot runs (virsh destroy+start test1-8 —
 a FAIL wedges the LUN, must reboot before re-prep). Then tcp_dlm_scaling ≤60s,
 full 8/tcp 17/17, then 1/2/4. Resurrection canaries unlink_visibility,
-rename_visibility, crash_consistency MUST stay PASS. Watch RULE-0 timing from
+rename_visibility, crash_consistency MUST stay PASS. Watch RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS timing from
 extra re-reads. Repro:
 `MXFS_EXTRA_MODARGS='inode_mht_ms=50 dirwr=2' MXFS_TEST_ENV='DRC_ROUNDS=2'
 ./run.sh 8 tcp dir_reuse_coherency`; merge P-DIRWR owner=131 across nodes, sort

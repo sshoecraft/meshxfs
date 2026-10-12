@@ -34,7 +34,7 @@ the raw compare and the predicate never disagreed in practice because
 `xfs_iflush` runs. Kept the patch (closes a documented hole, zero cost) but did
 not credit it with the fix.
 
-GPT RULE-5 ruling at this point: a fence that abandons a publication must
+GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling at this point: a fence that abandons a publication must
 **resolve** the obligation explicitly (not `durable = pending`, which launders
 a lost update); add a `resolved_seq` frontier with an outcome
 (DURABLE/SUPERSEDED/REPLAYED/UNRESOLVED_CONFLICT); drive the reload from a
@@ -176,7 +176,7 @@ harness (disable the three fix levers, `reldefer_noprogress_ms=2000`, run
 
 ## Related, same incident (474) — `docs/rulings/3-grant-progress-publication.md`
 
-Separate GPT RULE-5 ruling covering incident474 hole (c)/(c2) — the
+Separate GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling covering incident474 hole (c)/(c2) — the
 still-mounted, still-beating holder that never releases a grant
 (`tests/hold_grant_liveness.sh`, `mxfs.hold_grant_fault_ino`, reproduced
 `P-WAIT-EXTEND el_ms=120159`, 129.6s acquire). Distinct from #380 but

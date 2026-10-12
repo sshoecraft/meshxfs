@@ -1,4 +1,4 @@
-<!-- sess461 RULE-5 ruling on D-FOREIGN-SLICE-INTENTS-ABANDONED item 5 (real EFI completion): descriptor obl_ag_mask freeze + bnobt idempotence ACCEPTED;… -->
+<!-- sess461 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on D-FOREIGN-SLICE-INTENTS-ABANDONED item 5 (real EFI completion): descriptor obl_ag_mask freeze + bnobt idempotence ACCEPTED;… -->
 # sess461 GPT ruling — item 5 EFI completion (D-FOREIGN-SLICE-INTENTS-ABANDONED)
 
 Facts given: mkfs = FINOBT only => EFI is the only loggable intent class; ladder OBLIGATIONS_DONE (5) unused; replay runs on system_unbound_wq (live) or the mount barrier (no txns); no AG lock during replay, victim bits frozen until purge; census keeps ag_mask only; xfs_alloc_has_records exists; sweep runs post-purge under normal grants.

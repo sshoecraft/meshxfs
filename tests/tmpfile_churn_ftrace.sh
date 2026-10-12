@@ -1,6 +1,6 @@
 #!/bin/bash
 # tmpfile_churn_ftrace.sh — per-callee wall-time breakdown of ONE node's
-# O_TMPFILE churn loop (D-TMPFILE-CHURN-the budget rule-PERF-400) with the kernel's
+# O_TMPFILE churn loop (D-TMPFILE-CHURN-RULE0-PERF-400) with the kernel's
 # function_graph tracer.  No rebuild, no probe printk: the tracer times every
 # non-inlined function under the four syscall entry points of one churn
 # iteration —

@@ -232,8 +232,15 @@ fi
 # rd_ns wr_bytes wr_ops wr_ns flush_ops flush_ns", from `qm status --verbose`;
 # and of the host's own disks: "<ts> DISK <dev> <the 17 fields of its stat>",
 # whose last two are the flushes completed and the milliseconds spent on them.
+# Also every VM's QEMU run state, "<ts> QMP <vmid> <qmpstatus>" (a guest whose
+# storage refused a write with ENOSPC is paused: io-error), and every
+# storage's usage, "<ts> STORE <name>:<status>:<used KiB>:<avail KiB> ...".
 BLK=$(cat <<'EOF'
 for d in /sys/block/sd*; do echo "$(date +%s) DISK ${d##*/} $(cat "$d/stat")"; done
+for id in $(qm list 2>/dev/null | awk 'NR > 1 {print $1}'); do
+    echo "$(date +%s) QMP $id $(qm status "$id" --verbose 2>/dev/null | awk '/^qmpstatus:/ {print $2}')"
+done
+echo "$(date +%s) STORE $(pvesm status 2>/dev/null | awk 'NR > 1 {printf "%s:%s:%s:%s ", $1, $3, $5, $6}')"
 for id in $(qm list 2>/dev/null | awk '$3 == "running" {print $1}'); do
     hn=$(timeout 5 qm agent "$id" get-host-name 2>/dev/null | sed -n 's/.*"host-name" *: *"\([^"]*\)".*/\1/p')
     echo "$(date +%s) AGENT $id ${hn:--}"

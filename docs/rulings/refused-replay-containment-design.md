@@ -1,4 +1,4 @@
-<!-- sess320 RULE-5 ruling -->
+<!-- sess320 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling -->
 # sess320 — GPT ruling: refused-foreign-replay survivor containment (D-FOREIGN-REPLAY-REFUSAL-CLUSTERWIDE-SUICIDE-513 / #90)
 
 Full text in sess320 transcript. Key points:

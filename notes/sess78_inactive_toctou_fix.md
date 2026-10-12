@@ -1,4 +1,4 @@
-# sess78 — xfs_inactive TOCTOU double-free fix (Gemini RULE-5 design)
+# sess78 — xfs_inactive TOCTOU double-free fix (Gemini RULE: CONSULT ANOTHER MODEL WHEN STUCK design)
 
 ## Proven diagnosis (instrumented)
 - `cache_coherency` PASSES 4/4 with build `68DF68548A03059ED1292A6` (sess37
@@ -17,7 +17,7 @@
   the inode in-core with nlink==0) frees+reuses the inode. Two nodes race into
   destructive inactivation; the guard's point-in-time read can't close it.
 
-## Fix (Gemini design, RULE 5)
+## Fix (Gemini design, RULE: CONSULT ANOTHER MODEL WHEN STUCK)
 Make the disk-check + destructive free atomic w.r.t. the cluster by acquiring
 the per-inode DLM **EX** grant at the top of xfs_inactive (multi-node, nlink==0
 branch), BEFORE the disk read, and holding it across truncate+ifree.

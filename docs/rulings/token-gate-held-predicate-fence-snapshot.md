@@ -1,5 +1,5 @@
-<!-- sess402 RULE-5 ruling (D-402 / D-FOREIGN-REPLAY-UNGATED-IMAGES): 'victim bit present at replay' is unsound as proof; freeze+snapshot manifest at fenc… -->
-# sess402 RULE-5 ruling — token-gate "held" predicate vs dead-holder bit lifetime
+<!-- sess402 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (D-402 / D-FOREIGN-REPLAY-UNGATED-IMAGES): 'victim bit present at replay' is unsound as proof; freeze+snapshot manifest at fenc… -->
+# sess402 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — token-gate "held" predicate vs dead-holder bit lifetime
 
 Evidence brought: kill1 (enforce off) single-owner AG 13 victim evaluated held/WOULD_APPLY=6,
 shared AG 2 victim staleep; kill2 (enforce ARMED) shared-AG victims slots 30/31 (AG 5/6)

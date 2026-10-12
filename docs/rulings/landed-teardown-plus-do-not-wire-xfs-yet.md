@@ -1,5 +1,5 @@
-<!-- sess135 RULE-5 ruling on the LANDED 0.11.451 teardown: 3 stop-ship items. Wiring the XFS stuck-notify NAIVELY CREATES A UAF — do not wire until the d… -->
-# sess135 RULE-5 ruling — review of the LANDED 0.11.451 teardown
+<!-- sess135 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the LANDED 0.11.451 teardown: 3 stop-ship items. Wiring the XFS stuck-notify NAIVELY CREATES A UAF — do not wire until the d… -->
+# sess135 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — review of the LANDED 0.11.451 teardown
 
 Consult covered: (1) review the landed D2/D3/D4/D6 shape, (2) how to wire the
 XFS end of the escalation, (3) the escalation never fires at runtime.

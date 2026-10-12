@@ -1,4 +1,4 @@
-<!-- sess488 RULE-5 ruling: D-0483 base half (lap 5 refusal arm) + fix half (lap 4 pre_wr=9) COMBINE under the declared rule; only the plain 32/caw board… -->
+<!-- sess488 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: D-0483 base half (lap 5 refusal arm) + fix half (lap 4 pre_wr=9) COMBINE under the declared rule; only the plain 32/caw board… -->
 # sess488 GPT ruling on D-0483 closure evidence (2026-09-04 ~06:30Z)
 
 Question: may the base half (lap 5 chain 138: base#1/base#2 each 1/32 hung with

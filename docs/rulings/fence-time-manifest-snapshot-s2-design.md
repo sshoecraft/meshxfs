@@ -1,4 +1,4 @@
-<!-- sess404 RULE-5 ruling: fence-time manifest SNAPSHOT = S2 (durable sealed manifest in a per-victim region) + protected-projection validation + expande… -->
+<!-- sess404 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: fence-time manifest SNAPSHOT = S2 (durable sealed manifest in a per-victim region) + protected-projection validation + expande… -->
 # sess404 GPT ruling — fence-time manifest snapshot design (D-FOREIGN-REPLAY-UNGATED-IMAGES owed item, stop-ship gate for enforcement default-on)
 
 ## Context given

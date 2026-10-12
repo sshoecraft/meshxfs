@@ -70,7 +70,7 @@ What IS the bug (ground-truth proven):
   buf is often LOCKED (P-H12: b_transp=NULL, pin=0, bip_in_ail=-1, flags=0x80030 =
   XBF_DONE|XBF_ASYNC|custom) → an **in-flight async write**, so it is skipped.
 
-Leading hypotheses for next session (RULE 4 — instrument before patching):
+Leading hypotheses for next session (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS — instrument before patching):
 - H-A: `xfs_buf_stale()` on a committed-but-home-not-yet-written dir buf **cancels
   the home-block write** (content lives only in the log); peer reads the stale home
   block directly (magic=0x0). Need: ensure dir home block is WRITTEN (not just
@@ -122,7 +122,7 @@ DECISIVE DLM-timeline capture (both nodes, one failing iter, module D6DEB43/D143
          re-read the data-fork extents on reload, not just the dinode core.
     (ii) test2's entry lives only in the cached buf and nothing writes it; stale
          discards it. FIX on RELEASE side: WRITE the dir block before release.
-  NEXT STEP (RULE 4): add instrumentation logging, on the RELEASING node, test2's
+  NEXT STEP (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS): add instrumentation logging, on the RELEASING node, test2's
   dir-block WRITE LBA + first 16 bytes (does it contain the new name?), and on the
   ACQUIRING node, test1's dir-block READ LBA + bytes. Compare LBAs. That single
   experiment distinguishes (i) vs (ii) and points to the exact fix. Do NOT patch
@@ -173,7 +173,7 @@ The bug is a genuine LOST UPDATE, but NOT because disk reads zeros:
   `mxfs_buf_in_fua_window` gate (pal/linux/xfs_buf.c ~1707) that decides whether a
   read bypasses lower-layer cache.  If root's dir block isn't covered, the node
   reuses its stale XBF_DONE buf.
-- sess37 NEXT STEP (RULE 4): with the FIXED P-H16, capture on the acquiring node:
+- sess37 NEXT STEP (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS): with the FIXED P-H16, capture on the acquiring node:
   does P-H16 (now correct LBA) show the peer's entry on disk at acquire time?  If
   YES → the node has it on disk but uses a stale cached buf → fix = force re-read
   (stale/invalidate the dir buf, incl. locked ones, on acquire).  If NO (peer's
@@ -310,7 +310,7 @@ This is a SECOND deep blocker, independent of the cross-node coherency RMW bug:
 - It blocks ALL heavy-metadata criteria: single_node_paired, rsync_paired, scaling_curve,
   soak, and likely contributes to zero_silent_loss / cache_coherency timeouts under load.
 
-sess37 investigation directions (RULE 4):
+sess37 investigation directions (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS):
   1. Confirm size-vs-deadlock: does a LIGHT rsync (e.g. 500 files) complete on single-node
      mxfs, while 8137 wedges?  If light passes, it's log-space exhaustion (fix = larger
      per-node log slice in mkfs_mxfs / journal slicing).  If light also wedges, it's a hard
@@ -607,7 +607,7 @@ NEXT (sess37) — actually capture the hang state (don't theorize):
           maybe NOT active; verify) — a regression making xfsaild back off / mis-target.
    (H-L3) iop_push for the ordered cluster bufs returns FLUSHING/stuck for a mxfs-specific
           reason even single-node (e.g. _XBF_DELWRI_Q set on them by the ordered path).
-  Pin it with the capture BEFORE patching (RULE 4).  Prior MXFS ran rsync benches, so this
+  Pin it with the capture BEFORE patching (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS).  Prior MXFS ran rsync benches, so this
   is likely a sess20-35 regression — `git`-free, but compare against ~/src/mxfs.{1,2,3}
   behavior / the v3-version-history if needed.
 
@@ -624,7 +624,7 @@ but makes NO PROGRESS (items can't be submitted — PINNED awaiting a log force,
 returns FLUSHING), so it returns a backoff timeout and sleeps again while the log stays
 full → wedge.  Wedging in 10s with little data written suggests the log fills almost
 immediately and the tail never advances at all.
-NEXT (sess37, RULE 4): add a temporary gated printk in xfsaild_push (xfs_trans_ail.c ~466)
+NEXT (sess37, RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS): add a temporary gated printk in xfsaild_push (xfs_trans_ail.c ~466)
 logging each cycle: count, stuck, flushing, and target vs xfs_ail_max LSN; AND in
 xfsaild_push_item log the iop_push return (PUSHED/PINNED/LOCKED/FLUSHING) for the first few
 items.  Build with mxfs.instr=1, reproduce, read why every item is stuck:

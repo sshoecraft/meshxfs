@@ -53,7 +53,7 @@ apparently derives holder-ship from tombstoned lock records/lineage, not
 live grants (open question at handoff).
 
 `docs/history/docs/history/docs/history/compiled-sess353-363-fr-enforce-grant-freeze-cascade.md`: GPT
-RULE-5 ruling revises the "no kernel change" position — race 7 is
+RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling revises the "no kernel change" position — race 7 is
 arithmetically impossible under `virsh suspend` because B's cycle-1 mount
 always blocks in P225 SETTLE-VERIFY for exactly the death-threshold
 duration, so A always crosses the fence line before a second cycle can
@@ -99,7 +99,7 @@ detach.
 
 `docs/history/docs/history/compiled-sess353-363-fr-enforce-grant-freeze-cascade.md` +
 `docs/rulings/cascade-dispositions-and-gate-order.md`:
-fleet re-prepped clean on 0.13.4. GPT RULE-5 ruling on the cascade, in full:
+fleet re-prepped clean on 0.13.4. GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the cascade, in full:
 
 - **Build order**: build the foreign-replay preflight + per-txn verdict
   cache + `foreign_replay_token_enforce` knob (default 0) NOW — one
@@ -161,7 +161,7 @@ admit arm sits between snlocal-accept and sbclean-skip in
 still fails the whole replay per existing sess233 semantics. Not
 GPT-reviewed, not deployed.
 
-`docs/history/docs/history/docs/history/compiled-sess353-363-fr-enforce-grant-freeze-cascade.md`: RULE-5
+`docs/history/docs/history/docs/history/compiled-sess353-363-fr-enforce-grant-freeze-cascade.md`: RULE: CONSULT ANOTHER MODEL WHEN STUCK
 review — **knob=0 board: GO**; **knob=1 campaign: NO-GO as landed**, with
 stop-ships. Fixed and landed as 0.14.1: (1) attempt-local enforcement mode
 (`l_mxfs_fr_enforce_mode`) set only by preflight, replacing global resampling
@@ -214,7 +214,7 @@ stuck waiter was polling a CAW slot, not a disklock record. Freeze mechanism
 confirmed: death triggers `mxfs_dlm_caw_purge_dead_nodes_ex(KEEP_EX)`, which
 retains the victim's EX/PW bits; the success-path release lives in
 `mxfs_v5_dlm_recovery_complete`, but the refusal path has no equivalent
-release — that gap IS defect #3. GPT RULE-5 review of the 0.14.2 design
+release — that gap IS defect #3. GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK review of the 0.14.2 design
 carries forward as requirements for the redo: bind the classifier to the
 platter mask (fail on mismatch), fail closed on unreadable gate mid-purge,
 revalidate the gate before every destructive CAS (not amortized), and add a

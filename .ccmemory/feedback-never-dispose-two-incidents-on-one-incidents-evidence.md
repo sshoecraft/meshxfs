@@ -28,13 +28,13 @@ REOPENED as `D-HOST-CLYDE-CRASH-XAS-SPLIT-ALLOC-FOLIO-ORDER-CORRUPT-0901A`.
 
 ## The rules this violated
 
-- **RULE 6.** A disposition reached on another incident's evidence is not a
+- **RULE: ZERO ACCEPTED KNOWN DEFECTS.** A disposition reached on another incident's evidence is not a
   disposition. Two incidents in one record need PER-INCIDENT evidence for each,
   or they are two records.
 - The seduction was that both crashes were memory corruption, same morning,
   same host, and the user HAD said they were doing P2P work. A true statement
   about one incident got silently extended to cover a second. That is the exact
-  shape RULE 6 forbids: a plausible explanation standing in for proof.
+  shape RULE: ZERO ACCEPTED KNOWN DEFECTS forbids: a plausible explanation standing in for proof.
 
 ## The operational rule
 

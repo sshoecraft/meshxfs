@@ -310,7 +310,7 @@ RESIDUAL (unfixed): rare steady-state xfsaild zombie reflush (`readdir=799`) —
 
 ## sess40 — `readdir=799` is a TCP DLM transport flap (not buffer-layer); flap-prevention fix
 
-**REFRAME (PROVEN, RULE 4):** the dir_reuse single-dirent durable loss correlates 1:1 with a
+**REFRAME (PROVEN, RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS):** the dir_reuse single-dirent durable loss correlates 1:1 with a
 transient ~500ms TCP flap (`TCP peer N disconnected — deferring death / reconnected — flap
 absorbed`). The loss happens even at ROUND 1 on a fresh dir; all 8 nodes agree; `P-DATACLOBBER`,
 `P25-RELVERIFY`, `P40-WRBARRIER` all SILENT (so not a stale dir-block write / release gap / late
@@ -1571,7 +1571,7 @@ harness `tests/d0287_remaster_measure.sh`.
   gate `make -C tests/tauth test` (tauth_test 8, ledger_test 15 groups, dlm_ledger_test
   11 groups) must pass before rig time; (5) compile single objects with
   `make -C $KDIR M=/src/mxfs dlm/dlm.o ...` while a rig run is live — never relink mxfs.ko.
-- **Open (RULE 4 owed)**: 0.34.0 on 32/tcp: 4/32 mounts refused ("can't read superblock"),
+- **Open (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS owed)**: 0.34.0 on 32/tcp: 4/32 mounts refused ("can't read superblock"),
   tcp_token_plumbing_verify workload hung (30 s), 13 unmounts hung, rig
   `P-TAUTH-DOUBLE-GRANT` ×1 on test24 and test30 — no node dmesg captured;
   `tests/sess424_chain.sh` sweeps raw P-TAUTH/mount/REMASTER lines after every tcp stage.
@@ -1629,7 +1629,7 @@ harness `tests/d0287_remaster_measure.sh`.
   the platter on the master's next page import (`P-TAUTH-PURGE node=<live>`; proven by
   7b before the fix).  Now node-id only.  Pitfall: usermode tests must give a returning
   node a FRESH id — a purged id never returns (by design; rig ids are per-incarnation).
-- **sess425 RULE-4 instrumentation**: `dlm_retry(ctx, why)` tags every RETRY site in
+- **sess425 RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS instrumentation**: `dlm_retry(ctx, why)` tags every RETRY site in
   `dlm_lock_impl` (1 pend-retry, 2 remaster, 3 ledger-busy, 4 prepare, 5 own-pending,
   6 own-release, 7 refused, 8 grant-again, 9 wait-retry); the "lock request failed after
   N retries" line now prints type/ino/mode/last_rc and the per-request `why[...]` tally
@@ -1775,7 +1775,7 @@ harness `tests/d0287_remaster_measure.sh`.
   `owner_slot` disagree.  `struct mxfs_disklock_ctx` gained `owner_bootstrap`
   and `epoch_predrawn`; `mxfs_disklock_claim_slot()` consumes a valid
   `epoch_predrawn` instead of redrawing (bootstrap owner keeps ONE epoch from
-  provisional to ACTIVE — RULE-5 ruling Q2).  API:
+  provisional to ACTIVE — RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling Q2).  API:
   `mxfs_disklock_set_owner_bootstrap(ctx, bool)`,
   `mxfs_disklock_predraw_epoch(ctx)`.
 - Item 5 design as ruled: `docs/whole-cluster-restart.md` §6; ruling `docs/rulings/item5-slotless-bootstrap-build-review.md`.
@@ -2087,7 +2087,7 @@ post-hang remount admitted after one `P304-RETIRE-WORKER-REAPED`, no oops.
 
 ## sess463 (2026-09-02) — item 5 increments 3+4 ruled; completion evidence formats (UNWIRED)
 
-RULE-5 ruling `ccloop-c7ee71c6-sess463-GPT-ruling-item5-inc3-4-completion-
+RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling `ccloop-c7ee71c6-sess463-GPT-ruling-item5-inc3-4-completion-
 takeover-stopship`: the EMPTY/FULL/SPARSE completion scheme is accepted, the
 disposition flip is STOP-SHIP on ten conditions (design text:
 `docs/dlm-protocol.md` "Increments 3+4"; tree anchors: `docs/history/item5-inc3-implementation-map.md`).  Facts that shape

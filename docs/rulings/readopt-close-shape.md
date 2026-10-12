@@ -1,5 +1,5 @@
-<!-- sess390 RULE-5 ruling on closing AG re-adoption after a pending BAST: explicit capability classes (nonblock -EAGAIN; restartable unwind; resource-fre… -->
-# sess390 RULE-5 ruling #2 (gpt-5.6-sol) — shape of "close local re-adoption after a pending BAST" (ruling-2 item 1 / item C)
+<!-- sess390 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on closing AG re-adoption after a pending BAST: explicit capability classes (nonblock -EAGAIN; restartable unwind; resource-fre… -->
+# sess390 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling #2 (gpt-5.6-sol) — shape of "close local re-adoption after a pending BAST" (ruling-2 item 1 / item C)
 
 ## Evidence brought
 Arm 3 at 25 AGs (0.21.0, ag_readopt_window_ms=50 with blocking acquirers WAITING for the handoff): rsync walls improved for 26 nodes (14-44 s) but test24+test32 wedged: the INODE BAST worker (mxfs_dlm_bast_process -> filemap_write_and_wait_range -> xfs_bmap_btalloc -> mxfs_ag_dlm_lock blocking pass) holding ILOCK_EXCL sat in the closed-admission wait loop; noino fence froze on its inode item outside the agwait bracket (convoy_stalls=0) -> 8 stalls -> shutdown. Evidence tests/logs/ag25_sess390_readopt_close_wedge.txt.

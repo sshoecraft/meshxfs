@@ -39,7 +39,7 @@ goes blind precisely at the severity where it matters most, and it fails in the
 direction of good news.
 
 - Use an **absolute** budget when one exists — this project already has them
-  per criterion, derived from native XFS (RULE 0). `mean >= 200 ms` would have
+  per criterion, derived from native XFS (RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS). `mean >= 200 ms` would have
   fired on every one of those indices.
 - Or fix the denominator to a **known-good baseline** measured elsewhere (the
   private-directory arm, an earlier F, native XFS), never to the run under test.

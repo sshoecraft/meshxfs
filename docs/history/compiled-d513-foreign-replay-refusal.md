@@ -20,7 +20,7 @@ would have occurred. That does not remove the defect: an actual TORN/refused rep
 must never suicide survivors, enforcement or not.
 `docs/history/docs/history/docs/history/compiled-d513-foreign-replay-refusal.md`
 
-### sess320 — GPT containment design (RULE-5 ruling)
+### sess320 — GPT containment design (RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling)
 Design settled: on a refusal, the recovery-lease OWNER durably publishes a monotonic
 terminal outcome record (victim slot+incarnation, fence cert, lease epoch, slice/
 manifest digest, outcome ∈ {PENDING, RECOVERED, TERMINAL_REFUSED}, reason ∈ {policy,
@@ -175,7 +175,7 @@ fault injection needs a pure-inode victim load to exercise a real applied prefix
 ### Recurring pattern across this chain
 Every one of sess325/333/335's "landed" reviews found real, rig-blocking holes in the
 prior session's landing — never zero. Treat a D-513-class containment/quarantine
-change as needing at minimum one post-landing RULE-5 diff review before rig time, and
+change as needing at minimum one post-landing RULE: CONSULT ANOTHER MODEL WHEN STUCK diff review before rig time, and
 do not assume a clean build or a passing narrow test means the landing is complete.
 The containment design itself converged on: durable monotonic terminal-outcome
 records, a single shared classify/import/publish state machine reused by every entry

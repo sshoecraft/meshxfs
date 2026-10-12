@@ -21,7 +21,7 @@ the un-prepped (but mounted, same-sv) fleet.
 
 Rules:
 - After killing a chain, ALSO kill its run.sh: `for p in $(tools/mxfs_pgrep.sh 'run.sh'); do ...`
-  (never `pgrep -f` host-locally — RULE 2c), or check `fuser -v /tmp/mxfs_run.lock` is empty
+  (never `pgrep -f` host-locally — RULE: NEVER WEDGE THE LAB HOST), or check `fuser -v /tmp/mxfs_run.lock` is empty
   before appending a DONE to a gate log.
 - Better: append the DONE to the gate only once the lock is free; the gate poll is 30 s.
 - `tools/mxfs_pgrep.sh '<pattern>'` also matches the CALLING shell's cmdline (sess467 exit 144):

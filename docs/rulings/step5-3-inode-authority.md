@@ -1,5 +1,5 @@
-<!-- sess95 RULE-5 ruling on step 5.3: BOTH my designs rejected — no iget in the formatter, no buffer stamp. Immutable RCU authority certificate + 5 new s… -->
-# sess95 RULE-5 ruling — step 5.3 (inode authority capture)
+<!-- sess95 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on step 5.3: BOTH my designs rejected — no iget in the formatter, no buffer stamp. Immutable RCU authority certificate + 5 new s… -->
+# sess95 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — step 5.3 (inode authority capture)
 
 I brought two designs. **Both were rejected as written.**
 

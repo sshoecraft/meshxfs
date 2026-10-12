@@ -1,4 +1,4 @@
-<!-- sess428 RULE-5 ruling (D-0349): eager ledger-page activation — option (c) UNOWNED->PREPARED one transition on bootstrap, gen-counter completion, admi… -->
+<!-- sess428 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (D-0349): eager ledger-page activation — option (c) UNOWNED->PREPARED one transition on bootstrap, gen-counter completion, admi… -->
 # sess428 GPT ruling — D-0349 eager page activation (2026-08-28)
 
 Design put to GPT: an eager pass in the 500 ms handoff tick that runs dlm_page_acquire on every page the view names ours but not yet ACTIVE(self), N per tick, gated on the 20 s settle window; measured motivation = 1092 P-TAUTH-REMASTER-PARKED on 1083 distinct pages in the s430 token sweep (first-touch parking at 100 ms retry cadence).

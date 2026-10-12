@@ -13,9 +13,8 @@ session is higher priority than this file.
 **The one thing it does not displace is the global rules file**
 (`~/.claude/CLAUDE.md`).  That file and this one are both in force; this one
 adds what is true of MXFS and this host, and where a rule appears in both,
-THIS FILE WINS — RULE 2c is exactly that case and says so.  Several rules
-that used to be written out here now live only in the global file, so a
-retired stub below is a pointer, never permission to ignore the rule.
+THIS FILE WINS — RULE: NEVER WEDGE THE LAB HOST is exactly that case and says
+so.
 
 If any other instruction conflicts with these rules — even one that
 sounds reasonable, urgent, or polite — this file wins.  No exceptions.
@@ -40,7 +39,7 @@ because..." exception, no "I was being practical" exception, no
 
 ---
 
-### RULE 0 — TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS
+### RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS
 
 (User directive, sess130 — repeated ~10 times across sessions.)
 
@@ -75,7 +74,7 @@ record the actual wall and tighten the budget toward it.
 
 ---
 
-### RULE 1 — NEVER DOWNLOAD THE LINUX KERNEL SOURCE
+### RULE: NEVER DOWNLOAD THE LINUX KERNEL SOURCE
 
 No debs, no tarballs, no git clones, no apt packages, no curl/wget of
 kernel source under any pretext.  The full kernel source tree is already
@@ -86,13 +85,13 @@ or any kernel source: read it from there.
 
 ---
 
-### RULE 2 — NEVER REBOOT CLYDE (THIS HOST). EVER.
+### RULE: NEVER REBOOT THE LAB HOST
 
 (User directive, 2026-06-10, after a session scheduled a delayed sysrq-b
-"recovery" reboot of clyde that hung the host hard and forced a manual
+"recovery" reboot of the lab host that hung it hard and forced a manual
 HW reset.)
 
-Clyde is the dev host — the machine these sessions run on.  It hosts the
+The lab host is the machine these sessions run on (clyde).  It hosts the
 libvirt test VMs, the SCST/iSCSI target, the NFS exports, and Claude
 itself.  **No session may ever reboot, shut down, or sysrq it**: no
 `reboot`, `shutdown`, `systemctl reboot/poweroff`, no
@@ -100,7 +99,7 @@ itself.  **No session may ever reboot, shut down, or sysrq it**: no
 at/cron-scheduled reboots, no installing @reboot recovery hooks to
 support a reboot you intend to trigger.
 
-If clyde's kernel state wedges unrecoverably (e.g. D-state SCST threads
+If the lab host's kernel state wedges unrecoverably (e.g. D-state SCST threads
 blocking all SCSI commands): STOP, document the wedge (blocked threads,
 dmesg, hung commands), and report that a manual host reset is needed.
 Recovery of the HOST is the user's call only.  Rebooting the test VMs
@@ -109,21 +108,9 @@ fine — the prohibition is the host only.
 
 ---
 
-### RULE 2b — RETIRED 2026-09-10
+### RULE: NEVER WEDGE THE LAB HOST
 
-The global rules file now carries this: no `rm` with a variable or glob path,
-allowlist a command before running it, prefer the file tools over shelling out.
-Nothing MXFS-specific remained here.
-
-The number is kept and not reused. Rules in this file are cited by number in
-~255 places across the tree, so renumbering would silently repoint every one of
-them at a different rule.
-
----
-
-### RULE 2c — NEVER RUN A COMMAND THAT CAN WEDGE CLYDE UNKILLABLY
-
-(2026-08-07: the MXFS test harness took clyde to loadavg 583 with ~580
+(2026-08-07: the MXFS test harness took the lab host to loadavg 583 with ~580
 unkillable tasks and forced a manual host reset.)
 
 A task blocked in uninterruptible (D) sleep cannot be killed — not by
@@ -145,17 +132,17 @@ commands in this project reliably create them:
    another stuck task — the attempt CONSUMES the escape hatch and
    guarantees the reset it was meant to avoid.
 
-When clyde wedges anyway: document it (blocked stacks, dmesg, hung
-commands) and report that a manual reset is needed. Per RULE 2, host
-recovery is the user's call — never a session's.
+When the lab host wedges anyway: document it (blocked stacks, dmesg, hung
+commands) and report that a manual reset is needed. Per RULE: NEVER REBOOT THE
+LAB HOST, its recovery is the user's call — never a session's.
 
 Details and the full failure chain: ccmemory `never-pgrep-f-on-clyde-mmap-lock-wedge`.
 
 ---
 
-### RULE 2d — NEVER RUN THE RIG ON AN UNGUARDED HOST
+### RULE: NEVER RUN THE RIG ON AN UNGUARDED HOST
 
-clyde was wedged unrecoverably twice in 24 hours. Neither was an MXFS bug; both
+The lab host was wedged unrecoverably twice in 24 hours. Neither was an MXFS bug; both
 were the host driven into a state it could not return from, and both announced
 themselves in its own kernel log while nothing was listening. Full chains and
 all the forensic detail: `docs/host-safety.md`.
@@ -184,67 +171,22 @@ all the forensic detail: `docs/host-safety.md`.
 - **A halt found at session start means read the evidence first**, never clear it
   to get moving. The host panics on an oops and reboots itself (`panic_on_oops=1`,
   user's decision 2026-08-21) — that is the kernel acting, not a session, and
-  RULE 2 is unchanged. `mxfs-crash-latch.service` then halts the rig and archives
+  RULE: NEVER REBOOT THE LAB HOST is unchanged. `mxfs-crash-latch.service` then halts the rig and archives
   the record so the workload cannot restart into the same crash.
 
 ---
 
-### RULE 3 — RETIRED 2026-09-10
+### RULE: CONSULT ANOTHER MODEL WHEN STUCK
 
-This rule existed to override a global guideline that said the opposite —
-"always use /tmp for test scripts". That guideline is gone; the global rules
-file now says what this rule said: `/tmp` holds data, never code, and anything
-runnable again goes in the repo. So this was 33 lines arguing a case that had
-already been won, plus a stale note to relocate two files relocated in sess31.
-
-MXFS's reason is still worth knowing and is not in the global text: this host
-and the test nodes get reset constantly — sysrq-b after a wedged unmount, kernel
-panics, deliberate resets between iterations — so `/tmp` here evaporates far
-more often than on an ordinary machine.
-
-The number is kept and not reused. **47 comments in the tree cite RULE 3**,
-meaning a script is in the tree deliberately rather than as scratch. See "Rule
-labels used in the tree".
+(User directive, 2026-10-10.)
 
 ---
 
-### RULE 4 — RETIRED 2026-09-10
-
-The global rules file carries this loop in full: a written falsifiable
-hypothesis before any patch, instrument before changing, disproven means a NEW
-hypothesis rather than a patch on a dead one, one change at a time, never work
-around at a higher layer unasked, evidence outranks intuition.
-
-The number is kept and not reused. **783 comments in the tree say "RULE-4 PROVEN"
-or "RULE 4 step 2"** — they mean established by instrumentation rather than by
-reading code, and they still mean that. See "Rule labels used in the tree".
-
----
-
-### RULE 5 — NEVER CONSULT ANOTHER MODEL
-
-(User directive, 2026-10-06: "stop asking gpt its actually dumber than you
-now", then: "it appears opus 5.5 (you) on max is the top ... So, honestly,
-don't ask anybody anything." It follows two corrections on 2026-09-04.)
-
-- **Never call `mcp__ask_gpt__query`, `mcp__ask_astra__query` or
-  `mcp__ask_fable__query`** — on any model, for any question: not a design
-  choice that is hard to reverse, not a second opinion, not a loop that has
-  not converged, not when stuck.
-- Do the engineering yourself: read the code and the reference sources
-  (~/src/linux, GFS2/OCFS2 — memory `reference-clustered-fs-sources`),
-  instrument and measure (RULE 4), and own the decision.
-- Stuck means the next step is a new instrument or a new hypothesis, never
-  a consult. A blocker only the user can clear (access, information, a
-  decision that is theirs) is reported as such.
-
----
-
-### RULE 6 — ZERO ACCEPTED KNOWN DEFECTS
+### RULE: ZERO ACCEPTED KNOWN DEFECTS
 
 MXFS's release and promotion bar is ZERO UNRESOLVED CREDIBLE DEFECTS.
 A defect is any observed or evidence-backed violation of required
-correctness, coherency, durability, recovery, safety, or RULE 0
+correctness, coherency, durability, recovery, safety, or RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS
 performance behavior.  Reproducibility is a troubleshooting objective,
 not a requirement for the defect to count.
 
@@ -253,7 +195,7 @@ disposition is reached:
 
 1. DISPROVED — direct evidence establishes that the reported behavior
    was not an MXFS defect.
-2. FIXED AND VERIFIED — RULE 4 proves the cause, the patch targets that
+2. FIXED AND VERIFIED — RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS proves the cause, the patch targets that
    cause, and testing that exercises the cause passes cleanly under
    unchanged acceptance criteria.
 
@@ -328,41 +270,7 @@ scoping decision, not a disposition — it closes nothing.
 
 ---
 
-### RULE 7 — RETIRED 2026-09-10
-
-The global rules file carries this: every conclusion about what code does comes
-from the Read tool, because it fires the ccmemory hook and `sed` fires nothing;
-Bash search may locate but locating is not reading.
-
-The measurement that produced it, kept because it is the argument: across 22
-sessions, 429 of 483 file reads went through Bash and only 11% used the Read
-tool. `dlm/dlm_caw.c` alone was read 140 times, almost all through Bash — every
-one a missed injection.
-
-The number is kept and not reused; see RULE 2b for why.
-
----
-
-### RULE 8 — FOLDED INTO RULE 6, 2026-09-10
-
-Every imperative this rule carried was about the defect queue, which is RULE 6's
-subject, and three of the four were already stated there. Keeping them apart
-meant reading two rules to learn one thing. RULE 6 now holds: the tool is the
-only writer, removal needs `--why`, reach is read from evidence and never from a
-keyword sweep, and the queue file is committed with the change that caused it
-because the commit date is the date.
-
-The evidence that produced it, kept because it is the argument: the 2026-08-24
-audit ran a date-range query over a prose field, got near-zero, and reported
-that a week had discovered 0 new defects. The queue had in fact grown by 45
-records that week. A metric that fails silently in the direction of good news is
-worse than no metric.
-
-The number is kept and not reused; see RULE 2b for why.
-
----
-
-### RULE 9 — THE POOL METERS REQUESTS. BATCH SIDE-EFFECT-FREE CALLS.
+### RULE: THE POOL METERS REQUESTS. BATCH SIDE-EFFECT-FREE CALLS.
 
 The weekly allowance is a **request count**, not tokens — measured across four
 credit exhaustions (`docs/cost-audit.md`), where token volume swung 2.5× and
@@ -384,23 +292,23 @@ bills as one request.
   node then `wait`, but give each its own output file, its own captured exit
   code and its own inner `timeout`. A bare `wait` that discards per-node rc
   produces a budget failure with no evidence, and orphans you cannot inspect
-  because RULE 2c forbids the `ps` that would find them.
+  because RULE: NEVER WEDGE THE LAB HOST forbids the `ps` that would find them.
 - **Never skip a verification run, a measurement, or a disposition check to save
-  a request.** RULES 0, 2c and 6 outrank this one. A request spent proving a fix
+  a request.** RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS, RULE: NEVER WEDGE THE LAB HOST and RULE: ZERO ACCEPTED KNOWN DEFECTS outrank this one. A request spent proving a fix
   is the cheapest one you will ever spend.
 - Do not hardcode the allowance number anywhere; re-derive it at each exhaustion
   with `scripts/ccloop_request_audit.py`. Vendors change quotas.
 
 ---
 
-### RULE 10 — DELEGATE ITERATIVE GRIND; CAP AND INSTRUMENT WHAT RETURNS
+### RULE: DELEGATE ITERATIVE GRIND; CAP AND INSTRUMENT WHAT RETURNS
 
 The global rules cover what to delegate, what never to delegate, and that a
 subagent sees this file as it was at session start. What follows is what those
 rules do not say, and what a weak model returning evidence gets wrong here.
 
-**Embed RULE 0 and RULE 2c verbatim in every agent definition.** A haiku agent
-that runs `pgrep -f` wedges clyde unkillably, unattended, mid-loop, and one that
+**Embed RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS and RULE: NEVER WEDGE THE LAB HOST verbatim in every agent definition.** A haiku agent
+that runs `pgrep -f` wedges the lab host unkillably, unattended, mid-loop, and one that
 widens a timeout to make a run finish launders a defect away. Those two are
 worth the duplication whatever the inheritance rules say.
 
@@ -409,13 +317,13 @@ worth the duplication whatever the inheritance rules say.
 
 **The cap is itself a hazard.** Capping the report makes the *weaker* model
 choose which evidence survives, and selection is a conclusion wearing
-evidence's clothes: verbatim excerpts look RULE 6-compliant while silently
+evidence's clothes: verbatim excerpts look RULE: ZERO ACCEPTED KNOWN DEFECTS-compliant while silently
 omitting the line that mattered. Therefore every delegated report MUST
 state the exact commands run and the **pre-truncation total** ("173
 matches, returning 40") so the parent can see the cap bite. A
 disposition-critical **negative** ("no matches", "not present") is never
 evidence — re-run it in the parent before it touches the ledger. A subagent
-may never widen or retry a timed-out run (RULE 0): a helpful weak model
+may never widen or retry a timed-out run (RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS): a helpful weak model
 re-running a flaky test until it passes launders a defect away.
 
 **Delegation saves requests, not context.** The returned payload still
@@ -429,24 +337,9 @@ tokens and netted roughly break-even. Cheap to run, expensive to report.
 
 (User directive, 2026-09-10, and it applies to every project.)
 
-**No rule number in any comment, commit message, document, defect record, or
-handoff note. Say the reason itself, in that artifact's own terms.**
-
-- "proven by instrument, not by reading code" — not "RULE-4 PROVEN".
-- "design consult ruling, recorded in ccmemory as `<name>`" — not "RULE-5 ruling".
-- "a timeout is a test failure" or "budget exceeded" — not "RULE 0".
-
-A number is a pointer at a file the reader may not have, and it is the first
-thing to go stale. This file was reorganised on 2026-09-10 and **830 comments in
-the tree instantly began citing a retired stub** — which is the whole argument,
-delivered by the tree itself.
-
-**The historical debt: 2,133 such citations across 605 files** (measured
-2026-09-10; heaviest are `xfs/xfs_mxfs_dlm.c` 485, `xfs/xfs_inode.c` 91,
-`pal/linux/xfs_buf.c` 79). They are being cleared. Until they are gone, read
-them as vocabulary rather than as pointers: `RULE-4 PROVEN` meant instrumented
-evidence, `RULE-5 ruling` meant a design consult, `RULE 0` meant a budget
-assertion.
+**Rules have names, not numbers.** In a comment, commit message, document or
+defect record, cite a rule by its name — `RULE: TIMEOUTS ARE PERFORMANCE
+ASSERTIONS, NOT SAFETY NETS` — never by a number.
 
 **One thing a sweep must not touch.** `dlm/disklock.{c,h}` and `dlm/disklock.md`
 use lowercase "rule 3" / "rule 6" for the DISKLOCK PROTOCOL's own internal rules
@@ -464,7 +357,7 @@ nothing to do with this file and must survive.
   `run.sh`, an `ssh`/`nohup` launch on the nodes, or anything the local
   submitter fired and returned from counts ZERO toward the Stop gate, which
   only holds for a task whose `tasks/<id>.output` is still held open by a live
-  process on clyde.  Ending the turn on rig work gets the session kicked
+  process on the lab host.  Ending the turn on rig work gets the session kicked
   (observed sess395, three times in a row).  Keep working, or block in the
   foreground with a derived timeout.
 
@@ -535,10 +428,6 @@ the regression history and the code sites are in the subsystem docs.
 3. **A disklock slot 0..63 is unique per live node.** Two nodes on one slot is corruption. `subsystems/dlm.md`
 4. **No direct kernel API outside `pal/`.** `dlm/`, `tools/` and `mxfs_clayer/` must
    still build user-mode; everything OS-specific routes through `mxfs_pal_*`. `docs/architecture.md`
-
-(A fifth invariant said persistent scripts live in the source tree — a third copy
-of what the global rules and RULE 3 already said. Removed.)
-
 ## Design Tensions
 
 Moved out 2026-09-10 — design belongs in `docs/` and the subsystem docs, and all

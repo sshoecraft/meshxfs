@@ -1,4 +1,4 @@
-<!-- sess388 RULE-5 rulings: AG-sharing pace = geometry (agcount>=nodes, 2x perf class; LUN 128GiB for 32 nodes), handoff protocol order, nonblocking inod… -->
+<!-- sess388 RULE: CONSULT ANOTHER MODEL WHEN STUCK rulings: AG-sharing pace = geometry (agcount>=nodes, 2x perf class; LUN 128GiB for 32 nodes), handoff protocol order, nonblocking inod… -->
 ## Context (sess388 measurements that triggered the consult)
 - rsync_paired lap 2+ @32/caw: the 14 slow/exhausted nodes == the 14 nodes whose AG affinity
   (node_slot % agcount) collides (agcount=25 on the 50GiB LUN; 32x64MB log slices = 2GiB log

@@ -1,5 +1,5 @@
-<!-- sess104 RULE-5 ruling: the dead release-begin hook IS a defect (i_dlm_mode is a local summary, not the release linearization point); auth_line is the… -->
-# sess104 RULE-5 ruling — release-hook discipline + the right probe
+<!-- sess104 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: the dead release-begin hook IS a defect (i_dlm_mode is a local summary, not the release linearization point); auth_line is the… -->
+# sess104 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — release-hook discipline + the right probe
 
 Evidence put to GPT: the sess104 P240 measurement, FINDING A (dead
 `mxfs_inode_authority_begin_release_locked`, release_begin=0 / backstop=2486)

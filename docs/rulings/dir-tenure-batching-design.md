@@ -1,5 +1,5 @@
-<!-- sess125 RULE-5 ruling on the dir-EX tenure batching fix: op-quantum ALONE is insufficient; measure deadline from BAST not GRANT; idle grace from last… -->
-# sess125 RULE-5 ruling — directory EX tenure batching
+<!-- sess125 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the dir-EX tenure batching fix: op-quantum ALONE is insufficient; measure deadline from BAST not GRANT; idle grace from last… -->
+# sess125 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — directory EX tenure batching
 
 Consulted after rooting the 22ms/create pace to the MHT adaptive floor
 (`i_dlm_tenure_ops <= 1` -> clamp 300ms window to 15ms).

@@ -1,5 +1,5 @@
-<!-- sess93 RULE-5 ruling on wiring the fence-evidence channel: one intent winner issues P&A, losers WAIT (never speculate), recovery_begin leaves the liv… -->
-# sess93 — the RULE-5 ruling that governs wiring the fence-evidence channel
+<!-- sess93 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on wiring the fence-evidence channel: one intent winner issues P&A, losers WAIT (never speculate), recovery_begin leaves the liv… -->
+# sess93 — the RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling that governs wiring the fence-evidence channel
 
 Asked with the full sess92 inventory + the shipped API semantics + the sess73
 rig measurements. This ruling is BINDING on the implementation; where it

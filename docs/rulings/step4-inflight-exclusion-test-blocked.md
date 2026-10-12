@@ -1,5 +1,5 @@
-<!-- sess132 RULE-5 ruling: the proposed in-flight exclusion test is BLOCKED for closure — 7 mandatory changes, incl. sg_persist alone is not RULE-6 evide… -->
-# RULE-5 ruling (gpt-5.6-sol, sess132): step-4 in-flight exclusion test is BLOCKED
+<!-- sess132 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: the proposed in-flight exclusion test is BLOCKED for closure — 7 mandatory changes, incl. sg_persist alone is not RULE: ZERO ACCEPTED KNOWN DEFECTS evide… -->
+# RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (gpt-5.6-sol, sess132): step-4 in-flight exclusion test is BLOCKED
 
 My proposal: dm-delay under a second **vdisk_blockio** LUN on a separate IQN,
 victim issues a held O_DIRECT write, survivor issues `sg_persist --preempt-abort`,
@@ -7,7 +7,7 @@ clyde polls the loop device, assert `t_land <= t_return`; A/B 0x04 vs 0x05.
 
 **Verdict: do NOT close the defect with this test as written.** Four closure
 blockers, plus wrong-answer risks. The A/B concept is sound as a *discriminator*
-but by itself it is a target-stack qualification test, not RULE-6 closure.
+but by itself it is a target-stack qualification test, not RULE: ZERO ACCEPTED KNOWN DEFECTS closure.
 
 ## The four closure blockers
 1. **`t_land <= t_return` is weaker than the ledger's unchanged criterion.**

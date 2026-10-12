@@ -104,7 +104,7 @@ MODULE_PARM_DESC(dirop_sync_barrier,
                  "(rely on demote-drain flush + destage kick)");
 
 /*
- * (D-TMPFILE-CHURN-the budget rule-PERF-400, PROVEN BY INSTRUMENT + design-consult ruling):
+ * (D-TMPFILE-CHURN-RULE0-PERF-400, PROVEN BY INSTRUMENT + design-consult ruling):
  * the per-op parent publish above is gated per call site on
  *     !dp->i_mxfs_self_created || dp->i_dlm_dir_gen > 0
  * where the second clause ("also fire for a CONTENDED dir") was meant

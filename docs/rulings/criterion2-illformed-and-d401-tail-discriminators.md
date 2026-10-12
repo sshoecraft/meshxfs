@@ -1,4 +1,4 @@
-<!-- sess480 RULE-5 ruling: criterion (2) failed as written (do not relabel); it is a release gate, not record verification. Plus D-401 tail-mechanism dis… -->
+<!-- sess480 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: criterion (2) failed as written (do not relabel); it is a release gate, not record verification. Plus D-401 tail-mechanism dis… -->
 # sess480 GPT ruling — criterion (2), and what the D-401 tail actually means
 
 Context: the 0.64.37 board came back `crash_consistency FAIL 91/90s nodes_pass=0/32

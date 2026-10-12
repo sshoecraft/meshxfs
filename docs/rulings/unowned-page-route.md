@@ -1,4 +1,4 @@
-<!-- sess426 RULE-5 ruling (D-0345): route UNOWNED-page FREEZE_REQ to the bootstrap node is correct; keep bootstrap-only claim (write+readback is not CAS)… -->
+<!-- sess426 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (D-0345): route UNOWNED-page FREEZE_REQ to the bootstrap node is correct; keep bootstrap-only claim (write+readback is not CAS)… -->
 # sess426 GPT ruling — UNOWNED page routed to the bootstrap node (D-0345)
 
 Proven root (usermode tests/tauth/unowned_page_test + rig s427): `dlm_page_acquire` UNOWNED branch at a non-bootstrap view-master parked forever (nobody to ask: auth_node=0).

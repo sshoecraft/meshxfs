@@ -1,4 +1,4 @@
-<!-- sess420 RULE-5 ruling on the mount recovery barrier (D-MOUNT-WINDOW): NOT rig-ready — item 3 needs obligations in completion eligibility, item 4 need… -->
+<!-- sess420 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the mount recovery barrier (D-MOUNT-WINDOW): NOT rig-ready — item 3 needs obligations in completion eligibility, item 4 need… -->
 # sess420 GPT ruling — mount recovery barrier (items 3/4/6C) + window-arm design
 
 ## Verdict: not yet sound for ACCEPTANCE rig cycles (diagnostic runs ok). Two stop-ships.

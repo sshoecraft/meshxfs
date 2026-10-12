@@ -49,7 +49,7 @@ survivor. The real fix needed `pkill -9 -f "ssh.*root@test.*<suite-script>.sh"`
 (or killing every PID in the full local process tree) AND killing the matching
 remote process via a fresh ssh (`pgrep -af 'fence_during_write|dir_reuse_coherency'`
 per node, then `pkill -9 -f <name>` remotely — a killed local ssh client does NOT
-kill the remote bash, per run.sh's own RULE-0 cascade-guard comment).
+kill the remote bash, per run.sh's own RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS cascade-guard comment).
 
 Confirmed fixed by: `flock -n /tmp/mxfs_run.lock -c "echo LOCK_IS_FREE"` succeeding
 only after killing ALL of: the orphaned local sshpass/ssh PIDs (every layer, not
@@ -76,7 +76,7 @@ check:
 5. Verify with `flock -n /tmp/mxfs_run.lock -c "echo LOCK_IS_FREE"` before
    relaunching.
 6. If any node won't respond to ssh/pkill within ~10-15s, just power-cycle it
-   (`virsh -c qemu:///system destroy/start <node>`, RULE 2 permits test-VM
+   (`virsh -c qemu:///system destroy/start <node>`, RULE: NEVER REBOOT THE LAB HOST permits test-VM
    cycling) rather than fighting it further — cheaper than more diagnosis.
 
 This is a NARROWER, more mechanistic companion to

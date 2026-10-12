@@ -495,10 +495,22 @@ void mxfs_pal_cond_broadcast(mxfs_cond_t *c);
 mxfs_sock_t *mxfs_pal_tcp_connect(const char *host, uint16_t port);
 
 /*
- * Create a TCP listen socket on the given port.
- * Returns NULL on failure.
+ * Listen on the given TCP port.  Every caller on a port shares one host
+ * socket: a connection is handed to the listener whose key it carries
+ * (mxfs_pal_tcp_listen_keyed), so each filesystem mounted on a host gets the
+ * connections meant for it.  Returns NULL on failure.
  */
 mxfs_sock_t *mxfs_pal_tcp_listen(uint16_t port);
+
+/*
+ * As mxfs_pal_tcp_listen, routed: a new connection belongs to the listener
+ * whose key_len-byte key equals the bytes at key_off of what the connector
+ * sends first (peeked, not consumed).  A connection whose key is all zero
+ * goes to the first listener.  Every listener on a port must route on the
+ * same key_off and key_len (at most 16 bytes).
+ */
+mxfs_sock_t *mxfs_pal_tcp_listen_keyed(uint16_t port, const void *key,
+                                       uint32_t key_off, uint32_t key_len);
 
 /*
  * Accept an incoming TCP connection.
@@ -548,8 +560,9 @@ void mxfs_pal_tcp_close(mxfs_sock_t *s);
 /* ─── UDP Networking ─── */
 
 /*
- * Create and bind a UDP socket on the given port.
- * Returns NULL on failure.
+ * Open a UDP socket on the given port.  Every caller on a port shares one
+ * host socket and receives every datagram that reaches it, unicast or
+ * multicast, so each must drop what is not for it.  Returns NULL on failure.
  */
 mxfs_sock_t *mxfs_pal_udp_open(uint16_t port);
 

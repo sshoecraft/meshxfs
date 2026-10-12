@@ -1,4 +1,4 @@
-<!-- sess455 RULE-5 impl review of the 0.61.0 departure I/O gate (G3 as first landed): STOP-SHIP, 10 required changes — uncapped wait for real tokens, ret… -->
+<!-- sess455 RULE: CONSULT ANOTHER MODEL WHEN STUCK impl review of the 0.61.0 departure I/O gate (G3 as first landed): STOP-SHIP, 10 required changes — uncapped wait for real tokens, ret… -->
 # sess455 GPT ruling on the G3 departure-gate IMPLEMENTATION (2026-09-02 00:40Z): STOP-SHIP
 
 Reviewed: the code as landed 00:30Z (acct struct, token_take/retire/buf_free, freeze_drain 2000 ms bounded, put_super reorder, unwind, synthetic late-token injector). Findings and the disposition taken in the rework (same session):

@@ -33,6 +33,14 @@
 #                                              loads on the survivor, which must exclude it, certify,
 #                                              replay and keep every load free of I/O errors; the guard
 #                                              then releases the dead node, which rejoins; cold chk clean
+#   scripts/drbd_rig.sh multi-death-test    the self death on a pair with DRBD_RIG_RESOURCES resources (default 3),
+#                                              each on its own pool LUNs and mounted: every resource must
+#                                              exclude the dead node under its own episode, recover, keep
+#                                              every fsynced file, and release and rejoin it; cold chk clean
+#                                              (MULTI_CUT=1: instead of a death, only the last resource's
+#                                              link is cut; the exclusion must take every shared link down.
+#                                              MULTI_CUT=mounting: that link is cut while the victim is still
+#                                              mounting that resource; the victim must restart itself)
 #   scripts/drbd_rig.sh outage-test         both nodes die at once; a bootstrap with its swaps refused writes
 #                                              nothing, then the pair recovers with every fsynced file
 #   scripts/drbd_rig.sh self-outage-test    both nodes die at once under the built-in authority (agent=self) and
@@ -74,6 +82,10 @@
 #                     same build as this script's tree, so a second tree under
 #                     /src can be measured without touching /src/mxfs
 #   DRBD_RIG_NO_BASELINE=1   skip the backing-LUN fio legs in `up`
+#   DRBD_RIG_RESOURCES  multi-death-test: how many resources (2..9, default 3;
+#                       two pool LUNs each)
+#   DRBD_RIG_MULTI_SIZE multi-death-test: how much of each LUN a resource
+#                       replicates (default 4G)
 #
 # Evidence: tests/evidence/drbd_rig/<UTC stamp>-<subcommand>/ (one log per step,
 # fio.json with every leg).  Suite and fio_perf results go to a board of their
@@ -130,7 +142,12 @@ CMD=${1:-}; [ "$#" -gt 0 ] && shift
 EVID="$REPO/tests/evidence/drbd_rig/$(date -u +%Y%m%dT%H%M%SZ)-${CMD:-none}"
 
 say() { echo "[$(date +%H:%M:%S)] $*"; }
-die() { say "FAIL: $*"; exit 1; }
+die() {
+    say "FAIL: $*"
+    # a multi-death-test that fails while its stall watch runs still reports it
+    if [ "${MULTI_WATCHING:-0}" = 1 ]; then MULTI_WATCHING=0; multi_watch_report; fi
+    exit 1
+}
 # ssh_n <node> <command> [timeout]: the command's output, with sshpass noise dropped
 ssh_n() { timeout "${3:-60}" "$SSH" "$(lab_addr "$1")" "$2" </dev/null 2>&1 | grep -avE '^Warning:|^Unauthorized|^If you|^$'; }
 # both <command> [timeout]: run on both nodes at once; output to $EVID/<step>.<node>, rc in .rc
@@ -224,11 +241,13 @@ NODE_UNMOUNT='
     # A boot program an interrupted outage test left running would mount this
     # node on its own as soon as its peer mounts, in the middle of a later step.
     systemctl stop mxfs-rig-boot 2>/dev/null; systemctl reset-failed mxfs-rig-boot 2>/dev/null
-    if mountpoint -q '"$MNT"'; then
-        fuser -km '"$MNT"' 2>/dev/null; sleep 1
-        timeout 30 umount '"$MNT"' 2>/dev/null || timeout 30 umount -f '"$MNT"' 2>/dev/null
-    fi
-    mountpoint -q '"$MNT"' && { echo STOP_FAIL still mounted; exit 1; }
+    # Every MXFS mount, not only '"$MNT"': the module does not unload under
+    # any of them, and multi-death-test mounts one per resource.
+    for m in $(while read -r d m t r; do [ "$t" = mxfs ] && echo "$m"; done < /proc/mounts); do
+        fuser -km "$m" 2>/dev/null; sleep 1
+        timeout 30 umount "$m" 2>/dev/null || timeout 30 umount -f "$m" 2>/dev/null
+    done
+    grep -q " mxfs " /proc/mounts && { echo "STOP_FAIL still mounted: $(grep " mxfs " /proc/mounts | cut -d" " -f2 | tr "\n" " ")"; exit 1; }
     for t in 1 2 3 4 5; do lsmod | grep -q "^mxfs " || break; rmmod mxfs 2>/dev/null && break; sleep 2; done
     lsmod | grep -q "^mxfs " && { echo STOP_FAIL mxfs still loaded; exit 1; }'
 NODE_STOP=$NODE_UNMOUNT'
@@ -261,12 +280,12 @@ stop_nodes() {
     done
 }
 
-drbd_res() {  # the resource file, identical on both nodes
-    local a1 a2
+drbd_res() {  # [<name> <minor> <port> <disk N1> <disk N2> <size>]: the resource file, identical on both nodes
+    local a1 a2 res=${1:-$RES} minor=${2:-0} port=${3:-$DRBD_PORT} d1=${4:-${LUN_DEV[$N1]}} d2=${5:-${LUN_DEV[$N2]}} size=${6:-}
     a1=$(lab_addr "$N1"); a2=$(lab_addr "$N2")
     cat <<EOF
 # written by scripts/drbd_rig.sh — 2/net/mesh/drbd
-resource $RES {
+resource $res {
     net {
         protocol C;
         allow-two-primaries yes;
@@ -292,21 +311,23 @@ resource $RES {
         # A Primary that loses its peer freezes all I/O until the handler
         # confirms the peer node is powered off (exit 7).  Without this, a
         # split replication link leaves both Primaries writing.
-        fencing resource-and-stonith;
+        fencing resource-and-stonith;${size:+
+        # only the first $size of the backing disk is replicated
+        size $size;}
     }
     handlers {
         fence-peer "/usr/sbin/mxfs-drbd-fence-peer";
     }
     on $N1 {
-        device $DRBD_DEV minor 0;
-        disk "${LUN_DEV[$N1]}";
-        address $a1:$DRBD_PORT;
+        device /dev/drbd$minor minor $minor;
+        disk "$d1";
+        address $a1:$port;
         meta-disk internal;
     }
     on $N2 {
-        device $DRBD_DEV minor 0;
-        disk "${LUN_DEV[$N2]}";
-        address $a2:$DRBD_PORT;
+        device /dev/drbd$minor minor $minor;
+        disk "$d2";
+        address $a2:$port;
         meta-disk internal;
     }
 }
@@ -373,6 +394,17 @@ fio_json() {
 }
 
 # ── steps ───────────────────────────────────────────────────────────────────
+# drbd-utils from the distribution (userland 9.x drives the in-kernel 8.4
+# module through drbdadm-84).  drbd.service is disabled: a reboot must not
+# bring the resource back up on its own as Secondary with an old peer view.
+DRBD_INSTALL='
+    if ! command -v drbdadm >/dev/null; then
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends drbd-utils >/tmp/drbd_rig_apt.log 2>&1 \
+            || { echo "INSTALL_FAIL $(tail -1 /tmp/drbd_rig_apt.log)"; exit 1; }
+    fi
+    systemctl disable --now drbd >/dev/null 2>&1
+    modprobe drbd || { echo "INSTALL_FAIL modprobe drbd"; exit 1; }
+    echo "INSTALL_OK drbd=$(cat /sys/module/drbd/version 2>/dev/null) utils=$(dpkg-query -W -f="\${Version}" drbd-utils 2>/dev/null)"'
 step_up() {
     local n t0 out
     say "step 1-2: nodes $N1 $N2 (group $GROUP)"
@@ -405,17 +437,7 @@ step_up() {
     say "step 4: DRBD dual-primary on $DRBD_DEV"
     local res; res=$(drbd_res)
     echo "$res" > "$EVID/$RES.res"
-    # drbd-utils from the distribution (userland 9.x drives the in-kernel 8.4
-    # module through drbdadm-84).  drbd.service is disabled: a reboot must not
-    # bring the resource back up on its own as Secondary with an old peer view.
-    both install '
-        if ! command -v drbdadm >/dev/null; then
-            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends drbd-utils >/tmp/drbd_rig_apt.log 2>&1 \
-                || { echo "INSTALL_FAIL $(tail -1 /tmp/drbd_rig_apt.log)"; exit 1; }
-        fi
-        systemctl disable --now drbd >/dev/null 2>&1
-        modprobe drbd || { echo "INSTALL_FAIL modprobe drbd"; exit 1; }
-        echo "INSTALL_OK drbd=$(cat /sys/module/drbd/version 2>/dev/null) utils=$(dpkg-query -W -f="\${Version}" drbd-utils 2>/dev/null)"' "$APT_BUDGET"
+    both install "$DRBD_INSTALL" "$APT_BUDGET"
     for n in "${NODES[@]}"; do
         grep -aq '^INSTALL_OK' "$EVID/install.$n" || die "$n: $(tail -1 "$EVID/install.$n")"
     done
@@ -755,6 +777,22 @@ wait_mxfs_recovered() {  # <survivor> <test name>
     say "  $surv's MXFS recovered the fenced peer's slice under the DRBD witness; releasing the inhibit"
 }
 
+# Load this tree's module on a node before its DRBD comes up, and mount later
+# with MXFS_KEEP_LOADED=1.  Loading the module holds the CPU it runs on for
+# ~0.9 s on these guests while the kernel patches its code; DRBD pins each
+# resource's threads to one CPU and gives up on a link whose PingAck is 0.5 s
+# late, so a load with a link up has cost links, and under the built-in
+# authority a node.  The packages load it at boot (modules-load.d), before
+# any DRBD unit, for the same reason.
+load_mxfs_node() {  # <node> <device for prep_node's rig tag>
+    local out
+    out=$(ssh_n "$1" "mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }
+        grep -E '^ *[0-9]+: cs:(Connected|SyncSource|SyncTarget|WFBitMap|WFReportParams)' /proc/drbd 2>/dev/null | head -1 | sed 's/^/LINK_UP /'
+        MXFS_NO_MOUNT=1 MXFS_DEV=$2 MXFS_KO_MD5=$(md5sum "$REPO/mxfs.ko" | awk '{print $1}') MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1 | grep -aE 'NODE_PREP_(OK|FAIL)'" 180)
+    grep -q '^LINK_UP' <<<"$out" && die "$1: a DRBD link is up before the module load: $(grep '^LINK_UP' <<<"$out")"
+    grep -q '^NODE_PREP_OK' <<<"$out" || die "$1: module load: $out"
+}
+
 rejoin_node() {
     local node=$1 surv=$2 out ep
     out=$(timeout 30 "$REPO/tools/rig_fence_virsh.sh" status "$node")
@@ -765,6 +803,7 @@ rejoin_node() {
         say "  released $node (episode $ep)"
     fi
     "$REPO/scripts/lab_power.sh" up "$node" > "$EVID/rejoin_power.$node" 2>&1 || die "$node did not boot"
+    load_mxfs_node "$node" "$DRBD_DEV"
     out=$(ssh_n "$node" "$NODE_DRBD_UP
         for i in \$(seq 1 $REJOIN_BUDGET); do
             [ \"\$(drbdadm dstate $RES 2>/dev/null)\" = UpToDate/UpToDate ] && { drbdadm primary $RES 2>&1 | tail -1; echo \"REJOIN_OK \$(drbdadm role $RES)\"; exit 0; }
@@ -772,7 +811,7 @@ rejoin_node() {
         done
         echo \"REJOIN_TIMEOUT \$(drbdadm dstate $RES) \$(drbdadm cstate $RES)\"" $((REJOIN_BUDGET + 20)))
     grep -q '^REJOIN_OK Primary/Primary' <<<"$out" || die "rejoin: $node did not rejoin DRBD: $(tail -1 <<<"$out")"
-    ssh_n "$node" "mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }; MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$(md5sum "$REPO/mxfs.ko" | awk '{print $1}') MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1" 180 > "$EVID/rejoin_mount.$node"
+    ssh_n "$node" "mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }; MXFS_KEEP_LOADED=1 MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$(md5sum "$REPO/mxfs.ko" | awk '{print $1}') MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1" 180 > "$EVID/rejoin_mount.$node"
     grep -aq '^NODE_PREP_OK' "$EVID/rejoin_mount.$node" || die "rejoin: $node did not remount: $(grep -a FAIL "$EVID/rejoin_mount.$node" | tail -1)"
 }
 
@@ -1146,6 +1185,469 @@ step_self_death_test() {
     say "  cold chk_mxfs clean"
     install_fencing
     say "self death test: passed (the rig's node fence is configured again; MXFS left unmounted)"
+}
+
+# ── several resources on one pair ──────────────────────────────────────────
+# A Proxmox pair commonly carries more than one MXFS resource (the physical
+# pair runs three: one on a loop-backed image, one on each spare disk).  The
+# built-in authority excludes a dead peer once per resource, each under its
+# own episode, and each resource's MXFS must recover the dead node on its own
+# resource's evidence.  With one resource a per-host answer and a per-resource
+# one cannot be told apart: in 0.90.120 the authority answered `status` per
+# host, and on the nested pair the second resource never recovered.
+#
+# multi-death-test builds DRBD_RIG_RESOURCES resources on the pair under the
+# built-in authority, each on a pool LUN of its own on each node
+# (tools/lun_pool.sh alloc --also), mounts MXFS on every one, and destroys the
+# higher-addressed node with every mount written to and a writer running on
+# each.  Every resource must exclude it under an episode of its own, witness
+# that episode, finish its recovery and take fsynced writes again with every
+# fsynced file intact; the guard must then release the node on each
+# resource's own evidence, and the node must rejoin every resource and read
+# what the survivor reads.  A cold chk_mxfs of every filesystem closes it.
+#
+# Resource k (1..N): mxfs, mxfs2, ...; /dev/drbd<k-1>; port 7789+k-1;
+# /mnt/shared, /mnt/shared2, ...  Each replicates only the first
+# DRBD_RIG_MULTI_SIZE (default 4G) of its LUNs, so the pair needs N small
+# initial syncs rather than N of 20 GiB.  The pair is left with every resource
+# down, the extra resources' files removed, and the node fence configured
+# again; the LUNs stay bound until a later `up` rebinds the nodes.
+MULTI_N=${DRBD_RIG_RESOURCES:-3}
+MULTI_SIZE=${DRBD_RIG_MULTI_SIZE:-4G}
+# a mount on the network transport joining a mounted peer waits up to one BAST
+# period (~10 s, D-ON-THE-TCP-TRANSPORT-A-NODE-MOUNTING-WHILE-ITS); a first
+# mount 2.7 s (TIMEOUT_BUDGETS.md)
+MULTI_MOUNT_BOUND=25
+mres() { if [ "$1" = 1 ]; then echo "$RES"; else echo "$RES$1"; fi; }
+mmnt() { if [ "$1" = 1 ]; then echo "$MNT"; else echo "$MNT$1"; fi; }
+mdev() { echo "/dev/drbd$(( $1 - 1 ))"; }
+mport() { echo $(( DRBD_PORT + $1 - 1 )); }
+mall() { local k; for k in $(seq 1 "$MULTI_N"); do echo -n "$($1 "$k") "; done; }
+declare -A MLUN   # [<node>.<k>]: the guest path of that node's LUN for resource k
+
+# Every MXFS mount down, the module out, every DRBD resource down, and the
+# files of a previous run's extra resources gone.
+MULTI_STOP=$NODE_UNMOUNT'
+    if lsmod | grep -q "^drbd "; then timeout 60 drbdadm down all >/dev/null 2>&1; fi
+    if grep -E "^ *[0-9]+: cs:" /proc/drbd 2>/dev/null | grep -qv Unconfigured; then
+        echo "STOP_FAIL DRBD minors still configured: $(grep -E "^ *[0-9]+: cs:" /proc/drbd | tr "\n" " ")"; exit 1
+    fi
+    for k in 2 3 4 5 6 7 8 9; do rm -f /etc/drbd.d/'"$RES"'$k.res; done
+    # The authority state of an earlier run: its isolation, inhibits and
+    # receipts.  A receipt left over would satisfy this run'"'"'s check of its own.
+    for t in $(nft list tables 2>/dev/null | sed -n "s/^table inet \(mxfs_fence_.*\)/\1/p"); do nft delete table inet "$t"; done
+    rm -f /var/lib/mxfs/drbd-inhibit.*.json /var/lib/mxfs/drbd-fence.*
+    echo STOP_OK'
+
+hold_multi_luns() {  # one holder per node, owning every LUN of that node
+    local n h k line
+    for n in "${NODES[@]}"; do
+        ( for fd in "${LOCK_FDS[@]}"; do exec {fd}>&-; done; exec tail --pid=$$ -f /dev/null ) >/dev/null 2>&1 &
+        h=$!
+        HOLDERS+=("$h")
+        for k in $(seq 1 "$MULTI_N"); do
+            # the first binds the node afresh (out of every other target); the
+            # rest are bound beside it
+            line=$("$POOL" alloc $([ "$k" -gt 1 ] && echo --also) --owner "$h" \
+                       --what "drbd_rig multi $CONFIG $n $(mres "$k")" "$n") \
+                || die "no pool LUN for $n $(mres "$k") (tools/lun_pool.sh status)"
+            echo "$line" >> "$EVID/luns"
+            MLUN[$n.$k]=$(sed -n 's/.* dev=\([^ ]*\).*/\1/p' <<<"$line")
+            [ -n "${MLUN[$n.$k]}" ] || die "unusable allocation for $n: $line"
+            say "  $n $(mres "$k"): lun$(sed -n 's/.* id=\([^ ]*\).*/\1/p' <<<"$line") ${MLUN[$n.$k]}"
+        done
+    done
+    HELD=1
+}
+
+multi_up() {  # N resources, created, connected, synced and Primary/Primary
+    local k n res files="" out rl gib sb
+    rl=$(mall mres)
+    files=""
+    for k in $(seq 1 "$MULTI_N"); do
+        res=$(drbd_res "$(mres "$k")" $((k - 1)) "$(mport "$k")" "${MLUN[$N1.$k]}" "${MLUN[$N2.$k]}" "$MULTI_SIZE")
+        echo "$res" > "$EVID/$(mres "$k").res"
+        files+="echo '$(base64 -w0 <<<"$res")' | base64 -d > /etc/drbd.d/$(mres "$k").res
+"
+    done
+    both install "$DRBD_INSTALL" "$APT_BUDGET"
+    for n in "${NODES[@]}"; do
+        grep -aq '^INSTALL_OK' "$EVID/install.$n" || die "$n: $(tail -1 "$EVID/install.$n")"
+    done
+    # create-md takes ~3 s a resource; twice that
+    both createmd "$files
+        drbdadm sh-nop >/dev/null 2>&1 || { echo \"MD_FAIL config: \$(drbdadm sh-nop 2>&1 | tail -1)\"; exit 1; }
+        for r in $rl; do
+            ll=\$(drbdadm sh-ll-dev \$r 2>/dev/null)
+            [ -b \"\$ll\" ] || { echo \"MD_FAIL \$r: no backing disk: \$ll\"; exit 1; }
+            sg_persist --out --register-ignore --param-sark=0x5eed \"\$ll\" >/dev/null 2>&1
+            sg_persist --out --clear --param-rk=0x5eed \"\$ll\" >/dev/null 2>&1
+            sg_persist --in -r -d \"\$ll\" 2>&1 | grep -q 'NO reservation held' \
+                || { echo \"MD_FAIL \$r: a SCSI reservation on \$ll could not be cleared\"; exit 1; }
+            drbdadm -- --force create-md \$r </dev/null >/tmp/drbd_rig_md.log 2>&1 \
+                || { echo \"MD_FAIL \$r: \$(tail -1 /tmp/drbd_rig_md.log)\"; exit 1; }
+            drbdadm up \$r >/tmp/drbd_rig_up.log 2>&1 || { echo \"MD_FAIL \$r up: \$(tail -1 /tmp/drbd_rig_up.log)\"; exit 1; }
+        done
+        echo MD_OK" $((6 * MULTI_N + 30))
+    for n in "${NODES[@]}"; do
+        grep -aq '^MD_OK' "$EVID/createmd.$n" || die "$n: $(tail -1 "$EVID/createmd.$n")"
+    done
+    out=$(ssh_n "$N1" "for i in \$(seq 1 $CONNECT_BUDGET); do
+            ok=1; for r in $rl; do [ \"\$(drbdadm cstate \$r)\" = Connected ] || ok=0; done
+            [ \$ok = 1 ] && { echo CONNECTED; exit 0; }; sleep 1
+        done
+        echo NOT_CONNECTED \$(for r in $rl; do echo \$r=\$(drbdadm cstate \$r); done)" $((CONNECT_BUDGET + 15)))
+    grep -q '^CONNECTED' <<<"$out" || die "the replication links did not all connect in ${CONNECT_BUDGET}s: $out"
+    # SYNC_BUDGET is twice a 20 GiB sync of one LUN; N syncs share the pool's
+    # bandwidth, so the budget scales with the bytes synced in all
+    gib=$(( $(numfmt --from=iec "$MULTI_SIZE") >> 30 ))
+    sb=$(( SYNC_BUDGET * MULTI_N * gib / 20 ))
+    say "  $MULTI_N resources connected; initial syncs of $MULTI_SIZE each from $N1 (budget ${sb}s)"
+    local t0; t0=$(date +%s)
+    out=$(ssh_n "$N1" "for r in $rl; do drbdadm primary --force \$r 2>&1 | tail -1; done
+        for i in \$(seq 1 $sb); do
+            ok=1; for r in $rl; do [ \"\$(drbdadm dstate \$r)\" = UpToDate/UpToDate ] || ok=0; done
+            [ \$ok = 1 ] && { echo SYNC_OK; exit 0; }; sleep 1
+        done
+        echo SYNC_TIMEOUT \$(for r in $rl; do echo \$r=\$(drbdadm dstate \$r); done)" $((sb + 20)))
+    echo "$out" > "$EVID/sync"
+    grep -q '^SYNC_OK' <<<"$out" || die "initial syncs: budget exceeded is a failure: $(tail -1 <<<"$out")"
+    say "  synced in $(( $(date +%s) - t0 ))s"
+    ssh_n "$N2" "for r in $rl; do drbdadm primary \$r 2>&1 | tail -1; done" 30 > "$EVID/promote.$N2"
+    multi_need_dual_primary
+}
+
+multi_need_dual_primary() {
+    local n bad
+    both mcheck "for r in $(mall mres); do echo \"\$r \$(drbdadm role \$r 2>&1) \$(drbdadm dstate \$r 2>&1) \$(drbdadm cstate \$r 2>&1)\"; done" 30
+    for n in "${NODES[@]}"; do
+        bad=$(grep -av ' Primary/Primary UpToDate/UpToDate Connected$' "$EVID/mcheck.$n")
+        [ -z "$bad" ] && [ "$(grep -ac . "$EVID/mcheck.$n")" = "$MULTI_N" ] \
+            || die "$n DRBD is not Primary/Primary UpToDate/UpToDate Connected on every resource: $(tr '\n' ' ' < "$EVID/mcheck.$n")"
+    done
+    say "  DRBD: $MULTI_N resources Primary/Primary UpToDate/UpToDate Connected on both"
+}
+
+# Load this tree's module on a node and mount every resource; the first mount
+# goes through prep_node.sh as every rig mount does.
+SRC_UP='mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }'
+multi_mount_node() {  # <node> <evidence tag> [1: leave the last resource unmounted]
+    local n=$1 tag=$2 k out last=$MULTI_N
+    [ "${3:-0}" = 1 ] && last=$((MULTI_N - 1))
+    ssh_n "$n" "$SRC_UP; MXFS_KEEP_LOADED=1 MXFS_DEV=$(mdev 1) MXFS_MOUNT=$(mmnt 1) MXFS_KO_MD5=$(md5sum "$REPO/mxfs.ko" | awk '{print $1}') MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1" 180 > "$EVID/$tag.$n"
+    grep -aq '^NODE_PREP_OK' "$EVID/$tag.$n" || die "$n: MXFS will not mount $(mdev 1): $(grep -a FAIL "$EVID/$tag.$n" | tail -1)"
+    for k in $(seq 2 "$last"); do
+        # judged on this mount's own output: a mount whose ssh returns
+        # nothing (stuck past the bound) must not read as the one before it
+        out=$(ssh_n "$n" "mkdir -p $(mmnt "$k"); t0=\$(date +%s%N); timeout $MULTI_MOUNT_BOUND mount -t mxfs $(mdev "$k") $(mmnt "$k") 2>&1; echo MOUNT_RC=\$? MS=\$(( (\$(date +%s%N) - t0) / 1000000 ))" \
+            $((MULTI_MOUNT_BOUND + 10)))
+        echo "${out:-NO_RESULT $(mdev "$k") (bound ${MULTI_MOUNT_BOUND}s)}" >> "$EVID/$tag.$n"
+        grep -aq "^MOUNT_RC=0 " <<<"$out" \
+            || die "$n: mount $(mdev "$k") on $(mmnt "$k") failed or exceeded ${MULTI_MOUNT_BOUND}s: ${out:-no result}"
+    done
+    say "  $n: $last mounts up ($(grep -aho 'MS=[0-9]*' "$EVID/$tag.$n" | tr '\n' ' '))"
+}
+
+# A watch for stalls: DRBD gives up on a link whose PingAck is 0.5 s late, and
+# on this rig links have dropped with both nodes healthy while the pair was
+# being set up (D-DRBD-RIG-SPURIOUS-PINGACK-LOSS-DURING-MULTI-MOUNT-SETUP).
+# Each node pings the other every 50 ms on its own clock, so a node that
+# stalls shows a gap on its own timeline, and this host pings both every
+# 200 ms (the least an unprivileged ping allows).  Every gap over 300 ms is
+# listed beside the DRBD link losses of each node, in wall-clock time.
+MULTI_WATCH_S=900   # set-up to the kill takes ~5 min
+multi_watch_start() {
+    local n peer
+    for n in "${NODES[@]}"; do
+        if [ "$n" = "$N1" ]; then peer=$N2; else peer=$N1; fi
+        ssh_n "$n" "rm -f /root/mwatch.ping; nohup setsid ping -D -i 0.05 -w $MULTI_WATCH_S $(lab_addr "$peer") > /root/mwatch.ping 2>&1 < /dev/null & echo WATCH_OK" 15 | grep -q WATCH_OK \
+            || say "  (stall watch could not start on $n)"
+        ( exec ping -D -i 0.2 -w "$MULTI_WATCH_S" "$(lab_addr "$n")" > "$EVID/mwatch.host.$n" 2>&1 ) &
+        HOLDERS+=($!)
+    done
+    MULTI_WATCHING=1
+}
+multi_watch_report() {
+    local n
+    for n in "${NODES[@]}"; do
+        ssh_n "$n" "cat /root/mwatch.ping" 30 > "$EVID/mwatch.node.$n"
+        ssh_n "$n" "dmesg --time-format iso | grep -aE 'PingAck did not arrive|meta connection shut down|conn\\( Connected -> (NetworkFailure|BrokenPipe|Timeout)'" 30 > "$EVID/mwatch.drbd.$n"
+    done
+    python3 -I - "$EVID" "${NODES[@]}" <<'PY' > "$EVID/mwatch.gaps"
+import datetime, glob, os, re, sys
+ev, nodes = sys.argv[1], sys.argv[2:]
+for f in sorted(glob.glob(os.path.join(ev, "mwatch.node.*")) + glob.glob(os.path.join(ev, "mwatch.host.*"))):
+    t = [float(m.group(1)) for m in (re.match(r"\[(\d+\.\d+)\] \d+ bytes from", l) for l in open(f, errors="replace")) if m]
+    gaps = [(a, b - a) for a, b in zip(t, t[1:]) if b - a > 0.3]
+    print("%s replies=%d gaps_over_300ms=%d" % (os.path.basename(f), len(t), len(gaps)))
+    for a, g in gaps:
+        print("  GAP %s +%.0f ms" % (datetime.datetime.fromtimestamp(a).strftime("%H:%M:%S.%f")[:-3], g * 1000))
+for n in nodes:
+    for l in open(os.path.join(ev, "mwatch.drbd." + n), errors="replace"):
+        print("DRBD %s %s" % (n, l.strip()[:160]))
+PY
+    say "  stall watch: $(grep -c '  GAP ' "$EVID/mwatch.gaps") gap(s) over 300 ms, $(grep -c '^DRBD ' "$EVID/mwatch.gaps") DRBD link loss line(s) ($EVID/mwatch.gaps)"
+}
+
+MULTI_REJOIN_BUDGET=$REJOIN_BUDGET   # every resource resyncs at once, each only what changed
+step_multi_death_test() {
+    local out n k r rl ml surv vict a1 a2 t0 tk ep eps="" sums_s sums_v line bad
+    [[ "$MULTI_N" =~ ^[0-9]+$ ]] && [ "$MULTI_N" -ge 2 ] && [ "$MULTI_N" -le 9 ] \
+        || die "DRBD_RIG_RESOURCES is 2..9, not $MULTI_N"
+    rl=$(mall mres); ml=$(mall mmnt)
+    say "multi death test: $MULTI_N resources ($rl) on $N1 $N2"
+    "$REPO/scripts/lab_power.sh" up "${NODES[@]}" > "$EVID/power" 2>&1 || die "power up: $(tail -1 "$EVID/power")"
+    both stop "$MULTI_STOP" 180
+    for n in "${NODES[@]}"; do
+        grep -aq '^STOP_OK' "$EVID/stop.$n" || die "$n would not release mxfs/DRBD: $(tail -1 "$EVID/stop.$n")"
+    done
+    hold_multi_luns
+    multi_watch_start
+    # the module before any DRBD link (load_mxfs_node)
+    for n in "${NODES[@]}"; do load_mxfs_node "$n" "${MLUN[$n.1]}"; done
+    multi_up
+    install_self_authority
+    if [ "${MULTI_SETUP_ONLY:-0}" = 1 ]; then
+        # the pair connected under the built-in authority, nothing mounted:
+        # what an experiment on the idle resources starts from
+        MULTI_WATCHING=0; multi_watch_report
+        say "multi death test: set up only (MULTI_SETUP_ONLY=1); DRBD left up, nothing mounted"
+        return 0
+    fi
+    both src "$SRC_UP; mountpoint -q /src && echo SRC_OK" 40
+    for n in "${NODES[@]}"; do grep -aq '^SRC_OK' "$EVID/src.$n" || die "$n: /src (NFS) not mounted"; done
+    for k in $(seq 1 "$MULTI_N"); do
+        out=$(ssh_n "$N1" "MXFS_DEV=$(mdev "$k") MXFS_MOUNT=$(mmnt "$k") MXFS_LOG_SLICES=$LOG_SLICES MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_fs.sh 2>&1" 60)
+        echo "$out" > "$EVID/mkfs.$k"
+        grep -q '^FS_PREP_OK' <<<"$out" || die "mkfs $(mdev "$k") on $N1: $(tail -1 <<<"$out")"
+    done
+    say "  formatted $(mall mdev)on $N1"
+    a1=$(lab_addr "$N1"); a2=$(lab_addr "$N2")
+    if python3 -I -c 'import ipaddress, sys; sys.exit(0 if ipaddress.ip_address(sys.argv[1]) < ipaddress.ip_address(sys.argv[2]) else 1)' "$a1" "$a2"; then
+        surv=$N1; vict=$N2
+    else
+        surv=$N2; vict=$N1
+    fi
+    # MULTI_CUT=mounting: the victim leaves the last resource unmounted until
+    # the kill, which starts that mount and cuts its link while it is still
+    # joining.  The sets and writers then cover the other resources only.
+    local ma=0 sl=$ml ns=$MULTI_N
+    if [ "${MULTI_CUT:-0}" = mounting ]; then
+        ma=1; ns=$((MULTI_N - 1)); sl=""
+        for k in $(seq 1 "$ns"); do sl+="$(mmnt "$k") "; done
+    fi
+    # the survivor first: the victim's last mount, in the mounting arm, is
+    # then a join of a mounted cluster (~5 s), long enough to cut it midway
+    multi_mount_node "$surv" mount
+    multi_mount_node "$vict" mount "$ma"
+    MULTI_WATCHING=0; multi_watch_report
+    # a link lost while mounting would make the death below measure a split
+    multi_need_dual_primary
+    say "  survivor $surv (participant 0, the lower DRBD address), victim $vict"
+    # Only the lines the verdict reads, and every one of them: N filesystems
+    # print the same line N times, which the repeat limit would hold back.
+    for n in "$surv" "$vict"; do
+        self_dyndbg "$n" narrow || die "cannot narrow the debug sites on $n"
+        ssh_n "$n" "echo 0 > /sys/module/mxfs/parameters/log_repeat_limit; cat /sys/module/mxfs/parameters/log_repeat_limit" 15 | grep -qx 0 \
+            || die "cannot lift the log repeat limit on $n"
+    done
+
+    # 64 fsynced files from each node on every resource; "SUM <k> <md5>"
+    for n in "$surv" "$vict"; do
+        ssh_n "$n" "k=0; for m in $sl; do k=\$((k + 1)); d=\$m/mdeath/$n; mkdir -p \$d && for i in \$(seq 1 64); do head -c 65536 /dev/urandom > \$d/f\$i; done && sync -f \$m && echo SUM \$k \$(cd \$d && md5sum f* | sort -k2 | md5sum | cut -c1-32) || echo WRITE_FAIL \$m; done" 120 > "$EVID/mdeath_sums.$n"
+        grep -aq WRITE_FAIL "$EVID/mdeath_sums.$n" && die "writes on $n: $(grep -a WRITE_FAIL "$EVID/mdeath_sums.$n" | tr '\n' ' ')"
+        [ "$(grep -ac '^SUM ' "$EVID/mdeath_sums.$n")" = "$ns" ] || die "no checksum of every set on $n: $(tr '\n' ' ' < "$EVID/mdeath_sums.$n")"
+    done
+    sums_s=$(grep -a '^SUM ' "$EVID/mdeath_sums.$surv"); sums_v=$(grep -a '^SUM ' "$EVID/mdeath_sums.$vict")
+    # the victim dies with a writer running on every filesystem, its slice dirty on each
+    out=$(ssh_n "$vict" "for m in $sl; do nohup setsid bash -c \"i=0; while :; do i=\\\$((i+1)); echo \\\$i > \$m/mdeath/live\\\$((i % 200)); done\" >/dev/null 2>&1 < /dev/null & done; sleep 3
+        n=0; for m in $sl; do [ -e \$m/mdeath/live1 ] && n=\$((n + 1)); done; echo WRITERS=\$n" 30)
+    grep -q "^WRITERS=$ns\$" <<<"$out" || die "not every writer on $vict is writing: $out"
+    local vboot; vboot=$(ssh_n "$vict" "cat /proc/sys/kernel/random/boot_id" 10)
+    say "  both nodes' fsynced sets on every resource; a writer on each of $vict's mounts; destroying $vict"
+
+    ssh_n "$surv" "dmesg -C; echo '<5>mxfs-test: multi-death kill $vict' > /dev/kmsg" 10 >/dev/null
+    t0=$(date +%s)
+    local budget=$SELF_RECOVER_BUDGET
+    if [ "$ma" = 1 ]; then
+        # The victim's last mount starts now, joining the survivor's cluster
+        # (~5 s), and must still be in progress when its link is cut: in no
+        # mount table yet, the module holding it.  Losing the tie-break, the
+        # victim must restart itself rather than leave it blocked for ever on
+        # the frozen device.
+        out=$(ssh_n "$vict" "rm -f /root/mdeath_mount.rc; mkdir -p $(mmnt "$MULTI_N")
+            nohup setsid sh -c 'timeout 300 mount -t mxfs $(mdev "$MULTI_N") $(mmnt "$MULTI_N"); echo RC=\$? > /root/mdeath_mount.rc' >/dev/null 2>&1 < /dev/null &
+            sleep 1
+            if grep -q ' $(mmnt "$MULTI_N") mxfs ' /proc/mounts || [ -e /root/mdeath_mount.rc ]; then echo MOUNT_NOT_IN_PROGRESS; else echo \"MOUNT_IN_PROGRESS refcnt=\$(cat /sys/module/mxfs/refcnt)\"; fi" 20)
+        grep -q '^MOUNT_IN_PROGRESS' <<<"$out" || die "$vict's mount of $(mdev "$MULTI_N") was not in progress at the cut: $out"
+        say "  $vict is mounting $(mdev "$MULTI_N") (${out#MOUNT_IN_PROGRESS })"
+    fi
+    if [ "${MULTI_CUT:-0}" = 1 ] || [ "$ma" = 1 ]; then
+        # Only the last resource's link fails, on the victim's side; every
+        # other link and the victim itself stay up.  The survivor's exclusion
+        # must take every shared resource's link down with it (each then
+        # excluded under its own episode), and the victim, losing the
+        # tie-break with MXFS mounted, restarts itself.  One more DRBD
+        # detection than a death (2 x ping-int + ping-timeout, 6.5 s), twice.
+        local cport; cport=$(mport "$MULTI_N")
+        ssh_n "$vict" "iptables -I INPUT -p tcp --dport $cport -j DROP; iptables -I INPUT -p tcp --sport $cport -j DROP; iptables -I OUTPUT -p tcp --dport $cport -j DROP; iptables -I OUTPUT -p tcp --sport $cport -j DROP; echo CUT" 15 | grep -q '^CUT' \
+            || die "could not cut $(mres "$MULTI_N")'s link on $vict"
+        budget=$((SELF_RECOVER_BUDGET + 13))
+        say "  cut $(mres "$MULTI_N")'s replication link (port $cport) on $vict; every other link and $vict stay up"
+    else
+        timeout 60 virsh -c qemu:///system destroy "$vict" >/dev/null 2>&1 || die "virsh destroy $vict failed"
+    fi
+
+    # Each filesystem recovers on its own; all of them at once, each in the
+    # self death test's budget.
+    out=$(ssh_n "$surv" "t0=\$(date +%s%N); for m in $ml; do ( mkdir -p \$m/post && head -c 1048576 /dev/urandom > \$m/post/f && sync -f \$m/post/f && echo POST_OK \$m \$(( (\$(date +%s%N) - t0) / 1000000 )) \$(md5sum < \$m/post/f | cut -c1-32) ) & done; wait" $((budget + 10)))
+    echo "$out" > "$EVID/mdeath_post"
+    for m in $ml; do
+        line=$(awk -v m="$m" '$1 == "POST_OK" && $2 == m' <<<"$out")
+        [ -n "$line" ] || die "$surv: $m took no fsynced write within ${budget}s of the kill"
+        say "  $surv: $m wrote again $(awk '{print $3}' <<<"$line") ms after the kill"
+    done
+    out=$(ssh_n "$surv" "for i in \$(seq 1 $budget); do
+            p=0; for d in $(mall mdev); do [ \"\$(cat /sys/fs/mxfs/\${d##*/}/recovery_pending 2>/dev/null)\" = 0 ] || p=\$((p + 1)); done
+            [ \$p = 0 ] && [ \$(dmesg | grep -ac 'P163-RECOVERY-COMPLETE') -ge $ns ] && break
+            sleep 1
+        done
+        for d in $(mall mdev); do echo PENDING \$d \$(cat /sys/fs/mxfs/\${d##*/}/recovery_pending 2>&1); done
+        echo COMPLETE \$(dmesg | grep -ac 'P163-RECOVERY-COMPLETE')
+        for r in $rl; do echo RECEIPT \$r \$(grep 'result=EXCLUDED' /var/lib/mxfs/drbd-fence.\$r 2>/dev/null | tail -1); /usr/sbin/mxfs-drbd-fence-self status $vict \$r | sed \"s/^/STATUS \$r /\"; done" $((budget + 30)))
+    tk=$(( $(date +%s) - t0 ))
+    echo "$out" > "$EVID/mdeath_recovery"
+    ssh_n "$surv" "dmesg | grep -aE 'P238-DRBD|P236-FENCE|P-DRBD|P163|P239|P238-FENCE|P-RBLK|P240|mxfs-drbd-fence|no longer responding|P232-FREPLAY|elected|BUG:|Oops|WARNING:' | cut -c1-400" 30 > "$EVID/mdeath_kernlog"
+    bad=$(grep -a '^PENDING ' <<<"$out" | grep -av ' 0$')
+    [ -z "$bad" ] || die "recovery still pending ${tk}s after the kill: $(tr '\n' ' ' <<<"$bad")"
+    # one per filesystem the victim was a member of; in the mounting arm its
+    # last mount may or may not have joined before the cut
+    [ "$(sed -n 's/^COMPLETE //p' <<<"$out")" -ge "$ns" ] 2>/dev/null \
+        || die "$(sed -n 's/^COMPLETE //p' <<<"$out") recoveries completed of $ns (evidence $EVID)"
+    for r in $rl; do
+        grep -q "^RECEIPT $r .*result=EXCLUDED .*agent=self participant=0" <<<"$out" \
+            || die "no EXCLUDED receipt from the built-in authority for $r: $(grep "^RECEIPT $r " <<<"$out")"
+        ep=$(sed -n "s/^STATUS $r STATE $vict excluded inhibit=\(.*\)$/\1/p" <<<"$out")
+        [ -n "$ep" ] || die "the authority does not hold $vict excluded for $r: $(grep "^STATUS $r " <<<"$out")"
+        case " $eps " in *" $ep "*) die "$r's exclusion of $vict reuses episode $ep of another resource" ;; esac
+        eps="$eps $ep"
+        # the mounting arm's last resource: a mount cut before it joined left
+        # the survivor no dead member there, so nothing to witness or recover
+        # (its exclusion is still required above)
+        if [ "$ma" = 1 ] && [ "$r" = "$(mres "$MULTI_N")" ]; then
+            grep -q "P238-DRBD-FENCE-WITNESSED .*episode=$ep " "$EVID/mdeath_kernlog" \
+                && say "  $r: witnessed too (the mount had joined before the cut)"
+            continue
+        fi
+        grep -q "P238-DRBD-FENCE-WITNESSED .*episode=$ep " "$EVID/mdeath_kernlog" \
+            || die "$r: no DRBD witness of its own episode $ep"
+    done
+    if grep -qE "$RBLK_REFUSED" "$EVID/mdeath_kernlog"; then
+        die "$surv refused operations as RECOVERY_BLOCKED: $(grep -m2 -E "$RBLK_REFUSED" "$EVID/mdeath_kernlog" | cut -c1-200 | tr '\n' ' ')"
+    fi
+    say "  $surv: every resource excluded $vict under its own episode, witnessed it and recovered (${tk}s after the kill)"
+
+    multi_read_sets() {  # <reader> <what>: both nodes' sets on every resource
+        local rd=$1 got
+        got=$(ssh_n "$rd" "k=0; for m in $sl; do k=\$((k + 1)); for w in $surv $vict; do echo SET \$k \$w \$(cd \$m/mdeath/\$w && md5sum f* | sort -k2 | md5sum | cut -c1-32); done; done" 120)
+        echo "$got" > "$EVID/mdeath_read.$rd"
+        for k in $(seq 1 "$ns"); do
+            [ "$(sed -n "s/^SET $k $surv //p" <<<"$got")" = "$(sed -n "s/^SUM $k //p" <<<"$sums_s")" ] \
+                || die "$2: $surv's set on $(mmnt "$k") reads differently on $rd"
+            [ "$(sed -n "s/^SET $k $vict //p" <<<"$got")" = "$(sed -n "s/^SUM $k //p" <<<"$sums_v")" ] \
+                || die "$2: $vict's fsynced set on $(mmnt "$k") reads differently on $rd"
+        done
+    }
+    multi_read_sets "$surv" "after the recovery"
+    say "  every fsynced file of both nodes intact on $surv on every resource"
+    # Writes after the recovery: in the cut arm the first ones can land on a
+    # resource before its link is even taken down.  A fsynced write on an
+    # idle filesystem takes milliseconds; bounded at the mount bound.
+    out=$(ssh_n "$surv" "for m in $ml; do ( head -c 1048576 /dev/urandom > \$m/post/g && sync -f \$m/post/g && echo POST2_OK \$m \$(md5sum < \$m/post/g | cut -c1-32) ) & done; wait" $((MULTI_MOUNT_BOUND + 10)))
+    echo "$out" > "$EVID/mdeath_post2"
+    for m in $ml; do
+        grep -q "^POST2_OK $m " <<<"$out" || die "$surv: $m took no fsynced write after the recovery: $out"
+    done
+    say "  $surv writes on every resource after the recovery"
+
+    # The guard releases each resource's exclusion on that resource's own
+    # evidence once the node is back with DRBD down.
+    ssh_n "$surv" "systemctl stop mxfs-rig-guard 2>/dev/null; systemd-run --unit=mxfs-rig-guard --collect /usr/sbin/mxfs-drbd-fence-self guard >/dev/null 2>&1 && echo GUARD_OK" 20 | grep -q GUARD_OK \
+        || die "cannot start the guard on $surv"
+    t0=$(date +%s)
+    "$REPO/scripts/lab_power.sh" up "$vict" > "$EVID/mdeath_power" 2>&1 || die "$vict did not boot: $(tail -1 "$EVID/mdeath_power")"
+    if [ "${MULTI_CUT:-0}" = 1 ] || [ "$ma" = 1 ]; then
+        # the cut victim restarts itself (the handler's restart of a loser
+        # MXFS holds anything on, a mount in progress included); a victim
+        # still on its old boot never left
+        out=$(ssh_n "$vict" "cat /proc/sys/kernel/random/boot_id" 10)
+        [ -n "$out" ] && [ -n "$vboot" ] && [ "$out" != "$vboot" ] \
+            || die "$vict did not restart after losing the tie-break (boot id ${vboot:-?} -> ${out:-?})"
+        say "  $vict restarted itself after losing the tie-break"
+    fi
+    out=$(ssh_n "$surv" "for i in \$(seq 1 60); do
+            n=0; for r in $rl; do grep -q 'result=RELEASED' /var/lib/mxfs/drbd-fence.\$r 2>/dev/null && [ \"\$(/usr/sbin/mxfs-drbd-fence-self status $vict \$r | awk '{print \$3}')\" = unfenced ] && n=\$((n + 1)); done
+            [ \$n = $MULTI_N ] && break; sleep 1
+        done
+        for r in $rl; do echo RELEASE \$r \$(grep 'result=RELEASED' /var/lib/mxfs/drbd-fence.\$r 2>/dev/null | tail -1); /usr/sbin/mxfs-drbd-fence-self status $vict \$r | sed \"s/^/STATUS \$r /\"; done" 90)
+    echo "$out" > "$EVID/mdeath_release"
+    for r in $rl; do
+        grep -q "^STATUS $r STATE $vict unfenced " <<<"$out" || die "the guard did not release $vict on $r within 60 s of its boot: $(grep "^STATUS $r " <<<"$out")"
+    done
+    for ep in $eps; do
+        grep -q "^RELEASE .*result=RELEASED .*episode=$ep" <<<"$out" || die "no release of episode $ep: $(grep '^RELEASE ' <<<"$out" | tr '\n' ' ')"
+    done
+    say "  guard released $vict on every resource, each under its own episode, $(( $(date +%s) - t0 ))s after it was started"
+
+    # The rejoin: the module first, then every resource up, resynced, Primary,
+    # mounted.
+    load_mxfs_node "$vict" "${MLUN[$vict.1]}"
+    out=$(ssh_n "$vict" "modprobe drbd || echo 'MREJOIN_FAIL modprobe drbd'
+        for i in \$(seq 1 $LOGIN_BUDGET); do
+            a=0; for r in $rl; do [ -b \"\$(drbdadm sh-ll-dev \$r 2>/dev/null)\" ] || a=\$((a + 1)); done
+            [ \$a = 0 ] && break
+            iscsiadm -m node --loginall=automatic >/dev/null 2>&1; udevadm settle -t 5 >/dev/null 2>&1; sleep 1
+        done
+        for r in $rl; do drbdadm up \$r 2>&1 | tail -1; done
+        for i in \$(seq 1 $MULTI_REJOIN_BUDGET); do
+            ok=1; for r in $rl; do [ \"\$(drbdadm dstate \$r 2>/dev/null)\" = UpToDate/UpToDate ] || ok=0; done
+            [ \$ok = 1 ] && break; sleep 1
+        done
+        for r in $rl; do [ \"\$(drbdadm dstate \$r 2>/dev/null)\" = UpToDate/UpToDate ] && drbdadm primary \$r 2>&1 | tail -1; echo \"MREJOIN \$r \$(drbdadm role \$r) \$(drbdadm dstate \$r) \$(drbdadm cstate \$r)\"; done" $((LOGIN_BUDGET + MULTI_REJOIN_BUDGET + 60)))
+    echo "$out" > "$EVID/mdeath_rejoin"
+    for r in $rl; do
+        grep -q "^MREJOIN $r Primary/Primary UpToDate/UpToDate Connected$" <<<"$out" \
+            || die "$vict did not rejoin $r: $(grep "^MREJOIN $r " <<<"$out")"
+    done
+    multi_mount_node "$vict" rejoin_mount
+    multi_read_sets "$vict" "after the rejoin"
+    out=$(ssh_n "$vict" "for m in $ml; do echo POSTSUM \$m \$(md5sum < \$m/post/f | cut -c1-32) \$(md5sum < \$m/post/g | cut -c1-32); done" 60)
+    for m in $ml; do
+        [ "$(awk -v m="$m" '$1 == "POSTSUM" && $2 == m {print $3}' <<<"$out")" = "$(awk -v m="$m" '$1 == "POST_OK" && $2 == m {print $4}' "$EVID/mdeath_post")" ] \
+            || die "the rejoined $vict reads $surv's post-crash file on $m differently: $out"
+        [ "$(awk -v m="$m" '$1 == "POSTSUM" && $2 == m {print $4}' <<<"$out")" = "$(awk -v m="$m" '$1 == "POST2_OK" && $2 == m {print $3}' "$EVID/mdeath_post2")" ] \
+            || die "the rejoined $vict reads $surv's post-recovery file on $m differently: $out"
+    done
+    say "  $vict rejoined and remounted every resource $(( $(date +%s) - t0 ))s after it was started, and reads what $surv reads"
+    ssh_n "$surv" "systemctl stop mxfs-rig-guard 2>/dev/null; echo" 20 >/dev/null
+
+    for n in "$surv" "$vict"; do
+        # the module's, XFS's and DRBD's lines, and any BUG/Oops: a boot
+        # message of the CPU's own ("ITS: WARNING: ...") is not this test's
+        ssh_n "$n" "dmesg | grep -aE 'mxfs|MXFS|XFS|drbd|BUG:|Oops' | grep -aE 'BUG:|Oops|WARNING:|[Cc]orrupt[^=]|[Cc]orruption|EUCLEAN|Busy inodes' | head -3" 30 > "$EVID/mdeath_bad.$n"
+        [ -s "$EVID/mdeath_bad.$n" ] && die "$n kernel: $(tr '\n' ' ' < "$EVID/mdeath_bad.$n")"
+        self_dyndbg "$n" all
+    done
+    both stop "$NODE_UNMOUNT; echo STOP_OK" 120
+    for n in "${NODES[@]}"; do grep -aq '^STOP_OK' "$EVID/stop.$n" || die "$n would not unmount: $(tail -1 "$EVID/stop.$n")"; done
+    out=$(ssh_n "$surv" "for d in $(mall mdev); do $NODE_REPO/tools/chk_mxfs \$d >/tmp/drbd_rig_chk.log 2>&1; echo CHK \$d rc=\$? \$(tail -1 /tmp/drbd_rig_chk.log); done" $((60 * MULTI_N)))
+    echo "$out" > "$EVID/mdeath_chk"
+    bad=$(grep -a '^CHK ' <<<"$out" | grep -av ' rc=0 ')
+    [ -z "$bad" ] && [ "$(grep -ac '^CHK ' <<<"$out")" = "$MULTI_N" ] || die "chk_mxfs after the recovery: $(tr '\n' ' ' <<<"${bad:-$out}")"
+    say "  cold chk_mxfs clean on every filesystem"
+    both stop "$MULTI_STOP" 180
+    install_fencing
+    say "multi death test: passed ($MULTI_N resources; every resource down, the node fence configured again)"
 }
 
 # A power cut of the pair under the built-in authority (agent=self), the
@@ -2221,6 +2723,7 @@ case "$CMD" in
     split-test)  evid; take_locks; hold_luns adopt; step_split_test ;;
     death-test)  evid; take_locks; hold_luns adopt; step_death_test ;;
     self-death-test) evid; take_locks; hold_luns adopt; step_self_death_test ;;
+    multi-death-test) evid; take_locks; step_multi_death_test ;;
     resolve-test) evid; take_locks; hold_luns adopt; step_resolve_test ;;
     misconfig-test) evid; take_locks; hold_luns adopt; step_misconfig_test ;;
     promotion-race-test) evid; take_locks; hold_luns adopt; step_promotion_race_test ;;

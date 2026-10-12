@@ -1,7 +1,7 @@
 <!-- ccloop-4dd7 sess1 final lead: P150 proves divergent per-node inobt record content across AG handoffs; suspects = in-AIL keep guard vs Invariant-1 dra… -->
 # ccloop-4dd7 sess1 part C — the remaining flavor-1 root lead (STOP-POINT)
 
-## Where the RULE-4 loop stands on the LAST unfixed corruption flavor
+## Where the RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS loop stands on the LAST unfixed corruption flavor
 v0.11.46 round 1: both nodes died again on the inobt double-free flavor (P-DIFREE-DBL
 agno=1 agino=138 off=10 freecount=54 → xfs_inobt_check_irec → -117 both nodes).
 **P150 gave the decisive evidence** (tests/logs/vmrig_dialloc_20260724_10*/):

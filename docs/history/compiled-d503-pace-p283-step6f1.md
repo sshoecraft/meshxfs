@@ -5,13 +5,13 @@ surfaced (sess305-306), and the step-6 F1 deferred-release enforcement design it
 
 ## D-503: 32-node shared-dir create pace collapse (dir_reuse_coherency / crash_consistency)
 
-sess294's timeline led into sess295's RULE-4 refutation: "holder sat on EX through 1-2 BAST
+sess294's timeline led into sess295's RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS refutation: "holder sat on EX through 1-2 BAST
 retries" was a misread of P34 dur_ms — P291-EXWIN showed continuous fair rotation (median
 handoff 309ms, per-node wins 22-51, even). Real mechanism: 32 nodes × 50 O_SYNC creates into
 one shared dir, ~8 tenures/node × ~6 creates/tenure, tenure ≈300ms (MHT bound + 15ms batch
 grace); under collapse each rotation queues 31×300ms → matches observed 24-33s phases.
 `docs/rulings/503-convoy-quantified-gpt-ruling-fix-order.md` got the first GPT
-RULE-5 ruling: instrument the full mint/nom handoff timeline before any fix, candidate fixes
+RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: instrument the full mint/nom handoff timeline before any fix, candidate fixes
 B (nominee-only fast-retry ladder after nudge) and D (bounded background-release sweep
 pacing), plus a note that "shape A" (wall-clock tenure extension) is a no-op since tenure was
 already at MHT.
@@ -143,7 +143,7 @@ violated in this same run (loser's `relcert_finish` writes ACTIVE over the winne
 
 ## Step-6 F1: deferred-release enforcement (sess307, sess309)
 
-With steps 1-5 landed as telemetry, sess307 obtained the RULE-5 ruling for step 6 — making
+With steps 1-5 landed as telemetry, sess307 obtained the RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling for step 6 — making
 deferral of a release actually happen instead of just being counted. Defer predicate:
 `still_dirty || proof_failed || tripwire` — explicitly NOT the F2 ticket-absent/NO_DOMAIN
 case (that's step-7 persistence-domain policy, snapshotted at mount so a runtime

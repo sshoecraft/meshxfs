@@ -118,7 +118,7 @@ suspects. Landed 0.65.0: `find_ms=`/`backoff_ms=` on `P381-UNLK-CONTEND`,
 
 End-of-session state and full landing list:
 `docs/rulings/end-create-cost-instrumentation-and-ceiling-ruling.md`.
-GPT RULE-5 ruling, checked against the full measurement package:
+GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling, checked against the full measurement package:
 `docs/rulings/pace-ceiling.md`.
 
 Ceiling arithmetic: `S_max = 1/(1-f_H)`. Closing the row (target 106.7

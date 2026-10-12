@@ -100,11 +100,21 @@ lab_groups() {  # every rig group's name, once each
         | awk '!seen[$0]++'
 }
 
-lab_addr() {  # <node> -> IPv4: the lab file first, then the resolver
-    local a
+lab_addr() {  # <node> -> IPv4: the lab file, the resolver, then libvirt's view
+    local a src
     a=$(lab_get addr "$1" 2>/dev/null) && { echo "$a"; return 0; }
     a=$(getent ahostsv4 "$1" | awk 'NR == 1 {print $1}')
-    echo "${a:-$1}"
+    [ -n "$a" ] && { echo "$a"; return 0; }
+    # A local guest no lab line and no resolver names (the nested Proxmox
+    # guests pve9-3..7): the address libvirt sees on its NIC, from the DHCP
+    # lease, the host's ARP table, or the guest agent.  Without it a power-up
+    # waited its whole boot budget on a name that never resolves.
+    for src in lease arp agent; do
+        a=$(timeout 10 virsh -c qemu:///system domifaddr "$1" --source "$src" 2>/dev/null \
+            | awk '$3 == "ipv4" {sub("/.*", "", $4); print $4; exit}')
+        [ -n "$a" ] && { echo "$a"; return 0; }
+    done
+    echo "$1"
 }
 
 lab_lun_nodes() {  # every node named by a pair, plus storage also=

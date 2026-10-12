@@ -7,7 +7,7 @@ metadata:
 
 # CLAUDE.md rules: no provenance clutter (user correction, 2026-07-16)
 
-While rewording RULE 5, the heading was written as "RULE 5 — ... (user directive, 2026-07-16)" plus a "(Reworded 2026-07-16 ...)" parenthetical. The user pushed back: "now i have to edit it ... why put this: (user directive, 2026-07-16) ... clearly you know what im asking you to do here".
+While rewording RULE: CONSULT ANOTHER MODEL WHEN STUCK, the heading was written as "RULE: CONSULT ANOTHER MODEL WHEN STUCK — ... (user directive, 2026-07-16)" plus a "(Reworded 2026-07-16 ...)" parenthetical. The user pushed back: "now i have to edit it ... why put this: (user directive, 2026-07-16) ... clearly you know what im asking you to do here".
 
 **The lesson:** when the user asks to reword a CLAUDE.md rule, write ONLY the clean rule text. No date/session attributions, no "reworded on..." meta notes, no change-history parentheticals. Provenance and history belong in ccmemory (that's what it's for), not in the rule the user has to read every session.
 

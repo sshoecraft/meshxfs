@@ -18,9 +18,11 @@
 #   Release stages (the 16-node group contains the 2-, 4- and 8-node ones):
 #     A  2/net/mesh/direct@g2 4/net/mesh/direct@g4 2/disk/caw/direct@g2b 8/disk/caw/direct@g8
 #     B  16/disk/caw/direct@g16 4/disk/caw/direct@g4b
+#     C  2/disk/caw/mpath@g2 4/disk/caw/mpath@g4 8/disk/caw/mpath@g8
+#     D  16/disk/caw/mpath@g16
 # Output: tests/evidence/release_rig_gates_<VERSION>.out; each release board's
 # VERDICT line, and last
-#   RELEASE_RIG_GATES PASS|FAIL version=<V> srcversion=<S> drbd=<PASS|FAIL> boards_green=<n>/6
+#   RELEASE_RIG_GATES PASS|FAIL version=<V> srcversion=<S> drbd=<PASS|FAIL> boards_green=<n>/<boards>
 # tests/boards_stage_chain.sh exits 0 whatever its boards found, so the boards
 # are graded here from each one's own log.
 # Launch detached (nohup setsid ... &); a board killed mid-row finalizes
@@ -48,10 +50,16 @@ say "drbd: $drbd"
 
 A="2/net/mesh/direct@g2,4/net/mesh/direct@g4,2/disk/caw/direct@g2b,8/disk/caw/direct@g8"
 B="16/disk/caw/direct@g16,4/disk/caw/direct@g4b"
-tests/boards_stage_chain.sh "$LABEL" "$A" "$B" > "tests/evidence/release_rig_gates_${V}_boards.console" 2>&1
+# the mpath attachment's boards carry the path-fault rows of
+# docs/mpath-verification.md; disk/caw/mpath at 2, 4 and 8 nodes, then 16
+C="2/disk/caw/mpath@g2,4/disk/caw/mpath@g4,8/disk/caw/mpath@g8"
+D="16/disk/caw/mpath@g16"
+STAGES=("$A" "$B" "$C" "$D")
+total=$(printf '%s\n' "${STAGES[@]}" | tr ',' '\n' | grep -c .)
+tests/boards_stage_chain.sh "$LABEL" "${STAGES[@]}" > "tests/evidence/release_rig_gates_${V}_boards.console" 2>&1
 green=0
 i=0
-for stage in "$A" "$B"; do
+for stage in "${STAGES[@]}"; do
     i=$((i + 1))
     for spec in ${stage//,/ }; do
         cfg=${spec%@*}; grp=${spec#*@}
@@ -68,6 +76,6 @@ for stage in "$A" "$B"; do
 done
 
 v=FAIL
-case "$drbd" in "DRBD_RELEASE_VERIFY PASS version=$V "*) [ "$green" = 6 ] && v=PASS ;; esac
+case "$drbd" in "DRBD_RELEASE_VERIFY PASS version=$V "*) [ "$green" = "$total" ] && v=PASS ;; esac
 dv=FAIL; case "$drbd" in "DRBD_RELEASE_VERIFY PASS "*) dv=PASS ;; esac
-echo "RELEASE_RIG_GATES $v version=$V srcversion=$SV drbd=$dv boards_green=$green/6" >> "$O"
+echo "RELEASE_RIG_GATES $v version=$V srcversion=$SV drbd=$dv boards_green=$green/$total" >> "$O"

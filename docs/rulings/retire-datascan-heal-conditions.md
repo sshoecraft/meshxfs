@@ -1,4 +1,4 @@
-<!-- sess498 GPT RULE-5 ruling: heal-off board is a valid experiment but NOT sufficient to flip dir_datascan_heal default; 6 conditions + residual produce… -->
+<!-- sess498 GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: heal-off board is a valid experiment but NOT sufficient to flip dir_datascan_heal default; 6 conditions + residual produce… -->
 # sess498 GPT ruling — retiring mxfs_dir2_datascan_lookup / leafless_removename (D-0496)
 
 Context given: all 101 P22-DATASCAN-HIT of 2026-09-04 trace to D-0492 (retire of undestaged log item, fixed 0.70.11); proposal = knob mxfs.dir_datascan_heal (landed 0.70.18, default 1), control board + crash chain with heal off, then default 0.

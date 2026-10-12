@@ -1,6 +1,6 @@
 ---
 name: feedback-a-validation-that-finds-blockers-is-reported-before-the-version-or-scope-moves
-description: USER (angry, 0.90.40→.41): asked only to validate a release; blockers found → I bumped the version and began fixes unannounced. Report first.
+description: USER (0.90.40→.41): asked only to validate a release; blockers found → I bumped the version and began fixes unannounced. Report first.
 metadata:
   type: feedback
 tags: [release, scope, version]

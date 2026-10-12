@@ -1,5 +1,5 @@
 <!-- sess175 ruling 2 (#1 lineage impl): A1 random-u64 lineage RATIFIED; v3 emit may precede proto-gen4 but enforcement hard-gated on admitted gen>=4; eva… -->
-# sess175 — second RULE-5 ruling: lineage discriminator implementation shape (full text in sess175 transcript)
+# sess175 — second RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: lineage discriminator implementation shape (full text in sess175 transcript)
 
 ## Q-A: mint source = A1 RANDOM nonzero 64-bit (RATIFIED; A2 global counter REJECTED as unneeded surface)
 - Equality discriminator ONLY — no <, >, age, or distance comparisons anywhere, audit tooling included.

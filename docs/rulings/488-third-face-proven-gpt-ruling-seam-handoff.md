@@ -1,5 +1,5 @@
-<!-- sess267: -488 3rd face PROVEN (truncate ILOCK poisons home-AG drain, zero retained grants) + RULE-5 ruling: contended-only post-roll ILOCK handoff at… -->
-# sess267 — -488 third face proven + RULE-5 fix ruling
+<!-- sess267: -488 3rd face PROVEN (truncate ILOCK poisons home-AG drain, zero retained grants) + RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: contended-only post-roll ILOCK handoff at… -->
+# sess267 — -488 third face proven + RULE: CONSULT ANOTHER MODEL WHEN STUCK fix ruling
 
 ## Proven (live specimen test3/test25, 0.11.493, stacks + P67 probes)
 - dd holds ILOCK_EXCL (xfs_setattr_size) across truncate defer chain,
@@ -13,7 +13,7 @@
 - 120s poll valve dead: waiter-extension (holder node alive) extends forever.
 - sess266's "holder=dd(dead)" was WRONG: dd alive, blocked in caw_wait_for_grant.
 
-## RULE-5 ruling (GPT sess267, full text in transcript)
+## RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (GPT sess267, full text in transcript)
 Contended-only **post-roll ILOCK handoff**; self-iflush REJECTED as mechanism;
 no timeout/grant-steal valve (progress-based deadlock detection → fencing only).
 - trylock under ILOCK; on fail in defer context: record wanted AG, return

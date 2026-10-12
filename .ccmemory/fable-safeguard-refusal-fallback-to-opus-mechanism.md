@@ -1,6 +1,6 @@
 ---
 name: fable-safeguard-refusal-fallback-to-opus-mechanism
-description: Why sessions "switch to Opus 4.8"/die with "[cyber]": API safeguard flag + CLI refusal-fallback. Not CLAUDE.md/RULE 10/agents. Rate spiked 2026-08-22.
+description: Why sessions "switch to Opus 4.8"/die with "[cyber]": API safeguard flag + CLI refusal-fallback. Not CLAUDE.md/RULE: DELEGATE ITERATIVE GRIND/agents. Rate spiked 2026-08-22.
 metadata:
   type: reference
 tags: [claude-code, ccloop, opus-fallback, safeguards, cyber, reasoning_extraction, switchModelsOnFlag]
@@ -24,7 +24,7 @@ Jul 26, Aug 1 (sess22), Aug 2 (sess25) → Opus 5 silently; Aug 7 (sess148) → 
 
 ## Ruled out as the trigger (evidence)
 - CLAUDE.md: identical across ~1,500 clean Fable requests and the flagged ones.
-- RULE 10 / subagents: the Jul-Aug 7 and sess386/389 events had ZERO Agent calls. After ccenv 0.23 made sessions delegate (sonnet grind/scout; NOTE log-sweeper ran on claude-opus-5 in sess393), sess394 was refused with ZERO agents — flags happen with and without subagent output in context.
+- RULE: DELEGATE ITERATIVE GRIND / subagents: the Jul-Aug 7 and sess386/389 events had ZERO Agent calls. After ccenv 0.23 made sessions delegate (sonnet grind/scout; NOTE log-sweeper ran on claude-opus-5 in sess393), sess394 was refused with ZERO agents — flags happen with and without subagent output in context.
 - GPT consults, ccloop prompt vocabulary (same fence/kill/wedge words for weeks; "overflow" never in any prompt).
 - With constant inputs the rate went 3 in 3 weeks → 3 in 24 h → 4 in 25 min: server-side classifier change.
 

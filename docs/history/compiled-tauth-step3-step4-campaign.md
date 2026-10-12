@@ -27,7 +27,7 @@ Two bugs the harness found and fixed before landing:
 the durable-grant/release/blocker-import baseline every later bug in this arc violates in some
 edge.
 
-## sess423 — step 4 design hole + RULE-5 ruling: ordered mastership handoff `docs/rulings/tauth-step4-ordered-handoff.md`
+## sess423 — step 4 design hole + RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: ordered mastership handoff `docs/rulings/tauth-step4-ordered-handoff.md`
 
 The hole step 3 leaves open: step 3's page_write readback only validates crc+seq. Old owner A
 (lagging view) and new owner B can both read page P at seq s, both target the same shadow copy,

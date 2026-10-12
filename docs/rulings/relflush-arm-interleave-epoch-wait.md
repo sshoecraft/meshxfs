@@ -1,5 +1,5 @@
-<!-- sess238 RULE-5 ruling (#23): .482 stamp = sess47 relflush-admit arm (28957, no mode check) admitting opener in ms-long post-terminal-store tail; sess… -->
-# sess238 RULE-5 ruling (gpt-5.6-sol) — #23 D-OPEN-PROTECT-DEMOTE-RACE
+<!-- sess238 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (#23): .482 stamp = sess47 relflush-admit arm (28957, no mode check) admitting opener in ms-long post-terminal-store tail; sess… -->
+# sess238 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (gpt-5.6-sol) — #23 D-OPEN-PROTECT-DEMOTE-RACE
 
 ## Interleave (CONFIRMED consistent, needs one-shot proof)
 .482 stamp (mode=NL, prh=1, nl_age_us=16) = release worker legally stored

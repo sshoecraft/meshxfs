@@ -20,7 +20,7 @@ defect's class.
 
 ## Ruling compliance: the hazard clause is part of the procedure, not commentary
 
-The D-0946 RULE-5 ruling gave a progress rule for transient allocator refusal
+The D-0946 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling gave a progress rule for transient allocator refusal
 and named its hazards explicitly, including "do not hold the cluster AG grant
 across a synchronous flush — that is cluster-wide head-of-line blocking."
 `mxfs_pubob_drive_publication()` was built with exactly that shape:

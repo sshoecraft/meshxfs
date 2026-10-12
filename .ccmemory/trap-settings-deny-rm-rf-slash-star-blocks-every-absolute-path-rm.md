@@ -14,7 +14,7 @@ Change directory first and remove by relative name, one Bash call:
 
     cd /tmp/claude-1000/-src-mxfs/<sess>/scratchpad && rm -rf mxfs_0705 mxfs_0706; cd /src/mxfs
 
-That is exactly what the deny intends to allow (a named scratch dir), and it still never touches `/` or a variable/glob path (RULE 2b).
+That is exactly what the deny intends to allow (a named scratch dir), and it still never touches `/` or a variable/glob path (RULE: NEVER RUN A COMMAND THAT CAN TRIGGER A PERMISSION PROMPT).
 
 ## Why the trees were there
 `tools/scratch_build.sh` copies the whole tree (~600-700 MB per version) into the session scratchpad on clyde's ROOT ext4 (`/dev/nvme0n1p2`, the same fs that carries the LUN and VM images) and never removes it after freezing. Eleven of them = 15 G = the 88% preflight refusal at the sess492 boundary. After removal: 87%, 233 G free, preflight PASS. Remove the scratch tree after the FROZEN line lands (the frozen ko/tools live on NFS under tests/evidence).

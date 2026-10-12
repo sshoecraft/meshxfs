@@ -1,4 +1,4 @@
-<!-- sess435 RULE-5 ruling D-0359 (CAW-less device lone mount): option (a) as a separate non-joinable SNLOCAL_EXCLUSIVE authority mode; (b) R/V/W for all… -->
+<!-- sess435 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-0359 (CAW-less device lone mount): option (a) as a separate non-joinable SNLOCAL_EXCLUSIVE authority mode; (b) R/V/W for all… -->
 # D-0359 ruling (gpt-5.6-sol, sess435)
 
 **Choose (a) with two qualifications:** SNLOCAL_EXCLUSIVE is a SEPARATE authority mode (not a weaker CAW grant), and a single FUA write is NOT a crash-durable authority record (torn-write stop-ship). (b) read/verify/write for all mounts REJECTED: not a CAS under contention → two initiators can both grant the same epoch. (c) unnecessary.

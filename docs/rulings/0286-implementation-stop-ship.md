@@ -1,4 +1,4 @@
-<!-- sess418 RULE-5 review of the 0.29.0 D-0286 session-poison landing: STOP-SHIP — 9 closure conditions (linearization, RX TOCTOU, remaster reconstructio… -->
+<!-- sess418 RULE: CONSULT ANOTHER MODEL WHEN STUCK review of the 0.29.0 D-0286 session-poison landing: STOP-SHIP — 9 closure conditions (linearization, RX TOCTOU, remaster reconstructio… -->
 # sess418 GPT review (gpt-5.6-sol) of the 0.29.0 D-0286 landing — STOP-SHIP
 
 ## What was landed (0.29.0, sess418) before the review

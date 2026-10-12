@@ -6,7 +6,7 @@ metadata:
 tags: [pve, dmesg, diagnostics, user-correction]
 ---
 
-The user has said kernel-log spam "is gonna piss off a lot of people". On pve1 (physical PVE pair) the kernel log showed a steady ~243 MXFS-looking lines per hour while idle. They were `mxfs-diag-heat:` lines from `tools/pve_crashdiag.sh on` (a temperature logger writing to /dev/kmsg every 15 s, installed to diagnose pve2's crashes); the module itself logged 4 lines in that hour.
+The user has said kernel-log spam would annoy a lot of people. On pve1 (physical PVE pair) the kernel log showed a steady ~243 MXFS-looking lines per hour while idle. They were `mxfs-diag-heat:` lines from `tools/pve_crashdiag.sh on` (a temperature logger writing to /dev/kmsg every 15 s, installed to diagnose pve2's crashes); the module itself logged 4 lines in that hour.
 
 **Why:** anything written to the kernel log with an `mxfs` prefix is, to the user, MXFS spamming dmesg, whoever wrote it.
 

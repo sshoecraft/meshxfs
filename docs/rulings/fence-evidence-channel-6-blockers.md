@@ -1,5 +1,5 @@
-<!-- sess74 RULE-5 ruling: unowned victim-sector fence certificate APPROVED as architecture, with 6 release-blocking requirements — plus my mixed-version… -->
-# sess74 — GPT RULE-5 ruling on the fence-evidence channel
+<!-- sess74 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: unowned victim-sector fence certificate APPROVED as architecture, with 6 release-blocking requirements — plus my mixed-version… -->
+# sess74 — GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the fence-evidence channel
 
 Design put to GPT: descriptor **v2** carrying a fence certificate, published by
 the PROVER into the VICTIM's own HB sector at fence time, **UNOWNED**

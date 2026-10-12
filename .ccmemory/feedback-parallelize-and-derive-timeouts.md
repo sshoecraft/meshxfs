@@ -1,6 +1,6 @@
 ---
 name: feedback-parallelize-and-derive-timeouts
-description: User (sess17): NEVER reuse a prior session's timeout — derive each one (RULE 0). Per-node/cluster chores MUST run in parallel (shell & or subagents),…
+description: User (sess17): NEVER reuse a prior session's timeout — derive each one (RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS). Per-node/cluster chores MUST run in parallel (shell & or subagents),…
 metadata:
   type: feedback
 tags: [timeouts, parallelism, rule0]
@@ -8,14 +8,14 @@ tags: [timeouts, parallelism, rule0]
 
 # Derive every timeout; parallelize every per-node chore
 
-**User feedback, 2026-06-10 (sess17), angry, after I reused a 590s timeout
+**User feedback, 2026-06-10 (sess17), after I reused a 590s timeout
 for cluster_reset_n.sh:**
 
 > "a _10_ minute timeout to reset the cluster? are you kidding me? ... why are
 > you not having subagents do this? ... You better be doing them in
 > parallel. I'm not kidding."
 
-**Why:** RULE 0 already requires deriving budgets from measured operation
+**Why:** RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS already requires deriving budgets from measured operation
 time; copying a previous session's round number is the exact violation it
 names. And serial 16-node loops (ssh per node, dmesg harvest per node,
 verify per node) waste 16× wall clock for no reason.

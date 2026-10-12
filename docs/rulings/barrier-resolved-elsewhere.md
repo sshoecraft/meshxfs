@@ -1,4 +1,4 @@
-<!-- sess424 RULE-5 ruling: mount barrier must accept a survivor's completion — proof = enumerated terminal sector state + armed->resolved lineage; never… -->
+<!-- sess424 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: mount barrier must accept a survivor's completion — proof = enumerated terminal sector state + armed->resolved lineage; never… -->
 # sess424 — barrier "resolved elsewhere" ruling (D-MOUNT-WINDOW-PEER-DEATH-IMMEDIATE-PURGE window arm)
 
 ## Measured (s423 rerun, tests/evidence/20260828T090326Z_mwindow_window, module 0.34.0)

@@ -1,5 +1,5 @@
-<!-- sess382 RULE-5 ruling 3 (incident474 hole c / c2): progress goes in a dedicated per-node single-writer table, one entry per outstanding BAST; progres… -->
-# sess382 RULE-5 ruling 3 — where grant progress lives, and what counts as progress
+<!-- sess382 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling 3 (incident474 hole c / c2): progress goes in a dedicated per-node single-writer table, one entry per outstanding BAST; progres… -->
+# sess382 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling 3 — where grant progress lives, and what counts as progress
 
 Context: hole (c) is now **reproducible** (`tests/hold_grant_liveness.sh`,
 `mxfs.hold_grant_fault_ino`): a holder that stays mounted and beating while

@@ -1,5 +1,5 @@
-<!-- sess188 RULE-5 ruling: kind-17 recheck APPROVED w/ corrections — validate desc tuple vs cached auth BEFORE branching fence_kind; sole-live-slot ident… -->
-# sess188 RULE-5 ruling — kind-17 leg of v5_exclusion_recheck (gpt-5.6-sol)
+<!-- sess188 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: kind-17 recheck APPROVED w/ corrections — validate desc tuple vs cached auth BEFORE branching fence_kind; sole-live-slot ident… -->
+# sess188 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — kind-17 leg of v5_exclusion_recheck (gpt-5.6-sol)
 
 Fix for the P239-EXCL-LAPSED blocker (D-SHUTDOWN-UMOUNT-CLEAN-RELEASE-DIRTY-SLICE remount arm): APPROVED with corrections.
 

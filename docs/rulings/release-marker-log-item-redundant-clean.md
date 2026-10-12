@@ -1,5 +1,5 @@
-<!-- sess403 RULE-5 ruling (D-FOREIGN-REPLAY-UNGATED-IMAGES / D-402): REDUNDANT_CLEAN certificate = IN-LOG release-marker log item (B), marker durable BEF… -->
-# sess403 RULE-5 ruling — clean-release certificate carrier (gpt-5.6-sol)
+<!-- sess403 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (D-FOREIGN-REPLAY-UNGATED-IMAGES / D-402): REDUNDANT_CLEAN certificate = IN-LOG release-marker log item (B), marker durable BEF… -->
+# sess403 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — clean-release certificate carrier (gpt-5.6-sol)
 
 ## Evidence brought
 kill5b (0.23.16, enforce armed): victim test3 logged AG1 images at epoch 19, cleanly released

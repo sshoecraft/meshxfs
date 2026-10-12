@@ -44,7 +44,7 @@ point: LIVE double-alloc (bnobt gave the block twice) vs FREED-then-reused, and 
 instr and not run, so "0 AG0 yields" was NOT proven. Planned next: a LIGHT un-gated probe scoped
 `pag_agno==0 && agbno<64` (instr=1 is 100× slower and HIDES the race, sess30).
 
-## Fable consult (RULE-5)
+## Fable consult (RULE: CONSULT ANOTHER MODEL WHEN STUCK)
 
 `docs/history/docs/history/docs/history/compiled-caw-4node-doublealloc-forceblock.md` — Fable ~85% root = mechanism (a):
 **agbno 9 is the leftmost record of a PRISTINE post-mkfs bnobt** (agbno 0–8 = sb/agf/agi/agfl/
@@ -78,7 +78,7 @@ of the incoherence, all → dir3 read-verify fail → shutdown → 0/4 cascade:
 2. **undurable-garbage** — daddr read owner=0 garbage (dir block alloc'd but write not durable when peer FUA-read it).
 3. **torn-RMW wrong-CRC** — valid XDB3 magic + correct self-blkno but CRC MISMATCH (P15I-CRCFAIL err=-74).
 
-Instrumented RULE-4 rule-outs: NOT a PR-fence/coherency regression; NOT a DLM bypass (AG-DLM
+Instrumented RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS rule-outs: NOT a PR-fence/coherency regression; NOT a DLM bypass (AG-DLM
 acquired at the choke `xfs_alloc_vextent_prepare_ag`→`xfs_alloc_fix_freelist` for alloc and
 `xfs_free_extent_fix_freelist` for free — all 5 wrappers incl. delalloc-writeback's start_ag route
 through `xfs_alloc_vextent_finish`, verified — refuting Fable's "no DLM"); NOT a pristine snapshot

@@ -36,7 +36,7 @@ fixes are COMPLEMENTARY and were never tested together until sess45.
 ### CAVEAT: addname_coherent only handles CLEAN blocks (returns 0 if
 dirty/in-AIL/pinned). The collision block is clean on node7 before its first add,
 so it should catch it. If a DIRTY-stale block still double-allocs, also need the
-sess61 dirty-keep fix. Also watch RULE-0 slowness (per-clean-block FUA read).
+sess61 dirty-keep fix. Also watch RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS slowness (per-clean-block FUA read).
 
 ### Config under test: build C074A836 (= dir_release_fua_write=1 default +
 membership beacon + run.sh convergence gate + self-fence) + modargs

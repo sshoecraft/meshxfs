@@ -127,7 +127,7 @@ epoch completed/superseded (state-only check is ABA-vulnerable), then full
 restart. RELFLUSH-clear alone is too early a completion signal (precedes device
 flush + wire unlock).
 
-`docs/history/docs/history/docs/history/compiled-sess225-252-finobt481-openprotect-aglock-livelock.md`: RULE-4
+`docs/history/docs/history/docs/history/compiled-sess225-252-finobt481-openprotect-aglock-livelock.md`: RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS
 proof on 0.11.486 — A/B injection (ride delay + park after terminal store) landed
 the exact interleave 60/60 times, all failures stamped arm=29008 (the relflush
 arm), restarts burning ~30µs per lap before -EIO. Fix (0.11.487) verified:

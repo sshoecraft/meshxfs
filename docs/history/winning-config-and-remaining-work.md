@@ -44,7 +44,7 @@ FUA, in-core stale).
 1. Read batch8_winning.log result (grace40 effect on FLAP + SINGLE rate).
 2. If high pass-rate: make dir_addname_coherent=1 + memb_settle_ms=20000 (+grace?)
    DEFAULTS, rebuild, RE-VALIDATE 1/2/4 tcp (full suite — addname_coherent adds
-   per-add FUA cost: watch RULE-0 slowness on rsync_paired/scaling at 2/4) + 8/tcp.
+   per-add FUA cost: watch RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS slowness on rsync_paired/scaling at 2/4) + 8/tcp.
 3. Extend addname_coherent to dirty-stale blocks for the SINGLE residual.
 Harnesses: tests/drc_batch8.sh (dist), drc_detail8.sh (mechanism), drc_cap4.sh.
 See `docs/history/breakthrough-8node-loss-is-intrablock-doublealloc-addname-coherent-fix.md`

@@ -1,5 +1,5 @@
-<!-- sess450 RULE-5 ruling on the 0.59.0 RETIRE_PENDING implementation: STOP-SHIP with 10 merge criteria — EAGAIN stale image, admission barrier gap, non-… -->
-# sess450 RULE-5 ruling — 0.59.0 RETIRE_PENDING implementation: **STOP-SHIP**
+<!-- sess450 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the 0.59.0 RETIRE_PENDING implementation: STOP-SHIP with 10 merge criteria — EAGAIN stale image, admission barrier gap, non-… -->
+# sess450 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — 0.59.0 RETIRE_PENDING implementation: **STOP-SHIP**
 
 Reviewed: the as-landed 0.59.0 code (tree /src/mxfs, UNBUILT, scratch sv `1D966649DDAA5C735AE647F` compiles clean). GPT's earlier sess449 ruling required the state; this reviews the implementation of it. Core `RETIRE_PENDING -> {EMPTY, WITHDRAWN}` transition and the CAW serialization between competing settlers are judged SOUND. Five holes make it unsafe to ship as written.
 

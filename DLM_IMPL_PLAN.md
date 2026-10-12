@@ -69,11 +69,11 @@ DLM_PLAN_REVIEW.md §5 holds the required fault-injection matrices (§13
 of the plan binds them to gates). This document translates §11 into a
 file-by-file, function-level implementation plan plus: the user-mode protocol
 test harness (Invariant 4), fault-injection hooks in both builds, and
-per-gate test scripts under tests/ with written RULE-0 budgets.
+per-gate test scripts under tests/ with written RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS budgets.
 
 Hard constraints carried through every step:
-- RULE 0: every gate test has a written budget (infra + native×2); timeout = FAIL.
-- RULE 3: all harnesses/scripts live in the source tree, not /tmp.
+- RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS: every gate test has a written budget (infra + native×2); timeout = FAIL.
+- RULE: A SCRIPT IS NEVER A TEMP FILE: all harnesses/scripts live in the source tree, not /tmp.
 - Invariant 1: drain pipeline / release ordering untouched in XFS.
 - Invariant 4: everything builds user-mode; no kernel API outside pal/.
 - Makefile/Kbuild edits: explicit user go-ahead required at the moment of edit.
@@ -450,7 +450,7 @@ in the gate-script section below.
 suite at 1/2/4/8/16/32 on `net2` transport; tcp-era leak workloads
 (`tcp_dlm_scaling`, `dir_reuse_coherency`, `dlm_fairness`, stress)
 repeatedly clean WITH injected loss/dup/reorder; zero overlapping grants;
-RULE-0 budgets met (2× native ceiling). Requires the run.sh/prep `net2`
+RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS budgets met (2× native ceiling). Requires the run.sh/prep `net2`
 plumbing described in the gate-script section.
 
 ### Step 8 — Overlay provider (edits: dlm/net2_overlay.c)
@@ -547,7 +547,7 @@ regression.
   the docs/.md project rule); docs entries for touched modules
   (disklock evict-ring change, scsipr PAL extension, seam).
 - `tests/criteria/TIMEOUT_BUDGETS.md` updated with every pinned net2 gate
-  budget + actual walls (RULE 0 tighten-toward-actual).
+  budget + actual walls (RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS tighten-toward-actual).
 
 ## User-mode protocol test harness (Invariant 4) — tests/net2/
 
@@ -556,7 +556,7 @@ tools are standalone SG_IO probes; `pal/linux/user.c` fully implements the
 needed PAL — pthreads user.c:298/328, TCP sockets 588-794, O_DIRECT file
 I/O — but is currently built by nothing).
 
-Layout (RULE 3 — everything in-tree):
+Layout (RULE: A SCRIPT IS NEVER A TEMP FILE — everything in-tree):
 ```
 tests/net2/
   Makefile              # NEW standalone file; `make -C tests/net2`.
@@ -618,12 +618,12 @@ Architecture:
   style), harness control = direct API. (No in-tree fault framework
   exists — verified; xfs_errortag is kernel-sysfs-only and stays untouched.)
 
-## Per-gate test scripts under tests/ (RULE 0 budgets)
+## Per-gate test scripts under tests/ (RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS budgets)
 
 Conventions (from the live harness, verified): gate scripts emit lib.sh
 `RESULT:` lines; cluster tests are manifest-driven
 (`PHASE TEST COORD MINNODES BUDGET_S [SCALE]`) and run through
-`./run.sh <N> <dlm> [test...]` which enforces RULE-0
+`./run.sh <N> <dlm> [test...]` which enforces RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS
 (elapsed>budget ⇒ FAIL) and records into criteria.json keyed `<N>/<dlm>`;
 `RULE0_CALIBRATE=1` = measurement mode. Budgets follow
 tests/criteria/TIMEOUT_BUDGETS.md: `budget = infra(measured) +
@@ -663,7 +663,7 @@ power-cycle 40-50 s, 4-node fresh cluster ~60 s, ssh RT 1-2 s/node):
 
 Every gate script header carries its written derivation (the numbers
 above + measured infra), enforces the budget with `timeout`, treats
-timeout as FAIL (kill, record, diagnose — RULE 0.3), and appends
+timeout as FAIL (kill, record, diagnose — RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS.3), and appends
 {budget, actual} to TIMEOUT_BUDGETS.md's table after a healthy PASS.
 Gate-7 fault-injected repeats set net2_fault modparams per run (loss/dup/
 reorder percentages + seeds recorded in the RESULT line for reproduction).
@@ -687,13 +687,13 @@ enforced per-test by run.sh, per-scenario by the gate scripts.
 - End-to-end: after gate 7, `bench/rsync_bench.sh` paired native-XFS vs
   net2 (2× hard ceiling); fio_perf variance rules per tests memory
   (rerun-on-quiet-LUN).
-- RULE 4 loop for every failure; RULE 5 escalation to GPT if a gate stalls
+- RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS loop for every failure; RULE: CONSULT ANOTHER MODEL WHEN STUCK escalation to GPT if a gate stalls
   without a proven diagnosis (never grind ≥2 sessions).
 
 ## Execution mechanics
 
 - On approval: copy this plan into the repo as `/src/mxfs/DLM_IMPL_PLAN.md`
-  (living checklist, per RULE-3 spirit; DLM_PLAN.md v2 stays the design of
+  (living checklist, per RULE: A SCRIPT IS NEVER A TEMP FILE spirit; DLM_PLAN.md v2 stays the design of
   record) and create `docs/net2.md` (maintained every step).
 - VERSION: minor bump to 0.11.0 when step-1 code lands; patch bump per
   subsequent gate landing (project version rule).

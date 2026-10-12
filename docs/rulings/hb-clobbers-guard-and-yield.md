@@ -1,5 +1,5 @@
-<!-- sess77 RULE-5 ruling: the blind HB write CLOBBERS a recovery guard in its own slot — destroys the one-shot fence certificate AND lets a node being re… -->
-# sess77 — GPT RULE-5 ruling on the fence-evidence channel
+<!-- sess77 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: the blind HB write CLOBBERS a recovery guard in its own slot — destroys the one-shot fence certificate AND lets a node being re… -->
+# sess77 — GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the fence-evidence channel
 
 I brought GPT one hole (the intent holder is an undisplaceable SPOF).
 It refuted four of my premises and found a **second, worse defect**.

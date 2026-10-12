@@ -1,4 +1,4 @@
-<!-- sess447 RULE-5 ruling: sess197 replay_gate_enforce (F1/F3/F4) is NOT a prerequisite for flipping foreign_replay_token_enforce default; scoped coheren… -->
+<!-- sess447 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: sess197 replay_gate_enforce (F1/F3/F4) is NOT a prerequisite for flipping foreign_replay_token_enforce default; scoped coheren… -->
 # GPT ruling (sess447) — default-on sequencing for D-FOREIGN-REPLAY-UNGATED-IMAGES
 
 Ground truth brought: F4 registry built, f4_gate=0 (ruling items 4+5 open); F3 built AND release_proof_enforce=1 default defers ICLUS release (F3 READY macro stale 0); F1 250 ms 'releasing anyway' loop live (ICLUS only; icluster_dlm=1 refused by the token setter); F2 durable flush only on replay/mount-recovery path; step 8 oracle absent; B2/B3 unbuilt.

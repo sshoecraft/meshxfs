@@ -1,5 +1,5 @@
-<!-- sess459 RULE-5 ruling on D-0517 fix (drop upstream on-disk-LSN skip in xlog_recover_buf_commit_pass2 under foreign replay): STOP-SHIP as proposed; 6… -->
-# sess459 RULE-5 ruling — D-0517 buffer-path cross-slice LSN skip (2026-09-02 ~02:50Z)
+<!-- sess459 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on D-0517 fix (drop upstream on-disk-LSN skip in xlog_recover_buf_commit_pass2 under foreign replay): STOP-SHIP as proposed; 6… -->
+# sess459 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — D-0517 buffer-path cross-slice LSN skip (2026-09-02 ~02:50Z)
 
 Proposal reviewed: on untrusted replay, skip the upstream `disk lsn >= txn lsn` veto in xlog_recover_buf_commit_pass2 for images that reached pass 2 (token verdict APPLY). GPT: the core conclusion is correct (a foreign slice LSN must not veto an authoritative image) but STOP-SHIP as written.
 

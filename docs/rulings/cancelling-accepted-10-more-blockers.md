@@ -1,5 +1,5 @@
-<!-- sess114 RULE-5 ruling: CANCELLING-vs-JOIN is ACCEPTED for the adopt/cancel race, but 10 more release blockers — RELEASING, last-reference unlock, nod… -->
-# sess114 — RULE-5 ruling on the CONCRETE lreq redesign
+<!-- sess114 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: CANCELLING-vs-JOIN is ACCEPTED for the adopt/cancel race, but 10 more release blockers — RELEASING, last-reference unlock, nod… -->
+# sess114 — RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the CONCRETE lreq redesign
 
 Prior: `…sess113-GPT-ruling-lreq-registry-STOP-SHIP` (rejected sess112's
 counter-sampling), `…sess113-lreq-verified-code-facts-and-design` (FACTS 1-3).
@@ -23,7 +23,7 @@ entering behind the canceller. So the plan, once authorized, stays authorized.
 1. Add **RELEASING** exclusion, or equivalent, covering whole-node disk clear,
    joins, and adoption.
 2. **Structurally enforce final-local-reference unlock; do not ship
-   measure-only.** (My RULE-4 "instrument first" proposal was REJECTED here:
+   measure-only.** (My RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS "instrument first" proposal was REJECTED here:
    "You already know the representation permits `tenure[m] > 1` and the unlock
    clears every node bit. A probe discovers the violation *after* the unsafe
    clear; it does not prevent it.")

@@ -1,5 +1,5 @@
-<!-- sess118 RULE-5 ruling: snapshot-before-read CONFIRMED; but 8 release blockers — the residual demotion window stays IN SCOPE, and 50ms fail-forward is… -->
-# sess118 RULE-5 ruling on the clear-window linearization
+<!-- sess118 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: snapshot-before-read CONFIRMED; but 8 release blockers — the residual demotion window stays IN SCOPE, and 50ms fail-forward is… -->
+# sess118 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the clear-window linearization
 
 Consult put the sess117 clearer side + the sess118 publication side to GPT with
 four questions. Verdict: **"I would not take this to the 32-node rig as
@@ -50,7 +50,7 @@ dispositions:
 3. prove that every caller of normal unlock AND force-release has already
    performed equivalent resource-wide quiescence.
 
-RULE-0 does not buy an exemption: "If quiescence regularly takes too long, the
+RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS does not buy an exemption: "If quiescence regularly takes too long, the
 design has a performance failure, but clearing early turns it into corruption."
 The BAST handler may hand the demotion to an async worker; the on-disk clear
 still may not precede quiescence.

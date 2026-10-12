@@ -1,4 +1,4 @@
-<!-- sess430 RULE-5 ruling: D-0351 dialloc containment must be TWO-PHASE (Option B) — no platter I/O under AGI/cursor nesting; dedicated non-expiring per-… -->
+<!-- sess430 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: D-0351 dialloc containment must be TWO-PHASE (Option B) — no platter I/O under AGI/cursor nesting; dedicated non-expiring per-… -->
 # sess430 — dialloc containment ruling (D-0351 item "platter-live validation before the inobt modification")
 
 Asked: Option A (plain lock-free LUN read inside mxfs_dialloc_pick_in_rec, next to the existing DLM try-reserve) vs Option B (true two-phase). Ruling:

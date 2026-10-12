@@ -1,4 +1,4 @@
-# Deferred-publish design (sess43, Gemini RULE-5 consult)
+# Deferred-publish design (sess43, Gemini RULE: CONSULT ANOTHER MODEL WHEN STUCK consult)
 
 ## Problem
 rsync_paired: 4-node parallel rsync of disjoint subtrees. Worst node 28.5s vs
@@ -36,7 +36,7 @@ target 5.5s (1.2x single-node XFS). PROVEN decomposition (solo rsync, peers idle
   (zero disk slots, no release CAW). If published, release CAW (or LRU + scavenger
   when table >25% full).
 
-## Gap (~6-8s) hypotheses to instrument next (per RULE 4)
+## Gap (~6-8s) hypotheses to instrument next (per RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS)
 1. multi-node synchronous log forces (xlog_force XFS_LOG_SYNC) on dir/inode-alloc
    txns — count xlog_force single vs multi-node.
 2. normal (non-FUA) buffer read count spike in multi-node — blktrace read count.

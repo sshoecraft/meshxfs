@@ -1,4 +1,4 @@
-<!-- sess467 RULE-5 ruling on the classless images that POLICY-REFUSE a dying node's rm txns: B (iunlink DINODE_BUF -> AG class, guarded) first, A (inacti… -->
+<!-- sess467 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the classless images that POLICY-REFUSE a dying node's rm txns: B (iunlink DINODE_BUF -> AG class, guarded) first, A (inacti… -->
 # sess467 GPT ruling — D-FOREIGN-SLICE-INTENTS-ABANDONED classless images (chain 93: buf_items=37 classless=34 st=4 MISLABELLED = 39 bmbt one-block images + 2 DINODE_BUF iunlink images)
 
 ## Q1 — inactivation images: shape A ACCEPTED, narrowly

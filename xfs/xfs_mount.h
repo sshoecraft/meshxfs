@@ -316,6 +316,7 @@ typedef struct xfs_mount {
 	char			*m_logname;	/* external log device name */
 	struct mxfs_static_peers *m_mxfs_peers;	/* peers= option; NULL = multicast */
 	char			*m_mxfs_cluster_name;	/* cluster= option; NULL = none */
+	int			m_mxfs_transport;	/* transport= option: MXFS_MOUNT_TRANSPORT_* */
 	struct xfs_da_geometry	*m_dir_geo;	/* directory block geometry */
 	struct xfs_da_geometry	*m_attr_geo;	/* attribute block geometry */
 	struct xlog		*m_log;		/* log specific stuff */

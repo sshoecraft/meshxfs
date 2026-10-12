@@ -1,4 +1,4 @@
-<!-- sess413 RULE-5 ruling D-526: APPROVE (a) monitor EMPTY clean-departure arm (exact-incarnation FUA+tokenized close), (b) latch clear, (c) tri-state st… -->
+<!-- sess413 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-526: APPROVE (a) monitor EMPTY clean-departure arm (exact-incarnation FUA+tokenized close), (b) latch clear, (c) tri-state st… -->
 # sess413 GPT ruling: D-526 clean-departure fix design (APPROVED, conditions)
 
 EMPTY must be treated as a durable TERMINAL state for ONE EXACT slot incarnation. Chain (already enforced, D-532 give-back included): durable clean-unmount record -> durable lease give-back -> exact-image CAS to EMPTY. A concurrent recovery/fence guard beats the CAS and the release is refused.

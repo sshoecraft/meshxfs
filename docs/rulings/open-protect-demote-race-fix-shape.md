@@ -1,5 +1,5 @@
-<!-- sess235 RULE-5 ruling: open_protect live-NL = cold-open restart (shape a), NO synthetic -ESTALE, release-gen serialization + admission gate; 9 invari… -->
-# sess235 RULE-5 ruling (gpt-5.6-sol) — D-OPEN-PROTECT-DEMOTE-RACE-SPURIOUS-EIO fix shape
+<!-- sess235 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: open_protect live-NL = cold-open restart (shape a), NO synthetic -ESTALE, release-gen serialization + admission gate; 9 invari… -->
+# sess235 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (gpt-5.6-sol) — D-OPEN-PROTECT-DEMOTE-RACE-SPURIOUS-EIO fix shape
 
 Defect: mxfs_dlm_open_protect (xfs/xfs_mxfs_dlm.c:37531-37654) returns -EIO
 when the post-ride re-read sees mode==NL. PROVEN benign race (0.11.482

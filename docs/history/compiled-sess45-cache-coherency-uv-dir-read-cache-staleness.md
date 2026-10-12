@@ -33,7 +33,7 @@ reboot both nodes clean (`virsh destroy/start`) before trusting any full-suite r
 `DABUF_MAP_HOLE` (xfs_create→xfs_dabuf_map !MAP_HOLE_OK, dir extent-map hole) did NOT recur on a
 clean run — contamination artifact, not a standalone bug.
 
-### PROVEN root (RULE-4 A/B discriminator) — reader-cache staleness, not node2 durability
+### PROVEN root (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS A/B discriminator) — reader-cache staleness, not node2 durability
 See `docs/history/docs/history/docs/history/compiled-sess45-cache-coherency-uv-dir-read-cache-staleness.md`. Reliable repro: reboot
 clean, `./run.sh 2 tcp cache_coherency` → node1 FAIL 1/2. Added an env-gated `MXFS_UV_DISCRIM=1`
 branch to the uv check, ran, then REVERTED it:
@@ -95,7 +95,7 @@ for $D never advanced). NEXT: read `mxfs_dlm_dir_consumer_refresh` (2470-2560); 
 when multi-node and dir is peer-shared, FORCE the data-block evict (like dir_force_evict does for
 the modify path) so node1's lookup cold-reads $D.
 
-### FIX DIRECTIONS (next session — RULE-4 instrument before patching; RULE-0 perf watch vs tcp_dlm_scaling)
+### FIX DIRECTIONS (next session — RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS instrument before patching; RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS perf watch vs tcp_dlm_scaling)
 The correct mechanism is the SYNCHRONOUS DLM, not the async ring:
 - **(a) LOAD-BEARING:** make node1's dir lookup acquire the dir per-inode DLM (PR) so node2's EX
   BASTs it → node1 invalidates + slow-path reloads (gen bump → `xfs_da_read_buf` re-reads). Cost:

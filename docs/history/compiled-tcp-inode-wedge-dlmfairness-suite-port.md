@@ -20,7 +20,7 @@ tests/suite/{dlm_membership, scaling_curve, dlm_scaling, rsync_paired, crash_con
 Best full `./run.sh 2 tcp` = **13 PASS / 3 FAIL / 0 PENDING**. But VARIABLE — a later identical re-run gave 9/7. The variance is itself the blocker. The 3 FAILs:
 - **fence_during_write** — FALSE POSITIVE. node1 6/7 checks pass; dmesg FPAT matched 21 benign `EVICT-RING-DIRMOD` lines. Fix (live, no rebuild): narrow FPAT in tests/suite/fence_during_write.sh to real phrases only (`self-fence|Shutting down|Corruption|Internal error|fenced node`), drop bare `evict`/`fence`. → trivially 14/16.
 - **soak** (dmesg_hits=0, e.g. 3458/4703 or 3766/4910 EIO errs) and **tcp_dlm_scaling** (node1 got=0 rounds) — both ran LATE, after the FS had already wedged; dmesg_hits=0 because the shutdown predated soak's marker. Not independent failures — collateral of the wedge.
-- **dlm_scaling** — INTERMITTENT (PASS one run, FAIL next); perf-threshold FLOOR_OPS=50/s over a 60s window for 2000 ops is too tight when metadata slows under cumulative load. Possibly a real RULE-0 perf issue under load.
+- **dlm_scaling** — INTERMITTENT (PASS one run, FAIL next); perf-threshold FLOOR_OPS=50/s over a 60s window for 2000 ops is too tight when metadata slows under cumulative load. Possibly a real RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS perf issue under load.
 
 ## The last blocker — deep stale-inode duplicate-free wedge
 Under full `./run.sh 2 tcp` (all 16 tests on ONE mount, no remount between), the FS eventually wedges: `xfs_inactive_ifree → DLM inode reload imap_to_bp -5 → Metadata I/O Error, Shutting down`, plus a flood of `INACT-SKIP-STALE incore_mode=0100644 disk_mode=00` (live in-core inode, FREE on disk) in a node's OWN partition AG (test1 AG4 / test2 AG1 / earlier AG3). This is the ~90-session cache_coherency family (sess40/48/108/111 lineage): stale INODE / in-core copy of an inode freed+reused on disk — NOT bnobt/AG-meta and NOT block-alloc (both prior red herrings).
@@ -49,7 +49,7 @@ A node with no local-unlink intent AND no DLM lock has no authority to free the 
 ## Open items / next
 - Run full `./run.sh 2 tcp` (16 tests) on B4168BB5 to confirm the wedge is gone across the cumulative suite; expect soak + tcp_dlm_scaling to recover once the FS no longer shuts down.
 - Apply the fence_during_write FPAT narrowing (→14/16) and re-verify it passes when FS is healthy.
-- Reassess dlm_scaling perf floor (FLOOR_OPS/window) under load — could be RULE-0.
+- Reassess dlm_scaling perf floor (FLOOR_OPS/window) under load — could be RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS.
 - Data-block allocation is still not partitioned (`xfs_bmap_btalloc`/`xfs_alloc_vextent` use parent locality + unconstrained `for_each_perag_wrap`); a strict data-block AG partition (owned(a)=a%N==slot%N, N=live-node count, relaxed fallback on true ENOSPC) is the candidate hardening but is a RISKY core-allocator change — confirm reproducibility before doing it.
 
 ## Harness / environment notes

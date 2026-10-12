@@ -2329,6 +2329,16 @@ mxfs_dlm_inode_init(
 	ip->i_mxfs_reldefer_badness = 0;
 	ip->i_mxfs_reldefer_tries = 0;
 	ip->i_mxfs_relwedge_shot = false;
+	/* The release state too: WEDGED is entered and never left
+	 * (mxfs_rel_state_set), so memory whose last occupant wedged would
+	 * refuse every acquire on this new inode for the life of the mount
+	 * (path_all_lost: a fenced node remounted and could not open a file
+	 * its new mount had never touched).  Plain store, not the setter —
+	 * the setter is what refuses to leave WEDGED. */
+	if (ip->i_mxfs_rel_state == MXFS_RELSTATE_WEDGED)
+		pr_warn_ratelimited("mxfs: P-RELSTATE-RECYCLED ino=%llu prev=WEDGED -- new in-core inode allocated in memory whose last occupant wedged; starting ACTIVE\n",
+			(unsigned long long)ip->i_ino);
+	WRITE_ONCE(ip->i_mxfs_rel_state, MXFS_RELSTATE_ACTIVE);
 	ip->i_mxfs_dscan_clean_key = ~0ULL;	/* datascan gen-gate sentinel — first miss always scans */
 	ip->i_dlm_handoff_acted_gen = 0;	/* no handoff acted on yet */
 	ip->i_dlm_dir_valid_epoch = 0;	/* base predates any tracked handoff -> first dir grant refreshes */

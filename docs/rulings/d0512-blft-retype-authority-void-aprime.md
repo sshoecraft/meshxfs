@@ -1,4 +1,4 @@
-<!-- sess445 RULE-5 ruling D-0512 (dir sf->block re-type voids the authority token): fix = A' pending-witness reclassify at next protected dirty; MIXED on… -->
+<!-- sess445 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-0512 (dir sf->block re-type voids the authority token): fix = A' pending-witness reclassify at next protected dirty; MIXED on… -->
 # sess445 ruling (gpt-5.6-sol) — D-DIR-SF-TO-BLOCK-RETYPE-VOIDS-AUTHORITY-TOKEN-SLICE-REFUSED-0512
 
 ## Defect

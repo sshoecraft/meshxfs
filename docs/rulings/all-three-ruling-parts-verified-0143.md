@@ -23,7 +23,7 @@ ag_mask is built only from AGs of refused items (xfs_log_recover.c:3252),
 so an AG with no refused item is out of closure and IS revoked by part (3);
 the prober then ACQUIRES and USES the released root inode.
 
-## RULE-5 round 3 caught two real defects before ship
+## RULE: CONSULT ANOTHER MODEL WHEN STUCK round 3 caught two real defects before ship
 1. The cancel path skipped `caw_drop_own_waiter` → stranded waiter bit
    (the sess48 phantom-waiter wedge). `out:` only frees buffers; the
    TIMEOUT path is the one that drops the waiter.

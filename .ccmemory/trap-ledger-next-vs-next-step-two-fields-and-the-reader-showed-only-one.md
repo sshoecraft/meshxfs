@@ -1,6 +1,6 @@
 ---
 name: trap-ledger-next-vs-next-step-two-fields-and-the-reader-showed-only-one
-description: TRAP (sess566): the RULE 6 ledger has both `next` and `next_step`; defects.sh -d showed only the first, hiding ~130k chars on 18 open records. ledger…
+description: TRAP (sess566): the RULE: ZERO ACCEPTED KNOWN DEFECTS ledger has both `next` and `next_step`; defects.sh -d showed only the first, hiding ~130k chars on 18 open records. ledger…
 metadata:
   type: feedback
 tags: [trap, ledger, rule6, tooling, sess566]

@@ -166,7 +166,7 @@ Also corrected here: sess38's "drain-dominated" turn economy was **WRONG**. The 
 split proves drain stages are ~1.6ms p50 while the **wire-unlock CAS** is p50 9.7 / p90 44ms —
 that is the dominant slice (`docs/history/docs/history/docs/history/compiled-c7ee71c6-sess30-39-authority-and-pace-era.md`).
 
-## 6. Self-fence — a whole RULE-4 arc inside one session
+## 6. Self-fence — a whole RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS arc inside one session
 
 test21 self-fenced during rsync. Initially read as a `P15-REL-ABORT` orphan loop; reframed by
 code+deployment check — the heartbeat had failed to land for the **full 62s lease** and the

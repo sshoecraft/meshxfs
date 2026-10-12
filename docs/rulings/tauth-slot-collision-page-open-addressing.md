@@ -1,4 +1,4 @@
-<!-- sess426 RULE-5 ruling (D-0348): page-local open addressing keyed by full resource id + mkfs-sized bigger region; page-full = LEDGER_CAPACITY_WAIT nev… -->
+<!-- sess426 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (D-0348): page-local open addressing keyed by full resource id + mkfs-sized bigger region; page-full = LEDGER_CAPACITY_WAIT nev… -->
 # sess426 GPT ruling — tauth slot-hash collisions (D-0348)
 
 Measured: 8000 live inode locks → 44 P-TAUTH-COLLISION refusals → -EIO to file ops (dlm.c ~3452 turns MXFS_ERR_LEDGER into -EIO).

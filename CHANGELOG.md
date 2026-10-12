@@ -1,4 +1,1001 @@
-## 2026-10-10 — 0.90.116 — the allocator's trylock no longer does ledger I/O while it holds a VM image's lock
+## 2026-10-12 — 0.90.124 — restored multipath for 2–16-node SANs, multiple filesystems per host, and multi-resource DRBD recovery
+
+What changed for someone upgrading from 0.90.116, the last published
+release (0.90.117 to 0.90.123 were never published; their work ships here):
+
+- **dm-multipath is released again for SAN clusters on the on-disk lock
+  manager** (0.90.124): `2/disk/caw/mpath`, `4/disk/caw/mpath`,
+  `8/disk/caw/mpath` and `16/disk/caw/mpath`, each node reaching the shared
+  iSCSI LUN over two paths on separate networks.  Last claimed in 0.90.51.
+- **Fixed on the way there** (0.90.123, 0.90.124): a directory acquire that
+  waited on a child's lock held by a peer waiting for that directory, which
+  stalled all 16 nodes for eight minutes; a node that rejoined after being
+  fenced and could not open a file, its `open()` retrying for ever and
+  impossible to kill; an open that can never be granted now fails with EIO,
+  and a killed open always returns.
+- **More than one MXFS filesystem on a host** (0.90.120): the filesystems no
+  longer cross each other's lock traffic, and the new mount option
+  `transport=tcp|caw` picks each one's lock manager, so a host can keep a
+  DRBD resource mounted beside a SAN LUN.
+- **A DRBD pair with several MXFS resources recovers every one** (0.90.121,
+  0.90.122): a dead host is fenced and recovered on each resource under its
+  own evidence; one failed link cuts the peer off on every shared resource;
+  the module is loaded before DRBD connects.
+- **Less wasted lock work under heavy VM load on a DRBD pair** (0.90.117,
+  0.90.118): abandoned lock answers 84 → 17, the longest queued request 39 s
+  → 13 s, the longest allocation walk 46 s → 8.5 s.
+- **A misleading kernel warning is gone** (0.90.117): `P958-ACQ-IDLE-LOST`.
+
+**Released configurations and what 0.90.124 was validated on:**
+
+| configuration | nodes | storage | validated on 0.90.124 |
+|---|---|---|---|
+| `2/net/mesh/drbd` | 2 | each host's own disk, DRBD 8.4 dual-primary | `tests/drbd_release_verify.sh`; `scripts/drbd_rig.sh multi-death-test` (3 resources, a host destroyed; 6 resources, one link cut); `tests/pve_drbd_multi_mount_crash.sh` on a nested Proxmox VE 9 pair |
+| `2/net/mesh/direct` | 2 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+| `4/net/mesh/direct` | 4 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+| `2/disk/caw/direct` | 2 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `4/disk/caw/direct` | 4 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `8/disk/caw/direct` | 8 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `16/disk/caw/direct` | 16 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `2/disk/caw/mpath` | 2 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+| `4/disk/caw/mpath` | 4 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+| `8/disk/caw/mpath` | 8 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+| `16/disk/caw/mpath` | 16 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+
+The test rig is Ubuntu 24.04 (kernel 6.8.0-101-generic, multipath-tools
+0.9.4, `tools/mpath_settings.sh`).  "Installed packages" means the release
+packages on two nodes of each of Proxmox VE 9, RHEL 9.8, Ubuntu 24.04 and
+Debian 13, on one path, so `mpath` is claimed on Ubuntu 24.04 only.  Several
+filesystems per host were verified with `tests/multi_mount.sh` on both lock
+managers, with and without `peers=`, and with a node destroyed while it held
+one of two filesystems.  Every host in a cluster needs the same version.
+
+### 0.90.124 in detail
+
+One version for the whole of the mpath work.  0.90.123 was opened for it
+and 0.90.124 opened in error for a defect that work found; both are folded
+here, and nothing under either number was committed, pushed or installed.
+
+### A node that rejoins after being fenced cannot open a file its new mount has never touched (16/disk/caw/mpath `path_all_lost`)
+
+**A new in-core inode no longer inherits a terminal release state from the
+memory it was allocated in** (`xfs/xfs_mxfs_dlm.c`).  `xfs_inode_alloc` takes
+its inode from the slab without zeroing it, and `mxfs_dlm_inode_init` reset
+the release-defer episode but never assigned `i_mxfs_rel_state`.  WEDGED can
+be entered and never left, so an inode whose memory last held a wedged inode
+started out wedged: every lock acquire on it was refused, and `open()`
+restarted forever without a grant.  Measured on 16/disk/caw/mpath
+`path_all_lost` (0.90.123,
+`tests/evidence/board_20261011T225324Z-g16_path_all_lost/`): test16 lost both
+paths, was fenced and withdrew; its unmount wedged 125837620 at teardown
+(`P-INODE-WEDGE ... teardown=1`, 437 s).  It remounted at 502 s, and at 506 s
+the first acquire on 125829259, an inode the new mount had just read, was
+refused as wedged (`P-INODE-WEDGE-FENCE`) with no wedge of it in that mount.
+Its load spun in `mxfs_dlm_open_protect` (`P95-OPEN-PROTECT-RESTART`, state R)
+until the row ended, and could not be killed, which aborted the next row
+(`path_peer_withdrawn`: `STRAY killed=1 left=1`).  The initializer now starts
+every inode ACTIVE, and says when the memory it was given held a wedge
+(`P-RELSTATE-RECYCLED`).
+
+**`dbg_relstate_wedge_on_free`** (test only, `xfs/xfs_icache.c`) frees every
+inode with its release state WEDGED, so the next inode allocated in that
+memory meets what test16 met; `path_all_lost` reaches it only when a teardown
+wedge happens and the slab then hands that object to an inode the remounted
+node opens (lap 2 of the same 16-node run had no wedge at all).
+**`tests/relstate_recycle_inject.sh`** sets it on one node, drops that
+node's inode cache and reads and appends to files a peer created; it passes
+only when the poisoned memory was reached (`P-RELSTATE-RECYCLED` ≥ 1) and no
+acquire was refused as wedged.  On 0.90.124 it passed: 149 inodes freed
+poisoned, new inodes allocated in that memory, no wedge refusal, 200 of 200
+reads and appends, the slowest pair 18 ms.  On a control build without the
+assignment the same test refused 210 acquires as wedged and its `cat` and
+`sh` stayed in the kernel through `timeout -s KILL` until the node was
+reset.  D-RECYCLED-INODE-INHERITS-WEDGED-REL-STATE is removed from the
+defect queue.
+
+**An open that cannot be granted fails, and a killed open leaves**
+(`xfs/xfs_mxfs_open.c`).  `mxfs_dlm_open_protect` restarts an open that
+lost the race for its grant, treating every missing grant as contention, and
+its only way out was the mount shutting down.  An acquire refused outright —
+a wedged inode, refused for the life of the mount — therefore restarted
+forever, and the loop never looked for a fatal signal, so the task could not
+be killed: that is what aborted `path_peer_withdrawn` above.  A wedged
+inode's open now fails with EIO (`P95-OPEN-REFUSED`), as the admission gate
+fails every other operation on it, and a fatal signal ends the wait
+(`P95-OPEN-KILLED`), both at each restart and in the 30 s demote wait.
+**`tests/open_wedged_inode.sh`** (test knobs `dbg_openprotect_wedge_ino`,
+`dbg_openprotect_refuse_ino`): on a build with the knobs and without the
+change, the open of a wedged inode never returned and survived `kill -9`,
+and an open held in contention survived SIGKILL until the contention ended;
+with the change the first fails in 55 ms and the second is gone within 2 s
+of SIGKILL.  D-OPEN-PROTECT-RESTART-LOOP-UNBOUNDED-AND-UNKILLABLE is removed
+from the defect queue.
+
+**The 4-node `mpath` sequential-write slowdowns were clyde's disk, not
+MXFS** (D-4NODE-MPATH-SEQ-WRITE-COLLAPSE, disproved and removed).  With
+clyde's `/` back to 74% used, six host-sampled `fio_perf` laps on 4
+`disk/caw/mpath` nodes passed at 1801-3503 MiB/s sequential write (the low
+runs read 243-761, all taken with `/` 92-100% full), and in every lap the
+guests' time per write followed the host disk's own (host p95 74 ms → guests
+47-120 ms; 508 → 312-648).  In the earlier low run every node had kept 32
+writes in flight at 60-970 ms each.  `fio_perf_vs_xfs` now reads 189% of
+native XFS for sequential write.  It is not over: in the release gates'
+repeats on 8 nodes one run of ten read 665 MiB/s (62%) at a host load of
+11, with `/` 74% used, which the full-disk explanation does not cover; that
+is D-MPATH-SEQ-WRITE-LOW-RUN-RECURS-WITH-DISK-NOT-FULL, open.  That run had
+nothing sampling the host, so **every throughput row now records clyde's
+pool disk and memory while it runs** (`run.sh`): `host_disk[...]` (the
+device's time per write, p95 and worst, and its peak MiB/s) and
+`host_mem[...]` (peak dirty and writeback, least available), the raw
+capture kept as `tests/evidence/hostdisk_<config>_<row>_<time>.txt`.  The
+first version held each row still for the sampler's whole lifetime —
+`run_coord` waits for its node launches with a bare `wait`, which waited
+for the sampler too — so fio ran only after the sample had ended; the
+sampler is now out of the shell's job table, and a 4-node `fio_perf` row
+takes 82 s again with its stamp agreeing with an independent sample
+(13,135 MiB against 13,137 in `/proc/diskstats`; peak 1883 MiB/s, p95 575
+ms per write).  **`tests/mpath/fio_host_timeline.sh`** runs rows with the
+pool disk sampled from outside `run.sh` and prints the heavy-write seconds
+beside `run.sh`'s timestamped lines.
+
+With that stamp the low run came back in the release gates' repeats on 8
+nodes (seqW 348 MiB/s) and was clyde's disk: through the whole
+sequential-write phase the pool NVMe held about 270 writes in flight and
+completed 58-440 MiB/s at 300-1250 ms per write, where a passing run at the
+same depth completed 200-1706 MiB/s.  Both put the same 13.7 GB on the
+device, and host memory was not short.  A model is being trained on clyde
+meanwhile, and the drive is a DRAM-less TLC SSD on a 79%-full filesystem
+taking 13.7 GB every few minutes.  D-MPATH-SEQ-WRITE-LOW-RUN-RECURS-WITH-
+DISK-NOT-FULL is disproved and removed, and that FAIL is amended on the
+board as the detector's (`fio_perf_vs_xfs` at 8/disk/caw/mpath,
+2026-10-12T03:22:57Z: it graded the host's disk, not MXFS).
+**`tools/path_io_latency.py`** reads
+`path_io_sampler.sh` captures: per device, the seconds it wrote, MiB/s and
+time per write (median, p95, worst).
+
+**The allocation witness now measures MXFS, not what earlier rows left
+behind** (`tests/tooling/alloc_witness.sh`).  In one of nine 16-node release
+repeats `alloc_witness` read `coverage=INSUFFICIENT` on its `overlap` floor,
+and `chk_clean` followed with `release=VACUOUS`, `errors=0`
+(`20261012T042829Z-g16`).  The floor requires every node's phase-1 carves
+to overlap in time; rank 1's first carve came 10.0 s into the burst, after
+rank 3's last (9.6 s).  The cause was the fill that is meant to leave each
+node with no free inodes: it stopped at the end of the 64-create batch in
+which it saw a carve, leaving the carved chunk with as many free inodes as
+the AG had held before (0-63).  At 16 nodes a node creates ~7 files/s in
+the shared directory, so up to 63 leftover inodes delayed its first phase-1
+carve by up to ~9 s.  The fill now creates until the live inobt record of
+its newest chunk shows none free (`FILL ... topup=N chunk_free_after=0`),
+and rank 1 makes the shared directory before the fill rather than after,
+since that `mkdir` takes an inode from rank 1's partition.  Every node's
+first phase-1 carve is now its first create.  The remaining spread, 0.1 to
+5.9 s, is the wait for each node's first turn at the shared directory's
+lock.  Running the row twice on one `mkfs` then showed a second fault:
+the file names are fixed, so the second run's `: >` truncated the first
+run's 192 `r<rank>_<i>` files and allocated nothing, and 12 of 16 nodes
+made no phase-1 carve.  Each run now works in a directory of its own
+(`alloc_witness/<run id>`).  Three further runs on that aged filesystem
+passed every floor with overlap margins of 4.6-10.7 s, and `chk_clean`
+read CLEAN each time.  The two FAILs from the reused filesystem are
+amended on the board as the detector's.
+
+**The user-mode ledger test checks a prepared page's answer without the
+harness's own tick in the way** (`tests/tauth/dlm_ledger_test.c`,
+`tests/tauth/dlm_mesh.h`).  Rebuilt on this tree and run 100 times with the
+rig loading clyde (loadavg 6.5-10.8), `dlm_ledger_test` failed twice, both
+on case 18's last check: after the hand-off pass had prepared an AG lock's
+ledger page, the next no-queue request answered would-block (rc=-11), its
+readiness probe reading `ready=-16` (the page's mutex held at that instant).
+The harness's tick thread runs the hand-off tick every 20 ms, and that tick
+takes every loaded page's lock in turn (`mxfs_tauth_ledger_page_auth`); the
+no-queue path decides only on a page whose lock is free that instant, as its
+comment says, and would-block sends the allocator to another AG.  Measured
+with the new `DLT_TICK_PROBE=<n>` (the readiness probe called n times with
+the node's ticks running, then n times with them held): 22, 65 and 67 busy
+answers per 60 million calls with the ticks running, 0 in 180 million with
+them held; the receive thread ran in both arms.  The check now holds the
+node's ticks across that one request (`tick_hold`, and `vnode.tick_seq`,
+odd while a tick runs).  With it, `make -C tests/tauth test` passes all
+nine tests from a clean build and 100 runs of `dlm_ledger_test` failed none
+(`tests/evidence/tauth_ledger124_fixed`).  D-DLM-LEDGER-TEST-CASE18-NOQUEUE-ON-PREPARED-PAGE-
+ANSWERS-WOULD-BLOCK-UNDER-LOAD is removed from the defect queue.  The same
+100 runs never failed case 15 (one failure in 29 runs on 0.90.109), and
+D-DLM-LEDGER-TEST-CASE15-REMASTER-PARKED-PAST-ITS-RETRY-BUDGET-ONCE-UNDER-LOAD
+stays open.  Its release bar is now recorded from its own evidence: every
+FAIL it logged follows from one acquire not granted inside the test's
+five-retry budget, its later checks passed, and the module's own acquire
+returns an error to its caller after a 60-retry budget, which loses no data
+and stops no node.
+
+**`tests/multi_mount.sh` runs without `MM_NODES_A`/`MM_NODES_B` set.**
+Under `set -u` their expansions stopped the script before it began
+("MM_NODES_A: unbound variable"), so the documented default — every node
+given mounts both filesystems — could not run.
+
+**`tests/dir_reload_child_inact.sh`** exercises 0.90.123's deferred dcache
+shrink: peers run the path load's `mkdir`/`rmdir` mutex on one directory
+(recycling one inode number) while another node keeps a cached copy of it and
+keeps acquiring the parent.  It fails unless the shrink's worker inactivated
+a child (`P-DSHRINK-INACT` ≥ 1), so a run that never reaches the case cannot
+pass, and it fails on any operation of 15 s or more.
+
+### A node acquiring a directory waits on a child's lock that a peer holds while it waits for that directory (16/disk/caw/mpath hang; opened as 0.90.123)
+
+**A directory's reload no longer drops its children inside the lock acquire**
+(`xfs/xfs_mxfs_reload.c`).  The reload that a directory acquire runs after a
+peer has held the directory ended with `shrink_dcache_parent()`, which drops
+the last reference on cached children and, on a cluster, inactivates each one
+synchronously, taking that child's lock.  It ran while the directory was still
+being acquired: the node holds the directory's grant on disk and defers every
+peer's request for it until the acquire ends.  When a peer held the child and
+was waiting for the directory, each waited on the other.  Measured on
+16/disk/caw/mpath `path_fenced_return` (0.90.122,
+`tests/evidence/board_20261011T203508Z-g16_path_fenced_return/retrieved/`):
+test12's `rmdir LOCK` held the `LOCK` directory (33569536) and waited for its
+parent `shared` (92813250); test7 acquired `shared` for reading at
+21:15:34.745, and 2 ms later began inactivating its stale copy of 33569536 from
+inside that acquire.  The other fifteen nodes, test12 among them, waited for
+`shared` behind test7's grant until test7's child lock gave up at 480 s
+(`rc=-110`); in the same millisecond test7 ended the acquire and released
+`shared` (`P35-ACQBAST-HONOR`).  The dcache shrink
+is now queued to a per-directory work item that runs with no lock held, so
+the acquire finishes and a peer's request is served while the child waits.
+
+**A synchronous inactivation that waits long for its lock prints who called
+it** (`P-SYNC-INACT-SLOW`, `xfs/xfs_icache.c`): the caller's stack is still
+live when the wait ends, so each such wait names the path that dropped the
+last reference.
+
+**`tools/lun_pool.sh` unmounts a node whose LUN has gone.**  Its unmount
+loop stopped at `mountpoint -q`, which is false on a mount whose root answers
+`stat` with EIO, so a node left mounted on a LUN the pool had since rebound
+never had `umount` tried, and every allocation over it failed `UNMOUNT_FAIL`
+(test8-16 after lun12 was released under them; a plain `umount` then
+succeeded at once on each).  `mountpoint` now gates only `fuser -km`, which it
+exists for.
+
+**`tools/compress_evidence.py`** gzips plain-text evidence files over 100 MB
+in place, verifies each `.gz` before the original goes, and leaves anything
+modified in the last two hours to its writer.  clyde's `/` carries the LUN
+pool, the guest images and `tests/evidence`, and had fallen to 9 GB free, under
+the preflight's 10 GB floor, refusing every fleet run; path rows' load logs
+were most of the evidence (two `ops.log` files alone were 9.1 GB as text,
+124 MB compressed).  It is back to 36 GB free.
+
+**`tools/space_report.sh`** sizes each top-level tree on clyde's `/` by name
+(a scan from `/` is not allowed on this host), breaks the largest down two
+levels, lists deleted files still held open, and reconciles the total against
+`df`.  **`tools/vm_reclaim.sh`** gives back what the guests' qcow2 images hold
+for data the guests deleted: every domain's disk is `discard='unmap'`, so an
+`fstrim` in the guest frees the clusters (a shut-off domain is started for
+it); `--compact` then rewrites each image offline, verified with
+`qemu-img compare` before it replaces the original.  The 43 guest images held
+288 GB; test17's went from 5.7 to 4.9 GiB on the trim alone.
+
+**`tests/mpath/fio_path_probe.sh` samples the pool's own disk on clyde**
+beside every node's paths (`path_io_sampler.sh` takes a device pattern).  Its
+first low run (seqW 586 MiB/s) showed every node's writes on one path of two,
+each taking 60-970 ms at 32 in flight: the device under the guests is slow,
+not MXFS idle.
+
+**Verified, and removed from the defect queue:**
+D-DIR-RELOAD-CHILD-INACTIVATION-DEADLOCK (the hang above).  On 0.90.124, with
+`tests/dir_reload_child_inact.sh` on four nodes in the hang's lock order
+(rmdir takes the child before the parent), the deferred shrink's worker
+inactivated children (`P-DSHRINK-INACT` 2 and 4 in two runs, longest 25 ms),
+each locker completed ~700 lock cycles in 60 s and no operation reached 1 s.
+The same test on a control build with the shrink back inside the acquire
+completed ~7 and ~15 cycles, with operations of 9.9 s and 7.2 s.  The
+16-node path rows on 0.90.123 passed 10 of 10, `path_fenced_return` among
+them.
+
+**Four Proxmox-pair fairness tools recovered from abandoned workflow
+checkouts** that never merged: `tools/tenure_timeline.py` (both hosts' lock
+releases on chosen inodes, merged in time order), `tools/churn_stack_report.py`
+(where each host's loop tasks waited, by wait and operation),
+`tools/churn_ops_timeline.py` (when each host's loops made progress), all
+reading what `tests/pve_churn_fairness.sh` writes, and
+`tests/pve_fairness_knob_ab.sh` (an A/B of one module parameter on a pair,
+alternating the settings run by run and reading each back on both hosts).
+They are carried unchanged and have not been run against this tree.
+`.gitignore` now excludes Claude Code's worktree, checkpoint and mailbox
+directories, which hold whole copies of the tree.
+
+## 2026-10-11 — 0.90.122 — NOT RELEASED (its work ships with 0.90.124): a DRBD pair with several MXFS resources survives one link failing, and the module is loaded before DRBD connects
+
+**One resource's exclusion now takes the peer off every resource the two
+hosts share** (`tools/mxfs_drbd_fence_self.py`).  The built-in authority's
+isolation drops MXFS's ports to the peer, and those ports carry every MXFS
+filesystem on the host, but it dropped only the DRBD port of the resource
+whose link failed.  On a pair with six resources, one missed keepalive left
+the other five Connected and Primary on both hosts with their lock traffic
+cut and no exclusion either side could prove: the winner's next mount retried
+its root lock for 19 s and shut down, and the loser's mount sat in D state.
+The isolation now drops the DRBD port of every resource shared with the peer
+as well, so each of those links fails the way a lost link does and DRBD runs
+that resource's own handler, which excludes the peer under the resource's own
+episode.  Never a graceful disconnect: DRBD runs no handler for one, and the
+peer would carry on as Primary.
+
+**A node that loses the tie-break restarts whenever MXFS holds anything on
+it.**  It restarted only when MXFS was mounted on the resource whose link
+failed, so a mount still in progress (in no mount table yet) blocked for ever
+on the frozen device.  The test is now the module's reference count, which a
+mount in progress holds.
+
+**The module is loaded before any DRBD link comes up.**  Loading `mxfs.ko`
+holds the CPU it runs on for ~0.9 s on the rig's guests while the kernel
+patches its code (the stock `xfs.ko` holds it ~0.27 s; stripping the debug
+info changes nothing).  DRBD pins each resource's threads to one CPU and gives
+up on a link whose PingAck is 0.5 s late, so a load with links up dropped
+links, and under the built-in authority that fences a host.  The packages
+already load the module at boot through `modules-load.d`, before any DRBD
+unit; the boot program now loads it before its own `drbdadm up` when it is not
+loaded, and the DRBD rig loads it on each node before DRBD comes up and when a
+node rejoins (`tests/setup/prep_node.sh` keeps a module of the same build with
+`MXFS_KEEP_LOADED=1`).
+
+**`scripts/drbd_rig.sh multi-death-test`**: `DRBD_RIG_RESOURCES` resources
+(2-9, default 3) on one pair, each on pool LUNs of its own, under the built-in
+authority, every one mounted and written to; the higher-addressed node is then
+destroyed, or with `MULTI_CUT=1` only one resource's link is cut.  Every
+resource must exclude the node under an episode of its own and witness it,
+recover, keep every fsynced file and take writes again; the guard must release
+the node on each resource's own evidence and it must rejoin all of them; a
+cold `chk_mxfs` of each closes it.  A stall watch (each node pinging the other
+every 50 ms, this host pinging both) is reported beside every DRBD link loss.
+`tests/vm_stall_probe.sh` replays a module load with pings pinned per CPU and
+counts the DRBD links lost meanwhile.
+
+**`scripts/pve_mxfs_spare_disk.sh`** accepts a disk model with a space in it
+(`MODEL="850 EVO"` failed the remote shell's `case`).
+
+**Removed from the defect queue:**
+
+- **On a DRBD pair with several MXFS resources under the built-in authority,
+  one resource losing its replication link isolated the peer from every MXFS
+  port while every other resource stayed Connected, Primary/Primary and
+  unexcluded** (D-DRBD-ONE-RESOURCE-EXCLUSION-CUTS-EVERY-RESOURCES-MXFS-TRAFFIC)
+  — FIXED AND VERIFIED.  The cause and the fix are above.
+  `scripts/drbd_rig.sh multi-death-test` with six resources and only `mxfs6`'s
+  link cut on test1 (`tests/evidence/drbd_rig/20261011T134315Z-multi-death-test`,
+  again `…T143401Z` with the module loaded first): test2 excluded test1 on all
+  six resources, each under its own episode, and witnessed each; all six
+  recoveries completed 25-29 s after the cut; every fsynced file of both nodes
+  was intact and every filesystem took writes afterwards; test1 restarted
+  itself, was released on each resource's own evidence, rejoined all six and
+  read the same data; cold `chk_mxfs` clean on all six.
+
+- **On the six-resource DRBD rig a link dropped with both nodes healthy
+  ("PingAck did not arrive in time") while the first node mounted**
+  (D-DRBD-RIG-SPURIOUS-PINGACK-LOSS-DURING-MULTI-MOUNT-SETUP) — FIXED AND
+  VERIFIED.  The cause is the module load above, made while the links were up:
+  each loss dropped exactly the resources pinned to one CPU, and a load with
+  six idle resources connected dropped links in 3 of 3 probe runs, the loss
+  inside the `insmod` (`tests/evidence/vm_stall_probe/20261011T135426Z`,
+  `…T140150Z`, `…T140438Z`).  Before the fix 3 of 5 six-resource runs lost a
+  link while mounting; with the module loaded first, 5 of 5 kept every link
+  through the mounts and passed end to end
+  (`tests/evidence/drbd_rig/20261011T142811Z-multi-death-test` and the four
+  after it).  Not explained: loads without `dyndbg=+p` held the CPU as long but
+  dropped no link in 20 probe loads; loading first removes the exposure either
+  way.
+
+- **A node that lost the tie-break with an MXFS mount still in progress left
+  the mount blocked for ever on the frozen device**
+  (D-DRBD-LOSER-MOUNT-IN-PROGRESS-HANGS-UNKILLABLE-NO-RESTART) — FIXED AND
+  VERIFIED.  The cause and the fix are above.  `multi-death-test` with
+  `MULTI_CUT=mounting` cuts a link while the victim is still mounting that
+  resource (checked at the cut: not in the mount table, module refcount 7):
+  test1 restarted itself, test2 excluded it on all six resources and recovered
+  the five it was a member of, every fsynced file intact, test1 released on
+  each resource's own evidence, rejoined all six and read the same data, cold
+  `chk_mxfs` clean (`tests/evidence/drbd_rig/20261011T150424Z-multi-death-test`).
+
+- **A node that lost one of its two multipath paths returned EIO for every
+  operation from 20 s after the loss, with its other path up**
+  (D-NETMESH-MPATH-VICTIM-EIO-AFTER-ONE-PATH-LOST, seen on 4/net/mesh/mpath
+  `path_failover`) — FIXED AND VERIFIED.  The cause, measured in 5053 kept
+  path-row node logs: a FUA read (`mxfs_pal_scsi_read_fua_bdev_body`,
+  `pal/linux/kern.c`) resolved one SCSI path of the map and spent all 21 of its
+  attempts on it after that path's session had failed, every attempt answering
+  DID_NO_CONNECT (2422 distinct `P-FUA-READ-ERR ret=0x10000 tries=21`); a
+  caller that does not tolerate a failed FUA read turned that into a shutdown.
+  The fix (0.90.54): an attempt that fails on an offline path or with a
+  transport host byte re-resolves the path, and reads through the map when no
+  path resolves.  Verified in three rounds of every path row, each row's kept
+  node logs counted from its own mark: two laps on 0.90.54 (0 errors, 501
+  re-resolves, every path row passing; the build without the re-resolve: 74
+  errors, 0 re-resolves), and the release boards of 2/4/8 disk/caw/mpath and
+  2/4 net/mesh/mpath on 0.90.122 (`4C5776ECF3862F3B954E7DE`, run
+  `20261011T163334Z`, 43 path rows): every path row PASS, no `P-FUA-READ-ERR`
+  in any node log, 312 re-resolves, 20 of them to the map, all on the victim of
+  `path_all_lost`.
+
+- **2/net/mesh/mpath: in four path rows the victim's load stopped completing
+  operations for about 72 s per fault window**
+  (D-2NODE-MPATH-VICTIM-LOAD-BLOCKED-OUTSIDE-ITS-OPS) — DISPROVED.  It was
+  test2's clock.  The row starts and stops both nodes' loads together, and in
+  each of the failed rows (`tests/evidence/board_20261005T154539Z-g2_path_*`)
+  the two ops logs span the same duration with test2's timestamps 74.0 s
+  earlier at both ends.  The fault windows were taken on this host's clock and
+  test2's operations, stamped on its own, fell before each window.  test2's
+  own log shows no operation longer than 16.9 s, no error, and never more than
+  55 ms outside an operation.
+
+**The path rows grade a node's operations on that node's clock.**  A fault
+window is taken on this host's clock and a load stamps its operations on its
+node's, so a node whose clock was off by more than the stall bound failed (or
+could have passed) a row on its clock alone.  `tests/lib/rig.sh` now measures
+each node's offset when its load starts (the best of three ssh samples, error
+under half a round trip, ~200 ms on the rig), and `pf_window`, `pf_resumed`,
+`pf_acked_after` and `pf_last_op_ms` in `tests/mpath/lib.sh`, and
+`tests/pathload_hang_watch.sh`, translate between the two.  The fence rows'
+"nothing acknowledged after the fence" check used the same comparison, so a
+node behind by more than its fence gap could have hidden such a write.  A
+clock can also be stepped mid-row: in run `20261005T204723Z-g2` test1's clock
+was 366.5 s behind when its load started and was put right during the first
+fault, so one 16.7 s operation read as 383 s and the row failed.  Each window
+now reads every node's clock again, and a node whose offset moved by more
+than 2 s ends the row ABORT (the rig's fault, no verdict) instead of FAIL.
+
+**A throughput row waits for the host and its pool device to go quiet before
+it measures, and says what it saw** (`run.sh`).  The host lock keeps every
+other board's rows off the host while `fio_perf` runs, but not the host's
+flush of what they had just written, nor the pool SSD's own write cache (a
+DRAM-less TLC drive on a full filesystem).  A throughput row now waits for
+the host's Dirty+Writeback to fall under 256 MiB (bounded 45 s, the 30 s dirty
+expiry plus the flush) and then for the pool device to write under 32 MiB/s
+for 20 s in a row (bounded 120 s), and prints both.  It was added to explain
+4/disk/caw/mpath's slow sequential writes and did not: with both quiet that
+row still read 243 MiB/s (D-4NODE-MPATH-SEQ-WRITE-COLLAPSE, added below).
+What it does is take the host out of the question for every throughput row.
+
+**`tools/criteria.py unamend`** takes back an amendment whose case a later
+measurement refuted; the run counts as a genuine FAIL again and the reason it
+was withdrawn is kept beside it.
+
+**Added to the defect queue:** fio_perf's sequential write on
+4/disk/caw/mpath intermittently reads 22-60% of its yardstick (every node's
+passes 40-150 MiB/s) while the same build, group and LUN read 155-207% on
+other runs and random write holds (D-4NODE-MPATH-SEQ-WRITE-COLLAPSE).  Also, a
+fenced node shuts its filesystem down with
+the in-core corruption reason, so its kernel log says "Corruption of in-memory
+data detected" for what is the required stop of a fenced node
+(D-FENCED-NODE-SHUTDOWN-REPORTS-CORRUPTION-OF-IN-MEMORY-DATA, minor: the
+message is wrong, nothing is corrupted).
+
+**Board:**
+
+- **crash_audit at 4/disk/caw/mpath and 8/disk/caw/mpath, the FAILs of
+  2026-10-05T06:17:43Z and 05:34:08Z, were the detector's.**  The oracle
+  (`tests/tcp_death_replay.sh`) stopped before killing anything: "ABORT: test17
+  (test21) srcversion != tree D350114A01E49A85A00756E
+  (sv=2436A85B09810AB6EF34C94)"
+  (`tests/evidence/board_20261005T045241Z-g4b_crash_audit/oracle.log`,
+  `…T041055Z-g8b_crash_audit/oracle.log`).  The tree's module was rebuilt at
+  05:08:07Z under the running boards and the oracle compares the loaded module
+  with the tree's file, the same abort already amended on 8/net/mesh/mpath that
+  night.  No node was killed and nothing was replayed, so neither run measured
+  the filesystem.
+- **path_mount_degraded at 2/net/mesh/mpath and 4/net/mesh/mpath, the FAILs of
+  2026-10-05T21:14:44Z and 21:14:16Z, were the rig's.**  The victim's unmount
+  was refused as busy within 6 ms because a load from a chain stopped from
+  outside at ~20:55Z was still running on it: the path_flap loads of runs
+  `20261005T204723Z-g2` (test2) and `20261005T204652Z-g4` (test6) never wrote
+  their exit line and logged operations until 21:15:26Z and 21:14:41Z.  The
+  row runs no load on its victim.  `pf_start_gate` now clears such a load
+  before a row starts, or ends the row ABORT.
+- **fio_perf_vs_xfs at 4/disk/caw/mpath (2026-10-11T16:42:11Z, 17:57:59Z),
+  4/net/mesh/mpath (16:42:11Z) and 8/disk/caw/mpath (2026-10-05T08:07:44Z,
+  16:49:15Z) were amended as the pool SSD's write cache and then unamended**:
+  the release gates' run of the row waited for the device to be idle and
+  still read 243 MiB/s.  They count as genuine FAILs, and the cause is open.
+- **path_failover at 2/net/mesh/mpath, the FAIL of 2026-10-05T20:50:49Z, was
+  test1's clock being stepped mid-row** (the measurement above): with the
+  366.5 s step taken out, its "383 s" operation took 16.7 s.
+
+## 2026-10-11 — 0.90.121 — NOT RELEASED (its work ships with 0.90.124): a DRBD pair with two MXFS resources recovers both when a host dies
+
+**The built-in fence authority answers for the resource that asks.**
+`mxfs-drbd-fence-self` excludes a dead peer once per resource, each under its
+own episode, but `status <peer>` answered with the first inhibit it listed for
+that host.  On a pair with two MXFS resources the witness of the other one
+compared that episode with its own receipt, the module never judged the peer
+excluded, and that filesystem never recovered the dead node: on the nested
+pair, pve9-4 destroyed with `/mnt/shared` and `/mnt/shared2` mounted,
+`/mnt/shared` replayed and wrote again while `/mnt/shared2` stayed at
+`recovery_pending=1` with `mkdir`, `ls` and `pvestatd` blocked, the kernel
+repeating "the peer is inhibited under episode '…2148…', the receipt names
+'…2151…'".  `status <target> <resource>` now answers with that resource's
+exclusion, and the witness names its resource when the authority is the
+built-in one (a node fence holds the whole host under one episode, so its
+protocol is unchanged).  With the fixed pair installed on the stuck survivor,
+`/mnt/shared2` replayed the dead slot and completed recovery within 15 s.
+
+**`scripts/pve_pair_update.sh` updates a pair with more than one resource.**
+It stopped only `mxfs-drbd@$RES` before unloading the module, which does not
+unload with any MXFS filesystem mounted.  It now stops every `mxfs-drbd@`
+unit active on either host, refuses the swap while an MXFS mount no unit owns
+is left, and waits for every resource to come back mounted, Primary/Primary
+and UpToDate on the new build, each at its unit's `MOUNTPOINT`.  `CHECK` and
+`REFORMAT` still act on `RES` alone.
+
+**Removed from the defect queue:**
+
+- **The built-in DRBD fence authority answered `status` per host while it
+  excludes per resource, so a second resource never recovered a dead peer**
+  (D-DRBD-SELF-AUTHORITY-STATUS-PER-HOST-HOLDS-SECOND-RESOURCE-UNRECOVERED) —
+  FIXED AND VERIFIED.  The cause and the fix are above.  With 0.90.121 on both
+  nested hosts, `tests/pve_drbd_multi_mount_crash.sh` passed twice
+  (`tests/evidence/pve_drbd_multi_mount/20261011T043010Z-0.90.121`,
+  `…T043136Z-0.90.121`): pve9-4 destroyed with both filesystems mounted,
+  pve9-3 wrote again on `/mnt/shared` and `/mnt/shared2` within 5.8–8.6 s and
+  read the dead host's fsynced files, `status` answered each resource's own
+  episode, and pve9-4 came back on both in 31 s and 53 s, each exclusion
+  released on its own resource's evidence.
+
+- **Two MXFS mounts on one host opened two sockets on each fixed port, and
+  Linux routed each connection or unicast datagram by address hash, not by
+  filesystem** (D-MULTIMOUNT-SHARED-PORTS-MISROUTE-PER-MOUNT-TRAFFIC) — FIXED
+  AND VERIFIED.  Before the fix (0.90.120's first build), `tests/multi_mount.sh`
+  logged a lock-manager connection reset at the other filesystem's listener on
+  every run, and with `peers=` one filesystem never took its peer's heartbeat
+  and its fsynced writes took 17171 ms against 604 ms.  The fix is 0.90.120's
+  one socket per port per host.  Afterwards the same harness and acceptance on
+  test18/test19/test20, tcp and caw, multicast and `peers=`, mixed transports,
+  crashes and three hosts with overlapping memberships (evidence
+  `tests/evidence/multi_mount/20261011T034352Z` through `…T042019Z`): zero
+  handshake resets and every lease ACTIVE on every node of every run, writes
+  equal across nodes (`peers=` 638/647 ms tcp, 692/689 ms caw), cross-reads
+  matching.  The two FAILs in between were the harness's (a `corrupt=0` match
+  in a benign log line; a module reload on a node rebooted without `/src`).
+
+**`tests/pve_drbd_multi_mount_crash.sh`** refuses to start while a resource's
+`mxfs-drbd@` unit is not enabled: the victim's rejoin is its units starting at
+boot, and a unit that never starts would read as a failed rejoin.
+
+## 2026-10-10 — 0.90.120 — NOT RELEASED (its work ships with 0.90.124): more than one MXFS filesystem mounted on a host
+
+**One socket per port per host** (`pal/linux/kern.c`).  Every mount opened
+its own sockets on the fixed ports (TCP 7600, UDP 7601-7603) with
+SO_REUSEPORT, and Linux hands each new connection, or unicast datagram, to one
+of them by address hash, not by filesystem.  Measured with two filesystems on
+test18/test19: a lock-manager connection reached the other filesystem's
+listener and was reset on every run, and with `peers=` one filesystem never
+heard its peer's heartbeat at all, so that node's fsynced writes took 17.2 s
+against 0.6 s.  Now the host owns one socket per port and each mount holds a
+handle on it.  A UDP datagram is copied to every mount on the port (each
+already drops other volumes' packets, as multicast always relied on).  A TCP
+connection goes to the mount whose volume id its first message, the NODE_JOIN,
+carries: the listener peeks it without consuming it
+(`mxfs_pal_tcp_listen_keyed`).  After: zero resets, every lease ACTIVE, and
+writes of 0.6-0.8 s on both nodes, on TCP and on CAW, with and without
+`peers=`.
+
+**The lock transport is per filesystem.**  `force_transport` is a module
+parameter, so every mount on a host ran the same transport: a host could not
+keep a DRBD resource (network lock manager only) mounted beside a SAN LUN on
+COMPARE AND WRITE.  New mount option `transport=tcp|caw` names one
+filesystem's transport.  It overrides the module parameter, forms a new
+cluster on that transport, and refuses a volume whose live holders run the
+other one.  A DRBD device that names none now gets TCP whatever the module
+default, instead of being refused.
+
+**The DRBD fence helper's peer evidence is per resource**
+(`tools/mxfs_drbd_fence_self.py`).  Releasing an exclusion needed the peer to
+have no MXFS mount at all and a module reference count of 0.  With two
+resources on the pair, the first one remounted held the other excluded for
+ever.  It now asks about the resource's own device: no mount of it and no
+`/sys/fs/mxfs/<dev>` (which outlives a lazy unmount).  Participant 1's wait
+for participant 0, and the wait for the peer's recovery, count the same way.
+
+**The Proxmox test scripts stop taking `/mnt/shared` down.**
+`scripts/pve_mxfs_spare_disk.sh` stopped the pair's own `mxfs-drbd@mxfs`
+before building its second DRBD resource, so one MXFS mount ran at a time and
+`/mnt/shared` stayed down through every leg; it now stays mounted beside the
+second one (`ALONE=1` stops it, for a measurement that wants the pair to
+itself), its refusal looks only at its own device, and `THIN="<vg>/<pool>
+<size>"` makes the backing volume on a host with no spare disk.
+`scripts/pve_mxfs_san_disk.sh` mounts the SAN LUN with `-o transport=caw`
+instead of flipping the host's `force_transport` under its other mounts.
+
+**`tests/multi_mount.sh`**: two filesystems on the same nodes, each with its
+own membership (`MM_NODES_A`, `MM_NODES_B`), every member mounting, writing
+and reading every member's files, then a cold check of each.  It fails on a
+connection that reached the wrong listener, on a peer lease that never went
+ACTIVE, and on any kernel error.  `MM_CRASH=1` destroys a node with its
+filesystems mounted: the survivors must recover it on each filesystem it was
+in and read its fsynced files, a filesystem it was not in must keep taking
+fsynced writes with none slower than 2 s, and the node must come back and
+mount again.
+**`tools/lun_pool.sh alloc --also`** binds a second pool LUN to nodes that
+already hold one, without unmounting, unloading or logging out anything they
+have.
+
+## 2026-10-10 — 0.90.119 — NOT RELEASED (its work ships with 0.90.124): a directory's lock-release check names why it judged the node's copy behind the disk; SAN legs check the filesystem before the LUN is reused
+
+**P189-RELOG-BEHIND-DISK says why it refused** (`xfs/xfs_mxfs_bast.c`).  The
+lock-release drain's write-side backstop now prints which of its three tests
+tripped, whether the in-core changecount was ahead of the platter, the
+node's publication counters (pending / durable / flush: whether it still owed
+the platter a committed change), its lock mode and stale flag, and, for a
+shortform directory, the entry names in core and on the platter, so a hit
+shows which side holds the names the other lacks.
+
+**`scripts/pve_mxfs_verify.sh`**: after a build leg, both hosts list the
+whole tree (inode, type, links, size, path) and the listings must match, both
+unmount, and `chk_mxfs -n` runs on the device; `scripts/pve_build_compare.sh`
+runs it after every `mxfs` and `san` leg, before the next leg's wipe reuses
+the device, and `tests/pve_build_leg_kmsg.sh` fails a leg whose check fails
+and counts P189 lines.
+
+**A three-node Proxmox VE 9 cluster on one SAN LUN, nested on clyde**
+(pve9-5/6/7, 192.168.120.213-215, cluster `mxfslab9c`, 8 GiB each), the
+shape most Proxmox SAN users run:
+`scripts/pve_nested_pair.sh` now builds any number of hosts (`NESTED_PAIR`
+may name more than two, `MEM_MIB` sets their memory; the cluster phase joins
+them one at a time, and its key write is retried until `/etc/pve` takes it,
+where `[ -w ]` had answered for root while the cluster filesystem refused the
+write); `scripts/pve_tree_install.sh` builds and installs this tree on hosts
+with no MXFS; `scripts/pve_caw_lun.sh` exported a 30 GiB CAW LUN
+(`pve-caw-02`) from 192.168.120.1 to the three; `scripts/pve_mxfs_san_disk.sh`
+mounts on every listed host (it checked only the first two) and gains `join`
+(mount a host back without formatting); `scripts/pve_cloud_guest.sh` makes a
+source guest from the Debian 12 cloud image on the MXFS storage, whose clones'
+cloud-init sets the lab root password from the secrets store and installs the
+QEMU agent.
+
+**Live migration round three hosts: PASS.**  `tests/pve_live_migrate.sh`
+(now any number of hosts, laps in name order, `MNT`/`DRBD_RES` for a LUN
+without DRBD) on the three: the clone hashed alike on all three hosts, six
+online migrations pve9-5 -> 6 -> 7 -> 5 -> 6 -> 7 -> 5 with the guest writing
+throughout, 12-14 s each, 75-99 ms downtime, all 32 fsynced files verified
+after every lap (305 written), no bad line in any host's or the guest's
+kernel log (`tests/evidence/pve_live_migrate/20261011T013404Z`).
+
+**HA failover on three hosts: PASS** (`tests/pve_ha_failover.sh`, new).  An
+HA guest on the MXFS storage, its fsynced writer running, and a second
+"bystander" guest on a host that survives, writing a new fsynced 1 MiB file
+every 0.2 s.  pve9-5, running the HA guest, was powered off (`virsh
+destroy`): Proxmox HA restarted the guest on pve9-6 144 s later (its agent
+answered at 170 s), and every file it had fsynced verified (32/32); pve9-5
+was started again, back in the cluster in 20 s, remounted the volume
+(`pve_mxfs_san_disk.sh join`), and HA migrated the guest back to it in 31 s
+with the files verifying again.  The bystander made 2039 writes across the
+whole run, the longest 424 ms, none over 1 s and none failing: guests on the
+surviving hosts did not stall.  What did wait: a new file created in the
+volume's root directory on each survivor at the moment of the power-off
+completed in 67.0 s on both, the dead host's 60 s lease
+(`MXFS_LEASE_DURATION_DEFAULT_MS`) running out before its directory locks
+could be taken over.  No bad line in any host's or guest's kernel log
+(`tests/evidence/pve_ha_failover/20261011T020249Z`).  Two earlier runs of the
+test failed on its own faults, fixed here: it asked the powered-off host for
+the cluster's VM list, and it moved an HA resource with `qm migrate`, which
+only files the request.
+
+**3- and 5-node clusters pass the whole suite.**  The configuration table
+had only 2, 4, 8 and 16 nodes, and 3 is the smallest Proxmox cluster that
+keeps quorum on its own.  New rig groups `g3`, `g5`, `g3b` and `g5b` (lab
+file) ran `3/disk/caw/direct`, `5/disk/caw/direct`, `3/net/mesh/direct` and
+`5/net/mesh/direct` side by side on 0.90.119: every one of the 30 rows passed
+in each, `guard_census` after the census fix below.
+
+**`tools/sole_survivor_audit.py` no longer names a guard after a macro.**  It
+credits each single-node guard to the last column-0 `name(` above it, and
+counted `MODULE_PARM_DESC(`, `module_param_named(` and `EXPORT_SYMBOL(` as
+names.  0.90.118's `ag_nb_mute_unanswered_master` parameter, added between
+`v5_boot_k_lineage` and `mxfs_v5_dlm_is_mds()`, re-credited that reviewed
+guard to `MODULE_PARM_DESC`, and `guard_census` failed on every configuration
+reading it as new.  Column-0 macro calls are skipped now; the guard is back
+under its inventory entry, and the inventory's four unclassified
+`xfs_mxfs_pubob.c` guards, credited to `EXPORT_SYMBOL` the same way, are
+keyed `xfs/xfs_mxfs_pubob.c::?` (no column-0 name above them), unchanged
+otherwise.  71 guards, none new.
+
+**`tests/pve_dir_rmdir_handoff.sh`** (with `tests/pve_dir_rmdir_loop.sh`):
+both hosts of the pair remove, list and recreate their own subdirectories of
+one shared shortform directory at once, so the directory's lock changes hands
+on nearly every operation; the directory must end as exactly the expected
+names on both hosts, with the volume check above clean.
+
+- **MXFS on the physical Proxmox pair over clyde's shared iSCSI LUN (CAW transport, 0.90.118 E8B6C853D1BD97C4133E304), seven concurrent VM installs: pve1 held directory ino 8388736 in core BEHIND the platter (incore nlink=6 size=50 chg=12, disk nlink=8 size=72 chg=10) at its BAST drain, and P189-RELOG-BEHIND-DISK refused to re-log it.** — DISPROVED (the backstop refused a genuinely stale copy; nothing was owed and nothing was lost): `tests/pve_dir_rmdir_handoff.sh` on the same pair and LUN, 0.90.119, 240 s of both hosts' rmdir/ls/mkdir (8744 + 9032 operations, no error), reproduced the same signature (in-core nlink 8 < 9, size 66 < 76, changecount 15570 > 15565) and printed what it was: publication pending = durable = flush (no committed change of this node unlanded), lock mode NL with the cache marked stale at that release, and the one name the in-core copy lacked, `b2`, was the peer's own subdirectory, recreated by pve2.  The copy was behind, the refusal was right, and the in-core changecount is not comparable with the platter's, which is why 183 past hits read as "ahead".  Both hosts then listed exactly the expected eight names, the whole-tree listings matched and `chk_mxfs -n` was clean; no I/O error, hang or kernel warning (`tests/evidence/pve_dir_rmdir_handoff/20261011T000045Z-p189-rmdir-0.90.119`).  The 8-node `run_chk_clean` runs that carried such hits had all ended `chk_clean` PASS.
+- **On the physical pair's Samsung 850 EVO DRBD (`pve_build_compare_850_20261009T205922Z`, leg 3 mxfs, 3+4 concurrent AlmaLinux installs), one install (alma9-6, VM 107 on pve2) never answered as installed and was cancelled at 1626 s while its six siblings installed in 667-1109 s.** — DISPROVED (not MXFS): the build's boot command processing failed, and the guest's own counters agree: it read 176 MB of its install ISO from the host's local storage and stopped, and its MXFS-backed disk saw only 150 small probe reads, all completed, and no write.  The other MXFS leg and both LVM legs of that run installed all seven.
+
+## 2026-10-10 — 0.90.118 — NOT RELEASED (its work ships with the next release): an allocation stops asking a host that has left one of its AG lock tries unanswered
+
+**The allocator's AG walk no longer spends a whole lock attempt on every AG
+the other host masters once that host has stopped answering.** A VM disk's
+block allocation walks AG after AG holding the image's inode lock, trying each
+AG without queueing.  On `net/mesh` an AG whose lock master is the other host
+costs a round trip and, when that host is too busy to answer, a whole attempt
+(1 s).  Mined from three legs on the physical DRBD pair (0.90.116-0.90.117,
+seven concurrent AlmaLinux installs): 310 such unanswered tries, every one
+from an `iou-wrk` thread (the guests' disk writes), and 231 of them (75%)
+came straight after another unanswered try by the same thread toward the same
+host, in runs of up to 25 AGs, about one second each, all under one image's
+inode lock.
+
+- `dlm/dlm.c` `mxfs_dlm_lock_noqueue()`: a no-queue acquire that names the
+  master that left it unanswered (the old `mxfs_dlm_lock_retries` is the same
+  loop with nobody asking).
+- `dlm/v5_mount.c` `mxfs_v5_dlm_ag_lock_nb()`: with the allocation's
+  `mute_master`, an AG that master owns answers would-block at once
+  (`P-AGNB-MUTED`), as a peer-held AG does; the unanswered try's own record
+  is kept, so a late grant is still adopted by the next try of that AG.
+  Module parameter `ag_nb_mute_unanswered_master` (default 1; 0 asks every
+  AG, for A/B).  `P-AGNB-MUTE-STATS` at teardown counts both.
+- `xfs/libxfs/xfs_alloc.h` `xfs_alloc_arg.mxfs_mute_master`, carried across
+  every AG walk and pass made with one allocation's args;
+  `mxfs_ag_dlm_trylock_alloc()` passes it down.
+- `xfs/libxfs/xfs_alloc.c` `P-ALLOC-WALK-SLOW`: one AG walk that took a
+  second or more under its caller's inode lock, with its wall time, whether
+  it found an AG and the master it stopped asking.
+- `tests/pve_build_leg_kmsg.sh` switches on and counts the new probes.
+
+**Measured, one build (076200B2F7C1F961F0139E8) A/B on the physical pair**
+(Kingston spare disks, seven concurrent installs per arm, knob 1 first):
+
+| arm | unanswered no-queue tries | AG walks ≥ 1 s | longest walk | installs pve1 / pve2 |
+|---|---|---|---|---|
+| `ag_nb_mute_unanswered_master=1` | 8 + 6 | 12 + 10 | 4.9 / 8.5 s | 2308-2463 s / 1938-2151 s |
+| `=0` (the 0.90.117 behaviour) | 80 + 31 | 28 + 16 | **46.1** / 16.5 s | 2662-2698 s / 2139-2451 s |
+
+Arm 0's 46 s walk held a guest image's inode lock past the 30 s hung-task
+line on pve1 (14 tasks reported, the holder named in the walk), so without
+this change D-REMOTE-NOQUEUE is a stability defect, not only a slowdown.
+Arm 1 had a hung-task episode of its own whose lock holder the report does
+not name (D-DRBD-GUEST-WRITE-ILOCK-HOLDER-UNKNOWN-30S-0-90-118): both arms
+graded FAIL, and the defect stays open.
+
+**A shared iSCSI LUN with CAW for the physical Proxmox pair**, so the pair
+can run MXFS the SAN way (`2/disk/caw/direct`) beside DRBD:
+`scripts/pve_caw_lun.sh setup` makes (or grows, and has SCST and both hosts
+re-read) a fully allocated 120 GiB image outside
+the rig's LUN pool (`/home/steve/disks/pve/pvecaw01.img`), exports it from
+clyde's SCST as `iqn.2026-05.local.mxfs:pve-caw-01` on 192.168.1.166 only,
+with LUN 0 visible to pve1's and pve2's initiator names alone, and logs each
+host in to that target without touching any other session.  Verified from
+both hosts (`/dev/sdd`, one WWID `eui.313862343731362d`): a CAW write on each
+read back on the other, a miscompare refused with the block unchanged, and a
+reservation key registered on pve1 read on pve2 and removed.  120 GiB because
+Proxmox's shared LVM, the leg MXFS is compared against, is thick: seven
+16 GiB build disks are 112 GiB reserved at creation.
+
+`scripts/pve_build_compare.sh` legs `san` (`scripts/pve_mxfs_san_disk.sh`:
+MXFS formatted from pve1, both hosts mounting it on the CAW transport,
+Proxmox storage `mxfssan`) and `sanlvm` (`scripts/pve_lvm_san_baseline.sh`,
+storage `sanlvm`); `tests/pve_build_leg_kmsg.sh` takes them as `LEGS=`.
+`scripts/pve_pair_builds.sh` samples every VM's QEMU run state (an ENOSPC
+pauses a guest as `io-error`) and every storage's usage each minute.  The
+first `san` leg, on the 20 GiB LUN, finished no install in 45 min.
+
+- **On the physical Proxmox pair with MXFS on clyde's shared iSCSI LUN (CAW transport, scripts/pve_mxfs_san_disk.sh, 0.90.118 076200B2F7C1F961F0139E8) none of seven concurrent AlmaLinux installs answered as installed: every packer build 'Timeout waiting for SSH' after 45 min 28 s (the same builds finish in 1639-2698 s on MXFS-on-DRBD).** — DISPROVED (sizing, not MXFS): the same seven-install workload on the same MXFS-on-CAW-iSCSI setup, rerun on a 120 GiB LUN (tests/evidence/pve_build_leg_kmsg/20261010T224329Z-san-sanlvm-120g-0.90.118/compare/leg1-san/blockstat.txt, STORE sampled every 60 s on both hosts), peaked at 20.4 GiB used at 18:00 — more than the 18 GiB the 20 GiB LUN had free after mkfs, so the first run's guests ran out of space. On 120 GiB all 7 installed (765-1115 s), every VM state sample read running, and both hosts' kernel logs held 0 I/O error / hung task / WARNING / BUG lines.
+
+**MXFS against Proxmox shared LVM on the same iSCSI LUN** (one leg each,
+`tests/evidence/pve_build_leg_kmsg/20261010T224329Z-san-sanlvm-120g-0.90.118`,
+both PASS, no I/O error, hung task, kernel warning or withdrawal on either
+host).  Seven concurrent AlmaLinux 9.7 installs, three on pve1 and four on
+pve2, seconds to installed:
+
+| host | MXFS on CAW (`san`) | shared LVM (`sanlvm`) |
+|---|---|---|
+| pve1 | 1056, 1115, 1018 (mean 1063) | 1059, 1037, 1012 (mean 1036) |
+| pve2 | 765, 850, 824, 814 (mean 813) | 878, 850, 824, 813 (mean 841) |
+| all seven | 6442 | 6473 |
+
+Level within 0.5%, with MXFS's sparse images peaking at 20.4 GiB used where
+the LVM leg reserves 112 GiB at creation.  One leg each, on a LUN that clyde
+serves from its page cache (flushes averaged 1.2 ms), so the absolute times
+flatter both; not a published claim while the finding below is open.
+
+That 120 GiB `san` leg's one finding: at 18:02:34 pve1 held directory
+ino 8388736 in core behind the platter (nlink 6 against 8, size 50 against
+72, yet changecount 12 against 10) at its lock-release drain, and the
+write-side backstop P189-RELOG-BEHIND-DISK refused to re-log it
+(D-SAN-CAW-RELOG-BEHIND-DISK-INCORE-DIR-STALE, open).  Whether anything was
+lost is unknown: the shared-LVM leg reformatted the LUN before the
+filesystem was checked.
+
+`P-ILOCK-HOLD-SLOW` (`xfs/xfs_inode.c`): a regular file's ILOCK_EXCL released
+after 10 s or more logs its hold time, where and by whom it was taken, and the
+releasing stack, so a guest-write stall past the hung-task line names its
+holder (D-DRBD-GUEST-WRITE-ILOCK-HOLDER-UNKNOWN-30S-0-90-118).
+
+## 2026-10-10 — 0.90.117 — NOT RELEASED (its work ships with the next release): two-host Proxmox VE on DRBD: less wasted lock work under heavy VM load; misleading kernel warning removed
+
+**For a two-host Proxmox VE pair running MXFS on DRBD dual-primary
+(`2/net/mesh/drbd`), upgrading from 0.90.116:**
+
+- **Under heavy load each host stops spending its lock commits on requests
+  the other host has already given up on.** With seven AlmaLinux installs at
+  once on two physical Proxmox VE 9 hosts with 2011-era SATA SSDs under DRBD:
+  - lock answers written to disk for nobody fell from 84 to 17;
+  - the longest wait in the answering host's lock queue fell from 39 s to
+    13 s;
+  - all seven installs finished and no task hung.
+- **A misleading kernel warning is gone.** `P958-ACQ-IDLE-LOST` read like a
+  lock wait of up to 20 minutes. Every one was the leftover record of a brief
+  try that had already given up.
+- **Still open:** under that load, a write needing new space can still wait
+  one second per region on a slow answer from the other host, about 65 times
+  per install run. No write fails and no data is at risk
+  (D-REMOTE-NOQUEUE-AG-TRYLOCK-WAITS-A-FULL-ATTEMPT-PER-AG-UNDER-ILOCK).
+
+**Released configurations and what 0.90.117 was validated on:**
+
+| configuration | nodes | storage | validated on 0.90.117 |
+|---|---|---|---|
+| `2/net/mesh/drbd` | 2 | each host's own disk, DRBD 8.4 dual-primary | the DRBD test rig; a nested Proxmox VE 9 pair through every failover step; two physical Proxmox VE 9 hosts, seven concurrent installs |
+| `2/net/mesh/direct` | 2 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+| `4/net/mesh/direct` | 4 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+| `2/disk/caw/direct` | 2 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `4/disk/caw/direct` | 4 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `8/disk/caw/direct` | 8 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `16/disk/caw/direct` | 16 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+
+The test rig is Ubuntu 24.04 with one iSCSI path per node.  "Installed
+packages" means the release packages on two nodes of each of Proxmox VE 9,
+RHEL 9.8, Ubuntu 24.04 and Debian 13.  Every host in a cluster needs the same
+version.
+
+### 0.90.117 in detail
+
+**A peer's lock requests, releases and cancels run on four per-resource
+workers instead of its receive thread** (`v5_rrq_*` in `dlm/v5_mount.c`,
+`lock_rx_worker`, default 1; 0 processes them inline, for A/B only). The
+master answers a request only once the grant's ledger record is durable, and
+retires a release's record durably before its ACK. On the receive thread,
+every message from that peer waited for each of those commits. On the
+physical pair's slow spare disks (0.90.116, 7 concurrent VM installs), pve1's
+allocator trylocks toward pve2 went unanswered 61 times, one second each,
+while holding a VM image's ILOCK. Of the 49 unanswered tries in the
+instrumented leg, 39 match no slow processing on the master at all: they
+waited behind other requests' commits, for example six AGs answered back to
+back after one 3.7 s grant. What the order keeps:
+- One resource's request, cancel and release from a peer go to the same
+  worker and are decided in arrival order.
+- A GOODBYE is processed only after everything its sender queued before it
+  (`v5_rrq_drain`).
+- A request that waited while its sender died, and was purged by recovery, is
+  dropped, not decided (`P-RRQ-DROP-PURGED`). Deciding it would put a dead
+  incarnation's grant on the platter after the purge that retires its
+  records.
+- The workers recheck `mounted` and `withdrawn` before each message, as the
+  receive thread did on arrival. At teardown they finish what is queued once
+  the peer transport is down, before the engine is destroyed
+  (`P-RRQ-STATS`).
+
+**A no-queue try that gave up unanswered no longer reads as a lost wait.**
+Its acquisition record is marked `gave_up`. It stays, so a late grant is
+adopted for the next try instead of bounced. When the idle scan retires it,
+that logs as `P958-ACQ-GAVE-UP-RETIRED` (a probe), not as
+`P958-ACQ-IDLE-LOST` at warning level with a wait of `idle_ms`. A later try
+that finds the record starts a new age. This is the fix for
+D-IDLE-LOST-WARNS-OF-A-LONG-WAIT-FOR-A-NO-QUEUE-TRY-ABANDONED-MINUTES-AGO.
+
+**New probes:** `P-RREQ-NOQUEUE-SLOW` (a peer's no-queue AG request that took
+a quarter of the requester's attempt or more, split into the ledger page's
+preparation and the rest) and `P-TAUTH-TAKEOVER-DEAD-TARGET` (a page prepared
+to a target that died before consuming it, taken over).
+
+**Physical pair:** MXFS on DRBD on the Kingston spare disks, 7 concurrent
+AlmaLinux installs, build 03981811B7B40A706D4DC1A
+(`tests/evidence/pve_build_leg_kmsg/20261010T131113Z-rrq-workers-0.90.117`).
+- PASS: 7 of 7 installed (pve1 2302–2498 s, pve2 1839–2134 s, the same range
+  as 0.90.116's leg), and both hosts' kernel logs had no hung task, I/O error,
+  warning or withdrawal.
+- `P958-ACQ-IDLE-LOST` 0 on both hosts (27 in 0.90.116's leg), and
+  `P958-ACQ-GAVE-UP-RETIRED` 4 and 22.
+- **The request workers did not reduce the unanswered no-queue tries.**
+  `P-ACQ-NOQUEUE-UNANSWERED` was pve1 120 and pve2 60, against 61 on pve1 in
+  0.90.116's leg, and `P-RREQ-NOQUEUE-SLOW` 29 and 37. That the tries waited
+  behind other messages' commits on the receive thread is disproven as their
+  cause. D-REMOTE-NOQUEUE-AG-TRYLOCK-WAITS-A-FULL-ATTEMPT-PER-AG-UNDER-ILOCK
+  stays open.
+
+**A peer's no-queue request that waited past its one attempt is dropped
+undecided** (`lock_rx_drop_stale_noqueue`, default 1; 0 decides it anyway, for
+A/B only). The requester gives a no-queue request one attempt
+(`MXFS_LOCK_ACQUIRE_WAIT_MS`), then answers would-block and keeps nothing
+waiting. On the leg above, the master decided such requests anyway, seconds
+later: 84 grants were committed for tries already abandoned, adopted
+unclaimed and handed back (`P958-ACQ-GRANT-RELEASED`), a second commit each.
+Requests waited up to 29 s (pve1) and 39 s (pve2) in the workers' queues
+behind those commits. A request that has waited that long in a worker's queue
+is now dropped before any decision, as if it never arrived
+(`P-RRQ-DROP-STALE-NOQUEUE`, counted in `P-RRQ-STATS`).
+
+Same disks and load, build 8AF4E4F710125B08E424F0D
+(`tests/evidence/pve_build_leg_kmsg/20261010T141420Z-drop-stale-noqueue-0.90.117`):
+PASS, 7 of 7 installed, and no hung task, I/O error, warning or withdrawal.
+
+| Leg (same disks, 7 installs) | Unanswered tries, pve1 + pve2 | Late grants released unused | Slowest install, pve1 / pve2 |
+|---|---|---|---|
+| 0.90.116 | 61 + 0 | not counted | 2441 / 2174 s |
+| 0.90.116, probes added | 15 + 49 | not counted | 2403 / 2147 s |
+| 0.90.116, 200 ms remote wait | 33 + 32 | 13 + 23 | 2493 / 2217 s |
+| 0.90.117, workers only | 120 + 60 | 43 + 41 | 2498 / 2134 s |
+| 0.90.117, workers and the stale drop | 23 + 43 | 8 + 9 | 2365 / 2045 s |
+
+- 40 stale requests dropped (26 on pve1, 14 on pve2).
+- The workers' longest queue waits fell to 13.4 s and 5.3 s.
+- The unanswered tries returned to 0.90.116's level, but not below it.
+  D-REMOTE-NOQUEUE-AG-TRYLOCK-WAITS-A-FULL-ATTEMPT-PER-AG-UNDER-ILOCK stays
+  open: the master's decision and commit still take seconds (`rest_ms`), and
+  the requester still waits a whole second per AG under the ILOCK.
+
+**Defect queue:**
+- **P958-ACQ-IDLE-LOST read as a wait of `idle_ms` that never happened**
+  (D-IDLE-LOST-WARNS-OF-A-LONG-WAIT-FOR-A-NO-QUEUE-TRY-ABANDONED-MINUTES-AGO):
+  FIXED AND VERIFIED by the `gave_up` change above, on the leg above.
+
+**Rig gates** on this build (D8C1F2194BD47BD19CAC2FF, the module source of
+the stale-drop leg): `DRBD_RELEASE_VERIFY PASS`, and all six release boards
+31 of 31 PASS. An earlier run on the workers-only build (B3240CC6) passed its
+DRBD verification, but its boards measured nothing. The tree's tools and module
+were removed mid-run, so every node's `chk_clean` reported "chk tool missing"
+and `dlm_lock_correctness` "fua_verify missing". Those two setup failures
+then graded four rows FLAKY on this build's run, whose own measurements were
+all clean.
+
+**`tools/criteria.py`: a test whose own instrument was absent is rig noise,
+not a flake.** "chk tool missing" (`tests/tooling/chk_clean.sh`) and
+"fua_verify missing" (`tests/caw/dlm_lock_correctness.sh`) are emitted only
+by those tests' `[ -x tool ]` setup checks, before anything is measured, the
+same class as a prep failure. Every failure that carries a measurement still
+counts.
+
+**Platforms:** the installed packages passed on Proxmox VE 9 (kernels 6.17 and
+7.0), RHEL 9.8 (with SELinux), Ubuntu 24.04 and Debian 13
+(`tests/evidence/full_verify_0.90.117_<platform>.log`).
+
+## 2026-10-10 — 0.90.116 — two-host Proxmox VE on DRBD: VM disks no longer freeze on slow SSDs, and a host that leaves, fails or rejoins comes back cleanly
+
+**For a two-host Proxmox VE pair running MXFS on DRBD dual-primary
+(`2/net/mesh/drbd`), upgrading from 0.90.107, the last release:**
+
+- **VM disk writes no longer freeze under heavy load on slow disks.** With
+  seven AlmaLinux installs running at once on two physical Proxmox VE 9 hosts
+  with 2011-era SATA SSDs under DRBD, a guest write that needed new space
+  could hold its disk image locked for 30 s to a minute. The host reported
+  hung tasks. On the same disks and load in 0.90.116, no task hung and all
+  seven installs finished. No write ever failed and no data was lost
+  (0.90.115, 0.90.116).
+- **A host that drops out and rejoins comes back cleanly.** When one host's
+  mount is declared dead and recovered, and then remounts without a restart,
+  its mount no longer waits minutes to be admitted (0.90.113). Its first reads
+  no longer take 69 to 95 s (0.90.114).
+- **Shutting down or unmounting one host is quick, however busy the
+  filesystem was.** A clean departure is bounded in time whatever it was
+  serving (0.90.110). It no longer waits out the other host's rejoin
+  (0.90.109).
+- **When one host leaves, the other takes over everything it served,
+  whichever of the two it is** (0.90.111), and leaves nothing stranded
+  (0.90.113).
+- **Live migration between the two hosts is tested** (0.90.112).
+- **Both hosts deleting VM disk images at once, still open, leave nothing
+  behind** (0.90.116).
+- **Fewer false alarms in the kernel log.** Messages a healthy, loaded host
+  printed as warnings or as recovery are now debug probes (0.90.108).
+
+**Validated on:**
+- the two physical Proxmox VE 9 hosts (both their Samsung 850 EVO and their
+  older Kingston SSDs);
+- a nested Proxmox VE 9 pair through every failover step: crashes, power
+  cuts, restarts, promotions, a slow heartbeat and withdrawals;
+- the DRBD test rig;
+- the six shared-LUN configurations on the test rig;
+- the installed packages on Proxmox VE 9, RHEL 9.8, Ubuntu 24.04 and
+  Debian 13.
+
+Every host in a cluster needs the same version. The README lists the
+configurations this release claims.
+
+What was measured and changed, release by release, follows here and in the
+0.90.108 to 0.90.115 sections below.
+
+### 0.90.116 in detail
 
 **An AG lock's no-queue request does no ledger I/O and never waits for a
 ledger page's lock.** 0.90.115's fix answered would-block only when the
@@ -20871,7 +21868,7 @@ wait costs nothing on the ordinary path.
 
 ## 0.75.104 — 2026-09-09 — The defect queue was hiding a third of its own guidance
 
-The RULE 6 ledger accumulated three spellings of the same field over time —
+The RULE: ZERO ACCEPTED KNOWN DEFECTS ledger accumulated three spellings of the same field over time —
 `next`, `next_step`, `next_steps` — and the queue reader returned the FIRST of
 them that was populated. Eighteen open records populate two, so whichever one
 lost the race was written by one session and then shown to no later one.
@@ -20946,7 +21943,7 @@ count, and reading it as a count would have been wrong.
 
 ## 0.75.101 — 2026-09-09 — A throughput gate that could not tell which rig it was scoring
 
-The RULE 0 throughput row compares this rig's measurement against a yardstick
+The RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS throughput row compares this rig's measurement against a yardstick
 captured on this rig, because the rigs differ enough that a cross-rig comparison
 is meaningless — its own header has said so since the rig tag was introduced.
 The tag, however, was derived only from `MXFS_RIG_TAG` or a substring of
@@ -25057,7 +26054,7 @@ is test-harness and tooling.
 ## 0.11.364-369 (sess46) — 2026-08-02 — routed open-unlink: five defects burned down to matrix 9/9
 
 The 363 implementation failed openunlink_matrix 7/9 on the routed config;
-each failure was RULE-4 instrumented, rooted, and fixed one build at a time.
+each failure was RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS instrumented, rooted, and fixed one build at a time.
 All are icluster-config (knob=1) defects; knob=0 ship config untouched
 except where noted.
 
@@ -25262,7 +26259,7 @@ except where noted.
   then resume — makes the pause-takeover-resume race directly testable.
 - Boards on this build: 32/caw 27/27 PASS and 8/caw 27/27 PASS (policy row red at the
   open-defect count, as designed).
-- NEW ledger entries (RULE 6): D-MASS-TEARDOWN-DEPARTURE-WAVE-WEDGE (major — still-
+- NEW ledger entries (RULE: ZERO ACCEPTED KNOWN DEFECTS): D-MASS-TEARDOWN-DEPARTURE-WAVE-WEDGE (major — still-
   mounted tail nodes saw cleanly-departed peers as 62s-frozen slots during a 32-node
   mass teardown, fencing wave wedged 4 umounts, harness power-cycled them) and
   D-RELOAD-FREED-ADOPT-BOGUS-IMODE (minor, fix shipped in .357, verification pending).
@@ -25453,7 +26450,7 @@ except where noted.
 
 ## 0.11.337 (sess40) — 2026-08-01
 
-- **D-CAW-CLAIM-RETRY-EXHAUSTION-SHUTDOWN ROOT PROVEN AND FIXED** (RULE 4
+- **D-CAW-CLAIM-RETRY-EXHAUSTION-SHUTDOWN ROOT PROVEN AND FIXED** (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS
   step 2b).  P92-CLAIMCAS caught it on three nodes independently:
   `cmp[magic=b4bc1b3d gen=4045629598] disk[magic=4d584357 gen=1]
   first_diff=0 fresh_read_skipped=1` — the CAS compare buffer held GARBAGE
@@ -25480,7 +26477,7 @@ except where noted.
 
 ## 0.11.336 (sess40) — 2026-08-01
 
-- D-CAW-CLAIM-RETRY-EXHAUSTION-SHUTDOWN increment 1 (RULE-4 measured, not
+- D-CAW-CLAIM-RETRY-EXHAUSTION-SHUTDOWN increment 1 (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS measured, not
   guessed).  New P91-CLAIMEXH prints, at the moment the acquire gives up, the
   resource hash base, the insertion point we kept CASing, that slot's actual
   content, and a bounded re-probe for the resource.  Two captures at 32/caw:
@@ -25701,7 +26698,7 @@ except where noted.
 ## 0.11.325 (sess38) — 2026-08-01
 
 - Heartbeat-starvation mutex fix (D-RELABORT-ORPHAN-LOOP-HEARTBEAT-SELFFENCE
-  RULE-4 step 2b — root CONFIRMED live by the 324 probes within an hour of
+  RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS step 2b — root CONFIRMED live by the 324 probes within an hour of
   deployment: test1 P-HB-SLOW lockwait_ms=26726 write_ms=0; peers
   P-HB-MONSLOW 5.4-6.5s).  Three disklock read loops held ctx->lock
   CONTINUOUSLY across full slot scans, starving the heartbeat writer that
@@ -25731,7 +26728,7 @@ board).  D-RELABORT-ORPHAN-LOOP-HEARTBEAT-SELFFENCE = FIXED AND VERIFIED.
 ## 0.11.324 (sess38) — 2026-08-01
 
 - P-HB-SLOW / P-HB-MONSLOW (D-RELABORT-ORPHAN-LOOP-HEARTBEAT-SELFFENCE
-  RULE-4 step 1): unconditional disklock heartbeat cycle clocks — per-cycle
+  RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS step 1): unconditional disklock heartbeat cycle clocks — per-cycle
   write_ms + lockwait_ms (ctx->lock is shared with the 32-peer monitor scan)
   + age_since_last_ok_ms + monitor-pass duration; logs ONLY when a write is
   slow (>2s), the last-ok age exceeds 2 intervals, or the monitor pass
@@ -25741,7 +26738,7 @@ board).  D-RELABORT-ORPHAN-LOOP-HEARTBEAT-SELFFENCE = FIXED AND VERIFIED.
 
 ## 0.11.323 (sess38) — 2026-08-01
 
-- D-AGI-UNLINKED-CROSSNODE-RECOVERY-SHUTDOWN instrumentation (RULE 4 step 2):
+- D-AGI-UNLINKED-CROSSNODE-RECOVERY-SHUTDOWN instrumentation (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS step 2):
   - mxfs_inode_disk_unlinked() (xfs_mxfs_dlm.c): FUA dinode read returning
     on-disk di_next_unlinked (+nlink/mode).
   - P83-UNL-REMCHK (xfs_iunlink_remove_inode, instr-gated): in-core vs
@@ -25784,7 +26781,7 @@ aging effect on sequential allocation, worth a future look.
 
 ## 0.11.322 (sess38) — 2026-08-01
 
-- PR-batch admission storm fix (P139 census root, RULE 4 + GPT RULE-5).
+- PR-batch admission storm fix (P139 census root, RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS + GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK).
   Census on 321: the round wall's tail = SIMULTANEOUS ~900ms PR admission
   storms — a streak-yield ticket names N readers (chosen on ~85% of loop
   reads) but each self-claims ONE CAS at a time (9 nodes x ~22 tries, each
@@ -25812,7 +26809,7 @@ log-force/flush congestion at the shared target, not a per-op bug.
 
 ## 0.11.321 (sess38) — 2026-08-01
 
-- P139 tail census (RULE 4 discriminator for the dir_reuse round-wall root:
+- P139 tail census (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS discriminator for the dir_reuse round-wall root:
   ONE rotating multi-second grant-wait outlier per round — measured 4.70s
   create-EX wait on test28 r=6 while its lookup PR granted in 0.5ms and both
   files created in 10ms each).  Unconditional on ALL nodes, >800ms waits
@@ -25821,13 +26818,13 @@ log-force/flush congestion at the shared target, not a per-op bug.
   clock across outer retries: retries + per-CAS-site -EAGAIN census) —
   discriminates queue-position-consumed-by-churn vs claim/adopt latency vs
   bounded-bypass violation vs lost-nudge 250ms dozing vs multi-retry
-  re-registration.  GPT RULE-5 consult (full design in sess38 memory)
+  re-registration.  GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK consult (full design in sess38 memory)
   prescribes persistent-enrollment + RR-cursor grant discipline; this census
   picks WHICH hole to close first.
 
 ## 0.11.320 (sess38) — 2026-08-01
 
-- create_intent_ex default 1 -> 0 (RULE 4 same-build A/B, 32/caw dir_reuse on
+- create_intent_ex default 1 -> 0 (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS same-build A/B, 32/caw dir_reuse on
   0.11.319: knob-on 6 rounds vs knob-off 7 in the 120s box).  With the sess38
   tag-survival fixes the mechanism is CORRECT (instrumented nodes: rc=-35
   create-path count 0, P-CI-A engaged 52/52, arm-entry cached grant 0/PR/EX =
@@ -25847,7 +26844,7 @@ log-force/flush congestion at the shared target, not a per-op bug.
 
 ## 0.11.319 (sess38) — 2026-08-01
 
-- CREATEINT tag-survival fix (RULE 4 + RULE 5 GPT design review). 0.11.318's
+- CREATEINT tag-survival fix (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS + RULE: CONSULT ANOTHER MODEL WHEN STUCK GPT design review). 0.11.318's
   instrumented lap showed partial engagement: waves batch, but ~one
   "EX denied EDEADLK rc=-35 -> drop -> drain -> fresh EX" survived per dir
   visit (test1 lap window: 8x ino=128 root + 7x ino=131 drc, all mode=5).
@@ -25893,7 +26890,7 @@ log-force/flush congestion at the shared target, not a per-op bug.
   ILOCK_SHARED protects an in-core-only read (i_delayed_blks + loaded
   extent tree), but routed through xfs_ilock it paid a FULL DLM wire
   acquire per call — and the reclaim path calls it for EVERY evicted
-  inode (mark_reclaimable -> needs_inactive -> here; RULE-4 stack
+  inode (mark_reclaimable -> needs_inactive -> here; RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS stack
   capture).  Now takes the raw i_lock rwsem directly (both mxfs hooks
   skipped symmetrically).
 - With 314-317 combined, dir_reuse's drop_caches phase (new
@@ -25911,7 +26908,7 @@ log-force/flush congestion at the shared target, not a per-op bug.
 
 - **EVICT-RETAIN-PR** (knob mxfs.evict_retain_pr=1): a clean PR DLM
   grant is retained across inode eviction instead of CAS-cleared.
-  RULE-4 stack capture (new DCSTK sampler in dir_reuse's dc wait
+  RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS stack capture (new DCSTK sampler in dir_reuse's dc wait
   loop): barrier-aligned drop_caches had all 32 nodes inside
   caw_slot <- unlock_gen <- v5_dlm_inode_unlock <- mxfs_dlm_evict
   simultaneously clearing PR bits on the SAME hot slots, each unlock
@@ -26039,7 +27036,7 @@ log-force/flush congestion at the shared target, not a per-op bug.
   probe now re-reads authority immediately before emitting: a
   transient logs P-A-TRANSIENT (no stack); only a persistently
   unauthorized write earns the crash-shaped artifact.  Soak's kernel
-  -log scan is untouched (RULE 6: fix the noise source, not the test).
+  -log scan is untouched (RULE: ZERO ACCEPTED KNOWN DEFECTS: fix the noise source, not the test).
 - MATRIX: caw column fully re-measured this session on 308/309 —
   1/2/4/8/16 all green (16/caw was 1-FAIL on the sess27 0.11.237
   baseline), 32 = 20/21 (dir_reuse pace only).
@@ -26075,7 +27072,7 @@ log-force/flush congestion at the shared target, not a per-op bug.
   ARE clean).  Fix: xfs_irele on the queue-false branch at all four
   sites, mirroring the ilock-end arm's correct pattern; the P76 prints
   now read "extra ref dropped (P226)".  GPT design review passed.
-  Tools built for this hunt (RULE 3): tests/refleak_trace.sh (tracefs
+  Tools built for this hunt (RULE: A SCRIPT IS NEVER A TEMP FILE): tests/refleak_trace.sh (tracefs
   kprobes on igrab/ihold/__iget/iput with BTF offsets, per-node
   streaming), tests/refleak_analyze.py (per-inode running-count
   reconstruction + per-task net balance), tests/census_p.sh.
@@ -26207,7 +27204,7 @@ log-force/flush congestion at the shared target, not a per-op bug.
 
 ## 0.11.298 (sess35) — 2026-07-31
 
-- Classifier round 2 instrumentation (RULE 4) for the P239 population:
+- Classifier round 2 instrumentation (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS) for the P239 population:
   - P239 grew gen=/pgen= (in-core vs platter incarnation — the
     dead-shell discriminator), ds=/gs= (dirty_seq vs ex_grant_seq at
     condemnation), fields= (re-log state deciding self-heal vs
@@ -26235,7 +27232,7 @@ log-force/flush congestion at the shared target, not a per-op bug.
 
 ## 0.11.294 (sess34) — 2026-07-31
 
-- FIX-1 REFINEMENT (RULE 4 — 293's unconditional form was a proven
+- FIX-1 REFINEMENT (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS — 293's unconditional form was a proven
   livelock engine, caught on its first board): the P238 cluster-merge
   ledger rollback + PUB_SKIPPED re-arm now engages ONLY inside the
   sanctioned-release window (MXFS_IF_DLM_RELFLUSH).  293's first cut
@@ -26291,7 +27288,7 @@ log-force/flush congestion at the shared target, not a per-op bug.
 
 ## 0.11.295 (sess34) — 2026-07-31
 
-- Instrumentation build (no behavior change; Gemini RULE-5 consult #2
+- Instrumentation build (no behavior change; Gemini RULE: CONSULT ANOTHER MODEL WHEN STUCK consult #2
   drove the design):
   P239-OVERLAY-ID: unconditional identity trace at every cluster-merge
     overlay of a slot with an in-flight copy-in claim (flush!=durable) —
@@ -26330,7 +27327,7 @@ log-force/flush congestion at the shared target, not a per-op bug.
   bytes never on the wire; close_or_defer read pend==dur and the wire
   unlock proceeded; 50s later a reload adopted the stale platter (P177
   silent — ledger read closed) destroying the only cc=6 copy.
-- Three-part fix (Gemini RULE-5 review: flush-before-demote must be
+- Three-part fix (Gemini RULE: CONSULT ANOTHER MODEL WHEN STUCK review: flush-before-demote must be
   structural; dirty-at-NL unrepresentable; evict of an obligated fork is
   the loss finalizer):
   FIX-1 P238-CLMERGE-LEDGER-ROLLBACK: merge overlay of a staged slot
@@ -26410,7 +27407,7 @@ log-force/flush congestion at the shared target, not a per-op bug.
   lognoex_nl / lognoex_pr in the P220 dump. .287 first data: pr=0, nl only
   from the pipeline's own P146V/P182 re-log arms → .288 gates those via
   i_mxfs_pipe_relog → STRICT ZERO on dd+zsl. .289's full board then fired
-  it 2-24/node — attributed (RULE 4) to the FIX-25/26/27 nested ioend/
+  it 2-24/node — attributed (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS) to the FIX-25/26/27 nested ioend/
   writeback admissions, which legitimately mutate while drain site 2 has
   already cleared i_dlm_mode to NL but the on-disk mirror grant is still
   ours (their ex_holders census pins the wire grant; P15 aborts + re-arms
@@ -26491,7 +27488,7 @@ log-force/flush congestion at the shared target, not a per-op bug.
 
 - Admission barrier in mxfs_relbar_close_or_defer: .282's unconditional
   down_write(&i_lock) CONVOYED behind readdir's long ILOCK_SHARED holds
-  (dirent_durability 240s/240s, 4x wall — RULE 0 fail) and was replaced in
+  (dirent_durability 240s/240s, 4x wall — RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS fail) and was replaced in
   .283 by a <=40ms down_write_trylock loop (timeout = safe pre-barrier defer
   behavior). Measured: the trylock rarely wins on a hot dir (closed=7 vs
   deferred=119 over 227k unlocks) — defers stay safe/bounded at healthy
@@ -26732,7 +27729,7 @@ CAW lock-wait liveness extension (ccloop 72513a13 sess2):
   cap MXFS_CAW_WAIT_HARDCAP_MS=480s — so a live-but-wedged holder (P113
   family) still surfaces as a timeout instead of hanging forever.
   P-WAIT-EXTEND logs each extension episode.  Slowness stays visible at
-  the harness layer via RULE-0 per-test budgets.
+  the harness layer via RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS per-test budgets.
 
 ## [0.11.9] — 2026-07-18
 
@@ -26746,7 +27743,7 @@ stay armed.
 
 ## [0.11.8] — 2026-07-18
 
-mmap-fault vs bast-drain ABBA deadlock fix (ccloop 72513a13 sess2, RULE-4
+mmap-fault vs bast-drain ABBA deadlock fix (ccloop 72513a13 sess2, RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS
 live capture on test20 during 32/cawd mmap_coherency):
 
 - A page fault's readahead/read_folio path adds folios to the page cache
@@ -27005,7 +28002,7 @@ VMs stay on 0.10.120 — CAW criteria-met status undisturbed).
 - gate2_midcomms.sh --kernel-smoke implemented (was checkpoint-A-gated
   stub): reset both nodes (umount+rmmod, virsh power-cycle fallback),
   back-to-back insmods with swapped slot params, dmesg marker harvest,
-  per-node srcversion verify, RULE-0 enforcement in-script.
+  per-node srcversion verify, RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS enforcement in-script.
 
 ## [0.11.1] — 2026-07-17
 
@@ -27494,7 +28491,7 @@ Repository normalization and first public release. No functional code changes.
 - 2026-02-15: Ported from kernel to portable C using PAL
 
 ## 0.11.374-376 (sess47, 2026-08-02)
-- 374: RULE-4 probes naming every exit of xfs_iunlink_remove_inode
+- 374: RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS probes naming every exit of xfs_iunlink_remove_inode
   (P-UNLREM-INCOMPLETE/-NOPREV/-LOGSELF/-BACKREF); deterministic repro
   tests/reap_midlist_repro.sh REPRODUCED D-REAP-IFREE-EFSCORRUPTED-SHUTDOWN-372
   first run (40s): reap-after-reclaim mid-list remove with prev=0 ->

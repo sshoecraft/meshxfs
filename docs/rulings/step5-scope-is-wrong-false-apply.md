@@ -1,5 +1,5 @@
-<!-- sess81 RULE-5 ruling: the ledger's step-5 scope (AG exact-match gate) would INTRODUCE a false-APPLY regression. v1 tokens are NOT authority evidence.… -->
-# sess81 RULE-5 ruling — D-FOREIGN-REPLAY-UNGATED-IMAGES step 5
+<!-- sess81 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: the ledger's step-5 scope (AG exact-match gate) would INTRODUCE a false-APPLY regression. v1 tokens are NOT authority evidence.… -->
+# sess81 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — D-FOREIGN-REPLAY-UNGATED-IMAGES step 5
 
 **Verdict: the ledger's step-5 scope is WRONG and must not be enabled.**
 Enabling an exact `{class,resource,epoch}` AG match on the tokens as they are

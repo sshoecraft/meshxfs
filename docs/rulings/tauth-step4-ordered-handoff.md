@@ -1,5 +1,5 @@
-<!-- sess423 RULE-5 ruling on tauth step 4 (ordered mastership handoff): volatile FROZEN insufficient — durable PREPARED->MOVED page transitions, nonce co… -->
-# sess423 — RULE-5 ruling on step 4 (ordered mastership handoff) of docs/tcp-authority-ledger.md
+<!-- sess423 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on tauth step 4 (ordered mastership handoff): volatile FROZEN insufficient — durable PREPARED->MOVED page transitions, nonce co… -->
+# sess423 — RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on step 4 (ordered mastership handoff) of docs/tcp-authority-ledger.md
 
 ## The hole (session finding, GPT concurred)
 Step 3's page_write readback validates crc+seq only.  Old owner A (view lagging) and new owner B

@@ -4017,7 +4017,8 @@ xfs_alloc_vextent_prepare_ag(
 	 * deadlock.  The blocking second pass (no TRYLOCK) waits as before.
 	 */
 	if ((alloc_flags & XFS_ALLOC_FLAG_TRYLOCK) || args->mxfs_ag_trylock)
-		error = mxfs_ag_dlm_trylock(args->mp, args->pag);
+		error = mxfs_ag_dlm_trylock_alloc(args->mp, args->pag,
+						  &args->mxfs_mute_master);
 	else if (args->tp && args->tp->t_mxfs_ag_restart_ok &&
 		 !(args->tp->t_flags & XFS_TRANS_DIRTY))
 		/*
@@ -4028,7 +4029,8 @@ xfs_alloc_vextent_prepare_ag(
 		 * from xfs_alloc_vextent_finish so the caller can pregrant
 		 * the AG while holding nothing, then restart.
 		 */
-		error = mxfs_ag_dlm_trylock(args->mp, args->pag);
+		error = mxfs_ag_dlm_trylock_alloc(args->mp, args->pag,
+						  &args->mxfs_mute_master);
 	else if (args->tp && (args->tp->t_flags & XFS_TRANS_DIRTY))
 		/*
 		 * ABBA edge-2 (stack-proven run36): a DIRTY trans here
@@ -4611,6 +4613,29 @@ xfs_alloc_vextent_this_ag(
  * transaction if we are doing a blocking iteration. This will result in an
  * out-of-order locking of AGFs and hence can cause deadlocks.
  */
+/*
+ * MXFS: name an AG walk that took a second or more.  Its caller holds the
+ * inode's ILOCK for all of it (a VM image's writes wait behind it), and on
+ * net/mesh each AG a remote master does not answer costs a whole lock
+ * attempt.  mute is the master that allocation stopped asking, 0 if none.
+ */
+static void
+mxfs_alloc_walk_note(
+	struct xfs_alloc_arg	*args,
+	xfs_agnumber_t		start_agno,
+	u64			walk_t0,
+	int			error)
+{
+	u64			ms = (ktime_get_ns() - walk_t0) / NSEC_PER_MSEC;
+
+	if (ms < 1000)
+		return;
+	mxfs_probe_ratelimited("mxfs: P-ALLOC-WALK-SLOW start=%u agno=%d ms=%llu got=%d err=%d mute=%u comm=%s -- one AG walk of an allocation took a second or more under its caller's inode lock\n",
+		start_agno, args->agbp ? (int)args->agno : -1,
+		(unsigned long long)ms, args->agbp ? 1 : 0, error,
+		args->mxfs_mute_master, current->comm);
+}
+
 static int
 xfs_alloc_vextent_iterate_ags(
 	struct xfs_alloc_arg	*args,
@@ -4623,6 +4648,7 @@ xfs_alloc_vextent_iterate_ags(
 	xfs_agnumber_t		restart_agno = minimum_agno;
 	xfs_agnumber_t		agno;
 	int			error = 0;
+	u64			walk_t0 = ktime_get_ns();
 
 	if (alloc_flags & XFS_ALLOC_FLAG_TRYLOCK)
 		restart_agno = 0;
@@ -4693,10 +4719,13 @@ restart:
 		}
 		xfs_perag_rele(args->pag);
 		args->pag = NULL;
+		mxfs_alloc_walk_note(args, start_agno, walk_t0, error);
 		return error;
 	}
-	if (args->agbp)
+	if (args->agbp) {
+		mxfs_alloc_walk_note(args, start_agno, walk_t0, 0);
 		return 0;
+	}
 
 	/*
 	 * We didn't find an AG we can alloation from. If we were given
@@ -4711,6 +4740,7 @@ restart:
 
 	ASSERT(args->pag == NULL);
 	trace_xfs_alloc_vextent_allfailed(args);
+	mxfs_alloc_walk_note(args, start_agno, walk_t0, 0);
 	return 0;
 }
 

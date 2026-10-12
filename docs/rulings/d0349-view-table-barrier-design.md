@@ -1,4 +1,4 @@
-<!-- sess428 RULE-5 ruling (D-0349 at 67651 pages): target = durable VIEW TABLE + 2-phase barrier (B); group authority (A) ok as interim; C safe w/ 7 cond… -->
+<!-- sess428 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (D-0349 at 67651 pages): target = durable VIEW TABLE + 2-phase barrier (B); group authority (A) ok as interim; C safe w/ 7 cond… -->
 # sess428 GPT ruling #2 — D-0349 redesign at format-v2 geometry (2026-08-28)
 
 Facts given: v2 ledger = 67,651 pages (31 rec/page), per-page durable authority header; eager per-page activation REFUTED in usermode ramp (16/tick: ~1 page/pass, stale EX record + 33 rel re-sends; 2/tick+(c): 12 lock failures, 9× -110); any per-page handoff on a view change is O(pages) writes; lazy first-touch ≥100 ms × ~5000 pages for the workload. Requirement ≤ 6 s (2× native) for the 4-node small-file workload.

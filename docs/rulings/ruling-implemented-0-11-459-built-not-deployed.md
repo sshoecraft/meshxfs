@@ -1,9 +1,9 @@
-<!-- sess163: RULE-5 ruling on sess162 wiring (A refuted→fixed, B/C ratified, D=4-before-5) implemented, 0.11.459 sv F6077665 BUILT. Deploy+measure NEXT. -->
+<!-- sess163: RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on sess162 wiring (A refuted→fixed, B/C ratified, D=4-before-5) implemented, 0.11.459 sv F6077665 BUILT. Deploy+measure NEXT. -->
 # sess163 — consult done, ruling implemented, 0.11.459 BUILT (NOT deployed)
 
 Build: **0.11.459 sv F6077665E740E6ED1A6B472**, builds clean. Ledger unchanged: 28 open / 17 critical.
 
-## The RULE-5 ruling on the sess162 begin_release wiring (full text in sess163 transcript)
+## The RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the sess162 begin_release wiring (full text in sess163 transcript)
 
 - **(A) REFUTED — phantom arms must invalidate AT DETECTION**, not ride the backstop: retaining a proving cert after wire-loss detection permits stale authority tagging during any intervening logging/lock-drop, and re-acquire must never start while the old tenure appears live. Backstop stays reserved for uninstrumented paths. Post-phantom reacquire must mint fresh tenure (gen++ satisfies).
 - **(B) RATIFIED** — evict placement after P237/durability arms is correct; the real invariant is "before relinquishment becomes PEER-EFFECTIVE", not "eviction begin" (peer-visible activity under a held grant is legitimate; a successful P237 CAS is itself a proving act). Failed P237 needs no phantom handling (unpublished = no wire grant ever believed; UNPUBLISHED_EX fails closed at the gate).
@@ -20,7 +20,7 @@ Build: **0.11.459 sv F6077665E740E6ED1A6B472**, builds clean. Ledger unchanged: 
 
 ## NEXT (task #3, unchanged): deploy + measure
 
-`MXFS_FORCE_PREP=1 ./run.sh 32 caw prep_cluster` then a board lap. Assert: release_begin>0, release_clean>0, **backstop==0 strictly** (post-A-fix there is no legitimate population), phantom_loss≈0 (each hit is a real wire/cache divergence — investigate), pub_live==0, P248 absent; RULE-0 timings. Then tick ledger items 1+2 in D-FOREIGN-REPLAY next-field and proceed to step 4 (recovery descriptor + IMAGE_REPLAY_DONE + victim freeze — overlaps D-FOREIGN-SLICE-INTENTS-ABANDONED #7), with step-5 shadow parts fair game per (D).
+`MXFS_FORCE_PREP=1 ./run.sh 32 caw prep_cluster` then a board lap. Assert: release_begin>0, release_clean>0, **backstop==0 strictly** (post-A-fix there is no legitimate population), phantom_loss≈0 (each hit is a real wire/cache divergence — investigate), pub_live==0, P248 absent; RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS timings. Then tick ledger items 1+2 in D-FOREIGN-REPLAY next-field and proceed to step 4 (recovery descriptor + IMAGE_REPLAY_DONE + victim freeze — overlaps D-FOREIGN-SLICE-INTENTS-ABANDONED #7), with step-5 shadow parts fair game per (D).
 
 ## Housekeeping
 

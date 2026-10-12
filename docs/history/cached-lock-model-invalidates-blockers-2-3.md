@@ -87,7 +87,7 @@ and clears it.
 
 ## Open consult (fired at the relay boundary, answer not yet seen)
 
-A RULE-5 consult carrying FACTS A-D was sent asking GPT to rule per item:
+A RULE: CONSULT ANOTHER MODEL WHEN STUCK consult carrying FACTS A-D was sent asking GPT to rule per item:
 (1) accept FACT A and withdraw blocker 2; (2) the correct requirement in its
 place — my position is the registry's sound scope is exactly what it does
 today, gate `caw_drop_own_waiter`, because XFS's per-resource state machine is

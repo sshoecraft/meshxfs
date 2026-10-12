@@ -1,4 +1,4 @@
-<!-- sess439 RULE-5 ruling: whole-cluster-restart items 3-5 — self-succession only under a CAS fence intent (method SELF_SUCCESSION) on the predecessor sl… -->
+<!-- sess439 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: whole-cluster-restart items 3-5 — self-succession only under a CAS fence intent (method SELF_SUCCESSION) on the predecessor sl… -->
 # sess439 GPT ruling — bootstrap record + self-succession (docs/whole-cluster-restart.md §5)
 
 Question asked: (A) self-succession at REGISTER -EEXIST via identity+ledger then REGISTER-IGNORE + ledger FENCED-by-successor; (B) no bootstrap record, rebooter claims a free slot ACTIVE and runs the existing pre-mountfs barrier over all dead records; (C) full occupancy 64 dead; (D) refusals.

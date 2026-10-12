@@ -1,4 +1,4 @@
-<!-- sess253 RULE-5 ruling (step 5 F3): keyed per-cluster {daddr} write accounting (no device-wide wait), generation-based flush proof, ticket-status enum… -->
+<!-- sess253 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (step 5 F3): keyed per-cluster {daddr} write accounting (no device-wide wait), generation-based flush proof, ticket-status enum… -->
 # sess253 GPT ruling — step 5 (F3) implementation shape
 
 Full text in sess253 transcript. Verdicts on my proposed shape:

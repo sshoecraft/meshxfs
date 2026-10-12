@@ -1,4 +1,4 @@
-<!-- sess463 RULE-5 ruling on directory-sharding stages 1-2 concrete shape: private flags + ROOT xattr manifest accepted; 12 STOP-SHIPs (explicit lock mod… -->
+<!-- sess463 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on directory-sharding stages 1-2 concrete shape: private flags + ROOT xattr manifest accepted; 12 STOP-SHIPs (explicit lock mod… -->
 # sess463 GPT ruling — symmetric directory sharding, stages 1-2 concrete shape (D-32NODE-SHARED-DIR-CREATE-PACE / D-401; owner doc docs/dir-sharding.md)
 
 Verdict: directionally acceptable, NOT code-ready as proposed (S4-S9 must not be coded literally). Invariant: an ordinary op takes LOGICAL-PARENT PR + exactly ONE shard lock; no MDS, no per-op RPC.

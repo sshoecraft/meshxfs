@@ -7,7 +7,7 @@ tags: [compiled, clyde, host-safety, pgrep, wedge, rig, libvirt]
 ---
 
 Clyde is the dev host: it runs libvirt, the SCST/iSCSI target, NFS, and Claude
-Code itself. Per CLAUDE.md RULE 2, only the user resets it — every host
+Code itself. Per CLAUDE.md RULE: NEVER REBOOT THE LAB HOST, only the user resets it — every host
 incident below either has a recovery path that avoids that, or (mmap_lock)
 proves there isn't one and the only fix is not entering the state. Two
 standing reference procedures anchor the recovery paths that follow:
@@ -91,7 +91,7 @@ virtlockd's lease on the disk image (unbreakable while the zombie holds the
 fd — point the domain at a copy), and systemd-machined's stale registration
 (`machinectl terminate`). Automated end-to-end in `tools/recover_wedged_domain.sh`
 (~3 min, dominated by a sparse image copy), verified to bring the domain back
-and let a 32-node cluster re-prep clean. It never touches the host (RULE 2).
+and let a 32-node cluster re-prep clean. It never touches the host (RULE: NEVER REBOOT THE LAB HOST).
 This incident is also why every `virsh` call in `run.sh`'s
 `power_cycle_node()` is now wrapped in `timeout 60` — unbounded, it hangs an
 unattended prep forever against a deadlocked domain, the same shape as the

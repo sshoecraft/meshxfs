@@ -21,5 +21,5 @@ Code-landed only. NOT yet: ledger #90 entry update, deploy, GPT's 7 pre-rig unit
 
 ## Next session
 1. Update ledger #90 next-step (./defects.sh flow, hand-edit OPEN_DEFECTS.json entry).
-2. Consider a RULE-5 diff review of THIS landing (sess325/sess333 precedent: post-landing review caught real holes both times) before rig time.
+2. Consider a RULE: CONSULT ANOTHER MODEL WHEN STUCK diff review of THIS landing (sess325/sess333 precedent: post-landing review caught real holes both times) before rig time.
 3. Then the Q7 rig verification plan.

@@ -15,7 +15,7 @@ passes; pass 5 gave the GO for step 1.  Pass 2 (ccmemory
 NO-GO for build step 1 until the manifest lifetime (R1), the root nonce /
 ambiguous-CAW rule (R5) and the byte-level format (R6) were frozen — §11-§13
 below freeze them; R2, R3, R4, R7 are folded into §3.1, §5 and §7.  Target of
-D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-the budget rule-0349.  Rulings: `docs/rulings/d0349-view-table-barrier-design.md` (shape),
+D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349.  Rulings: `docs/rulings/d0349-view-table-barrier-design.md` (shape),
 `…-sess428-GPT-review-view-record-barrier-spec-20-findings` (this revision
 answers every finding; F<n> below cites them), `…-sess428-GPT-ruling-d0349-
 eager-page-activation` (refused shapes).  Supersedes build-order step 4's

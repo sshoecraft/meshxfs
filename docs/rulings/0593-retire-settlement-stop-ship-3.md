@@ -1,5 +1,5 @@
-<!-- sess453 RULE-5 review -->
-# sess453 RULE-5 review #3 — 0.59.2/0.59.3 (sv 9727DA88) — NO-GO
+<!-- sess453 RULE: CONSULT ANOTHER MODEL WHEN STUCK review -->
+# sess453 RULE: CONSULT ANOTHER MODEL WHEN STUCK review #3 — 0.59.2/0.59.3 (sv 9727DA88) — NO-GO
 
 Prompt file: scratchpad review3_prompt.txt (88k chars; excerpts scsipr.c 406-737, disklock.c 800-1038 + 4375-4514, v5_mount.c 1676-1899 + 4440-4549 + 11360-11606, xfs_super.c 1458-1483 + 1700-1912 + 3780-3810, xfs_buf.c 2606-2640 + 6303-6335, kern.c knobs). GPT's line cites are excerpt-relative.
 

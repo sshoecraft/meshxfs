@@ -7,35 +7,67 @@ filesystem is a lockspace inside it.
 
 ## What MXFS does today
 
-Every mount builds a complete DLM of its own, network included:
+The host owns the network ports; everything above them is still per mount.
 
-- **Its own listener on the shared ports.**  The TCP DLM listens on 7600
-  (`MXFS_PORT_DLM`, `include/mxfs/mxfs_ports.h`) and discovery and the lease
-  use UDP 7601-7603.  A second mount binds the same ports with `SO_REUSEPORT`
-  (`pal/linux/kern.c` `mxfs_pal_tcp_listen` and `mxfs_pal_udp_open`), and
-  each listener drops what is not for its volume: the accept loop closes a
-  NODE_JOIN whose `volume_id` differs from its own (`dlm/peer.c`), and the UDP
-  receive paths filter on the volume UUID.
-- **Its own identity.**  The node id is drawn once per mount context
+- **One socket per port per host** (`pal/linux/kern.c`).  The TCP lock
+  manager listens on 7600 (`MXFS_PORT_DLM`, `include/mxfs/mxfs_ports.h`);
+  discovery, the CAW nudges and the lease heartbeat use UDP 7601-7603.  The
+  first mount on a host that needs a port creates its socket and the thread
+  that serves it, every later one takes a handle on it, and the last one to
+  close takes both down.  A datagram is copied to every mount on the port, and
+  each drops what is not for its volume (the volume UUID in every discovery,
+  lease and nudge packet).  A connection goes to the mount whose volume id
+  the connector's first message, the NODE_JOIN, carries: the acceptor peeks
+  it without consuming it (`mxfs_pal_tcp_listen_keyed`).
+- **Why not a socket per mount with `SO_REUSEPORT`.**  Linux gives a new connection or a unicast datagram to one socket chosen
+  by a hash of the addresses and ports, not by the volume.  Measured with two
+  filesystems on the same two hosts (`tests/multi_mount.sh`): a lock-manager
+  connection reached the other filesystem's listener and was reset on every
+  run, and under `peers=` one filesystem never heard its peer's heartbeat,
+  because the peer's fixed source port always hashed to the other socket.
+- **Its own identity per mount.**  The node id is drawn once per mount context
   (`dlm/v5_mount.c`), along with the epoch and, on SCSI, the reservation key.
-- **Its own discovery threads**, announcing node UUID, volume UUID and port
-  (`docs/discovery.md`).
+- **Its own discovery and lease threads per mount**, announcing node UUID,
+  volume UUID and port (`docs/discovery.md`), and its own connection to each
+  peer: two filesystems shared by the same two hosts run two connections and
+  two liveness judgements of the same peer.
+- **Its own lock transport per mount.**  The `transport=tcp|caw` mount option
+  names it, overriding the module's `force_transport`; a DRBD device always
+  runs TCP.
 
-The port sharing does not demultiplex, it guesses.  Linux gives a new
-connection on a `SO_REUSEPORT` port to one listener, chosen by a hash of its
-addresses and ports, not by its volume.  With two mounts, a connection meant
-for one lands on the other half the time, is closed, and is retried from a new
-source port until the hash happens to pick the right one.  A unicast datagram
-is worse: it goes to one socket by the same kind of hash, and a peer sending
-from a fixed source port always hashes to the same socket, so a mount can
-fail to hear a peer for as long as that peer keeps its port.  Multicast and
-broadcast reach every socket, so default discovery survives; `peers=` (unicast
-discovery and lease) and the TCP mesh do not.
-
-The DRBD tooling assumes one resource per pair: the fence helper's firewall
-rules drop the fixed MXFS ports to and from the peer, whatever resource fenced
-it, and its rejoin check counts every mxfs mount in the peer's
-`/proc/mounts`.
+The DRBD tooling scopes its evidence to one resource: releasing an exclusion
+asks whether the peer has that resource's device mounted, or a superblock of
+it alive (`/sys/fs/mxfs/<dev>`), never whether it has any MXFS mount.  Each
+resource's handler excludes the peer under that resource's own episode, so the
+built-in authority answers `status <peer> <resource>` for one resource, and the
+witness of each mount asks for its own; a host-wide answer would hand every
+other resource an episode its receipt does not name, and those mounts would
+never prove the peer excluded.  (A node fence is different: it holds the whole
+host under one episode, which a second resource's fence reuses.)  Its
+isolation drops every MXFS port to and from the peer, and those ports carry
+every filesystem the two hosts share, so it is a fence of the whole host
+whichever resource lost its link.  It therefore also drops the DRBD port of
+every resource the two hosts share.  Left Connected, those resources would keep
+the peer Primary with their MXFS traffic cut and no exclusion either side could
+prove, so their filesystems could neither reach the peer nor recover it.
+Dropped, each link fails the way a lost link does: DRBD runs that resource's
+own handler, which excludes the peer under that resource's episode on the
+winner and freezes the resource on the loser.  The cut is never a graceful
+disconnect, because DRBD runs no handler for one and the peer would carry on
+as Primary alone.  This is consistent across resources because the tie-break
+is fixed: participant 0, the lower DRBD address, is the same host for every
+resource the pair shares, so the same host wins every split.
+`scripts/drbd_rig.sh multi-death-test` holds the rig to this: a pair with
+`DRBD_RIG_RESOURCES` resources (default 3), each on pool LUNs of its own, loses
+a node with every one mounted.  Every resource must exclude the node under an
+episode no other resource uses and witness that episode, and its recovery must
+complete.  The node is then released on each resource's own evidence and
+rejoins all of them.  With `MULTI_CUT=1`, only one resource's link is cut
+instead, and every resource must still end up excluded and recovered.  With
+`MULTI_CUT=mounting`, that link is cut while the victim is still mounting the
+resource, and the victim must restart itself rather than leave the mount
+blocked.  The loser restarts whenever the module holds anything, because the
+fence covers the whole host.
 
 ## The design
 
@@ -173,9 +205,11 @@ filesystem.
 - **Discovery on the wire.**  An announcement that lists volumes changes the
   discovery packet; a mixed cluster (old per-mount announcer, new per-host)
   needs either a version bit or a flag day.
-- **The DRBD fence helper** must key its isolation by peer host and tell every
-  resource with that peer, and its rejoin check must ask about the one
-  resource, not count mounts.
+- **The DRBD fence helper's isolation** is per resource in its bookkeeping
+  (one nftables table per resource) but host-wide in effect (every MXFS port
+  to the peer).  Whether a resource's exclusion should tell the other
+  resources' mounts at once, instead of each finding the peer gone by its own
+  timeout, is open.
 - **The CAW transport** coordinates through the device itself and has no
   listener to share; whether its UDP nudges move to the host layer is to be
   decided with the rest of the UDP plane.

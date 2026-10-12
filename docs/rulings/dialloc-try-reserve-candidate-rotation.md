@@ -1,5 +1,5 @@
-<!-- sess392 RULE-5 ruling: lap-2 shared-AG pace root = dialloc 1 s inode-slot reserve under AG/AGI hold on peer-freed (noino-held) inodes; fix S1 = nonqu… -->
-# sess392 — rsync lap-2 pace at 25 AGs: root proven + RULE-5 ruling on fix shape
+<!-- sess392 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: lap-2 shared-AG pace root = dialloc 1 s inode-slot reserve under AG/AGI hold on peer-freed (noino-held) inodes; fix S1 = nonqu… -->
+# sess392 — rsync lap-2 pace at 25 AGs: root proven + RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on fix shape
 
 ## Chain of this session (0.22.0 -> 0.22.4)
 - 0.22.0 lap 1 collapsed (all rows BUDGET_EXHAUSTED): mxfs_ag_handoff_commit set bast_scheduled=true and mxfs_ag_demote_clear never cleared it -> after the first completed handoff every later BAST saw sched=1 and only the 30 s P275 watchdog requeued the worker (b2c_max=30031, P275 requeued=1). FIXED 0.22.1 (clear in demote_clear).

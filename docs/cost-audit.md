@@ -746,7 +746,7 @@ still averaged 89 turns.
 | component | tokens | tunable |
 |---|---:|---|
 | Claude Code baseline (system prompt, tool schemas, skills) | ~30k | no |
-| project `CLAUDE.md` | ~5.6k → ~6.6k after the unkillable-wedge rule/7/8 | yes |
+| project `CLAUDE.md` | ~5.6k → ~6.6k after RULE: NEVER WEDGE THE LAB HOST, RULE: INSPECT WITH THE RIGHT TOOL and RULE: ZERO ACCEPTED KNOWN DEFECTS | yes |
 | ccloop prompt | 4.6–5.5k → **396** with a fresh handoff | done |
 | global `CLAUDE.md` | ~2.2k | yes |
 | SessionStart hook output | ~1.5k | yes |
@@ -1706,7 +1706,7 @@ Largest remaining categories, fractional by request:
 | category | requests | share | delegable |
 |---|---:|---:|---|
 | text/listing | 998.0 | 32.3% | **yes** |
-| Read | 543.1 | 17.6% | no (the Read-tool rule/10) |
+| Read | 543.1 | 17.6% | no (RULE: INSPECT WITH THE RIGHT TOOL, RULE: DELEGATE ITERATIVE GRIND) |
 | harness-run | 412.4 | 13.3% | **yes** |
 | Edit | 211.1 | 6.8% | no |
 | no-tool (text/thinking only) | 166.0 | 5.4% | no |

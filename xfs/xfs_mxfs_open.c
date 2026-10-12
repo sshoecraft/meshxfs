@@ -31,6 +31,32 @@ MODULE_PARM_DESC(openprotect_arm_gate,
 	"Fault injection: arm the open-admission gate at open_protect entry so the terminal-store defer path is exercised (default 0 = off)");
 
 /*
+ * TEST ONLY (D-OPEN-PROTECT-RESTART-LOOP-UNBOUNDED-AND-UNKILLABLE): an open of
+ * this inode number marks the inode WEDGED on entry — the state a teardown
+ * wedge leaves behind without shutting the mount down, and the state a fenced
+ * node's remount met on 0.90.123 — so the open's handling of an acquire that
+ * is refused outright can be exercised on a live mount.
+ * tests/open_wedged_inode.sh.  0 (default) = off.
+ */
+static unsigned long long mxfs_dbg_openprotect_wedge_ino;
+module_param_named(dbg_openprotect_wedge_ino, mxfs_dbg_openprotect_wedge_ino,
+		   ullong, 0644);
+MODULE_PARM_DESC(dbg_openprotect_wedge_ino,
+	"TEST: mark this inode WEDGED when it is opened (0 = off)");
+
+/*
+ * TEST ONLY, same defect: an open of this inode number reads its admission as
+ * "no grant" after every ride, which is what persistent contention looks like
+ * to the restart loop.  The loop is meant to keep restarting then; what is
+ * under test is that a fatal signal still ends it.  0 (default) = off.
+ */
+static unsigned long long mxfs_dbg_openprotect_refuse_ino;
+module_param_named(dbg_openprotect_refuse_ino, mxfs_dbg_openprotect_refuse_ino,
+		   ullong, 0644);
+MODULE_PARM_DESC(dbg_openprotect_refuse_ino,
+	"TEST: read this inode's open admission as no grant after every ride (0 = off)");
+
+/*
  * 0.75.59: a write open's protecting ride acquires EX outright.
  *
  * mxfs_dlm_open_protect rode ILOCK_SHARED for every open, so an open for
@@ -320,6 +346,12 @@ int mxfs_dlm_open_protect(struct xfs_inode *ip, bool want_ex)
 	}
 	mxfs_acqfall_enter(&acqfall, ip->i_ino);
 	acqfall_on = true;
+	if (unlikely(mxfs_dbg_openprotect_wedge_ino) &&
+	    ip->i_ino == READ_ONCE(mxfs_dbg_openprotect_wedge_ino)) {
+		mxfs_rel_state_set(ip, MXFS_RELSTATE_WEDGED);
+		pr_warn_ratelimited("mxfs: P95-OPEN-WEDGE-INJECT ino=%llu comm=%s -- test knob marked the inode WEDGED at open entry\n",
+			(unsigned long long)ip->i_ino, current->comm);
+	}
 restart:
 	/* Fast path: cached grant, no release/BAST in flight. */
 	spin_lock(&ip->i_dlm_lock);
@@ -348,6 +380,9 @@ restart:
 	 * our admit reads our count. */
 	if (ok && mxfs_dlm_iclus_covered(ip))
 		ok = ip->i_dlm_routed_iclus;
+	if (unlikely(mxfs_dbg_openprotect_refuse_ino) &&
+	    ip->i_ino == READ_ONCE(mxfs_dbg_openprotect_refuse_ino))
+		ok = false;
 	spin_unlock(&ip->i_dlm_lock);
 	if (ok && mxfs_dlm_iclus_covered(ip))
 		ok = mxfs_iclus_open_admit(mp, ip->i_ino);
@@ -445,6 +480,9 @@ restart:
 	}
 	spin_lock(&ip->i_dlm_lock);
 	ok = ip->i_dlm_mode != MXFS_LOCK_NL;
+	if (unlikely(mxfs_dbg_openprotect_refuse_ino) &&
+	    ip->i_ino == READ_ONCE(mxfs_dbg_openprotect_refuse_ino))
+		ok = false;
 	sn_arm = ip->i_mxfs_openprot_arm;
 	sn_mode = ip->i_dlm_mode;
 	sn_state = ip->i_dlm_state;
@@ -536,6 +574,34 @@ restart:
 			bool		demoting;
 			int		stuck = 0;
 
+			/*
+			 * Two ways out that are not contention, and that this
+			 * loop had none for (measured on 16/disk/caw/mpath
+			 * path_all_lost: an open of an inode its node believed
+			 * wedged restarted for the rest of the row in state R,
+			 * and SIGKILL did not end it).  A wedged release refuses
+			 * every acquire on the inode for the life of the mount
+			 * (the admission gate in mxfs_dlm_ilock_begin), so no
+			 * restart can ever be granted: fail the open as that gate
+			 * fails every other operation.  And a killed task must
+			 * leave, whatever the contention.
+			 */
+			if (mxfs_release_proof_enforce &&
+			    READ_ONCE(ip->i_mxfs_rel_state) ==
+						MXFS_RELSTATE_WEDGED) {
+				pr_warn_ratelimited("mxfs: P95-OPEN-REFUSED ino=%llu restarts=%d comm=%s -- the inode's release is wedged and every acquire on it is refused; failing the open instead of restarting\n",
+					(unsigned long long)ip->i_ino,
+					restarts, current->comm);
+				ret = -EIO;
+				goto out;
+			}
+			if (fatal_signal_pending(current)) {
+				pr_warn_ratelimited("mxfs: P95-OPEN-KILLED ino=%llu restarts=%d comm=%s -- killed while waiting for the open's grant; leaving the restart loop\n",
+					(unsigned long long)ip->i_ino,
+					restarts, current->comm);
+				ret = -EINTR;
+				goto out;
+			}
 			restarts++;
 			if (restarts > MXFS_OPEN_PROTECT_PLAIN_RESTARTS &&
 			    !gated) {
@@ -546,7 +612,8 @@ restart:
 			wait_epoch = ip->i_dlm_epoch;
 			demoting = ip->i_dlm_state == MXFS_DLM_ISTATE_DEMOTING;
 			spin_unlock(&ip->i_dlm_lock);
-			while (demoting && !xfs_is_shutdown(mp)) {
+			while (demoting && !xfs_is_shutdown(mp) &&
+			       !fatal_signal_pending(current)) {
 				if (wait_event_timeout(ip->i_dlm_wait,
 				    READ_ONCE(ip->i_dlm_state) !=
 						MXFS_DLM_ISTATE_DEMOTING ||
@@ -576,6 +643,10 @@ restart:
 						MXFS_SITE_ARGS(sn_nlline), sn_nlom,
 						(unsigned long long)nl_age_us,
 						sn_arm, current->comm);
+			}
+			if (fatal_signal_pending(current)) {
+				ret = -EINTR;
+				goto out;
 			}
 			cond_resched();
 			goto restart;

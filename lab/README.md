@@ -29,12 +29,25 @@ rig's prep has formed a cluster short of that node because of it.
    which must be installed too). Run `mkosimage` with no arguments once: it
    says what to set up. Its documentation covers locations, credentials and
    specs: <https://sshoecraft.github.io/osimager>. A *location* is your
-   network — bridge, addressing, DNS — and is yours to define.
+   network — bridge, addressing, DNS — and is yours to define. The lab
+   network these builds run on (a host bridge on its own subnet, dnsmasq on it
+   for DHCP and DNS, the host resolving the lab domain, a route out) is set up
+   as osimager's
+   [Lab Network Setup](https://sshoecraft.github.io/osimager/configuration/lab-setup/)
+   describes.
 2. **Build each node** from the row's spec:
    ```
-   mkosimage -D libvirt_uri=qemu:///system qemu/<location>/<spec> <name> <ip>
+   mkosimage -D libvirt_uri=qemu:///system qemu/<location>/<spec> <name>
    ```
-   osimager's QEMU build registers the finished VM with libvirt. Name the URI:
+   Give it no address. On a network whose DHCP server registers names in DNS
+   (dnsmasq does), the node takes its address by DHCP and is reachable by
+   name; resolve it with `host <name>.<domain> <dns-server>` (the domain and
+   DNS server are your location's). The server answers from its leases, so a
+   node resolves only while it is up and holds one: a node that is off, or
+   still in its installer, answers NXDOMAIN, and that is not a fault. Picking an
+   address and passing it as mkosimage's optional last argument hard-codes one
+   the DHCP server knows nothing about, so it can hand that address to another
+   guest. osimager's QEMU build registers the finished VM with libvirt. Name the URI:
    without it, a build run as an ordinary user lands in `qemu:///session`,
    where nothing in this tree looks. Then run
    `scripts/vm_reclaim_disk.sh <name>`: osimager defines the disk without

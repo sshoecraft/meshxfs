@@ -23,7 +23,7 @@ run79 got 7/8; still chasing a suppression-family tail-loss.
 ## sess1 — gen-aware release + barriers-off pace solve
 `docs/history/docs/history/docs/history/compiled-tcp-ladder-sess1-5-barriers-drc.md` `docs/history/docs/history/docs/history/compiled-tcp-ladder-sess1-5-barriers-drc.md`
 
-**Gen-aware release fix chain (`D03537C9`, all RULE-4 proven):**
+**Gen-aware release fix chain (`D03537C9`, all RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS proven):**
 1. `mxfs_dlm_unlock_gen(ctx,res,expected_gen)` (dlm.c; wrapper gen 0; `mxfs_v5_dlm_inode_unlock_gen`). bast_process captures `p_rel_gen` via `mxfs_v5_dlm_inode_grant_gen` BEFORE the NL-set; unlock releases ONLY that tenure; newer-gen entry → -ESTALE. Kills run42-t4 root: a stale queued release ate the fresh EX mirror, echoed the CURRENT gen → master accepted → CONCURRENT EX (invisible to P-DOUBLEGRANT) → stale-base RMW → durable dirent loss.
 2. Local-immediate grant gen stamping (dlm.c ~1497) — the one grant path leaving grant_gen=0; masters' own tenures had gen 0 → capture read 0 → releases skipped → run44 total wedge (readdir=0). Stamp `dlm_next_gen(ctx)`.
 3. P6Z skip: TCP + capture==0 → skip unlock entirely.
@@ -52,7 +52,7 @@ run79 got 7/8; still chasing a suppression-family tail-loss.
 ## sess3 — FIRST clean 8/tcp drc PASS (run67)
 `docs/history/docs/history/docs/history/compiled-tcp-ladder-sess1-5-barriers-drc.md`
 
-`754883887E` — run67 = 8/8, 24 rounds, 435s wall incl prep, ZERO corruption/shutdown. Four RULE-4 proven root fixes:
+`754883887E` — run67 = 8/8, 24 rounds, 435s wall incl prep, ZERO corruption/shutdown. Four RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS proven root fixes:
 1. **-EEXIST wait-out** (dlm/v5_mount.c `mxfs_v5_dlm_inode_lock`): run61 t6 shutdown root was a local EX hitting its own in-flight PR's WAITING entry (dlm.c:1270 EEXIST); ilock_begin's 3×50ms retry gave up. sess2's "silent imap_to_bp rc=-5 sweeps" were POST-SHUTDOWN fallout (xfs_is_shutdown → -EIO, alert suppressed) — sess2 MISSED the 119.7s shutdown line. Fix: retry EEXIST every 20ms up to ~60s.
 2. **Release-path dir-INODE-cluster destage:** sess1's Road-B gate `mxfs_dirop_durable_needed()` was INSIDE `mxfs_dlm_dir_inode_durable`, so it no-op'd the bast_process sd-stage call too → dir blocks landed but the DINODE never did → run60/61 `xfs_dir3_block_verify daddr 0x48` tear. Fix: split `__mxfs_dlm_dir_inode_durable` (ungated, called at release) from the gated per-op wrapper. Format-tear family: 0 since.
 3. **!DONE+undestaged re-land** (`mxfs_dir_data_durable` + `mxfs_dir_flush_one_daddr`): run62/64 dir blocks whose extent was in the durable dinode but content NEVER submitted → platter = prior-life garbage → EFSBADCRC kills. Insight: lseq>wseq means NEVER-LANDED (sess47's undestaged term was DONE-gated = only evict-invalidated stale). Fix: undestaged unconditional in both predicates; before bwrite of a !DONE buf validate magic+owner (P3F-UNLANDED-LOST) then set XBF_DONE (P3R-RELAND). CRC-garbage family: 0 since.

@@ -1,5 +1,5 @@
-<!-- sess333 RULE-5 review of 0.12.2 D-513 landing: 6 STOP-SHIPS (A barrier -EIO defer, B backfill-return validation, D barrier must publish refusals, bac… -->
-# sess333 — RULE-5 diff review of the sess331/332 D-513 landing (0.12.2 sv 0C47E91907CFA130AFB6520)
+<!-- sess333 RULE: CONSULT ANOTHER MODEL WHEN STUCK review of 0.12.2 D-513 landing: 6 STOP-SHIPS (A barrier -EIO defer, B backfill-return validation, D barrier must publish refusals, bac… -->
+# sess333 — RULE: CONSULT ANOTHER MODEL WHEN STUCK diff review of the sess331/332 D-513 landing (0.12.2 sv 0C47E91907CFA130AFB6520)
 
 GPT reviewed the full implementation (disklock backfill_legacy + publish_refusal gate, shared classifier, reap rewiring, barrier classify/terminal masks, knob one-shot/slot/shape-4). Verdict: **do NOT run the rig**. Stop-ship on A, B, D + 3 additional blockers. C (reclassify -EAGAIN not entering quarblocked in round loop), E (shape-4 countdown counts only non-skipped applied items), F (one-shot consumed pre-shadow-alloc) ruled ACCEPTABLE.
 

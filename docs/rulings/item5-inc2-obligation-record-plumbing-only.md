@@ -1,4 +1,4 @@
-<!-- sess462 RULE-5 ruling on item-5 increment 2: durable obligation list in the rman slot zone ACCEPTED; inc2 = plumbing only, terminal disposition stays… -->
+<!-- sess462 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on item-5 increment 2: durable obligation list in the rman slot zone ACCEPTED; inc2 = plumbing only, terminal disposition stays… -->
 # sess462 GPT ruling — D-FOREIGN-SLICE-INTENTS-ABANDONED item 5 increment 2
 
 Consult input: F1-F8 tree facts (census on the shadow xlog, 40-byte pad in mxfs_recov_body, ~60 KiB unused per rman slot between the 4 KiB header and the 64 KiB entry area, ladder order in recovery_complete2, selective purge primitive, mount-barrier no-txn variant, dbg_efd_hold_ms reproducer, peer CAW-poll waits) and proposal P1-P6 (36-byte record in pad; RECOVER extent list capped 3072 in the rman slot zone at 4 KiB, written+flushed before the IMAGES_REPLAYED CAS; verdict grows with the list; GRANTS_RELEASED/complete2 gates; mount barrier publishes only; no peer import).

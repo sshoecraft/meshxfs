@@ -1,4 +1,4 @@
-<!-- sess175 RULE-5 ruling (#1 gate swap): txn-atomic admission ratified w/ corrections; lineage=option-b v3 token; release invariant unproven; 108-captur… -->
+<!-- sess175 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (#1 gate swap): txn-atomic admission ratified w/ corrections; lineage=option-b v3 token; release invariant unproven; 108-captur… -->
 # sess175 — GPT ruling: foreign-replay enforcement gate design (full text in sess175 transcript)
 
 ## P273 sample #3 (this session, elected arm, victim test5/slot3, 0.11.462)

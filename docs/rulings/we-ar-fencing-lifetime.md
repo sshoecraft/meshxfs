@@ -1,5 +1,5 @@
-<!-- sess381 RULE-5 ruling: switch to WE-AR (all registrants) behind a proto-gen bump; encode the command-submission boundary, not the reason; and the reg… -->
-# sess381 RULE-5 ruling — WE-AR, and the fencing state machine
+<!-- sess381 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: switch to WE-AR (all registrants) behind a proto-gen bump; encode the command-submission boundary, not the reason; and the reg… -->
+# sess381 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — WE-AR, and the fencing state machine
 
 Consulted with the full measured chain for
 `D-PR-RESERVATION-SINGLE-HOLDER-UNMOUNT-DISARMS-FENCING-381` and

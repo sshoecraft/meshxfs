@@ -71,7 +71,7 @@ the actual blast radius (zero nodes could mount). Tension for next session:
 D-CLEAN-UNMOUNT-LEAKS-PR-REGISTRATION-377 made key retirement mandatory and
 fail-closed; this defect requires the retirement to be gated on slice
 cleanliness, or a self-departure fence certificate, or an admission path for
-"key absent + durable clean-quiesce stamp" — a RULE-5 question, unresolved at
+"key absent + durable clean-quiesce stamp" — a RULE: CONSULT ANOTHER MODEL WHEN STUCK question, unresolved at
 end of sess379.
 
 **Hot-slot CAW hypothesis for the mass-unmount stall**
@@ -97,7 +97,7 @@ cached grants) rather than pure-detecting. Landed 0.15.2/0.15.3: max wall
 error-recovery latency, not the budget — the real fix has to remove the
 convergence, not bound the wait.
 
-Two RULE-5 rulings shaped the follow-on work:
+Two RULE: CONSULT ANOTHER MODEL WHEN STUCK rulings shaped the follow-on work:
 
 `docs/rulings/detector-io-off-the-fast-path.md`:
 framed the question as whether cached grants are independently authoritative
@@ -175,7 +175,7 @@ strictly bimodal (p50 8ms, then a long tail to 60.4s) — ruling out ordinary
 queueing. Fix: `continue`→`break` in `scst_check_scsi_atomicity()` so edges
 only point at predecessors (list is append-at-tail with one insert site and
 one removal site, audited stable), plus a `dev_exec_seq` stamp and
-`WARN_ONCE` orientation detector for the DAG-acyclic invariant. RULE-5
+`WARN_ONCE` orientation detector for the DAG-acyclic invariant. RULE: CONSULT ANOTHER MODEL WHEN STUCK
 reviewed before landing. One-variable A/B (MXFS byte-identical, scst .2 vs
 .3): 28-of-32 unmount 120.48s→0.37s; worst hot-slot command 60,426ms→59ms;
 ABORT_TASK 12→0. This resolved both sess379 GPT-ruling gaps directly: paired

@@ -1907,6 +1907,11 @@ static bool dlm_owner_purged(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t node, int 
 	return false;
 }
 
+bool mxfs_dlm_owner_purged(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t node)
+{
+	return ctx && dlm_owner_purged(ctx, node, -1);
+}
+
 /*
  * 0.75.81 (D-...-0935, measured s570a): the purged owner recorded for a
  * heartbeat slot, or 0.  This is the ONLY way to attribute a shared holder
@@ -4698,6 +4703,15 @@ static int dlm_takeover_page(struct mxfs_dlm_ctx *ctx, uint32_t p, mxfs_node_id_
 		 */
 		to_self = true;
 	}
+	/* A page one departed incarnation PREPARED to another that died before
+	 * consuming it: both ends dead.  Left PREPARED by a recovery takeover,
+	 * which takes only the departed authority's pages, until a sweep that
+	 * judges every authority ran (physical pair, 0.90.113: 4 such pages). */
+	if (retarget && !to_self && a.target_node != node)
+		mxfs_probe_ratelimited(
+		    "mxfs: P-TAUTH-TAKEOVER-DEAD-TARGET page=%u auth=%u/%llu target=%u/%llu via=%s -- a page prepared to a target that died before consuming it is taken over\n",
+		    p, node, (unsigned long long)inc, a.target_node,
+		    (unsigned long long)a.target_inc, how);
 	if (to_self) {
 		owner = ctx->local_node;
 		seq = a.seq;
@@ -7629,7 +7643,7 @@ static uint64_t dlm_acq_begin(struct mxfs_dlm_ctx *ctx,
 	int pid = mxfs_pal_current_pid();
 	int i, freeslot = -1, oldest = -1;
 	/* What this call had to destroy to proceed, reported outside the lock. */
-	int lost_idle = 0, lost_evict = 0, collide_pid = 0;
+	int lost_idle = 0, lost_evict = 0, collide_pid = 0, gave_up_idle = 0;
 	uint64_t lost_ms = 0;
 	/* At most ONE adopted grant is released per call, outside the lock; a
 	 * record holding one is otherwise left alone by the idle scan and by
@@ -7673,8 +7687,20 @@ static uint64_t dlm_acq_begin(struct mxfs_dlm_ctx *ctx,
 				orphan = ctx->acq[i].grant;
 				orphan_res = ctx->acq[i].resource;
 			}
-			if (resource_equal(&ctx->acq[i].resource, resource) &&
-			    ctx->acq[i].mode == mode) {
+			/* A record its no-queue caller gave up on carries no wait:
+			 * retiring it loses nothing.  Reported as lost, each one
+			 * read as a wait of idle_ms; on the physical DRBD pair all
+			 * 27 in one build leg were such records, each retired
+			 * exactly idle_ms after its unanswered try. */
+			if (ctx->acq[i].gave_up) {
+				ctx->acq_gave_up_retired++;
+				if (resource_equal(&ctx->acq[i].resource, resource) &&
+				    ctx->acq[i].mode == mode) {
+					gave_up_idle = 1;
+					lost_ms = now - ctx->acq[i].last_ms;
+				}
+			} else if (resource_equal(&ctx->acq[i].resource, resource) &&
+				 ctx->acq[i].mode == mode) {
 				ctx->acq_idle_live++;
 				lost_idle = 1;
 				lost_ms = now - ctx->acq[i].last_ms;
@@ -7699,6 +7725,12 @@ static uint64_t dlm_acq_begin(struct mxfs_dlm_ctx *ctx,
 		 * the fact that it can. */
 		if (resource_equal(&ctx->acq[i].resource, resource) &&
 		    ctx->acq[i].mode == mode) {
+			if (ctx->acq[i].gave_up) {
+				/* a new try, not the old wait resumed */
+				ctx->acq[i].gave_up = 0;
+				ctx->acq[i].first_ms = now;
+				ctx->acq[i].owner_pid = pid;
+			}
 			if (ctx->acq[i].owner_pid != pid) {
 				ctx->acq_key_collide++;
 				collide_pid = ctx->acq[i].owner_pid;
@@ -7755,6 +7787,7 @@ static uint64_t dlm_acq_begin(struct mxfs_dlm_ctx *ctx,
 		ctx->acq[slot].rejected = 0;
 		memset(ctx->acq[slot].attempt, 0, sizeof(ctx->acq[slot].attempt));
 		ctx->acq[slot].attempt_next = 0;
+		ctx->acq[slot].gave_up = 0;
 		memset(&ctx->acq[slot].grant, 0, sizeof(ctx->acq[slot].grant));
 		ctx->acq[slot].in_use = 1;
 		ctx->acq_minted++;
@@ -7772,6 +7805,14 @@ static uint64_t dlm_acq_begin(struct mxfs_dlm_ctx *ctx,
 		    resource->ag_number, mode_name(mode),
 		    (unsigned long long)lost_ms,
 		    (unsigned long long)ctx->acq_idle_live);
+	if (gave_up_idle)
+		mxfs_probe_ratelimited(
+		    "mxfs: P958-ACQ-GAVE-UP-RETIRED type=%u ino=%llu ag=%u mode=%s idle_ms=%llu gave_up=%llu retired=%llu -- the record of a no-queue try that gave up unanswered is retired by this resource's next acquire; no wait was lost\n",
+		    resource->type, (unsigned long long)resource->ino,
+		    resource->ag_number, mode_name(mode),
+		    (unsigned long long)lost_ms,
+		    (unsigned long long)ctx->acq_gave_up,
+		    (unsigned long long)ctx->acq_gave_up_retired);
 	if (lost_evict)
 		mxfs_probe_ratelimited(
 		    "mxfs: P958-ACQ-EVICT-LIVE type=%u ino=%llu ag=%u mode=%s slots=%d total=%llu -- acquisition table full of live records; one was taken to make room\n",
@@ -7883,6 +7924,30 @@ static void dlm_acq_end(struct mxfs_dlm_ctx *ctx,
 			     mode_name(mode), master, retx,
 			     (unsigned long long)age,
 			     (unsigned long long)degraded_for);
+}
+
+/*
+ * A no-queue request gave up with no answer.  Its record is kept, so a grant
+ * the master sends late is adopted for this node's next try of the resource
+ * instead of bounced, but it is marked: no wait goes on under it.
+ */
+static void dlm_acq_give_up(struct mxfs_dlm_ctx *ctx,
+			    const struct mxfs_resource_id *resource, uint8_t mode)
+{
+	int i;
+
+	if (!ctx->acq_lock)
+		return;
+	mxfs_pal_spinlock_lock(ctx->acq_lock);
+	for (i = 0; i < MXFS_DLM_ACQ_SLOTS; i++) {
+		if (ctx->acq[i].in_use && ctx->acq[i].mode == mode &&
+		    resource_equal(&ctx->acq[i].resource, resource)) {
+			ctx->acq[i].gave_up = 1;
+			ctx->acq_gave_up++;
+			break;
+		}
+	}
+	mxfs_pal_spinlock_unlock(ctx->acq_lock);
 }
 
 /*
@@ -10148,10 +10213,45 @@ int mxfs_dlm_lock(struct mxfs_dlm_ctx *ctx,
  * inode<->AG ABBA deadlock -> -ETIMEDOUT -> dirty trans_cancel -> shutdown
  * (the tcp_dlm_scaling within-window/drain failure).
  */
+static int dlm_lock_retries_impl(struct mxfs_dlm_ctx *ctx,
+		  const struct mxfs_resource_id *resource,
+		  uint8_t mode, uint32_t flags,
+		  uint8_t *granted_mode, int max_retries,
+		  mxfs_node_id_t *unanswered_master);
+
 int mxfs_dlm_lock_retries(struct mxfs_dlm_ctx *ctx,
 		  const struct mxfs_resource_id *resource,
 		  uint8_t mode, uint32_t flags,
 		  uint8_t *granted_mode, int max_retries)
+{
+	return dlm_lock_retries_impl(ctx, resource, mode, flags, granted_mode,
+				     max_retries, NULL);
+}
+
+/*
+ * A no-queue acquire that also says which master, if any, left it
+ * unanswered: *unanswered_master is set to that master's id when the request
+ * answered would-block because the master did not answer within one attempt,
+ * and left untouched otherwise (a would-block the master decided, a grant, an
+ * error).  The allocator uses it to stop asking that master again during the
+ * same allocation; see mxfs_v5_dlm_ag_lock_nb.
+ */
+int mxfs_dlm_lock_noqueue(struct mxfs_dlm_ctx *ctx,
+			  const struct mxfs_resource_id *resource,
+			  uint8_t mode, uint32_t flags,
+			  uint8_t *granted_mode,
+			  mxfs_node_id_t *unanswered_master)
+{
+	return dlm_lock_retries_impl(ctx, resource, mode,
+				     flags | MXFS_LKF_NOQUEUE, granted_mode,
+				     MXFS_DLM_FULL_BUDGET, unanswered_master);
+}
+
+static int dlm_lock_retries_impl(struct mxfs_dlm_ctx *ctx,
+		  const struct mxfs_resource_id *resource,
+		  uint8_t mode, uint32_t flags,
+		  uint8_t *granted_mode, int max_retries,
+		  mxfs_node_id_t *unanswered_master)
 {
 	int ret;
 	int retries = max_retries > 0 ? max_retries : 1;
@@ -10443,6 +10543,9 @@ int mxfs_dlm_lock_retries(struct mxfs_dlm_ctx *ctx,
 				    ctx->node_live_cb ?
 					ctx->node_live_cb(ctx->cb_data, m) : -1,
 				    dlm_cur_comm());
+				dlm_acq_give_up(ctx, resource, mode);
+				if (unanswered_master && m && m != ctx->local_node)
+					*unanswered_master = m;
 				return -EAGAIN;
 			} else if (ret == -ETIMEDOUT && retries > 1 &&
 				   ctx->acq_fallible_cb &&
@@ -12864,9 +12967,44 @@ static void dg_release(const struct mxfs_resource_id *res, mxfs_node_id_t owner)
 
 /* ─── Remote request processing ─── */
 
+static int dlm_process_remote_request_body(struct mxfs_dlm_ctx *ctx,
+					   mxfs_node_id_t sender,
+					   const struct mxfs_dlm_lock_req *req,
+					   uint64_t *prep_ms);
+
+/*
+ * A peer's no-queue AG request waits one attempt (MXFS_LOCK_ACQUIRE_WAIT_MS)
+ * for this answer while it holds an inode's ILOCK, and gives up past it.
+ * Measured on the physical DRBD pair: pve1's allocator trylocks toward pve2
+ * went unanswered 61 times in one build leg, AG after AG, 1 s each.  This
+ * names where the master's time went: the ledger page's preparation, and the
+ * rest (the decision and any grant's durable commit), for each such request
+ * that took a quarter of the requester's attempt or more.
+ */
 int mxfs_dlm_process_remote_request(struct mxfs_dlm_ctx *ctx,
 				    mxfs_node_id_t sender,
 				    const struct mxfs_dlm_lock_req *req)
+{
+	uint64_t t0 = mxfs_pal_time_ms(), prep_ms = 0, wall;
+	int rc;
+
+	rc = dlm_process_remote_request_body(ctx, sender, req, &prep_ms);
+	wall = mxfs_pal_time_ms() - t0;
+	if (req && (req->flags & MXFS_LKF_NOQUEUE) &&
+	    req->resource.type == MXFS_LTYPE_AG &&
+	    wall >= MXFS_LOCK_ACQUIRE_WAIT_MS / 4)
+		mxfs_probe_ratelimited(
+		    "mxfs: P-RREQ-NOQUEUE-SLOW ag=%u mode=%s sender=%u rc=%d wall_ms=%llu prepare_ms=%llu rest_ms=%llu -- a peer's no-queue AG request took this long to answer on this master\n",
+		    req->resource.ag_number, mode_name(req->mode), sender, rc,
+		    (unsigned long long)wall, (unsigned long long)prep_ms,
+		    (unsigned long long)(wall - prep_ms));
+	return rc;
+}
+
+static int dlm_process_remote_request_body(struct mxfs_dlm_ctx *ctx,
+					   mxfs_node_id_t sender,
+					   const struct mxfs_dlm_lock_req *req,
+					   uint64_t *prep_ms)
 {
 	const struct mxfs_resource_id *resource;
 	uint8_t mode;
@@ -12920,8 +13058,10 @@ int mxfs_dlm_process_remote_request(struct mxfs_dlm_ctx *ctx,
 	}
 	/* page current + blockers imported before any decision */
 	{
+		uint64_t pt0 = mxfs_pal_time_ms();
 		int prc = dlm_ledger_prepare(ctx, resource, &ledger_gen, false);
 
+		*prep_ms = mxfs_pal_time_ms() - pt0;
 		if (prc) {
 			if (prc == -EAGAIN) {
 				uint32_t pg = dlm_res_page(ctx, resource);

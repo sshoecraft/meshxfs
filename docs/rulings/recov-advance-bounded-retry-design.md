@@ -1,4 +1,4 @@
-<!-- sess420 RULE-5 ruling on D-RECOV-ADVANCE-UNBOUNDED-RETRY fix shape: ship fail-stop withdraw (ii) at deadline/invariant; stage-aware classify; identit… -->
+<!-- sess420 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on D-RECOV-ADVANCE-UNBOUNDED-RETRY fix shape: ship fail-stop withdraw (ii) at deadline/invariant; stage-aware classify; identit… -->
 # sess420 GPT ruling — bounded completion retry (D-RECOV-ADVANCE-UNBOUNDED-RETRY)
 
 Consult: gpt-5.6-sol. Reviewed my design A/B/C (v5_complete_fail classifier + blocked[].terminal latch + -ECANCELED to xfs).

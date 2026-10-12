@@ -1,5 +1,5 @@
-<!-- sess298: D-503 root PROVEN (releaser-relative memoryless nomination + ticket flap) + RULE-5 ruling: fix C = sticky yield_to + last_ex_slot round-robin -->
-# sess298 — D-503 root proven + RULE-5 ruling (fix shape C)
+<!-- sess298: D-503 root PROVEN (releaser-relative memoryless nomination + ticket flap) + RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: fix C = sticky yield_to + last_ex_slot round-robin -->
+# sess298 — D-503 root proven + RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (fix shape C)
 
 ## Root cause PROVEN (P298-ADOPTCENSUS, 0.11.508 sv 3A0B62CA95FAAFA9A6A0BB4, 1545 census lines fleet-wide)
 Slow (>800ms) EX grants on hot shared dirs decompose as:
@@ -11,7 +11,7 @@ Slow (>800ms) EX grants on hot shared dirs decompose as:
 
 Mechanism (dlm_caw.c release path ~9074-9230): `caw_pick_next_ex_waiter(ex_w, ctx->node_bit)` picks "first EX waiter after the RELEASER'S OWN slot" — memoryless, releaser-relative. Every intermediate releaser (each PR reader draining) re-runs nomination and OVERWRITES yield_to with its own pick → ticket flaps; only the last-leaving holder's pick gets the direct handoff. A waiter can be passed over indefinitely → heavy tail (p99 2.8s) → dir_reuse round pace shortfall.
 
-## RULE-5 ruling (GPT, this session): fix C = both
+## RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (GPT, this session): fix C = both
 1. STATE-RELATIVE SELECTION: when no valid reservation exists, nominee = first eligible EX waiter after `last_ex_slot` (deterministic from slot image; all releasers agree).
 2. STICKY TICKET: a valid standing yield_to naming a live registered EX waiter is a RESERVATION — ordinary releasers must NOT overwrite it. It survives PR drains and PR streak-yield batches.
 3. `last_ex_slot` advances ONLY on committed EX grant/conversion (direct handoff, self-promote, PR→EX conversion) — NEVER at nomination. PR batches do NOT advance it.

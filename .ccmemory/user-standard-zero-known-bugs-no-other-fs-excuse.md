@@ -49,5 +49,5 @@ explicitly NOT permission to accept the bugs already known. Those get killed.
 
 Consistent with the global "NO mock/fake data, no 'simple' stand-in functions,
 no giving up and offering alternatives — keep working until solved" directives
-and RULE 4 (troubleshoot to root cause). This memory sharpens them: the bar is
+and RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS (troubleshoot to root cause). This memory sharpens them: the bar is
 zero KNOWN defects, and comparisons to other buggy systems are never a defense.

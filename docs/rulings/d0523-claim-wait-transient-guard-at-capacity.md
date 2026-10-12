@@ -1,4 +1,4 @@
-<!-- sess464 RULE-5 ruling on D-0523 (rejoin mount fails -28 during a transient sweep guard at capacity): in-kernel claim WAIT accepted; 8 STOP-SHIPs (rec… -->
+<!-- sess464 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on D-0523 (rejoin mount fails -28 during a transient sweep guard at capacity): in-kernel claim WAIT accepted; 8 STOP-SHIPs (rec… -->
 # sess464 GPT ruling — D-REJOIN-CLAIM-ENOSPC-DURING-TRANSIENT-SWEEP-GUARD-AT-CAPACITY-0523
 
 Defect: 32/32 volume, dead node reboots while a survivor holds the transient unclaimed-bucket sweep guard on its former slot -> mxfs_disklock_claim_slot pass 2 finds no slot -> -ENOSPC immediately -> mount aborts (chain 88 test2 07:22:57Z; remounted fine 6 s after the guard cleared). Evidence in the ledger record.

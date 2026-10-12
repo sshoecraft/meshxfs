@@ -1,4 +1,4 @@
-<!-- sess413 RULE-5 ruling D-532: (a) MANDATORY ordered mount-abort lease give-back (stop-submit→drain→durable CAS UNOWNED→then member release), (b) clean… -->
+<!-- sess413 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-532: (a) MANDATORY ordered mount-abort lease give-back (stop-submit→drain→durable CAS UNOWNED→then member release), (b) clean… -->
 # sess413 GPT ruling: D-532 stranded recovery lease fix design
 
 ## Ruling (hierarchy)

@@ -1,5 +1,5 @@
-<!-- sess318 RULE-5 ruling D-INCARN-STALE-SHELL-UNGATED-FILE-READS-512: dontcache retire + fail-closed lookup + ESTALE gates on all file ops incl fault/ge… -->
-# sess318 RULE-5 ruling — INCARN_STALE fix shape (D-INCARN-STALE-SHELL-UNGATED-FILE-READS-512)
+<!-- sess318 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-INCARN-STALE-SHELL-UNGATED-FILE-READS-512: dontcache retire + fail-closed lookup + ESTALE gates on all file ops incl fault/ge… -->
+# sess318 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — INCARN_STALE fix shape (D-INCARN-STALE-SHELL-UNGATED-FILE-READS-512)
 
 GPT ruling (full text in sess318 transcript). Required set:
 1. Retire arm (xfs_inode.c:1534): d_mark_dontcache(VFS_I(ip)) BEFORE xfs_irele; keep bounded retries.

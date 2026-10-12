@@ -30,7 +30,7 @@ shows at two; a release's node count is verified on the development rig.
 | `rhel10` | `alma-10.1-x86_64` | 2 | enable EPEL; firewalld running, SELinux enforcing | runtime |
 | `debian12` | `debian-12.13-x86_64` | 2 | | runtime |
 | `rhel8` | `alma-8.10-x86_64` | 2 | enable EPEL; firewalld running, SELinux enforcing | runtime |
-| `debian11` | `debian-11.11-x86_64` | 2 | | runtime |
+| `debian11` | `debian-11.11-x86_64` | 2 | replace the DVD-only `sources.list` with deb.debian.org `bullseye` and `bullseye-updates`, and `bullseye-security` from archive.debian.org (deb.debian.org's security index still lists packages whose files have moved to the archive, so installs 404); install `linux-headers-$(uname -r) linux-headers-amd64 dkms build-essential open-iscsi sg3-utils` | runtime |
 | `sles16` | `sles-16.0-x86_64` | 2 | | runtime |
 | `freebsd14` | `freebsd-14.4-x86_64` | 2 | | runtime (a port; no package exists yet) |
 | `raspios11` | none — a Raspberry Pi | 2 | | runtime on real hardware |

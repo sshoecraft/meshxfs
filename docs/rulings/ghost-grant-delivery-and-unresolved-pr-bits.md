@@ -1,4 +1,4 @@
-<!-- sess424 RULE-5 ruling: deliver every successful ledger commit (gen change after commit must not suppress); no release-on-send-failure; unresolved PR… -->
+<!-- sess424 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: deliver every successful ledger commit (gen change after commit must not suppress); no release-on-send-failure; unresolved PR… -->
 # sess424 — GHOST PR grants: root cause of the 0.34.0 32/tcp mount failures, and the ruling
 
 ## Measured (journal of test19/20/24/30 + usermode tests/tauth/formation_test)

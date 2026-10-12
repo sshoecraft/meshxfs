@@ -16,7 +16,7 @@
     failed after 10 retries" x54, P-LKTIMEOUT-REMOTE master=3752614140 (test7 slot 8); 26 mounts abort.
   * P-TAUTH-STATS why=close on the 26 failed nodes: commits=0 (they never granted anything).  No GHOST, no
     LATE-DELIVERY, no POISON, no REFUSE.
-- NEXT RULE-4 TARGET (H2): dlm_page_freeze_drain (dlm.c ~1425) waits for dlm_page_has_pending(page)==false;
+- NEXT RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS TARGET (H2): dlm_page_freeze_drain (dlm.c ~1425) waits for dlm_page_has_pending(page)==false;
   a PENDING_DURABLE / PENDING_RELEASE table entry whose txn was refused/abandoned (the DOUBLE-GRANT -EBUSY
   path? the finalize "refused: undo" path? a txn_commit error return before finalize?) never clears -> page
   frozen forever.  Read dlm_page_has_pending + every dlm_txn_* error path for an entry left in a PENDING

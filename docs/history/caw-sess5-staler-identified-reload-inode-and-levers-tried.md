@@ -1,7 +1,7 @@
 <!-- sess5 REFINED: the 32-node inode-cluster staler = mxfs_dlm_reload_inode (xfs_mxfs_dlm.c:14417) on reused-inode grant + bast_process. MHT-up HURTS. Fi… -->
 ## sess5 REFINED — the inode-cluster STALER identified + levers tried (ccloop 12e0d157)
 
-### THE STALER (RULE-4 proven via xfs_buf_stale attribution probe, build D1E1911C, param read_attr_probe=1)
+### THE STALER (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS proven via xfs_buf_stale attribution probe, build D1E1911C, param read_attr_probe=1)
 dump_stack at xfs_buf_stale on INODE buffers during dlm_scaling@32 shows TWO callers:
 1. **`mxfs_dlm_reload_inode` → xfs_buf_stale (xfs/xfs_mxfs_dlm.c:14417)** — the dominant one. reload_inode
    invalidates the cached inode-cluster buffer ("the other node wrote updated data... force re-read")

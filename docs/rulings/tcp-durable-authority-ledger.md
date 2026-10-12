@@ -1,4 +1,4 @@
-<!-- sess418 RULE-5 ruling -->
+<!-- sess418 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling -->
 # sess418 GPT ruling #2 — TCP durable authority backend (supersedes the bare shape (a)+)
 
 ## Why (a)+ alone is not enough (session finding, GPT concurred)

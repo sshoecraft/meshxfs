@@ -1839,7 +1839,7 @@ MODULE_PARM_DESC(dir_nl_logged_skip,
                  "(default), 0=legacy always-write-logged");
 
 /*
- * (D-TMPFILE-CHURN-the budget rule-PERF-400, design-consult ruling priority 2): the
+ * (D-TMPFILE-CHURN-RULE0-PERF-400, design-consult ruling priority 2): the
  * per-ifree AGI FUA re-read in xfs_inactive_ifree (mxfs_ag_buf_disk_differs,
  * 0.22 ms measured, ~40% of ifree) — containment for the stale prior-tenure
  * in-core AGI class that D-399 fixed at root.  1 = legacy every-ifree read and

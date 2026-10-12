@@ -112,11 +112,11 @@ For cross-init E1 sanity (proves storage works):
 | `scripts/sess36_capture_with_correlation.sh` | Run + classify + chronologize |
 | `state.md` | Top-level entry point with SESS36 FIRST ACTIONS |
 
-## Number of RULE 4 cycles
+## Number of RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS cycles
 
 12 hypotheses tested with instrumentation: H22, H23, H26, H29, H35, H36, H37, H38, H38b, H38c, H39, plus E1/E1b storage tests.
 Each was hypothesis → instrument → measure → patch (when proven) → revert (when falsified).
-Per RULE 4 throughout — no code-reading shortcuts to fix.
+Per RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS throughout — no code-reading shortcuts to fix.
 
 ## Final assessment (after 13 hypothesis cycles + 10-iter H38c v2 falsification)
 

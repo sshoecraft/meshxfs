@@ -19,18 +19,18 @@ directive to the ccenv project.
 
 ## What it means in practice
 
-Never write `RULE 0`, `RULE-4 PROVEN`, `RULE-5 ruling`, `per RULE 6`, or any
+Never write `RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS`, `RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS PROVEN`, `RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling`, `per RULE: ZERO ACCEPTED KNOWN DEFECTS`, or any
 numbered form — in source comments, docs, `CHANGELOG.md` entries, commit
 messages, defect records, handoff notes, or awareness docs. Say the thing:
 
 | instead of | write |
 |---|---|
-| `RULE-4 PROVEN` | `PROVEN BY INSTRUMENT` / "established by instrumentation, not by reading code" |
-| `RULE-5 ruling <name>` | "design-consult ruling, recorded in ccmemory as `<name>`" |
-| `RULE 0` (a budget) | "derived time budget" / "a timeout IS a test failure" |
-| `RULE 0` (the ceiling) | "the 2x-native-XFS performance ceiling" |
-| `per RULE 3` | "this script lives in the tree deliberately, not as scratch" |
-| `RULE 6` | "this is a defect and stays open until disposed of" |
+| `RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS PROVEN` | `PROVEN BY INSTRUMENT` / "established by instrumentation, not by reading code" |
+| `RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling <name>` | "design-consult ruling, recorded in ccmemory as `<name>`" |
+| `RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS` (a budget) | "derived time budget" / "a timeout IS a test failure" |
+| `RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS` (the ceiling) | "the 2x-native-XFS performance ceiling" |
+| `per RULE: A SCRIPT IS NEVER A TEMP FILE` | "this script lives in the tree deliberately, not as scratch" |
+| `RULE: ZERO ACCEPTED KNOWN DEFECTS` | "this is a defect and stays open until disposed of" |
 
 Rule numbers belong ONLY inside the rules file itself, as its own headings.
 

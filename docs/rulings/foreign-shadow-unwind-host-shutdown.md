@@ -1,4 +1,4 @@
-<!-- sess337 NEW DEFECT + RULE-5 ruling: foreign-replay mid-replay failure shuts down REPLAYER's live mount (xlog_do_recovery_pass:4359); fix = xfs_buf_de… -->
+<!-- sess337 NEW DEFECT + RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: foreign-replay mid-replay failure shuts down REPLAYER's live mount (xlog_do_recovery_pass:4359); fix = xfs_buf_de… -->
 # sess337 — foreign-shadow unwind host-shutdown defect + GPT fix ruling
 
 ## Defect (PROVEN, 32/caw rig, 0.12.4 sv B04D26F33C9CB068166732F)
@@ -8,7 +8,7 @@ P227-FR-FORCED-TORN fired at an XFS_LI_INODE item (0x123b) with a real 2-item ap
 ## Root (direct evidence, exact site)
 `xlog_do_recovery_pass` xfs_log_recover.c:4359: on pass-2 error with non-empty buffer_list it calls `xlog_force_shutdown(log, SHUTDOWN_LOG_IO_ERROR)` so the following `xfs_buf_delwri_submit` stales the partial-checkpoint buffers without IO. But `log` is the SHADOW xlog and `xlog_force_shutdown` does `xfs_set_shutdown(log->l_mp)` (xfs_log.c:3888) — the shadow's l_mp is the survivor's LIVE mount. The stale-discard is keyed off MOUNT shutdown in `__xfs_buf_submit` → `xfs_buf_ioend_fail`.
 
-## GPT RULE-5 ruling (fix shape = option b as buffer-layer op)
+## GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (fix shape = option b as buffer-layer op)
 1. Add `xfs_buf_delwri_fail(buffer_list, error, origin)` in pal/linux/xfs_buf.c: for each queued bp — remove from b_list, clear _XBF_DELWRI_Q once, set b_error, stale, run the NORMAL failure completion (same machinery as xfs_buf_ioend_fail: _XBF_LOGRECOVERY cleanup at xfs_buf.c:2246, b_iodone, refs) with NO device IO and NEVER consulting/modifying b_mount shutdown. Do NOT open-code in log_recover (option a rejected); do NOT use a persistent b_flags bit; xfs_buf_delwri_cancel (xfs_buf.c:11110) must NOT be assumed suitable (may skip recovery iodone).
 2. In xlog_do_recovery_pass error arm: `if (error && xlog_is_mxfs_untrusted_replay(log)) error2 = xfs_buf_delwri_fail(...)` else keep upstream shutdown+submit. Preserve primary error.
 3. CRITICAL: inspect everything reached via b_iodone — callbacks may themselves call xfs_force_shutdown(bp->b_mount). Provenance must distinguish foreign-shadow recovery IO from live metadata IO; do not infer from b_mount.

@@ -16,7 +16,7 @@ handoff file to do.
 
 ## What was removed
 
-- `/src/mxfs/CLAUDE.md` **RULE 8 — MAINTAIN `handoff.md` AS YOU WORK** —
+- `/src/mxfs/CLAUDE.md` **RULE: ZERO ACCEPTED KNOWN DEFECTS — MAINTAIN `handoff.md` AS YOU WORK** —
   deleted in full (2,389 bytes). The rule numbering now goes 7 → 9; that gap
   is deliberate, do not renumber.
 - `/src/mxfs/.ccloop/handoff.md` — deleted.
@@ -33,4 +33,4 @@ handoff file to do.
 
 Durable findings still belong in **ccmemory** (that is what it is for) and
 defect state still belongs in `tests/criteria/OPEN_DEFECTS.json` under
-RULE 6. Neither of those is a handoff document.
+RULE: ZERO ACCEPTED KNOWN DEFECTS. Neither of those is a handoff document.

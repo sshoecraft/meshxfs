@@ -1,5 +1,5 @@
-<!-- RULE-5 ruling (sess571, D-0946): naive shape A is unsafe; use shape B as transient publication-block with a progress path; long term proof-carrying r… -->
-# RULE-5 ruling — D-0946, the two gates that disagree about reuse
+<!-- RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (sess571, D-0946): naive shape A is unsafe; use shape B as transient publication-block with a progress path; long term proof-carrying r… -->
+# RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — D-0946, the two gates that disagree about reuse
 
 Question put: gate 1 (`mxfs_dialloc_validate_candidate`, xfs_ialloc.c) allows an
 inode whose platter dinode is live, on the grounds that this node holds an open

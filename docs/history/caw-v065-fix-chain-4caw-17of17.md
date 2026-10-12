@@ -1,7 +1,7 @@
 <!-- v0.6.5 build 656E89B4: FIVE fixes → 4/caw 17/17 ALL PASS. acq_epoch, P106-BAIL, P5R self-trans refresh, destage tenure-refuse+merge, block-format-for… -->
 # v0.6.5 fix chain — 4/caw 17/17 (sess5 ccloop 186320ae, build 656E89B4)
 
-## The five fixes (in order, each RULE-4 proven from dlm_fairness/cache_coherency forensics)
+## The five fixes (in order, each RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS proven from dlm_fairness/cache_coherency forensics)
 1. **acq_epoch** (`i_dlm_dir_acq_epoch`, xfs_inode.h): P65 CAW adopt gate compares
    grant_epoch vs acq_epoch (NOT valid_epoch, which modify-path hooks up-sync).
    Advances ONLY at reload fall-through (~15245). → cache_coherency 13/13+.

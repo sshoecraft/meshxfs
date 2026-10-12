@@ -1,5 +1,5 @@
-<!-- sess379 RULE-5 ruling on D-HOT-SLOT-CAW-SERIALIZES-LUN-PER-LBA-379: fix order, the gate+per-node-reader-record format, and why "skip release-all" is… -->
-# sess379 RULE-5 ruling — fixing the hot-slot CAW serialization
+<!-- sess379 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on D-HOT-SLOT-CAW-SERIALIZES-LUN-PER-LBA-379: fix order, the gate+per-node-reader-record format, and why "skip release-all" is… -->
+# sess379 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — fixing the hot-slot CAW serialization
 
 Second consult of sess379, on **D-HOT-SLOT-CAW-SERIALIZES-LUN-PER-LBA-379**.
 

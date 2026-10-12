@@ -1,5 +1,5 @@
-<!-- sess382 RULE-5 ruling 2: suppress both changecount bumps under pipe_relog, but land a COMPLETE canonical-equality oracle FIRST; SELFAHEAD needs EX re… -->
-# sess382 RULE-5 ruling 2 — changecount, canonical equality, and SELFAHEAD
+<!-- sess382 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling 2: suppress both changecount bumps under pipe_relog, but land a COMPLETE canonical-equality oracle FIRST; SELFAHEAD needs EX re… -->
+# sess382 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling 2 — changecount, canonical equality, and SELFAHEAD
 
 Context: the fenced-publication wedge fix (0.18.2) verifies against fault
 injection but all 9 NATURAL firings report `closed=0`. Correlation showed the

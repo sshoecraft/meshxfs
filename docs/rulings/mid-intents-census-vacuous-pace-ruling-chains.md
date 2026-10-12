@@ -14,7 +14,7 @@
 ## D-401 / D-32NODE-SHARED-DIR-CREATE-PACE
 - Mode split anatomy (tests/evidence/sess436_tenure_modesplit/report.txt): EX one-at-a-time every 310 ms = inode_mht_ms=300 tenure; holder does ~13 serial O_SYNC creates (23 ms each) per tenure; release 9 ms; handoff 10 ms.
 - All three MHT arm sites are grace-sliced (10 ms) and lastop is stamped at every ilock_end, yet tenures are full-window: suspect the dwork's busy gate (i_dlm_pin_count>0 during each file fsync / holders during the next open) never samples a >=10 ms quiet gap; the sweep discriminates (MHT=10 vs 300 vs 0).
-- RULE-5 ruling banked: docs/rulings/shared-dir-create-pace-mht-delegation.md (short term: MHT as max useful quantum + direct baton + successor-only poll + aging; real fix: dir delegation/op combining or physical sharding). docs/perf.md updated.
+- RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling banked: docs/rulings/shared-dir-create-pace-mht-delegation.md (short term: MHT as max useful quantum + direct baton + successor-only poll + aging; real fix: dir delegation/op combining or physical sharding). docs/perf.md updated.
 
 ## Other
 - D-0359 step 2 (SNLOCAL_EXCLUSIVE) not started; UNGATED-IMAGES steps 7-10 not started.

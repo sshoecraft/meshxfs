@@ -1,5 +1,5 @@
 <!-- sess7: un-ratelimiting P56-CORESIDENT-DIR-SKIP (~75 lines/s/node in unlink storms) alone dropped dlm_scaling@32 below its 50 ops/s floor. Diagnostics… -->
-# printk volume is a RULE-0 perf criterion (sess7 proof)
+# printk volume is a RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS perf criterion (sess7 proof)
 
 0.10.118 changed P56-CORESIDENT-DIR-SKIP from pr_warn_ratelimited to capped-20000 pr_warn for the iter_13/14 forensics. In the dlm_scaling create/unlink storm it fires on EVERY partial inode-cluster write that skips a dir slot → 17,964 lines/4min on test17 (~75/s/node, 42.7K total mxfs lines in the window). Effect: per-node op rate fell from ~50-66 to 44-52 ops/s → dlm_scaling@32 floor=50 FAILed (30/32, then 27/32). Reverting to ratelimited (0.10.120, srcver F2443A0C) restored PASS 32/32 @49s.
 

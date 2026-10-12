@@ -1,5 +1,5 @@
-<!-- sess363 RULE-5 ruling: CAW selective purge redo APPROVED w/ conditions — per-CAS leased gate, tri-state classifier, single victim; G1/G2 = demand-tri… -->
-# sess363 RULE-5 ruling — CAW-layer selective purge redo (defect #3/#4 grant freeze)
+<!-- sess363 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: CAW selective purge redo APPROVED w/ conditions — per-CAS leased gate, tri-state classifier, single victim; G1/G2 = demand-tri… -->
+# sess363 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — CAW-layer selective purge redo (defect #3/#4 grant freeze)
 
 Conditional approval. Mandatory items:
 

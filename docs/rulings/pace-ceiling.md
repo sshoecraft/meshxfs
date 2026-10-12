@@ -1,5 +1,5 @@
-<!-- sess481 RULE-5 ruling: directory-handoff tuning cannot fix crash_consistency (needs f_H>=64.8%, measured 5-16%); the binding term is the private-arm… -->
-# RULE-5 ruling — sess481, D-32NODE-SHARED-DIR-CREATE-PACE ceiling
+<!-- sess481 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: directory-handoff tuning cannot fix crash_consistency (needs f_H>=64.8%, measured 5-16%); the binding term is the private-arm… -->
+# RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — sess481, D-32NODE-SHARED-DIR-CREATE-PACE ceiling
 
 Consulted with the full sess481 measurement package (phase markers, P291-EXWIN
 distribution, P138-BAST su/sw/sx split, `mxfs_inode_mht_ms=300`, the record's own

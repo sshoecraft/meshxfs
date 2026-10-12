@@ -232,9 +232,12 @@ def authority_argv(conf, verb_args):
     return None
 
 
-def authority_status(conf, peer):
-    """The fence authority's answer about peer: (state, inhibit), or None."""
-    argv = authority_argv(conf, ["status", peer])
+def authority_status(conf, peer, res):
+    """The fence authority's answer about peer: (state, inhibit), or None.
+    The built-in authority excludes per resource, each under its own episode,
+    so it is asked about this resource's; a node fence holds the host itself
+    under one episode, whichever resource asked for it."""
+    argv = authority_argv(conf, ["status", peer] + ([res] if conf and conf.get("agent") == "self" else []))
     if not argv:
         return None
     try:
@@ -323,7 +326,7 @@ def main():
     emit("RECEIPT_EPISODE", rc[2] if rc else None)
     emit("RECEIPT_KIND", rc[3] if rc else None)
     peer = cfg.get("peer_host")
-    auth = authority_status(conf, peer) if peer else None
+    auth = authority_status(conf, peer, res) if peer and res else None
     emit("AUTH_STATE", auth[0] if auth else None)
     emit("AUTH_INHIBIT", auth[1] if auth else None)
     flush(0)

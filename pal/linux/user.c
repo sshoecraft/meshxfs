@@ -797,6 +797,19 @@ mxfs_sock_t *mxfs_pal_tcp_listen(uint16_t port)
 	return s;
 }
 
+/*
+ * A user-mode process mounts no filesystem, so no two filesystems ever share
+ * a port here; the key routes nothing and every listener gets its own socket.
+ */
+mxfs_sock_t *mxfs_pal_tcp_listen_keyed(uint16_t port, const void *key,
+				       uint32_t key_off, uint32_t key_len)
+{
+	(void)key;
+	(void)key_off;
+	(void)key_len;
+	return mxfs_pal_tcp_listen(port);
+}
+
 mxfs_sock_t *mxfs_pal_tcp_accept(mxfs_sock_t *listener)
 {
 	mxfs_sock_t *s;

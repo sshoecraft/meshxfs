@@ -1,6 +1,6 @@
 ---
 name: feedback-every-bash-command-starts-with-an-allowlisted-program-never-cd-sleep-or-an-env-prefix
-description: USER (furious, 0.90.53): commands starting `cd …;`, `sleep`, `VAR=… cmd`, zcat stopped an unattended session on approval prompts. Start with allowlis…
+description: USER (0.90.53): commands starting `cd …;`, `sleep`, `VAR=… cmd`, zcat stopped an unattended session on approval prompts. Start with allowlis…
 metadata:
   type: feedback
 tags: [permissions, allowlist, unattended, harness]

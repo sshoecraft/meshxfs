@@ -14,7 +14,7 @@ Invocation: `MXFS_DEV=/dev/mapper/mpatha MXFS_EXTRA_MODARGS="dirwr=1 dirland=1" 
 throughput saturates ~1319/s → 32 nodes get 41 (<50). Need agg ≥1600 (32×50).
 
 ### Symptom PROVEN (read-bound, AG-0, peer-induced) — `docs/history/caw-32node-dlm-scaling-root-shared-ag0-reread.md`
-RULE-4 instrumented chain on build `115CCA8`:
+RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS instrumented chain on build `115CCA8`:
 1. Read-bound not write: SCST vdisk (`~/disk.img`) served ~2.7GB READ vs ~289MB WRITE (~9:1),
    per `read_io_count_kb`/`write_io_count_kb` under `/sys/kernel/scst_tgt/...:shared/`.
 2. NVMe backing store is NOT the bottleneck: iostat nvme0n1 r/s≈24000, r_await 0.04ms (served from clyde

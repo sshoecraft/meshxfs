@@ -1,5 +1,5 @@
-<!-- sess344 RULE-5 ruling -->
-# sess344 RULE-5 ruling — #92 D-CLEAN-RELEASE-TREATED-AS-DEATH-PHANTOM-RECOVERY-526 fix shape
+<!-- sess344 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling -->
+# sess344 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — #92 D-CLEAN-RELEASE-TREATED-AS-DEATH-PHANTOM-RECOVERY-526 fix shape
 
 GPT (gpt-5.6-sol) APPROVED arm A + b; REJECTED putting EMPTY into hb_still_dead_stamp;
 RULED the missed-EMPTY reuse race (d) is NOT deferrable — needs claim-time provenance.

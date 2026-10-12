@@ -489,6 +489,10 @@ void mxfs_dlm_inode_final_release(struct xfs_inode *ip);
  * deferred revocation worker (PTE zap + page-cache discard + DONTCACHE).
  * Callable from any process context, including with ip's own locks held. */
 void mxfs_incarn_poison(struct xfs_inode *ip);
+/* Work function of a directory's deferred dcache shrink (i_mxfs_dshrink_work):
+ * drops cached children with no lock held, so their synchronous inactivation
+ * never runs inside the directory's own acquire.  See mxfs_dlm_reload_inode. */
+void mxfs_dir_dshrink_work_fn(struct work_struct *work);
 /* (D-0941): 0 = off (default).  Poison every Nth cross-node lookup so
  * the shell-retirement path can be exercised without waiting for the rare
  * natural precondition.  See the definition in xfs_mxfs_dlm.c. */
@@ -898,6 +902,9 @@ void mxfs_dlm_reset_inode_for_create(struct xfs_inode *ip);
 int  mxfs_ag_dlm_lock(struct xfs_mount *mp, struct xfs_perag *pag);
 int  mxfs_ag_dlm_lock_resfree(struct xfs_mount *mp, struct xfs_perag *pag);
 int  mxfs_ag_dlm_trylock(struct xfs_mount *mp, struct xfs_perag *pag);
+/* the allocator's trylock, with that allocation's unanswered-master memory */
+int  mxfs_ag_dlm_trylock_alloc(struct xfs_mount *mp, struct xfs_perag *pag,
+			       uint32_t *mute_master);
 int  mxfs_ag_dlm_lock_bounded(struct xfs_mount *mp, struct xfs_perag *pag);
 void mxfs_ag_dlm_unlock(struct xfs_mount *mp, struct xfs_perag *pag);
 

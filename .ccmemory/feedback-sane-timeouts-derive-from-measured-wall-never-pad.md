@@ -8,13 +8,13 @@ tags: [rule0, timeouts, user-directive, run.sh, board]
 
 « USER DIRECTIVE — sess378, said emphatically and, in the user's words, "at
 least 50 times" before this. It kept not sticking because it was only ever
-written into RULE 0 prose, never into a `feedback` memory that surfaces in
+written into RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS prose, never into a `feedback` memory that surfaces in
 every session's first `memory_list`. It is here now. »
 
 ## The complaint, verbatim in substance
 
-> "your timeouts are incredibly stupid. They make everything you do and every
-> test you do take at least 10 times longer than it should"
+> The timeouts make everything done and every test run take at least 10 times
+> longer than it should.
 
 ## What I was doing wrong (sess378, the concrete instance)
 
@@ -24,14 +24,14 @@ even higher (440000 / 520000 / 540000 ms).
 
 Every one of those numbers was invented. The chunks' real walls were 26s, 75s,
 76s. I picked "a number that fits under the 10-minute tool cap" — which is
-precisely the failure RULE 0 names by name.
+precisely the failure RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS names by name.
 
 ## THE RULE
 
 **A timeout is a derived number with a shown derivation. If you cannot write
 the arithmetic, you do not get to type the number.**
 
-1. **`run.sh` ALREADY enforces RULE 0 per-test.** `tests/suite/manifest`
+1. **`run.sh` ALREADY enforces RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS per-test.** `tests/suite/manifest`
    column 5 is each test's budget, and the harness uses it as that test's hard
    timeout AND flips PASS to FAIL on `elapsed_s > budget_s`. Wrapping it in a
    padded outer `timeout` adds nothing but latency on a hang. The wrapper's
@@ -44,7 +44,7 @@ the arithmetic, you do not get to type the number.**
 3. **The Bash tool `timeout` parameter = the derived number + ~5s.** Never a
    round number, never "the max", never 10 minutes.
 4. **Never widen a timeout because something did not finish.** The slowness IS
-   the bug (RULE 0 §5). Kill it, record FAIL, diagnose.
+   the bug (RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS §5). Kill it, record FAIL, diagnose.
 5. **After a healthy PASS, tighten** — record the actual wall in
    `tests/criteria/TIMEOUT_BUDGETS.md` and move the budget toward it.
 
@@ -76,5 +76,5 @@ wrong in the case that matters. When a run WEDGES — which on this rig is the
 normal failure mode, not the exotic one — the padded timeout is exactly how
 long the session sits doing nothing. Ten padded wrappers across a session is
 where the "10x longer" comes from. It also destroys the assertion: a run that
-takes 8 minutes under a 10-minute wrapper reads as success when it is a RULE 0
+takes 8 minutes under a 10-minute wrapper reads as success when it is a RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS
 failure.

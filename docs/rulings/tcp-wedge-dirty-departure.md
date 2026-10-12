@@ -1,4 +1,4 @@
-<!-- sess416 RULE-5 ruling D-0286: TCP wedge fix = Shape B strengthened — session-wide POISONED/dirty-departure state machine, no TCP pins; invariants + r… -->
+<!-- sess416 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-0286: TCP wedge fix = Shape B strengthened — session-wide POISONED/dirty-departure state machine, no TCP pins; invariants + r… -->
 # sess416 GPT ruling (gpt-5.6-sol) — D-TCP-WEDGE-PIN-NOOP-REPORTS-SUCCESS-0286 fix shape
 
 ## Ruling: Shape B, strengthened into a fail-closed dirty-departure protocol

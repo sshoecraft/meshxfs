@@ -1,5 +1,5 @@
-<!-- sess113 RULE-5 ruling: the sess112 lreq registry is STOP-SHIP. Counter-sampling cannot authorize a clear; needs explicit op ownership. 3 corruption p… -->
-# sess113 — RULE-5 ruling on the sess112 local request registry: STOP-SHIP
+<!-- sess113 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: the sess112 lreq registry is STOP-SHIP. Counter-sampling cannot authorize a clear; needs explicit op ownership. 3 corruption p… -->
+# sess113 — RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the sess112 local request registry: STOP-SHIP
 
 Prior: `…sess112-lreq-registry-LANDED-0.11.441` (what landed),
 `…sess111-GPT-ruling-blocker6-REJECTS-held-table-guard` (what was required).

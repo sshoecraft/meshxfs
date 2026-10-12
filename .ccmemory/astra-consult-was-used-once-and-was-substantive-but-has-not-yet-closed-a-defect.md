@@ -32,7 +32,7 @@ the fix touches on-disk and replay semantics.
    already-flushed image is idempotent. It is not. Astra proposed a stricter
    classification scheme in place of the "add more override sites" patch.
 
-The session called the reply substantive and redirected its RULE 4 hypothesis on
+The session called the reply substantive and redirected its RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS hypothesis on
 it — load-bearing input, not a rubber stamp.
 
 ## The caveat that must travel with the answer

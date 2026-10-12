@@ -1,4 +1,4 @@
-<!-- sess419 RULE-5 ruling D-PURGE-NONATOMIC-PUBLICATION test design: gate (P234) is the interlock, owner-side publish_refusal injectors for both refreeze… -->
+<!-- sess419 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-PURGE-NONATOMIC-PUBLICATION test design: gate (P234) is the interlock, owner-side publish_refusal injectors for both refreeze… -->
 # sess419 GPT ruling — D-PURGE-NONATOMIC-PUBLICATION verification
 
 Context: live tree has only two purge call sites (elected owner post-GRANTS_RELEASED; slotless-victim
@@ -11,7 +11,7 @@ owner's descriptor cannot change under it except via false-death fencing.
    (-EBUSY) with P234-PURGE-FROZEN naming owner O, ZERO writes by the non-owner, no live grant/HB
    damaged, owner completes and publishes normally; a post-publication invocation performs no writes
    (may refuse -ENOENT). P235-PURGE-CONTENDED is NOT required (it only records retry exhaustion).
-   Bypassing phase 0 (B) fabricates an impossible caller — not RULE-6 evidence; if CAS-collision is
+   Bypassing phase 0 (B) fabricates an impossible caller — not RULE: ZERO ACCEPTED KNOWN DEFECTS evidence; if CAS-collision is
    tested separately add a per-MISCOMPARE counter. Slotless fallback (C) exercises nothing destructive;
    add a regression assertion (0 victim records, no CAW zero, no HB zero).
 2. Descriptor-change arms: no real false-fence needed. But "same gate function" is NOT sufficient —

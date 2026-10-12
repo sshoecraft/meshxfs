@@ -130,3 +130,9 @@ __pycache__/
 # generated at build time from the target kernel's headers (Kbuild filechk)
 /pal/linux/mxfs_libiscsi_fingerprint.h
 /pal/linux/mxfs_kcompat.h
+
+# Claude Code per-session state: workflow worktrees (whole checkouts of the tree),
+# checkpoints and agent mailboxes
+.claude/worktrees/
+.claude/checkpoints/
+.claude/mailbox/

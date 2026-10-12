@@ -444,12 +444,11 @@ static void mxfs_peer_accept_fn(void *arg)
 			continue;
 		}
 
-		/* Multi-LUN: reject connections for a different volume.
-		 * With SO_REUSEPORT, the kernel may deliver a connection
-		 * intended for another mount's accept loop to us.  If the
-		 * sender's volume_id is non-zero and doesn't match ours,
-		 * close immediately — the sender will retry and the kernel
-		 * will probabilistically deliver it to the correct listener. */
+		/* A connection for a different volume is closed.  The host's
+		 * shared listener already routes every connection to the
+		 * mount whose volume its NODE_JOIN names, so in the kernel
+		 * this only catches a connector that changed its mind between
+		 * the routing peek and this read. */
 		if (join.volume_id != 0 &&
 		    ctx->local_volume_id != 0 &&
 		    join.volume_id != ctx->local_volume_id) {
@@ -613,8 +612,14 @@ struct mxfs_peer_ctx *mxfs_peer_init(mxfs_node_id_t node_id,
 		ctx->peers[i].send_lock = mxfs_pal_mutex_create();
 	}
 
-	/* Create TCP listen socket */
-	ctx->listen_sock = mxfs_pal_tcp_listen(port);
+	/*
+	 * Listen on the host's shared port, routed by volume: every filesystem
+	 * this host mounts listens on the same port, and the connector's first
+	 * message, its NODE_JOIN, carries the volume it is for.
+	 */
+	ctx->listen_sock = mxfs_pal_tcp_listen_keyed(port, &ctx->local_volume_id,
+						     offsetof(struct mxfs_dlm_node_msg, volume_id),
+						     sizeof(ctx->local_volume_id));
 	if (!ctx->listen_sock) {
 		mxfs_pal_log(MXFS_LOG_ERR,
 			     "peer: listen on port %u failed", port);
@@ -940,8 +945,9 @@ static int peer_connect_impl(struct mxfs_peer_ctx *ctx,
 		return -EPROTO;
 	}
 
-	/* Multi-LUN: verify reply is from the correct volume.
-	 * SO_REUSEPORT may have delivered us to the wrong listener. */
+	/* The reply must come from the mount of our volume: a peer whose
+	 * module predates routed listeners may still hand this connection to
+	 * another filesystem's accept loop. */
 	if (reply.volume_id != 0 &&
 	    ctx->local_volume_id != 0 &&
 	    reply.volume_id != ctx->local_volume_id) {

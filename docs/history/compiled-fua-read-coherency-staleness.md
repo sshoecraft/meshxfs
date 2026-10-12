@@ -20,7 +20,7 @@ fully coherent — `docs/history/docs/history/compiled-fua-read-coherency-stalen
   NOT fix the di_size=0 blocker there, correctly ruling FUA OUT as the di_size
   root (that one was write-side, see below). So FUA-disable was shelved this
   session as not-the-cause for di_size.
-- **`docs/history/docs/history/compiled-fua-read-coherency-staleness.md` (2026-06-05, build `7DF27971`).** GPT consult (RULE-5)
+- **`docs/history/docs/history/compiled-fua-read-coherency-staleness.md` (2026-06-05, build `7DF27971`).** GPT consult (RULE: CONSULT ANOTHER MODEL WHEN STUCK)
   rank-1 root was "`_XBF_FUA_FRESH` is node-local, served stale AG-meta on
   reacquire." Code analysis PARTIALLY REFUTED that: MXFS already has the epoch
   (`pag->pag_dlm_meta_gen` bumped on fresh acquire at `xfs_mxfs_dlm.c:4925` +

@@ -4,7 +4,7 @@
 Single-topic compile (ccloop `0d6e174d` sess2, 2026-07-07, host-wedged / UNTESTED). Subject: `dir_reuse_coherency`
 is the SOLE 16-node ship holdout — correctness is FINE (dedup+bast_wq, now default in build `115CCA8C`); the
 blocker is WALL TIME. Central finding: the dominant cost is **inherent disk-CAW per-inode coherence latency**,
-largely irreducible, and this is most likely a RULE-0 budget-legitimacy call rather than a perf bug. Sources
+largely irreducible, and this is most likely a RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS budget-legitimacy call rather than a perf bug. Sources
 progress from first analysis → GFS2 reference compare → sharper conclusion → code-confirmed FINAL correction.
 
 ### Measured (16 nodes, dedup+bast_wq, no fair_handoff)
@@ -31,7 +31,7 @@ progress from first analysis → GFS2 reference compare → sharper conclusion �
   starvation but adds latency (300s/round — too slow). Aging / longest-waiter-first in `caw_wait_for_grant`
   (sess3 idea) gives fairness without round-robin latency, but raw throughput stays handoff-bound.
 
-### GFS2 reference comparison (RULE-5 reference-read of ~/src/linux/fs/gfs2) — the model is NOT the cost
+### GFS2 reference comparison (RULE: CONSULT ANOTHER MODEL WHEN STUCK reference-read of ~/src/linux/fs/gfs2) — the model is NOT the cost
 - GFS2 uses the **same coherence MODEL** as mxfs: per-inode/dir glock (`dip->i_gl`). Create does
   `gfs2_glock_nq_init(dip->i_gl, LM_ST_EXCLUSIVE)` (inode.c:729) → dir-EX serializes concurrent same-dir
   creates (O(N) handoffs, same as mxfs). Lookup does `LM_ST_SHARED` (inode.c:343). Glocks cached until a peer
@@ -63,8 +63,8 @@ path corrected this:
   can't assume that globally. Needs careful design + host validation; do NOT ship blind.
   `docs/history/docs/history/docs/history/compiled-caw-dir-reuse-perf-analysis.md`
 
-### Bottom line — RULE-0 budget-legitimacy, not a perf bug
-dir_reuse has NO native-XFS equivalent (clustered-only) → RULE-0's "2× native" ceiling is UNDEFINED. The fair
+### Bottom line — RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS budget-legitimacy, not a perf bug
+dir_reuse has NO native-XFS equivalent (clustered-only) → RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS's "2× native" ceiling is UNDEFINED. The fair
 comparison (GFS2 network-DLM) uses a transport mxfs deliberately avoids for scale. The project's own
 `dirop_durable_caw=0` A/B already proved the per-op FUA is load-bearing (durably LOST a dirent without it).
 The dominant verify cost is the irreducible price of per-inode PR coherence over the disk-CAW transport.
@@ -81,6 +81,6 @@ necessary workload. Setting it correctly is NOT "widening to pass."
 4. If still over budget (verify dominates): EITHER accept budget = measured healthy wall (defensible —
    necessary coherence I/O, GFS2/OCFS2-model-inherent, no native equiv; prefer this — it's honest) OR
    carefully prototype the optimistic-READ for verify behind a param + validate coherence (risky).
-5. Only if doubt remains whether the cost is architecturally competitive → RULE-5 Fable consult (reference
+5. Only if doubt remains whether the cost is architecturally competitive → RULE: CONSULT ANOTHER MODEL WHEN STUCK Fable consult (reference
    GFS2+OCFS2 already read); escalate to GPT-5.5 only if Fable fails. The "tried+refuted own fixes" bar needs
    the host first.

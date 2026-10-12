@@ -1,5 +1,5 @@
-<!-- sess50 RULE-5 GPT ruling on foreign-replay step 4: copied manifest CAN be dropped (CAW table is the manifest) but durable REPLAYED state CANNOT; both… -->
-# GPT RULE-5 ruling — foreign-replay step 4 ordering (sess50)
+<!-- sess50 RULE: CONSULT ANOTHER MODEL WHEN STUCK GPT ruling on foreign-replay step 4: copied manifest CAN be dropped (CAW table is the manifest) but durable REPLAYED state CANNOT; both… -->
+# GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — foreign-replay step 4 ordering (sess50)
 
 Campaign: `docs/history/docs/history/compiled-foreign-replay-authority-tokens.md`. Asked adversarially with
 line-verified code facts; GPT confirmed two NEW defects and partially accepted

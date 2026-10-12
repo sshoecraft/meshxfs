@@ -753,6 +753,61 @@ mxfs_incarn_revoke_work_fn(
 }
 
 /*
+ * A directory's deferred dcache shrink (see its queueing site at the end of
+ * mxfs_dlm_reload_inode for why it never runs inside the reload).  Runs with
+ * no lock held, so a child whose last reference goes here is inactivated
+ * against its holder alone.
+ */
+void
+mxfs_dir_dshrink_work_fn(
+	struct work_struct	*work)
+{
+	struct xfs_inode	*ip = container_of(work, struct xfs_inode,
+						   i_mxfs_dshrink_work);
+	struct dentry		*de = d_find_alias(VFS_I(ip));
+
+	if (de) {
+		shrink_dcache_parent(de);
+		dput(de);
+		mxfs_idbg("mxfs: P41-INSTR ino=%llu dcache drained",
+			  (unsigned long long)ip->i_ino);
+	}
+	xfs_irele(ip);
+}
+
+static void
+mxfs_dir_dshrink_queue(
+	struct xfs_inode	*ip)
+{
+	struct xfs_mount	*mp = ip->i_mount;
+	struct dentry		*de;
+	bool			queued = false;
+
+	/*
+	 * No alias, nothing to shrink.  It also keeps the reference below off
+	 * an inode the iget miss path has not inserted yet (no dentry can
+	 * exist for one): that path frees its inode directly, whatever its
+	 * reference count (see mxfs_incarn_poison).
+	 */
+	de = d_find_alias(VFS_I(ip));
+	if (!de)
+		return;
+	dput(de);
+	if (!mp->m_mxfs_inode_bast_wq || !igrab(VFS_I(ip)))
+		return;
+	/* the arm gate put_super closes before it flushes this queue */
+	spin_lock(&mp->m_mxfs_arm_lock);
+	if (!mp->m_mxfs_arms_off)
+		queued = queue_work(mp->m_mxfs_inode_bast_wq,
+				    &ip->i_mxfs_dshrink_work);
+	spin_unlock(&mp->m_mxfs_arm_lock);
+	/* not queued: a pass already pending covers this reload, or the
+	 * filesystem is going down; the caller's own reference remains */
+	if (!queued)
+		xfs_irele(ip);
+}
+
+/*
  * TEST ONLY — the A/B control for the uninserted-poison fix below: 1 restores
  * the pre-0.89.75 behaviour (igrab + queue a revocation even on an object
  * that is not the cache's inode for its number), so the defect and the fix
@@ -6107,30 +6162,31 @@ mxfs_dlm_reload_inode_under(
 	xfs_buf_relse(bp);
 
 	/*
-	 * v0.3.88 dir dcache invalidation, relocated here (
-	 * ROOT FIX — see the comment at its old site above the
-	 * S_ISREG arm): shrink_dcache_parent can iput the last reference
-	 * on child inodes and run their SYNCHRONOUS inactivation right
-	 * here, so it must not run while this function still holds the
-	 * dir's inode-cluster buffer locked (the child shares that
-	 * cluster; its precommit re-locks it → b_sema self-deadlock, the
-	 * b54r1/b55r3 node-convoy + peer -110 shutdown).  After the
-	 * relse/up_write above the child inactivation completes normally.
-	 * Ordering is safe: the reloaded dir content is already published
-	 * (i_dlm_stale cleared) and lookups revalidate via
-	 * mxfs_drevalidate epochs; the shrink is cache hygiene, not a
-	 * coherency fence.
+	 * v0.3.88 dir dcache invalidation: drop the cached children so the
+	 * next lookups resolve against the reloaded directory.  It is cache
+	 * hygiene, not a coherency fence: the reloaded content is already
+	 * published (i_dlm_stale cleared) and lookups revalidate via
+	 * mxfs_drevalidate epochs.
+	 *
+	 * It never runs here.  shrink_dcache_parent can iput the last
+	 * reference on a child and, on a cluster, run its SYNCHRONOUS
+	 * inactivation, which takes the child's lock.  This reload runs
+	 * inside the directory's acquire (state ACQUIRING): the grant is held
+	 * on disk and every peer's request for the directory is deferred
+	 * until the acquire ends.  A peer holding the child while it waits
+	 * for this directory (rmdir locks the child, then the parent) then
+	 * waits on us while we wait on it.  Measured on 16/disk/caw/mpath:
+	 * test7's acquire of `shared` sat 480 s inactivating its stale copy
+	 * of `LOCK`, which test12's rmdir held, while test12 and fourteen
+	 * other nodes waited for `shared`; test7 released it in the
+	 * millisecond its child lock gave up.  So the shrink is queued, and
+	 * runs with no lock held; the child then waits only for its holder,
+	 * which can now be served.  (It also cannot hold this dir's
+	 * inode-cluster buffer, the b54r1/b55r3 b_sema self-deadlock that
+	 * first moved it below the relse.)
 	 */
 	if (S_ISDIR(VFS_I(ip)->i_mode)) {
-		struct dentry *de = d_find_alias(VFS_I(ip));
-
-		if (de) {
-			shrink_dcache_parent(de);
-			dput(de);
-			mxfs_idbg(
-				"mxfs: P41-INSTR ino=%llu dcache drained",
-				(unsigned long long)ip->i_ino);
-		}
+		mxfs_dir_dshrink_queue(ip);
 		/* H19: drop the dir inode's page cache too.  XFS dir
 		 * data normally lives in xfs_buf cache, but readdir / find
 		 * iteration may also be affected by stale page-cache state.

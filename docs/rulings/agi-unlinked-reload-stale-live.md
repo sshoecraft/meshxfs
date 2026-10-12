@@ -1,4 +1,4 @@
-<!-- sess384 RULE-5 ruling: do NOT reuse the -ENOENT destructive heal for an allocated nlink!=0 unlinked-list member; FUA home reads are not authoritative… -->
+<!-- sess384 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: do NOT reuse the -ENOENT destructive heal for an allocated nlink!=0 unlinked-list member; FUA home reads are not authoritative… -->
 ## Context
 
 Measured 32/caw 2026-08-20 (sess384), reproduced 3x. One node's rsync rename

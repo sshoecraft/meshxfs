@@ -1,5 +1,5 @@
-<!-- sess391 RULE-5 ruling (3rd on AG handoff/PACE-388): atomic zero-holder LATCH at last-holder unlock + explicit AG_CLOSING admission state at BAST + RE… -->
-# sess391 RULE-5 ruling — AG handoff closure (re-ask of the sess390 consult that died)
+<!-- sess391 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (3rd on AG handoff/PACE-388): atomic zero-holder LATCH at last-holder unlock + explicit AG_CLOSING admission state at BAST + RE… -->
+# sess391 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — AG handoff closure (re-ask of the sess390 consult that died)
 
 Prompt = the sess390 constraint set (ledger D-RSYNC-LAP-PACE-AG-SHARING-388 next_step; L1-L5 shapes).
 

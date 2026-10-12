@@ -1,4 +1,4 @@
-<!-- sess93 RULE-5 ruling -->
+<!-- sess93 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling -->
 # sess93 ruling #2 — how (and whether) MXFS can actually fence a live victim
 
 Asked with the sess93 measurement in hand (a PREEMPT-AND-ABORTed node

@@ -1,4 +1,4 @@
-<!-- sess263: -488 run3 wedge PROVEN = 3-node cross-AG ABBA deadlock in EFI-finish path; RULE-5 ruling = release-before-block at defer pre-mutation checkp… -->
+<!-- sess263: -488 run3 wedge PROVEN = 3-node cross-AG ABBA deadlock in EFI-finish path; RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling = release-before-block at defer pre-mutation checkp… -->
 # sess263 — -488 second face: cross-AG ABBA deadlock, proven + ruled
 
 ## Proof (live wedged fleet, 0.11.491, scaling_curve run3 leftovers)
@@ -15,7 +15,7 @@
   (unfinished EFI work references the AG). No acquisition ordering →
   cycles. Waiter extension ("holders alive") never breaks it.
 
-## RULE-5 ruling (GPT; full text in sess263 transcript)
+## RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (GPT; full text in sess263 transcript)
 Release-before-block (option a) is SAFE and chosen:
 - A durable EFI does NOT require continuous AG ownership: its extent is
   not in the freespace btrees, so peers cannot allocate/free it.

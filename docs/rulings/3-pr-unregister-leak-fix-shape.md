@@ -1,5 +1,5 @@
-<!-- sess377 RULE-5 ruling for D-CLEAN-UNMOUNT-LEAKS-PR-REGISTRATION-377: symmetric all-nexus unregister + mandatory READ KEYS verification + fail-closed;… -->
-«RULE-5 RULING — clean-unmount PR registration leak (sess377)»
+<!-- sess377 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling for D-CLEAN-UNMOUNT-LEAKS-PR-REGISTRATION-377: symmetric all-nexus unregister + mandatory READ KEYS verification + fail-closed;… -->
+«RULE: CONSULT ANOTHER MODEL WHEN STUCK RULING — clean-unmount PR registration leak (sess377)»
 
 Defect: D-CLEAN-UNMOUNT-LEAKS-PR-REGISTRATION-377. Consult 4 of sess377,
 gpt-5.6-sol.

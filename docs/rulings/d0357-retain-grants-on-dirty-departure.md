@@ -1,5 +1,5 @@
-<!-- sess433 RULE-5 ruling D-0357: dirty departure must NOT unlock on-disk grants — approved with 4 stop-ships: explicit RECOVERY_REQUIRED/CLEAN_RELEASE_O… -->
-# sess433 RULE-5 ruling — D-0357 (dirty unmount releases on-disk grants before replay -> notheld)
+<!-- sess433 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-0357: dirty departure must NOT unlock on-disk grants — approved with 4 stop-ships: explicit RECOVERY_REQUIRED/CLEAN_RELEASE_O… -->
+# sess433 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — D-0357 (dirty unmount releases on-disk grants before replay -> notheld)
 
 Verdict: the fix shape (in-core teardown WITHOUT on-disk unlock on a recovery-required departure; grants stay held by the withdrawn incarnation; survivor's P&A + manifest seal captures them; existing post-replay purge frees them) is correct and makes dirty unmount == crash. Conditional on:
 

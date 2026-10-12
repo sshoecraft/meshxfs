@@ -204,7 +204,16 @@ cqval(){ # <chunk line> <key>
 # partition.  Measured 2/disk/caw/direct, 0.90.6: test1 (slot 0, stride 32, agcount 63)
 # filled AG 32, carved there, and the loop, watching AG 0 only, ran all 8192
 # creates and aborted the row.
-D="$MNT/alloc_witness"
+#
+# Every run works in a directory of its own.  The names are fixed (x<i>,
+# r<rank>_<i>, u<i>), so a second run on the same filesystem found its
+# predecessor's files under them: `: >` truncated them and allocated
+# nothing.  Measured 16/disk/caw/mpath, 0.90.124, two runs on one mkfs
+# (20261012T090118Z-g16 then 090301Z-g16): in the second, 12 of 16 nodes
+# made zero phase-1 carves, each re-touching the 192 r<rank>_<i> files the
+# first run had made, and own_ag and overlap failed; the occupant list read
+# back at the end would also have taken in the earlier run's u<i> files.
+D="$MNT/alloc_witness/$RUN_ID"
 FILL_MAX="${AW_FILL_MAX:-8192}"
 W0=$(cat "$WIT" 2>/dev/null)
 AFF=$(( $(field "$W0" slot) % $(field "$W0" agcount) ))
@@ -217,6 +226,10 @@ partcarves(){ # <witness text>: carves summed over this node's partition
                 for (i = 2; i <= NF; i++) if ($i ~ /^carves=[0-9]+$/) c += substr($i, 8) }
         END { print c + 0 }'
 }
+# rank 1's shared directory is made BEFORE the fill: its inode comes from rank
+# 1's partition, and made after, it would take one inode out of the reserve the
+# fill has just exhausted
+[ "$RANK" = 1 ] && { mkdir -p "$D/shared" 2>/dev/null; sync -f "$MNT" 2>/dev/null; }
 mkdir -p "$D/fill_r$RANK" || fail_out "fill_mkdir=failed rank=$RANK" "mkdir of the node's fill directory failed"
 echo 1 > "$WIT" 2>/dev/null || fail_out "clear=failed rank=$RANK" "the witness counters could not be cleared before the fill"
 fill=0; fcarved=0; fstart=$(date +%s%N)
@@ -229,11 +242,35 @@ while [ "$fill" -lt "$FILL_MAX" ]; do
     fcarved=$(partcarves "$(cat "$WIT" 2>/dev/null)")
     [ "${fcarved:-0}" -ge 1 ] && break
 done
-rec "FILL affine_ag=$AFF stride=$FSTRIDE files=$fill carved=${fcarved:-0} wall_ms=$(( ($(date +%s%N) - fstart) / 1000000 ))"
 [ "${fcarved:-0}" -ge 1 ] || fail_out "fill=exhausted files=$fill affine_ag=$AFF stride=$FSTRIDE rank=$RANK" "$fill creates in the node's AG partition never carved a chunk; the free reserve could not be exhausted inside AW_FILL_MAX"
+# The carve came somewhere inside the last batch of 64, so the chunk it made
+# still holds as many free inodes as the AG had before the fill (0-63, left by
+# earlier rows).  Those are created now, until the live inobt record of the
+# newest file's chunk shows none free: otherwise phase 1's first carve on this
+# node waits for that leftover to be used up.  Measured 16/disk/caw/mpath,
+# 0.90.124, run 20261012T042829Z-g16: a node creates ~7 files/s in the shared
+# directory at 16 nodes and carves every ~10 s, so rank 1's first phase-1
+# carve came 10.0 s into the burst, after rank 3's last (9.6 s), and the
+# overlap floor failed on the leftover alone.
+topup=0; fagno=""; ffree=""; round=0
+while :; do
+    ino=$(stat -c %i "$D/fill_r$RANK/x$((fill - 1))" 2>/dev/null)
+    q=$(chunkq "$ino") || fail_out "fill_chunk_query=failed rank=$RANK" "the live chunk query for the fill's newest inode could not be issued"
+    fagno=$(cqval "$q" agno); ffree=$(cqval "$q" freecount)
+    [ -n "$ffree" ] || fail_out "fill_chunk_query=empty ino=$ino rank=$RANK" "the live chunk query returned no freecount for the fill's newest inode: [$q]"
+    [ "$ffree" = 0 ] && break
+    [ "$round" -ge 3 ] && break
+    j=0
+    while [ "$j" -lt "$ffree" ]; do
+        : > "$D/fill_r$RANK/x$fill" || fail_out "fill_topup_create=failed i=$fill rank=$RANK" "a create topping up the fill's chunk failed"
+        fill=$((fill + 1)); j=$((j + 1)); topup=$((topup + 1))
+    done
+    round=$((round + 1))
+done
+rec "FILL affine_ag=$AFF stride=$FSTRIDE files=$fill carved=${fcarved:-0} topup=$topup chunk_agno=${fagno:-?} chunk_free_after=${ffree:-?} wall_ms=$(( ($(date +%s%N) - fstart) / 1000000 ))"
+[ "$ffree" = 0 ] || fail_out "fill_topup=incomplete free=$ffree agno=$fagno rank=$RANK" "after $topup top-up creates the fill's newest chunk still shows $ffree free inodes"
 
 # ---- 0. clear, baseline, clock exchange -----------------------------------
-[ "$RANK" = 1 ] && { mkdir -p "$D/shared" 2>/dev/null; sync -f "$MNT" 2>/dev/null; }
 echo 1 > "$WIT" 2>/dev/null || fail_out "clear=failed rank=$RANK" "the witness counters could not be cleared"
 snap S0
 CLEARS0=$(field "$S_S0" clears)

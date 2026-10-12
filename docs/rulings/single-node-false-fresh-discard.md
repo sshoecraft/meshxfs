@@ -1,5 +1,5 @@
-<!-- sess432 RULE-5 ruling D-0353: explicit GAUTH_SINGLE_NODE provenance (transition-serialized), P131 -> two-pass preflight + shutdown (never log-force t… -->
-# sess432 RULE-5 ruling — D-SINGLENODE-FALSE-FRESH-DISCARDS-PINNED-AGMETA-DOUBLE-ALLOC-0353
+<!-- sess432 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-0353: explicit GAUTH_SINGLE_NODE provenance (transition-serialized), P131 -> two-pass preflight + shutdown (never log-force t… -->
+# sess432 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — D-SINGLENODE-FALSE-FRESH-DISCARDS-PINNED-AGMETA-DOUBLE-ALLOC-0353
 
 Chain (measured on the LUN, tests/lone_mount_create.sh): caw_lock single-node fast path -> non-proving grant (epoch 0) -> sess291 epochless-hint drop (xfs_mxfs_dlm.c:40088) on every acquire -> P130 false-fresh -> invalidate_ag_meta stales PINNED AGI/inobt/finobt (P131) -> platter re-read -> mkdir's inode allocated twice -> shutdown.
 

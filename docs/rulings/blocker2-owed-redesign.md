@@ -1,5 +1,5 @@
-<!-- sess121 RULE-5 ruling on blocker 2: intent-first is right, but retraction needs target-scope + generation, lreq_plan must go PURE, and owed_slot over… -->
-# sess121 RULE-5 ruling — blocker 2 (guaranteed-progress owed cleanup)
+<!-- sess121 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on blocker 2: intent-first is right, but retraction needs target-scope + generation, lreq_plan must go PURE, and owed_slot over… -->
+# sess121 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — blocker 2 (guaranteed-progress owed cleanup)
 
 I proposed a 3-part fix: (A) intent-first owed publication, (B) precise
 retraction on confirmed clear, (C) executor in the existing BAST poll thread.

@@ -1,5 +1,5 @@
-<!-- sess83 RULE-5 ruling: random nonzero 64-bit incarnation (NOT my timestamp construction), zero is never a wildcard, and last-writer-wins provenance is… -->
-# sess83 RULE-5 ruling — mount incarnation + token v2 + provenance capture
+<!-- sess83 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: random nonzero 64-bit incarnation (NOT my timestamp construction), zero is never a wildcard, and last-writer-wins provenance is… -->
+# sess83 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — mount incarnation + token v2 + provenance capture
 
 Consult sent with the sess83 measurement (all 31 live HB records read EPOCH=0 off
 the LUN; `ctx->epoch` written once as 0 and never again).  Verdict: **the finding

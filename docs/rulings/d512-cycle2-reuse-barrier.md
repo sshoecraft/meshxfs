@@ -1,4 +1,4 @@
-<!-- sess415 RULE-5 ruling D-512 cycle-2: reuse barrier mostly present; closure needs extent-publication proof, drain-error fail-stop, dirty diff-gen cont… -->
+<!-- sess415 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-512 cycle-2: reuse barrier mostly present; closure needs extent-publication proof, drain-error fail-stop, dirty diff-gen cont… -->
 # sess415 GPT ruling (gpt-5.6-sol) — D-512 cycle-2 CLUSTER REUSE BARRIER
 
 ## Tree facts brought to the consult (verified sess415)

@@ -1,5 +1,5 @@
-<!-- sess377 RULE-5 ruling for D-QUARANTINED-SLOT-EXHAUSTS-CLUSTER-ADMISSION-376: offline crash-safe chk_mxfs repair + slots 32..63 archive ledger + incom… -->
-«RULE-5 RULING — quarantined-slot exhaustion / operator repair path (sess377)»
+<!-- sess377 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling for D-QUARANTINED-SLOT-EXHAUSTS-CLUSTER-ADMISSION-376: offline crash-safe chk_mxfs repair + slots 32..63 archive ledger + incom… -->
+«RULE: CONSULT ANOTHER MODEL WHEN STUCK RULING — quarantined-slot exhaustion / operator repair path (sess377)»
 
 Defect: D-QUARANTINED-SLOT-EXHAUSTS-CLUSTER-ADMISSION-376.
 Consult: mcp__ask_gpt__query, gpt-5.6-sol, 2026-08-19.

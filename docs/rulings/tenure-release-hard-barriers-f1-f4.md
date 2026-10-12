@@ -1,4 +1,4 @@
-<!-- sess197 RULE-5 ruling: F1/F3/F4 are HARD release-blocking barriers before enforcement gate; F2 needs durable flush + explicit domain knob; 10-step bu… -->
+<!-- sess197 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: F1/F3/F4 are HARD release-blocking barriers before enforcement gate; F2 needs durable flush + explicit domain knob; 10-step bu… -->
 # sess197 GPT ruling — tenure-release invariant hard barriers (D-FOREIGN-REPLAY item 2)
 
 Full ruling text in sess197 transcript (task koqgeh7mr). Line-cited audit that
@@ -81,5 +81,5 @@ never rejected, new-tenure image never stable before its epoch mint.
    vs stable-media oracle).
 9. Enable per class: AG → inode → ICLUS → dir. Boards per step.
 10. Global enable only at zero invalid certificates + zero oracle mismatch.
-RULE-0: one deterministic stage per node/seed, rotate stages across 32
+RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS: one deterministic stage per node/seed, rotate stages across 32
 nodes; full cache-loss matrix only on dedicated crash boards.

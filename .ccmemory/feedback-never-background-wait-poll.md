@@ -60,7 +60,7 @@ resolves exactly as the gate globs it.
   counts zero, keepgoing re-feeds "continue", and the session is kicked.
   Observed sess395: the session announced it was holding for a ~35 min rig
   series and was re-fed three times in a row. For rig work: keep working, or
-  block in the foreground with a RULE 0 derived timeout.
+  block in the foreground with a RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS derived timeout.
 - **Outside a ccloop run there is no gate at all.** Ending the turn there hands
   control back to the user — the original sess10 failure.
 - Short work (under ~1 min) stays in the foreground. Backgrounding is for

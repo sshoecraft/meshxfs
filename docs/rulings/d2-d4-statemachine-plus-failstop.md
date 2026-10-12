@@ -1,4 +1,4 @@
-<!-- sess133 RULE-5 ruling: state machine APPROVED with conditions; D6 abandon-and-leak REJECTED as a known UAF — the answer is bounded escalation then LO… -->
+<!-- sess133 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: state machine APPROVED with conditions; D6 abandon-and-leak REJECTED as a known UAF — the answer is bounded escalation then LO… -->
 # sess133 — GPT ruling: the lifecycle state machine, and D6 ends in FAIL-STOP
 
 Tree 0.11.449 at consult time. Consult covered (A) my D2/D3/D4 state-machine

@@ -103,6 +103,21 @@ module_param_named(dbg_poison_direct_free, mxfs_dbg_poison_direct_free,
 MODULE_PARM_DESC(dbg_poison_direct_free,
 	"TEST: poison the next N inodes the iget miss path frees directly on an error exit (0 = off)");
 
+/*
+ * TEST ONLY: every inode freed while this is set returns to the slab with
+ * i_mxfs_rel_state WEDGED, so the next inode allocated in its memory meets
+ * exactly what a fenced node met after remounting
+ * (D-RECYCLED-INODE-INHERITS-WEDGED-REL-STATE): memory whose last occupant
+ * wedged at teardown.  The natural shape needs a teardown wedge and then the
+ * slab handing that object to a new inode the remounted node goes on to open.
+ * tests/relstate_recycle_inject.sh.  0 (default) = off.
+ */
+static int mxfs_dbg_relstate_wedge_on_free;
+module_param_named(dbg_relstate_wedge_on_free,
+		   mxfs_dbg_relstate_wedge_on_free, int, 0644);
+MODULE_PARM_DESC(dbg_relstate_wedge_on_free,
+	"TEST: free every inode with its release state WEDGED (0 = off)");
+
 /* Radix tree tags for incore inode tree. */
 
 /* inode is to be reclaimed */
@@ -490,6 +505,7 @@ xfs_inode_alloc(
 	ip->i_mxfs_nu_cert_next = NULLAGINO;
 	ip->i_mxfs_nu_cert_valid = 0;
 	atomic_set(&ip->i_mxfs_revoke_refs, 0);
+	INIT_WORK(&ip->i_mxfs_dshrink_work, mxfs_dir_dshrink_work_fn);
 	ip->i_prev_unlinked = 0;
 	ip->i_unlinked_bucket = -1;
 	atomic_set(&ip->i_mxfs_open_n, 0);
@@ -611,6 +627,9 @@ xfs_inode_free_callback(
 	 * thing before the free.
 	 */
 	mxfs_dlm_inode_final_release(ip);
+
+	if (unlikely(READ_ONCE(mxfs_dbg_relstate_wedge_on_free)))
+		WRITE_ONCE(ip->i_mxfs_rel_state, MXFS_RELSTATE_WEDGED);
 
 	kmem_cache_free(xfs_inode_cache, ip);
 }
@@ -4592,6 +4611,7 @@ xfs_inode_mark_reclaimable(
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	bool			need_inactive;
+	u64			inact_t0;
 
 	XFS_STATS_INC(mp, vn_reclaim);
 
@@ -4703,9 +4723,60 @@ xfs_inode_mark_reclaimable(
 			ip->i_flags |= XFS_NEED_INACTIVE;
 			spin_unlock(&ip->i_flags_lock);
 
+			inact_t0 = ktime_get_ns();
 			error = xfs_inactive(ip);
 			(void)error;	/* errors logged inside; mark reclaimable */
 			xfs_inodegc_set_reclaimable(ip);
+
+			/*
+			 * A long inactivation here is a lock wait on the
+			 * inode, in whatever context dropped its last
+			 * reference -- and that context may hold locks a
+			 * peer needs to release this one (measured: a
+			 * directory reload's dcache shrink held its
+			 * directory's acquire 480 s this way).  The
+			 * dropping caller is still on this stack, so name it.
+			 */
+			{
+				u64 inact_ms = (ktime_get_ns() - inact_t0) /
+					       NSEC_PER_MSEC;
+				static atomic_t pslow_n = ATOMIC_INIT(0);
+
+				if (inact_ms >= 10000 &&
+				    atomic_inc_return(&pslow_n) <= 200) {
+					mxfs_probe("mxfs: P-SYNC-INACT-SLOW ino=%llu ms=%llu rc=%d pid=%d comm=%s -- synchronous inactivation waited; stack is the caller that dropped the last reference\n",
+						(unsigned long long)ip->i_ino,
+						(unsigned long long)inact_ms,
+						error, current->pid,
+						current->comm);
+					mxfs_probe_stack();
+				}
+			}
+			/*
+			 * The case the deferred dcache shrink exists for: a
+			 * child inactivated from a directory reload's shrink,
+			 * now in its worker with no directory held.  Counted,
+			 * so a run shows the path was exercised; the first 50
+			 * and any that waited a second or more are printed.
+			 */
+			{
+				struct work_struct *cw = current_work();
+				static atomic_t dshr_n = ATOMIC_INIT(0);
+				static atomic_t dshr_printed = ATOMIC_INIT(0);
+				u64 inact_ms = (ktime_get_ns() - inact_t0) /
+					       NSEC_PER_MSEC;
+				int k;
+
+				if (cw && cw->func == mxfs_dir_dshrink_work_fn) {
+					k = atomic_inc_return(&dshr_n);
+					if ((k <= 50 || inact_ms >= 1000) &&
+					    atomic_inc_return(&dshr_printed) <= 500)
+						mxfs_probe("mxfs: P-DSHRINK-INACT ino=%llu ms=%llu rc=%d total=%d -- a child inactivated by a directory's deferred dcache shrink\n",
+							(unsigned long long)ip->i_ino,
+							(unsigned long long)inact_ms,
+							error, k);
+				}
+			}
 
 			{
 				static atomic_t p25b_n = ATOMIC_INIT(0);

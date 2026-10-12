@@ -69,7 +69,7 @@ pushback, not the in-flight drain, and the implicit suspend inside
 Worse: the failed attempt leaves a dmsetup holding `md->suspend_lock`, so
 every later suspend/resume/remove on that device blocks behind it. **The
 attempt consumes the escape hatch.** Only a host reset clears it — and per
-CLAUDE.md RULE 2 that is the user's call, never a session's.
+CLAUDE.md RULE: NEVER REBOOT THE LAB HOST that is the user's call, never a session's.
 
 ## The fix (in tree, 2026-08-07)
 

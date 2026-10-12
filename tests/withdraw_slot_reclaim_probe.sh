@@ -189,7 +189,7 @@ PYEOF" 2>&1 | tail -3
 t1=$(date +%s); PAY=$((t1-t0))
 echo "payload wall=${PAY}s budget=${BUDGET_PAYLOAD}s"
 if [ "$PAY" -gt "$BUDGET_PAYLOAD" ]; then
-    echo "the budget rule-FAIL: payload exceeded its derived budget (${PAY}s > ${BUDGET_PAYLOAD}s)"
+    echo "FAIL (RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS): payload exceeded its derived budget (${PAY}s > ${BUDGET_PAYLOAD}s)"
 fi
 
 # The reader-side timeline must be running BEFORE the shutdown so it captures
@@ -218,7 +218,7 @@ t0=$(date +%s)
 t1=$(date +%s); MNTW=$((t1-t0))
 echo "mount wall=${MNTW}s budget=${BUDGET_MOUNT}s"
 if [ "$MNTW" -gt "$BUDGET_MOUNT" ]; then
-    echo "the budget rule-FAIL: mount exceeded its derived budget (${MNTW}s > ${BUDGET_MOUNT}s)"
+    echo "FAIL (RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS): mount exceeded its derived budget (${MNTW}s > ${BUDGET_MOUNT}s)"
 fi
 
 say "CLAIM: which slot did the remount take?"

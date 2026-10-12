@@ -1,4 +1,4 @@
-<!-- sess465 RULE-5 ruling on the D-0524 pubob race fix: entry-authoritative under the pubob lock, in-flight token consumed under lock, exact predecessor… -->
+<!-- sess465 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the D-0524 pubob race fix: entry-authoritative under the pubob lock, in-flight token consumed under lock, exact predecessor… -->
 # sess465 GPT ruling — D-0524 (free_commit vs 'flushed' discharge lost update)
 
 Verdict: proposed (a)+(b) fixes the reported race but NOT stop-ship complete. Ranked:

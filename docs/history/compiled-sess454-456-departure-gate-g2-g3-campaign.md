@@ -58,7 +58,7 @@ synthetic late-token injector, and two new settle-arm tests (`slowrace`, `lateco
 
 ## GPT STOP-SHIP on the G3 implementation (sess455)
 
-RULE-5 review of the just-landed G3 code returned **STOP-SHIP**, 10 required changes — the
+RULE: CONSULT ANOTHER MODEL WHEN STUCK review of the just-landed G3 code returned **STOP-SHIP**, 10 required changes — the
 single most consequential ruling in this campaign:
 1. Drain must **wait uncapped** for real tokens (a capped-then-proceed drain touches freed
    `bp`/`mp` on a late real completion); only the `corrupt` path may abandon after one bounded
@@ -152,7 +152,7 @@ cluster buffer (only the iget-miss ladder does).
 
 ## Review #5: NO-GO (sess456)
 
-RULE-5 review of 0.61.1 (G1+G2+G3 together, with chain 77/78 evidence) returned **NO-GO**.
+RULE: CONSULT ANOTHER MODEL WHEN STUCK review of 0.61.1 (G1+G2+G3 together, with chain 77/78 evidence) returned **NO-GO**.
 Of the review-#3 conditions: 4 and 6 MET; 1,2,3,5,7,9 PARTIAL; **8 (I/O gate fails closed on
 any accounting violation) UNMET** — the STOP-SHIP finding. D-377 and D-0356 both left
 PARTIAL/NO-GO.
@@ -182,7 +182,7 @@ anonymous?) rather than a single "pr_restamp crash PASS." Uncapped drain itself 
 - **Never trust an exact string/hex comparison between two tools that format the same value
   differently** (kernel unpadded hex vs `chk_mxfs` padded hex) without normalizing both sides
   first.
-- **GPT RULE-5 review of an as-landed implementation, not just the design, caught real
+- **GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK review of an as-landed implementation, not just the design, caught real
   concurrency/lifecycle bugs the design ruling didn't** (rejected-generation double-counting,
   orphan UAF-adjacent ref-drop, lock-ordering deadlock) — implementation review is a distinct,
   necessary step from design review in this workflow.

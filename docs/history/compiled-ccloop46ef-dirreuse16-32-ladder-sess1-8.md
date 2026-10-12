@@ -15,7 +15,7 @@ shows @32 in worse shape than sess7 left it (see "Current state" at the end).
 ## sess1 — tenure-floor concept born; two unrelated root fixes proven
 
 Entering state: 1/2/4/8 caw 17/17, 16 caw 16/17 (dir_reuse unrun), 32 caw all failing/unrun.
-Two independent root causes proven via RULE-4 chains on `diag_rv_replay` 32-node
+Two independent root causes proven via RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS chains on `diag_rv_replay` 32-node
 `docs/history/docs/history/docs/history/compiled-ccloop46ef-dirreuse16-32-ladder-sess1-8.md`:
 
 1. **Stale-HB evict-ring replay** — disklock.c's HB monitor scan used a plain (non-FUA)

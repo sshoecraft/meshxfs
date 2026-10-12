@@ -1,7 +1,7 @@
 # Session State — MXFS
 
 **Saved**: 2026-07-21, interactive session (Proxmox 2/tcp — AGI umount-wedge)
-**Session Goal**: Fix the AGI-buffer umount wedge to FIXED-AND-VERIFIED (RULE 6).
+**Session Goal**: Fix the AGI-buffer umount wedge to FIXED-AND-VERIFIED (RULE: ZERO ACCEPTED KNOWN DEFECTS).
 **DONE.** Next chosen target (user pick): the cross-node **stale-inode dialloc
 corruption** (the separate defect that TRIGGERS the shutdown).
 
@@ -39,7 +39,7 @@ earlier `...-ROOT-agmeta-track-hold-leak-FIX-and-pve1-hung`). Summary:
   injection). Awareness docs `pal.md` + `xfs.md` updated.
 
 Also this session: had to `make tools` (mkfs_mxfs/chk_mxfs/etc were unbuilt →
-prep failed with "mkfs tool not found"). New harnesses in `scripts/` (RULE 3).
+prep failed with "mkfs tool not found"). New harnesses in `scripts/` (RULE: A SCRIPT IS NEVER A TEMP FILE).
 
 ## Current state of the code
 
@@ -68,7 +68,7 @@ its downstream consequence). It is a real data-coherency bug, still OPEN.
   `P-CR62 ... verdict=DISK-FREE=>incore-struct-stale` (disk_di_mode=00, incore
   MISS/stale), `P-CR3-CANCEL error=-117 trans_dirty=1`, `P7-INSTR`/`P9-INSTR`
   corruption-buf/corruption-disk (shows `dlm_stale=1`), `P-DIALLOC`.
-- **Leading hypothesis (NOT yet RULE-4 proven)**: peer freed the inode; this node
+- **Leading hypothesis (NOT yet RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS proven)**: peer freed the inode; this node
   holds a STALE cached inode-cluster buffer (dlm_stale=1) showing the inode
   allocated. dialloc reads the stale cluster → sees a "free" inode still marked
   used → EFSCORRUPTED. Same family as ccmemory `compiled-agi-unlinked-list-
@@ -78,7 +78,7 @@ its downstream consequence). It is a real data-coherency bug, still OPEN.
 - **Repro**: `scripts/agi_wedge_repro.sh 180 24` (heavy 2-node shared-dir churn) —
   PROBABILISTIC (narrow race; fired at ~45s on old builds, but ~960s produced 0 on
   the fix build in one run — it's timing-sensitive, NOT suppressed by the AGI fix
-  which is a no-op in normal op). Start by RULE-4 instrumenting the stale-cluster
+  which is a no-op in normal op). Start by RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS instrumenting the stale-cluster
   read path, not by guessing. `mxfs.dbg_ialloc_dblcheck=1` (default 0) adds a
   same-chunk double-alloc check at the alloc site — may help diagnose.
 - **CAUTION — the injection param does NOT reproduce this bug.**
@@ -87,7 +87,7 @@ its downstream consequence). It is a real data-coherency bug, still OPEN.
   condition. For the corruption you need the natural race (or build a deterministic
   repro of the STALE inode-cluster state).
 
-## Other OPEN items (RULE 6 — not dropped)
+## Other OPEN items (RULE: ZERO ACCEPTED KNOWN DEFECTS — not dropped)
 
 1. **AGI fix Phase-B completeness** (GPT-reviewed, deferred): the STALE detach
    branches (`xfs_buf_item_release` stale-branch + `xfs_buf_item_unpin` stale-branch
@@ -111,7 +111,7 @@ its downstream consequence). It is a real data-coherency bug, still OPEN.
 
 ## Next steps (priority order)
 
-1. **Stale-inode dialloc corruption (user pick).** RULE 4: instrument the inode-
+1. **Stale-inode dialloc corruption (user pick).** RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS: instrument the inode-
    cluster read/acquire path to PROVE the stale-cluster hypothesis (who wrote the
    stale image, was it re-read on acquire, what's the tenure_id/dlm_stale state at
    the failing dialloc). Reproduce via `scripts/agi_wedge_repro.sh` (be patient —
@@ -143,7 +143,7 @@ its downstream consequence). It is a real data-coherency bug, still OPEN.
 - **Fast rebuild both nodes** (parallel): `tools/mxfs_sshpass.sh <node>
   /tmp/.proxmox_pass "bash /src/mxfs/scripts/pve_dkms_rebuild.sh"`. Purges+builds+
   installs DKMS (~1.5 min/node). Header changes → full clean rebuild automatically.
-- **AGI-wedge harnesses** (RULE 3, `scripts/`): `agi_wedge_verify_inject.sh`
+- **AGI-wedge harnesses** (RULE: A SCRIPT IS NEVER A TEMP FILE, `scripts/`): `agi_wedge_verify_inject.sh`
   (DETERMINISTIC, preferred — arms `mxfs.dbg_dialloc_shutdown`, one create, asserts
   clean umount + P-AGMETA-RECLAIM>0); `agi_wedge_repro.sh` (natural 2-node churn,
   monitors both nodes, exit 42 on escalation); `agi_wedge_verify.sh` (natural churn
@@ -151,7 +151,7 @@ its downstream consequence). It is a real data-coherency bug, still OPEN.
   NOT dispatch XFS_IOC_GOINGDOWN, FSGEOMETRY ENOTTYs).
 - **`make tools`** if any `tools/*` binary is missing (mkfs_mxfs etc.) — prep needs
   them and they were unbuilt at session start.
-- GPT consults preserved (RULE 5 — keep consulting when a RULE-4 loop stalls). The
+- GPT consults preserved (RULE: CONSULT ANOTHER MODEL WHEN STUCK — keep consulting when a RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS loop stalls). The
   AGI fix + verification design came from a GPT consult; its full Phase-B plan is in
   the FIXED-AND-VERIFIED ccmemory dossier.
-- Reference kernel tree at `/src/linux` (RULE 1: never download; read from there).
+- Reference kernel tree at `/src/linux` (RULE: NEVER DOWNLOAD THE LINUX KERNEL SOURCE: never download; read from there).

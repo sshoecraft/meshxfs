@@ -1,4 +1,4 @@
-<!-- sess385 RULE-5 ruling: AG release has NO inode-log-item→home-block conversion stage; a log force is not an inode flush. Fix = quiesce/flush/pointee-f… -->
+<!-- sess385 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: AG release has NO inode-log-item→home-block conversion stage; a log force is not an inode flush. Fix = quiesce/flush/pointee-f… -->
 ## What was measured first (sess385, 32/caw, build 9FF47B72D59E6DCE4C8ECA9)
 
 `mxfs_dlm_ag_drain_inode_buffers` never received the three hardenings the

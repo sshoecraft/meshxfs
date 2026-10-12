@@ -1,5 +1,5 @@
-<!-- sess312 RULE-5 ruling: step-6 F1 stays OPEN until (c) — INODE fault sites + persistent-failure policy defined/tested, knob-on .511 board, ICLUS fault… -->
-# sess312 — RULE-5 ruling: step-6 F1 closure requires option (c)
+<!-- sess312 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: step-6 F1 stays OPEN until (c) — INODE fault sites + persistent-failure policy defined/tested, knob-on .511 board, ICLUS fault… -->
+# sess312 — RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: step-6 F1 closure requires option (c)
 
 GPT consult (sess312) on the sess311 blocked fault leg. Corrected input
 evidence: icluster_dlm=1 HAS been board-green twice (0.11.290 sess33,

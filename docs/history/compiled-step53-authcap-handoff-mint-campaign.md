@@ -50,7 +50,7 @@ apply/skip decision, so it's safe to ship ahead of the consumer work.
 0.11.436 deployed to 32/caw. Capture plumbing proven sound: `nocap=0`
 (no dirty path bypasses the seam), `noblft=0` (the one unproven design
 assumption — BLFT is always set before first dirty — holds over 112640
-windows), `mismatch=0`. No RULE-0 regression despite adding a
+windows), `mismatch=0`. No RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS regression despite adding a
 perag_get+RCU lookup per re-log (250162 of them).
 
 Decisive cross-tab, 220947 images: `durable` 96.01% (expected), `none`
@@ -228,7 +228,7 @@ publishes 0 and logs `P243-AGAUTH-UNBOUND`. Both the old reread function
 and its TCP-side twin (`mxfs_dlm_caw_read_ex_grant_epoch`) deleted with
 their only callers.
 
-Deployed to 32/caw, 4/4 board PASS, no RULE-0 regression (dir_reuse
+Deployed to 32/caw, 4/4 board PASS, no RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS regression (dir_reuse
 actually improved 8s — direct handoff is the pace-setting path and
 minting added no measurable cost). **The sess106 defect population is
 gone fleet-wide**: `P241-AUTHTRY nonewr_samegen=0` on all 32 nodes (was

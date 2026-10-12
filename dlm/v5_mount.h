@@ -52,6 +52,15 @@ struct mxfs_v5_dlm_opts {
 	 */
 	struct mxfs_authority *authority;
 	int             transport;          /* MXFS_V5_TRANSPORT_* */
+	/*
+	 * The mount named its transport (mount option transport=): the module's
+	 * force_transport does not override it, and a platter whose live
+	 * tenures run the other transport refuses the mount instead of being
+	 * joined on that one.  A host can then mount one filesystem on each
+	 * transport at once -- a DRBD resource, which only the network lock
+	 * manager can serve, beside a SAN LUN on COMPARE AND WRITE.
+	 */
+	bool            transport_explicit;
 	uint16_t        dlm_port;           /* TCP port (default 7600) */
 	uint16_t        discovery_port;     /* UDP port (default 7601) */
 	/*
@@ -910,7 +919,8 @@ int  mxfs_v5_dlm_ag_lock(struct mxfs_v5_dlm *ctx, uint32_t agno,
  * failing silently (D-AGLOCK-...-LIVELOCK-488).  See the definition. */
 int  mxfs_v5_dlm_ag_lock_nb(struct mxfs_v5_dlm *ctx, uint32_t agno,
 			    uint64_t local_epoch,
-			    struct mxfs_grant_result *gres, bool demand);
+			    struct mxfs_grant_result *gres, bool demand,
+			    uint32_t *mute_master);
 /* D-488 (ruling): tri-state release outcome (mxfs_dlm.h).  CAW
  * resolves an UNKNOWN body outcome via an authoritative own-bit read-back
  * before returning; only a read error leaves UNKNOWN.  Callers that have

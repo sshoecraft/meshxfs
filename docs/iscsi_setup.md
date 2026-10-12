@@ -16,12 +16,14 @@ nodes and you will get silent corruption. **Read this before formatting a LUN.**
 ## 1. Pick a transport: TCP DLM or CAW
 
 MXFS coordinates nodes with a distributed lock manager (DLM) that runs over one
-of two transports, each node reaching the LUN over its own iSCSI login on one
-path (the `direct` attachment): CAW is released for 2-, 4-, 8- and 16-node
-clusters, TCP for 2 and 4.  TCP at 8 and 16 nodes, and two paths through
-dm-multipath (`mpath`, with the settings of `tools/mpath_settings.sh`), were
-verified in 0.90.51 and are not claimed by the current release (README,
-"Released in an earlier version"); hypervisor passthrough is not verified. A
+of two transports.  With each node reaching the LUN over its own iSCSI login on
+one path (the `direct` attachment), CAW is released for 2-, 4-, 8- and 16-node
+clusters, TCP for 2 and 4.  With two paths per node through dm-multipath
+(`mpath`, with the settings of `tools/mpath_settings.sh`), CAW is released for
+2-, 4-, 8- and 16-node clusters on Ubuntu 24.04.  TCP at 8 and 16 nodes, and
+TCP on `mpath`, were verified in 0.90.51 and are not claimed by the current
+release (README, "Released in an earlier version"); hypervisor passthrough is
+not verified. A
 configuration names
 the transport by class and method: TCP is `net/mesh`, CAW is `disk/caw`.
 

@@ -15,7 +15,7 @@
   coherent reads (1024×1MB md5 + 640 rename + 960 unlink verifies) saturate the ONE iSCSI target.
 - So the 32-node coherency slowness is REAL on fresh substrate, confirming the read-storm root.
 
-### STORM MECHANISM (RULE-4 proven this session)
+### STORM MECHANISM (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS proven this session)
 - Storm = COLD re-reads of **regular-file inode clusters in AG0** (dd confirmed magic 0x494e/mode 0644;
   fsblk~24645 = ino~197160), test1's OWN files (slot0→AG0 affinity). ~0.3/op peers-idle → ~6/op at load.
 - **NOT** peer AG-lock ping-pong (`ag: acq=1 rel=0 nest=4258` = AG0 held EX continuously).

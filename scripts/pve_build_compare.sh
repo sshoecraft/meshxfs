@@ -17,10 +17,17 @@
 # hosts, the leg's storage built (pve_mxfs_spare_disk.sh up, or
 # pve_lvm_drbd_baseline.sh up), the builds run, and the build VMs this
 # harness left stopped destroyed.  The pair's own MXFS mount (/mnt/shared)
-# stays stopped throughout; scripts/pve_mxfs_spare_disk.sh down restores it.
+# stays mounted throughout, idle, unless ALONE=1 is in the environment
+# (passed to scripts/pve_mxfs_spare_disk.sh, which then stops it for the run;
+# its `down` starts it again).
 #
 # Usage: scripts/pve_build_compare.sh <outdir> [leg ...]
 #   legs: mxfs | lvm   (default: mxfs lvm mxfs lvm)
+#         san | sanlvm  MXFS on the shared iSCSI LUN (CAW transport,
+#                       scripts/pve_mxfs_san_disk.sh), or Proxmox's shared
+#                       LVM on that LUN (scripts/pve_lvm_san_baseline.sh):
+#                       the SAN use case and its yardstick.  The LUN is
+#                       scripts/pve_caw_lun.sh's, logged in on both hosts.
 # Env:   PVE_PAIR ("192.168.1.80 192.168.1.81")  DISK (/dev/sdb)
 #        MODEL (SVP100S: the disk's model must contain it)  SETTLE_S (120)
 #        COUNTS ("3 4")  and the builds' DEFINES / MKOS_FLAGS (defaults: the
@@ -49,9 +56,11 @@ reap() {        # the build VMs this harness created and left stopped
         say "  $h: destroying leftover build VM $id ($name): $(on "$h" "qm destroy $id --purge 1 --destroy-unreferenced-disks 1 >/dev/null 2>&1; echo rc=\$?" 120)"
     done < "$OWNED"
 }
-wipe() {        # both storages down, DISK discarded and wiped on both hosts
+wipe() {        # every storage down, DISK discarded and wiped on both hosts
     MODEL=$MODEL "$REPO/scripts/pve_mxfs_spare_disk.sh" off >> "$OUT/compare.log" 2>&1
     "$REPO/scripts/pve_lvm_drbd_baseline.sh" down >> "$OUT/compare.log" 2>&1
+    "$REPO/scripts/pve_mxfs_san_disk.sh" off >> "$OUT/compare.log" 2>&1
+    "$REPO/scripts/pve_lvm_san_baseline.sh" down >> "$OUT/compare.log" 2>&1
     local h out
     for h in "${PAIR[@]}"; do
         out=$(on "$h" "set -u
@@ -79,16 +88,30 @@ for leg in $LEGS; do
     case "$leg" in
         mxfs) MODEL=$MODEL timeout 480 "$REPO/scripts/pve_mxfs_spare_disk.sh" up > "$OUT/leg$i-up.log" 2>&1; store=mxfssdb ;;
         lvm)  MODEL=$MODEL timeout 400 "$REPO/scripts/pve_lvm_drbd_baseline.sh" up > "$OUT/leg$i-up.log" 2>&1; store=drbdlvm ;;
+        san)  timeout 900 "$REPO/scripts/pve_mxfs_san_disk.sh" up > "$OUT/leg$i-up.log" 2>&1; store=mxfssan ;;
+        sanlvm) timeout 300 "$REPO/scripts/pve_lvm_san_baseline.sh" up > "$OUT/leg$i-up.log" 2>&1; store=sanlvm ;;
         *) say "unknown leg $leg"; continue ;;
     esac
     rc=$?
-    say "  $leg up rc=$rc: $(grep -E 'unit=active|Primary/Primary|active' "$OUT/leg$i-up.log" | tail -2 | tr -s ' ' | tr '\n' ' ')"
+    say "  $leg up rc=$rc: $(grep -E 'unit=active|Primary/Primary|active|mount rc=' "$OUT/leg$i-up.log" | tail -2 | tr -s ' ' | tr '\n' ' ')"
     [ "$rc" = 0 ] || { say "leg $i: $leg did not come up; stopping"; break; }
     STOP_INSTALLED=1 STORAGE=$store EVID="$OUT/leg$i-$leg" "$REPO/scripts/pve_pair_builds.sh" > "$OUT/leg$i-builds.log" 2>&1
     say "  builds rc=$?"
     grep -E 'installed after|never answered|its VM never started' "$OUT/leg$i-$leg/summary.txt" | sed 's/^/  /' | tee -a "$OUT/compare.log"
+    # an MXFS leg's volume is checked before the next leg's wipe reuses it
+    case "$leg" in
+        mxfs) vmnt=/mnt/mxfssdb; vdev=/dev/drbd2 ;;
+        san)  vmnt=/mnt/mxfssan; vdev=/dev/disk/by-path/ip-192.168.1.166:3260-iscsi-iqn.2026-05.local.mxfs:pve-caw-01-lun-0 ;;
+        *)    vmnt= ;;
+    esac
+    if [ -n "$vmnt" ]; then
+        "$REPO/scripts/pve_mxfs_verify.sh" "$OUT/leg$i-$leg/verify" "$vmnt" "$vdev" > "$OUT/leg$i-verify.log" 2>&1
+        say "  leg $i $leg: $(tail -1 "$OUT/leg$i-verify.log")"
+    fi
 done
 reap
 MODEL=$MODEL "$REPO/scripts/pve_mxfs_spare_disk.sh" off >> "$OUT/compare.log" 2>&1
 "$REPO/scripts/pve_lvm_drbd_baseline.sh" down >> "$OUT/compare.log" 2>&1
-say "done; the spare disks are free and /mnt/shared is still stopped (scripts/pve_mxfs_spare_disk.sh down restores it)"
+"$REPO/scripts/pve_mxfs_san_disk.sh" off >> "$OUT/compare.log" 2>&1
+"$REPO/scripts/pve_lvm_san_baseline.sh" down >> "$OUT/compare.log" 2>&1
+say "done; the spare disks are free$([ "${ALONE:-0}" = 1 ] && echo ' and /mnt/shared is still stopped (ALONE=1 scripts/pve_mxfs_spare_disk.sh down restores it)')"

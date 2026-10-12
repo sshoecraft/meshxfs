@@ -1,5 +1,5 @@
-<!-- sess96 RULE-5 ruling: the grant_meta-cache epoch source is REJECTED (release blocker). Thread the epoch out of the granting CAS; durable authority mu… -->
-# sess96 RULE-5 ruling — step 5.3 PRODUCER half
+<!-- sess96 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: the grant_meta-cache epoch source is REJECTED (release blocker). Thread the epoch out of the granting CAS; durable authority mu… -->
+# sess96 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — step 5.3 PRODUCER half
 
 I brought three decisions. **Decision 1 was rejected outright and named a release blocker.**
 

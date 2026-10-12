@@ -2986,10 +2986,165 @@ void mxfs_pal_cond_broadcast(mxfs_cond_t *c)
  * TCP Networking
  * ═══════════════════════════════════════════════════════════════════ */
 
+/*
+ * ONE SOCKET PER PORT PER HOST.
+ *
+ * Every MXFS mount on a host runs its network plane on the same fixed ports:
+ * the lock manager listens on TCP 7600, and discovery, the CAW nudges and the
+ * lease heartbeat use UDP 7601-7603 (include/mxfs/mxfs_ports.h).  Each mount
+ * used to open sockets of its own on them with SO_REUSEPORT, and Linux hands
+ * a new connection, or a unicast datagram, to ONE of the sockets bound to a
+ * port, chosen by a hash of the addresses and ports -- never by the
+ * filesystem it is for.  A host with two filesystems mounted reset the
+ * lock-manager connections that hashed to the other one's listener, and under
+ * peers= (unicast) one filesystem could never hear its peer's heartbeat at
+ * all, because the peer's fixed source port always hashed to the other
+ * filesystem's socket (measured: tests/multi_mount.sh, 0.90.120).
+ *
+ * So the host owns each socket and every mount holds a handle on it.  The
+ * first handle on a port creates the socket and the thread that serves it;
+ * the last one to close takes both down.
+ *
+ *   UDP: the reader copies every datagram to the queue of every handle on the
+ *        port.  Each receiver already drops what is not for its volume (the
+ *        volume UUID in every discovery, lease and nudge packet) -- the same
+ *        filter multicast delivery to every socket always relied on.
+ *   TCP: the acceptor peeks the first bytes of each new connection, reads the
+ *        routing key the listeners on that port declared (for the lock
+ *        manager, the volume_id of the NODE_JOIN a connector sends first),
+ *        and queues the connection on the handle whose key matches.  Nothing
+ *        is consumed: the mount still reads the NODE_JOIN itself.
+ *
+ * This is the first layer of the host DLM in docs/host-dlm-lockspaces.md.
+ */
+#define MXFS_PORT_KEY_MAX	16
+#define MXFS_UDP_DGRAM_MAX	65536
+/* per handle, the receive buffer each mount's own socket used to have */
+#define MXFS_UDP_QUEUE_BYTES	(4 * 1024 * 1024)
+#define MXFS_PORT_GROUPS	8
+/* how long a new connection has to deliver its routing key: the connector
+ * sends its NODE_JOIN the moment it is connected */
+#define MXFS_TCP_ROUTE_PEEK_MS	2000
+
+struct mxfs_udp_port;
+struct mxfs_tcp_port;
+
 struct mxfs_sock {
-	struct socket *sk;
+	struct socket *sk;		/* a connected TCP socket; NULL on a port handle */
 	int is_udp;
+	/* a handle on a host-owned port: a TCP listener, or any UDP socket */
+	struct mxfs_udp_port *uport;
+	struct mxfs_tcp_port *tport;
+	struct list_head port_link;	/* on the port's handles, under its hlock */
+	wait_queue_head_t wq;
+	spinlock_t qlock;		/* q, qbytes, shut */
+	struct list_head q;		/* datagrams, or accepted connections */
+	uint32_t qbytes;
+	uint64_t qdrops;
+	long rcvtimeo;			/* jiffies; 0 waits for ever */
+	bool shut;
+	uint8_t key[MXFS_PORT_KEY_MAX];
 };
+
+struct mxfs_udp_dgram {
+	struct list_head link;
+	struct sockaddr_in from;
+	uint32_t len;
+	uint8_t data[];
+};
+
+struct mxfs_tcp_conn {
+	struct list_head link;
+	struct socket *sk;
+};
+
+struct mxfs_udp_port {
+	struct list_head link;		/* on mxfs_udp_ports */
+	uint16_t port;
+	struct socket *sk;
+	struct task_struct *reader;
+	void *buf;			/* the reader's, MXFS_UDP_DGRAM_MAX */
+	struct mutex hlock;		/* handles, nhandles */
+	struct list_head handles;
+	int nhandles;
+	bool stopping;
+	__be32 groups[MXFS_PORT_GROUPS];	/* joined, under mxfs_ports_lock */
+	int ngroups;
+};
+
+struct mxfs_tcp_port {
+	struct list_head link;		/* on mxfs_tcp_ports */
+	uint16_t port;
+	struct socket *sk;
+	struct task_struct *acceptor;
+	struct mutex hlock;		/* handles, nhandles */
+	struct list_head handles;
+	int nhandles;
+	bool stopping;
+	uint32_t key_off;		/* where the routing key sits in the */
+	uint32_t key_len;		/* first bytes a connector sends */
+	uint8_t *peekbuf;		/* key_off + key_len, the acceptor's */
+};
+
+/*
+ * The port lists.  Held across creating and destroying a port, so a port is
+ * never bound twice and no handle joins a port that is going away; never
+ * taken by a reader or acceptor thread, so destroying a port can wait for its
+ * thread under it.
+ */
+static DEFINE_MUTEX(mxfs_ports_lock);
+static LIST_HEAD(mxfs_udp_ports);
+static LIST_HEAD(mxfs_tcp_ports);
+
+static struct mxfs_sock *mxfs_port_handle_alloc(void)
+{
+	struct mxfs_sock *h = kzalloc(sizeof(*h), GFP_KERNEL);
+
+	if (!h)
+		return NULL;
+	INIT_LIST_HEAD(&h->port_link);
+	INIT_LIST_HEAD(&h->q);
+	init_waitqueue_head(&h->wq);
+	spin_lock_init(&h->qlock);
+	return h;
+}
+
+static bool mxfs_port_handle_ready(struct mxfs_sock *h)
+{
+	bool ready;
+
+	spin_lock(&h->qlock);
+	ready = !list_empty(&h->q) || h->shut;
+	spin_unlock(&h->qlock);
+	return ready;
+}
+
+static void mxfs_port_handle_shut(struct mxfs_sock *h)
+{
+	spin_lock(&h->qlock);
+	h->shut = true;
+	spin_unlock(&h->qlock);
+	wake_up_all(&h->wq);
+}
+
+/*
+ * Wake a thread blocked in kernel_recvmsg or kernel_accept on a socket that
+ * is going away.  SHUT_RDWR alone does not wake a thread waiting on a listen
+ * socket's accept queue; the error report does.
+ */
+static void mxfs_sock_wake_blocked(struct socket *sock)
+{
+	kernel_sock_shutdown(sock, SHUT_RDWR);
+	sock->sk->sk_err = EINTR;
+	sock->sk->sk_error_report(sock->sk);
+}
+
+static void mxfs_sock_set_rcvtimeo(struct socket *sock, long timeo)
+{
+	lock_sock(sock->sk);
+	sock->sk->sk_rcvtimeo = timeo;
+	release_sock(sock->sk);
+}
 
 /*
  * Parse an IPv4 address string into a sockaddr_in.
@@ -3047,86 +3202,262 @@ mxfs_sock_t *mxfs_pal_tcp_connect(const char *host, uint16_t port)
 	return s;
 }
 
-mxfs_sock_t *mxfs_pal_tcp_listen(uint16_t port)
+static void mxfs_sock_set_reuseaddr(struct socket *sock)
 {
-	struct mxfs_sock *s;
-	struct sockaddr_in addr;
-	int ret;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0)
-	int opt = 1;
-#endif
-
-	s = kzalloc(sizeof(*s), GFP_KERNEL);
-	if (!s)
-		return NULL;
-	s->is_udp = 0;
-
-	ret = sock_create_kern(&init_net, AF_INET, SOCK_STREAM,
-			       IPPROTO_TCP, &s->sk);
-	if (ret) {
-		kfree(s);
-		return NULL;
-	}
-
 #if MXFS_EFFECTIVE_VERSION >= KERNEL_VERSION(5, 8, 0)
-	sock_set_reuseaddr(s->sk->sk);
+	sock_set_reuseaddr(sock->sk);
 #else
-	kernel_setsockopt(s->sk, SOL_SOCKET, SO_REUSEADDR,
+	int opt = 1;
+
+	kernel_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
 			  (char *)&opt, sizeof(opt));
 #endif
+}
 
-	/* SO_REUSEPORT — allows multiple mounts on the same node to
-	 * bind the same TCP port (multi-LUN support).  Each mount's
-	 * accept loop validates volume_id in the NODE_JOIN handshake
-	 * to reject connections intended for a different mount. */
-	s->sk->sk->sk_reuse = SK_CAN_REUSE;
-#ifdef SO_REUSEPORT
-	s->sk->sk->sk_reuseport = 1;
-#endif
+/* 0 when the first len bytes of the connection could be read without
+ * consuming them */
+static int mxfs_tcp_peek(struct socket *sock, void *buf, uint32_t len)
+{
+	struct msghdr msg = {};
+	struct kvec iov;
+	long saved = sock->sk->sk_rcvtimeo;
+	int ret;
+
+	iov.iov_base = buf;
+	iov.iov_len = len;
+	mxfs_sock_set_rcvtimeo(sock, msecs_to_jiffies(MXFS_TCP_ROUTE_PEEK_MS));
+	ret = kernel_recvmsg(sock, &msg, &iov, 1, len, MSG_PEEK | MSG_WAITALL);
+	mxfs_sock_set_rcvtimeo(sock, saved);
+	return ret == (int)len ? 0 : -EIO;
+}
+
+/*
+ * The listener a connection belongs to, under tp->hlock: the one whose key
+ * the connection carries.  A connector that carries a zero key (a module
+ * that predates the volume id), or any connection on a port whose listeners
+ * declared no key, goes to the first listener, which is where the single
+ * socket of a host with one filesystem always took it.
+ */
+static struct mxfs_sock *mxfs_tcp_port_route(struct mxfs_tcp_port *tp,
+					     const uint8_t *key)
+{
+	static const uint8_t zero[MXFS_PORT_KEY_MAX];
+	struct mxfs_sock *h, *first = NULL;
+	bool shut;
+
+	list_for_each_entry(h, &tp->handles, port_link) {
+		spin_lock(&h->qlock);
+		shut = h->shut;
+		spin_unlock(&h->qlock);
+		if (shut)
+			continue;
+		if (!first)
+			first = h;
+		if (tp->key_len && !memcmp(h->key, key, tp->key_len))
+			return h;
+	}
+	if (!tp->key_len || !memcmp(key, zero, tp->key_len))
+		return first;
+	return NULL;
+}
+
+static int mxfs_tcp_port_acceptor(void *arg)
+{
+	struct mxfs_tcp_port *tp = arg;
+
+	while (!kthread_should_stop()) {
+		struct socket *ns = NULL;
+		struct mxfs_tcp_conn *c;
+		struct mxfs_sock *h;
+		int ret;
+
+		ret = kernel_accept(tp->sk, &ns, 0);
+		if (ret) {
+			schedule_timeout_interruptible(msecs_to_jiffies(
+				READ_ONCE(tp->stopping) ? 20 : 100));
+			continue;
+		}
+		if (READ_ONCE(tp->stopping)) {
+			sock_release(ns);
+			continue;
+		}
+		if (tp->key_len &&
+		    mxfs_tcp_peek(ns, tp->peekbuf, tp->key_off + tp->key_len)) {
+			mxfs_pal_log(MXFS_LOG_DEBUG,
+				     "pal: port %u: a connection sent no routing key in %u ms; closed",
+				     tp->port, MXFS_TCP_ROUTE_PEEK_MS);
+			sock_release(ns);
+			continue;
+		}
+		c = kmalloc(sizeof(*c), GFP_KERNEL);
+		if (!c) {
+			sock_release(ns);
+			continue;
+		}
+		c->sk = ns;
+		mutex_lock(&tp->hlock);
+		h = mxfs_tcp_port_route(tp, tp->peekbuf + tp->key_off);
+		if (h) {
+			spin_lock(&h->qlock);
+			list_add_tail(&c->link, &h->q);
+			spin_unlock(&h->qlock);
+			wake_up(&h->wq);
+		}
+		mutex_unlock(&tp->hlock);
+		if (!h) {
+			mxfs_pal_log(MXFS_LOG_DEBUG,
+				     "pal: port %u: a connection for no filesystem mounted here; closed",
+				     tp->port);
+			sock_release(ns);
+			kfree(c);
+		}
+	}
+	return 0;
+}
+
+/* under mxfs_ports_lock */
+static struct mxfs_tcp_port *mxfs_tcp_port_create(uint16_t port,
+						  uint32_t key_off,
+						  uint32_t key_len)
+{
+	struct mxfs_tcp_port *tp;
+	struct sockaddr_in addr;
+	int ret;
+
+	tp = kzalloc(sizeof(*tp), GFP_KERNEL);
+	if (!tp)
+		return NULL;
+	tp->port = port;
+	tp->key_off = key_off;
+	tp->key_len = key_len;
+	mutex_init(&tp->hlock);
+	INIT_LIST_HEAD(&tp->handles);
+	tp->peekbuf = kzalloc(key_off + key_len + 1, GFP_KERNEL);
+	if (!tp->peekbuf)
+		goto err_free;
+
+	ret = sock_create_kern(&init_net, AF_INET, SOCK_STREAM,
+			       IPPROTO_TCP, &tp->sk);
+	if (ret)
+		goto err_free;
+	mxfs_sock_set_reuseaddr(tp->sk);
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	addr.sin_port = htons(port);
-
-	ret = kernel_bind(s->sk, (void *)&addr, sizeof(addr));
+	ret = kernel_bind(tp->sk, (void *)&addr, sizeof(addr));
 	if (ret) {
-		sock_release(s->sk);
-		kfree(s);
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "pal: TCP port %u: bind failed: %d", port, ret);
+		goto err_sock;
+	}
+	/* every peer of every filesystem on this host connects here */
+	ret = kernel_listen(tp->sk, 128);
+	if (ret)
+		goto err_sock;
+
+	tp->acceptor = kthread_run(mxfs_tcp_port_acceptor, tp, "mxfs-tcp/%u", port);
+	if (IS_ERR(tp->acceptor))
+		goto err_sock;
+	list_add_tail(&tp->link, &mxfs_tcp_ports);
+	return tp;
+
+err_sock:
+	sock_release(tp->sk);
+err_free:
+	kfree(tp->peekbuf);
+	kfree(tp);
+	return NULL;
+}
+
+/* under mxfs_ports_lock, the port already off the list and with no handle */
+static void mxfs_tcp_port_destroy(struct mxfs_tcp_port *tp)
+{
+	WRITE_ONCE(tp->stopping, true);
+	mxfs_sock_wake_blocked(tp->sk);
+	kthread_stop(tp->acceptor);
+	sock_release(tp->sk);
+	kfree(tp->peekbuf);
+	kfree(tp);
+}
+
+mxfs_sock_t *mxfs_pal_tcp_listen_keyed(uint16_t port, const void *key,
+				       uint32_t key_off, uint32_t key_len)
+{
+	struct mxfs_tcp_port *tp = NULL, *it;
+	struct mxfs_sock *h;
+
+	if (key_len > MXFS_PORT_KEY_MAX || (key_len && !key))
+		return NULL;
+	h = mxfs_port_handle_alloc();
+	if (!h)
+		return NULL;
+	if (key_len)
+		memcpy(h->key, key, key_len);
+
+	mutex_lock(&mxfs_ports_lock);
+	list_for_each_entry(it, &mxfs_tcp_ports, link) {
+		if (it->port == port) {
+			tp = it;
+			break;
+		}
+	}
+	if (tp && (tp->key_off != key_off || tp->key_len != key_len)) {
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "pal: TCP port %u: its listeners route on %u bytes at %u, this one on %u at %u",
+			     port, tp->key_len, tp->key_off, key_len, key_off);
+		tp = NULL;
+	} else if (!tp) {
+		tp = mxfs_tcp_port_create(port, key_off, key_len);
+	}
+	if (tp) {
+		mutex_lock(&tp->hlock);
+		list_add_tail(&h->port_link, &tp->handles);
+		tp->nhandles++;
+		h->tport = tp;
+		mutex_unlock(&tp->hlock);
+	}
+	mutex_unlock(&mxfs_ports_lock);
+	if (!tp) {
+		kfree(h);
 		return NULL;
 	}
+	return h;
+}
 
-	ret = kernel_listen(s->sk, 16);
-	if (ret) {
-		sock_release(s->sk);
-		kfree(s);
-		return NULL;
-	}
-
-	return s;
+mxfs_sock_t *mxfs_pal_tcp_listen(uint16_t port)
+{
+	return mxfs_pal_tcp_listen_keyed(port, NULL, 0, 0);
 }
 
 mxfs_sock_t *mxfs_pal_tcp_accept(mxfs_sock_t *listener)
 {
+	struct mxfs_tcp_conn *c;
 	struct mxfs_sock *s;
-	struct socket *newsock;
-	int ret;
 
-	if (!listener || !listener->sk)
+	if (!listener || !listener->tport)
 		return NULL;
+	if (wait_event_interruptible(listener->wq,
+				     mxfs_port_handle_ready(listener)))
+		return NULL;
+
+	spin_lock(&listener->qlock);
+	c = list_first_entry_or_null(&listener->q, struct mxfs_tcp_conn, link);
+	if (c)
+		list_del(&c->link);
+	spin_unlock(&listener->qlock);
+	if (!c)
+		return NULL;	/* shut down */
 
 	s = kzalloc(sizeof(*s), GFP_KERNEL);
-	if (!s)
-		return NULL;
-	s->is_udp = 0;
-
-	ret = kernel_accept(listener->sk, &newsock, 0);
-	if (ret) {
-		kfree(s);
+	if (!s) {
+		sock_release(c->sk);
+		kfree(c);
 		return NULL;
 	}
-
-	s->sk = newsock;
+	s->sk = c->sk;
+	kfree(c);
 	return s;
 }
 
@@ -3316,26 +3647,57 @@ void mxfs_pal_tcp_set_opts(mxfs_sock_t *s)
 
 void mxfs_pal_tcp_shutdown(mxfs_sock_t *s)
 {
-	if (!s || !s->sk)
+	if (!s)
+		return;
+	if (s->tport) {
+		/* a listener: its accept returns NULL from now on */
+		mxfs_port_handle_shut(s);
+		return;
+	}
+	if (!s->sk)
 		return;
 	kernel_sock_shutdown(s->sk, SHUT_RDWR);
 	/*
-	 * kernel_sock_shutdown(SHUT_RDWR) on a LISTEN socket only sets
-	 * shutdown flags — it does NOT wake threads blocked in
-	 * kernel_accept (inet_csk_accept waits on the accept queue,
-	 * not the socket error path).  Force-wake by setting sk_err
-	 * and invoking sk_state_change, which posts a wake-up to all
-	 * waiters including the accept queue.  Without this, the accept
-	 * thread hangs forever and the listen socket is never released.
+	 * kernel_sock_shutdown(SHUT_RDWR) does not by itself wake every
+	 * waiter.  Force-wake by setting sk_err and invoking the error report,
+	 * which posts a wake-up to all waiters.
 	 */
 	s->sk->sk->sk_err = EINTR;
 	s->sk->sk->sk_error_report(s->sk->sk);
+}
+
+static void mxfs_tcp_handle_close(struct mxfs_sock *h)
+{
+	struct mxfs_tcp_port *tp = h->tport;
+	struct mxfs_tcp_conn *c, *n;
+	bool last;
+
+	mutex_lock(&mxfs_ports_lock);
+	mutex_lock(&tp->hlock);
+	list_del(&h->port_link);
+	last = --tp->nhandles == 0;
+	mutex_unlock(&tp->hlock);
+	if (last) {
+		list_del(&tp->link);
+		mxfs_tcp_port_destroy(tp);
+	}
+	mutex_unlock(&mxfs_ports_lock);
+	/* off the port: nothing is queued to it any more */
+	list_for_each_entry_safe(c, n, &h->q, link) {
+		sock_release(c->sk);
+		kfree(c);
+	}
+	kfree(h);
 }
 
 void mxfs_pal_tcp_close(mxfs_sock_t *s)
 {
 	if (!s)
 		return;
+	if (s->tport) {
+		mxfs_tcp_handle_close(s);
+		return;
+	}
 	if (s->sk) {
 		kernel_sock_shutdown(s->sk, SHUT_RDWR);
 		sock_release(s->sk);
@@ -3371,45 +3733,94 @@ int mxfs_pal_tcp_getpeername(mxfs_sock_t *s, char *buf, size_t buf_len)
  * UDP Networking
  * ═══════════════════════════════════════════════════════════════════ */
 
-mxfs_sock_t *mxfs_pal_udp_open(uint16_t port)
+/* Copy one datagram, in up->buf, to every handle on the port. */
+static void mxfs_udp_port_deliver(struct mxfs_udp_port *up,
+				  const struct sockaddr_in *from, uint32_t len)
 {
-	struct mxfs_sock *s;
+	struct mxfs_sock *h;
+
+	mutex_lock(&up->hlock);
+	list_for_each_entry(h, &up->handles, port_link) {
+		struct mxfs_udp_dgram *d;
+		bool queued = false;
+
+		d = kmalloc(sizeof(*d) + len, GFP_KERNEL);
+		if (d) {
+			d->from = *from;
+			d->len = len;
+			memcpy(d->data, up->buf, len);
+			spin_lock(&h->qlock);
+			if (!h->shut && h->qbytes + len <= MXFS_UDP_QUEUE_BYTES) {
+				list_add_tail(&d->link, &h->q);
+				h->qbytes += len;
+				queued = true;
+			}
+			spin_unlock(&h->qlock);
+		}
+		if (queued) {
+			wake_up(&h->wq);
+		} else {
+			kfree(d);
+			h->qdrops++;
+		}
+	}
+	mutex_unlock(&up->hlock);
+}
+
+static int mxfs_udp_port_reader(void *arg)
+{
+	struct mxfs_udp_port *up = arg;
+
+	while (!kthread_should_stop()) {
+		struct sockaddr_in from;
+		struct msghdr msg = {};
+		struct kvec iov;
+		int ret;
+
+		memset(&from, 0, sizeof(from));
+		msg.msg_name = &from;
+		msg.msg_namelen = sizeof(from);
+		iov.iov_base = up->buf;
+		iov.iov_len = MXFS_UDP_DGRAM_MAX;
+		ret = kernel_recvmsg(up->sk, &msg, &iov, 1, MXFS_UDP_DGRAM_MAX, 0);
+		if (READ_ONCE(up->stopping)) {
+			schedule_timeout_interruptible(msecs_to_jiffies(20));
+			continue;
+		}
+		if (ret > 0) {
+			mxfs_udp_port_deliver(up, &from, ret);
+			continue;
+		}
+		/* the 1 s receive timeout, or an error the next datagram clears;
+		 * a zero-length datagram carries nothing any receiver accepts */
+		if (ret < 0 && ret != -EAGAIN && ret != -EWOULDBLOCK && ret != -EINTR)
+			schedule_timeout_interruptible(msecs_to_jiffies(10));
+	}
+	return 0;
+}
+
+/* under mxfs_ports_lock */
+static struct mxfs_udp_port *mxfs_udp_port_create(uint16_t port)
+{
+	struct mxfs_udp_port *up;
 	struct sockaddr_in addr;
 	int ret;
 
-	s = kzalloc(sizeof(*s), GFP_KERNEL);
-	if (!s)
+	up = kzalloc(sizeof(*up), GFP_KERNEL);
+	if (!up)
 		return NULL;
-	s->is_udp = 1;
+	up->port = port;
+	mutex_init(&up->hlock);
+	INIT_LIST_HEAD(&up->handles);
+	up->buf = kmalloc(MXFS_UDP_DGRAM_MAX, GFP_KERNEL);
+	if (!up->buf)
+		goto err_free;
 
 	ret = sock_create_kern(&init_net, AF_INET, SOCK_DGRAM,
-			       IPPROTO_UDP, &s->sk);
-	if (ret) {
-		kfree(s);
-		return NULL;
-	}
-
-	/* SO_REUSEADDR — non-fatal if it fails (known issue on 5.10) */
-#if MXFS_EFFECTIVE_VERSION >= KERNEL_VERSION(5, 8, 0)
-	sock_set_reuseaddr(s->sk->sk);
-#else
-	{
-		int opt = 1;
-		kernel_setsockopt(s->sk, SOL_SOCKET, SO_REUSEADDR,
-				  (char *)&opt, sizeof(opt));
-	}
-#endif
-
-	/* SO_REUSEPORT — allows multiple mounts on the same node to
-	 * bind the same UDP port (e.g. multi-LUN: each mount has its
-	 * own DLM/lease/discovery context on port 7601/7602).  The
-	 * kernel delivers multicast packets to ALL bound sockets;
-	 * each mount's recv path filters by volume_uuid so there is
-	 * no cross-filesystem interference. */
-	s->sk->sk->sk_reuse = SK_CAN_REUSE;
-#ifdef SO_REUSEPORT
-	s->sk->sk->sk_reuseport = 1;
-#endif
+			       IPPROTO_UDP, &up->sk);
+	if (ret)
+		goto err_free;
+	mxfs_sock_set_reuseaddr(up->sk);
 
 	/* default rcvbuf (~208KB ≈ 270 skbs) drops
 	 * BAST-hint/GRANT-nudge mcasts under 32-node storms — the recv
@@ -3417,43 +3828,114 @@ mxfs_sock_t *mxfs_pal_udp_open(uint16_t port)
 	 * default window, and a lost GRANT nudge costs the waiter a full
 	 * poll backstop on that handoff.  4MB absorbs multi-second bursts
 	 * (~200B messages → ~5k packets of headroom). */
-	s->sk->sk->sk_rcvbuf = 4 * 1024 * 1024;
-	s->sk->sk->sk_userlocks |= SOCK_RCVBUF_LOCK;
+	up->sk->sk->sk_rcvbuf = 4 * 1024 * 1024;
+	up->sk->sk->sk_userlocks |= SOCK_RCVBUF_LOCK;
+	/* the reader looks up for kthread_stop at least once a second */
+	mxfs_sock_set_rcvtimeo(up->sk, HZ);
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	addr.sin_port = htons(port);
-
-	ret = kernel_bind(s->sk, (void *)&addr, sizeof(addr));
+	ret = kernel_bind(up->sk, (void *)&addr, sizeof(addr));
 	if (ret) {
-		sock_release(s->sk);
-		kfree(s);
-		return NULL;
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "pal: UDP port %u: bind failed: %d", port, ret);
+		goto err_sock;
 	}
 
-	return s;
+	up->reader = kthread_run(mxfs_udp_port_reader, up, "mxfs-udp/%u", port);
+	if (IS_ERR(up->reader))
+		goto err_sock;
+	list_add_tail(&up->link, &mxfs_udp_ports);
+	return up;
+
+err_sock:
+	sock_release(up->sk);
+err_free:
+	kfree(up->buf);
+	kfree(up);
+	return NULL;
+}
+
+/* under mxfs_ports_lock, the port already off the list and with no handle */
+static void mxfs_udp_port_destroy(struct mxfs_udp_port *up)
+{
+	WRITE_ONCE(up->stopping, true);
+	mxfs_sock_wake_blocked(up->sk);
+	kthread_stop(up->reader);
+	sock_release(up->sk);
+	kfree(up->buf);
+	kfree(up);
+}
+
+mxfs_sock_t *mxfs_pal_udp_open(uint16_t port)
+{
+	struct mxfs_udp_port *up = NULL, *it;
+	struct mxfs_sock *h;
+
+	h = mxfs_port_handle_alloc();
+	if (!h)
+		return NULL;
+	h->is_udp = 1;
+
+	mutex_lock(&mxfs_ports_lock);
+	list_for_each_entry(it, &mxfs_udp_ports, link) {
+		if (it->port == port) {
+			up = it;
+			break;
+		}
+	}
+	if (!up)
+		up = mxfs_udp_port_create(port);
+	if (up) {
+		mutex_lock(&up->hlock);
+		list_add_tail(&h->port_link, &up->handles);
+		up->nhandles++;
+		h->uport = up;
+		mutex_unlock(&up->hlock);
+	}
+	mutex_unlock(&mxfs_ports_lock);
+	if (!up) {
+		kfree(h);
+		return NULL;
+	}
+	return h;
 }
 
 void mxfs_pal_udp_shutdown(mxfs_sock_t *s)
 {
-	if (!s || !s->sk)
+	if (!s || !s->uport)
 		return;
-	kernel_sock_shutdown(s->sk, SHUT_RDWR);
-	/*
-	 * Force-wake any thread blocked in kernel_recvmsg or
-	 * kernel_sendmsg by setting an error on the socket.
-	 */
-	s->sk->sk->sk_err = EINTR;
-	s->sk->sk->sk_error_report(s->sk->sk);
+	/* a receive returns 0 from now on, as a UDP socket's does after
+	 * SHUT_RD; a send returns -EPIPE */
+	mxfs_port_handle_shut(s);
 }
 
 void mxfs_pal_udp_close(mxfs_sock_t *s)
 {
+	struct mxfs_udp_port *up;
+	struct mxfs_udp_dgram *d, *n;
+	bool last;
+
 	if (!s)
 		return;
-	if (s->sk)
-		sock_release(s->sk);
+	up = s->uport;
+	if (up) {
+		mutex_lock(&mxfs_ports_lock);
+		mutex_lock(&up->hlock);
+		list_del(&s->port_link);
+		last = --up->nhandles == 0;
+		mutex_unlock(&up->hlock);
+		if (last) {
+			list_del(&up->link);
+			mxfs_udp_port_destroy(up);
+		}
+		mutex_unlock(&mxfs_ports_lock);
+	}
+	/* off the port: nothing is queued to it any more */
+	list_for_each_entry_safe(d, n, &s->q, link)
+		kfree(d);
 	kfree(s);
 }
 
@@ -3463,10 +3945,16 @@ int mxfs_pal_udp_sendto(mxfs_sock_t *s, const void *buf, uint32_t len,
 	struct sockaddr_in dest;
 	struct msghdr msg = {};
 	struct kvec iov;
+	bool shut;
 	int ret;
 
-	if (!s || !s->sk || !buf || !host)
+	if (!s || !s->uport || !buf || !host)
 		return -EINVAL;
+	spin_lock(&s->qlock);
+	shut = s->shut;
+	spin_unlock(&s->qlock);
+	if (shut)
+		return -EPIPE;
 
 	ret = parse_ipv4(host, port, &dest);
 	if (ret)
@@ -3478,7 +3966,7 @@ int mxfs_pal_udp_sendto(mxfs_sock_t *s, const void *buf, uint32_t len,
 	iov.iov_base = (void *)buf;
 	iov.iov_len = len;
 
-	ret = kernel_sendmsg(s->sk, &msg, &iov, 1, len);
+	ret = kernel_sendmsg(s->uport->sk, &msg, &iov, 1, len);
 	if (ret < 0)
 		return ret;
 	return 0;
@@ -3488,88 +3976,107 @@ int mxfs_pal_udp_recvfrom(mxfs_sock_t *s, void *buf, uint32_t len,
 			  char *from_host, size_t host_len,
 			  uint16_t *from_port)
 {
-	struct sockaddr_in sender;
-	struct msghdr msg = {};
-	struct kvec iov;
-	int ret;
+	struct mxfs_udp_dgram *d;
+	long ret;
+	uint32_t n;
 
-	if (!s || !s->sk || !buf)
+	if (!s || !s->uport || !buf)
 		return -EINVAL;
 
-	msg.msg_name = &sender;
-	msg.msg_namelen = sizeof(sender);
+	ret = wait_event_interruptible_timeout(s->wq,
+			mxfs_port_handle_ready(s),
+			s->rcvtimeo ? s->rcvtimeo : MAX_SCHEDULE_TIMEOUT);
+	if (ret == 0)
+		return -ETIMEDOUT;
+	if (ret < 0)
+		return -EINTR;
 
-	iov.iov_base = buf;
-	iov.iov_len = len;
-
-	ret = kernel_recvmsg(s->sk, &msg, &iov, 1, len, 0);
-	if (ret < 0) {
-		if (ret == -EAGAIN || ret == -EWOULDBLOCK)
-			return -ETIMEDOUT;
-		return ret;
+	spin_lock(&s->qlock);
+	d = list_first_entry_or_null(&s->q, struct mxfs_udp_dgram, link);
+	if (d) {
+		list_del(&d->link);
+		s->qbytes -= d->len;
 	}
+	spin_unlock(&s->qlock);
+	if (!d)
+		return 0;	/* shut down */
 
+	n = min(len, d->len);
+	memcpy(buf, d->data, n);
 	if (from_host && host_len > 0)
-		snprintf(from_host, host_len, "%pI4", &sender.sin_addr);
+		snprintf(from_host, host_len, "%pI4", &d->from.sin_addr);
 	if (from_port)
-		*from_port = ntohs(sender.sin_port);
-
-	return ret;
+		*from_port = ntohs(d->from.sin_port);
+	kfree(d);
+	return n;
 }
 
 int mxfs_pal_udp_join_multicast(mxfs_sock_t *s, const char *group)
 {
+	struct mxfs_udp_port *up;
 	struct ip_mreqn mreq;
-	int ret;
+	__be32 g;
+	int i, ret = 0;
 
-	if (!s || !s->sk || !group)
+	if (!s || !s->uport || !group)
 		return -EINVAL;
-
-	memset(&mreq, 0, sizeof(mreq));
-	mreq.imr_multiaddr.s_addr = in_aton(group);
-	mreq.imr_address.s_addr = htonl(INADDR_ANY);
-	mreq.imr_ifindex = 0;
+	up = s->uport;
+	g = in_aton(group);
 
 	/*
-	 * Join multicast group and set TTL/loopback via sockopt.
-	 * Uses sock->ops->setsockopt which works across all kernel versions.
+	 * A group is joined once per port, for every handle on it, and stays
+	 * joined until the port's socket closes: a handle that did not join
+	 * it receives its datagrams too, and drops those that are not for its
+	 * volume or from a listed peer, as it drops every other.
 	 */
-	{
-		sockptr_t optval = KERNEL_SOCKPTR((void *)&mreq);
-		ret = s->sk->ops->setsockopt(s->sk, IPPROTO_IP,
-					      IP_ADD_MEMBERSHIP,
-					      optval, sizeof(mreq));
-	}
-	if (ret)
-		return ret;
+	mutex_lock(&mxfs_ports_lock);
+	for (i = 0; i < up->ngroups; i++)
+		if (up->groups[i] == g)
+			break;
+	if (i == up->ngroups) {
+		if (up->ngroups == MXFS_PORT_GROUPS) {
+			ret = -ENOSPC;
+		} else {
+			sockptr_t optval = KERNEL_SOCKPTR((void *)&mreq);
 
-	{
+			memset(&mreq, 0, sizeof(mreq));
+			mreq.imr_multiaddr.s_addr = g;
+			mreq.imr_address.s_addr = htonl(INADDR_ANY);
+			mreq.imr_ifindex = 0;
+			ret = up->sk->ops->setsockopt(up->sk, IPPROTO_IP,
+						      IP_ADD_MEMBERSHIP,
+						      optval, sizeof(mreq));
+			if (!ret)
+				up->groups[up->ngroups++] = g;
+		}
+	}
+	if (!ret) {
 		u8 ttl = 1;
 		u8 loop = 1;
 		sockptr_t tv = KERNEL_SOCKPTR((void *)&ttl);
 		sockptr_t lv = KERNEL_SOCKPTR((void *)&loop);
 
-		s->sk->ops->setsockopt(s->sk, IPPROTO_IP,
-				       IP_MULTICAST_TTL, tv, sizeof(ttl));
-		s->sk->ops->setsockopt(s->sk, IPPROTO_IP,
-				       IP_MULTICAST_LOOP, lv, sizeof(loop));
+		up->sk->ops->setsockopt(up->sk, IPPROTO_IP,
+					IP_MULTICAST_TTL, tv, sizeof(ttl));
+		up->sk->ops->setsockopt(up->sk, IPPROTO_IP,
+					IP_MULTICAST_LOOP, lv, sizeof(loop));
 	}
-
-	return 0;
+	mutex_unlock(&mxfs_ports_lock);
+	return ret;
 }
 
 int mxfs_pal_udp_set_broadcast(mxfs_sock_t *s)
 {
-	if (!s || !s->sk)
+	if (!s || !s->uport)
 		return -EINVAL;
 
 #if MXFS_EFFECTIVE_VERSION >= KERNEL_VERSION(5, 8, 0)
-	sock_set_flag(s->sk->sk, SOCK_BROADCAST);
+	sock_set_flag(s->uport->sk->sk, SOCK_BROADCAST);
 	return 0;
 #else
 	{
 		int opt = 1;
-		return kernel_setsockopt(s->sk, SOL_SOCKET, SO_BROADCAST,
+		return kernel_setsockopt(s->uport->sk, SOL_SOCKET, SO_BROADCAST,
 					 (char *)&opt, sizeof(opt));
 	}
 #endif
@@ -3577,25 +4084,15 @@ int mxfs_pal_udp_set_broadcast(mxfs_sock_t *s)
 
 int mxfs_pal_udp_set_recv_timeout(mxfs_sock_t *s, uint32_t timeout_ms)
 {
-	struct __kernel_sock_timeval tv;
+	long t;
 
-	if (!s || !s->sk)
+	if (!s || !s->uport)
 		return -EINVAL;
-
-	tv.tv_sec = timeout_ms / 1000;
-	tv.tv_usec = (timeout_ms % 1000) * 1000;
-
-#if MXFS_EFFECTIVE_VERSION >= KERNEL_VERSION(5, 8, 0)
-	lock_sock(s->sk->sk);
-	s->sk->sk->sk_rcvtimeo = msecs_to_jiffies(timeout_ms);
-	if (s->sk->sk->sk_rcvtimeo == 0 && timeout_ms > 0)
-		s->sk->sk->sk_rcvtimeo = 1;
-	release_sock(s->sk->sk);
+	t = msecs_to_jiffies(timeout_ms);
+	if (t == 0 && timeout_ms > 0)
+		t = 1;
+	s->rcvtimeo = t;
 	return 0;
-#else
-	return kernel_setsockopt(s->sk, SOL_SOCKET, SO_RCVTIMEO_NEW,
-				 (char *)&tv, sizeof(tv));
-#endif
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -7220,6 +7717,7 @@ EXPORT_SYMBOL_GPL(mxfs_pal_cond_signal);
 EXPORT_SYMBOL_GPL(mxfs_pal_cond_broadcast);
 EXPORT_SYMBOL_GPL(mxfs_pal_tcp_connect);
 EXPORT_SYMBOL_GPL(mxfs_pal_tcp_listen);
+EXPORT_SYMBOL_GPL(mxfs_pal_tcp_listen_keyed);
 EXPORT_SYMBOL_GPL(mxfs_pal_tcp_accept);
 EXPORT_SYMBOL_GPL(mxfs_pal_tcp_send);
 EXPORT_SYMBOL_GPL(mxfs_pal_tcp_recv);

@@ -1,4 +1,4 @@
-<!-- sess232 RULE-5 ruling -->
+<!-- sess232 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling -->
 # sess232 GPT ruling — D-FINOBT-IBT-FREE-MISMATCH-481 fix shape
 
 ## Mechanism verdict

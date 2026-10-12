@@ -26,7 +26,7 @@ i.e. blocked writing the guest's SERIAL LOG on the HOST's own ext4. MXFS is not
 in that path at all — do not read it as a filesystem defect. A D-state task
 cannot take a signal, so libvirtd retries the kill forever.
 
-Diagnose it safely (RULE 2c): `/proc/<pid>/stat`, `/proc/<pid>/task/*/stat` and
+Diagnose it safely (RULE: NEVER WEDGE THE LAB HOST): `/proc/<pid>/stat`, `/proc/<pid>/task/*/stat` and
 `/proc/<pid>/task/*/stack` are safe on a wedged host; `cmdline` and `maps` are
 not, and `pgrep -f` is banned. `tools/mxfs_pgrep.sh` is the safe matcher.
 
@@ -55,7 +55,7 @@ Automates all five. ~3 minutes, dominated by the image copy (26 GB in 75s;
 cluster re-prepped clean (60s, all 32 `active_count=32`).
 
 It restarts libvirtd and virtlogd — running guests survive both. It NEVER
-reboots or sysrqs the host (RULE 2). The old image is left in place because the
+reboots or sysrqs the host (RULE: NEVER REBOOT THE LAB HOST). The old image is left in place because the
 stuck threads still hold it; only a host reset clears that process.
 
 After the domain starts it has **no /src** (NFS is deliberately not an fstab
@@ -66,7 +66,7 @@ node can run anything from the tree.
 
 `run.sh`'s `power_cycle_node()` called `virsh destroy`/`start` UNBOUNDED. Against
 a deadlocked domain that hangs `prep_cluster` forever in an unattended ccloop
-run — the exact RULE 2b/2c failure shape. Every `virsh` call in `run.sh` is now
+run — the exact RULE: NEVER RUN A COMMAND THAT CAN TRIGGER A PERMISSION PROMPT/RULE: NEVER WEDGE THE LAB HOST failure shape. Every `virsh` call in `run.sh` is now
 `timeout 60` with a WARN on expiry. **Never add an unbounded `virsh` call.**
 
 ## Also worth knowing

@@ -1,5 +1,5 @@
-<!-- sess379 RULE-5 ruling for D-MASS-UMOUNT-ROOT-EX-SERIALIZE-100S-526B: detector I/O must leave caller context; deferred samples need ABA-proof generati… -->
-# sess379 RULE-5 ruling — taking detector I/O off the DLM fast path
+<!-- sess379 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling for D-MASS-UMOUNT-ROOT-EX-SERIALIZE-100S-526B: detector I/O must leave caller context; deferred samples need ABA-proof generati… -->
+# sess379 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — taking detector I/O off the DLM fast path
 
 Consulted with the sess379 root-cause evidence (32-node mass umount: 30/32 nodes'
 `statx()` blocked 60.5 / 121 / 181.5 s inside `mxfs_pal_scsi_read_fua_bdev`, all on

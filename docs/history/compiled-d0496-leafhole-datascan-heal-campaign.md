@@ -84,7 +84,7 @@ default 1, gating both `mxfs_dir2_datascan_lookup` call sites and both
 `mxfs_dir2_leafless_removename` sites) plus `tests/sess498_heal_off_board.sh` (full 32/caw board
 with the heal off), launched as chain s498a.
 
-``docs/rulings/retire-datascan-heal-conditions.md`` — RULE-5 consult on
+``docs/rulings/retire-datascan-heal-conditions.md`` — RULE: CONSULT ANOTHER MODEL WHEN STUCK consult on
 whether the heal-off board alone justifies flipping the default to 0. Verdict: experiment sound,
 default flip on board+crash-pass alone UNSOUND. Six conditions must be excluded first: (1) stale
 foreign replay of an older leaf/node image over a newer home image

@@ -7,7 +7,7 @@ Single ccloop `0d6e174d` (2026-07-06/07). Compiles five raw memories on the 16/c
 **8B203AA4** (v2 +`valid_epoch==0`, SAFE, CURRENT/FINAL) → 787CCEE8 (v2+probes) →
 787CCEE8/B5FED995 (margin experiments, reverted → back to 8B203AA4).
 
-### The failure (ROOT PROVEN, RULE-4, base D8BEF5A5)
+### The failure (ROOT PROVEN, RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS, base D8BEF5A5)
 `dlm_scaling` 16/caw = **FAIL 0/16**, every node fails `rate>=floor` (FLOOR_OPS=50/s,
 WINDOW=60s). Each node runs 2000× (create+stat+unlink) in its OWN PRIVATE subdir
 `.dlm_scaling/nodeR` (disjoint resources). Measured ~33-50 ops/s (~20-30ms/op) vs native

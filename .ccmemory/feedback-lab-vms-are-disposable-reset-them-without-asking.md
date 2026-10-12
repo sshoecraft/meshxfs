@@ -1,6 +1,6 @@
 ---
 name: feedback-lab-vms-are-disposable-reset-them-without-asking
-description: USER 2026-09-23 (angry): every lab VM (testN, pve9-*, vstest*, alma-97) may be reset/restarted/reconfigured without asking; waiting for permission wa…
+description: USER 2026-09-23: every lab VM (testN, pve9-*, vstest*, alma-97) may be reset/restarted/reconfigured without asking; waiting for permission wa…
 metadata:
   type: feedback
 ---

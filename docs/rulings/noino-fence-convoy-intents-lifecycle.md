@@ -1,5 +1,5 @@
-<!-- sess390 RULE-5 ruling: noino release fence — do NOT exempt intent items; convoy-aware stall accounting w/ attribution + absolute wall (B); INACTIVATI… -->
-# sess390 RULE-5 ruling (gpt-5.6-sol) — noino release fence vs. frozen EFI
+<!-- sess390 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: noino release fence — do NOT exempt intent items; convoy-aware stall accounting w/ attribution + absolute wall (B); INACTIVATI… -->
+# sess390 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (gpt-5.6-sol) — noino release fence vs. frozen EFI
 
 ## Evidence brought
 25-AG wedge (sess389): P-AILMIN frozen item type=4662=0x1236=XFS_LI_EFI on both nodes, static lsn; test7 probe armed, ZERO P129 lines -> EFI was the only frozen item (inode item re-logged past the fence target by xfs_trans_roll; EFI not). Owner = inodegc extent free blocked in P1-AGWAIT on the SHARED AG held by the peer ~13 s (peer readopt=342). Fenced inode X already freed (IRECLAIMABLE/absent), 40 peer EX waiters (ino reuse). Convoy, not deadlock.

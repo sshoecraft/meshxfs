@@ -1,5 +1,5 @@
-<!-- sess282 RULE-5 ruling: preacq exhaustion fix = shape B (unbounded clean op-level retry, remove EAGAIN→ETIMEDOUT entirely); C (BAST-defer pregrant win… -->
-# sess282 RULE-5 ruling — preacquire-exhaustion fix shape (rename/remove spurious ETIMEDOUT)
+<!-- sess282 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: preacq exhaustion fix = shape B (unbounded clean op-level retry, remove EAGAIN→ETIMEDOUT entirely); C (BAST-defer pregrant win… -->
+# sess282 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — preacquire-exhaustion fix shape (rename/remove spurious ETIMEDOUT)
 
 Defect: 32-way same-dir rename storm → P271-PREACQ-EXHAUST on 30/32 nodes, mv returns ETIMEDOUT on 4/32 (cache_coherency rv subtest, 0.11.499 board run 20260814T195525Z).
 

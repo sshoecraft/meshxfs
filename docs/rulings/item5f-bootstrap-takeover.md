@@ -1,5 +1,5 @@
-<!-- sess442 RULE-5 ruling for item 5f (bootstrap owner died in another boot): new-term RESEAL with validated inheritance (receipts for zeroed slots), K c… -->
-# sess442 RULE-5 ruling — item 5f, bootstrap TAKEOVER (owner dead in a different boot)
+<!-- sess442 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling for item 5f (bootstrap owner died in another boot): new-term RESEAL with validated inheritance (receipts for zeroed slots), K c… -->
+# sess442 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — item 5f, bootstrap TAKEOVER (owner dead in a different boot)
 
 Proposed: fence the stale owner as a victim through the phase-3 pipeline on K, takeover CAS to T+1 with manifest/escrow RESET, then the ordinary fresh bootstrap flow (K PENDING preferred, FULL own-log replay of both incarnations).
 

@@ -1,5 +1,5 @@
-<!-- sess389 RULE-5 ruling on the publication-durability gate: F1 narrow PUBOB-at-PR flush, F2 converter honesty + re-log repair, F3 no ledger discharge o… -->
-# sess389 RULE-5 ruling (gpt-5.6-sol) — publication durability gate
+<!-- sess389 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the publication-durability gate: F1 narrow PUBOB-at-PR flush, F2 converter honesty + re-log repair, F3 no ledger discharge o… -->
+# sess389 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (gpt-5.6-sol) — publication durability gate
 
 ## Measured chain brought to the consult (test10 ino 130023711 / test7 ino 92277034, identical)
 P82-ADD (unlink committed while inode DLM mode was PR after a mid-drain re-acquire, P15-REL-ABORT)

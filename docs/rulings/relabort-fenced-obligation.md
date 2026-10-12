@@ -1,4 +1,4 @@
-<!-- sess387 RULE-5 ruling: fenced-obligation corpse fix = (b) release/reacquire state machine (no writable reacquire survives real EX->PR; terminal gate… -->
+<!-- sess387 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: fenced-obligation corpse fix = (b) release/reacquire state machine (no writable reacquire survives real EX->PR; terminal gate… -->
 ## sess387 ruling #2 — the fenced-obligation corpse chain (mid-chain P84 deaths)
 
 ### Measured chain (test18/test23, 0.19.29)

@@ -193,7 +193,7 @@ RULES OUT a hypothesis:
   disagreed on the tree. Suggestive of metadata read-staleness but the remount-while-active
   disrupts the cluster so it's not a clean signal — re-test cleanly next session.
 
-### Refined hypothesis for the empty-content self-loss (next session, RULE-4 it)
+### Refined hypothesis for the empty-content self-loss (next session, RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS it)
 The "files 11-20" (later-half) pattern + needs-concurrency + node-loses-OWN-content points to
 **inode-cluster sharing under concurrent allocation + di_size flush timing**: node1's file
 inode shares a 32-64-inode cluster with peers' inodes; a peer allocating in the same cluster

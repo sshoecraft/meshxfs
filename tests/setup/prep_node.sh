@@ -101,7 +101,18 @@ if mountpoint -q "$MXFS_MOUNT"; then
         || timeout 25 umount -f "$MXFS_MOUNT" 2>/dev/null \
         || umount -l "$MXFS_MOUNT" 2>/dev/null || true
 fi
-if lsmod | grep -q '^mxfs'; then
+# MXFS_KEEP_LOADED=1: a module this build already loaded stays.  Loading the
+# 88 MB module holds the CPU it runs on for ~0.9 s while the kernel patches it
+# (measured on the rig's guests), which starves the DRBD threads pinned to that
+# CPU past DRBD's 0.5 s ping timeout; so a DRBD node loads it before any DRBD
+# link is up (as the packages' modules-load.d does at boot) and keeps it here.
+KEEP=0
+if [ "${MXFS_KEEP_LOADED:-0}" = 1 ] && lsmod | grep -q '^mxfs ' \
+   && [ "$(cat /sys/module/mxfs/srcversion 2>/dev/null)" = "$(modinfo -F srcversion "$([ "$MODULE_SOURCE" = installed ] && echo mxfs || echo "$MODULE")" 2>/dev/null)" ]; then
+    KEEP=1
+    echo "MXFS_MODULE_KEPT srcversion=$(cat /sys/module/mxfs/srcversion)"
+fi
+if [ "$KEEP" = 0 ] && lsmod | grep -q '^mxfs'; then
     for i in 1 2 3 4 5 6 7 8; do
         rmmod mxfs 2>/dev/null && break
         sleep 2
@@ -174,7 +185,9 @@ if [ -f /src/mxfs/tools/mxfs_lu_reset_witness.py ]; then
 else
     echo "WARN: /src/mxfs/tools/mxfs_lu_reset_witness.py is not readable here — no LU-reset witness helper installed"
 fi
-case "$MODULE_SOURCE" in
+[ "$KEEP" = 1 ] && MODULE_SOURCE_LOAD=kept || MODULE_SOURCE_LOAD=$MODULE_SOURCE
+case "$MODULE_SOURCE_LOAD" in
+    kept) ;;
     repo)
         # sess10 (ccloop c7ee71c6) NFS-STALENESS-PROOF LOAD.  The repo ko is
         # relinked IN PLACE on the NFS export; with server/client clock skew a

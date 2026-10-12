@@ -12,7 +12,7 @@ metadata:
 already in its context.
 
 **Result — inheritance CONFIRMED:**
-- Listed RULES 0, 1, 2, 2b, 2c, 3, 4, 5, 6, 7, 8 with correct summaries,
+- Listed RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS, RULE: NEVER DOWNLOAD THE LINUX KERNEL SOURCE, RULE: NEVER REBOOT THE LAB HOST, RULE: NEVER RUN A COMMAND THAT CAN TRIGGER A PERMISSION PROMPT, RULE: NEVER WEDGE THE LAB HOST, RULE: A SCRIPT IS NEVER A TEMP FILE, RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS, RULE: CONSULT ANOTHER MODEL WHEN STUCK, RULE: ZERO ACCEPTED KNOWN DEFECTS, RULE: INSPECT WITH THE RIGHT TOOL, RULE: ZERO ACCEPTED KNOWN DEFECTS with correct summaries,
   including the unusual 2b/2c numbering.
 - Answered yes to all four specific prohibitions probed (`pgrep -f`,
   host reboot, derived timeouts, scripts-in-tree).
@@ -29,7 +29,7 @@ session start too (confirmed separately: newly written `rig-runner` /
 
 ## Why this memory exists
 
-A RULE-5 review asserted "subagents don't inherit house rules unless the
+A RULE: CONSULT ANOTHER MODEL WHEN STUCK review asserted "subagents don't inherit house rules unless the
 agent definition carries them" and called it the most dangerous omission in
 the proposal. That assertion was written into CLAUDE.md **unverified**, as
 "A subagent inherits none of this file." It is false, and it was caught
@@ -41,9 +41,9 @@ session had already been burned three times by publishing conclusions
 ahead of testing them (300k -> 500k -> 145k on the cutoff). Test the cheap
 ones; they are usually one subagent call away.
 
-## Standing guidance (now in RULE 10)
+## Standing guidance (now in RULE: DELEGATE ITERATIVE GRIND)
 
-Still embed RULES 0, 2c, 3 verbatim in every agent definition — not
+Still embed RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS, RULE: NEVER WEDGE THE LAB HOST, RULE: A SCRIPT IS NEVER A TEMP FILE verbatim in every agent definition — not
 because inheritance fails, but because a newly-written rule has not
 propagated yet, and a constraint next to the task is obeyed more reliably
 than one 400 lines up the file.

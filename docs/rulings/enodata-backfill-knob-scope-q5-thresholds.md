@@ -1,5 +1,5 @@
-<!-- sess328 RULE-5 ruling D-513: -ENODATA arm STOP-SHIP (must backfill synthesized LEGACY_INTENT outcome); knob one-shot+slot-scoped + genuine mid-replay… -->
-# sess328 RULE-5 ruling — D-513 pre-rig follow-up (3 questions)
+<!-- sess328 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-513: -ENODATA arm STOP-SHIP (must backfill synthesized LEGACY_INTENT outcome); knob one-shot+slot-scoped + genuine mid-replay… -->
+# sess328 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — D-513 pre-rig follow-up (3 questions)
 
 ## Q1: -EPERM→-ENODATA arm (intent-path quarantined descriptor, no outcome record)
 latch+release+no-import is **STOP-SHIP** — recreates terminal-but-uncommunicated

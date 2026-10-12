@@ -1,5 +1,5 @@
-<!-- sess381 RULE-5 ruling 2: the fence-retry state machine — invert the bit to MAY_HAVE_RUN, descriptor is the durable queue, never re-fire expire_cb, 4… -->
-# sess381 RULE-5 ruling 2 — the fencing retry/takeover state machine
+<!-- sess381 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling 2: the fence-retry state machine — invert the bit to MAY_HAVE_RUN, descriptor is the durable queue, never re-fire expire_cb, 4… -->
+# sess381 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling 2 — the fencing retry/takeover state machine
 
 Serves `D-FENCE-PRECONDITION-FAILURE-RECORDED-TERMINAL-381`. Consulted with the
 concrete MXFS machinery (recov_desc stages, `recovery_fence_intent` return

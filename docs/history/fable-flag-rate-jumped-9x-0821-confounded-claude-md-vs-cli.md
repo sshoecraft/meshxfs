@@ -17,4 +17,4 @@ What IS supported from the user's reading: a model switch followed by a return t
 
 CLI 2.1.238→2.1.239 refusal-string diff: only `refusalFallbackLatchOriginRequestId` went 2→4 occurrences (latching logic), cyber=55 both, switchModelsOnFlag=23 both.
 
-Proposed discriminating A/B (cheap: the delegation rule delegation unused since 08-16): remove the delegation rule + `.claude/agents/*.md`, keep CLI, run ~2,000 Fable requests, compare flags/1k against 1/500. If unchanged, next arm is the unkillable-wedge rule/2d wording (host-wedge/unkillable/panic vocabulary) or CLI rollback to 2.1.233. Pending user decision.
+Proposed discriminating A/B (cheap: RULE: DELEGATE ITERATIVE GRIND delegation unused since 08-16): remove the delegation rule + `.claude/agents/*.md`, keep CLI, run ~2,000 Fable requests, compare flags/1k against 1/500. If unchanged, next arm is the RULE: NEVER WEDGE THE LAB HOST / RULE: NEVER RUN THE RIG ON AN UNGUARDED HOST wording (host-wedge/unkillable/panic vocabulary) or CLI rollback to 2.1.233. Pending user decision.

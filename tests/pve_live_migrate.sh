@@ -1,6 +1,6 @@
 #!/bin/bash
 # pve_live_migrate.sh — live-migrate a running guest whose disk is on the
-# shared MXFS storage back and forth between the two hosts of a Proxmox pair,
+# shared MXFS storage round the hosts of a Proxmox cluster (two, or more),
 # with the guest writing throughout, and prove every byte it wrote survives
 # every move.
 #
@@ -35,7 +35,11 @@
 #
 # Usage: tests/pve_live_migrate.sh
 # Env:
-#   PVE_PAIR    "<addr> <addr>" (default the physical pair)
+#   PVE_PAIR    "<addr> <addr> ..." (default the physical pair); the laps go
+#               round the hosts in name order
+#   MNT         the MXFS mount every host must hold (default /mnt/shared)
+#   DRBD_RES    the DRBD resource under it (default mxfs); empty on a shared
+#               LUN, where only the mount is checked
 #   SRC_VMID    installed guest to clone (default 100)
 #   VMID        the clone's id (default 9100); an existing VM of that id is
 #               reused only if this script created it (its description says so)
@@ -59,7 +63,12 @@ set -u
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 SSHP="$REPO/tools/mxfs_sshpass.sh"
 read -r -a PAIR <<<"${PVE_PAIR:-192.168.1.80 192.168.1.81}"
-[ "${#PAIR[@]}" = 2 ] || { echo "pve_live_migrate: PVE_PAIR must name two hosts"; exit 2; }
+[ "${#PAIR[@]}" -ge 2 ] || { echo "pve_live_migrate: PVE_PAIR must name at least two hosts"; exit 2; }
+# The volume each host must hold mounted throughout.  DRBD_RES names the DRBD
+# resource under it on a DRBD pair (Primary/Primary, Connected, UpToDate);
+# empty for a shared LUN, where the mount alone is checked.
+MNT=${MNT:-/mnt/shared}
+DRBD_RES=${DRBD_RES-mxfs}
 SRC_VMID=${SRC_VMID:-100}
 VMID=${VMID:-9100}
 SHARED=${SHARED:-shared}
@@ -90,7 +99,11 @@ on() {  # <host> <cmd> [timeout]
 say() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG"; }
 fail() { say "FAIL: $*"; bad=1; }
 whole() {
-    on "$1" "grep -q ' /mnt/shared mxfs ' /proc/mounts && [ \"\$(drbdadm role mxfs)\" = Primary/Primary ] && [ \"\$(drbdadm cstate mxfs)\" = Connected ] && [ \"\$(drbdadm dstate mxfs)\" = UpToDate/UpToDate ] && echo WHOLE" 20 | grep -q WHOLE
+    if [ -n "$DRBD_RES" ]; then
+        on "$1" "grep -q ' $MNT mxfs ' /proc/mounts && [ \"\$(drbdadm role $DRBD_RES)\" = Primary/Primary ] && [ \"\$(drbdadm cstate $DRBD_RES)\" = Connected ] && [ \"\$(drbdadm dstate $DRBD_RES)\" = UpToDate/UpToDate ] && echo WHOLE" 20 | grep -q WHOLE
+    else
+        on "$1" "grep -q ' $MNT mxfs ' /proc/mounts && echo WHOLE" 20 | grep -q WHOLE
+    fi
 }
 # node name <-> address
 declare -A ADDR
@@ -99,6 +112,15 @@ for h in "${PAIR[@]}"; do
     [ -n "$n" ] || { say "FAIL: $h did not answer"; exit 1; }
     ADDR[$n]=$h
 done
+# the laps go round the hosts in name order
+mapfile -t NODES < <(printf '%s\n' "${!ADDR[@]}" | sort)
+next_node() {  # <node>: the one after it, round the list
+    local i
+    for i in "${!NODES[@]}"; do
+        [ "${NODES[$i]}" = "$1" ] && { echo "${NODES[$(( (i + 1) % ${#NODES[@]} ))]}"; return; }
+    done
+    echo "${NODES[0]}"
+}
 node_of() {  # the node VMID's config is on, or empty
     on "${PAIR[0]}" "pvesh get /cluster/resources --type vm --output-format json" 30 |
         python3 -I -c 'import json,sys; v=[r for r in json.load(sys.stdin) if r.get("vmid")==int(sys.argv[1])]; print(v[0]["node"] if v else "")' "$1"
@@ -164,7 +186,7 @@ for h in "${PAIR[@]}" src; do
 done
 wait
 for h in "${PAIR[@]}" src; do SUM[$h]=$(cat "$EVID/sum-$h"); done
-say "image sums: source on $src ${SUM[src]:0:16}; clone on ${PAIR[0]} ${SUM[${PAIR[0]}]:0:16}, on ${PAIR[1]} ${SUM[${PAIR[1]}]:0:16}"
+say "image sums: source on $src ${SUM[src]:0:16}; clone$(for h in "${PAIR[@]}"; do printf ' on %s %s' "$h" "${SUM[$h]:0:16}"; done)"
 for h in "${PAIR[@]}"; do
     [ -n "${SUM[src]}" ] && [ "${SUM[$h]}" = "${SUM[src]}" ] || fail "the clone read on $h does not match the source image"
 done
@@ -225,7 +247,7 @@ hosts_written=" $src "
 # 3. the laps
 for lap in $(seq 1 "$LAPS"); do
     curn=$(node_of "$VMID")
-    for n in "${!ADDR[@]}"; do [ "$n" != "$curn" ] && tgt=$n; done
+    tgt=$(next_node "$curn")
     idle=0
     if [[ " $IDLE_LAPS " == *" $lap "* ]]; then
         idle=1

@@ -728,6 +728,15 @@ struct v5_depart_req {
 	bool            orphan_sweep;
 };
 
+/* the request workers (v5_rrq_*): how many, and what each one is given */
+#define MXFS_RRQ_SHARDS 4
+struct mxfs_v5_dlm;
+struct v5_rrq_shard {
+	struct mxfs_v5_dlm      *ctx;
+	int                     idx;
+	mxfs_thread_t           *thread;
+};
+
 struct mxfs_v5_dlm {
 	/*
 	 * THIS INCARNATION'S AUTHORITY OVER THE SHARED LUN.  Allocated by the
@@ -1216,6 +1225,28 @@ struct mxfs_v5_dlm {
 	/* where the receive threads' time went, per message type (types below
 	 * 32), printed when the engine stops: P-RX-DISPATCH-STATS */
 	uint64_t                        rx_n[32], rx_ms[32], rx_max_ms[32];
+	/*
+	 * Peers' master-side lock traffic (LOCK_REQ, LOCK_RELEASE, LOCK_CANCEL),
+	 * processed on MXFS_RRQ_SHARDS workers chosen by the resource (v5_rrq_*)
+	 * instead of the peer's receive thread: each grant and each release is a
+	 * durable ledger commit, and every message behind one waited for it.
+	 * One resource's messages always go to the same worker, in arrival
+	 * order.  rrq_lock guards the queues, rrq_busy, rrq_n and rrq_closed;
+	 * rrq_cond wakes the workers and anyone draining the queues.
+	 */
+	mxfs_mutex_t                    *rrq_lock;
+	mxfs_cond_t                     *rrq_cond;
+	struct v5_rrq_item              *rrq_head[MXFS_RRQ_SHARDS], *rrq_tail[MXFS_RRQ_SHARDS];
+	bool                            rrq_busy[MXFS_RRQ_SHARDS];
+	uint32_t                        rrq_n;
+	bool                            rrq_closed;
+	struct v5_rrq_shard             rrq_shard[MXFS_RRQ_SHARDS];
+	uint64_t                        rrq_queued, rrq_inline, rrq_max_n, rrq_max_wait_ms;
+	uint64_t                        rrq_dropped_purged, rrq_dropped_stale;
+	/* this node's no-queue AG tries a master left unanswered, and the tries
+	 * the same allocation then did not send to that master (see
+	 * mxfs_v5_dlm_ag_lock_nb) */
+	mxfs_atomic32_t                 agnb_unanswered, agnb_muted;
 	/*
 	 * 0.89.67: the withdrawal a closure raises is driven by THIS thread, not
 	 * only by the PR worker's tick.  A task already asleep in a log wait has
@@ -2249,6 +2280,304 @@ static void v5_hrx_worker_stop(struct mxfs_v5_dlm *ctx)
 	}
 }
 
+/*
+ * A peer's lock requests, releases and cancels run on MXFS_RRQ_SHARDS workers,
+ * one resource always on the same worker, in arrival order.
+ *
+ * The master answers a request only after it has decided it, and a grant is
+ * decided only once its ledger record is durable; a release retires its
+ * record durably before its ACK.  On the receive thread every message from
+ * the peer waited for each of those commits.  Measured on the physical DRBD
+ * pair's slow disks (0.90.116, 7 concurrent VM installs): the master took
+ * 0.4 to 11 s to answer some no-queue AG requests, each a grant waiting on
+ * its commit, and 39 of the requester's 49 unanswered one-second tries match
+ * no slow processing on the master at all: they waited behind others, e.g.
+ * six AGs answered back to back after one 3.7 s grant.  The requester's
+ * allocator held a VM image's ILOCK through every one of those seconds.
+ *
+ * What the order kept, and still keeps: one resource's request, cancel and
+ * release from a peer are decided in the order they arrived (same worker,
+ * FIFO).  Messages for different resources were never ordered by anything
+ * the master decides on.  A GOODBYE is processed after everything its sender
+ * queued before it (v5_rrq_drain), as the receive thread did.  A request
+ * that waited in a queue while its sender died and was purged by recovery is
+ * dropped, not decided: deciding it would put a dead incarnation's grant on
+ * the platter after the purge that retires its records.
+ */
+int mxfs_lock_rx_worker = 1;
+module_param_named(lock_rx_worker, mxfs_lock_rx_worker, int, 0644);
+MODULE_PARM_DESC(lock_rx_worker,
+    "process peers' lock requests, releases and cancels on per-resource workers instead of the receive thread (default 1; 0 restores inline processing for A/B)");
+
+#define MXFS_RRQ_MAX 8192
+
+struct v5_rrq_item {
+	struct v5_rrq_item              *next;
+	mxfs_node_id_t                  sender;
+	uint64_t                        queued_ms;
+	uint32_t                        type;
+	union {
+		struct mxfs_dlm_lock_req        req;
+		struct mxfs_dlm_lock_release    rel;
+		struct mxfs_dlm_lock_cancel     cancel;
+	} m;
+};
+
+static int v5_rrq_shard_of(const struct mxfs_resource_id *r)
+{
+	uint64_t h = (r->ino * 0x9E3779B97F4A7C15ULL) ^
+		     ((uint64_t)r->ag_number << 32) ^ r->type;
+
+	h ^= h >> 29;
+	return (int)(h % MXFS_RRQ_SHARDS);
+}
+
+/*
+ * A no-queue request waits one attempt (MXFS_LOCK_ACQUIRE_WAIT_MS from its
+ * send) for this node's answer, then answers would-block and gives up; its
+ * record keeps nothing waiting.  One that has waited that long in a worker's
+ * queue has been abandoned: deciding it commits a grant nobody is waiting for,
+ * which the requester adopts unclaimed and hands back, a second commit.
+ * Measured on the physical DRBD pair (0.90.117 leg, 7 concurrent installs):
+ * requests waited up to 39 s in these queues, 84 late grants were adopted and
+ * released unclaimed, and the master's commits were the time every live
+ * request queued behind.  Such a request is dropped before any decision, as
+ * if it never arrived: nothing is minted, nothing committed, nothing answered.
+ */
+int mxfs_lock_rx_drop_stale_noqueue = 1;
+module_param_named(lock_rx_drop_stale_noqueue, mxfs_lock_rx_drop_stale_noqueue, int, 0644);
+MODULE_PARM_DESC(lock_rx_drop_stale_noqueue,
+    "drop a peer's no-queue lock request that waited in a request worker's queue longer than the requester's one attempt (default 1; 0 decides it anyway, for A/B)");
+
+/* One message, with the gates the receive thread applied at its arrival
+ * applied again now: the node may have withdrawn or begun its teardown, or
+ * the sender died and was purged, while it waited.  waited_ms is how long it
+ * sat in a worker's queue (0 when processed inline). */
+static void v5_rrq_process(struct mxfs_v5_dlm *ctx, mxfs_node_id_t sender,
+			   uint32_t type, const void *msg, uint64_t waited_ms)
+{
+	if (READ_ONCE(ctx->withdrawn))
+		return;
+	switch (type) {
+	case MXFS_MSG_LOCK_REQ: {
+		const struct mxfs_dlm_lock_req *req = msg;
+
+		if (!READ_ONCE(ctx->mounted))
+			return;
+		if (mxfs_dlm_owner_purged(ctx->dlm, sender)) {
+			ctx->rrq_dropped_purged++;
+			mxfs_pal_log(MXFS_LOG_WARN,
+				     "mxfs: P-RRQ-DROP-PURGED type=%u ino=%llu ag=%u from=%u total=%llu -- "
+				     "a request queued before its sender died is not decided after "
+				     "the recovery that purged it",
+				     req->resource.type, (unsigned long long)req->resource.ino,
+				     req->resource.ag_number, sender,
+				     (unsigned long long)ctx->rrq_dropped_purged);
+			return;
+		}
+		if ((req->flags & MXFS_LKF_NOQUEUE) &&
+		    waited_ms >= MXFS_LOCK_ACQUIRE_WAIT_MS &&
+		    READ_ONCE(mxfs_lock_rx_drop_stale_noqueue)) {
+			ctx->rrq_dropped_stale++;
+			mxfs_probe_ratelimited(
+			    "mxfs: P-RRQ-DROP-STALE-NOQUEUE type=%u ino=%llu ag=%u mode=%u from=%u waited_ms=%llu total=%llu -- a peer's no-queue request that waited past its one attempt is dropped undecided\n",
+			    req->resource.type, (unsigned long long)req->resource.ino,
+			    req->resource.ag_number, req->mode, sender,
+			    (unsigned long long)waited_ms,
+			    (unsigned long long)ctx->rrq_dropped_stale);
+			return;
+		}
+		mxfs_dlm_process_remote_request(ctx->dlm, sender, msg);
+		break;
+	}
+	case MXFS_MSG_LOCK_RELEASE:
+		mxfs_dlm_process_remote_release(ctx->dlm, sender, msg);
+		break;
+	case MXFS_MSG_LOCK_CANCEL:
+		if (!READ_ONCE(ctx->mounted))
+			return;
+		mxfs_dlm_process_cancel(ctx->dlm, sender, msg);
+		break;
+	}
+}
+
+static void v5_rrq_worker_fn(void *arg)
+{
+	struct v5_rrq_shard *sh = arg;
+	struct mxfs_v5_dlm *ctx = sh->ctx;
+	int s = sh->idx;
+
+	mxfs_pal_mutex_lock(ctx->rrq_lock);
+	for (;;) {
+		struct v5_rrq_item *it = ctx->rrq_head[s];
+		uint64_t waited;
+
+		if (!it) {
+			if (ctx->rrq_closed)
+				break;
+			mxfs_pal_cond_timedwait(ctx->rrq_cond, ctx->rrq_lock, 1000);
+			continue;
+		}
+		ctx->rrq_head[s] = it->next;
+		if (!ctx->rrq_head[s])
+			ctx->rrq_tail[s] = NULL;
+		ctx->rrq_n--;
+		ctx->rrq_busy[s] = true;
+		/* room for a receive thread waiting on a full queue */
+		mxfs_pal_cond_broadcast(ctx->rrq_cond);
+		mxfs_pal_mutex_unlock(ctx->rrq_lock);
+		waited = mxfs_pal_time_ms() - it->queued_ms;
+		if (waited > ctx->rrq_max_wait_ms)
+			ctx->rrq_max_wait_ms = waited;
+		v5_rrq_process(ctx, it->sender, it->type, &it->m, waited);
+		mxfs_pal_free(it);
+		mxfs_pal_mutex_lock(ctx->rrq_lock);
+		ctx->rrq_busy[s] = false;
+		mxfs_pal_cond_broadcast(ctx->rrq_cond);
+	}
+	mxfs_pal_mutex_unlock(ctx->rrq_lock);
+}
+
+static bool v5_rrq_running(struct mxfs_v5_dlm *ctx)
+{
+	int s;
+
+	for (s = 0; s < MXFS_RRQ_SHARDS; s++)
+		if (!ctx->rrq_shard[s].thread)
+			return false;
+	return ctx->rrq_lock && ctx->rrq_cond;
+}
+
+/* Wait until every request, release and cancel queued so far is processed. */
+static void v5_rrq_drain(struct mxfs_v5_dlm *ctx)
+{
+	int s;
+
+	if (!ctx->rrq_lock)
+		return;
+	mxfs_pal_mutex_lock(ctx->rrq_lock);
+	for (;;) {
+		bool idle = ctx->rrq_n == 0;
+
+		for (s = 0; s < MXFS_RRQ_SHARDS && idle; s++)
+			if (ctx->rrq_busy[s])
+				idle = false;
+		if (idle || !v5_rrq_running(ctx))
+			break;
+		mxfs_pal_cond_timedwait(ctx->rrq_cond, ctx->rrq_lock, 1000);
+	}
+	mxfs_pal_mutex_unlock(ctx->rrq_lock);
+}
+
+static void v5_rrq_submit(struct mxfs_v5_dlm *ctx, mxfs_node_id_t sender, uint32_t type,
+			  const void *msg, size_t size, const struct mxfs_resource_id *res)
+{
+	struct v5_rrq_item *it = NULL;
+
+	if (size <= sizeof(it->m) && v5_rrq_running(ctx) && READ_ONCE(mxfs_lock_rx_worker))
+		it = mxfs_pal_alloc(sizeof(*it));
+	if (it) {
+		int s = v5_rrq_shard_of(res);
+
+		memcpy(&it->m, msg, size);
+		it->sender = sender;
+		it->type = type;
+		it->next = NULL;
+		it->queued_ms = mxfs_pal_time_ms();
+		mxfs_pal_mutex_lock(ctx->rrq_lock);
+		while (!ctx->rrq_closed && ctx->rrq_n >= MXFS_RRQ_MAX)
+			mxfs_pal_cond_timedwait(ctx->rrq_cond, ctx->rrq_lock, 1000);
+		if (!ctx->rrq_closed) {
+			if (ctx->rrq_tail[s])
+				ctx->rrq_tail[s]->next = it;
+			else
+				ctx->rrq_head[s] = it;
+			ctx->rrq_tail[s] = it;
+			ctx->rrq_n++;
+			ctx->rrq_queued++;
+			if (ctx->rrq_n > ctx->rrq_max_n)
+				ctx->rrq_max_n = ctx->rrq_n;
+			mxfs_pal_cond_broadcast(ctx->rrq_cond);
+			mxfs_pal_mutex_unlock(ctx->rrq_lock);
+			return;
+		}
+		mxfs_pal_mutex_unlock(ctx->rrq_lock);
+		mxfs_pal_free(it);
+	}
+	/* inline, but never ahead of what is already queued */
+	v5_rrq_drain(ctx);
+	ctx->rrq_inline++;
+	v5_rrq_process(ctx, sender, type, msg, 0);
+}
+
+static void v5_rrq_workers_start(struct mxfs_v5_dlm *ctx)
+{
+	int s;
+
+	ctx->rrq_lock = mxfs_pal_mutex_create();
+	ctx->rrq_cond = mxfs_pal_cond_create();
+	for (s = 0; s < MXFS_RRQ_SHARDS && ctx->rrq_lock && ctx->rrq_cond; s++) {
+		ctx->rrq_shard[s].ctx = ctx;
+		ctx->rrq_shard[s].idx = s;
+		ctx->rrq_shard[s].thread = mxfs_pal_thread_create(v5_rrq_worker_fn,
+								  &ctx->rrq_shard[s]);
+	}
+	if (!v5_rrq_running(ctx))
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "mxfs: P-RRQ-WORKER-NOTHREAD -- peers' lock requests, releases "
+			     "and cancels are processed on the receive threads");
+}
+
+/*
+ * Called once the peer transport is shut down, so nothing can be queued any
+ * more, and before the engine is destroyed: the workers process what is
+ * queued, then exit.
+ */
+static void v5_rrq_workers_stop(struct mxfs_v5_dlm *ctx)
+{
+	int s;
+
+	if (ctx->rrq_lock) {
+		mxfs_pal_mutex_lock(ctx->rrq_lock);
+		ctx->rrq_closed = true;
+		if (ctx->rrq_cond)
+			mxfs_pal_cond_broadcast(ctx->rrq_cond);
+		mxfs_pal_mutex_unlock(ctx->rrq_lock);
+	}
+	for (s = 0; s < MXFS_RRQ_SHARDS; s++) {
+		if (ctx->rrq_shard[s].thread) {
+			mxfs_pal_thread_join(ctx->rrq_shard[s].thread);
+			ctx->rrq_shard[s].thread = NULL;
+		}
+	}
+	if (ctx->rrq_queued || ctx->rrq_inline)
+		mxfs_pal_log(MXFS_LOG_INFO,
+			     "mxfs: P-RRQ-STATS queued=%llu inline=%llu max_depth=%llu "
+			     "max_wait_ms=%llu dropped_purged=%llu dropped_stale=%llu -- peers' "
+			     "lock requests, releases and cancels, processed on per-resource workers",
+			     (unsigned long long)ctx->rrq_queued,
+			     (unsigned long long)ctx->rrq_inline,
+			     (unsigned long long)ctx->rrq_max_n,
+			     (unsigned long long)ctx->rrq_max_wait_ms,
+			     (unsigned long long)ctx->rrq_dropped_purged,
+			     (unsigned long long)ctx->rrq_dropped_stale);
+	if (mxfs_atomic32_get(&ctx->agnb_unanswered))
+		mxfs_pal_log(MXFS_LOG_INFO,
+			     "mxfs: P-AGNB-MUTE-STATS unanswered=%d muted=%d -- no-queue AG "
+			     "tries a master left unanswered, and the tries the same "
+			     "allocation then did not send to it",
+			     mxfs_atomic32_get(&ctx->agnb_unanswered),
+			     mxfs_atomic32_get(&ctx->agnb_muted));
+	if (ctx->rrq_cond) {
+		mxfs_pal_cond_destroy(ctx->rrq_cond);
+		ctx->rrq_cond = NULL;
+	}
+	if (ctx->rrq_lock) {
+		mxfs_pal_mutex_destroy(ctx->rrq_lock);
+		ctx->rrq_lock = NULL;
+	}
+}
+
 static void v5_peer_msg_cb_tcp_dispatch(struct mxfs_v5_dlm *ctx, mxfs_node_id_t sender,
 					void *msg, size_t len);
 
@@ -2383,9 +2712,11 @@ static void v5_peer_msg_cb_tcp_dispatch(struct mxfs_v5_dlm *ctx, mxfs_node_id_t 
 
 	switch (hdr->type) {
 	case MXFS_MSG_LOCK_REQ: {
+		/* on the request workers: v5_rrq_submit */
 		const struct mxfs_dlm_lock_req *req = msg;
 		if (len >= sizeof(*req))
-			mxfs_dlm_process_remote_request(ctx->dlm, sender, req);
+			v5_rrq_submit(ctx, sender, MXFS_MSG_LOCK_REQ, req, sizeof(*req),
+				      &req->resource);
 		break;
 	}
 	case MXFS_MSG_LOCK_GRANT:
@@ -2408,7 +2739,8 @@ static void v5_peer_msg_cb_tcp_dispatch(struct mxfs_v5_dlm *ctx, mxfs_node_id_t 
 	case MXFS_MSG_LOCK_CANCEL: {
 		const struct mxfs_dlm_lock_cancel *c = msg;
 		if (len >= sizeof(*c))
-			mxfs_dlm_process_cancel(ctx->dlm, sender, c);
+			v5_rrq_submit(ctx, sender, MXFS_MSG_LOCK_CANCEL, c, sizeof(*c),
+				      &c->resource);
 		break;
 	}
 	case MXFS_MSG_LOCK_CANCEL_ACK: {
@@ -2420,7 +2752,8 @@ static void v5_peer_msg_cb_tcp_dispatch(struct mxfs_v5_dlm *ctx, mxfs_node_id_t 
 	case MXFS_MSG_LOCK_RELEASE: {
 		const struct mxfs_dlm_lock_release *rel = msg;
 		if (len >= sizeof(*rel))
-			mxfs_dlm_process_remote_release(ctx->dlm, sender, rel);
+			v5_rrq_submit(ctx, sender, MXFS_MSG_LOCK_RELEASE, rel, sizeof(*rel),
+				      &rel->resource);
 		break;
 	}
 	case MXFS_MSG_LOCK_RELEASE_ACK: {
@@ -2475,9 +2808,11 @@ static void v5_peer_msg_cb_tcp_dispatch(struct mxfs_v5_dlm *ctx, mxfs_node_id_t 
 		 * (v5_recovered_cb / mxfs_v5_dlm_recovery_complete) and nowhere
 		 * else for such a node.
 		 */
-		/* the sender's hand-offs before its goodbye are processed first,
-		 * as they were when the receive thread processed them itself */
+		/* the sender's hand-offs, requests and releases before its
+		 * goodbye are processed first, as they were when the receive
+		 * thread processed them itself */
 		v5_hrx_drain(ctx);
+		v5_rrq_drain(ctx);
 		{
 			int d = READ_ONCE(mxfs_dbg_goodbye_rx_delay_ms);
 
@@ -18433,7 +18768,9 @@ static void v5_tcp_transport_unwind(struct mxfs_v5_dlm *ctx)
 		mxfs_peer_shutdown(ctx->peer);
 		ctx->peer = NULL;
 	}
-	/* nothing can queue a hand-off now; it processes what is queued */
+	/* nothing can queue a hand-off or a request now; the workers process
+	 * what is queued */
+	v5_rrq_workers_stop(ctx);
 	v5_hrx_worker_stop(ctx);
 	if (ctx->dlm) {
 		mxfs_dlm_destroy(ctx->dlm);
@@ -18782,7 +19119,7 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 
 	ctx->transport = opts->transport;
 #ifdef __KERNEL__
-	if (mxfs_force_transport == 1) {
+	if (mxfs_force_transport == 1 && !opts->transport_explicit) {
 		ctx->transport = MXFS_V5_TRANSPORT_TCP;
 		/* the packaged configuration, reported once per mount */
 		mxfs_pal_log(MXFS_LOG_INFO,
@@ -18834,6 +19171,20 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 		goto err_free;
 	}
 	ctx->drbd_minor = mxfs_pal_bdev_drbd_minor(ctx->dev);
+	/*
+	 * A DRBD device has one transport, the network lock manager (see the
+	 * refusal below), so a mount that did not name one gets it whatever
+	 * the module default: a host whose default is COMPARE AND WRITE, for
+	 * the SAN LUNs it mounts, still mounts its DRBD resources.
+	 */
+	if (ctx->drbd_minor >= 0 && !opts->transport_explicit &&
+	    ctx->transport != MXFS_V5_TRANSPORT_TCP) {
+		ctx->transport = MXFS_V5_TRANSPORT_TCP;
+		mxfs_pal_log(MXFS_LOG_INFO,
+			     "mxfs: DRBD minor %d -> TCP transport (a DRBD device "
+			     "runs the network lock manager only)",
+			     ctx->drbd_minor);
+	}
 
 	mxfs_pal_log(MXFS_LOG_DEBUG,
 		     "mxfs: DLM init: node_id=%u requested_transport=%s",
@@ -18876,6 +19227,11 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 #ifdef __KERNEL__
 		forced = (mxfs_force_transport == 1);
 #endif
+		/* a transport the mount named, or a DRBD device's, is pinned
+		 * exactly as force_transport=1 pins TCP: it forms on it, and
+		 * never joins the other */
+		if (opts->transport_explicit || ctx->drbd_minor >= 0)
+			forced = true;
 		trc = mxfs_disklock_scan_transport(ctx->dev, ctx->disklock_offset,
 						   fs_gen, &cen);
 		if (trc < 0) {
@@ -18897,16 +19253,30 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 				     cen.n_unknown);
 			goto err_dev;
 		}
-		if (forced && cen.n_caw > 0) {
+		if (forced && ctx->transport == MXFS_V5_TRANSPORT_TCP &&
+		    cen.n_caw > 0) {
 			mxfs_pal_log(MXFS_LOG_ERR,
 				     "mxfs: P-TRANSPORT-MISMATCH-REFUSED forced=tcp "
 				     "platter=caw votes=%d (slot %d) unknown=%d -- "
 				     "force_transport=1 selects a transport only when "
 				     "FORMING a cluster; this volume already has CAW "
 				     "tenures, so a TCP mount would run a second lock "
-				     "manager beside them.  Load with force_transport=0 "
-				     "to join, or release/recover every CAW slot first",
+				     "manager beside them.  Mount with transport=caw (or "
+				     "load with force_transport=0) to join, or "
+				     "release/recover every CAW slot first",
 				     cen.n_caw, cen.first_caw, cen.n_unknown);
+			goto err_dev;
+		}
+		if (forced && ctx->transport == MXFS_V5_TRANSPORT_CAW &&
+		    cen.n_tcp > 0) {
+			mxfs_pal_log(MXFS_LOG_ERR,
+				     "mxfs: P-TRANSPORT-MISMATCH-REFUSED asked=caw "
+				     "platter=tcp votes=%d (slot %d) unknown=%d -- "
+				     "transport=caw selects a transport only when "
+				     "FORMING a cluster; this volume already has TCP "
+				     "tenures.  Mount with transport=tcp to join, or "
+				     "release/recover every TCP slot first",
+				     cen.n_tcp, cen.first_tcp, cen.n_unknown);
 			goto err_dev;
 		}
 		if (!forced && cen.n_tcp > 0 &&
@@ -19052,6 +19422,9 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 			mxfs_pal_log(MXFS_LOG_WARN,
 				     "mxfs: P-HRX-WORKER-NOTHREAD -- peers' page hand-offs are "
 				     "processed on the receive threads");
+		/* likewise before the peer transport starts: the receive threads
+		 * queue lock requests, releases and cancels to them */
+		v5_rrq_workers_start(ctx);
 		if (ctx->tcp_suspect_lock)
 			ctx->tcp_death_thread =
 			    mxfs_pal_thread_create(v5_tcp_death_worker_fn, ctx);
@@ -21099,6 +21472,7 @@ void mxfs_v5_dlm_shutdown_defer_release(struct mxfs_v5_dlm *ctx,
 		/* the receive threads are gone: nothing can queue a hand-off
 		 * now, and the worker processes what is queued before the
 		 * engine goes */
+		v5_rrq_workers_stop(ctx);
 		v5_hrx_worker_stop(ctx);
 		mxfs_dlm_destroy(ctx->dlm);
 		ctx->dlm = NULL;
@@ -25097,10 +25471,31 @@ bool mxfs_v5_dlm_victim_adopted(struct mxfs_v5_dlm *ctx, uint32_t slot)
  * fleet on every allocation).  true = leave persistent demand behind, for a
  * caller that has no blocking fallback and would otherwise spin -EAGAIN
  * forever against a lazily-cached holder (the bounded dirty-trans grow sweep).
+ *
+ * mute_master (net/mesh only; NULL when the caller keeps no such state) is
+ * one allocation's memory of a master that left one of its tries unanswered.
+ * The allocator walks AG after AG holding the inode's ILOCK, and a try toward
+ * a remote master that does not answer costs a whole attempt
+ * (MXFS_LOCK_ACQUIRE_WAIT_MS).  Measured on the physical DRBD pair (three legs,
+ * 0.90.116-0.90.117, 7 concurrent VM installs): 231 of 310 unanswered tries
+ * came straight after another one from the same thread toward the same
+ * master, in runs of up to 25 AGs, one second each, all under one VM image's
+ * ILOCK.  So once a master has left one try unanswered, the rest of that
+ * allocation does not ask it again: an AG it masters answers would-block at
+ * once, as a peer-held AG does, and the walk goes on to the AGs this node can
+ * be answered for.  The unanswered try's record is kept as before, so a late
+ * grant is still adopted by the next try of that AG.
  */
+int mxfs_ag_nb_mute_unanswered_master = 1;
+module_param_named(ag_nb_mute_unanswered_master,
+		   mxfs_ag_nb_mute_unanswered_master, int, 0644);
+MODULE_PARM_DESC(ag_nb_mute_unanswered_master,
+    "once a master leaves one of an allocation's no-queue AG tries unanswered, the rest of that allocation does not ask it again (default 1; 0 asks every AG, for A/B)");
+
 int mxfs_v5_dlm_ag_lock_nb(struct mxfs_v5_dlm *ctx, uint32_t agno,
 			   uint64_t local_epoch,
-			   struct mxfs_grant_result *gres, bool demand)
+			   struct mxfs_grant_result *gres, bool demand,
+			   uint32_t *mute_master)
 {
 	struct mxfs_resource_id res;
 	uint32_t flags = MXFS_LKF_NOQUEUE;
@@ -25121,10 +25516,28 @@ int mxfs_v5_dlm_ag_lock_nb(struct mxfs_v5_dlm *ctx, uint32_t agno,
 	make_ag_resource(&res, ctx->volume_id, agno);
 
 	if (ctx->dlm) {
-		ret = mxfs_dlm_lock(ctx->dlm, &res, MXFS_LOCK_EX,
-				    flags, &granted);
+		mxfs_node_id_t unanswered = 0;
+		bool muting = mute_master &&
+			      READ_ONCE(mxfs_ag_nb_mute_unanswered_master);
+
+		if (muting && *mute_master &&
+		    mxfs_dlm_resource_master(ctx->dlm, &res) == *mute_master) {
+			int n = mxfs_atomic32_inc(&ctx->agnb_muted);
+
+			mxfs_probe_ratelimited(
+			    "mxfs: P-AGNB-MUTED ag=%u master=%u muted=%d -- this allocation's earlier try toward this master went unanswered; the AG answers would-block without asking\n",
+			    agno, *mute_master, n);
+			return -EAGAIN;
+		}
+		ret = mxfs_dlm_lock_noqueue(ctx->dlm, &res, MXFS_LOCK_EX,
+					    flags, &granted, &unanswered);
 		if (ret == 0)
 			v5_tcp_grant_result_fill(ctx, &res, granted, gres);
+		else if (unanswered) {
+			mxfs_atomic32_inc(&ctx->agnb_unanswered);
+			if (muting)
+				*mute_master = unanswered;
+		}
 	} else if (ctx->dlm_caw)
 		/* attested — see mxfs_v5_dlm_ag_lock. */
 		ret = mxfs_dlm_caw_lock_attested(ctx->dlm_caw, &res, MXFS_LOCK_EX,

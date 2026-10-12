@@ -1,4 +1,4 @@
-<!-- sess289 RULE-5 ruling (D-488 legs 7+8): forced READOPT mint (never restore surrendered epoch), rx READOPT_PENDING state, leg-8 shape A copy-before-cl… -->
+<!-- sess289 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (D-488 legs 7+8): forced READOPT mint (never restore surrendered epoch), rx READOPT_PENDING state, leg-8 shape A copy-before-cl… -->
 # sess289 GPT ruling — D-488 closure legs 7+8
 
 Evidence base (sess289 code read): CAW already-held fast path

@@ -1,4 +1,4 @@
-<!-- sess441 RULE-5 ruling for item 5d: shape B (adopt ONE certified victim slice K via full own-log xfs_log_mount, existing barrier for N-1), escrow K's… -->
+<!-- sess441 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling for item 5d: shape B (adopt ONE certified victim slice K via full own-log xfs_log_mount, existing barrier for N-1), escrow K's… -->
 # sess441 GPT ruling — 5d replay shape
 
 Facts put to it: foreign engine hard-refuses without mp->m_log (xfs_log.c:938), skips intents by design, barrier runs after xfs_log_mount; own-log path does FULL replay incl. intents; ACTIVE claim replaces the sector (descriptor gone); full occupancy needs a victim slot.

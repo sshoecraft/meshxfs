@@ -1032,7 +1032,7 @@ mxfs_preacq_poll(
 	int			error;
 
 	for (;;) {
-		error = __mxfs_ag_dlm_lock(mp, pag, true, demand, false);
+		error = __mxfs_ag_dlm_lock(mp, pag, true, demand, false, NULL);
 		demand = false;
 		if (error != -EAGAIN && error != -EWOULDBLOCK)
 			break;

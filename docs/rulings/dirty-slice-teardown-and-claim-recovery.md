@@ -1,5 +1,5 @@
-<!-- sess180 RULE-5 ruling (dirty-slice defect + -->
-# sess180 RULE-5 ruling — dirty-slice teardown + who replays
+<!-- sess180 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (dirty-slice defect + -->
+# sess180 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — dirty-slice teardown + who replays
 
 Consult: gpt-5.6-sol, sess180. Covers D-SHUTDOWN-UMOUNT-CLEAN-RELEASE-DIRTY-SLICE
 (both arms) and D-OWN-CRASH-RECLAIM-PATH-UNREACHABLE item 1.

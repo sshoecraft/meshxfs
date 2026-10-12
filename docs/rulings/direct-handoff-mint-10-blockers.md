@@ -1,5 +1,5 @@
-<!-- sess107 RULE-5 ruling: the RELEASER may mint the grantee's epoch (the CAS is the linearization point) — but 10 release blockers, incl. a NEW latent d… -->
-# sess107 RULE-5 ruling — direct-handoff epoch minting
+<!-- sess107 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: the RELEASER may mint the grantee's epoch (the CAS is the linearization point) — but 10 release blockers, incl. a NEW latent d… -->
+# sess107 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — direct-handoff epoch minting
 
 Consult carried the sess106 root (`…sess106-P241-MEASURED-direct-handoff-mints-no-epoch`)
 plus the AG escalation found this session. Verdict: **the releaser MAY mint the

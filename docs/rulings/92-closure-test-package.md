@@ -1,4 +1,4 @@
-<!-- sess349 RULE-5 ruling: #92 closure = 6-part test package — pre-FUA gate knob for races 1+3, hb_forge wrong-stamp table for 4, GUARD loser audit + mix… -->
+<!-- sess349 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: #92 closure = 6-part test package — pre-FUA gate knob for races 1+3, hb_forge wrong-stamp table for 4, GUARD loser audit + mix… -->
 # sess349 GPT ruling — #92 minimal closure test package
 
 Board on 0.13.0 went green first (27/28, only open_defects policy cell red;

@@ -745,7 +745,7 @@ power_cycle_node() {  # <node>  -> 0 once node is reachable and DEV present
     # domstate <stuck>` and `virsh list --all` never return.  Measured on
     # clyde 2026-08-20 (test4, 5 threads wedged in ext4_buffered_write_iter
     # writing the guest SERIAL LOG).  Unbounded, this hangs prep_cluster
-    # forever in an unattended loop -- the exact the permission-prompt rule/2c failure shape.
+    # forever in an unattended loop -- the exact RULE: NEVER RUN A COMMAND THAT CAN TRIGGER A PERMISSION PROMPT / RULE: NEVER WEDGE THE LAB HOST failure shape.
     # A power cycle that cannot be issued must be REPORTED, not waited on.
     timeout 60 virsh -c qemu:///system destroy "$n" >/dev/null 2>&1 \
         || echo "    WARN: virsh destroy $n did not complete in 60s (libvirtd may be stuck on this domain)"
@@ -1831,6 +1831,8 @@ run_coord() {  # name cat budget scale
     local hload
     hload=$(cut -d' ' -f1 /proc/loadavg 2>/dev/null)
     [ -n "$hload" ] && measured="$measured hostload=$hload"
+    measured="$measured$(host_sample_measured)"
+    HOST_SAMPLE_OUT=""; HOST_SAMPLE_STOP=""; HOST_SAMPLE_PID=""
     # Prefer the FAILING node's numbers when the aggregate is a failure — those
     # are the ones a human needs; rank 1's are only meaningful on a clean run.
     if [ "$npass" -ne "$N" ] && [ -n "$fail_measured" ]; then
@@ -2122,6 +2124,109 @@ host_exclusive() {  # hold the turnstile and the host lock exclusive
     fi
     return 0
 }
+# The lock keeps every other row off the host while a throughput row runs, but
+# not the host's own writeback of what those rows wrote just before: the
+# guests' LUNs are files on this host's NVMe, the kernel holds their writes
+# dirty for up to dirty_expire_centisecs (30 s here) and then flushes them, and
+# a fio that starts in that flush shares the device with it.  So a throughput
+# row also waits for the host's Dirty+Writeback to fall under 256 MiB, polled
+# from /proc/meminfo (never a host-wide sync, which could not be killed if it
+# hung), bounded by that 30 s expiry plus 15 s to flush, and says what it saw.
+HOST_QUIET_KB=262144
+HOST_QUIET_S=45
+host_dirty_kb() { awk '/^(Dirty|Writeback):/ {s += $2} END {print s + 0}' /proc/meminfo; }
+# The device under the pool LUNs (a DRAM-less TLC SSD, Samsung 990 EVO Plus,
+# on a full filesystem) has a write cache of its own that no page count shows,
+# and another group's writes just before a row could leave it exhausted.  So
+# the row also waits for the device's own write rate (/proc/diskstats) to stay
+# under HOST_IDLE_MIBS for HOST_IDLE_S seconds in a row, bounded by
+# HOST_IDLE_MAX_S, and says what it saw.  This rules the device out; it did
+# not explain the slow 4/disk/caw/mpath runs: one read seqW 243 MiB/s after
+# 20 s of the device under 2 MiB/s (D-4NODE-MPATH-SEQ-WRITE-COLLAPSE).
+HOST_IDLE_MIBS=${HOST_IDLE_MIBS:-32}
+HOST_IDLE_S=${HOST_IDLE_S:-20}
+HOST_IDLE_MAX_S=${HOST_IDLE_MAX_S:-120}
+pool_disk() {  # the block device (diskstats name) under the pool LUNs
+    local p src
+    p=$("$REPO/tools/mxfs_lab.sh" get paths pool 2>/dev/null) || return 1
+    src=$(findmnt -n -o SOURCE -T "$p" 2>/dev/null) || return 1
+    basename "$src"
+}
+disk_wsect() { awk -v d="$1" '$3 == d {print $10; exit}' /proc/diskstats; }
+host_quiesce() {  # wait for the host's writeback and its pool device to go quiet; prints what it saw
+    local t0=$SECONDS d0 d dev w0 w1 rate quiet=0 peak=0
+    d0=$(host_dirty_kb); d=$d0
+    while [ "$d" -ge "$HOST_QUIET_KB" ] && [ $((SECONDS - t0)) -lt "$HOST_QUIET_S" ]; do
+        sleep 1; d=$(host_dirty_kb)
+    done
+    echo "    host writeback before this row: $((d0 / 1024)) MiB -> $((d / 1024)) MiB in $((SECONDS - t0))s (quiet under $((HOST_QUIET_KB / 1024)) MiB$([ "$d" -ge "$HOST_QUIET_KB" ] && echo ', NOT reached'))"
+    dev=$(pool_disk) && w0=$(disk_wsect "$dev") && [ -n "$w0" ] || { echo "    pool device write rate: not read (no pool device in /proc/diskstats)"; return 0; }
+    t0=$SECONDS
+    while [ "$quiet" -lt "$HOST_IDLE_S" ] && [ $((SECONDS - t0)) -lt "$HOST_IDLE_MAX_S" ]; do
+        sleep 1; w1=$(disk_wsect "$dev")
+        rate=$(( (w1 - w0) * 512 / 1048576 )); w0=$w1
+        [ "$rate" -gt "$peak" ] && peak=$rate
+        if [ "$rate" -lt "$HOST_IDLE_MIBS" ]; then quiet=$((quiet + 1)); else quiet=0; fi
+    done
+    echo "    pool device $dev before this row: ${quiet}s under ${HOST_IDLE_MIBS} MiB/s after $((SECONDS - t0))s (peak ${peak} MiB/s$([ "$quiet" -lt "$HOST_IDLE_S" ] && echo ", NOT idle for ${HOST_IDLE_S}s"))"
+}
+# A throughput row also samples the pool device once a second for as long as it
+# runs (tests/mpath/path_io_sampler.sh), and its result carries the device's
+# time per write and peak rate (host_disk[...]), the raw capture kept in
+# tests/evidence.  The quiet check above shows the device idle when the row
+# STARTS; a slow run with nothing beside it said nothing about the device
+# during the row, while this host also carries other work: one
+# 8/disk/caw/mpath fio_perf read seqW 665 MiB/s (62%) among nine runs at
+# 162-365%, and nothing had sampled the host (D-MPATH-SEQ-WRITE-LOW-RUN-
+# RECURS-WITH-DISK-NOT-FULL).
+HOST_SAMPLE_OUT=""; HOST_SAMPLE_STOP=""; HOST_SAMPLE_PID=""
+host_sample_start() {  # <row> <budget s>
+    local dev
+    dev=$(pool_disk) || { echo "    pool device not found: this row's host disk is not sampled"; return 0; }
+    HOST_SAMPLE_OUT="$REPO/tests/evidence/hostdisk_${CONFIG//\//-}_$1_$(date -u +%Y%m%dT%H%M%SZ)${GROUP:+_$GROUP}.txt"
+    HOST_SAMPLE_STOP="$HOST_SAMPLE_OUT.stop"
+    # The row's result is recorded long after its own elapsed time: a 4-node
+    # fio_perf of 36 s recorded 222 s after this call (launch and barrier
+    # first), and a lifetime of budget + 60 s ended the sample before fio
+    # wrote anything.  The stop file ends it when the row records; the
+    # lifetime only bounds a sampler whose row never records: three budgets
+    # for the row and its coordination, plus 300 s of launch.
+    local life=$(( $2 * 3 + 300 ))
+    "$REPO/tests/mpath/path_io_sampler.sh" "$life" "$HOST_SAMPLE_OUT" "$HOST_SAMPLE_STOP" "^${dev}\$" > /dev/null 2>&1 &
+    HOST_SAMPLE_PID=$!
+    # Out of this shell's job table: run_coord waits for its node launches
+    # with a bare `wait`, which waits for EVERY background job, and with the
+    # sampler in the table each throughput row stood still for the sampler's
+    # whole lifetime before fio started (and the sample ended before the
+    # writes began).
+    disown "$HOST_SAMPLE_PID"
+    # The guests' writes land in this host's page cache first (the device
+    # peaked at 93 MiB/s while a 4-node fio wrote 1433 MiB/s through the LUN),
+    # so what a guest write waits on is the host's dirty-page room, which
+    # shrinks with the host's free memory (other work on this host, guests
+    # overcommitted).  One MEM line a second beside the device lines:
+    #   MEM <epoch ms> <Dirty kB> <Writeback kB> <MemAvailable kB>
+    ( end=$(( SECONDS + life ))
+      while [ ! -e "$HOST_SAMPLE_STOP" ] && [ "$SECONDS" -lt "$end" ]; do
+          awk -v t="$(date +%s%3N)" '/^Dirty:/ {d = $2} /^Writeback:/ {w = $2} /^MemAvailable:/ {a = $2}
+               END {print "MEM", t, d, w, a}' /proc/meminfo >> "$HOST_SAMPLE_OUT.mem"
+          sleep 1
+      done ) > /dev/null 2>&1 &
+    disown "$!"
+}
+host_sample_measured() {  # prints " host_disk[...]" for the row just run, and stops the sampler
+    [ -n "$HOST_SAMPLE_OUT" ] || return 0
+    local s
+    : > "$HOST_SAMPLE_STOP"
+    # the sampler polls its stop file once a second
+    timeout 5 tail --pid="$HOST_SAMPLE_PID" -f /dev/null 2>/dev/null
+    s=$(python3 "$REPO/tools/path_io_latency.py" "$HOST_SAMPLE_OUT" 2>/dev/null \
+        | awk 'NR == 2 {printf " host_disk[%s wms_p95=%s wms_max=%s MiBs_max=%s]", $2, $7, $8, $5}')
+    printf '%s' "${s:- host_disk[not read: $(basename "$HOST_SAMPLE_OUT")]}"
+    awk '$1 == "MEM" {n++; if ($3 > d) d = $3; if ($4 > w) w = $4; if (!a || $5 < a) a = $5}
+         END {if (n) printf " host_mem[dirty_max=%dMiB writeback_max=%dMiB avail_min=%dMiB]", d / 1024, w / 1024, a / 1024
+              else printf " host_mem[not read]"}' "$HOST_SAMPLE_OUT.mem" 2>/dev/null
+}
 host_release() {
     [ -n "$HOST_FD" ] && exec {HOST_FD}>&-
     [ -n "$HOST_TFD" ] && exec {HOST_TFD}>&-
@@ -2358,6 +2463,7 @@ for row in "${ROWS[@]}"; do
         continue
     fi
     [ $(( SECONDS - pw0 )) -gt 0 ] && echo "    (waited $(( SECONDS - pw0 ))s for $hlw)"
+    [ "$hl" = host_exclusive ] && { host_quiesce; host_sample_start "$name" "$budget"; }
     mark_executing "$name"
     case "$coord" in
         none) run_none "$name" "$cat" "$budget" ;;

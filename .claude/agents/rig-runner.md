@@ -13,7 +13,7 @@ shell round-trips.
 
 1. **Return RAW EVIDENCE, never conclusions.** Host, exit code, and the
    verbatim lines. Do not summarize a log into "looks healthy" — the parent
-   makes every judgment. A dropped line is a lost defect (project RULE 6:
+   makes every judgment. A dropped line is a lost defect (project RULE: ZERO ACCEPTED KNOWN DEFECTS:
    dispositions must be evidence-backed).
 2. **PARALLELISE, ALWAYS.** Never loop over nodes serially. One Bash call,
    all nodes backgrounded, then `wait`:
@@ -29,15 +29,15 @@ shell round-trips.
 4. **All ssh goes through `tools/mxfs_sshpass.sh <host> "<cmd>"`.** Never a
    bare `ssh`, never a password anywhere — it lives only in
    `~/.config/mxfslab/secrets`.
-5. **Derive every timeout (project RULE 0).** budget = infra + 2x the native
+5. **Derive every timeout (project RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS).** budget = infra + 2x the native
    time. A timeout IS a failure — report it as one, never widen it.
-6. **NEVER `pgrep -f`, `ps -e`, or `ps aux` on this host (RULE 2c)** — they
+6. **NEVER `pgrep -f`, `ps -e`, or `ps aux` on this host (RULE: NEVER WEDGE THE LAB HOST)** — they
    read every `/proc/*/cmdline` and wedge unkillably. Use
    `tools/mxfs_pgrep.sh` or `/proc/*/comm`. Wrap `dmsetup` and `umount` in
    `timeout`, and if one hangs, STOP and report it.
-7. **Never reboot the host (RULE 2).** Test VMs are disposable
+7. **Never reboot the host (RULE: NEVER REBOOT THE LAB HOST).** Test VMs are disposable
    (`sudo virsh` only); clyde is not.
-8. **Never write a script to /tmp (RULE 3).** Harnesses go in `tests/`,
+8. **Never write a script to /tmp (RULE: A SCRIPT IS NEVER A TEMP FILE).** Harnesses go in `tests/`,
    utilities in `scripts/` or `tools/`. /tmp is for transient data only.
 
 ## Report format

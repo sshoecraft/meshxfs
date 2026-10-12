@@ -17,4 +17,4 @@ The shown rows were selected by position (head / window / tail), and the EX rele
 - Ask the sweeper for `field -> count` histograms over the whole match set, and only then for rows.
 - Before turning a "never / always" observation into a hypothesis, re-derive it with a count over the full population (one grep -c), the same way a disposition-critical negative is re-run in the parent.
 
-Related: RULE 10's cap hazard (selection is a conclusion wearing evidence's clothes) — this is the same hazard on the parent's side of the cap.
+Related: RULE: DELEGATE ITERATIVE GRIND's cap hazard (selection is a conclusion wearing evidence's clothes) — this is the same hazard on the parent's side of the cap.

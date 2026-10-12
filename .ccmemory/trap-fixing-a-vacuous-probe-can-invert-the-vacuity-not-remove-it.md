@@ -53,7 +53,7 @@ This is the project's `vacuous-pass` failure in probe form, one level up: the
 vacuity moved from the *output* to the *interpretation rule written for the
 output*.
 
-## Also learned (RULE-5 ruling, sess482)
+## Also learned (RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling, sess482)
 
 My first draft of the argument claimed the narrowed predicate was
 *unsatisfiable*. GPT corrected it: `d_time` belongs to the **dentry object**,

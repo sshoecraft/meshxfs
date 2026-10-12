@@ -1,5 +1,5 @@
-<!-- sess487 RULE-5 ruling: in-tenure create 16 ms must fall to ~6 ms AND handoff <~31 ms/tenure; order dirsig release-only -> rfr once-per-tenure -> spli… -->
-# GPT RULE-5 ruling on the chain-137 decomposition (sess487)
+<!-- sess487 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: in-tenure create 16 ms must fall to ~6 ms AND handoff <~31 ms/tenure; order dirsig release-only -> rfr once-per-tenure -> spli… -->
+# GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the chain-137 decomposition (sess487)
 
 Input: shared in-tenure create 16.0 ms = icr 4.6 + dirsig 4.5 + other 2.3 +
 rfr 1.1 + post 1.1 + dlk 1.0 + dia 0.8 + pdur 0.4 + cc 0.2; private 6.8

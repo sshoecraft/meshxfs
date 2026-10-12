@@ -44,7 +44,7 @@ immediately.
 ## How to break the loop
 
 - Check host load FIRST (`uptime`, `ps -eo pcpu,comm --sort=-pcpu`). If it is
-  someone else's workload, **do not kill it** — but know that RULE 0 timing
+  someone else's workload, **do not kill it** — but know that RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS timing
   measurements taken under it are not trustworthy, and say so rather than
   recording them as results.
 - Kill stale prep trees by anchored pattern — `pkill -f '^/bin/bash \./run\.sh'`.

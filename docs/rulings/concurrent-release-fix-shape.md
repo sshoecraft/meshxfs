@@ -1,5 +1,5 @@
-<!-- sess425 RULE-5 ruling (D-0341): txn-scoped PENDING_RELEASE bypass + re-scan on every retirement; master re-commits release alone; never ACK OK while… -->
-# sess425 RULE-5 ruling — concurrent-release DOUBLE-GRANT page wedge (D-0341)
+<!-- sess425 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (D-0341): txn-scoped PENDING_RELEASE bypass + re-scan on every retirement; master re-commits release alone; never ACK OK while… -->
+# sess425 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — concurrent-release DOUBLE-GRANT page wedge (D-0341)
 
 Evidence brought: deterministic usermode repro (tests/tauth/concurrent_release_test) of the 0.35.0
 32/tcp wedge: promote_waiters ignored EVERY PENDING_RELEASE holder → EX decided over a sibling's

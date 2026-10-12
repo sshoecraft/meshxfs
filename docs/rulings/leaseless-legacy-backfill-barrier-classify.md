@@ -1,4 +1,4 @@
-<!-- sess330 RULE-5 ruling D-513: leaseless backfill_legacy_intent API (auth impossible — claim/cert refuses QUARANTINED); classify-before-acquire both en… -->
+<!-- sess330 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-513: leaseless backfill_legacy_intent API (auth impossible — claim/cert refuses QUARANTINED); classify-before-acquire both en… -->
 # sess330 — D-513 follow-up ruling: leaseless legacy backfill + barrier classification
 
 ## Disproven sess329 premise (code-verified sess330)

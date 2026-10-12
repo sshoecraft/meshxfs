@@ -1,4 +1,4 @@
-<!-- sess438 RULE-5 ruling on whole-cluster-restart build item 2 (64-bit per-boot PR key): NOT SAFE as proposed — ledger cannot be deferred; 9 fixes -->
+<!-- sess438 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on whole-cluster-restart build item 2 (64-bit per-boot PR key): NOT SAFE as proposed — ledger cannot be deferred; 9 fixes -->
 # sess438 GPT ruling — item 2 (64-bit per-boot PR key + HB identity block)
 
 Proposed: carve evict ring 23->19, 64 B mxfs_hb_identity @360 (tail 424/456/500 unchanged); key drawn once per module load; READ KEYS collision redraw; victim key latched per slot in the monitor; proto_gen 11->12 without a format flag; registrant ledger deferred to item 5.

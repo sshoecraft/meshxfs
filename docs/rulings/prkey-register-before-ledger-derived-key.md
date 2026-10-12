@@ -1,4 +1,4 @@
-<!-- sess439 RULE-5 ruling: 0.43.0 ledger-before-REGISTER is unimplementable under WE-AR (measured -EBADE fleet-wide); derived per-boot key + REGISTER → v… -->
+<!-- sess439 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: 0.43.0 ledger-before-REGISTER is unimplementable under WE-AR (measured -EBADE fleet-wide); derived per-boot key + REGISTER → v… -->
 # sess439 ruling — PR key: register before ledger
 
 MEASURED (chain 17 s438c, 0.43.0 sv 7B7247CB): first node mounts + takes WE-AR; every later node's ledger CAS (a write) → RESERVATION CONFLICT (`P-PRKEY-PREPARE-FAILED idx=1 rc=-52`) BEFORE it registers → `P-PRKEY-SELECT-FAILED` → mount ENOTCONN on 31/32 nodes. Under WE-AR only registrants may write ANY on-LUN metadata (ledger, bootstrap record). No separately writable area exists.

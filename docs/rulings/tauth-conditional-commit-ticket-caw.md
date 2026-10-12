@@ -1,4 +1,4 @@
-<!-- sess426 RULE-5 ruling (D-0347): tauth page write must be a conditional commit — CAW ticket on the spare copy, exact base token, ticket-before-body, f… -->
+<!-- sess426 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (D-0347): tauth page write must be a conditional commit — CAW ticket on the spare copy, exact base token, ticket-before-body, f… -->
 # sess426 GPT ruling — tauth conditional commit (D-0347)
 
 Proven (tests/tauth/bootstrap_race_test): two "bootstrap" nodes both claimed one UNOWNED page; the late writer's image (based on a stale read) became the highest seq and erased the other's activation + committed grant. Root: `mxfs_tauth_page_write` ties nothing to the image the caller patched; readback only proves "my copy validates now".

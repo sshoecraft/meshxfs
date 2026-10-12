@@ -29,7 +29,7 @@ enterprise shipping target:
   multiple hosts — quite different from the metadata-heavy
   rsync/dir-reuse criteria tests. The criteria suite proves
   coherence/correctness; a CAW perf pass against the VM-on-SAN profile
-  (under RULE 0's 2× native-XFS ceiling) is wanted eventually, after
+  (under RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS's 2× native-XFS ceiling) is wanted eventually, after
   2-node CAW correctness is solid.
 
 ### Current roadmap decision

@@ -1,4 +1,4 @@
-<!-- sess448 RULE-5 ruling: ICLUS clean-release certificate (ic->auth_lineage + RELMARK before iclus unlock CAS) approved, land now READY=0, lab compile-t… -->
+<!-- sess448 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: ICLUS clean-release certificate (ic->auth_lineage + RELMARK before iclus unlock CAS) approved, land now READY=0, lab compile-t… -->
 # sess448 GPT ruling — ICLUS certificate, #1/#2 sequencing
 
 1. Shape SOUND if: marker identity == token identity. class=INODE,resource=cluster_base acceptable ONLY with a written non-alias proof (routed token cannot alias a per-inode tenure whose ino==base; full tuple {class,resource,lineage,grant_epoch,owner_slot,owner_epoch} unique; lineages not independently scoped per DLM namespace; replay never weakens the lookup). Else a distinct ICLUSTER class, changed on BOTH token capture and marker atomically. ic->auth_lineage installed/cleared/snapshotted together with auth_epoch; zero lineage stays fail-closed.

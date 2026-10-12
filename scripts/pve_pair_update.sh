@@ -20,7 +20,11 @@
 # Env:
 #   PVE_PAIR       "<addr> <addr>" (default "192.168.1.80 192.168.1.81");
 #                  participant 0 is the lower address
-#   RES / MNT      DRBD resource and mount point (default mxfs, /mnt/shared)
+#   RES / MNT      DRBD resource and mount point (default mxfs, /mnt/shared):
+#                  the one CHECK and REFORMAT act on.  Every other resource
+#                  whose mxfs-drbd@ unit is active on either host is stopped
+#                  and started with it (the module unloads only with no MXFS
+#                  mounted), at its unit's MOUNTPOINT
 #   CHECK=1        run `chk_mxfs -n` (check only) on participant 0 between the
 #                  stop and the start; a finding stops the update there
 #   REFORMAT=1     with both units stopped, `mkfs.mxfs -f` the device from
@@ -72,14 +76,36 @@ if python3 -I -c 'import ipaddress, sys; sys.exit(0 if ipaddress.ip_address(sys.
 else
     P0=${PAIR[1]}; P1=${PAIR[0]}
 fi
-STATE_CMD='echo "unit=$(systemctl is-active mxfs-drbd@'"$RES"') mnt=$(awk '\''$2 == "'"$MNT"'" && $3 == "mxfs" {print $2}'\'' /proc/mounts | head -1) role=$(drbdadm role '"$RES"' 2>/dev/null) cs=$(drbdadm cstate '"$RES"' 2>/dev/null) ds=$(drbdadm dstate '"$RES"' 2>/dev/null) build=$(cat /sys/module/mxfs/srcversion 2>/dev/null) ver=$(cat /sys/module/mxfs/version 2>/dev/null) tree=$(cat '"$TREE"'/VERSION 2>/dev/null)"'
-state() { on "$1" "$STATE_CMD" 20 | grep '^unit='; }
+state() {  # <host> [<resource>]
+    local r=${2:-$RES} m
+    m=${MNTS[${2:-$RES}]:-$MNT}
+    on "$1" 'echo "unit=$(systemctl is-active mxfs-drbd@'"$r"') mnt=$(awk '\''$2 == "'"$m"'" && $3 == "mxfs" {print $2}'\'' /proc/mounts | head -1) role=$(drbdadm role '"$r"' 2>/dev/null) cs=$(drbdadm cstate '"$r"' 2>/dev/null) ds=$(drbdadm dstate '"$r"' 2>/dev/null) build=$(cat /sys/module/mxfs/srcversion 2>/dev/null) ver=$(cat /sys/module/mxfs/version 2>/dev/null) tree=$(cat '"$TREE"'/VERSION 2>/dev/null)"' 20 | grep '^unit='
+}
+
+# Every resource whose unit runs on either host, RES first.  A host mounts any
+# number of MXFS filesystems, and the module unloads only with none mounted, so
+# every one of them goes down for the swap and comes back on the new build.
+# Each one's mount point is its unit's MOUNTPOINT (/etc/mxfs/drbd-<res>.conf).
+declare -A MNTS=([$RES]=$MNT)
+RESES=$RES
+for h in "$P0" "$P1"; do
+    for r in $(on "$h" "systemctl list-units --plain --no-legend --state=active 'mxfs-drbd@*.service' | awk '{print \$1}' | sed 's/^mxfs-drbd@//; s/\\.service\$//'" 20); do
+        case " $RESES " in *" $r "*) continue ;; esac
+        m=$(on "$h" "sed -n 's/^MOUNTPOINT=//p' /etc/mxfs/drbd-$r.conf | tail -1" 20)
+        [ -n "$m" ] || die "$h: mxfs-drbd@$r is active but /etc/mxfs/drbd-$r.conf names no MOUNTPOINT"
+        RESES="$RESES $r"; MNTS[$r]=$m
+    done
+done
+[ "$RESES" = "$RES" ] || say "resources: $(for r in $RESES; do echo -n "$r:${MNTS[$r]} "; done)"
 
 for h in "$P0" "$P1"; do
-    # every process with a file open on the mount, by pid and name
-    held=$(on "$h" "awk '\$2 == \"$MNT\" && \$3 == \"mxfs\"' /proc/mounts | grep -q . || exit 0; fuser -m $MNT 2>/dev/null | tr -s ' ' '\n' | grep -E '^[0-9]+' | tr -dc '0-9\n' | while read -r p; do echo \"\$p:\$(cat /proc/\$p/comm 2>/dev/null)\"; done | tr '\n' ' '" 30)
-    [ -z "${held// /}" ] || die "$h: processes hold $MNT ($held); stop them (qm stop for a guest whose disk is there) before the update"
-    say "$h before: $(state "$h")"
+    for r in $RESES; do
+        m=${MNTS[$r]}
+        # every process with a file open on the mount, by pid and name
+        held=$(on "$h" "awk '\$2 == \"$m\" && \$3 == \"mxfs\"' /proc/mounts | grep -q . || exit 0; fuser -m $m 2>/dev/null | tr -s ' ' '\n' | grep -E '^[0-9]+' | tr -dc '0-9\n' | while read -r p; do echo \"\$p:\$(cat /proc/\$p/comm 2>/dev/null)\"; done | tr '\n' ' '" 30)
+        [ -z "${held// /}" ] || die "$h: processes hold $m ($held); stop them (qm stop for a guest whose disk is there) before the update"
+        say "$h before: $r $(state "$h" "$r")"
+    done
 done
 
 # 1. pull and build on both hosts at once (SKIP_INSTALL=1: the build already
@@ -142,19 +168,26 @@ done
 NEW=$(on "$P0" "modinfo -F srcversion mxfs" 20)
 [ "$NEW" = "$(on "$P1" "modinfo -F srcversion mxfs" 20)" ] || die "the two hosts built different modules"
 
-# 2. both mounts down
+# 2. every mount down
 for h in "$P1" "$P0"; do
-    on "$h" "systemctl stop mxfs-drbd@$RES; echo STOP_RC=\$?" 240 | grep -q 'STOP_RC=0' \
-        || die "$h: the unit did not stop: $(on "$h" "journalctl -u mxfs-drbd@$RES --since -5min --no-pager | tail -8" 20)"
-    # a unit that had already failed (a refused mount) leaves DRBD up, often
-    # Primary, and its stop does nothing; with nothing mounted take it down
-    # as the unit's own stop would have
-    if on "$h" "if ! grep -q ' $MNT mxfs ' /proc/mounts && [ -n \"\$(drbdadm role $RES 2>/dev/null)\" ]; then echo DRBD_UP; fi" 20 | grep -q DRBD_UP; then
-        on "$h" "drbdadm secondary $RES; drbdadm down $RES; echo DOWN_RC=\$?" 60 | grep -q 'DOWN_RC=0' \
-            || die "$h: the unit is stopped but DRBD would not come down: $(state "$h")"
-        say "$h DRBD left up by a failed unit, taken down"
-    fi
-    say "$h stopped: $(state "$h")"
+    for r in $RESES; do
+        m=${MNTS[$r]}
+        on "$h" "systemctl stop mxfs-drbd@$r; echo STOP_RC=\$?" 240 | grep -q 'STOP_RC=0' \
+            || die "$h: mxfs-drbd@$r did not stop: $(on "$h" "journalctl -u mxfs-drbd@$r --since -5min --no-pager | tail -8" 20)"
+        # a unit that had already failed (a refused mount) leaves DRBD up, often
+        # Primary, and its stop does nothing; with nothing mounted take it down
+        # as the unit's own stop would have
+        if on "$h" "if ! grep -q ' $m mxfs ' /proc/mounts && [ -n \"\$(drbdadm role $r 2>/dev/null)\" ]; then echo DRBD_UP; fi" 20 | grep -q DRBD_UP; then
+            on "$h" "drbdadm secondary $r; drbdadm down $r; echo DOWN_RC=\$?" 60 | grep -q 'DOWN_RC=0' \
+                || die "$h: mxfs-drbd@$r is stopped but DRBD would not come down: $(state "$h" "$r")"
+            say "$h $r: DRBD left up by a failed unit, taken down"
+        fi
+        say "$h stopped: $r $(state "$h" "$r")"
+    done
+    # an MXFS mount no unit owns keeps the old module loaded: say so now,
+    # with every unit stopped, rather than as a failed module swap
+    left=$(on "$h" "awk '\$3 == \"mxfs\" {print \$1 \":\" \$2}' /proc/mounts | tr '\n' ' '" 20)
+    [ -z "${left// /}" ] || die "$h: MXFS still mounted outside the mxfs-drbd@ units ($left); every unit of [$RESES] is stopped"
 done
 
 # 3. optionally, check the filesystem nothing has mounted.  The stopped units
@@ -208,16 +241,20 @@ for h in "$P0" "$P1"; do
     say "$h $(grep LOADED <<<"$out")"
 done
 for h in "$P0" "$P1"; do
-    on "$h" "systemctl start --no-block mxfs-drbd@$RES" 30 >/dev/null
+    for r in $RESES; do
+        on "$h" "systemctl start --no-block mxfs-drbd@$r" 30 >/dev/null
+    done
 done
 T1=$(date +%s)
 for h in "$P0" "$P1"; do
-    while :; do
-        s=$(state "$h")
-        case "$s" in *"mnt=$MNT role=Primary/Primary cs=Connected ds=UpToDate/UpToDate build=$NEW"*) break ;; esac
-        [ $(( $(date +%s) - T1 )) -lt "$MOUNT_BUDGET" ] || die "$h not mounted on the new build within ${MOUNT_BUDGET}s: ${s:-no answer}"
-        sleep 5
+    for r in $RESES; do
+        while :; do
+            s=$(state "$h" "$r")
+            case "$s" in *"mnt=${MNTS[$r]} role=Primary/Primary cs=Connected ds=UpToDate/UpToDate build=$NEW"*) break ;; esac
+            [ $(( $(date +%s) - T1 )) -lt "$MOUNT_BUDGET" ] || die "$h $r not mounted on the new build within ${MOUNT_BUDGET}s: ${s:-no answer}"
+            sleep 5
+        done
+        say "$h mounted: $r $s"
     done
-    say "$h mounted: $s"
 done
 say "pair updated to $NEW in $(( $(date +%s) - T0 ))s"

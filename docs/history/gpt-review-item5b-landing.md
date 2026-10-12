@@ -1,4 +1,4 @@
-<!-- sess441 RULE-5 review of the item-5b bootstrap-owner landing: SS-1 retain owner key/ledger on refusal, SS-4 hb/transition serialization, SS-6 REVOKED… -->
+<!-- sess441 RULE: CONSULT ANOTHER MODEL WHEN STUCK review of the item-5b bootstrap-owner landing: SS-1 retain owner key/ledger on refusal, SS-4 hb/transition serialization, SS-6 REVOKED… -->
 # sess441 GPT review of the 5b landing (NOTE: the prompt lost the code body; the ruling is on the described design — treat line refs as symbolic)
 
 STOP-SHIP before first rig measurement:

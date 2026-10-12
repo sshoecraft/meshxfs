@@ -9,7 +9,7 @@ metadata:
 
 Killing the drc_cap2 / `run.sh 2 tcp` background task with TaskStop while it is MID-TEST (nodes actively creating files) leaves a leaked in-kernel reference: `rmmod mxfs` → "Module mxfs is in use", `/sys/module/mxfs/refcnt`=1 with EMPTY holders and NO mounts (the DLM/peer thread or workqueue didn't clean up on the abrupt kill). The next `run.sh` prep then fails at `mkfs_mxfs -f /dev/sda returned 1` (device/module busy) → "PREP FAIL (mkfs)" → ABORT.
 
-### RECOVERY (clean slate): reboot the test VMs (allowed — RULE 2 forbids only the HOST clyde):
+### RECOVERY (clean slate): reboot the test VMs (allowed — RULE: NEVER REBOOT THE LAB HOST forbids only the HOST clyde):
 ```
 virsh -c qemu:///system destroy test1; virsh -c qemu:///system destroy test2
 virsh -c qemu:///system start test1;   virsh -c qemu:///system start test2

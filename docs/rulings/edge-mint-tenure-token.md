@@ -1,5 +1,5 @@
-<!-- sess169 RULE-5 ruling (#15): edge-triggered mint APPROVED — mint iff can_write(new) && !can_write(prior from cur_slot); cur_slot into helper; caw_ver… -->
-# sess169 — RULE-5 ruling: D-EX-GRANT-EPOCH-NOT-UNIQUE-TENURE-ID fix design (gpt-5.6-sol)
+<!-- sess169 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (#15): edge-triggered mint APPROVED — mint iff can_write(new) && !can_write(prior from cur_slot); cur_slot into helper; caw_ver… -->
+# sess169 — RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: D-EX-GRANT-EPOCH-NOT-UNIQUE-TENURE-ID fix design (gpt-5.6-sol)
 
 Full ruling text in sess169 transcript (task kplzaeanf). Operative content:
 

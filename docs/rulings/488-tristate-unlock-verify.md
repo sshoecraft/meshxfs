@@ -1,4 +1,4 @@
-<!-- sess273 RULE-5 ruling (-488 birth fix): tri-state unlock outcome RELEASED/STILL_HELD/UNKNOWN, verify read-back, re-mint epoch only on proven STILL_HE… -->
+<!-- sess273 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (-488 birth fix): tri-state unlock outcome RELEASED/STILL_HELD/UNKNOWN, verify read-back, re-mint epoch only on proven STILL_HE… -->
 # sess273 GPT ruling — D-488 stranded-bit birth fix shape
 
 Evidence base: sess271/272 (silent unlock paths in caw_unlock_gen_body + void

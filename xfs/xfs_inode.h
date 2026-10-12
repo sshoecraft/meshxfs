@@ -144,6 +144,9 @@ typedef struct xfs_inode {
 	 * eviction while this is non-zero means that reference was taken
 	 * from under the worker */
 	atomic_t		i_mxfs_revoke_refs;
+	/* a directory's deferred dcache shrink; queued holding an inode
+	 * reference (mxfs_dir_dshrink_work_fn drops it) */
+	struct work_struct	i_mxfs_dshrink_work;
 
 	/*
 	 * If the inode is not on an unlinked list, this field is zero.  If the
@@ -1060,6 +1063,7 @@ typedef struct xfs_inode {
 	pid_t			i_mxfs_ilk_rd_pid;
 	char			i_mxfs_ilk_wr_comm[16];
 	char			i_mxfs_ilk_rd_comm[16];
+	u64			i_mxfs_ilk_wr_t0;   /* when the EXCL holder took it (ns) */
 
 	/* VFS inode */
 	struct inode		i_vnode;	/* embedded VFS inode */

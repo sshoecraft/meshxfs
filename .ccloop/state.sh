@@ -99,7 +99,7 @@ fi
 # ------------------------------------------------------------ pointers ----
 cat <<'EOF'
 ### Before you measure anything
-- RULE 0 budgets (a timeout IS a failure): `tests/criteria/TIMEOUT_BUDGETS.md`
+- RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS budgets (a timeout IS a failure): `tests/criteria/TIMEOUT_BUDGETS.md`
 - Deploy the fleet: `MXFS_FORCE_PREP=1 ./run.sh 32/disk/caw/mpath prep_cluster` (72-137s).
   A module reload RESETS runtime knobs.
 - Board a criterion: `./run.sh <nodes> <dlm> <test>`; read it with `tools/criteria.py <nodes> <dlm>`.

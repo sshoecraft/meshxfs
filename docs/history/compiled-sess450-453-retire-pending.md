@@ -4,7 +4,7 @@ Campaign: the RETIRE_PENDING two-phase clean-departure state machine (disklock A
 ## 0.59.0 (sess450) — first landing, STOP-SHIP
 `docs/history/docs/history/docs/history/compiled-sess450-453-retire-pending.md` lands the base mechanism: `MXFS_DISKLOCK_FLAG_RETIRE_PENDING`, `hb_retire_settle` (FUA confirm, CAS to EMPTY on proven absence or WITHDRAWN after a 30s grace), wired at pending-victim/first-sight/dead-confirm call sites, `mxfs_disklock_retire_complete_self` for no-key departures, v5 + chk_mxfs + docs updated.
 
-RULE-5 review (`docs/rulings/0590-retire-pending-stop-ship.md`) STOP-SHIPs it on 3 defects + 2 ordering issues:
+RULE: CONSULT ANOTHER MODEL WHEN STUCK review (`docs/rulings/0590-retire-pending-stop-ship.md`) STOP-SHIPs it on 3 defects + 2 ordering issues:
 1. `-EAGAIN` from a CAS mismatch returns CHANGED but leaves `*rhb` stale; every caller classifies the stale image (worst case: false death processing against a slot a new incarnation already owns).
 2. RETIRE_PENDING is invisible to the mount/admission recovery barrier — a crashed departer can leave a write-capable registration while a new node mounts writable on another slot.
 3. The key lookup is boolean (PRESENT/ABSENT) folding UNKNOWN and `-EOPNOTSUPP` into ABSENT — an invalid identity with no frozen observation must be UNKNOWN, and only authoritative ABSENT may produce EMPTY.
@@ -15,7 +15,7 @@ Before the fix: clyde double-crashed (GPU PCIe P2P, user-attributed, unrelated t
 
 0.59.1 answers criteria 1/2 of the sess450 ruling: tri-state `mxfs_scsipr_key_state`/`mxfs_disklock_key_state_fn` (ABSENT/PRESENT/UNKNOWN/OWN) with a 1s snapshot, `hb_retire_reread` on `-EAGAIN`, UNKNOWN never settles, RETIRE_PENDING now blocks the admission barrier, host-wide `mxfs_v5_dlm_departure_lock`, P305 settlement path.
 
-RULE-5 review #2 (`docs/rulings/0591-retire-settlement-stop-ship-2.md`): criteria 1/2/9 MET, but STOP-SHIP #2 on 5 new blockers, all instances of the same "stale proof" defect family:
+RULE: CONSULT ANOTHER MODEL WHEN STUCK review #2 (`docs/rulings/0591-retire-settlement-stop-ship-2.md`): criteria 1/2/9 MET, but STOP-SHIP #2 on 5 new blockers, all instances of the same "stale proof" defect family:
 1. Absence proof is not coherent — READ KEYS then READ RESERVATION then a 1s cache is not atomic; a preemption between commands or during the cache TTL still yields EMPTY off a snapshot that was never true at once. Fix shape: bracket KEYS-A / RESV / KEYS-B with equal PR generation, cache PRESENT only, never cache ABSENT, invalidate on every local PR mutation.
 2. Clustered no-PR still unsafe: `-EOPNOTSUPP` self-clears, and pr_key==0 reads as ABSENT instead of UNKNOWN/invalid.
 3. OWN is too broad — any generic PRESENT-for-our-key lookup can clear ANY pending record naming our key, including stale/duplicate/colliding ones; OWN must be a P305-only operation on one exact (slot,node,epoch,boot_uuid) tuple under the departure lock with a *fresh* proof.

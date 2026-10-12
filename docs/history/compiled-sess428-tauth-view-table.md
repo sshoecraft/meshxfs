@@ -1,10 +1,10 @@
-<!-- sess428: D-0351 free-publish regression root+fix (0.38.1-0.38.3), D-0349 GPT ruling to durable view-table+barrier, 4-pass RULE-5 review to GO on step… -->
+<!-- sess428: D-0351 free-publish regression root+fix (0.38.1-0.38.3), D-0349 GPT ruling to durable view-table+barrier, 4-pass RULE: CONSULT ANOTHER MODEL WHEN STUCK review to GO on step… -->
 # sess428: tauth view-table/barrier design + D-0351/D-0349 build chain
 
 Single session (2026-08-28), two interleaved threads: (1) the D-0351
 free-publish foreign-misclassification regression found and fixed through
 0.38.1→0.38.3, and (2) the D-0349 durable-authority redesign — GPT-ruled
-down to a VIEW TABLE + 2-phase barrier — spec'd through four RULE-5 passes
+down to a VIEW TABLE + 2-phase barrier — spec'd through four RULE: CONSULT ANOTHER MODEL WHEN STUCK passes
 to a GO on build step 1.
 
 ## Thread 1: D-0351 build chain (0.37.0 → 0.38.3)
@@ -136,7 +136,7 @@ sweep (first-touch parking at 100ms retry cadence).
   UNOWNED image and takeover of foreign ACTIVE needs ordered handoff or
   confirmed storage fence — not selected. D fixes a polling artifact only.
 
-- **RULE-5 spec review chain** on `docs/tauth-view-table.md` (the write-up
+- **RULE: CONSULT ANOTHER MODEL WHEN STUCK spec review chain** on `docs/tauth-view-table.md` (the write-up
   of design B above), four passes to GO:
   - **v1 review**
     (`docs/history/docs/history/docs/history/compiled-sess428-tauth-view-table.md`):

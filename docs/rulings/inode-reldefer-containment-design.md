@@ -1,4 +1,4 @@
-<!-- sess312 RULE-5 design ruling: INODE-class bounded defer containment — 10 required changes incl. defer-time admission closure, WEDGED gate, no reset o… -->
+<!-- sess312 RULE: CONSULT ANOTHER MODEL WHEN STUCK design ruling: INODE-class bounded defer containment — 10 required changes incl. defer-time admission closure, WEDGED gate, no reset o… -->
 # sess312 — GPT design ruling: INODE-class release-defer containment
 
 Approves mirroring the ICLUS sess307 machinery onto the INODE class

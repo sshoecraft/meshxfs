@@ -1,4 +1,4 @@
-<!-- sess243 RULE-5 ruling (-488 livelock): mechanism = signal-free NOQUEUE sweep vs lazy-cached holders (NO orphan); fix = sticky anonymous on-disk REVOK… -->
+<!-- sess243 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (-488 livelock): mechanism = signal-free NOQUEUE sweep vs lazy-cached holders (NO orphan); fix = sticky anonymous on-disk REVOK… -->
 # sess243: -488 livelock mechanism PROVEN + GPT fix ruling
 
 ## Mechanism (supersedes sess241 "orphan/tracking-loss" and sess242 framings)

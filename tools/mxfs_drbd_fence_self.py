@@ -47,7 +47,8 @@ Subcommands:
   fence-peer                      DRBD's handler action (DRBD_RESOURCE,
                                   DRBD_PEER_ADDRESS in the environment)
   fence <target> <requester>      the authority verb (startup fencing): refused
-  status <target>                 STATE <target> excluded|unfenced|... inhibit=<ep>|none
+  status <target> [<resource>]    STATE <target> excluded|unfenced|... inhibit=<ep>|none
+                                  (of that resource's exclusion, when named)
   release <target> <ep> <req>     release now if the evidence holds
   guard                           daemon: keep isolation in place, release on evidence,
                                   rejoin a mount that has shut down
@@ -308,16 +309,52 @@ def mxfs_mounted_on(dev):
     return None
 
 
+def mxfs_module_refs():
+    """The mxfs module's reference count: one per superblock, mounted or
+    still being mounted (a mount in progress holds its filesystem type);
+    0 when the module is not loaded."""
+    try:
+        with open("/sys/module/mxfs/refcnt") as fh:
+            return int(fh.read().strip() or 0)
+    except (OSError, ValueError):
+        return 0
+
+
 # ------------------------------------------------------------ isolation (nft)
 
-def nft_rules(res, peer_addr, drbd_port):
+def shared_drbd_ports(peer_addr, drbd_port):
+    """The DRBD port of every resource this host shares with `peer_addr`.
+
+    The isolation drops every MXFS port to and from the peer, and those ports
+    carry every MXFS filesystem the two hosts share, so an exclusion is a
+    fence of the whole host whichever resource lost its link.  The DRBD links
+    of the other resources must go with it: left Connected, the peer stays
+    Primary on them, their MXFS traffic is cut with no exclusion either side
+    can prove, and their filesystems can neither reach the peer nor recover
+    it.  Dropped, each link fails as a lost link does, so DRBD runs that
+    resource's own handler: here it excludes the peer under the resource's
+    own episode, which its witness can prove, and on the peer it freezes the
+    resource.  Never a graceful disconnect, for which DRBD runs no handler
+    and the peer would carry on as Primary alone."""
+    ports = {int(drbd_port)}
+    rc, out = run(["drbdadm", "sh-resources"], timeout=10)
+    if rc == 0:
+        for r in out.split():
+            ep = drbd_endpoints(r)
+            if ep and ep[4] == peer_addr:
+                ports.add(ep[5])
+    return sorted(ports)
+
+
+def nft_rules(res, peer_addr, drbd_ports):
     t = NFT_TABLE_FMT % res
+    d = "{ %s }" % ", ".join(str(p) for p in drbd_ports)
     return (
         "table inet %(t)s {\n"
         "  chain input {\n"
         "    type filter hook input priority -300; policy accept;\n"
-        "    ip saddr %(p)s tcp sport %(d)d drop\n"
-        "    ip saddr %(p)s tcp dport %(d)d drop\n"
+        "    ip saddr %(p)s tcp sport %(d)s drop\n"
+        "    ip saddr %(p)s tcp dport %(d)s drop\n"
         "    ip saddr %(p)s tcp sport %(mt)s drop\n"
         "    ip saddr %(p)s tcp dport %(mt)s drop\n"
         "    ip saddr %(p)s udp dport %(mu)s drop\n"
@@ -325,14 +362,14 @@ def nft_rules(res, peer_addr, drbd_port):
         "  }\n"
         "  chain output {\n"
         "    type filter hook output priority -300; policy accept;\n"
-        "    ip daddr %(p)s tcp dport %(d)d drop\n"
-        "    ip daddr %(p)s tcp sport %(d)d drop\n"
+        "    ip daddr %(p)s tcp dport %(d)s drop\n"
+        "    ip daddr %(p)s tcp sport %(d)s drop\n"
         "    ip daddr %(p)s tcp dport %(mt)s drop\n"
         "    ip daddr %(p)s tcp sport %(mt)s drop\n"
         "    ip daddr %(p)s udp dport %(mu)s drop\n"
         "    ip daddr %(p)s udp sport %(mu)s drop\n"
         "  }\n"
-        "}\n" % {"t": t, "p": peer_addr, "d": drbd_port,
+        "}\n" % {"t": t, "p": peer_addr, "d": d,
                  "mt": MXFS_TCP_PORTS, "mu": MXFS_UDP_PORTS})
 
 
@@ -344,7 +381,8 @@ def nft_present(res):
 def nft_apply(res, peer_addr, drbd_port):
     if nft_present(res):
         return
-    p = subprocess.run(["nft", "-f", "-"], input=nft_rules(res, peer_addr, drbd_port).encode(),
+    p = subprocess.run(["nft", "-f", "-"],
+                       input=nft_rules(res, peer_addr, shared_drbd_ports(peer_addr, drbd_port)).encode(),
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
     if p.returncode != 0 or not nft_present(res):
         raise RuntimeError("nft isolation of %s failed: %s" % (
@@ -536,11 +574,18 @@ def cmd_fence_peer():
             "node fence): bring %s back, or configure a node fence (IPMI/PDU) in "
             "/etc/mxfs/drbd-fence.conf." % (res, peer, peer_addr, me, peer, peer, peer),
             crit=True)
+        # The survivor fences this whole host (every MXFS port, every shared
+        # resource's link), so any MXFS state here is state it is replacing:
+        # a mount of this resource, of another one, or one still in progress,
+        # which is in no mount table yet and would block for ever on the
+        # frozen device.  The module holds a reference for each of them.
         mnt = mxfs_mounted_on(drbd_device(res))
-        if mnt:
-            log("restarting %s in %d s: MXFS on %s holds state the survivor is replacing, "
-                "and a restart is the only way back in (it rejoins once %s releases it)"
-                % (me, RESTART_DELAY_S, mnt, peer), crit=True)
+        held = mxfs_module_refs()
+        if mnt or held:
+            log("restarting %s in %d s: MXFS here (%s) holds state the survivor is "
+                "replacing, and a restart is the only way back in (it rejoins once %s "
+                "releases it)" % (me, RESTART_DELAY_S,
+                                  mnt or "%d module reference(s)" % held, peer), crit=True)
             # detached: DRBD waits for this handler; the restart must not.
             # No sync: the frozen device would hang it.
             subprocess.Popen(["/bin/sh", "-c", "sleep %d; echo b > /proc/sysrq-trigger"
@@ -557,7 +602,9 @@ def cmd_fence_peer():
         log("fence-peer: excluding %s failed (%s); I/O stays frozen" % (peer, e), crit=True)
         return 1
     log("DRBD %s lost its peer %s (%s). This node (%s, participant 0) wins the pair's "
-        "fixed tie-break: %s is isolated from this host (DRBD and MXFS ports), the "
+        "fixed tie-break: %s is isolated from this host (the DRBD port of every resource "
+        "the two share, and the MXFS ports, so each shared resource's link fails and is "
+        "excluded under its own episode), the "
         "resource goes StandAlone, and %s is held out (episode %s) until it reports no "
         "live MXFS and DRBD not Primary (a restart does that). I/O resumes now."
         % (res, peer, peer_addr, me, peer, peer, episode), crit=True)
@@ -577,9 +624,16 @@ def cmd_fence_peer():
 
 # -------------------------------------------------------- authority verbs
 
-def cmd_status(target):
+def cmd_status(target, res=None):
+    """The target's exclusion, for one resource when `res` is given.  This
+    authority excludes a peer per resource, each under its own episode, so a
+    host with two resources holds the same peer under two; the witness of
+    each asks for its own, or it would compare another resource's episode
+    with its receipt and never find the peer excluded.  With no resource the
+    answer is the first inhibit naming the target (a node fence's view: one
+    inhibit per host)."""
     for inh in all_inhibits():
-        if inh.get("peer") == target:
+        if inh.get("peer") == target and res in (None, inh.get("resource")):
             state = "excluded" if nft_present(inh["resource"]) else "isolation-missing"
             print("STATE %s %s inhibit=%s" % (target, state, inh["episode"]))
             return 0
@@ -604,8 +658,11 @@ def cmd_fence(target, requester):
 
 def peer_facts(res, peer, peer_addr):
     """The peer's own answer over ssh, as a dict, or (None, why).  ROLE is
-    `drbdadm role`, MOUNTS the number of MXFS mounts, REFCNT the module's
-    reference count, BOOT its boot id, BOOTSTATE what its boot program
+    `drbdadm role`, MOUNTS the number of MXFS mounts of THIS resource's device
+    (a host may mount several resources, each its own filesystem), SB 1 while
+    a superblock of that device is still alive (its /sys/fs/mxfs/<dev>
+    directory, which outlives a lazy unmount until the last reference goes),
+    REFCNT the module's reference count, BOOT its boot id, BOOTSTATE what its boot program
     published (BOOT_STATE_FMT; 'none' when there is no such file),
     BOOTLIVE whether that program is still running, RECOVERY its mount's
     /sys/fs/mxfs/<dev>/recovery_pending and OTHERSLOTS its other_slots_held
@@ -623,10 +680,14 @@ def peer_facts(res, peer, peer_addr):
     try:
         rc, out = run(["ssh"] + opts + ["root@" + peer_addr,
                        "echo ROLE=$(drbdadm role %s 2>/dev/null || echo Unconfigured); "
-                       "echo MOUNTS=$(grep -c ' mxfs ' /proc/mounts); "
+                       "d=$(drbdadm sh-dev %s 2>/dev/null); "
+                       "rd=$(readlink -f \"$d\" 2>/dev/null); m=0; "
+                       "for x in $(awk '$3 == \"mxfs\" {print $1}' /proc/mounts); do "
+                       "[ -n \"$rd\" ] && [ \"$(readlink -f $x)\" = \"$rd\" ] && m=$((m + 1)); done; "
+                       "echo MOUNTS=$m; "
+                       "[ -n \"$d\" ] && [ -d /sys/fs/mxfs/${d##*/} ] && echo SB=1 || echo SB=0; "
                        "echo REFCNT=$(cat /sys/module/mxfs/refcnt 2>/dev/null || echo unloaded); "
                        "echo BOOT=$(cat /proc/sys/kernel/random/boot_id); "
-                       "d=$(drbdadm sh-dev %s 2>/dev/null); "
                        "r=$(cat /sys/fs/mxfs/${d##*/}/recovery_pending 2>/dev/null); "
                        "echo RECOVERY=${r:-none}; "
                        "o=$(cat /sys/fs/mxfs/${d##*/}/other_slots_held 2>/dev/null); "
@@ -639,16 +700,19 @@ def peer_facts(res, peer, peer_addr):
     except subprocess.SubprocessError:
         return None, "ssh to %s timed out" % peer
     f = dict(l.split("=", 1) for l in out.splitlines() if "=" in l)
-    if rc != 0 or not {"ROLE", "MOUNTS", "REFCNT", "BOOT", "BOOTSTATE", "BOOTLIVE"} <= f.keys():
+    if rc != 0 or not {"ROLE", "MOUNTS", "SB", "REFCNT", "BOOT", "BOOTSTATE", "BOOTLIVE"} <= f.keys():
         return None, "no answer from %s over ssh (rc=%d)" % (peer, rc)
     return f, ""
 
 
 def peer_evidence(res, peer, peer_addr):
     """(True, why) when the peer provably holds nothing that can write to this
-    resource: no MXFS superblock alive (no mxfs mount, and the module's
-    reference count 0 or the module not loaded, so a lazily unmounted
-    filesystem still counts), and DRBD not Primary.  An MXFS incarnation is a
+    resource: no MXFS superblock of this resource's device alive (no mount of
+    it, and no /sys/fs/mxfs/<dev>, so a lazily unmounted filesystem still
+    counts), and DRBD not Primary.  The peer's mounts of OTHER resources are
+    not evidence about this one: a host that mounts two resources is
+    released on each one's own account, or the first remounted would hold
+    the second excluded for ever.  An MXFS incarnation is a
     live superblock, so this is positive evidence that the old one is gone,
     whether the peer rebooted or only unmounted.  Read over ssh, which a
     Proxmox cluster authenticates with its root key trust; anything short of a
@@ -659,11 +723,11 @@ def peer_evidence(res, peer, peer_addr):
     if f["ROLE"].startswith("Primary"):
         return False, "%s is DRBD %s" % (peer, f["ROLE"])
     if f["MOUNTS"] != "0":
-        return False, "%s has %s MXFS mount(s)" % (peer, f["MOUNTS"])
-    if f["REFCNT"] not in ("0", "unloaded"):
-        return False, "%s still holds %s MXFS superblock reference(s)" % (peer, f["REFCNT"])
-    return True, "%s answers: DRBD %s, no MXFS mount, module refcnt %s, boot %s" % (
-        peer, f["ROLE"], f["REFCNT"], f["BOOT"][:8])
+        return False, "%s has %s MXFS mount(s) of %s" % (peer, f["MOUNTS"], res)
+    if f["SB"] != "0":
+        return False, "%s still holds an MXFS superblock of %s" % (peer, res)
+    return True, "%s answers: DRBD %s, no MXFS superblock of %s, module refcnt %s, boot %s" % (
+        peer, f["ROLE"], res, f["REFCNT"], f["BOOT"][:8])
 
 
 def release(inh, why):
@@ -1321,6 +1385,17 @@ def cmd_boot(res, mountpoint):
         inh = None
     if inh:
         nft_apply(res, inh["peer_addr"], int(inh["drbd_port"]))
+    # The module before the link.  Loading it holds the CPU it runs on for
+    # most of a second while the kernel patches its code, and DRBD gives up on
+    # a link whose PingAck is 0.5 s late from threads pinned to one CPU: a load
+    # with links up has cost links, and under this authority a host.  The
+    # packages load it at boot (modules-load.d); a unit started later, after
+    # an unload, loads it here, before this resource's link comes up.
+    if not os.path.isdir("/sys/module/mxfs"):
+        rc, _ = run(["modprobe", "mxfs"], timeout=60)
+        if rc != 0:
+            log("%s: modprobe mxfs failed (rc=%d); the mount loads it, with the link up"
+                % (res, rc), crit=True)
     if cstate(res) == "":
         run(["drbdadm", "up", res], timeout=30, check=True)
     if not inh:
@@ -1452,8 +1527,8 @@ def main():
     try:
         if a[:1] == ["fence-peer"]:
             return cmd_fence_peer()
-        if len(a) == 2 and a[0] == "status":
-            return cmd_status(a[1])
+        if len(a) in (2, 3) and a[0] == "status":
+            return cmd_status(*a[1:])
         if len(a) == 3 and a[0] == "fence":
             return cmd_fence(a[1], a[2])
         if len(a) >= 3 and a[0] == "release":

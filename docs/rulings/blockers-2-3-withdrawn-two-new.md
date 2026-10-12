@@ -1,5 +1,5 @@
-<!-- sess115 RULE-5 ruling: FACT A accepted — sess114 blockers 2 and 3 WITHDRAWN, snapshot-subtract withdrawn; two new blockers (ICLUSTER quiescence, prov… -->
-# sess115 — RULE-5 ruling: the cached-lock model is accepted; blockers 2 and 3 are withdrawn
+<!-- sess115 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: FACT A accepted — sess114 blockers 2 and 3 WITHDRAWN, snapshot-subtract withdrawn; two new blockers (ICLUSTER quiescence, prov… -->
+# sess115 — RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: the cached-lock model is accepted; blockers 2 and 3 are withdrawn
 
 Facts submitted: `…sess115-cached-lock-model-invalidates-blockers-2-3` (FACTS A-D).
 Prior ruling being revised: `…sess114-GPT-ruling-cancelling-accepted-10-more-blockers`.

@@ -1,7 +1,7 @@
 <!-- sess461-463: item-5 EFI completion/takeover design (inc1-4 rulings), D-0522 quarantine double-add panic found+fixed, ungated-images closure blocked,… -->
 # D-FOREIGN-SLICE-INTENTS-ABANDONED item 5 (real EFI completion engine) — sess461-463 campaign
 
-One continuous design/build arc: item-5 goes from design (inc1 census) through two RULE-5
+One continuous design/build arc: item-5 goes from design (inc1 census) through two RULE: CONSULT ANOTHER MODEL WHEN STUCK
 rulings (inc2 plumbing, inc3+4 completion+takeover) while the same three sessions also land
 an unrelated critical defect found via the same rig chains (D-0522) and rule two adjacent
 questions that end up gating item-5's own closure path (D-FOREIGN-REPLAY-UNGATED-IMAGES
@@ -20,7 +20,7 @@ sweep, queued chain 89 to force a cluster release on the armed victim before the
 settle H1 vs H2. See `docs/history/docs/history/docs/history/compiled-sess461-463-item5-completion-dirshard-campaign.md`.
 
 Item-5 design question fielded: census keeps only `ag_mask`, not extents or txn verdicts;
-`xfs_alloc_has_records` picked as the EMPTY/FULL/SPARSE idempotence primitive. RULE-5 ruling
+`xfs_alloc_has_records` picked as the EMPTY/FULL/SPARSE idempotence primitive. RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling
 `docs/rulings/intents-item5-efi-completion-design.md` set the shape for
 everything downstream: freeze home = the victim's recovery descriptor (obl_ag_mask, never an
 AG-resource hint alone); no persistent per-extent dedup ledger needed given four conditions
@@ -44,7 +44,7 @@ executing. See `docs/history/docs/history/docs/history/compiled-sess461-463-item
 
 ## sess462 — inc2 ruled to plumbing-only; D-0522 found and fixed via the same harness gap
 
-RULE-5 ruling on increment 2 (durable obligation list in the ~60KiB unused rman-slot pad
+RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on increment 2 (durable obligation list in the ~60KiB unused rman-slot pad
 between the 4KiB header and 64KiB entry area) accepted P2: a durable RECOVER-extent list
 beats census-only re-replay on takeover, IF the rman slot is formally partitioned (fence
 prover owns header+entries; recovery owner owns [4KiB,64KiB)), the list becomes IMMUTABLE
@@ -91,7 +91,7 @@ at the XFS call sites. See `docs/history/docs/history/docs/history/compiled-sess
 
 ## sess463 — inc3+4 ruled STOP-SHIP; item-1 closure blocked; dir-sharding shape ruled
 
-RULE-5 ruling on increments 3+4 (the completion engine + AG takeover itself): core
+RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on increments 3+4 (the completion engine + AG takeover itself): core
 EMPTY/FULL/SPARSE algorithm accepted as sound, but the submitted design is STOP-SHIP on ten
 ranked conditions (SS-A..SS-J). The two structurally hardest: **SS-A** — a node-local scan of
 the 64 HB sectors for OPEN cases races every purge path (purge sees no OPEN under a stale
@@ -132,7 +132,7 @@ rule was no edits to any compiled source until the chain-89 prod build log exist
 
 Separately, sess463 forced a disposition ruling on **D-FOREIGN-REPLAY-UNGATED-IMAGES**: can it
 close F&V when the 32-node board is clean except a `crash_consistency` row that fails only as
-a RULE-0 timeout (all correctness checks pass) attributable to the separately-tracked
+a RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS timeout (all correctness checks pass) attributable to the separately-tracked
 D-32NODE-SHARED-DIR-CREATE-PACE/D-401? Ruled **DO NOT CLOSE** — "board clean" in the closure
 criterion is a literal outcome test, not an attribution test; reinterpreting it after a known
 failure is exactly the forbidden precedent. Status stays OPEN, labeled "FIX IMPLEMENTED;

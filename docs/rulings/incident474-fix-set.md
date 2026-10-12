@@ -1,5 +1,5 @@
-<!-- sess214 RULE-5 ruling (gpt-5.6-sol): hole(b)=b2+b3+recovery-barrier as ONE unit, NO general lock steal; hole(c)=c1+c2 progress cookies; armA=a1 autho… -->
-# sess214 RULE-5 ruling — incident474 containment fix set (gpt-5.6-sol)
+<!-- sess214 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (gpt-5.6-sol): hole(b)=b2+b3+recovery-barrier as ONE unit, NO general lock steal; hole(c)=c1+c2 progress cookies; armA=a1 autho… -->
+# sess214 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — incident474 containment fix set (gpt-5.6-sol)
 
 Full text in sess214 transcript. Key points, implementation-binding:
 

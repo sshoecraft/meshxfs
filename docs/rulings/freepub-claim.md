@@ -1,4 +1,4 @@
-<!-- sess431 RULE-5 ruling: D-0351 free image never lands because the cluster merge restores the platter over the P55C-staged free slot; fix = explicit pe… -->
+<!-- sess431 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: D-0351 free image never lands because the cluster merge restores the platter over the P55C-staged free slot; fix = explicit pe… -->
 # sess431 GPT ruling — FREE-publication claim (D-0351)
 
 ## Proven mechanism (s437 timelines, 56/123 P-DIALLOC-DISKLIVE)

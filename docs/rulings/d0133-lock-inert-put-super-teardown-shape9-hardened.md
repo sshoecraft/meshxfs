@@ -1,4 +1,4 @@
-<!-- sess475 RULE-5 ruling: 0.64.28 A+ lock INERT (rc=-19 96/96: put_super tears DLM down before xfs_unmountfs); shape (9) early locked cover GO only hard… -->
+<!-- sess475 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: 0.64.28 A+ lock INERT (rc=-19 96/96: put_super tears DLM down before xfs_unmountfs); shape (9) early locked cover GO only hard… -->
 # sess475 GPT ruling (2026-09-02 ~18:50Z) — D-0133 fix placement
 
 ## Measured fact that triggered it

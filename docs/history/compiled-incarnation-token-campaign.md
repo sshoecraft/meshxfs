@@ -2,13 +2,13 @@
 # HB blind-write clobber, authority-token step 5, and mount-incarnation landing (sess77-88, ccloop c7ee71c6)
 
 One continuous campaign: a fence-evidence defect (HB blind write) surfaced during
-RULE-5 review of the foreign-replay authority-token gate, and fixing it exposed
+RULE: CONSULT ANOTHER MODEL WHEN STUCK review of the foreign-replay authority-token gate, and fixing it exposed
 that the mount-incarnation field the whole recovery/fence/token design depends on
 was a hard-coded constant zero. Each session's fix unblocked the next.
 
 ## 1. HB own-slot blind write clobbers the recovery guard (sess77-79)
 
-RULE-5 review of the fence-evidence channel (one-shot fence certificate,
+RULE: CONSULT ANOTHER MODEL WHEN STUCK review of the fence-evidence channel (one-shot fence certificate,
 intent-holder SPOF) found a second, worse defect while refuting four of the
 reviewer's own premises: ``docs/rulings/hb-clobbers-guard-and-yield.md``.
 `disklock_hb_fn()` did `memset+fill+blind write_sector_fua()` on its own slot —
@@ -68,7 +68,7 @@ were already in the tree; the actual remaining gap is an exact-match
 `{class,resource,epoch}` taint predicate to stop skipping fully-authorized
 transactions.
 
-RULE-5 review found that scope itself unsound: ``docs/rulings/step5-scope-is-wrong-false-apply.md``.
+RULE: CONSULT ANOTHER MODEL WHEN STUCK review found that scope itself unsound: ``docs/rulings/step5-scope-is-wrong-false-apply.md``.
 Two producer-side bugs meant an AG-exact-match gate would **apply** — not just
 skip — records under the wrong authority: (A) buffers inside an AG but under
 inode authority (dir/da-node/attr/symlink/bmbt) were mislabeled `class=AG`
@@ -118,7 +118,7 @@ guard idiom `if (victim_epoch && …)` universally skips the check because every
 epoch read off disk is 0 — a rejoined incarnation of the same node silently
 adopts its own prior incarnation's recovery lease.
 
-RULE-5 ruling on the fix: ``docs/rulings/incarnation-and-token-v2.md``.
+RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the fix: ``docs/rulings/incarnation-and-token-v2.md``.
 Rejected the proposed `(timestamp<<16)|rand16` construction (16-bit collision
 resistance is too weak against clock-stuck/VM-snapshot cases) in favor of an
 opaque, nonzero, cryptographically random 64-bit value, generated before first

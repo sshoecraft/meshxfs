@@ -1,4 +1,4 @@
-<!-- sess456 RULE-5 review -->
+<!-- sess456 RULE: CONSULT ANOTHER MODEL WHEN STUCK review -->
 # Review #5 of 0.61.1 (2026-09-02 ~01:58Z) — NO-GO
 
 Evidence supplied: chain 78 (6/6 settle arms, 12/12 laps, board 26 PASS + known crash_consistency + policy row), chain 77, docs G1/G2/G3 + D4 audit statement + the 10 STOP-SHIP dispositions.

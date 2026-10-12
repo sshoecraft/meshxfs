@@ -1,4 +1,4 @@
-<!-- sess386 RULE-5 ruling: land the bounded CAW reserve acquire NOW (deadline+linearizable cancel, grant-wins rule); a1/a2 still required; full A/B evide… -->
+<!-- sess386 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: land the bounded CAW reserve acquire NOW (deadline+linearizable cancel, grant-wins rule); a1/a2 still required; full A/B evide… -->
 ## Context
 
 sess386 measured all four legs of the 474 collapse on one node in one incident

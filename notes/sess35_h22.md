@@ -42,7 +42,7 @@ and running `scripts/sess34_repro.sh 2`:
 ## Don't repeat
 
 - Do NOT patch a candidate site without P-H22 evidence pointing to it.
-- Do NOT bundle this with any other change (RULE 4 forbidden shortcut:
+- Do NOT bundle this with any other change (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS forbidden shortcut:
   "fix both X and Y at once").
 - Do NOT take a code-reading guess and build on it.
 

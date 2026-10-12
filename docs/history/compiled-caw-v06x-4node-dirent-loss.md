@@ -93,7 +93,7 @@ the sess4 "nobody wrote sf" hole was an artifact; now logs ALL dir dinode images
 ## Root cause 5 — full closure to 17/17 (sess5, build 656E89B4, `docs/history/docs/history/caw-v065-fix-chain-4caw-17of17.md`)
 `dlm_fairness` storm (create+mv+rm per round, 4 nodes, one dir) kept re-minting ghost families
 (n2_r15 mv-ENOENT adopt-empty; n4_r10.done / n2_r1 / n3_r1 stale-tenure destage clobber inside
-test3's gen-27 tenure; block→sf conversion crystallizing ghosts). FIVE fixes, each RULE-4 proven:
+test3's gen-27 tenure; block→sf conversion crystallizing ghosts). FIVE fixes, each RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS proven:
 1. **acq_epoch** (as RC4) → cache_coherency 13/13+.
 2. **P106-STALE-EX-BAIL** (`mxfs_dlm_ilock_begin` ~17700): phantom cached-EX serve (on-disk
    slot not ours) now demotes to NL + `goto restart` slow re-acquire. Gates: !unpublished,

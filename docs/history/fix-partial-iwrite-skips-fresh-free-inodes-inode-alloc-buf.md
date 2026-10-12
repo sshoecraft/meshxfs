@@ -1,7 +1,7 @@
 <!-- sess45 PROVEN FIX (build C0554679/EF006296): mxfs_submit_partial_inode_write skipped freshly-init'd FREE inodes (di_mode=0, ordered-buf, unlogged) →… -->
 ## sess45 (ccloop 8ddb16a2) — the deep 2/tcp crash_consistency wedge FIXED
 
-### ROOT (fully traced, RULE-4, not a guess):
+### ROOT (fully traced, RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS, not a guess):
 `mxfs_submit_partial_inode_write` (pal/linux/xfs_buf.c:1559, sess115 false-sharing protection)
 writes only inode-cluster sectors this node LOGGED this round; it SKIPS any slot that is
 free-on-buffer (di_mode==0) AND not logged AND not held-in-core (lines ~1694-1716), to avoid a

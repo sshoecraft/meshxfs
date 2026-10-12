@@ -1,5 +1,5 @@
-<!-- sess128 RULE-5 GPT ruling on the BAST-delivery fix + the code landed so far: a preallocated resource-keyed coalescing dispatch queue. -->
-# sess128 — RULE-5 ruling on the sess127 BAST-delivery root, and the landing
+<!-- sess128 RULE: CONSULT ANOTHER MODEL WHEN STUCK GPT ruling on the BAST-delivery fix + the code landed so far: a preallocated resource-keyed coalescing dispatch queue. -->
+# sess128 — RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the sess127 BAST-delivery root, and the landing
 
 Root (sess127, unchanged): `bast_recv_fn` is ONE thread doing a synchronous
 shared-LUN SCSI read per packet inside its recvfrom loop; RcvbufErrors=8085 on

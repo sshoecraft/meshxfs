@@ -1,4 +1,4 @@
-<!-- sess219 RULE-5 ruling (gpt-5.6-sol) for D-LOG-SLICE-SHARED-MULTIWRITER: dual-layer guard, REMOVE modulo (identity+checked helper), mkfs error-not-cla… -->
+<!-- sess219 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (gpt-5.6-sol) for D-LOG-SLICE-SHARED-MULTIWRITER: dual-layer guard, REMOVE modulo (identity+checked helper), mkfs error-not-cla… -->
 # sess219 GPT ruling — log-slice sharing fix shape
 
 Defect: D-LOG-SLICE-SHARED-MULTIWRITER (sess218 root: mkfs default -n 4, 32 nodes, slice = slot % 4 ⇒ 8 writers/slice).

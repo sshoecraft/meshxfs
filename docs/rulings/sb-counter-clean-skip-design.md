@@ -1,5 +1,5 @@
-<!-- sess351 RULE-5 ruling for -->
-# sess351 RULE-5 ruling — D-IDLE-SLICE-WSKIP-REFUSAL-AG-QUARANTINE-0130 fix shape
+<!-- sess351 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling for -->
+# sess351 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — D-IDLE-SLICE-WSKIP-REFUSAL-AG-QUARANTINE-0130 fix shape
 
 Full text in sess351 transcript (task ki00uxoru). Ruling: BOTH producer- and
 replay-side; immediate mitigation = narrow replay-side accounting carve-out.

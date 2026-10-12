@@ -1,6 +1,6 @@
 ---
 name: user-never-use-the-old-naming-convention-name-configurations-by-their-full-key
-description: USER 2026-10-01 (angry): NEVER use the old naming again ("2-node TCP", "8-node CAW", TCP/CAW, tcp/cawd/cawp codes). Always <nodes>/<class>/<method>/<…
+description: USER 2026-10-01: NEVER use the old naming again ("2-node TCP", "8-node CAW", TCP/CAW, tcp/cawd/cawp codes). Always <nodes>/<class>/<method>/<…
 metadata:
   type: user
 tags: [user, naming, configuration, readme, documentation]

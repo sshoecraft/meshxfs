@@ -1,4 +1,4 @@
-<!-- sess404 RULE-5 ruling (D-DEAD-WAITER-AG-TICKET-CREATE-ETIMEDOUT-404): extend sess31 fix A/B to AG; NOQUEUE -> -EAGAIN at once; DEMAND overrides ticke… -->
+<!-- sess404 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (D-DEAD-WAITER-AG-TICKET-CREATE-ETIMEDOUT-404): extend sess31 fix A/B to AG; NOQUEUE -> -EAGAIN at once; DEMAND overrides ticke… -->
 # sess404 GPT ruling — AG courtesy ticket naming a DEAD registered waiter
 
 ## Defect (PROVEN, 0.24.1 P-CAWEXH-AG on kill5d, tests/evidence/sess404_v0241/)

@@ -1,4 +1,4 @@
-<!-- sess473 RULE-5 (GPT) review of the D-0533 dirshard probe revalidation: STOP-SHIP, 12 findings; 4 actioned in 0.64.20 (convergence test, short wait in… -->
+<!-- sess473 RULE: CONSULT ANOTHER MODEL WHEN STUCK (GPT) review of the D-0533 dirshard probe revalidation: STOP-SHIP, 12 findings; 4 actioned in 0.64.20 (convergence test, short wait in… -->
 # sess473 GPT review — D-0533 fix (mxfs_dirshard_probe_revalidate)
 
 Verdict: STOP-SHIP on the first cut. Findings (numbered as returned):

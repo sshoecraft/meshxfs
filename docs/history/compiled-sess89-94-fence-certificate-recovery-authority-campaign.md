@@ -24,7 +24,7 @@ the GUARD lands 1.26s after WITHDRAWN, well inside a ~12s remount, so pass-2's
 GUARD skip holds and the remount correctly takes a free slot. 100/100
 fsync-acknowledged files survived.
 
-Owed: full 32/caw board (not run in 3 sessions), the no-survivor case, RULE-5
+Owed: full 32/caw board (not run in 3 sessions), the no-survivor case, RULE: CONSULT ANOTHER MODEL WHEN STUCK
 consult on fixing dead pass-1.
 
 ## sess90 — board green; crash_consistency FAIL localized to a contention STATE, not inherent pace `docs/history/docs/history/compiled-sess89-94-fence-certificate-recovery-authority-campaign.md`
@@ -131,7 +131,7 @@ authority). Established the wiring is tractable: `victim_key ==
 (uint64_t)victim_node` is known a priori (no need to split key-reads out of
 `fence_node`), and a GUARD slot is already unclaimable by joiners
 (`disklock.c:4707`), removing the main expected hazard to reordering fence-before-replay.
-Four open questions banked for the RULE-5 consult: single-winner CAS
+Four open questions banked for the RULE: CONSULT ANOTHER MODEL WHEN STUCK consult: single-winner CAS
 confirmation, availability policy when no certificate can exist, the source of
 epoch for the lease detector's zero, and whether mount-barrier cohort victims
 (previous-boot) get the same treatment.

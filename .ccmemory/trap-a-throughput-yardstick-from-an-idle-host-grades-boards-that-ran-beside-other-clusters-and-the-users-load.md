@@ -9,7 +9,7 @@ The native-XFS yardstick (`tools/xfs_baseline_refresh.sh`) runs on test1 with ev
 
 `fio_perf` records only the host's load average (`hostload=`), nothing about I/O, and clyde keeps no sysstat history, so a low reading cannot be told apart from host contention after the fact.
 
-What this produced: 4/net/mesh/direct seqW read 1018 MiB/s (72%) on g4 after the iSCSI tuning was reverted, against 1992 and 2024 on the same group an hour earlier. Last session had called the tuning "PROVEN" as the cause from two samples per arm taken under the same uncontrolled load. The user corrected it: "it's mostly idled now, but not when you were doing the damn testing", and the yardstick was a single node with nothing else running.
+What this produced: 4/net/mesh/direct seqW read 1018 MiB/s (72%) on g4 after the iSCSI tuning was reverted, against 1992 and 2024 on the same group an hour earlier. Last session had called the tuning "PROVEN" as the cause from two samples per arm taken under the same uncontrolled load. The user corrected it: the host was mostly idle by then, but not while the testing ran, and the yardstick was a single node with nothing else running.
 
 Do:
 - Measure both sides of `fio_perf_vs_xfs` under the same host conditions. Run the yardstick, then each configuration's throughput rows alone, with only that group powered up.

@@ -1,4 +1,4 @@
-<!-- sess276 RULE-5 ruling: proof-of-fence self-withdraw via PR IN READ FULL STATUS, BAST backoff+coalesce, refusal→terminal EIO state (no partial writeba… -->
+<!-- sess276 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: proof-of-fence self-withdraw via PR IN READ FULL STATUS, BAST backoff+coalesce, refusal→terminal EIO state (no partial writeba… -->
 # sess276 GPT ruling — false-death incident fix set
 
 Context: the sess276 dlm_fairness incident (see

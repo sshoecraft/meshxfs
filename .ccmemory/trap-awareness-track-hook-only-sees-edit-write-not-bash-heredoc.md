@@ -31,7 +31,7 @@ same message no matter how much correct prose was added, and re-reading mtimes
 to work out why is a dead end: drift is computed from the session ledger, not
 from timestamps.
 
-**Use the `Edit` or `Write` tool on awareness docs.** Same reason RULE 7 says to
+**Use the `Edit` or `Write` tool on awareness docs.** Same reason RULE: INSPECT WITH THE RIGHT TOOL says to
 use `Read` for source: the hooks are attached to the dedicated tools, and a
 shell equivalent that produces the same bytes does not produce the same
 side effects.

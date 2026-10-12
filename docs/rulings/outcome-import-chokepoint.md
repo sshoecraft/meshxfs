@@ -1,5 +1,5 @@
-<!-- sess383 RULE-5 ruling on the 3 measured fail-open arms in terminal-outcome import: one canonical validator reached via a quar_cb that RETURNS a dispo… -->
-# sess383 RULE-5 ruling — the terminal-outcome import chokepoint
+<!-- sess383 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the 3 measured fail-open arms in terminal-outcome import: one canonical validator reached via a quar_cb that RETURNS a dispo… -->
+# sess383 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — the terminal-outcome import chokepoint
 
 Context: the sess333 pre-rig unit checks finally RAN (tools/recov_forge +
 tests/d513_forged_record_checks.sh, real LUN, real mounts, 32/caw, 0.19.5).

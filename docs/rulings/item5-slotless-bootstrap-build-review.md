@@ -1,4 +1,4 @@
-<!-- sess440 RULE-5 ruling on the item-5 slotless-bootstrap build plan: phase structure right, 10 STOP-SHIPs (fence ALL non-owner keys, m_log==NULL replay… -->
+<!-- sess440 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the item-5 slotless-bootstrap build plan: phase structure right, 10 STOP-SHIPs (fence ALL non-owner keys, m_log==NULL replay… -->
 # sess440 GPT ruling — item 5 (slotless bootstrap) build-level review
 
 Plan put to it: A entry = survivor scan (2 reads ≥ dead window; no advance + ≥1 member record ⇒ bootstrap regardless of free slots); B provisional identity {node_id, fresh epoch, key}, owner_slot=0xFFFF; C seal = keys named by dead records only, slotless REGISTERED entries left alone, unclassifiable key ⇒ abort; D phase-3 fencing via the existing recovery_acquire pipeline in dlm_init; E dlm_init returns BOOTSTRAP_OWNER (node_slot=-1), xfs_mountfs hook before xfs_log_mount runs the barrier loop with the `!mp->m_log` guard relaxed; F RECOVERY_COMPLETE ⇒ ordinary claim/join from the hook; G waiters poll bounded.

@@ -3,7 +3,7 @@
 
 Found 2026-07-20 while debugging `MXFS_NODE_LIST=192.168.1.80 MXFS_DEV=/dev/sdb
 ./run.sh 1 xfs` failing `prep_cluster_xfs`'s final check against a Proxmox node
-that was demonstrably mounted correctly. RULE-4 proven on the first
+that was demonstrably mounted correctly. RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS proven on the first
 instrumentation pass, not guessed.
 
 ## The defect

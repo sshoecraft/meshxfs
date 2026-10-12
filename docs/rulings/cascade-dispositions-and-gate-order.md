@@ -1,4 +1,4 @@
-<!-- sess357 RULE-5 ruling: enforcement machinery build NOW at knob=0; F2 domain knob binds FR-enforce too; grant-freeze = NEW defect (closure classify +… -->
+<!-- sess357 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: enforcement machinery build NOW at knob=0; F2 domain knob binds FR-enforce too; grant-freeze = NEW defect (closure classify +… -->
 # sess357 GPT ruling — race-5 cascade dispositions + gate order (full text in sess357 transcript)
 
 Presented: sess356 mixed-run cascade (refused replay → AG2 quarantine → victim-held

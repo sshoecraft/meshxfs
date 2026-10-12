@@ -68,7 +68,7 @@ sweep is not evidence yet.**
 
 The obvious patch — copy the nine-step pipeline into the unmount path — would
 add up to three device flushes per AG to every unmount and could turn a
-correctness gap into a RULE 0 failure on the mass-unmount rows. Instrument
+correctness gap into a RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS failure on the mass-unmount rows. Instrument
 first; the right size of the problem is not known yet.
 
 ## Where to point this next

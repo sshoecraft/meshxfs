@@ -1,4 +1,4 @@
-<!-- sess421 RULE-5 rulings for tcp-authority-ledger step 3: page-aligned mastership, PENDING_DURABLE, release ACK, owner inc, blocker import, entry = CAW… -->
+<!-- sess421 RULE: CONSULT ANOTHER MODEL WHEN STUCK rulings for tcp-authority-ledger step 3: page-aligned mastership, PENDING_DURABLE, release ACK, owner inc, blocker import, entry = CAW… -->
 # sess421 GPT rulings — step 3 (master-side ledger) design
 
 ## Ruling 1 (design review) — approved with mandatory changes

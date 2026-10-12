@@ -110,7 +110,7 @@ lap3 (0.26.6): single-owner AG node test9 `ccprev=2001 tenure_hit=1992`;
 shared-AG nodes test1/test2 `tenure_hit=0` — every create there already
 re-acquires the AG (tenure++), so the read is one per acquire, i.e. the
 pre-existing shared-AG create-pace shape (D-32NODE-SHARED-DIR-CREATE-PACE,
-D-TMPFILE-CHURN-the budget rule-PERF-400), not a new cost class.
+D-TMPFILE-CHURN-RULE0-PERF-400), not a new cost class.
 
 ## Oracles
 

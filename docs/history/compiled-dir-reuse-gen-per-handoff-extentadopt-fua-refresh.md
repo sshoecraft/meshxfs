@@ -44,7 +44,7 @@ Working combo (build 965BDBD3, both levers as `MXFS_EXTRA_MODARGS="dir_gen_per_h
 
 Results (clean reboot each): Run A **PASS 8/8, 354s** (normal speed, HOLE=0, all 24 rounds, 0 failrounds). Run B **FAIL** — single round-13 `readdir=799/800` durable single-entry loss on ALL nodes, HOLE=0, 355s. So whole-block clobber + DABUF hole are FIXED; **residual = occasional SINGLE-entry lost-update (the long-standing readdir=799 deepest face). NOT 100% yet.**
 
-### Residual single-entry — open hypotheses (RULE-4, next session)
+### Residual single-entry — open hypotheses (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS, next session)
 One entry occasionally drops even with per-handoff data-block invalidation = likely a FREE-SLOT collision (two nodes write different dirents to the same slot). Needs the FREE-SPACE accounting stale for one node (data-block bestfree[] OR the node-format FREE block, `xfs_dir3_free_buf_ops`) OR an epoch-handoff-detection MISS (a rapid same-pair handoff whose epoch granularity under-fires so one handoff isn't invalidated). NEXT: (a) verify the per-handoff invalidation covers the FREE block (read via xfs_da_read_buf, should be gen-stamped+invalidated — confirm); (b) instrument the round-13 single loss — at the losing creator's addname, is the chosen slot already occupied on disk (free-block stale) vs a post-commit destage; (c) check whether `mxfs_v5_dlm_inode_dir_epoch` ever fails to advance on a rapid same-pair handoff.
 
 ### To ship

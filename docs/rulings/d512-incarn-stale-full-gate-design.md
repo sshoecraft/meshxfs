@@ -1,4 +1,4 @@
-<!-- sess413 RULE-5 ruling D-512: shape (c) — DONTCACHE+never-return-shell(ESTALE), full data-path gate set w/ drain sync, mmap zap+pagecache invalidate a… -->
+<!-- sess413 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-512: shape (c) — DONTCACHE+never-return-shell(ESTALE), full data-path gate set w/ drain sync, mmap zap+pagecache invalidate a… -->
 # sess413 GPT ruling: D-INCARN-STALE-SHELL-UNGATED-FILE-READS-512 fix design
 
 Invariant: after MXFS_IF_INCARN_STALE publishes, NO operation may obtain data, submit IO, dirty/fault a page, or successfully return that inode as current. Retirement = liveness; gates = safety; BOTH required. Lookup must NEVER fall through to the poisoned shell — blocked retirement returns -ESTALE (remove the 4-retry-then-fallthrough).

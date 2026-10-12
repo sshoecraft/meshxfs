@@ -1,6 +1,6 @@
 #!/bin/bash
 # revalidate_cell.sh — run one (N, caw) criteria-matrix cell-group on the
-# CURRENT build with fresh prep, cleared dmesg rings, the budget rule-derived
+# CURRENT build with fresh prep, cleared dmesg rings, RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS-derived
 # budgets, and a post-run probe sweep.  Built for the 0.10.66 full-matrix
 # re-validation (ccloop daf50d34): every recorded PASS must come from THIS
 # build, ship config (no MXFS_EXTRA_MODARGS), MXFS_DEV=/dev/mapper/mpatha.

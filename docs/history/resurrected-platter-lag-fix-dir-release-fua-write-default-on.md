@@ -32,7 +32,7 @@ dir blocks only. Build = `1DD4B2F3`.
 
 ### EVIDENCE both fixes passed 8/8 (the ONLY clean PASS 8/8 in project history)
 - cap_fw.log (2026-06-27 19:21): MA=dir_release_fua_write=1 → run.sh 8 tcp
-  dir_reuse_coherency PASS 8/8, 6m52s (within RULE-0 480s test budget).
+  dir_reuse_coherency PASS 8/8, 6m52s (within RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS 480s test budget).
 - cap_tf.log (2026-06-27 18:11): MA=dir_modify_target_flush=1 (reader-side
   SYNCHRONIZE CACHE, xfs_mxfs_dlm.c ~6185) → PASS 8/8. Two independent
   confirmations of the platter-lag root.
@@ -42,5 +42,5 @@ reader-modify; sess36-HEAD called it "stronger".
 ### OPEN (validating now): RELIABILITY. Both prior PASSes were single runs.
 Running `tests/drc_cap8.sh 3` (8/tcp dir_reuse ×3 clean-reboot) →
 scratchpad/validate8_fua.log. NEXT: if 3/3, run FULL `./run.sh 8 tcp` (regression
-+ RULE-0 perf check), then 4/2/1 tcp full suites. Criterion = full 1/2/4/8 tcp
++ RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS perf check), then 4/2/1 tcp full suites. Criterion = full 1/2/4/8 tcp
 100%. dir_modify_target_flush stays default-0 (belt-and-suspenders available).

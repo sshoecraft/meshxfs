@@ -1,5 +1,5 @@
-<!-- sess425 RULE-5 ruling (D-0342): partial ledger purge = HELD failure at recovery-complete; keep blockers until a COMPLETE pass returns 0; purge tombst… -->
-# sess425 RULE-5 ruling — partial ledger purge ignored (D-TCP-RECOVERY-COMPLETE-IGNORES-PARTIAL-LEDGER-PURGE-0342)
+<!-- sess425 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (D-0342): partial ledger purge = HELD failure at recovery-complete; keep blockers until a COMPLETE pass returns 0; purge tombst… -->
+# sess425 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — partial ledger purge ignored (D-TCP-RECOVERY-COMPLETE-IGNORES-PARTIAL-LEDGER-PURGE-0342)
 
 Hole: all 6 mxfs_dlm_ledger_purge_owner callers (v5_mount.c:970 goodbye, :2825 fenced-slotless, :3840
 handle_node_death, :3904 recovered_cb, :3937 clean_depart, :5620 recovery_complete2; dlm.c:1389 lazy)

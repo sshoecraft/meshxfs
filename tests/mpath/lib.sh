@@ -56,6 +56,9 @@ cklt() {  # <what> <got> <bound>: got < bound
 }
 finish() { echo "RESULT: $1 src=test | measured=$2 | reason=${why} (evidence $OUT)"; }
 now_ms() { date +%s%3N; }
+# Every time a row hands to the helpers below is on THIS host's clock; a load's
+# log is stamped on its node's clock, and they translate with clock_off
+# (tests/lib/rig.sh), measured for each node as its load starts.
 portal_of() { local v; v=$(lab_need san "$1") || exit 2; echo "${v##*,}.1"; }
 link() {  # <node> <a|b> <up|down>: the cable, logged with its time
     scripts/san_net.sh link "$1" "$2" "$3" >> "$OUT/links.log" \
@@ -202,6 +205,12 @@ pf_load_start() {
     done
     wait "${pids[@]}"
     trap 'stop_loads "$NODES"; links_all_up; kmsg_stop' EXIT
+    pids=()
+    for n in $on; do ( clock_measure "$n" ) & pids+=($!); done
+    wait "${pids[@]}"
+    for n in $on; do
+        [ -s "$OUT/clock_$n" ] || { echo "RESULT: ABORT label=$LABEL stage=clock node=$n (its clock could not be read, so no stall can be measured) evidence=$OUT"; exit 2; }
+    done
     sleep "$warm"
     for n in $on; do
         ck "$n's load is running before the first fault (completed operations > 0)" "$([ "$(grep -ac ' ok$' "$OUT/load_$n/ops.log" 2>/dev/null)" -gt 0 ] && echo yes || echo no)" yes
@@ -214,11 +223,18 @@ pf_load_start() {
 # after, from the load's own log), that operations kept completing, and that
 # none returned an error.  Every value goes to $OUT/stalls.txt.
 pf_window() {
-    local tag=$1 T0=$2 T1=$3 n line
+    local tag=$1 T0=$2 T1=$3 n line off pids=()
     sleep 2     # the load pushes its log to the server twice a second
     for n in ${4:-$LOAD_NODES}; do
-        line=$(python3 tests/mpath/pathload.py stall "$OUT/load_$n/ops.log" "$T0" "$T1")
-        echo "  INFO $tag: $n $line"
+        : > "$OUT/clock_$n.recheck"     # empty unless this reading succeeds
+        ( clock_measure "$n" "$OUT/clock_$n.recheck" >/dev/null ) & pids+=($!)
+    done
+    wait "${pids[@]}"
+    for n in ${4:-$LOAD_NODES}; do
+        clock_steady "$n" || { echo "RESULT: ABORT label=$LABEL stage=clock-step node=$n window=$tag (its operations cannot be placed against this window) evidence=$OUT"; exit 2; }
+        off=$(clock_off "$n")
+        line=$(python3 tests/mpath/pathload.py stall "$OUT/load_$n/ops.log" "$((T0 + off))" "$((T1 + off))")
+        echo "  INFO $tag: $n $line clock_off_ms=$off"
         echo "$tag $n t0_ms=$T0 $line" >> "$OUT/stalls.txt"
         cklt "$tag: $n's longest stall, ms" "$(sed -n 's/.*max_ms=\([0-9]*\).*/\1/p' <<<"$line")" "${PF_BOUND_MS:-$BOUND_MS}"
         ck "$tag: $n's load kept completing operations through the window" "$([ "$(sed -n 's/.*completed_in_window=\([0-9]*\).*/\1/p' <<<"$line")" -gt 0 ] && echo yes || echo no)" yes
@@ -377,7 +393,7 @@ pf_resumed() {
     while [ $((SECONDS - s)) -lt "$b" ]; do
         ok=1
         for n in $3; do
-            [ "$(tail -c 4096 "$OUT/load_$n/ops.log" 2>/dev/null | tr -d '\000' | awk -v t="$since" 'NF >= 4 && $4 == "ok" && $2 ~ /^[0-9]+$/ && $2 > t {f = 1} END {print f + 0}')" = 1 ] || ok=0
+            [ "$(tail -c 4096 "$OUT/load_$n/ops.log" 2>/dev/null | tr -d '\000' | awk -v t="$((since + $(clock_off "$n")))" 'NF >= 4 && $4 == "ok" && $2 ~ /^[0-9]+$/ && $2 > t {f = 1} END {print f + 0}')" = 1 ] || ok=0
         done
         [ "$ok" = 1 ] && { echo $((SECONDS - s)); return 0; }
         sleep 2
@@ -385,14 +401,14 @@ pf_resumed() {
     echo 999
 }
 # pf_last_op_ms <node>: the end time of the last operation in that node's log,
-# on the node's own clock
+# on this host's clock
 pf_last_op_ms() {
-    tr -d '\000' < "$OUT/load_$1/ops.log" 2>/dev/null | awk 'NF >= 4 && $2 ~ /^[0-9]+$/ {t = $2} END {print t + 0}'
+    tr -d '\000' < "$OUT/load_$1/ops.log" 2>/dev/null | awk -v off="$(clock_off "$1")" 'NF >= 4 && $2 ~ /^[0-9]+$/ {t = $2} END {print (t ? t - off : 0)}'
 }
 # pf_acked_after <node> <ms>: fsynced writes of that node's load that STARTED
-# after <ms> (on the node's clock) and were acknowledged
+# after <ms> (on this host's clock) and were acknowledged
 pf_acked_after() {
-    tr -d '\000' < "$OUT/load_$1/ops.log" 2>/dev/null | awk -v t="$2" 'NF >= 4 && $3 == "write" && $4 == "ok" && $1 ~ /^[0-9]+$/ && $1 >= t' | grep -c .
+    tr -d '\000' < "$OUT/load_$1/ops.log" 2>/dev/null | awk -v t="$(($2 + $(clock_off "$1")))" 'NF >= 4 && $3 == "write" && $4 == "ok" && $1 ~ /^[0-9]+$/ && $1 >= t' | grep -c .
 }
 # pf_victim_stopped <tag> <since_ms>: the fenced node stopped by itself and
 # nothing it wrote afterwards was acknowledged

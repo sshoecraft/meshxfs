@@ -29,7 +29,7 @@ reached*, not *nothing failed*. Detail:
 apart, each with 26-28 peers queued. That is a **fair** 32-node rotation — 48%
 of the budget is queue delay, not starvation and not a lost wakeup.
 
-## The ceiling ruling (RULE-5 checked)
+## The ceiling ruling (RULE: CONSULT ANOTHER MODEL WHEN STUCK checked)
 
 Removing ALL handoff cost buys at most `1/(1-f_H)`. Fitting the workload into
 30 s needs 2.84x ⇒ requires **f_H ≥ 64.8%**. Measured `P138-BAST` release on

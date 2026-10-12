@@ -214,14 +214,14 @@ since a record older than the boot isn't this boot's crash.
 2026-08-15 with a zero-tool-call haiku subagent: it correctly listed RULES 0,
 1, 2, 2b, 2c, 3-8 verbatim and answered all four probed prohibitions
 correctly, proving real CLAUDE.md inheritance rather than reconstruction. The
-catch: it's a SESSION-START snapshot — it did not know RULES 9 and 10, added
+catch: it's a SESSION-START snapshot — it did not know RULE: THE POOL METERS REQUESTS and RULE: DELEGATE ITERATIVE GRIND, added
 earlier in that same session, and newly-written `.claude/agents/*.md`
 definitions were "not found" by subagents until the next session restarted.
 This overturned an unverified claim ("subagents inherit none of this file")
 that had been written into CLAUDE.md as fact after a design-consult review;
 the fix was to actually test it. Standing lesson: a design consult's claims
 are hypotheses, not findings, and cheap ones are usually one subagent call
-away from being checked. Still embed RULES 0/2c/3 verbatim in every agent
+away from being checked. Still embed RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS/RULE: NEVER WEDGE THE LAB HOST/RULE: A SCRIPT IS NEVER A TEMP FILE verbatim in every agent
 definition anyway — not because inheritance fails, but because a rule written
 this session hasn't propagated yet, and a constraint next to the task is
 obeyed more reliably than one 400 lines up the file.

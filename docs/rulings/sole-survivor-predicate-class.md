@@ -1,5 +1,5 @@
-<!-- sess574 RULE-5 ruling on the 77-guard is_single_node class: sweep all 77, retire the predicate, and the missing axis is recovery-drain state not memb… -->
-# RULE-5 ruling (sess574): the `is_single_node()` guard class
+<!-- sess574 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the 77-guard is_single_node class: sweep all 77, retire the predicate, and the missing axis is recovery-drain state not memb… -->
+# RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (sess574): the `is_single_node()` guard class
 
 Asked because the class had been declared closed **twice** at single call sites
 (D-0904, D-0949) and 77 guards were still standing. Five shapes were put:

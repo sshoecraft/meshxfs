@@ -136,8 +136,13 @@ enum {
 	Opt_uqnoenforce, Opt_gqnoenforce, Opt_pqnoenforce, Opt_qnoenforce,
 	Opt_discard, Opt_nodiscard, Opt_dax, Opt_dax_enum, Opt_max_open_zones,
 	Opt_lifetime, Opt_nolifetime, Opt_max_atomic_write, Opt_errortag,
-	Opt_peer, Opt_peers, Opt_cluster,
+	Opt_peer, Opt_peers, Opt_cluster, Opt_transport,
 };
+
+/* m_mxfs_transport: what the transport= mount option asked for */
+#define MXFS_MOUNT_TRANSPORT_MODULE	0	/* none: force_transport decides */
+#define MXFS_MOUNT_TRANSPORT_TCP	1
+#define MXFS_MOUNT_TRANSPORT_CAW	2
 
 #define fsparam_dead(NAME) \
 	__fsparam(NULL, (NAME), Op_deprecated, fs_param_deprecated, NULL)
@@ -199,6 +204,7 @@ static const struct fs_parameter_spec xfs_fs_parameters[] = {
 	fsparam_string("peer",		Opt_peer),
 	fsparam_string("peers",		Opt_peers),
 	fsparam_string("cluster",	Opt_cluster),
+	fsparam_string("transport",	Opt_transport),
 	{}
 };
 
@@ -334,6 +340,10 @@ xfs_fs_show_options(
 		seq_show_option(m, "rtdev", mp->m_rtname);
 	if (mp->m_mxfs_cluster_name)
 		seq_show_option(m, "cluster", mp->m_mxfs_cluster_name);
+	if (mp->m_mxfs_transport == MXFS_MOUNT_TRANSPORT_TCP)
+		seq_puts(m, ",transport=tcp");
+	else if (mp->m_mxfs_transport == MXFS_MOUNT_TRANSPORT_CAW)
+		seq_puts(m, ",transport=caw");
 	if (mp->m_mxfs_peers) {
 		const struct mxfs_static_peers *sp = mp->m_mxfs_peers;
 		uint32_t i;
@@ -3548,6 +3558,23 @@ xfs_fs_parse_param(
 		if (!parsing_mp->m_mxfs_cluster_name)
 			return -ENOMEM;
 		return 0;
+	case Opt_transport:
+		/*
+		 * The lock transport of THIS filesystem.  force_transport is a
+		 * module parameter, one value for every mount on the host, and a
+		 * host that mounts a DRBD resource (network lock manager only)
+		 * beside a SAN LUN on COMPARE AND WRITE needs one of each.
+		 */
+		if (!strcmp(param->string, "tcp")) {
+			parsing_mp->m_mxfs_transport = MXFS_MOUNT_TRANSPORT_TCP;
+		} else if (!strcmp(param->string, "caw")) {
+			parsing_mp->m_mxfs_transport = MXFS_MOUNT_TRANSPORT_CAW;
+		} else {
+			xfs_warn(parsing_mp, "transport=: tcp or caw, not \"%s\"",
+				 param->string);
+			return -EINVAL;
+		}
+		return 0;
 	default:
 		xfs_warn(parsing_mp, "unknown mount option [%s].", param->key);
 		return -EINVAL;
@@ -5295,7 +5322,9 @@ xfs_fs_fill_super(
 		mp->m_mxfs_clustered = true;
 		struct mxfs_v5_dlm_opts dlm_opts = {
 			.authority = mp->m_mxfs_auth,
-			.transport = MXFS_V5_TRANSPORT_CAW,
+			.transport = mp->m_mxfs_transport == MXFS_MOUNT_TRANSPORT_TCP ?
+				     MXFS_V5_TRANSPORT_TCP : MXFS_V5_TRANSPORT_CAW,
+			.transport_explicit = mp->m_mxfs_transport != MXFS_MOUNT_TRANSPORT_MODULE,
 			.disklock_offset = mp->m_mxfs_disklock_offset,
 			.journal_offset = mp->m_mxfs_journal_offset,
 			.rman_offset = mp->m_mxfs_rman_offset,

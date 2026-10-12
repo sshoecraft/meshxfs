@@ -1,13 +1,13 @@
 ---
 name: timing-is-first-class
-description: RULE 0 (sess130): timeouts are performance assertions. budget = infra + 2×native-XFS. Timeout = FAIL even with 0 errors. tests/criteria/TIMEOUT_BUDGE…
+description: RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS (sess130): timeouts are performance assertions. budget = infra + 2×native-XFS. Timeout = FAIL even with 0 errors. tests/criteria/TIMEOUT_BUDGE…
 metadata:
   type: feedback
 ---
 
-# Timeouts are performance assertions (RULE 0)
+# Timeouts are performance assertions (RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS)
 
-**User directive, repeated ~10×, finalized sess130 as RULE 0 in /src/mxfs/CLAUDE.md.**
+**User directive, repeated ~10×, finalized sess130 as RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS in /src/mxfs/CLAUDE.md.**
 
 **Why:** Native XFS rsyncs ~700MB in 3-4s on this hardware. A clustered FS slower than
 2× native is unshippable — nobody uses GFS2/OCFS2 because they're too slow. A blanket
@@ -18,7 +18,7 @@ metadata:
    workload (native-XFS equivalent × 2). Budgets table: `tests/criteria/TIMEOUT_BUDGETS.md`.
 2. Set the Bash timeout TO the budget. Not a round number, not the tool cap.
 3. A timeout IS a FAIL, even with zero errors. Kill, record FAIL, diagnose slowness
-   as a first-class bug (RULE 4 loop).
+   as a first-class bug (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS loop).
 4. 2× native XFS = hard ceiling. XFS 7s vs mxfs 200s = FAIL even if bytes are correct.
 5. NEVER widen a timeout to make a run pass; never re-run with a bigger timeout
    "to see if it finishes".

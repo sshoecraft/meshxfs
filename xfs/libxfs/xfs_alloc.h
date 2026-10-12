@@ -69,6 +69,14 @@ typedef struct xfs_alloc_arg {
 	 */
 	bool		mxfs_ag_trylock;
 	/*
+	 * MXFS (net/mesh): the remote master that left one of this allocation's
+	 * no-queue AG tries unanswered, 0 while none has.  Kept across every AG
+	 * walk and pass made with these args, so the rest of the allocation does
+	 * not spend a whole attempt on each further AG that master owns while
+	 * the caller holds its inode's ILOCK (see mxfs_v5_dlm_ag_lock_nb).
+	 */
+	uint32_t	mxfs_mute_master;
+	/*
 	 * MXFS diagnostic-only: owner inode of a bmap-path allocation.
 	 * xfs_bmap_btalloc passes XFS_RMAP_OINFO_SKIP_UPDATE (oi_owner=0),
 	 * which made the P-DBLALLOC in-the-act detector dead code for file

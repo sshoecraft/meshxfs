@@ -25,7 +25,7 @@ the `[CALIBRATION: budget not enforced]` tag, nor compare `elapsed_s` vs
 `budget_s`. Meanwhile `scripts/ladder_rung.sh` — the harness that produced
 essentially the entire historical board, across ccloop runs 72513a13, 5d123e7b
 and 0220f43f — **hardcoded `RULE0_CALIBRATE=1` on every `run.sh` call**. Under
-calibrate mode `run.sh::record()` skips the RULE-0 elapsed>budget→FAIL override
+calibrate mode `run.sh::record()` skips the RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS elapsed>budget→FAIL override
 and inflates kill_budget/tt 20×.
 
 So every cell ever produced by `ladder_rung.sh` was calibration-tagged and had
@@ -42,7 +42,7 @@ real bug hid in there, but that was only knowable after auditing.
 `prep_cluster` call, changed to `RULE0_CALIBRATE="${RULE0_CALIBRATE:-1}"`.
 Default behavior for other callers is unchanged; `RULE0_CALIBRATE=0
 scripts/ladder_rung.sh <N> <cond>` now does a real run — exact manifest budget as
-kill_budget, RULE-0 override live.
+kill_budget, RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS override live.
 
 Then every cell was re-run for real: 24 rungs (4 cond × 6 N), condition by
 condition, N ascending. Post-sweep audit: 0 calibration-tagged, 0 elapsed>budget,
@@ -137,7 +137,7 @@ median-of-3 (`RAWCEIL_SAMPLES`) and never single samples.
 
 1/cawd `single_node_paired` (rsync of an 8714-file tree, 4 position-balanced
 rounds, trimmed-mean ratio, threshold ≤105%) did **not** clear on one retry.
-RULE 4: six independent real trials were gathered rather than accepting the first
+RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS: six independent real trials were gathered rather than accepting the first
 lucky PASS.
 
 | # | ratio | round_ratios | verdict |

@@ -1,4 +1,4 @@
-<!-- sess427 RULE-5 rulings (D-0351): FREE-PUBLISH invariant at AG handoff; refuse bare epoch READ_ONCE (TOCTOU), post-commit arming, mode-0 discharge, AG… -->
+<!-- sess427 RULE: CONSULT ANOTHER MODEL WHEN STUCK rulings (D-0351): FREE-PUBLISH invariant at AG handoff; refuse bare epoch READ_ONCE (TOCTOU), post-commit arming, mode-0 discharge, AG… -->
 # sess427 GPT rulings — D-0351 (ifree dinode never published; inobt free visible; peer double-alloc → shutdown)
 
 ## Ruling 1 (evidence + first proposal "keep RELFLUSH in INACT-DEFER")

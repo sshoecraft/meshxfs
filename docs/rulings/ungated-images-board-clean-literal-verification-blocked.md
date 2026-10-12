@@ -1,7 +1,7 @@
-<!-- sess463 RULE-5 ruling: D-FOREIGN-REPLAY-UNGATED-IMAGES stays OPEN (verification-blocked on the cc pace row): criterion (2) 'board clean' is literal;… -->
+<!-- sess463 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: D-FOREIGN-REPLAY-UNGATED-IMAGES stays OPEN (verification-blocked on the cc pace row): criterion (2) 'board clean' is literal;… -->
 # sess463 GPT ruling — D-FOREIGN-REPLAY-UNGATED-IMAGES disposition question
 
-Question: may the record close F&V with criterion (2) "32-node board clean apart from the policy cell" read as "no row fails for a cause attributable to this record", given crash_consistency fails only as a RULE-0 timeout (all checks pass) attributed to the separately-open D-32NODE-SHARED-DIR-CREATE-PACE / D-CRASH-CONSISTENCY-401?
+Question: may the record close F&V with criterion (2) "32-node board clean apart from the policy cell" read as "no row fails for a cause attributable to this record", given crash_consistency fails only as a RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS timeout (all checks pass) attributed to the separately-open D-32NODE-SHARED-DIR-CREATE-PACE / D-CRASH-CONSISTENCY-401?
 
 ## Ruling: DO NOT CLOSE.
 - (2) is an OUTCOME criterion, not an attribution criterion; a board with a red crash_consistency row is not clean. Reinterpreting after failure = the prohibited precedent. Separate ledgering explains WHY verification is blocked; it does not satisfy (2).

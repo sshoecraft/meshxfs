@@ -1,9 +1,9 @@
-<!-- sess384 RULE-5 ruling on D-374 NO_TERMINAL_RECORD: harness-side synthesized state is authoritative; node watchdog only enriches; kill tail -1 arbitra… -->
+<!-- sess384 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on D-374 NO_TERMINAL_RECORD: harness-side synthesized state is authoritative; node watchdog only enriches; kill tail -1 arbitra… -->
 ## Context (sess384) — PROVEN mechanism for D-CRASH-CONSISTENCY-NO-TERMINAL-RECORD-CAPTURE-374
 
 run.sh clamps the node-side rendezvous timeout `ct` to `tt-15` for
 **dir_reuse_coherency only**. Every other criterion gets the global
-`COORD_TIMEOUT=120`, which EXCEEDS its RULE-0 budget `tt` — rsync_paired 60,
+`COORD_TIMEOUT=120`, which EXCEEDS its RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS budget `tt` — rsync_paired 60,
 crash_consistency 90, posix_multi 30, cache_coherency 60, zero_silent_loss 60,
 scaling_curve/dlm_scaling/node_responsive 90, ... So the harness SIGKILLs the
 ssh at the budget long before the node-side barrier can report BARRIER_TIMEOUT.

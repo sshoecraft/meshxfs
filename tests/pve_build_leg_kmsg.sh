@@ -16,6 +16,8 @@
 # Usage: tests/pve_build_leg_kmsg.sh <label>
 # Env:   PVE_PAIR ("192.168.1.80 192.168.1.81")  DISK (/dev/sdb)
 #        MODEL (SVP100S)  COUNTS ("3 4")  as scripts/pve_build_compare.sh
+#        LEGS    scripts/pve_build_compare.sh legs to run (default mxfs; san for
+#                MXFS on the shared iSCSI LUN)
 #        PROBES  dynamic-debug formats switched on in mxfs on both hosts before
 #                the leg (default: the no-queue and prepare-wanted probes); a module reload
 #                switches them off again
@@ -27,7 +29,7 @@ SSHP="$REPO/tools/mxfs_sshpass.sh"
 LABEL=${1:?label}
 read -r -a H <<<"${PVE_PAIR:-192.168.1.80 192.168.1.81}"
 export DISK=${DISK:-/dev/sdb} MODEL=${MODEL:-SVP100S}
-PROBES=${PROBES:-P-ACQ-NOQUEUE-PREPARE P-ACQ-NOQUEUE-LEDGER-NOTREADY P-PREPARE-WANTED P-ACQ-NOQUEUE-UNANSWERED P958-ACQ-GAVE-UP-RETIRED P-RREQ-NOQUEUE-SLOW P958-ACQ-GRANT-}
+PROBES=${PROBES:-P-ACQ-NOQUEUE-PREPARE P-ACQ-NOQUEUE-LEDGER-NOTREADY P-PREPARE-WANTED P-ACQ-NOQUEUE-UNANSWERED P958-ACQ-GAVE-UP-RETIRED P-RREQ-NOQUEUE-SLOW P-RRQ-DROP-STALE-NOQUEUE P958-ACQ-GRANT- P-AGNB-MUTED P-ALLOC-WALK-SLOW}
 EVID="$REPO/tests/evidence/pve_build_leg_kmsg/$(date -u +%Y%m%dT%H%M%SZ)-$LABEL"
 mkdir -p "$EVID" || exit 1
 say() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$EVID/verdict.txt"; }
@@ -38,7 +40,7 @@ on() { timeout "${3:-60}" "$SSHP" "$1" "$2" </dev/null 2>&1 | grep -avE '^Warnin
 # of these lines, and the module's own stall forensics (P278-HB-STALL) dump a
 # stack at warn level on a healthy loaded host; they are counted instead.
 BAD='I/O error|blocked for more than|WARNING:|BUG:|Oops|Shutting down filesystem|P-WITHDRAW|RECOVERY_BLOCKED|self-fenc|corrupt|failed after [0-9]+ retries'
-COUNT='P-ACQ-NOQUEUE-PREPARE|P-ACQ-NOQUEUE-PREPARE-SLOW|P-ACQ-NOQUEUE-LEDGER-NOTREADY|P-PREPARE-WANTED|P-ACQ-NOQUEUE-UNANSWERED|P958-ACQ-IDLE-LOST|P958-ACQ-GAVE-UP-RETIRED|P-RREQ-NOQUEUE-SLOW|P958-ACQ-GRANT-CLAIMED|P958-ACQ-GRANT-RELEASED|P958-ACQ-GRANT-VANISHED|P960-AUTH-TRANSITION-NOQUEUE|P-ACQ-UNREACHABLE-MASTER-NOQUEUE|P278-HB-STALL'
+COUNT='P-ACQ-NOQUEUE-PREPARE|P-ACQ-NOQUEUE-PREPARE-SLOW|P-ACQ-NOQUEUE-LEDGER-NOTREADY|P-PREPARE-WANTED|P-ACQ-NOQUEUE-UNANSWERED|P958-ACQ-IDLE-LOST|P958-ACQ-GAVE-UP-RETIRED|P-RREQ-NOQUEUE-SLOW|P-RRQ-DROP-STALE-NOQUEUE|P-RRQ-STATS|P958-ACQ-GRANT-CLAIMED|P958-ACQ-GRANT-RELEASED|P958-ACQ-GRANT-VANISHED|P960-AUTH-TRANSITION-NOQUEUE|P-ACQ-UNREACHABLE-MASTER-NOQUEUE|P278-HB-STALL|P-AGNB-MUTED|P-ALLOC-WALK-SLOW|P-AGNB-MUTE-STATS|P-ILOCK-HOLD-SLOW|P189-RELOG-BEHIND-DISK'
 
 declare -A T0
 for h in "${H[@]}"; do
@@ -49,11 +51,11 @@ for h in "${H[@]}"; do
     done
     say "$h: build=$(on "$h" "cat /sys/module/mxfs/version /sys/module/mxfs/srcversion" | tr '\n' ' ')probes=$(on "$h" "grep -c '=p ' /proc/dynamic_debug/control")"
 done
-say "leg $LABEL: $DISK ($MODEL), builds ${COUNTS:-3 4}"
-"$REPO/scripts/pve_build_compare.sh" "$EVID/compare" mxfs > "$EVID/compare.out" 2>&1
+say "leg $LABEL: ${LEGS:-mxfs} on $DISK ($MODEL), builds ${COUNTS:-3 4}"
+"$REPO/scripts/pve_build_compare.sh" "$EVID/compare" ${LEGS:-mxfs} > "$EVID/compare.out" 2>&1
 crc=$?
 say "compare rc=$crc"
-grep -aE 'installed after|never answered|never started|did not come up|could not be reset' "$EVID/compare/compare.log" | tee -a "$EVID/verdict.txt"
+grep -aE 'installed after|never answered|never started|did not come up|could not be reset|VERIFY' "$EVID/compare/compare.log" | tee -a "$EVID/verdict.txt"
 
 fail=0
 for h in "${H[@]}"; do
@@ -71,6 +73,7 @@ for h in "${H[@]}"; do
     fi
 done
 grep -aq 'never answered\|never started\|did not come up\|could not be reset' "$EVID/compare/compare.log" && { say "an install or the leg's setup did not complete"; fail=1; }
+grep -aq 'VERIFY FAIL' "$EVID/compare/compare.log" && { say "a leg's volume failed its check (scripts/pve_mxfs_verify.sh)"; fail=1; }
 [ "$crc" = 0 ] || fail=1
 if [ "$fail" = 0 ]; then say "VERDICT PASS $LABEL"; else say "VERDICT FAIL $LABEL"; fi
 exit "$fail"

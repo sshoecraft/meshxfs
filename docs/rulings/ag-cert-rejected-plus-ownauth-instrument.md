@@ -1,10 +1,10 @@
-<!-- sess101 RULE-5 ruling: broad AG-class authority for inode images REJECTED (8 blockers); the answer is an AG-minted durable unpublished-child delegati… -->
+<!-- sess101 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: broad AG-class authority for inode images REJECTED (8 blockers); the answer is an AG-minted durable unpublished-child delegati… -->
 # sess101 — the step-5.3 ruling, and the instrument that decides the fork
 
 Build **0.11.435**, `srcversion CB58C97A17ED23DE0CE4753`, builds clean, **DEPLOYED to
 all 32 nodes** (prep_cluster, 72 s). The rig is on it now.
 
-## 1. The RULE-5 ruling on the sess100 question (AG tenure as the gate)
+## 1. The RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the sess100 question (AG tenure as the gate)
 
 I brought sess100's numbers (13153 unpublished vs 321 installs) and asked whether the AG
 tenure should gate the UNPUBLISHED_EX population. The ruling, verbatim in shape:

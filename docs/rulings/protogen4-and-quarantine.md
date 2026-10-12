@@ -1,5 +1,5 @@
-<!-- sess131 RULE-5 ruling: MXFS_PROTO_GEN 3 to 4 APPROVED with 4 mandatory blockers; runtime quarantine of legacy FENCED/NONE descriptors REJECTED as wri… -->
-# sess131 RULE-5 ruling (gpt-5.6-sol) — D-MIXED-VERSION-UNGATED-REPLAY
+<!-- sess131 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: MXFS_PROTO_GEN 3 to 4 APPROVED with 4 mandatory blockers; runtime quarantine of legacy FENCED/NONE descriptors REJECTED as wri… -->
+# sess131 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (gpt-5.6-sol) — D-MIXED-VERSION-UNGATED-REPLAY
 
 Asked: (A) is bumping `MXFS_PROTO_GEN` 3 -> 4 the right and sufficient mechanism for the 0.11.422 certified-replay gate; (B) should survivors durably QUARANTINE legacy uncertified FENCED/NONE descriptors.
 

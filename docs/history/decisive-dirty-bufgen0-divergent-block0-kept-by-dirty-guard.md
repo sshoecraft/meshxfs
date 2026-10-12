@@ -33,7 +33,7 @@ evict drops CLEAN stale buffers + sess41 refreshes in-AIL-clean ones, but a
 DIRTY stale-tenure buffer (bufgen=0, freshly materialized on a stale base) slips
 through.
 
-## FIX DIRECTION (GPT-5.5, RULE-4 next)
+## FIX DIRECTION (GPT-5.5, RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS next)
 GPT's recommended SAFE fix (do NOT union-merge; do NOT drop a dirty buffer joined
 to the live trans = iflush-corruption shutdown risk):
   PREVENT block0 from being materialized/dirtied on a stale base.

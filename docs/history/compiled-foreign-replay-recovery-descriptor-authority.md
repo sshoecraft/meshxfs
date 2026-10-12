@@ -131,7 +131,7 @@ at this point.
 
 ## Authority-token capture point ruling (sess102)
 
-`docs/rulings/capture-at-first-dirty-not-format.md`: RULE-5 ruling on
+`docs/rulings/capture-at-first-dirty-not-format.md`: RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on
 where the per-buffer authority proof must be captured for the replay-side token (the
 step-5.3 blocker). Measured P239-OWNAUTH first (format-time authority lookup): 99.95%
 durable on an rsync-heavy window, 92.49%/7.13%-none on a dir-heavy window, unpub/uncached

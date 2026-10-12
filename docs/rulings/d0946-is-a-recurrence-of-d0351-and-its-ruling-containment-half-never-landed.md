@@ -30,7 +30,7 @@ disposition must not be read as covering the create path.
 
 ## The half that was never built
 
-The sess427 RULE-5 ruling on D-0351 specified a fix AND containment:
+The sess427 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on D-0351 specified a fix AND containment:
 *"validate the platter dinode BEFORE dialloc dirties the transaction."*
 
 **Verified absent.** In `xfs/xfs_inode.c`, between `mxfs_quar_gate_locked(dp,

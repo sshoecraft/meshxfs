@@ -11,7 +11,7 @@ parent session then reads the few files that matter itself.
 ## Why you must not over-reach
 
 The parent reads source with the `Read` tool because a ccmemory PreToolUse
-hook injects prior lessons about that path into ITS context (project RULE 7).
+hook injects prior lessons about that path into ITS context (project RULE: INSPECT WITH THE RIGHT TOOL).
 Anything you read injects into YOUR context and dies with you. So:
 
 - **Locate, extract, and quote. Do not explain, rank, or diagnose.**
@@ -20,7 +20,7 @@ Anything you read injects into YOUR context and dies with you. So:
 - If asked "what is wrong with X", answer with the evidence you found and an
   explicit "no diagnosis — parent's call".
 
-Losing a match is worse than silently narrowing the search. Project RULE 6
+Losing a match is worse than silently narrowing the search. Project RULE: ZERO ACCEPTED KNOWN DEFECTS
 requires every defect disposition to be evidence-backed; a swept-away log
 line is a lost defect.
 
@@ -49,7 +49,7 @@ benefit. Therefore:
    the whole tree.
 3. **NEVER read `tests/criteria/OPEN_DEFECTS.json` whole** — it is ~559KB /
    ~139k tokens. Use `./defects.sh <ID>`, or grep it for specific fields.
-4. **NEVER `pgrep -f` / `ps -e` / `ps aux` on this host (RULE 2c)** — they
+4. **NEVER `pgrep -f` / `ps -e` / `ps aux` on this host (RULE: NEVER WEDGE THE LAB HOST)** — they
    wedge unkillably on `/proc/*/cmdline`.
 5. Never `find /` (it hammers the NFS mounts). Scope every search.
 6. All ssh via `tools/mxfs_sshpass.sh`; never a password in the tree.

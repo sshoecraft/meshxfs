@@ -42,7 +42,7 @@ EUCLEAN blocker on cross_write_read is GONE on clean infra + phantom-EX fix;
 P-WRBUF-DIRTORN / P-IFLUSH-DIRTORN (xfs_inode.c iflush ~4265) did NOT fire — torn
 dinode theory moot. cluster phase now runs ~13 tests; new blockers surfaced:
 test_dir_stress (19 fails / 80 assertions, 30s = real correctness not slow),
-test_discovery (~125s/node ≈ 2× lease_timeout — itself a RULE-0 fail),
+test_discovery (~125s/node ≈ 2× lease_timeout — itself a RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS fail),
 test_rename_vis_dbg (stalled >200s). `docs/history/docs/history/docs/history/compiled-posix-multi16-dir-corruption-early.md`
 
 ### sess53 — two FS-shutdown roots isolated
@@ -235,7 +235,7 @@ Check scripts/sess88_workload_a_modeN_baseline.sh.
   chunk-ALLOC bnobt-staleness sibling was still open here.
 - AGI unlinked-list coherency: insert-side fixed sess53 (9C3D67D7); remove-side
   stale bucket head (xfs_iunlink+0x27c, agi block 0x2) remained open at sess56.
-- RULE-0 timing failures also present in the phase (test_discovery ~125s/node).
+- RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS timing failures also present in the phase (test_discovery ~125s/node).
 - Secondary open criteria carried alongside: fence_during_write lost=400,
   rsync_paired 148%.
 

@@ -1,5 +1,5 @@
-<!-- sess396 RULE-5 ruling: non-empty-bucket fossil kill (F1 reset + buffer fossil -> precommit mismatch) => INSERT-mode iunlink item applied at sorted pr… -->
-# sess396 RULE-5 ruling — INSERT-mode iunlink item (GPT, 2026-08-22)
+<!-- sess396 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: non-empty-bucket fossil kill (F1 reset + buffer fossil -> precommit mismatch) => INSERT-mode iunlink item applied at sorted pr… -->
+# sess396 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — INSERT-mode iunlink item (GPT, 2026-08-22)
 
 ## The kill it answers
 0.23.5 lap 5 test25: `P-IUNL-FOSSIL-ENTRY ... fossil_next=0x9dc head=0x163b fix=1 — reset` (NON-empty bucket) then

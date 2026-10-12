@@ -99,7 +99,7 @@
    "guards": 1,
    "note": ""
   },
-  "xfs/xfs_mxfs_pubob.c::EXPORT_SYMBOL": {
+  "xfs/xfs_mxfs_pubob.c::?": {
    "class": "unclassified",
    "guards": 4,
    "note": ""

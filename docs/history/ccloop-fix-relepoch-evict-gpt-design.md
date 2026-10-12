@@ -3,7 +3,7 @@
 
 Build **AAA382D5** (TESTING). Addresses `docs/history/docs/history/compiled-dirreuse-run6614-sess5-coldread-salvage-master-epoch-zero.md`.
 
-### GPT-5.5 consult verdict (RULE-5, proven diagnosis + 5 refuted fixes):
+### GPT-5.5 consult verdict (RULE: CONSULT ANOTHER MODEL WHEN STUCK, proven diagnosis + 5 refuted fixes):
 The master dir_epoch propagation is genuinely broken (local granted-lock mirror's stored dir_epoch lags/zeros vs the master's correctly-sent value), AND — more importantly — **dir stale-base correctness should NOT be gated on the master dir_epoch at all**. Use the RELIABLE LOCAL tenure signal: a cached dir buffer is a stale RMW base iff `b_mxfs_relepoch < ip->i_dlm_epoch` (we released/lost the dir grant since this block was last read coherently; Inv-1 drained our work at that release). This is immune to the DLM propagation bug and is the same signal the sess50 write-side reflush-skip already trusts. i_dlm_epoch bumps on grant-loss/release (8 sites, incl. xfs_mxfs_dlm.c:9454).
 
 ### FIX APPLIED (mxfs_dir_evict_data_blocks, xfs_mxfs_dlm.c ~4646):

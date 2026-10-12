@@ -1,4 +1,4 @@
-<!-- sess418 RULE-5 ruling D-0288 (TCP foreign replay always refused): shape (a)+ = masters seal victim grants into per-victim manifest shards post-fence;… -->
+<!-- sess418 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-0288 (TCP foreign replay always refused): shape (a)+ = masters seal victim grants into per-victim manifest shards post-fence;… -->
 # sess418 GPT ruling (gpt-5.6-sol) — D-TCP-FOREIGN-REPLAY-ALWAYS-REFUSED-NO-AUTHORITY-SOURCE-0288
 
 ## Finding that prompted it

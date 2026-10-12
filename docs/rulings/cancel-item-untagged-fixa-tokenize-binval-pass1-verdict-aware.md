@@ -1,4 +1,4 @@
-<!-- sess476 RULE-5 ruling (D-FOREIGN-SLICE-INTENTS-ABANDONED chain 105): untagged CANCEL item = by construction (format gate !STALE); fix = A tokenize CA… -->
+<!-- sess476 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (D-FOREIGN-SLICE-INTENTS-ABANDONED chain 105): untagged CANCEL item = by construction (format gate !STALE); fix = A tokenize CA… -->
 # sess476 GPT ruling — untagged CANCEL buffer items (chain 105 refusals)
 
 ## Root (code-proven, probe s475b pending)

@@ -1,5 +1,5 @@
-<!-- sess231 RULE-5 ruling: a2 first (split-phase ifree, ZERO wait under ILOCK); detector progress-aware separately; finobt-481 triage = containment audit… -->
-# sess231 RULE-5 ruling — a2 implementation shape + FINOBT-481 triage (gpt-5.6-sol)
+<!-- sess231 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: a2 first (split-phase ifree, ZERO wait under ILOCK); detector progress-aware separately; finobt-481 triage = containment audit… -->
+# sess231 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — a2 implementation shape + FINOBT-481 triage (gpt-5.6-sol)
 
 Context: incident481 confirmed the cross-node ILOCK-over-CAW-poll convoy (12 nodes,
 kworker/inodegc). Post-recovery chk_mxfs found on-platter finobt/inobt divergence

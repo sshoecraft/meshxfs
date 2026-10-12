@@ -47,7 +47,7 @@ P52-GRANT-FREE) and the disposition is made per site with evidence in hand.
 
 The refusals stay at the wrappers. The choke point says where one is still owed.
 
-## Why this is the RULE 4 move
+## Why this is the RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS move
 
 It converts "read every caller and hope" into a measurement. The owed audit item
 on D-0945 was "the same question for the release paths that do not live in

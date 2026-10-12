@@ -1,5 +1,5 @@
-<!-- sess433 RULE-5 ruling D-0354: SHIP candidate A (single-node mode mints REAL durable epochs via the normal grant state machine; no memory-only authori… -->
-# sess433 RULE-5 ruling — D-0354 lone-era epoch-0 images
+<!-- sess433 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-0354: SHIP candidate A (single-node mode mints REAL durable epochs via the normal grant state machine; no memory-only authori… -->
+# sess433 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — D-0354 lone-era epoch-0 images
 
 Core invariant: no journal image requiring authority may be formatted until that authority is a durable, incarnation-bound, nonzero-epoch on-disk grant that recovery can place in the fence manifest. Caching an already-durable grant is fine; replacing it is not.
 

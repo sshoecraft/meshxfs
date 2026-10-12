@@ -118,7 +118,7 @@ in `tests/drc_autocapture.sh`, `drc_progress_watch.sh`,
 `dd_loss_differential.sh`, `rank1_stall_stacks.sh`. Diagnosing a wedged host:
 `/proc/*/comm`, `/proc/*/stat`, `/proc/<pid>/stack` are safe; `cmdline` and
 `maps` are not. This trap is why `never-pgrep-f-on-clyde-mmap-lock-wedge`
-itself, plus CLAUDE.md RULE 2c, exist.
+itself, plus CLAUDE.md RULE: NEVER WEDGE THE LAB HOST, exist.
 
 ### sess400/401 — long rig-run evidence in the session scratchpad is lost to a host reboot
 [[trap-long-rig-run-evidence-in-scratchpad-lost-to-host-reboot-sess400]]: a
@@ -258,7 +258,7 @@ handle it by SEQUENCING (don't run `make` in the tree while a chain's
 build/proof stage is running; editing sources while a chain is at
 prep/test stages is safe — it insmods the already-built `.ko`), never by
 relocating sources to `/tmp`. A scratch *copy of the tree* is the identical
-RULE 3 violation as any other file in `/tmp`, just less obviously so because
+RULE: A SCRIPT IS NEVER A TEMP FILE violation as any other file in `/tmp`, just less obviously so because
 the motive (avoiding a race) sounds responsible.
 
 ### sess429 — the dmesg ring wraps within minutes under a 32-node board; marker-bounded sweeps silently read zero
@@ -340,7 +340,7 @@ filesystems, or a journal that does not survive the reboot it was meant to
 diagnose. None of these were filesystem defects; all of them cost a rig
 rebuild, a lost run, a falsified verdict, or a multi-hour diagnosis detour
 before being converted into a standing rule (several are now load-bearing in
-CLAUDE.md RULE 2c/2d/3). A repeating shape across the newest entries: when
+CLAUDE.md RULE: NEVER WEDGE THE LAB HOST/RULE: NEVER RUN THE RIG ON AN UNGUARDED HOST/RULE: A SCRIPT IS NEVER A TEMP FILE). A repeating shape across the newest entries: when
 post-mortem evidence for a victim node comes back EMPTY, suspect the capture
 mechanism (dead ring, volatile journal, wrong mount, disabled node) before
 concluding the event left no trace.

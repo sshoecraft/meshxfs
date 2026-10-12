@@ -13,7 +13,7 @@ counts self-match the calling shell and mean nothing
 
 ## ICLUS clean-release certificate (D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY)
 
-GPT RULE-5 ruling (`docs/rulings/iclus-relmark-certificate-and-sequencing.md`)
+GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (`docs/rulings/iclus-relmark-certificate-and-sequencing.md`)
 set the shape: marker identity must equal token identity (full tuple
 `{class,resource,lineage,grant_epoch,owner_slot,owner_epoch}` unique;
 zero lineage fails closed). Land immediately in parallel with phase-5,
@@ -81,7 +81,7 @@ invocation to confirm before any disposition.
 
 ## TCP transport refusal
 
-RULE-5 follow-up ruling: refuse the TCP transport based on the SELECTED
+RULE: CONSULT ANOTHER MODEL WHEN STUCK follow-up ruling: refuse the TCP transport based on the SELECTED
 transport read after DLM init, RO mounts exempt, gated by a LAB macro.
 Landed as `mxfs_transport_domain_admit` in `pal/linux/xfs_super.c`,
 called after `mxfs_v5_dlm_init` and again on ro->rw remount; matrix row
@@ -148,7 +148,7 @@ P301 (unregister) failure (`P303-RETIRE-PENDING-RESTAMPED` /
 `dbg_pr_unregister_fail` one-shot knob added
 (`docs/history/docs/history/docs/history/compiled-sess448-449-iclus-tcp-departure-campaign.md`).
 
-GPT RULE-5 review at sess449 END ruled this **NOT sufficient**: the
+GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK review at sess449 END ruled this **NOT sufficient**: the
 RELEASED/EMPTY slot state is published *before* the PR key is proven
 absent, so a crash between release and unregister leaves the key still
 registered on a now-reusable EMPTY slot. Required redesign for 0.59.0

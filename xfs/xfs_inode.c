@@ -595,6 +595,7 @@ mxfs_ilk_note_lock(
 		ip->i_mxfs_ilk_wr_pid = current->pid;
 		memcpy(ip->i_mxfs_ilk_wr_comm, current->comm,
 		       sizeof(ip->i_mxfs_ilk_wr_comm));
+		ip->i_mxfs_ilk_wr_t0 = ktime_get_ns();
 	} else if (lock_flags & XFS_ILOCK_SHARED) {
 		atomic_inc(&ip->i_mxfs_ilk_rd_held);
 		ip->i_mxfs_ilk_rd_ret = ret_ip;
@@ -604,12 +605,44 @@ mxfs_ilk_note_lock(
 	}
 }
 
+/*
+ * A regular file's ILOCK_EXCL held this long names its holder when it is
+ * released.  Measured on the physical DRBD pair (0.90.118): guest writes of a
+ * VM image waited more than 30 s behind its ILOCK and the hung-task report
+ * could not say who held it, because the holder was not in an uninterruptible
+ * sleep.  The line gives the hold time, where the lock was taken, who took it,
+ * and the releasing task's stack, which is the path that held it.
+ */
+static void
+mxfs_ilk_note_long_hold(
+	struct xfs_inode	*ip,
+	unsigned long		ret_ip)
+{
+	static atomic_t		stacks = ATOMIC_INIT(0);
+	u64			held_ms;
+
+	if (!ip->i_mxfs_ilk_wr_t0 || !S_ISREG(VFS_I(ip)->i_mode))
+		return;
+	held_ms = (ktime_get_ns() - ip->i_mxfs_ilk_wr_t0) / NSEC_PER_MSEC;
+	if (held_ms < 10000)
+		return;
+	pr_warn_ratelimited("mxfs: P-ILOCK-HOLD-SLOW ino=%llu held_ms=%llu taken_at=%pS by=%d/%.16s released_at=%pS by=%d/%s -- a regular file's ILOCK_EXCL was held this long\n",
+		(unsigned long long)ip->i_ino, (unsigned long long)held_ms,
+		(void *)ip->i_mxfs_ilk_wr_ret, ip->i_mxfs_ilk_wr_pid,
+		ip->i_mxfs_ilk_wr_comm, (void *)ret_ip, current->pid,
+		current->comm);
+	if (atomic_inc_return(&stacks) <= 16)
+		dump_stack();
+}
+
 void
 mxfs_ilk_note_unlock(
 	struct xfs_inode	*ip,
 	uint			lock_flags,
 	unsigned long		ret_ip)
 {
+	if (lock_flags & XFS_ILOCK_EXCL)
+		mxfs_ilk_note_long_hold(ip, ret_ip);
 	if (lock_flags & XFS_ILOCK_SHARED)
 		atomic_dec(&ip->i_mxfs_ilk_rd_held);
 	else if (lock_flags & XFS_ILOCK_EXCL)
@@ -5086,7 +5119,7 @@ xfs_inactive_ifree(
 					XFS_INO_TO_AGINO(mp, ip->i_ino);
 				int		ck_differs = 0;
 				/*
-				 * (D-TMPFILE-CHURN-the budget rule-PERF-400, design-consult
+				 * (D-TMPFILE-CHURN-RULE0-PERF-400, design-consult
 				 * ruling priority 2): mxfs_ag_buf_disk_differs is a
 				 * synchronous FUA READ of the AGI (measured 0.22 ms,
 				 * ~40% of xfs_inactive_ifree) charged to EVERY

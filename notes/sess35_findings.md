@@ -187,7 +187,7 @@ investigate what's appropriate.
 
 ## Sess35 next step
 
-Per RULE 4 step 2b (proven hypothesis → patch), and accepting that
+Per RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS step 2b (proven hypothesis → patch), and accepting that
 sess34's options 1 (blocking lock) and 2 (`xfs_buf_delwri_pushbuf`)
 are both XFS-internal-API surgery that risk regression, the smaller
 focused experiment is:
@@ -1309,7 +1309,7 @@ Sess35's net contribution:
 - v6a docs/project-history.md documented in mxfs_clayer/V6A_ROADMAP.md
 - **Identified the dentry_operations.d_revalidate gap** as the
   catastrophic Mode A root cause
-- Documented per RULE 4 throughout
+- Documented per RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS throughout
 
 Sess36 has TWO fix paths:
 1. **NARROW (high-confidence, ~50 LOC):** add mxfs_dentry_operations
@@ -1712,7 +1712,7 @@ all H29/H35/H36/H37/H38/H38b/H38c experiments cleanly reverted).
 Cluster mounted on test1+test2 with this build.
 Storage config: write_cache=write back, WCE=1 (defaults).
 
-Sess35 attempted 11 hypothesis cycles, all per RULE 4 discipline.
+Sess35 attempted 11 hypothesis cycles, all per RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS discipline.
 Confirmed Mode A is the bug. Identified multiple potential fix
 paths (existence-check, d_revalidate, single_node bypass, v6a
 chokepoint). None fully closed by sess35; sess36 has clear
@@ -2030,7 +2030,7 @@ Confirmed one (Mode A duplicate-create). Identified path forward
 
 Total runs: ~15 reproductions of the bug at varying intensities.
 Total falsifying experiments: 5 (H22, H23, H26, H29, +H30/H31/H32/H33/H34
-listed for sess36). Per RULE 4, each was hypothesis-instrument-
+listed for sess36). Per RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS, each was hypothesis-instrument-
 prove/disprove-decide; none were code-reading shortcuts.
 
 

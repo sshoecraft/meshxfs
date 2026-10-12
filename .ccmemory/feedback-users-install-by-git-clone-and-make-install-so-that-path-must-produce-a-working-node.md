@@ -1,6 +1,6 @@
 ---
 name: feedback-users-install-by-git-clone-and-make-install-so-that-path-must-produce-a-working-node
-description: USER (stunned, 0.90.55): people clone and run `make && make install`; it installed only mxfs.ko. That path must install what the packages do, and be…
+description: USER (0.90.55): people clone and run `make && make install`; it installed only mxfs.ko. That path must install what the packages do, and be…
 metadata:
   type: feedback
 tags: [install, packaging, drbd, release]

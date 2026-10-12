@@ -1,4 +1,4 @@
-<!-- sess488 RULE-5 ruling for D-0487 AIL pin: fail-stop right, refuse LOCKED no stale, coherent not-held snapshot, no tail condition, 10 s grace diagnost… -->
+<!-- sess488 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling for D-0487 AIL pin: fail-stop right, refuse LOCKED no stale, coherent not-held snapshot, no tail condition, 10 s grace diagnost… -->
 # GPT ruling on the D-0487 terminal behaviour (2026-09-04 ~06:33Z)
 
 Proposal reviewed: stop staling in the skip arm, return XFS_ITEM_LOCKED, per-item

@@ -1,4 +1,4 @@
-<!-- sess431 RULE-5 review of 0.39.6/0.39.7: PUB_SKIPPED clear sound; chain-kept correct (no eviction drop, last-ifree epoch binds); platter-home needs a… -->
+<!-- sess431 RULE: CONSULT ANOTHER MODEL WHEN STUCK review of 0.39.6/0.39.7: PUB_SKIPPED clear sound; chain-kept correct (no eviction drop, last-ifree epoch binds); platter-home needs a… -->
 # sess431 GPT review (gpt-5.6-sol) of the post-claim changes
 
 - A (copy-in clears MXFS_IF_PUB_SKIPPED): sound iff copy-in/submit/completion stay serialized per slot (buffer lock does); suggested hardening: handle PUB_SKIPPED before the `!ili_last_fields` early exit in iodone (landed 0.39.9).

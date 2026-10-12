@@ -3,26 +3,30 @@
 # exactly as docs/drbd-setup.md tells a user to (the same resource options,
 # fence handler and mxfs-drbd@ unit), so the same VM builds can be timed on
 # MXFS and on LVM-on-DRBD (scripts/pve_lvm_drbd_baseline.sh) over the same
-# disks.  Only one MXFS mount runs on the pair at a time: `up` stops the
-# pair's own mxfs-drbd@mxfs (its /mnt/shared) first, and `down` starts it
-# again.  `up` refuses while a VM on either host has a disk on the storage
-# that mount carries.
+# disks.  The pair's own mxfs-drbd@mxfs (its /mnt/shared) stays mounted beside
+# it: a host mounts any number of MXFS filesystems.  With ALONE=1, `up` stops
+# that mount first (a measurement that wants the pair to itself; it refuses
+# while a VM on either host has a disk on the storage that mount carries),
+# and `down` starts it again.
 #
 # Usage: scripts/pve_mxfs_spare_disk.sh up|down|off|status
-#   off: as down, but the pair's own mount is left stopped (between runs that
-#   put the spare disks to other uses)
+#   off: this resource gone; the pair's own mount left as it is
 # Env:
 #   PVE_PAIR   "<addr> <addr>" (default "192.168.1.80 192.168.1.81"): host A
 #              (participant 0, the lower DRBD address, which formats) then B
 #   DISK       the spare disk on each host (default /dev/sdb).  `up` refuses
 #              a disk that holds the root filesystem or is mounted, or whose
 #              model does not contain MODEL.  Whatever is on it is lost.
+#   THIN       "<vg>/<thin pool> <size>": DISK is a logical volume to create
+#              in that thin pool on each host when it does not exist yet (a
+#              host with no spare disk, such as the nested pairs)
 #   MODEL      a substring the disk's model must contain (default empty = any)
 #   RES/MINOR/PORT  DRBD resource, minor and port (default mxfssdb, 2, 7792)
 #   MNT/STORE  mount point and Proxmox storage name (default /mnt/mxfssdb,
 #              mxfssdb)
-#   LIVE       the pair's own MXFS resource, stopped while this runs and
-#              started again by `down` (default mxfs; its storage `shared`)
+#   LIVE       the pair's own MXFS resource (default mxfs; its storage
+#              `shared`)
+#   ALONE=1    stop LIVE for the length of the run, start it again at `down`
 #
 # Both disks start as whatever the last user left, so the initial sync is
 # skipped (new-current-uuid --clear-bitmap) as for the LVM baseline: blocks
@@ -36,6 +40,7 @@ DISK=${DISK:-/dev/sdb}; MODEL=${MODEL:-}
 RES=${RES:-mxfssdb}; MINOR=${MINOR:-2}; PORT=${PORT:-7792}
 MNT=${MNT:-/mnt/mxfssdb}; STORE=${STORE:-mxfssdb}
 LIVE=${LIVE:-mxfs}; LIVE_STORE=${LIVE_STORE:-shared}
+ALONE=${ALONE:-0}; THIN=${THIN:-}
 
 on() {  # <host> <cmd> [timeout]
     timeout "${3:-120}" "$SSHP" "$1" "$2" </dev/null 2>&1 | grep -avE '^Warning:|^$'
@@ -83,15 +88,21 @@ up() {
     rf=$(res_file) || exit 1
     # no VM may have a disk on the live mount's storage: stopping it would
     # take the disk from under the guest
-    for h in "${PAIR[@]}"; do
-        out=$(on "$h" "for id in \$(qm list 2>/dev/null | awk 'NR > 1 {print \$1}'); do qm config \$id 2>/dev/null | grep -E '^(virtio|scsi|sata|ide|efidisk|tpmstate)[0-9]+: $LIVE_STORE:' | sed \"s/^/VM \$id /\"; done" 60)
-        [ -z "$out" ] || die "$h has guest disks on $LIVE_STORE: $out"
-    done
+    if [ "$ALONE" = 1 ]; then
+        for h in "${PAIR[@]}"; do
+            out=$(on "$h" "for id in \$(qm list 2>/dev/null | awk 'NR > 1 {print \$1}'); do qm config \$id 2>/dev/null | grep -E '^(virtio|scsi|sata|ide|efidisk|tpmstate)[0-9]+: $LIVE_STORE:' | sed \"s/^/VM \$id /\"; done" 60)
+            [ -z "$out" ] || die "$h has guest disks on $LIVE_STORE: $out"
+        done
+    fi
     for h in "${PAIR[@]}"; do
         on "$h" "set -u
+            if [ -n '$THIN' ] && ! [ -b $DISK ]; then
+                set -- $THIN
+                lvcreate -q -V \$2 -T \$1 -n \$(basename $DISK) >/dev/null || { echo 'REFUSE: lvcreate $DISK in $THIN failed'; exit 1; }
+            fi
             [ -b $DISK ] || { echo 'REFUSE: no $DISK'; exit 1; }
             m=\$(cat /sys/block/$(basename "$DISK")/device/model 2>/dev/null)
-            case \"\$m\" in *$MODEL*) ;; *) echo \"REFUSE: $DISK model is \$m\"; exit 1 ;; esac
+            case \"\$m\" in *\"$MODEL\"*) ;; *) echo \"REFUSE: $DISK model is \$m\"; exit 1 ;; esac
             rd=\$(lsblk -nrso NAME,TYPE \$(findmnt -n -o SOURCE /) | awk '\$2==\"disk\" {print \$1}')
             [ \"/dev/\$rd\" != $DISK ] || { echo 'REFUSE: $DISK holds the root filesystem'; exit 1; }
             lsblk -nro MOUNTPOINT $DISK | grep -q . && { echo 'REFUSE: something on $DISK is mounted'; exit 1; }
@@ -105,12 +116,14 @@ RESEOF
             echo PREP_OK" 60 | tail -3 | sed "s/^/$h: /"
         [ "${PIPESTATUS[0]}" = 0 ] || exit 1
     done
-    # the live mount down, B then A, through its own unit
-    for h in "${PAIR[@]:1}" "${PAIR[0]}"; do
-        on "$h" "systemctl stop mxfs-drbd@$LIVE; echo \"\$(hostname): $LIVE unit=\$(systemctl is-active mxfs-drbd@$LIVE) mounts=\$(grep -c ' mxfs ' /proc/mounts)\"" 300
-    done
+    # with ALONE=1, the live mount down, B then A, through its own unit
+    if [ "$ALONE" = 1 ]; then
+        for h in "${PAIR[@]:1}" "${PAIR[0]}"; do
+            on "$h" "systemctl stop mxfs-drbd@$LIVE; echo \"\$(hostname): $LIVE unit=\$(systemctl is-active mxfs-drbd@$LIVE) mounts=\$(grep -c ' mxfs ' /proc/mounts)\"" 300
+        done
+    fi
     for h in "${PAIR[@]}"; do
-        on "$h" "grep -q ' mxfs ' /proc/mounts && { echo 'REFUSE: an mxfs mount is still up'; exit 1; }
+        on "$h" "grep -q '^/dev/drbd$MINOR ' /proc/mounts && { echo 'REFUSE: /dev/drbd$MINOR is mounted'; exit 1; }
             drbdadm cstate $RES >/dev/null 2>&1 || { yes yes | drbdadm create-md --force $RES >/dev/null 2>&1; drbdadm up $RES; }
             echo \"\$(hostname): $RES up\"" 120 || exit 1
     done
@@ -139,7 +152,8 @@ off() {      # this resource gone; the live mount left as it is
 
 down() {
     off
-    start_units "$LIVE"
+    [ "$ALONE" = 1 ] && start_units "$LIVE"
+    return 0
 }
 
 start_units() {  # <resource>: start its unit on both hosts at once

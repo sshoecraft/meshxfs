@@ -2,7 +2,7 @@
 ## sess440 — item 5 (slotless bootstrap) build attempt, continuing D-437 whole-cluster-restart
 
 Direct continuation of ``docs/history/docs/history/compiled-sess439-self-succession-prkey-bootstrap.md``, whose
-next-session order was: compile-check 0.45.1, run chain 23, get a RULE-5 ruling on item
+next-session order was: compile-check 0.45.1, run chain 23, get a RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on item
 5's implementation, then build it. sess440 did all three and found item 5 not yet
 shippable.
 
@@ -27,7 +27,7 @@ glob), rebuild. Chain launchers should grep `ERROR:`, not `error:`, in build.txt
 mrc2=0 file=1); fln churn VERDICT PASS (withdrew 74s). `remount_refused` FAILED a new
 assertion: the refusal itself was correct (`P305-PR-SAME-BOOT-DIRTY-PREDECESSOR`
 refusing, `P302-PR-KEY-RETAINED-ON-REFUSAL` logged) but `sg_persist -i -k` afterward
-showed NO keys registered. RULE-4 root cause from code, not guessed: `err_scsipr`
+showed NO keys registered. RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS root cause from code, not guessed: `err_scsipr`
 (`dlm/v5_mount.c:7686`) calls `mxfs_scsipr_unregister` unconditionally on the refusal
 path, and `mxfs_scsipr_unregister` never consulted `ctx->registered` — so
 `retain_key`'s `registered=false` was a no-op and the retained key got unregistered
@@ -42,7 +42,7 @@ un-retired too). `scsipr.o` kbuild-clean per the corrected check above. Chain 24
 `sg_persist -i -k` before the teardown step clears the reservation table (the earlier
 version read after teardown and could never have caught this).
 
-### GPT RULE-5 ruling — item 5 phase structure right, not shippable
+### GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — item 5 phase structure right, not shippable
 
 ``docs/rulings/item5-slotless-bootstrap-build-review.md``: plan
 was survivor-scan claim (A) → provisional identity with `owner_slot=0xFFFF` (B) → seal

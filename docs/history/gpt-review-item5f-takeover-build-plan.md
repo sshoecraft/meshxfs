@@ -1,5 +1,5 @@
-<!-- sess443 RULE-5 review of the 5f takeover BUILD PLAN: 8 STOP-SHIPs (REGISTER before election under WE-AR, PREPARED must inspect K, fence stale contend… -->
-# sess443 RULE-5 review — item 5f (bootstrap takeover) implementation plan
+<!-- sess443 RULE: CONSULT ANOTHER MODEL WHEN STUCK review of the 5f takeover BUILD PLAN: 8 STOP-SHIPs (REGISTER before election under WE-AR, PREPARED must inspect K, fence stale contend… -->
+# sess443 RULE: CONSULT ANOTHER MODEL WHEN STUCK review — item 5f (bootstrap takeover) implementation plan
 
 Plan reviewed: 32 KiB region {s0 record, s1-15 manifest bank A, s16-30 bank B (term parity), s31 TAKEOVER, s32-39 receipts, s40-47 lineage}; contender election on the TAKEOVER sector; fence old owner (on K if K_CLAIMED, else slotless); build T+1 manifest with inherited-complete class 6 + fenced-owner class 5; lineage entry = T's escrow verbatim; composite K replay = array of (desc, manifest) pairs selected by token incarnation.
 

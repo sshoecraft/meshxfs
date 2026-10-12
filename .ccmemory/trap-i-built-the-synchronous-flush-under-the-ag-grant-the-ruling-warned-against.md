@@ -1,6 +1,6 @@
 ---
 name: trap-i-built-the-synchronous-flush-under-the-ag-grant-the-ruling-warned-against
-description: TRAP (sess572): a RULE-5 ruling named "do not hold the cluster AG grant across a synchronous flush" as head-of-line blocking; I implemented its progr…
+description: TRAP (sess572): a RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling named "do not hold the cluster AG grant across a synchronous flush" as head-of-line blocking; I implemented its progr…
 metadata:
   type: feedback
 tags: [d0946, d0947, rule5-ruling, head-of-line, allocator]
@@ -10,7 +10,7 @@ tags: [d0946, d0947, rule5-ruling, head-of-line, allocator]
 
 ## The ruling said
 
-The D-0946 RULE-5 ruling gave a progress rule for the transient refusal, and
+The D-0946 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling gave a progress rule for the transient refusal, and
 listed its hazards explicitly:
 
 > 3. release the locks the publication path needs before waiting;

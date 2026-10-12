@@ -1,5 +1,5 @@
-<!-- sess27 RULE-5 GPT verdict: gen-equality is only the local test; the real bug is publication WITHOUT write authority at inode-CLUSTER granularity. Plu… -->
-# sess27 RULE-5 GPT consult (gpt-5.6-sol) — verdict and actions
+<!-- sess27 RULE: CONSULT ANOTHER MODEL WHEN STUCK GPT verdict: gen-equality is only the local test; the real bug is publication WITHOUT write authority at inode-CLUSTER granularity. Plu… -->
+# sess27 RULE: CONSULT ANOTHER MODEL WHEN STUCK GPT consult (gpt-5.6-sol) — verdict and actions
 
 ## A. On the typeflip fix I landed
 

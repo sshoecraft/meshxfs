@@ -1,6 +1,6 @@
 ---
 name: feedback-follow-the-users-process-exactly-and-stop-on-a-conflict
-description: USER (angry, 0.90.55): told to commit+push then git pull + make install on the nodes, I scp'd/rsync'd the tree instead. Follow the stated process; on…
+description: USER (0.90.55): told to commit+push then git pull + make install on the nodes, I scp'd/rsync'd the tree instead. Follow the stated process; on…
 metadata:
   type: feedback
 tags: [process, user-correction]

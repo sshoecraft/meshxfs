@@ -87,7 +87,7 @@ steps 4 and 5 (both verify user-mode on clyde, no Kbuild, no VMs).
    stop-the-line: fix before proceeding (criteria-met status on
    0.10.120 must never be put at risk; only test1/test2 may run new
    builds, and cluster_reset.sh restores them).
-6. **Every gate obeys RULE 0**: budget written BEFORE the first run
+6. **Every gate obeys RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS**: budget written BEFORE the first run
    (infra + native×2), timeout IS a failure, never widened to pass;
    actual walls recorded and budgets tightened in TIMEOUT_BUDGETS.md.
 7. **Bookkeeping current at DONE**: VERSION/CHANGELOG per landed step,
@@ -97,21 +97,21 @@ steps 4 and 5 (both verify user-mode on clyde, no Kbuild, no VMs).
 
 ## HARD BOUNDARIES (loop must never cross)
 
-- NEVER reboot/shutdown/sysrq clyde (RULE 2). VM destroy/start via
+- NEVER reboot/shutdown/sysrq clyde (RULE: NEVER REBOOT THE LAB HOST). VM destroy/start via
   virsh for test1..test32 is fine.
 - No Makefile/Kbuild/mxfs_ports.h/deploy actions beyond the APPROVED
   lines above; anything else approval-shaped → leave PENDING, record
   in ccmemory, continue with authorized work.
 - Do NOT proceed past step 5 (step 6+ touches fencing/PAL/scsipr and
   the seam — next interactive checkpoint). Write DONE instead.
-- RULE 4 for every failure (hypothesis → instrument → measure; no
-  code-reading guesses); RULE 5: escalate to GPT
+- RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS for every failure (hypothesis → instrument → measure; no
+  code-reading guesses); RULE: CONSULT ANOTHER MODEL WHEN STUCK: escalate to GPT
   (mcp__ask_gpt__query, prompt only, never max_tokens) before any
   issue rolls into a second session without a proven diagnosis.
 - Foreground waits, chunked ≤~5 min (no run_in_background polling);
   multi-line remote scripts via mxfs_sshpass.sh + `bash -s`;
   `make clean` before kernel-build gates + srcversion verify per node.
-- Timeouts are performance assertions (RULE 0); 2× native XFS is the
+- Timeouts are performance assertions (RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS); 2× native XFS is the
   hard ceiling on anything with a native equivalent.
 
 ## DONE / STOP protocol

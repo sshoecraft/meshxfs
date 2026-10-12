@@ -1,4 +1,4 @@
-<!-- sess411 RULE-5 ruling on -117 replay failure: snapshot+stabilize before replay, retryable-not-TORN before stability proven, record incarnation stamp… -->
+<!-- sess411 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on -117 replay failure: snapshot+stabilize before replay, retryable-not-TORN before stability proven, record incarnation stamp… -->
 # GPT ruling (sess411): foreign-replay unstable-slice-read fix design
 
 Query: full evidence chain of the fln4_hb_churn -117 (see docs/history/replay-117-root-cause-live-slice-read-race.md). GPT verdict: hypothesis credible; later-clean platter does not exonerate storage path; item-position argument sound IF the batch counter and forensic ordinal count the same objects (instrument to be sure).

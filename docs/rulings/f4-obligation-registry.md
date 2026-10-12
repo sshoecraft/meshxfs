@@ -1,4 +1,4 @@
-<!-- sess227 RULE-5 ruling on F4 dir committed-never-submitted registry: enumerable records not count-only, own u64 gen, shutdown-only abort cancel, tenur… -->
+<!-- sess227 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on F4 dir committed-never-submitted registry: enumerable records not count-only, own u64 gen, shutdown-only abort cancel, tenur… -->
 # sess227 GPT ruling — F4 obligation registry (D-FOREIGN-REPLAY step 4)
 
 Full text in sess227 transcript (task kwp0on94b). Consolidated dispositions:

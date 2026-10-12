@@ -1,5 +1,5 @@
-<!-- sess432 RULE-5 ruling D-379(B)/D-0355: gate PR-key retirement on durable slot state + drain/flush (P1 OK); NO proving fence kind from WITHDRAWN+key-a… -->
-# sess432 RULE-5 rulings on the lone-remount / dirty-departure key retirement
+<!-- sess432 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-379(B)/D-0355: gate PR-key retirement on durable slot state + drain/flush (P1 OK); NO proving fence kind from WITHDRAWN+key-a… -->
+# sess432 RULE: CONSULT ANOTHER MODEL WHEN STUCK rulings on the lone-remount / dirty-departure key retirement
 
 ## Ruling A (shapes a/b/c)
 - A PR registration belongs to an I_T nexus. A next incarnation on the SAME host/nexus cannot hold a second key while the stale one exists; REGISTER AND IGNORE EXISTING KEY only replaces it and is NOT a PREEMPT AND ABORT proof. Self-recovery on the same nexus needs a distinct nexus, a helper initiator, an independently verified transport reset, or fail-closed.

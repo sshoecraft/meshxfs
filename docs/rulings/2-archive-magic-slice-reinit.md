@@ -1,5 +1,5 @@
-<!-- sess377 follow-up RULE-5 ruling: distinct archive magic OK instead of INCOMPAT bit (with old-writer audit + slice_count invariant); full-overwrite sl… -->
-«RULE-5 FOLLOW-UP RULING — archive magic vs INCOMPAT bit, slice reinit (sess377)»
+<!-- sess377 follow-up RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: distinct archive magic OK instead of INCOMPAT bit (with old-writer audit + slice_count invariant); full-overwrite sl… -->
+«RULE: CONSULT ANOTHER MODEL WHEN STUCK FOLLOW-UP RULING — archive magic vs INCOMPAT bit, slice reinit (sess377)»
 
 Consult 2 of sess377, after patch item 1 and repair-step-1 were landed and
 rig-verified. gpt-5.6-sol.

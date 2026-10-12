@@ -7,7 +7,7 @@ sess197 GPT ruling. Continues after `docs/history/docs/history/compiled-tenure-t
 (sess162-178); D-IUNL-LIVESKEW work in sess203-204 is a side branch hit while
 soaking the same fs.
 
-## sess197 — GPT ruling on the release invariant (RULE-5)
+## sess197 — GPT ruling on the release invariant (RULE: CONSULT ANOTHER MODEL WHEN STUCK)
 
 `docs/rulings/tenure-release-hard-barriers-f1-f4.md`
 
@@ -155,7 +155,7 @@ at session end): trace EDEADLK→EIO in the create path and instrument it.
 Two board chunks on .472 hit `NO_TERMINAL_RECORD` timeouts
 (`zero_silent_loss` at 60s, `crash_consistency` at 90s) as apparent
 first-run-after-marathon slowdown; both reconverged 32/32 on retry, left as
-open RULE-0 observations, not diagnosed.
+open RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS observations, not diagnosed.
 
 Ops facts recorded: `tools/mxfs_sshpass.sh testN "cmd"` takes no `root@`
 prefix (auth fails with it); `run.sh` preserves fail logs at

@@ -1,5 +1,5 @@
-<!-- sess126 RULE-5 ruling on the sess125 owed worker: RELEASE BLOCKED, 7 blockers. -ENOENT/pin/gen arguments SURVIVE but must be restated narrowly. -->
-# sess126 — RULE-5 ruling on the sess125 owed-cleanup worker
+<!-- sess126 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the sess125 owed worker: RELEASE BLOCKED, 7 blockers. -ENOENT/pin/gen arguments SURVIVE but must be restated narrowly. -->
+# sess126 — RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the sess125 owed-cleanup worker
 
 Tree at 0.11.442 / srcversion `B2E4583BA40413F3B2704D2`, UNCHANGED this
 session (no edits yet). Fleet still on 0.11.440. **STILL STOP-SHIP.**

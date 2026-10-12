@@ -47,7 +47,7 @@ module_param_named(dbg_strand_hold_ms, mxfs_dbg_strand_hold_ms, int, 0644);
 MODULE_PARM_DESC(dbg_strand_hold_ms, "TEST ONLY: with dbg_strand_ino, keep the dropped acquire IN FLIGHT (acq_inflight held) for this many ms before it exits, producing the in-flight strand shape; 0=exit at once (abandoned shape)");
 
 /*
- * (D-TMPFILE-CHURN-the budget rule-PERF-400 term (c), instrument step 2): per-site
+ * (D-TMPFILE-CHURN-RULE0-PERF-400 term (c), instrument step 2): per-site
  * shadow counters for the four mxfs_dlm_verify_rawmode call sites, so a
  * workload's verify reads can be attributed (the ftrace saw 0.31 ms of
  * verify per linkat on a brand-new inode; the P108 site skips

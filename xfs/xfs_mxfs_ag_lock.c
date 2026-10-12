@@ -82,7 +82,8 @@ __mxfs_ag_dlm_lock(
 	struct xfs_perag	*pag,
 	bool			nonblock,
 	bool			demand,
-	bool			resfree)
+	bool			resfree,
+	uint32_t		*mute_master)
 {
 	struct mxfs_v5_dlm	*dlm = mp->m_mxfs_dlm;
 	int			error;
@@ -737,7 +738,7 @@ __mxfs_ag_dlm_lock(
 		 */
 		error = mxfs_v5_dlm_ag_lock_nb(dlm, pag_agno(pag),
 					       READ_ONCE(pag->pag_mxfs_grant_epoch),
-					       &ag_gres, demand);
+					       &ag_gres, demand, mute_master);
 		if (error) {
 			mutex_unlock(&pag->pag_dlm_acquire_lock);
 			if (error == -EWOULDBLOCK)
@@ -762,7 +763,7 @@ __mxfs_ag_dlm_lock(
 		 */
 		error = mxfs_v5_dlm_ag_lock_nb(dlm, pag_agno(pag),
 					       READ_ONCE(pag->pag_mxfs_grant_epoch),
-					       &ag_gres, false);
+					       &ag_gres, false, NULL);
 		if (error) {
 			if (error == -EAGAIN || error == -EWOULDBLOCK) {
 				static atomic_t p1_agwait_stacks = ATOMIC_INIT(0);
@@ -1201,7 +1202,7 @@ mxfs_ag_dlm_lock(
 	struct xfs_mount	*mp,
 	struct xfs_perag	*pag)
 {
-	return __mxfs_ag_dlm_lock(mp, pag, false, false, false);
+	return __mxfs_ag_dlm_lock(mp, pag, false, false, false, NULL);
 }
 
 /*
@@ -1226,7 +1227,7 @@ mxfs_ag_dlm_lock_resfree(
 	 * defer trans still current (journal_info != NULL) and ILOCKs handed
 	 * off — resource-free by construction; a journal_info assertion here
 	 * fired on every seam entry (0.21.3 kernel_health FAIL, 6 nodes). */
-	return __mxfs_ag_dlm_lock(mp, pag, false, false, true);
+	return __mxfs_ag_dlm_lock(mp, pag, false, false, true, NULL);
 }
 
 /*
@@ -1241,7 +1242,23 @@ mxfs_ag_dlm_trylock(
 	struct xfs_mount	*mp,
 	struct xfs_perag	*pag)
 {
-	return __mxfs_ag_dlm_lock(mp, pag, true, false, false);
+	return __mxfs_ag_dlm_lock(mp, pag, true, false, false, NULL);
+}
+
+/*
+ * The allocator's trylock for one allocation's AG walk.  *mute_master
+ * carries, across the walk's AGs and passes, the remote master that left one
+ * of its tries unanswered; AGs that master owns then answer -EAGAIN without
+ * being asked (see mxfs_v5_dlm_ag_lock_nb).  It starts at 0 with the
+ * allocation's xfs_alloc_arg.
+ */
+int
+mxfs_ag_dlm_trylock_alloc(
+	struct xfs_mount	*mp,
+	struct xfs_perag	*pag,
+	uint32_t		*mute_master)
+{
+	return __mxfs_ag_dlm_lock(mp, pag, true, false, false, mute_master);
 }
 
 /*
@@ -1295,7 +1312,7 @@ mxfs_ag_dlm_lock_bounded(
 			next_demand_ns = now + 500ULL * NSEC_PER_MSEC +
 				(u64)get_random_u32_below(128) * NSEC_PER_MSEC;
 
-		error = __mxfs_ag_dlm_lock(mp, pag, true, demand, false);
+		error = __mxfs_ag_dlm_lock(mp, pag, true, demand, false, NULL);
 		if (error != -EAGAIN && error != -EWOULDBLOCK)
 			return error;
 		msleep(100);

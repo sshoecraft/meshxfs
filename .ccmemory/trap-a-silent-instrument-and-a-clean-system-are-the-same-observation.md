@@ -53,7 +53,7 @@ more measurement.
 non-zero one.** Preferably with a knob the tree already has, in the same run, so
 the positive and negative arms share every other condition.
 
-RULE 10 already says a disposition-critical NEGATIVE from a subagent is never
+RULE: DELEGATE ITERATIVE GRIND already says a disposition-critical NEGATIVE from a subagent is never
 evidence and must be re-run in the parent. This is the same hazard one level
 deeper: the negative can be false in the *kernel*, not just in the reporting.
 

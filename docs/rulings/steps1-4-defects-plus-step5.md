@@ -1,4 +1,4 @@
-<!-- sess132 RULE-5 ruling: the LANDED steps 1-4 (0.11.448) have 5 real defects incl. 2 blockers; step 5's threshold AND drain ceiling derivations both RE… -->
+<!-- sess132 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: the LANDED steps 1-4 (0.11.448) have 5 real defects incl. 2 blockers; step 5's threshold AND drain ceiling derivations both RE… -->
 # sess132 — GPT ruling: steps 1–4 are DEFECTIVE as landed; step 5's two derivations are both rejected
 
 Tree **0.11.448** at consult time. One consult covered both the review of the

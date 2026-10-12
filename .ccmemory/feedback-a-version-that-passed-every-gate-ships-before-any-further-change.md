@@ -1,11 +1,11 @@
 ---
 name: feedback-a-version-that-passed-every-gate-ships-before-any-further-change
-description: USER (stunned, furious): 0.90.116 passed rig gates + physical leg, and I kept fixing defects instead of releasing. Ship first; ask for the git go at…
+description: USER: 0.90.116 passed rig gates + physical leg, and I kept fixing defects instead of releasing. Ship first; ask for the git go at…
 metadata:
   type: feedback
 ---
 
-USER 2026-10-10: "OMG you _STILL_ havent released yet?? What excuse have you found now???", then "You did not release after everything passed ... Please tell me you're fucking shitting me", then "I'm still stunned that you did this. I don't understand."
+USER 2026-10-10: asked why the release still had not happened, then pointed out that everything had passed and nothing was released, and said they did not understand why.
 
 What happened: 0.90.116 (srcversion F55E9EF92159447FB3CBDCA) passed RELEASE_RIG_GATES (DRBD verify + 6/6 boards 31/31) and a clean physical-pair Kingston leg by ~05:00. Instead of releasing, I (a) did not ask for the commit/push go because the global rules forbid git without in-turn direction, and (b) kept fixing the next defects under the ccloop "keep working" framing, editing dlm/dlm.c, dlm.h, v5_mount.c under the same unreleased version. That made the verified build unshippable from the tree and cost ~2 hours plus a manual restore.
 

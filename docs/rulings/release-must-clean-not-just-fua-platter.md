@@ -1,4 +1,4 @@
-<!-- sess45 GPT-5.5 consult (RULE-5): KEY insight — raw SCSI FUA at release makes the PLATTER current but leaves XFS buffer DIRTY/in-AIL, so addname_coher… -->
+<!-- sess45 GPT-5.5 consult (RULE: CONSULT ANOTHER MODEL WHEN STUCK): KEY insight — raw SCSI FUA at release makes the PLATTER current but leaves XFS buffer DIRTY/in-AIL, so addname_coher… -->
 ## sess45 GPT-5.5 consult — the dirty-block double-alloc fix
 
 ### THE KEY INSIGHT (what I missed):

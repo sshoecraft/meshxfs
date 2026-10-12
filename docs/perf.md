@@ -159,7 +159,7 @@ Two fixes applied:
 
 **Both read and write now at 1.75x overhead vs raw XFS.** Remaining gap is inode cache get/put per 1MB chunk + block cache hash/LRU overhead.
 
-### 2026-08-23 (sess401-402) — O_TMPFILE churn breakdown, D-TMPFILE-CHURN-the budget rule-PERF-400
+### 2026-08-23 (sess401-402) — O_TMPFILE churn breakdown, D-TMPFILE-CHURN-RULE0-PERF-400
 
 32 nodes/caw, each node `open(O_TMPFILE) -> write 4K -> linkat -> unlink -> close`
 in a private dir, no contention.  ftrace function_graph on one node

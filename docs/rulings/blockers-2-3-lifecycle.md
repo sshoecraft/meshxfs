@@ -1,4 +1,4 @@
-<!-- sess130 RULE-5 ruling on the blockers 2+3 lifecycle design: my proposed order was WRONG (release_all before quiescence is a race). Corrected plan + w… -->
+<!-- sess130 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on the blockers 2+3 lifecycle design: my proposed order was WRONG (release_all before quiescence is a race). Corrected plan + w… -->
 # sess130 — GPT ruling on blockers 2+3, and the partial landing
 
 Tree `0.11.445` → **0.11.446**, srcversion `9A4FD08BE505182F28316CD`, builds

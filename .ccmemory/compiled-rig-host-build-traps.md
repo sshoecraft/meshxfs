@@ -29,7 +29,7 @@ defects filed the same session became suspect and had to be re-derived on a
 healthy host. Each oops leaves unkillable D-state qemu/vhost tasks (inode
 rwsem held forever mid-write) — `virsh destroy` on the wedged domain hangs
 (rc=124) though it works instantly on a healthy one. Recovery WITHOUT
-rebooting clyde (RULE 2): give the dead node a new libvirt domain name +
+rebooting clyde (RULE: NEVER REBOOT THE LAB HOST): give the dead node a new libvirt domain name +
 disk file but keep its MAC (DHCP/DNS repoints the hostname automatically,
 verified); clone from the node's own disk with `qemu-img convert -T none -t
 none` if still readable (13s; a plain `cp` of 6.5GB pushed kswapd hard and
@@ -38,7 +38,7 @@ rewrite identity (`/etc/hostname`, `initiatorname.iscsi`, `machine-id`, SSH
 host keys — cloud-init is disabled on these images so nothing else
 re-derives identity) before handing the clone the dead node's MAC in a fresh
 XML. ~3 min/node. Standing rule: corroborate any rig corruption-family
-finding against clyde's oops count before it goes on the RULE 6 ledger.
+finding against clyde's oops count before it goes on the RULE: ZERO ACCEPTED KNOWN DEFECTS ledger.
 
 ### 2026-08-20 — 32/caw board timing: the harness-overhead constant and two verdict traps
 [[board-32caw-chunking-measured-walls-and-harness-overhead]]: `wrapper =
@@ -131,7 +131,7 @@ chain that launched it. The orphaned `run.sh` (plus its ssh fan-out) kept
 holding `/tmp/mxfs_run.lock`; the next chain's `prep_joiner` failed
 `rc=3 another run.sh holds /tmp/mxfs_run.lock` 19s later and proceeded onto
 an un-prepped fleet. Rule: after killing a chain, also kill its `run.sh` by
-name (`tools/mxfs_pgrep.sh` — never bare `pgrep -f` host-locally, RULE 2c)
+name (`tools/mxfs_pgrep.sh` — never bare `pgrep -f` host-locally, RULE: NEVER WEDGE THE LAB HOST)
 or confirm `fuser -v /tmp/mxfs_run.lock` is empty before the next chain's
 gate releases; better, gate the next chain's start on the lock being free
 rather than on the prior chain's DONE line. Also noted: `mxfs_pgrep.sh

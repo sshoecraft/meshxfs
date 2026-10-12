@@ -37,7 +37,7 @@ Third: `mkfs_mxfs.c:789-792` sets ro_compat = FINOBT only ⇒ **reflink and
 rmapbt are OFF** on MXFS-formatted volumes. GPT still refused to let that
 excuse ignoring BUI (see below).
 
-## GPT RULE-5 ruling (binding; full text in the sess63 transcript)
+## GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (binding; full text in the sess63 transcript)
 
 - **Milestone state machine, not a stage byte**: `ACTIVE → GUARD{FENCED,
   IMAGES_REPLAYED, OBLIGATIONS_DONE, GRANTS_RELEASED} → CONSUMABLE(zeroed)`,

@@ -99,7 +99,7 @@ ambiguity. Settle phase 3 becomes an async worker; cancellation honored only
 while WAITING (never mid-fence — GPT: stopping between fence and dispatch
 strands the slice with no elected replayer). Async does not weaken correctness:
 phase 3 only STARTS recovery, replay is async either way, so a synchronous
-form would only add RULE-0 cost (+62s every cold-restart mount) without
+form would only add RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS cost (+62s every cold-restart mount) without
 shortening exposure. Open item flagged, unverified: whether anything inside
 `xfs_mountfs`/`xlog_recover` takes an AG DLM lock — if so, a mount could still
 park on a dead peer's retained bits, since step 6.5 used to purge before
@@ -140,7 +140,7 @@ call site not wired.
 
 `docs/history/docs/history/docs/history/compiled-step4a-mount-recovery-barrier-campaign.md` (0.11.401, part
 2): `mxfs_dlm_mount_recovery_barrier(mp)` lands and is wired into
-`xfs_mount.c` right after `xfs_log_mount()`'s error check. GPT's RULE-5 review
+`xfs_mount.c` right after `xfs_log_mount()`'s error check. GPT's RULE: CONSULT ANOTHER MODEL WHEN STUCK review
 of the actual implementation found it RECREATES the deadlock plus 7 more
 stop-ship items — **DO NOT BOARD**, no rig cycle spent:
 - **6A (highest priority, real deadlock)**: fence-failure residue is deferred
@@ -175,7 +175,7 @@ in the default config (this becomes item 1, fixed sess59).
 
 `docs/history/docs/history/docs/history/compiled-step4a-mount-recovery-barrier-campaign.md` (0.11.402):
 6A's real shape corrected — not an infinite hang, each blocked acquire stalls
-120s then `-ETIMEDOUT`s the mount (still a RULE-0 failure). Fixed: a read-only
+120s then `-ETIMEDOUT`s the mount (still a RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS failure). Fixed: a read-only
 `caw_footprint_scan` census + `mount_residue_blocking` check; if the residue
 still owns anything after 5 bounded fence retries, the barrier fails the mount
 immediately with a named cause instead of stalling minutes first. **New defect
@@ -263,7 +263,7 @@ in this arc is code-proof only, unmeasured on the 32-node board.
 - Every "obvious" fix in this arc created a new deadlock or a new honesty gap:
   keep-EX (sess51) needed CAS adoption (sess52) needed a pre-mountfs barrier
   (sess55) which itself needed 8 more corrections (sess57) before two remained
-  genuinely open. Iterating against GPT RULE-5 review caught each one before
+  genuinely open. Iterating against GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK review caught each one before
   a rig cycle was spent — no fix in this whole arc was disproven on the rig,
   they were disproven by review.
 - "Returns success" is not the same as "succeeded" — three separate functions

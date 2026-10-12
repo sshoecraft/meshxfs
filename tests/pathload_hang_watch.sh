@@ -74,6 +74,12 @@ start_loads() {
         pids+=($!)
     done
     wait "${pids[@]}"
+    pids=()
+    for n in $NODES; do ( clock_measure "$n" ) & pids+=($!); done
+    wait "${pids[@]}"
+    for n in $NODES; do
+        [ -s "$OUT/clock_$n" ] || { echo "ABORT: could not read $n's clock"; exit 2; }
+    done
     cycles=$((cycles + 1))
     t_cycle=$(( $(date +%s) + CYCLE_S ))
 }
@@ -94,9 +100,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-last_ok() {  # <node>: end time (ms) of the newest completed operation, or 0
+last_ok() {  # <node>: end time (ms, this host's clock) of the newest completed operation, or 0
     tail -c 8192 "$OUT/load_$1/ops.log" 2>/dev/null | tr -d '\000' \
-        | awk 'NF >= 4 && $4 == "ok" && $2 ~ /^[0-9]+$/ {t = $2} END {print t + 0}'
+        | awk -v off="$(clock_off "$1")" 'NF >= 4 && $4 == "ok" && $2 ~ /^[0-9]+$/ {t = $2} END {print (t ? t - off : 0)}'
 }
 inflight() {  # <node>: the operation after the newest logged one
     tail -c 8192 "$OUT/load_$1/ops.log" 2>/dev/null | tr -d '\000' \

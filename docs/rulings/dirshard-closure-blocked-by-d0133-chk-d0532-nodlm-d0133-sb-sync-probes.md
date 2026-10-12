@@ -1,4 +1,4 @@
-<!-- sess474 RULE-5 ruling: D-0533/0534/0535 NO-GO until a closing lap shows chk 0 (D-0133 sb counters block); D-0532 = option (a) xfs_iunlock_nodlm per I… -->
+<!-- sess474 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: D-0533/0534/0535 NO-GO until a closing lap shows chk 0 (D-0133 sb counters block); D-0532 = option (a) xfs_iunlock_nodlm per I… -->
 # sess474 GPT ruling (2026-09-02 ~17:50Z)
 
 ## 1. D-0533/0534/0535 closure: NO-GO on chain 115 s473c

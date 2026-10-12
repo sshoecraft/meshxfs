@@ -1,5 +1,5 @@
-<!-- sess184 RULE-5 ruling (blocker 1): OPTION C — kind-17 never unlocks P227 alone; durable write-time snlocal marker at claim + kind-17 at recovery, sco… -->
-# sess184 RULE-5 ruling — single-node untagged slice replay (blocker 1 of D-SHUTDOWN-UMOUNT-CLEAN-RELEASE-DIRTY-SLICE)
+<!-- sess184 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (blocker 1): OPTION C — kind-17 never unlocks P227 alone; durable write-time snlocal marker at claim + kind-17 at recovery, sco… -->
+# sess184 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — single-node untagged slice replay (blocker 1 of D-SHUTDOWN-UMOUNT-CLEAN-RELEASE-DIRTY-SLICE)
 
 Consult: gpt-5.6-sol, sess184. Question: may a kind-17 SINGLE_NODE_EXCLUSIVE
 certificate authorize applying a single-node victim's structurally untagged

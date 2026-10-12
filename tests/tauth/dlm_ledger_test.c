@@ -923,11 +923,53 @@ int main(int argc, char **argv)
                   "18 the worker's pass prepares the marked page (prepared +%llu want=%u state=%u)",
                   (unsigned long long)(A->dlm->prepare_wanted_pages - w0), A->dlm->page_want[pg],
                   A->dlm->page_state[pg]);
+            /* A's ticks are held across this request.  The handoff tick takes
+             * every loaded page's lock in turn, and the no-queue path decides
+             * only on a page whose lock is free that instant: with the ticks
+             * running, 2 of 100 runs under host load met the sweep on this
+             * page (ready=-16) and answered would-block, and DLT_TICK_PROBE
+             * measured 22-67 busy answers per 60M readiness probes with the
+             * ticks running against 0 in 180M with them held.  What this
+             * check asks is the prepared page's own answer. */
+            tick_hold(A, 1);
             rc = mxfs_dlm_lock_retries(A->dlm, &G, MXFS_LOCK_EX, MXFS_LKF_NOQUEUE, &gm, 10);
+            tick_hold(A, 0);
             CHECK(rc == 0 && gm == MXFS_LOCK_EX,
                   "18 the next no-queue request on that page is granted (rc=%d granted=%u)", rc, gm);
             if (rc == 0)
                 mxfs_dlm_unlock(A->dlm, &G);
+            /* DLT_TICK_PROBE=<n>: who else holds a ready page's lock.  The
+             * no-queue path's readiness probe, called n times with A's ticks
+             * running and n times with them held, counting -EBUSY (the page's
+             * mutex held by another thread at that instant). */
+            if (getenv("DLT_TICK_PROBE")) {
+                long n = atol(getenv("DLT_TICK_PROBE")), i;
+                int held;
+
+                for (held = 0; held <= 1; held++) {
+                    long busy = 0, ready = 0, other = 0;
+                    unsigned long ts0;
+                    uint64_t w0 = mxfs_pal_time_ms();
+
+                    tick_hold(A, held);
+                    ts0 = __atomic_load_n(&A->tick_seq, __ATOMIC_SEQ_CST);
+                    for (i = 0; i < n; i++) {
+                        int r = mxfs_tauth_ledger_page_ready_nowait(A->dlm->ledger, pg,
+                                                                    A->dlm->ledger_gen);
+                        if (r == -EBUSY)
+                            busy++;
+                        else if (r == 1)
+                            ready++;
+                        else
+                            other++;
+                    }
+                    printf("  INFO 18 tick-probe ticks=%s page=%u calls=%ld busy=%ld ready=%ld other=%ld tick_loops=%lu wall=%llums\n",
+                           held ? "held" : "running", pg, n, busy, ready, other,
+                           (__atomic_load_n(&A->tick_seq, __ATOMIC_SEQ_CST) - ts0) / 2,
+                           (unsigned long long)(mxfs_pal_time_ms() - w0));
+                }
+                tick_hold(A, 0);
+            }
         }
         mxfs_dl_noqueue_ledger_nowait = 1;
         settle(A);

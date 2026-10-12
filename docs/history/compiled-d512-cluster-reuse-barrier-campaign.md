@@ -72,7 +72,7 @@ D-512 only after all of it passes.
   open-unlink deferral; fd-closed allows real reuse and the stale shell never serves old bytes.
 - 0.28.4: T2/T6 drain pausepoints (`dbg_rel_pause_{ino,stage,ms}`, 5 sites in `bast_process`
   including both unlock arms). First pass: stages 1,2,4 held (publication blocked ≥2s); stages 3,5
-  looked like leaks but were a HARNESS bug (RULE-4 proven from dmesg: a recycled ino carried pending
+  looked like leaks but were a HARNESS bug (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS proven from dmesg: a recycled ino carried pending
   BAST state, create-churn released the grant ~10ms after create — *before* the second-ssh arm — so
   the pause never engaged and a free slot was found; not an ICLUS bypass). Fixed by arming in the
   same ssh as create and re-dirtying after arming. Rerun (sess416) closed T2 5/5 + T6 riders clean,

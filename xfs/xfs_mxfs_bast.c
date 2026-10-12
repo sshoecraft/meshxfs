@@ -1695,8 +1695,36 @@ static void mxfs_bast_write_inode_core_home(int *rtry_io, struct xfs_mount *mp,
 					XFS_DINODE_FMT_LOCAL &&
 				      vdip->di_format !=
 					XFS_DINODE_FMT_LOCAL))) {
+					/*
+					 * Which of the three tests tripped, and
+					 * whether this node still owed the platter
+					 * a committed change (pending != durable):
+					 * a core whose changecount is AHEAD of the
+					 * platter, with an obligation open, is this
+					 * node's own unlanded work rather than a
+					 * stale copy, and refusing it drops that
+					 * work.  The two name lists say which side
+					 * holds the names the other lacks.
+					 */
+					char p189in[160], p189dk[160];
+
+					p189in[0] = p189dk[0] = '\0';
+					/* a symlink's LOCAL fork is not a dir
+					 * shortform; walking it as one reads
+					 * past its data */
+					if (S_ISDIR(VFS_I(ip)->i_mode)) {
+						if (ip->i_df.if_format ==
+							XFS_DINODE_FMT_LOCAL &&
+						    ip->i_df.if_data)
+							mxfs_sf_fmt_names(mp,
+								ip->i_df.if_data,
+								p189in,
+								sizeof(p189in));
+						mxfs_sf_disk_names(mp, vdip, p189dk,
+								   sizeof(p189dk));
+					}
 					pr_warn_ratelimited(
-					    "mxfs: P189-RELOG-BEHIND-DISK ino=%llu incore[nlink=%u chg=%llu size=%lld fmt=%d] disk[nlink=%u chg=%llu size=%lld fmt=%d] -- in-core core is BEHIND the platter; refusing to re-log it over a peer's newer image\n",
+					    "mxfs: P189-RELOG-BEHIND-DISK ino=%llu incore[nlink=%u chg=%llu size=%lld fmt=%d] disk[nlink=%u chg=%llu size=%lld fmt=%d] trip[nlink=%d chg=%d fmt=%d] chg_ahead=%d pub[pending=%llu durable=%llu flush=%llu] dlm_mode=%u stale=%d stale_src=%u grant_seq=%llu dirty_seq=%llu try=%d incore_names=[%s] disk_names=[%s] -- in-core core is BEHIND the platter; refusing to re-log it over a peer's newer image\n",
 						(unsigned long long)ip->i_ino,
 						VFS_I(ip)->i_nlink,
 						(unsigned long long)inode_peek_iversion(VFS_I(ip)),
@@ -1705,7 +1733,26 @@ static void mxfs_bast_write_inode_core_home(int *rtry_io, struct xfs_mount *mp,
 						be32_to_cpu(vdip->di_nlink),
 						(unsigned long long)be64_to_cpu(vdip->di_changecount),
 						(long long)be64_to_cpu(vdip->di_size),
-						vdip->di_format);
+						vdip->di_format,
+						VFS_I(ip)->i_nlink <
+							be32_to_cpu(vdip->di_nlink),
+						inode_peek_iversion(VFS_I(ip)) <
+							be64_to_cpu(vdip->di_changecount),
+						ip->i_df.if_format ==
+							XFS_DINODE_FMT_LOCAL &&
+						vdip->di_format !=
+							XFS_DINODE_FMT_LOCAL,
+						inode_peek_iversion(VFS_I(ip)) >
+							be64_to_cpu(vdip->di_changecount),
+						(unsigned long long)ip->i_mxfs_pub_pending_seq,
+						(unsigned long long)ip->i_mxfs_pub_durable_seq,
+						(unsigned long long)ip->i_mxfs_pub_flush_seq,
+						ip->i_dlm_mode,
+						ip->i_dlm_stale ? 1 : 0,
+						ip->i_dlm_stale_src,
+						(unsigned long long)ip->i_mxfs_ex_grant_seq,
+						(unsigned long long)ip->i_mxfs_dirty_seq,
+						rtry, p189in, p189dk);
 					ip->i_dlm_stale = true;
 					ip->i_dlm_stale_src = 22;
 					flushed = true;

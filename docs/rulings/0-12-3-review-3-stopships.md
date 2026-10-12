@@ -1,5 +1,5 @@
-<!-- sess335 RULE-5 review of 0.12.3 D-513 landing: NO-GO, 3 stop-ships (barrier invalidate-before-publish must succeed; FSWIDE gate before no-DLM return;… -->
-# sess335 — RULE-5 diff review of the sess334 0.12.3 landing: NO-GO, 3 new stop-ships
+<!-- sess335 RULE: CONSULT ANOTHER MODEL WHEN STUCK review of 0.12.3 D-513 landing: NO-GO, 3 stop-ships (barrier invalidate-before-publish must succeed; FSWIDE gate before no-DLM return;… -->
+# sess335 — RULE: CONSULT ANOTHER MODEL WHEN STUCK diff review of the sess334 0.12.3 landing: NO-GO, 3 new stop-ships
 
 GPT reviewed the full sess334 landing (import_verdict, classify_terminal, publish_refusal, reap rewire, barrier_classify_slot, barrier flow, backfill identity check). Items A, B, 4, 5 PASS. Verdict **NO-GO for the rig** until:
 

@@ -1,4 +1,4 @@
-<!-- sess453 RULE-5 design ruling for 0.60.0 (review-#3 conditions): D1-D9 verdicts, lock order departure_mutex>probe_lock>snap_lock, D3 REJECTED (freeze+… -->
+<!-- sess453 RULE: CONSULT ANOTHER MODEL WHEN STUCK design ruling for 0.60.0 (review-#3 conditions): D1-D9 verdicts, lock order departure_mutex>probe_lock>snap_lock, D3 REJECTED (freeze+… -->
 # sess453 design ruling for 0.60.0 (the review-#3 conditions)
 
 Proposals D1-D9 as sent are in the transcript; verdicts:

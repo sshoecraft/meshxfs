@@ -57,7 +57,7 @@ Shell-based test infrastructure that drives 2-node bench/stress against test1/te
 | `tools/mxfs_sshpass.sh` | SSH+sshpass wrapper. All test scripts use this. Password is resolved from the lab secrets store `~/.config/mxfslab/secrets` (via `tools/mxfs_secrets.sh`), which materializes the `/tmp/.mxfs_pass` passfile — the wrapper re-resolves it if missing, so every caller works without a password in the tree. |
 | `tools/mxfs_secrets.sh` | Resolves `~/.config/mxfslab/secrets` (source of truth for test creds) → materializes the sshpass passfile. `passfile [path]` writes the node pw; `get <key> [field]` reads a field. The node root pw lives ONLY in the store (kept in sync with osimager `images/linux`) — never write it into the tree. |
 | `scripts/probe_sweep.sh <N>` | (ccloop daf50d34) Post-run cluster sweep of the 0.10.65+ xfs_buf integrity probes (P-SEMA-OVERUP/DUALLOCK, P-WRCNT-RESUBMIT, P-BLI-DOUBLEDONE) + SYSCALL_HANG/shutdown/BUG/Oops across test1..N dmesg rings. Exit 0 iff CLEAN. Run after every criteria run, BEFORE any VM recycle (ring dies on reboot). |
-| `scripts/revalidate_cell.sh <N> <full\|nodr\|dr\|g1\|g2>` | (ccloop daf50d34) One matrix-cell-group re-validation on the current build: clears rings, runs `run.sh N caw <group>` with RULE-0 TEST_TIMEOUT (600@32, 480@16, 300 else; dir_reuse auto 140*N inside run.sh), then probe_sweep. g1/g2 = the 32-node coherency/destructive split. |
+| `scripts/revalidate_cell.sh <N> <full\|nodr\|dr\|g1\|g2>` | (ccloop daf50d34) One matrix-cell-group re-validation on the current build: clears rings, runs `run.sh N caw <group>` with RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS TEST_TIMEOUT (600@32, 480@16, 300 else; dir_reuse auto 140*N inside run.sh), then probe_sweep. g1/g2 = the 32-node coherency/destructive split. |
 | `tests/cluster/`, `tests/single/`, `tests/stress/` | Per-area test cases. |
 | `tests/decision_reproducers/` | Standalone reproducers for specific past-bugs. |
 | `tests/lib/` | Common shell helpers. |
@@ -80,7 +80,7 @@ Shell scripts; no programmatic API. Invoked from the dev host.
 
 ## Invariants
 
-1. **Persistent scripts live in the source tree, not /tmp.** Per `/src/mxfs/CLAUDE.md` RULE 3. Test cluster reboots wipe /tmp; sess20–30 burned cycles re-creating harnesses. Keep harnesses in `tests/`, `bench/`, or `scripts/`.
+1. **Persistent scripts live in the source tree, not /tmp.** Per `/src/mxfs/CLAUDE.md` RULE: A SCRIPT IS NEVER A TEMP FILE. Test cluster reboots wipe /tmp; sess20–30 burned cycles re-creating harnesses. Keep harnesses in `tests/`, `bench/`, or `scripts/`.
 2. **Bench MUST capture dmesg cursor BEFORE rsync** so post-iter `dmesg_hits` count is bounded. The script does `sudo dmesg -T | wc -l > /tmp/dmesg_cursor_${LABEL}_iter${I}` pre-iter.
 3. **`shutdown_check` alone is INSUFFICIENT for stress PASS detection.** sess22 false-PASS regression: the shutdown check passed even when iter-1 had silent EIO. Fix in sess23: require `T1_DD_OK` + `T2_DD_OK` markers in addition.
 4. **Benches that take >120s indicate failure mode, not slow success.** Single-node rsync of open-gpu is ~3-13s. Multi-node working should be 2-3× SOLO at worst. 1300s timeouts = "let it grind through CAW timeouts" — don't read those as success.
@@ -113,7 +113,7 @@ Superseding the 2-node material above for coordinated (2-32 node) testing:
 - `run.sh <N> <caw|tcp> [test...]` — top-level orchestrator. Launches each
   test on all N nodes in parallel over SSH, aggregates results, records
   into `criteria.json` under `"<N>/<dlm>"`. Per-test wall-clock budgets are
-  workload-derived (RULE 0), not a blanket default — see the `case "$name"`
+  workload-derived (RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS), not a blanket default — see the `case "$name"`
   block in `run_coord()` for current per-test overrides (e.g.
   `dir_reuse_coherency` gets `140*N` seconds on CAW because its per-round
   cost is O(N): every node writes into one shared directory each round).
@@ -229,7 +229,7 @@ whatever the new hang-detection doesn't itself catch.
   launch, all N nodes must have the cluster FS mounted (`mountpoint -q` +
   fstype match, parallel, 15s timeout each); any miss records a hard FAIL
   naming the node(s) ("a prior test broke cluster formation state") and
-  skips the launch. Runs before `t0` so it never counts against RULE-0
+  skips the launch. Runs before `t0` so it never counts against RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS
   budgets. This turns any future silent formation breakage into a loud,
   attributable failure instead of hours of phantom coherency FAILs.
 - Debugging heuristic proven here: when a multi-node test says "peer sees
@@ -471,7 +471,7 @@ D-HOT-SLOT-CAW-SERIALIZES-LUN-PER-LBA-379.
   When `k < N` it also arms a non-departing observer node.
 - `SAMPLE_AT="<s> <s>"` — in-flight `/proc/<pid>/stack` sampling of blocked
   `umount` tasks. Reads `comm` and `stack` ONLY; never `cmdline` or `maps`
-  (RULE 2c — those take `mmap_lock` and wedge a sick node).
+  (RULE: NEVER WEDGE THE LAB HOST — those take `mmap_lock` and wedge a sick node).
 
 ### PITFALL — a re-prep moves the hot LBA
 
@@ -561,7 +561,7 @@ changed the harness contract, so read it before touching `run.sh`,
 
 ### What was broken
 
-`run.sh` runs each node under `timeout <RULE-0 budget> ssh ...` and aggregates
+`run.sh` runs each node under `timeout <RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS budget> ssh ...` and aggregates
 by grepping `^RESULT:` out of the captured stdout. The node-side rendezvous cap
 (`COORD_TIMEOUT`, default 120s) was clamped to `tt-15` for **dir_reuse_coherency
 only**, in a bespoke `case` in `run_coord()`. On the other 26 applicable rows it
@@ -654,7 +654,7 @@ nowhere in the path.
 
 `run.sh` now wraps EVERY `virsh` call in `timeout 60` and prints a WARN on
 expiry. Unbounded, this hangs `prep_cluster` forever in an unattended ccloop
-run — the exact RULE 2b/2c failure shape. **Never add an unbounded `virsh`
+run — the exact RULE: NEVER RUN A COMMAND THAT CAN TRIGGER A PERMISSION PROMPT/RULE: NEVER WEDGE THE LAB HOST failure shape. **Never add an unbounded `virsh`
 call.**
 
 Recovery without a host reset: `sudo tools/recover_wedged_domain.sh <domain>`.
@@ -666,15 +666,15 @@ holds the fd), and systemd-machined's stale `qemu-<id>-<domain>` registration.
 
 ## sess385 (2026-08-21) — harness/rig notes from the AG-publication campaign
 
-**Deriving the outer wrapper timeout (RULE 0).** `run.sh` already enforces each
+**Deriving the outer wrapper timeout (RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS).** `run.sh` already enforces each
 row's `budget_s` from `tests/suite/manifest` as that row's hard timeout and flips
 PASS->FAIL on overrun, so the outer `timeout` only decides how many ROWS you get.
 Derive it from summed **elapsed** walls (`tools/criteria.py N dlm`) + `12s x n_tests`
-+ `15s` startup, as RULE 0 says — but be aware that a row which stalls burns its
++ `15s` startup, as RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS says — but be aware that a row which stalls burns its
 full BUDGET, not its measured wall. `dirent_durability` measures ~66s against a
 240s budget; when it stalled, a wrapper sized on measured walls cut the chunk and
 the remaining rows stayed PENDING. **Put historically stall-prone rows in their own
-chunk** rather than padding the wrapper (padding is a RULE 0 violation and just
+chunk** rather than padding the wrapper (padding is a RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS violation and just
 makes you wait longer to learn the same thing).
 
 **Clear guest dmesg between builds.** `prep_cluster` does NOT clear it, so a probe
@@ -699,12 +699,12 @@ the sess385 result attributable. Prefer this over two builds.
 than falsely PASSed. If you see a chunk end early with no verdict, check the log
 tail for `Segmentation fault` before assuming a node fault.
 
-## sess387 (2026-08-21) — host-safety layer (RULE 2d)
+## sess387 (2026-08-21) — host-safety layer (RULE: NEVER RUN THE RIG ON AN UNGUARDED HOST)
 
 clyde wedged unrecoverably twice in 24h.  Neither was an MXFS bug; both were
 the host being driven into a state it could not return from, and both had an
 observable precondition nothing was checking.  Full chains and the SCST root
-cause: `docs/host-safety.md`.  Rule text: CLAUDE.md **RULE 2d**.
+cause: `docs/host-safety.md`.  Rule text: CLAUDE.md **RULE: NEVER RUN THE RIG ON AN UNGUARDED HOST**.
 
 ### New in the harness
 
@@ -734,7 +734,7 @@ cause: `docs/host-safety.md`.  Rule text: CLAUDE.md **RULE 2d**.
 `kernel.dmesg_restrict=1` on clyde: `dmesg` needs root.  The first version of
 the log-rate check read nothing as a normal user and reported "0 lines/s — OK".
 An unreadable log looks exactly like a quiet one.  It now FAILS when it cannot
-read.  Same class as RULE 10's "a disposition-critical negative is never
+read.  Same class as RULE: DELEGATE ITERATIVE GRIND's "a disposition-critical negative is never
 evidence".
 
 ### PITFALL — a fixed measurement window lets a marginal flood escape
@@ -756,7 +756,7 @@ a host that is already in trouble.  The guard matches with bash `[[ =~ ]]` and
 
 The state is the field after the `)` that closes `comm` — `sed -e 's/.*) //'
 -e 's/ .*//'`.  Never index by whitespace from the left: comm may contain
-spaces and parentheses.  (And per RULE 2c: `stat`, `comm`, `stack` are safe;
+spaces and parentheses.  (And per RULE: NEVER WEDGE THE LAB HOST: `stat`, `comm`, `stack` are safe;
 `cmdline` and `maps` are not.)
 
 ### PITFALL — allowlist the SCST trace mask, never blocklist it
@@ -793,7 +793,7 @@ A wedged host's journal going quiet is the wedge, not the absence of one.
 
 - **Standalone `run.sh` overhead is ~40 s for ONE test** (dirent_durability
   67 s test → 106 s wrapper; dlm_lock_correctness 1 s → 27 s; crash_consistency
-  80 s → >117 s).  The RULE 0 `15 s + 12 s × n` formula underestimates the
+  80 s → >117 s).  The RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS `15 s + 12 s × n` formula underestimates the
   n=1 case: use `walls + 40 s + 12 s × (n-1)`.  A 100 s wrapper on the 67 s
   test ABORTED it without the test ever failing.
 - **Prep clears dmesg after the mount**, so mount-time probes
@@ -838,7 +838,7 @@ A wedged host's journal going quiet is the wedge, not the absence of one.
   declined during N's demote (the seam then drops ILOCKs).
 - Evidence: tests/logs/ag25_sess390_convoy_demote.txt; sess389's incident
   tests/logs/ag25_incident_sess389.txt.
-- RULE 0: rsync_paired at 25 AGs is 18 s lap 1, 51-58 s lap 2, >60 s lap 3 — a
+- RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS: rsync_paired at 25 AGs is 18 s lap 1, 51-58 s lap 2, >60 s lap 3 — a
   pace FAIL by design of the geometry (PACE-388); at 64 AGs 15-30 s every lap.
 - 0.21.x knobs/probes (sess390): `mxfs.noino_lifecycle_requeue` (default 1) parks a
   no-inode BAST that finds the inode INEW/IRECLAIM/INACTIVATING/NEED_INACTIVE/
@@ -936,7 +936,7 @@ A wedged host's journal going quiet is the wedge, not the absence of one.
 - PRECONDITION: X and Y must have NO mxfs mount (the test keys would collide with
   their MXFS PR registration and a P&A would fence a live member). Run it after a
   host reboot / before prep, or on two nodes deliberately unmounted.
-- PITFALL (RULE 2d): never run it against an SCST older than `.5` — the harness
+- PITFALL (RULE: NEVER RUN THE RIG ON AN UNGUARDED HOST): never run it against an SCST older than `.5` — the harness
   refuses (`/sys/module/scst/version`) because the unfixed target panics the host.
   `scripts/clyde_preflight.sh` refuses a rig run while the knob is non-zero.
 - PITFALL (SCST build): `make` in `/src/scst/scst/src` only regenerated
@@ -997,7 +997,7 @@ A wedged host's journal going quiet is the wedge, not the absence of one.
   `tests/d0133_sb_mutation_gate.sh` (ioctls ENOTTY, sunit/swidth mount refused, uquota EINVAL,
   clean umount/mount zero refusals), `tests/crossnode_unlink_ubsweep.sh` (clean-departed slot's
   zombies freed by another node's fresh mount + chk oracle),
-  `tests/d_purge_nonatomic_verify.sh <label> concurrent|midscan|prefinal` (RULE-5 ruled arms).
+  `tests/d_purge_nonatomic_verify.sh <label> concurrent|midscan|prefinal` (RULE: CONSULT ANOTHER MODEL WHEN STUCK ruled arms).
 - TRAP: `tools/mxfs_pgrep.sh <pattern>` matches ANY process whose cmdline contains the pattern,
   including the calling shell and waiters whose ARGUMENTS name the pattern — killing by its
   output killed a rig_after waiter and the post-chain script (sess419).  Filter on the cmdline
@@ -1074,7 +1074,7 @@ A wedged host's journal going quiet is the wedge, not the absence of one.
 - `tests/free_foreign_realloc_repro.sh <label> [node] [files] [peer]` (sess430): same-node `dd; sync; rm; dd; rm` chains (records both lives' inos — same ino = the recycle path) then drop_caches, then the PEER creates 4×N files in the same dir to reallocate the numbers. FAIL on any P55C-FREE-FOREIGN whose ino is a chain ino, any P-CR62 DISK-LIVE / P-CR63-DEFER-DISKLIVE / shutdown signature on either node. Expected FAIL on 0.39.0 (the D-0351 chain defect), PASS on 0.39.1. `tests/classify_free_foreign.py` buckets a board sweep's FOREIGN lines (gen delta, per-ino cross-node tag timelines). `tests/sess430_chain.sh <label> <waitlog>`: pre-fix measure on the deployed build → build → post-fix repro → fhs → dre ×2 → board, journald sweeps with `chain_live`/`chain_written`/`disklive` verdict counters.
 - `tests/sess429_chain.sh <label> [wait_on_log]`: build → build-proof → tauth usermode gate (now incl. view_format_test) → prep → chk-geometry (authority ledger + authority view) → fhs → dre1/dre2 → 32/disk/caw/mpath board → journald sweeps with settled/unsettled/P237 verdict counts.
 ## sess431 — FREE-publication claim verification + wall-clock analysis
-- `tests/sess430_containment_chain.sh <label> <waitlog>` (sess430/431): wait → pre-fix injector (only if fleet sv == tree sv) → build+proof → tauth gate → prep → injector (or `AB=1` → `tests/dialloc_validate_ab.sh`) → (`SHORT=1` stops here) → ffr → fhs → dre ×2 → board (`tests/sess416_board_0286.sh`) → journald sweeps. Sweep HIGHVOL now prints `fp_claim/fp_keep/fp_write/fp_durable/fp_clear_other` and the verdict line `freepub_stale=` (P-FREEPUB-CLAIM-STALE + P238 cls=freepub-stale). Launch with `setsid nohup ... & disown` (survives the relay); ~27 min for a full lap (build no-op) — RULE 0: measured s439 16:54→17:21Z.
+- `tests/sess430_containment_chain.sh <label> <waitlog>` (sess430/431): wait → pre-fix injector (only if fleet sv == tree sv) → build+proof → tauth gate → prep → injector (or `AB=1` → `tests/dialloc_validate_ab.sh`) → (`SHORT=1` stops here) → ffr → fhs → dre ×2 → board (`tests/sess416_board_0286.sh`) → journald sweeps. Sweep HIGHVOL now prints `fp_claim/fp_keep/fp_write/fp_durable/fp_clear_other` and the verdict line `freepub_stale=` (P-FREEPUB-CLAIM-STALE + P238 cls=freepub-stale). Launch with `setsid nohup ... & disown` (survives the relay); ~27 min for a full lap (build no-op) — RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS: measured s439 16:54→17:21Z.
 - `tests/dialloc_validate_ab.sh <label> nodeA nodeB`: arm0 (knob off) now PASSES on EITHER pre-containment shape — P-CR62/shutdown signatures OR the silent one (X handed out to a created file; s438 on 0.39.4 measured exactly that: rc=1 sig=0 X_handed_out=1). arm1 (knob on) must contain (P-DIALLOC-DISKLIVE for X, X never handed out).
 - `scripts/analyze_p_diskslive_p55c.py <evidence_dir>` (needs `<dir>/raw/testN.log` + `<dir>/all_diskslive_lines.txt`): per P-DIALLOC-DISKLIVE, the latest preceding P55C-FREE-FLUSH/CHAIN on ANY node and whether that node then had `P-CLMERGE restored bmode=00` / `P239 arm=restore` / `P56-NL-LOGGED-DIR-SKIP` within 2 s. TRAP fixed sess431: `[ secs]` stamps are per-VM monotonic — the script converts each node to wall-clock from the median of `realms=`/1000 − t (P291-EXWIN carries realms=); never compare raw stamps across nodes.
 - `scripts/freepub_claim_chain.py <raw logs...>`: per FREE claim (P-FREEPUB-CLAIM ino/gen/epoch/seq) follows KEEP → WRITE → CLAIM-CLEAR why=; prints `ends:` histogram, STALE lines, and BAD claims (ended other than durable/discharge, or durable without keep+write). Exit 1 on any BAD/STALE. Journals: `journalctl -k -q --since '<MARKTIME>' -o short-monotonic | grep -a mxfs` per node into `tests/evidence/<label>_inos/raw/testN.log` (32-way backgrounded ssh with per-node rc files).
@@ -1104,7 +1104,7 @@ A wedged host's journal going quiet is the wedge, not the absence of one.
   arms above + lone_crash_replay e1/e0; log
   tests/evidence/sess433_chain_0400_<label>.log.
 - (sess434) `tests/lone_rsync_bench.sh <label> [A=test1] [nodes=32]` (120 s):
-  RULE 0 lone-node bench — fleet umount sweep, A mounts alone, rsyncs
+  RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS lone-node bench — fleet umount sweep, A mounts alone, rsyncs
   /root/open-gpu-kernel-modules (659 MB, 8714 files) into a fresh dir, sync,
   umount; prints `RESULT: PASS|FAIL ... rsync_wall= sync_wall= umount_wall=
   files= bad=`.  FAIL on rsync_wall > 60 s, files != 8714, any
@@ -1244,7 +1244,7 @@ A wedged host's journal going quiet is the wedge, not the absence of one.
 - `tests/retire_pending_admission.sh <N> <victim> <joiner> [probe] [arm]` — ten
   arms (sameboot, joiner, unknown, unknownresv, trunc, slowpr, joinerunk, race,
   genmove, multipending) for the 0.59.x two-phase departure; header documents
-  each invariant and RULE 0 budget.  `tests/pr_unregister_fail_restamp.sh`
+  each invariant and RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS budget.  `tests/pr_unregister_fail_restamp.sh`
   modes restamp|crash.  Chain driver `tests/sess452_chain71_retire_pending.sh
   <label> [expected-srcversion]` (aborts on a srcversion mismatch).
 - **TRAP (D-0518): a `umount; sleep 1; dmesg` capture can be one line short.**
@@ -1336,7 +1336,7 @@ A wedged host's journal going quiet is the wedge, not the absence of one.
 - `tests/intents_classless_attribute.sh <label> [node] [files]`: builds
   fragmented files on ONE live node, removes them (no destroy), harvests the
   producer's P239-OWNAUTH-NONDUR / P241-AUTHTRY lines by outcome x blft x
-  comm (D-FOREIGN-SLICE-INTENTS-ABANDONED RULE-4 attribution).
+  comm (D-FOREIGN-SLICE-INTENTS-ABANDONED RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS attribution).
 - `tests/sess467_chain99_d0523_peerloss_attrib.sh`: install frozen 0.64.2,
   joiner + peerloss arms, attribution lap, preps between.  Gated on chain 98.
 - Board wrapper: a full 28-row 32/disk/caw/mpath board measures 1283-1303 s; a
@@ -1373,7 +1373,7 @@ A wedged host's journal going quiet is the wedge, not the absence of one.
   line with `sed -n '/^{/,\$p'` like steps 1/4 (json.load raised on every lap before).
 - NEW `tests/dirshard_reuse_peer_list.sh <creator> <peer> [laps]` (D-0533): per lap, arm A =
   creator sharded mkdir A + 8 files, peer lists (caches members), creator rm+rmdir A, mkdir B
-  (number reuse), peer lists B — must be 8 entries, rc 0, < 300 ms (RULE 0); arm B = same with
+  (number reuse), peer lists B — must be 8 entries, rc 0, < 300 ms (RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS); arm B = same with
   the PEER doing the rmdir of the reused dir D (its free path probes members it cached under C).
   Verdict needs peer `P-DIRSHARD-STRANGER=0`, `P-DIRSHARD-SHELL-UNCONVERGED=0` and
   `P-DIRSHARD-SHELL-ADOPTED>0` (0 = VACUOUS: the reuse never landed on a number the peer cached).
@@ -1696,7 +1696,7 @@ Three rules it encodes:
   P238-FENCE-ABSENT, P163-RECOVERED, 'foreign replay of slot',
   P-TAUTH-ORPHAN-SWEEP, P-TAUTH-TAKEOVER, P-TAUTH-PAGE-PARKED, 'lock request
   failed after'; verdict = both MOUNTED inside the bound, zero lock failures,
-  zero shutdown/BUG.  RULE 0: ~420 s plus ~150 s for the VM restart.  A mount
+  zero shutdown/BUG.  RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS: ~420 s plus ~150 s for the VM restart.  A mount
   parked on an unreachable page is unkillable (D-0930): the harness's own
   `timeout` cannot end it and the join file then has no MOUNT_RC line — that
   absence is the D-0930 signature, not a harness fault.

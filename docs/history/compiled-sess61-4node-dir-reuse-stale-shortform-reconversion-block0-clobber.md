@@ -6,7 +6,7 @@ Central topic: the `dir_reuse_coherency` ship criterion (must pass 1/2/4/8 tcp
 8/tcp never run. Representative baseline (diagnostic probes OFF): **~2/24 rounds
 fail** (rounds 19-20). Peers (rank2/3/4) durably miss a `node1_f*` entry; **the
 creator (test1) NEVER fails**. sess61 changes did not regress this baseline.
-Root proven this session via RULE-4 direct evidence; the sess10 `grant_gen`
+Root proven this session via RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS direct evidence; the sess10 `grant_gen`
 fast-path fix was implemented and REFUTED.
 
 ### Build progression (sess61)
@@ -204,7 +204,7 @@ yet).
   the run log (NOT pgrep). Reset between runs: `virsh -c qemu:///system
   destroy+start test1-4` (device-busy otherwise). `pr_warn(4)` does NOT reach
   console at default loglevel 4.
-- RULE-0/PERF: ~13s/round × 24 ≈ 312s vs 300s TEST_TIMEOUT — even a fully
+- RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS/PERF: ~13s/round × 24 ≈ 312s vs 300s TEST_TIMEOUT — even a fully
   coherent run risks timing out near round 24; a per-round cost cut is also
   required, not just correctness.
 

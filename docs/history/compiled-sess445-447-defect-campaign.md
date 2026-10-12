@@ -34,7 +34,7 @@ during harness cleanup), all on the same dir block (`blkno=59308112`), class_cap
 st_cap=1 (VALID) voided to outcome=8.
 `docs/history/docs/history/docs/history/compiled-sess445-447-defect-campaign.md`
 
-GPT ruling (RULE-5): fix must be A' (witness reclassify at the *next* protected dirty), not A
+GPT ruling (RULE: CONSULT ANOTHER MODEL WHEN STUCK): fix must be A' (witness reclassify at the *next* protected dirty), not A
 (synchronous classify inside `xfs_trans_buf_set_type` — header/owner may be uninitialized for
 the new format at that point). On blft change with an existing capture, mark
 AUTH_BLFT_PENDING + record the new blft; classify at the next dirty with the current blft; if

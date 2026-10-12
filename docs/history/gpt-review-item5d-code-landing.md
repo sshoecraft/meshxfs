@@ -1,5 +1,5 @@
-<!-- sess442 RULE-5 code review of the 0.47.0 item-5d landing: 4 provisional concerns REFUTED by the code; NEW STOP-SHIPs: norecovery false K_REPLAY_OK, R… -->
-# sess442 RULE-5 code review — item 5d (0.47.0) as landed
+<!-- sess442 RULE: CONSULT ANOTHER MODEL WHEN STUCK code review of the 0.47.0 item-5d landing: 4 provisional concerns REFUTED by the code; NEW STOP-SHIPs: norecovery false K_REPLAY_OK, R… -->
+# sess442 RULE: CONSULT ANOTHER MODEL WHEN STUCK code review — item 5d (0.47.0) as landed
 
 Reviewed with the actual code bodies (v5_bootstrap_adopt, run tail, unwind, ladder hook, finish/terminal, victim_desc_read, claim_victim_slot, escrow prepare/advance, slot_complete/complete, xfs_log_mount adoption + P-BOOT-ADOPTED-REFUSED, barrier).
 

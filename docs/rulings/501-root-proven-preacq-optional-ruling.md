@@ -8,7 +8,7 @@
 - Real mechanism (observed in one 18ms window on test1): mv preacquires participating inodes' home AGs; trylock miss on peer-held ag21 → ILOCK handoff → dir EX granted away 17ms after a 642ms-wait adoption → blocks ~600ms holding nothing for ag21 → relock re-queues ~600ms for dir EX. Two serialized cross-node waits per rename that touches NO AG metadata.
 - Census: 1590 in-window AG waits; 850+ comm=mv; 1227 on ag=21. Per-node AGwait count ↔ slowness near-perfect (110 waits → 6/16 rounds; 0-2 waits → done <7s). Cached-ag21 holder batches 48 ops in 0.4s; makespan ≈ 32 × ag-handoff ≈ 32s vs 30s budget.
 
-## RULE-5 ruling (GPT sess286): phase-aware mandatory/optional AG intent
+## RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (GPT sess286): phase-aware mandatory/optional AG intent
 - Mandatory (today's trylock+handoff+block-holding-nothing) ONLY for AG demands reachable past a non-restartable boundary: target_ip's AG when rename has an existing target (in-trans iunlink); xfs_remove's ip AG (xfs_inode.c:5945, unchanged).
 - Optional (trylock; miss → PROCEED, no handoff, no block): rename src/target dir + src_ip home AGs. No-target same-dir rename: mandatory set EMPTY.
 - Tripwire probe at deep P1-AGWAIT site (xfs_mxfs_dlm.c ~36596) when a DIRTY trans blocks on AG — evidence of how often skipped insurance fires; dev-assert candidate.

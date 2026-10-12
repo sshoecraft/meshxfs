@@ -5,7 +5,7 @@ metadata:
   type: feedback
 ---
 
-USER (2026-10-09, angry: "dont do this again", "run a script or something"): a grind agent I prompted to run dlm_ledger_test under CPU load built the load from my own suggestion `sh -c 'while :; do :; done' &` x8 inside a for-loop chain. The permission checker could not verify the `sh -c` program ("This shell -c script runs rm and could not be checked") and stopped the unattended session on an approval prompt.
+USER (2026-10-09: "dont do this again", "run a script or something"): a grind agent I prompted to run dlm_ledger_test under CPU load built the load from my own suggestion `sh -c 'while :; do :; done' &` x8 inside a for-loop chain. The permission checker could not verify the `sh -c` program ("This shell -c script runs rm and could not be checked") and stopped the unattended session on an approval prompt.
 
 Why: my prompt text handed the agent the inline program. Agents copy example commands verbatim. This is the same class as feedback-multi-step-shell-logic-goes-in-a-repo-script-never-an-inline-bash-c-program, which I had not applied to my own prompt.
 

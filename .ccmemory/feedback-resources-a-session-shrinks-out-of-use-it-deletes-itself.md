@@ -1,11 +1,11 @@
 ---
 name: feedback-resources-a-session-shrinks-out-of-use-it-deletes-itself
-description: USER (furious, 0.90.41): I shrank platform sets 8→2 and left the 24 VMs I had cloned (134G) "for the user to decide". What I made and retire, I delet…
+description: USER (0.90.41): I shrank platform sets 8→2 and left the 24 VMs I had cloned (134G) "for the user to decide". What I made and retire, I delet…
 metadata:
   type: feedback
 ---
 
-When a change takes resources out of use — VMs, disk images, LUNs, DHCP reservations, lab-file lines — that earlier Claude sessions created, delete them in the same change. Never leave them "for the user's call": every line of this project, and every lab VM beyond the first node of a set, was made by Claude sessions. User: "YOU FUCKING MADE THEM ... you fucking delete them".
+When a change takes resources out of use — VMs, disk images, LUNs, DHCP reservations, lab-file lines — that earlier Claude sessions created, delete them in the same change. Never leave them "for the user's call": every line of this project, and every lab VM beyond the first node of a set, was made by Claude sessions. User: the sessions made them, so the sessions delete them.
 
 Lab VMs are disposable (feedback-lab-vms-are-disposable-reset-them-without-asking).
 

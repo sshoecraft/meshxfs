@@ -1,5 +1,5 @@
-<!-- sess395 RULE-5 ruling: insert-path fossil i_next_unlinked (empty-bucket case) — F1 reset+F2 buffer NUFIX are the root fix, F3 ingress sanitize only a… -->
-# sess395 RULE-5 ruling — fossil in-core i_next_unlinked at xfs_iunlink_insert_inode (D-AGI-UNLINKED-CROSSNODE-RECOVERY-SHUTDOWN, lap-3 test10 AG10 bucket 10, 0.23.1)
+<!-- sess395 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: insert-path fossil i_next_unlinked (empty-bucket case) — F1 reset+F2 buffer NUFIX are the root fix, F3 ingress sanitize only a… -->
+# sess395 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — fossil in-core i_next_unlinked at xfs_iunlink_insert_inode (D-AGI-UNLINKED-CROSSNODE-RECOVERY-SHUTDOWN, lap-3 test10 AG10 bucket 10, 0.23.1)
 
 ## Evidence brought (test10 = slot 10, bucket 10 = its own bucket)
 - 14:47:17.796 P82-REM 0x133 head=0x133 next=NULL at_head=1 (freed same txn) → bucket empty.

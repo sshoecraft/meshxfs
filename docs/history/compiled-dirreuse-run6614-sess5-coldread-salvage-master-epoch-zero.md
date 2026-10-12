@@ -26,7 +26,7 @@ marker NOT written.
 ### FIX 1 — undestaged cold-read SALVAGE (KEEP, VERIFIED)
 File `xfs_da_btree.c`, in-core-invalidated branch (~line 3302).
 
-**Root (RULE-4 proven):** multinode dir DATA blocks are UNDESTAGED (destage only
+**Root (RULE: TROUBLESHOOTING IS A LOOP, NOT A GUESS proven):** multinode dir DATA blocks are UNDESTAGED (destage only
 at DLM release, P16=0). A freshly created/REUSED dir block0 whose on-disk daddr
 still holds a freed prior owner's un-zeroed dir3 block (or garbage) lives only
 in-core. One of the ~10 `XBF_DONE`-clearing sites (evict/reload/modify-refresh)
@@ -129,7 +129,7 @@ must die at ACQUIRE (reload) or WRITE-completion, not read. `docs/history/docs/h
 
 ---
 
-### GPT-5.5 docs/project-history.md (RULE-5 consult, for next session)
+### GPT-5.5 docs/project-history.md (RULE: CONSULT ANOTHER MODEL WHEN STUCK consult, for next session)
 **Core: gate dir stale-base correctness on the RELIABLE LOCAL `ip->i_dlm_epoch` /
 `b_mxfs_relepoch`, NOT the broken master dir_epoch.** A cached dir buffer is a
 stale RMW base iff `b_mxfs_relepoch < ip->i_dlm_epoch` (released/lost the dir

@@ -56,6 +56,11 @@
 #       default route uses: two portals over one NIC are one path
 #       prints: POOL_LUN id=NN size=<bytes> target=<iqn> dev=<guest path>
 #                        wwid=<id> img=<host path> nodes=<a,b,..> owner=<pid>
+#       --also binds the LUN BESIDE the ones the same owner already holds on
+#       those nodes (single path only): the nodes keep their mounts, module
+#       and sessions, so one host can mount two filesystems.  A release
+#       (free, or a later plain alloc of those nodes) still unmounts every
+#       mxfs on the node, so free --also LUNs only after unmounting.
 #   tools/lun_pool.sh lookup --owner <pid>      the POOL_LUN line <pid> holds, if any
 #   tools/lun_pool.sh lookup --nodes <a,b,..>   the line of the allocation (live or
 #                                               kept) bound to exactly that node set
@@ -180,13 +185,18 @@ initiator_of() {  # <node> -> its InitiatorName, or nothing
 
 # Unmount every mxfs on the node.  The mountpoint gate before fuser -km is
 # load-bearing: on a directory that is not a mountpoint fuser resolves to the
-# root filesystem and kills sshd.  Each umount is bounded: an unbounded one
-# that hangs in the kernel is a task nothing can kill.
+# root filesystem and kills sshd.  It gates fuser only, never the umount: a
+# mount whose LUN has gone (the pool rebound it to another group) answers its
+# root's stat with EIO, so mountpoint says no while /proc/mounts still lists
+# it, and a plain umount then succeeds at once (measured 2026-10-11, test8-16
+# after lun12 was released under them: every bind failed UNMOUNT_FAIL with no
+# umount tried).  Each umount is bounded: an unbounded one that hangs in the
+# kernel is a task nothing can kill.
 NODE_UNMOUNT='
     for m in $(awk "\$3 == \"mxfs\" {print \$2}" /proc/mounts); do
         for t in 1 2 3 4 5; do
-            mountpoint -q "$m" || break
-            fuser -km "$m" 2>/dev/null; sleep 1
+            awk -v m="$m" "\$2 == m && \$3 == \"mxfs\" {f=1} END {exit !f}" /proc/mounts || break
+            if mountpoint -q "$m"; then fuser -km "$m" 2>/dev/null; sleep 1; fi
             timeout 30 umount "$m" 2>/dev/null && break
             sleep 1
         done
@@ -205,6 +215,25 @@ NODE_LOGIN=$NODE_UNMOUNT'
     for try in 1 2 3; do
         iscsiadm -m node -u >/dev/null 2>&1
         iscsiadm -m node -o delete >/dev/null 2>&1
+        iscsiadm -m node -o new -T TGT -p PORTAL:3260 >/dev/null 2>&1
+        iscsiadm -m node -T TGT -p PORTAL:3260 --op update -n node.startup -v automatic >/dev/null 2>&1
+        iscsiadm -m node -T TGT -p PORTAL:3260 --login >/dev/null 2>&1
+        iscsiadm -m session --rescan >/dev/null 2>&1
+        sleep 2
+        d=$(readlink -f DEVPATH 2>/dev/null)
+        if [ -b "$d" ]; then
+            echo "LOGIN_OK sessions=$(iscsiadm -m session 2>/dev/null | grep -c iqn) wwid=$(cat /sys/block/$(basename $d)/device/wwid 2>/dev/null | tr -d " ")"
+            exit 0
+        fi
+        sleep 3
+    done
+    echo LOGIN_FAIL no device'
+
+# A second LUN beside the one the node already holds (alloc --also): nothing
+# the node has is touched -- no unmount, no module unload, no logout -- this
+# target's node record is added and logged in, and the device must appear.
+NODE_LOGIN_ALSO='
+    for try in 1 2 3; do
         iscsiadm -m node -o new -T TGT -p PORTAL:3260 >/dev/null 2>&1
         iscsiadm -m node -T TGT -p PORTAL:3260 --op update -n node.startup -v automatic >/dev/null 2>&1
         iscsiadm -m node -T TGT -p PORTAL:3260 --login >/dev/null 2>&1
@@ -314,6 +343,7 @@ release() {  # <id>: log the owner's nodes out, empty the group, drop the owner 
     fi
     : > "$(owner_of "$id")"
     unlink "$POOL/lun$id.paths" 2>/dev/null
+    unlink "$POOL/lun$id.also" 2>/dev/null
     return 0
 }
 
@@ -377,9 +407,10 @@ cmd_up() {
 }
 
 cmd_alloc() {
-    local owner=$PPID what="" min=0 paths=1 nodes=() id n held best="" bestsize=0 sz
+    local owner=$PPID what="" min=0 paths=1 also=0 nodes=() id n held best="" bestsize=0 sz
     while [ "$#" -gt 0 ]; do
         case "$1" in
+            --also) also=1; shift ;;
             --owner) owner=${2:?}; shift 2 ;;
             --what) what=${2:?}; shift 2 ;;
             --size) min=$(numfmt --from=iec "${2:?}") || die "bad size $2"; shift 2 ;;
@@ -391,6 +422,7 @@ cmd_alloc() {
     [ "${#nodes[@]}" -ge 1 ] || die "alloc needs at least one node"
     case "$paths" in 1) ;; 2) [ "$(echo $MPLIST | wc -w)" -ge 2 ] || die "--paths 2 needs a portal per path on its own storage network: storage mpath=<ip>,<ip> in $MXFS_LAB (scripts/san_net.sh)" ;;
         *) die "--paths is 1 or 2" ;; esac
+    [ "$also" = 1 ] && [ "$paths" = 2 ] && die "--also binds a single-path LUN only: the multipath map is always mpatha"
     local st; st=$(starttime_of "$owner")
     [ -n "$st" ] || die "owner pid $owner is not running"
     local want; want=$(IFS=,; echo "${nodes[*]}")
@@ -399,6 +431,8 @@ cmd_alloc() {
     for id in $(ids); do
         owner_live "$id" || continue
         if [ "$(owner_field "$id" 1)" = "$owner" ]; then
+            # --also: the owner's own LUNs on these nodes stay, and another is added
+            [ "$also" = 1 ] && continue
             [ "$(owner_field "$id" 3)" = "$want" ] && [ "$(paths_of "$id")" = "$paths" ] \
                 || die "owner $owner already holds lun$id for [$(owner_field "$id" 3)] on $(paths_of "$id") path(s), not [$want] on $paths"
             pool_unlock
@@ -417,7 +451,10 @@ cmd_alloc() {
     # initiators in its group — and released when the node sets only overlap.
     for id in $(ids); do
         [ -s "$(owner_of "$id")" ] && ! owner_live "$id" || continue
-        if [ "$(owner_field "$id" 3)" = "$want" ] && [ "$(lun_size "$id")" -ge "$min" ] \
+        # A LUN bound with --also is never adopted: a later plain bind of its
+        # nodes logs them out of every target, so its owner file can name
+        # nodes that no longer see it.
+        if [ "$also" = 0 ] && [ ! -e "$POOL/lun$id.also" ] && [ "$(owner_field "$id" 3)" = "$want" ] && [ "$(lun_size "$id")" -ge "$min" ] \
            && [ "$(paths_of "$id")" = "$paths" ] \
            && [ "$(ls "$T/$(tgt_of "$id")/ini_groups/alloc/initiators" 2>/dev/null | grep -vc '^mgmt$')" = "${#nodes[@]}" ] \
            && [ -s "$POOL/lun$id.wwid" ]; then
@@ -459,6 +496,7 @@ cmd_alloc() {
     id=$best
     echo "$claim" > "$(owner_of "$id")"
     echo "$paths" > "$POOL/lun$id.paths"
+    if [ "$also" = 1 ]; then : > "$POOL/lun$id.also"; else unlink "$POOL/lun$id.also" 2>/dev/null; fi
     pool_unlock
 
     # Bind outside the lock: the owner file already claims the LUN and the nodes.
@@ -471,6 +509,7 @@ cmd_alloc() {
     done
     set_initiators "$id" "${inis[@]}" || { pool_lock; release "$id"; pool_unlock; die "lun$id: could not set its initiator group"; }
     if [ "$paths" = 2 ]; then snippet=$(subst "$NODE_LOGIN_MP" "$id")
+    elif [ "$also" = 1 ]; then snippet=$(subst "$NODE_LOGIN_ALSO" "$id")
     else snippet=$(subst "$NODE_LOGIN" "$id"); fi
     td=$(mktemp -d)
     for n in "${nodes[@]}"; do ( ssh_n "$n" "$snippet" 180 > "$td/$n" ) & done

@@ -38,6 +38,11 @@ struct vnode {
     mxfs_thread_t   *rx;
     mxfs_thread_t   *tick;              /* handoff + release ticks */
     volatile int     stop;
+    /* odd while the tick thread is inside its handoff and release ticks: the
+     * handoff tick takes every loaded ledger page's lock in turn, so a check
+     * that needs a page's lock free can read whether a tick overlapped it */
+    volatile unsigned long tick_seq;
+    volatile int     tick_pause;        /* the tick thread runs no tick */
     /* knobs / observations */
     volatile int     drop_grants;       /* drop this many inbound GRANTs */
     volatile int     hold_denies;       /* park this many inbound DENYs until
@@ -474,11 +479,25 @@ static void vtick_fn(void *arg)
 
     while (!me->stop) {
         if (me->dlm) {
-            mxfs_dlm_handoff_tick(me->dlm);
-            mxfs_dlm_release_retry_tick(me->dlm);
+            /* odd first, then the pause: tick_hold sets the pause first,
+             * then waits for an even count, so one of the two sees the other */
+            __atomic_add_fetch(&me->tick_seq, 1, __ATOMIC_SEQ_CST);
+            if (!__atomic_load_n(&me->tick_pause, __ATOMIC_SEQ_CST)) {
+                mxfs_dlm_handoff_tick(me->dlm);
+                mxfs_dlm_release_retry_tick(me->dlm);
+            }
+            __atomic_add_fetch(&me->tick_seq, 1, __ATOMIC_SEQ_CST);
         }
         mxfs_pal_sleep_ms(20);
     }
+}
+
+/* Hold (on=1) or resume (on=0) a node's ticks; returns with no tick running. */
+static inline void tick_hold(struct vnode *n, int on)
+{
+    __atomic_store_n(&n->tick_pause, on, __ATOMIC_SEQ_CST);
+    while (on && (__atomic_load_n(&n->tick_seq, __ATOMIC_SEQ_CST) & 1))
+        mxfs_pal_sleep_ms(1);
 }
 
 /* ─── node lifecycle ─── */

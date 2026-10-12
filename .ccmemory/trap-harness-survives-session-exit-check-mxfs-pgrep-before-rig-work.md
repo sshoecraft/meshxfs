@@ -8,7 +8,7 @@ metadata:
 # TRAP (sess410, CORRECTED sess413): rig runs vs session/relay teardown
 
 ## sess413 correction — the important half
-A harness launched as a plain Bash child of the claude process (foreground OR `run_in_background`, directly or via a rig-runner agent's Bash) **DIES when the session is torn down at a relay boundary**. Proven 2026-08-24: sess412's full board (`run.sh 32 caw`, run_id 20260824T004012Z) died at 00:43:26Z — the exact relay teardown moment — 3 minutes into a ~17-minute run, mid-board, leaving no summary row in criteria.json and never starting the chained second job. A grind-agent /proc sweep (comm-based, RULE-2c-safe) found zero surviving harness processes.
+A harness launched as a plain Bash child of the claude process (foreground OR `run_in_background`, directly or via a rig-runner agent's Bash) **DIES when the session is torn down at a relay boundary**. Proven 2026-08-24: sess412's full board (`run.sh 32 caw`, run_id 20260824T004012Z) died at 00:43:26Z — the exact relay teardown moment — 3 minutes into a ~17-minute run, mid-board, leaving no summary row in criteria.json and never starting the chained second job. A grind-agent /proc sweep (comm-based, RULE: NEVER WEDGE THE LAB HOST-safe) found zero surviving harness processes.
 
 **The fix: launch long rig work with `setsid nohup sh -c '...' &`.** The setsid detaches it from the session's process group so relay teardown cannot kill it, and per-stage `STAGE <name> rc=N` lines appended to an evidence chain-log make the next session's harvest trivial. Evidence files MUST live under tests/evidence/ (never scratchpad — host reboots wipe /tmp, sess400 trap).
 

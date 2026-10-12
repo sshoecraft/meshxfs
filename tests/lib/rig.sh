@@ -42,6 +42,54 @@ filt() { grep -av '^Unauthorized\|^Warning:\|^If you\|^$'; }
 # DISCARDED and the status returned is filt's.  Never feed a verdict from it.
 rs()  { timeout "$1" "$SSH" "$2" "$3" < /dev/null 2>/dev/null | filt; }
 
+# A time the harness takes is on THIS host's clock; anything a node stamps is
+# on the node's.  Comparing the two directly grades a node's clock instead of
+# its filesystem: on 2/net/mesh/mpath (run 20261005T154539Z-g2) test2's clock
+# was 74.0 s behind, its operations through each fault window were stamped
+# before the window, and four path rows failed on a "72 s stall" while every
+# operation it started finished in under 17 s.  An offset the other way would
+# hide a real stall, or count a write acknowledged after a fence as one made
+# before it.
+# A clock can also be STEPPED while a row runs: in run 20261005T204723Z-g2
+# test1's clock was 366.5 s behind when its load started and was put right
+# during the first fault, so one 16.7 s operation read as 383 s.  An offset
+# taken once cannot translate across a step, so clock_steady re-reads it.
+# clock_measure <node> [<file>]: <file> (default $OUT/clock_<node>) holds
+# "<node ms - host ms> <round trip ms>", from the sample with the shortest ssh
+# round trip of three (its error is at most half that trip).  Returns 1,
+# writing nothing, when the node answers none of them; the caller decides what
+# that stops.
+clock_measure() {
+    local n=$1 f=${2:-$OUT/clock_$1} i a b t rtt best="" off=""
+    for i in 1 2 3; do
+        a=$(date +%s%3N)
+        t=$(rs 10 "$n" 'echo CLK=$(date +%s%3N)' | sed -n 's/^CLK=\([0-9]*\)$/\1/p')
+        b=$(date +%s%3N)
+        [ -n "$t" ] || continue
+        rtt=$((b - a))
+        if [ -z "$best" ] || [ "$rtt" -lt "$best" ]; then best=$rtt; off=$((t - (a + b) / 2)); fi
+    done
+    [ -n "$off" ] || { echo "  INFO $n's clock could not be read"; return 1; }
+    echo "$off $best" > "$f"
+    echo "  INFO $n's clock is ${off} ms from this host's (ssh round trip ${best} ms)"
+}
+# clock_off <node>: that node's measured offset in ms (node - host), 0 if none
+clock_off() { awk '{print $1 + 0; exit}' "$OUT/clock_$1" 2>/dev/null | grep . || echo 0; }
+# clock_steady <node>: after `clock_measure <node> $OUT/clock_<node>.recheck`
+# (taken for every node at once by the caller), 0 when the node's offset is
+# within 2 s of the one measured at its load's start (two readings' errors,
+# each under half an ssh round trip, stay well inside that); 1 when it moved
+# further or the recheck has no reading, which is the rig's fault and no
+# statement about the filesystem.
+clock_steady() {
+    local n=$1 now was
+    [ -s "$OUT/clock_$n.recheck" ] || { echo "  INFO $n's clock could not be read again"; return 1; }
+    now=$(awk '{print $1 + 0; exit}' "$OUT/clock_$n.recheck"); was=$(clock_off "$n")
+    [ $(( now > was ? now - was : was - now )) -le 2000 ] && return 0
+    echo "  INFO $n's clock moved from ${was} ms to ${now} ms against this host's since its load started"
+    return 1
+}
+
 # rsx <timeout> <node> <cmd>: a MEASUREMENT.
 #   - stdout is the remote command's stdout, banner-filtered, byte for byte
 #     when the invocation succeeds;

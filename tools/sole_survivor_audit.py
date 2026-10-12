@@ -55,6 +55,13 @@ SOLE = "mxfs_v5_dlm_sole_survivor"
 # kernel's style, return type on the line above) or "type name(".
 FUNC = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 SKIP_KEYWORDS = {"if", "for", "while", "switch", "return", "sizeof", "else"}
+# Column-0 macro invocations that are not function definitions.  Counted as
+# names, a module parameter added between a function and a guard below it
+# re-attributed that guard to "MODULE_PARM_DESC", which the census then read
+# as a new, unreviewed site.
+NOT_FUNC = re.compile(r"^(MODULE_[A-Z_]+|module_param\w*|EXPORT_SYMBOL\w*|"
+                      r"DEFINE_\w+|DECLARE_\w+|module_init|module_exit|"
+                      r"late_initcall\w*|subsys_initcall\w*)$")
 
 
 def enclosing_functions(lines):
@@ -64,7 +71,8 @@ def enclosing_functions(lines):
     for i, raw in enumerate(lines):
         if raw and not raw[0].isspace() and not raw.startswith(("#", "/", "*", "}")):
             m = FUNC.match(raw)
-            if m and m.group(1) not in SKIP_KEYWORDS:
+            if (m and m.group(1) not in SKIP_KEYWORDS
+                    and not NOT_FUNC.match(m.group(1))):
                 cur = m.group(1)
             else:
                 # "static int" / "void" on its own line: the name follows.

@@ -1,7 +1,7 @@
 # tools (User-space utilities)
 
 **Owner files**: `tools/` (16 files, ~7.0K LOC)
-**Last updated**: 2026-06-12; 2026-07-16 (mkfs Step 3b: transport self-test scratch sector reservation); 2026-08-01 (chk_mxfs C7 `-U` upgrade + orphan inode audit); 2026-08-12 (caw_slotdump documented + `revoke` field); 2026-08-19 (caw_slotdump `--slot`/`yield`/always-`ag`; new caw_slot_hash.py); 2026-08-24 (RULE 8 ledger schema tools: `ledger_validate.py`, `ledger_backfill_dates.py`, `hook_ledger_guard.sh`); 2026-08-29 (sess439: bootstrap record region in mkfs/chk, `check_bootstrap` — see final section); 2026-08-29 (sess439: bootstrap record region in mkfs/chk, `check_bootstrap` — see final section); 2026-08-29 (sess450: chk_mxfs decodes MXFS_DISKLOCK_FLAG_RETIRE_PENDING (4) in check_disklock/--show-quarantine/repair-table — BLOCKED, never consumable; pitfall: chk_mxfs re-declares the flag constants locally and compares some against bare literals); 2026-09-02 (sess462: chk_mxfs `--show-quarantine` decodes the obligation record + reads/validates the obligation list — see the final section); 2026-09-05 (sess517: chk_mxfs -v prints agblocks/agblklog/inopblog — see the final section); 2026-09-08 (sess559: `disklock_hb_dump.py` — plain-pread heartbeat slot table for targets that refuse READ(16) FUA; see final section); 2026-09-09 (sess560: `disklock_hb_dump.py` decodes the recovery descriptor of every RECOVERY_GUARD record — stage/victim/owner/prover/fence kind; see final section); 2026-09-10 (sess575: `defects.py`, `criteria.py`, `defects_import.py`, `criteria_import.py` — the defect queue and the criteria board become writable tools over `data/`, and the 95 OPEN ledger records are imported; see final section); 2026-09-10 (sess576: the old ledger chain is ARCHIVED to `/src/archive/mxfs/` and unwired — `defects.sh`, `showstat.sh`, `tests/suite/open_defects.sh`, all eight `ledger_*` tools, `hook_ledger_guard.sh` and BOTH one-shot importers are gone from this tree, and the `open_defects` board criterion is retired. What remains in `tools/` is `defects.py` and `criteria.py`; see final section)
+**Last updated**: 2026-06-12; 2026-07-16 (mkfs Step 3b: transport self-test scratch sector reservation); 2026-08-01 (chk_mxfs C7 `-U` upgrade + orphan inode audit); 2026-08-12 (caw_slotdump documented + `revoke` field); 2026-08-19 (caw_slotdump `--slot`/`yield`/always-`ag`; new caw_slot_hash.py); 2026-08-24 (RULE: ZERO ACCEPTED KNOWN DEFECTS ledger schema tools: `ledger_validate.py`, `ledger_backfill_dates.py`, `hook_ledger_guard.sh`); 2026-08-29 (sess439: bootstrap record region in mkfs/chk, `check_bootstrap` — see final section); 2026-08-29 (sess439: bootstrap record region in mkfs/chk, `check_bootstrap` — see final section); 2026-08-29 (sess450: chk_mxfs decodes MXFS_DISKLOCK_FLAG_RETIRE_PENDING (4) in check_disklock/--show-quarantine/repair-table — BLOCKED, never consumable; pitfall: chk_mxfs re-declares the flag constants locally and compares some against bare literals); 2026-09-02 (sess462: chk_mxfs `--show-quarantine` decodes the obligation record + reads/validates the obligation list — see the final section); 2026-09-05 (sess517: chk_mxfs -v prints agblocks/agblklog/inopblog — see the final section); 2026-09-08 (sess559: `disklock_hb_dump.py` — plain-pread heartbeat slot table for targets that refuse READ(16) FUA; see final section); 2026-09-09 (sess560: `disklock_hb_dump.py` decodes the recovery descriptor of every RECOVERY_GUARD record — stage/victim/owner/prover/fence kind; see final section); 2026-09-10 (sess575: `defects.py`, `criteria.py`, `defects_import.py`, `criteria_import.py` — the defect queue and the criteria board become writable tools over `data/`, and the 95 OPEN ledger records are imported; see final section); 2026-09-10 (sess576: the old ledger chain is ARCHIVED to `/src/archive/mxfs/` and unwired — `defects.sh`, `showstat.sh`, `tests/suite/open_defects.sh`, all eight `ledger_*` tools, `hook_ledger_guard.sh` and BOTH one-shot importers are gone from this tree, and the `open_defects` board criterion is retired. What remains in `tools/` is `defects.py` and `criteria.py`; see final section)
 
 ## Purpose
 
@@ -272,7 +272,7 @@ heartbeat sector: `dump` / `save` / `restore` / `copy` / `mkguard`.
 
 It exists because the D-513 containment machinery could not be tested — the
 kernel only ever writes well-formed outcome records, so nothing in the tree
-could produce the malformed or misplaced inputs the RULE-5 review required
+could produce the malformed or misplaced inputs the RULE: CONSULT ANOTHER MODEL WHEN STUCK review required
 proof against. `recov_forge` produces them **on the real LUN with the real
 CRC binding** (crc32c over the record's own bytes folded with the sector's
 `{fs_gen, node_id, epoch}`), so the checks exercise the real kernel path.
@@ -392,7 +392,7 @@ AGI-RMW-399 (AGI `freecount` +1 vs inobt/finobt, the 0.23.9 "every create
 every chunk full and every allocated dinode live, i.e. the AGI side was
 wrong.  Pair it with `tests/agifc_churn_experiment.sh` (O_TMPFILE churn repro
 + `P-AGIFC-*` audit sweep) and `tests/tmpfile_churn_ftrace.sh` (function_graph
-per-callee timing of one node's churn iteration, for the RULE 0 perf defect
+per-callee timing of one node's churn iteration, for the RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS perf defect
 D-TMPFILE-CHURN-RULE0-PERF-400).
 
 Oracle trap (sess400): `chk_mxfs` on a LIVE LUN is not a valid AGI-vs-btree
@@ -429,7 +429,7 @@ Design + build order: `docs/recovery-manifest.md`.
   `D-FOREIGN-SLICE-INTENTS-ABANDONED` shape, not corruption.
 - PITFALL: this tightens the board oracle — kill-lap arms that used to PASS
   with "chk clean (SB lazy aside)" now FAIL on this error until the defect is
-  fixed.  That is RULE 6 working, not a regression of the tool.  `make tools`
+  fixed.  That is RULE: ZERO ACCEPTED KNOWN DEFECTS working, not a regression of the tool.  `make tools`
   after editing (the rig's prep/chk use `tools/chk_mxfs` from the tree; never
   rebuild mid-run).
 
@@ -468,7 +468,7 @@ grep the output for `ino=` to see which txns/versions matched; item counts
 in the TXN header are items (th_num_items in the trans header counts
 regions, ~3× for inode items).
 
-## 2026-08-24 (sess417): the ledger schema tools — RULE 8 enforcement
+## 2026-08-24 (sess417): the ledger schema tools — RULE: ZERO ACCEPTED KNOWN DEFECTS enforcement
 
 > **ARCHIVED 2026-09-10.** Every file this section describes now lives in
 > `/src/archive/mxfs/`, along with the ledger it operated on. Nothing in this
@@ -478,7 +478,7 @@ regions, ~3× for inode items).
 > resolution, both of which `defects.py` inherits. Read it as history, not as
 > a description of the current tree.
 
-Three files land the CLAUDE.md RULE 8 date schema on
+Three files land the CLAUDE.md RULE: ZERO ACCEPTED KNOWN DEFECTS date schema on
 `tests/criteria/OPEN_DEFECTS.json`. They are the first tools in this
 subsystem that operate on project *bookkeeping* rather than on a device, so
 they share none of the SG_IO/PAL machinery above.
@@ -549,7 +549,7 @@ so it can never block an unrelated write.
   or `list(d.values())` heuristic grabs `_comment` and reports 20 records.
   Always index `d["defects"]`.
 - **Never read the whole ledger** (~1.25 MB after the backfill, and growing —
-  see RULE 6). Use `./defects.sh`, or `json.load` + project the fields you
+  see RULE: ZERO ACCEPTED KNOWN DEFECTS). Use `./defects.sh`, or `json.load` + project the fields you
   need.
 - **`found` is prose, not a date.** Nothing may parse it as one. Session
   numbers, incident names and build ids belong there; dates belong in
@@ -985,7 +985,7 @@ would change the acceptance criteria mid-verification.
 
 **Cross-subsystem**
 
-- Both read `tests/criteria/OPEN_DEFECTS.json`, so they share the RULE-8 schema
+- Both read `tests/criteria/OPEN_DEFECTS.json`, so they share the RULE: ZERO ACCEPTED KNOWN DEFECTS schema
   with `tools/ledger_validate.py`; neither writes it.
 - `harness_lint.py` lints `tests/` and `scripts/`, so a new harness there is
   gated by it. It is deliberately **not** wired as a board criterion yet: adding
@@ -1250,7 +1250,7 @@ ITS tree.
 alone says the class is 77 wide and nothing about which of them anyone has
 thought about — which is how it stayed open through two closures.
 
-Classes, from the sess574 RULE-5 ruling. **The axis is not performance vs
+Classes, from the sess574 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling. **The axis is not performance vs
 correctness**; it is *what fact makes the skipped work unnecessary, and what
 stops that fact changing mid-operation*:
 

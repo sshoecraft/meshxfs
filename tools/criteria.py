@@ -154,7 +154,14 @@ GREEN = ("PASS",)
 #: What it must NOT mean is "the rig broke that day". A failure whose recorded reason is
 #: rig-formation is not evidence of an MXFS fault and never enters the flake count, and the two
 #: tests that ARE the rig-forming step and the policy gate never flake at all.
-RIG_NOISE = re.compile(r"pre-assert|NO_TERMINAL_RECORD|run was killed|prep fail", re.I)
+#:
+#: The same holds for a test whose own instrument was absent: `chk_clean` ("chk tool missing",
+#: tests/tooling/chk_clean.sh) and `dlm_lock_correctness` ("fua_verify missing",
+#: tests/caw/dlm_lock_correctness.sh) emit those only from their `[ -x tool ]` setup check, before
+#: anything is measured. On 2026-10-10 the tree's tools were deleted mid-run (a `make clean` for a
+#: backup) and those two reasons were counted as genuine FAILs for eleven runs.
+RIG_NOISE = re.compile(r"pre-assert|NO_TERMINAL_RECORD|run was killed|prep fail"
+                       r"|chk tool missing|fua_verify missing", re.I)
 FLAKE_WINDOW = 11
 NEVER_FLAKE = ("prep_cluster", "open_defects")
 
@@ -908,6 +915,40 @@ def cmd_amend(data: dict, args) -> int:
     return 0
 
 
+def cmd_unamend(data: dict, args) -> int:
+    """Take back an amendment: the run counts as a genuine FAIL again.
+
+    An amendment is a claim that the detector, not MXFS, produced the FAIL. When
+    a later measurement refutes the case it was made on (measured 2026-10-11: a
+    fio FAIL amended as the pool SSD's exhausted write cache recurred with that
+    device idle for 20 s), the FAIL must count again, and the record of why the
+    amendment was taken back stays beside it.
+    """
+    entry = find(data, args.id)
+    config = parse_at(args.at)
+    cell = cell_of(entry, config)
+    if not cell:
+        sys.exit(f"criteria: {entry['id']} has no cell at {config}")
+    runs = [cell] + list(cell.get("history") or [])
+    hit = [r for r in runs if str(r.get("iso", "")) == args.iso]
+    if not hit:
+        sys.exit("criteria: %s [%s] records no run stamped %s" % (entry["id"], config, args.iso))
+    run = hit[0]
+    was = run.pop("detector_defect", None)
+    if not was:
+        sys.exit("criteria: the run stamped %s carries no amendment" % args.iso)
+    run["amendment_withdrawn"] = ("%s | withdrawn: %s" % (was, args.why))[:600]
+    save(data)
+    genuine, seen = flake_count(entry, config)
+    print("unamended %s [%s] run %s: counts as a genuine FAIL again; genuine failures in the "
+          "window now %d of %d -> %s" % (entry["id"], config, args.iso, genuine, seen,
+                                          cell_status(entry, config)))
+    print("\nThis changes what the board says. It belongs in CHANGELOG.md:\n")
+    print("- **Board: %s at %s, the FAIL of %s counts again** — %s"
+          % (entry["id"], config, args.iso, args.why))
+    return 0
+
+
 def cmd_remove(data: dict, args) -> int:
     """Only for a criterion that is no longer something we must achieve.
 
@@ -1016,6 +1057,13 @@ def main() -> int:
                        help="what the detector got wrong, the evidence that the cluster had done "
                             "the right thing, and the detector fix that is already in the tree")
 
+    unamend = subs.add_parser("unamend", help="take back an amendment whose case did not hold")
+    unamend.add_argument("id")
+    unamend.add_argument("--at", metavar="CONFIGURATION", required=True)
+    unamend.add_argument("--iso", required=True, help="the amended run's stamp, as `show` prints it")
+    unamend.add_argument("--why", required=True,
+                         help="what was measured that shows the amendment's case was wrong")
+
     remove = subs.add_parser("remove", help="no longer something we must achieve")
     remove.add_argument("id")
     remove.add_argument("--why", required=True, help="why this is no longer required")
@@ -1068,6 +1116,8 @@ def main() -> int:
         return cmd_update(data, args)
     if args.command == "amend":
         return cmd_amend(data, args)
+    if args.command == "unamend":
+        return cmd_unamend(data, args)
     if args.command == "remove":
         return cmd_remove(data, args)
     if args.command == "move":

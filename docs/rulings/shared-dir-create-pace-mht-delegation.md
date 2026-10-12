@@ -1,4 +1,4 @@
-<!-- sess436 RULE-5 ruling D-401/D-32NODE-SHARED-DIR-CREATE-PACE: MHT=300ms is the immediate cause but not sufficient; rank: dir delegation+op combining >… -->
+<!-- sess436 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-401/D-32NODE-SHARED-DIR-CREATE-PACE: MHT=300ms is the immediate cause but not sufficient; rank: dir delegation+op combining >… -->
 # sess436 ruling (gpt-5.6-sol) — shared-dir create pace (D-401 / D-32NODE-SHARED-DIR-CREATE-PACE)
 
 ## Measured anatomy fed in (0.41.6, tests/evidence/sess436_tenure_modesplit/report.txt, tests/cc_tenure_modesplit.py)

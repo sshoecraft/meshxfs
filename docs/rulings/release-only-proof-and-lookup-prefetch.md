@@ -1,5 +1,5 @@
 <!-- sess495 GPT ruling on the pace levers: release-only needs an ordering proof + kill arms; lookup fix = parallel per-buffer FUA prefetch first, extent-… -->
-# sess495 GPT RULE-5 ruling — D-32NODE-SHARED-DIR-CREATE-PACE levers (2026-09-04)
+# sess495 GPT RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — D-32NODE-SHARED-DIR-CREATE-PACE levers (2026-09-04)
 
 Input: in-tenure create 15.2 ms on 0.70.12 = lkp 4.8 + dirsig 4.0 + other 2.3 + post_other 1.1 + rfr 1.0 + dlk 0.9 + dia 0.6; private dir 6.8 (lkp 0.3, dirsig 0). K~12, gap p50 7.7 s, h~45 ms.
 

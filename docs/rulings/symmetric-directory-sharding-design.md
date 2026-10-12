@@ -1,4 +1,4 @@
-<!-- sess436 RULE-5 ruling: fixed mkdir-time SYMMETRIC directory sharding (detached shard containers + durable manifest, per-shard summaries, parent-fsync… -->
+<!-- sess436 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: fixed mkdir-time SYMMETRIC directory sharding (detached shard containers + durable manifest, per-shard summaries, parent-fsync… -->
 # sess436 ruling (gpt-5.6-sol) — symmetric directory sharding for D-32NODE-SHARED-DIR-CREATE-PACE / D-401
 
 Context: private-dir headroom 17 s vs shared 70-100 s; sess68 user directive bars asymmetric MDS / per-op RTT.

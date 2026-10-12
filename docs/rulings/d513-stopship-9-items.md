@@ -1,5 +1,5 @@
-<!-- sess325 RULE-5 diff review of D-513 containment (0.12.0 sv C84100559): STOP-SHIP, 9 required pre-rig changes; full list in body + transcript -->
-# sess325 RULE-5 ruling — D-513 containment diff review: NOT DEPLOYABLE YET
+<!-- sess325 RULE: CONSULT ANOTHER MODEL WHEN STUCK diff review of D-513 containment (0.12.0 sv C84100559): STOP-SHIP, 9 required pre-rig changes; full list in body + transcript -->
+# sess325 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — D-513 containment diff review: NOT DEPLOYABLE YET
 
 Reviewed: full 9-item implementation (sess323-325), builds clean as 0.12.0
 sv C84100559E4BD2D5D0AB0BA. Core (c)+(a) design ruled SOUND; 9 required

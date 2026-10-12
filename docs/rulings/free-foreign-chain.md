@@ -1,4 +1,4 @@
-<!-- sess430 RULE-5 ruling: P55C-FREE-FOREIGN on same-node free->recycle->free chains; tenure continuity + explicit CHAIN_LIVE provenance; never a live in… -->
+<!-- sess430 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: P55C-FREE-FOREIGN on same-node free->recycle->free chains; tenure continuity + explicit CHAIN_LIVE provenance; never a live in… -->
 # sess430 — D-0351 chain: GPT ruling on the FREE-FOREIGN reclassification
 
 ## Evidence brought

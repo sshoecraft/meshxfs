@@ -1,5 +1,5 @@
-<!-- sess451 RULE-5 ruling on 0.59.1 RETIRE_PENDING settlement: STOP-SHIP #2 — 5 blockers (non-coherent/cached absence proof, no-PR self-clear + key0=abse… -->
-# sess451 RULE-5 ruling — 0.59.1 (sv 2529E66E) — STOP-SHIP #2
+<!-- sess451 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling on 0.59.1 RETIRE_PENDING settlement: STOP-SHIP #2 — 5 blockers (non-coherent/cached absence proof, no-PR self-clear + key0=abse… -->
+# sess451 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling — 0.59.1 (sv 2529E66E) — STOP-SHIP #2
 
 Criteria: 1 MET (reread on -EAGAIN; dead-confirm discards CHANGED), 2 MET (RETIRE_PENDING in barrier sweep, unresolved holds the gate), 3 PARTIAL, 4 PARTIAL, 5 UNMET, 6 PARTIAL, 7 UNMET, 8 PARTIAL, 9 MET, 10 UNMET.
 

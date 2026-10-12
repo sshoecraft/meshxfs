@@ -1,4 +1,4 @@
-<!-- sess189 RULE-5 ruling: mount barrier = ADMISSION barrier. Shape A (top-of-round mphase drain) + B (pending-descriptor fold) + gate-until-complete; pe… -->
+<!-- sess189 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: mount barrier = ADMISSION barrier. Shape A (top-of-round mphase drain) + B (pending-descriptor fold) + gate-until-complete; pe… -->
 # sess189 GPT ruling — mount recovery barrier is an ADMISSION barrier
 
 Defect: D-SHUTDOWN-UMOUNT-CLEAN-RELEASE-DIRTY-SLICE remount arm.
@@ -43,7 +43,7 @@ claimed / in-progress does not satisfy this."
 
 ## Implementation notes
 - Gate loop after rounds: sweep (WITHDRAWN-flag OR pending) non-local
-  slots minus published; try acquire+replay; poll; RULE-0 bounded; timeout
+  slots minus published; try acquire+replay; poll; RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS bounded; timeout
   → fail mount (same spirit as the (b2) residue gate).
 - Verify/reorder producer: where does fire_dead write the cert vs mark
   pending durable? (disklock.c fire_dead pipeline).

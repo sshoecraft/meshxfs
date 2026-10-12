@@ -1,4 +1,4 @@
-<!-- sess447 RULE-5 ruling D-0514: H1 (inline tail sweep inside the single foreign-replay work_struct blocks on victim B's grant; B's replay queued behind… -->
+<!-- sess447 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-0514: H1 (inline tail sweep inside the single foreign-replay work_struct blocks on victim B's grant; B's replay queued behind… -->
 # GPT ruling D-0514 (sess447)
 
 Evidence brought: chain 49 lap 1 trail (test1: RECOVERY-COMPLETE slot 29 12:27:23.907 → P97-SWEEP-START slot=29 same ms, no SWEEP-DONE; slot 31 detected .743 s later, elected, silence; test1 could not release mxfs at prep). Lap 2 PASS: both replays before any sweep; sweeps 13 ms / 0 ms.

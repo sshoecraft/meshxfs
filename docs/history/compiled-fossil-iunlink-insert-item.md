@@ -29,7 +29,7 @@ clears a non-NULL **buffer** `nu` (`P-IUNL-NUFIX`) before the AGI head update,
 using the same NUFIX idiom as the create path.
 
 `docs/rulings/iunlink-insert-fossil-reset-f1-f4.md`
-(RULE-5): F1 accepted as correct containment but flagged for weakening the
+(RULE: CONSULT ANOTHER MODEL WHEN STUCK): F1 accepted as correct containment but flagged for weakening the
 "already an interior member" detector — keep a per-caller proof requirement
 (fresh nlink→0 under lock; tmpfile/EEXIST orphan; orphan-scan only after the
 64-bucket membership check) and log old value+gen+head+caller. F2 accepted in

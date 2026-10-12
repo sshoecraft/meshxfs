@@ -1,5 +1,5 @@
-<!-- sess429 RULE-5 ruling: D-0351 0.38.3 regression (P55C-FREE-HOME leaves pub ledger open -> P237 evict shutdown) — settle by equivalence with predicate… -->
-# sess429 — RULE-5 ruling: home-free FREE obligation settles the publication ledger by equivalence
+<!-- sess429 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: D-0351 0.38.3 regression (P55C-FREE-HOME leaves pub ledger open -> P237 evict shutdown) — settle by equivalence with predicate… -->
+# sess429 — RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: home-free FREE obligation settles the publication ledger by equivalence
 
 ## Measured (s432, 0.38.3, tests/evidence/sess429_s432_test1_dmesg.txt lines ~83970-84010)
 test1 only, fio_perf prologue: `dd` creates ino 133, `rm` frees it (P128-INACT-DEFER pin=1 in_ail=1),

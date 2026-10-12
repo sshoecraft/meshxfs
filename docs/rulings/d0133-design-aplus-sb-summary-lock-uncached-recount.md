@@ -1,4 +1,4 @@
-<!-- sess474 RULE-5 ruling D-0133 fix = A+: dedicated SB_SUMMARY DLM EX lock (never AG0) held over uncached-coherent AGF/AGI recount + cover + SB home wri… -->
+<!-- sess474 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling D-0133 fix = A+: dedicated SB_SUMMARY DLM EX lock (never AG0) held over uncached-coherent AGF/AGI recount + cover + SB home wri… -->
 # sess474 GPT ruling (2026-09-02 ~18:12Z) — D-0133 counter arm fix design
 
 Evidence given: chain 116 s474c laps 1-2 on 0.64.26 (2/2 fail): workers test1/test2 recomputed 128/89 and 128/125 and saw their writes land (POST); 30 idle nodes recomputed 64/61 from their own STALE cached mount-time AG headers (no P-SB-RECOUNT-STALE because pag summary == cached buffer); regressors test9/test11/test28 had PRE durable=128 and wrote 64; final platter 64/61. Unmounts ~300 ms each, spread ~1 s.

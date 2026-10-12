@@ -1,4 +1,4 @@
-<!-- sess307 RULE-5 ruling (step 6 F1): defer on {still_dirty,proof_failed,tripwire} not F2/NO_DOMAIN; knob release_proof_enforce=1; ICLUS per-cluster wor… -->
+<!-- sess307 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (step 6 F1): defer on {still_dirty,proof_failed,tripwire} not F2/NO_DOMAIN; knob release_proof_enforce=1; ICLUS per-cluster wor… -->
 # sess307 GPT ruling — build-order step 6 (F1 deferred-release enforcement)
 
 Full text in sess307 transcript. Context: steps 1-5 landed as telemetry

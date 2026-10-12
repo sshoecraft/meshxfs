@@ -18,7 +18,7 @@ reads gigabytes of captured kernel log to find a shell function.
 
 **Why it is worse than slow.** It was launched while a 6-lap
 `tests/sess570_chain_ghost.sh` was running on the rig. Every lap of that chain
-is measured against a RULE 0 budget, and clyde's disk is also the host for the
+is measured against a RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS budget, and clyde's disk is also the host for the
 LUN, the guest images and the journal. A background gigabyte-scale read
 competes with the thing being measured, so the cost is not just the wasted
 call — it can invalidate the lap.

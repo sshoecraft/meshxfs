@@ -8,7 +8,7 @@ All three sess169 pending edits landed in dlm/dlm_caw.c:
 - Dead `mxfs_dlm_caw_flush_held_to_disk_orig` REMOVED (was ~12956-13125); tombstone comment left before `int mxfs_dlm_caw_flush_held_to_disk`.
 VERSION 0.11.461. `make modules` rc=0, srcversion **AC77A91359602432ABDB805**; `make -C tools` rc=0. Helper body verified correct per ruling (mint/CONT-ZERO/preserve arms, prev from `s` not `cur`, zero-skip in caw_next_grant_epoch at 1102). Rig still on 0.11.460 — deploy needed before any board.
 
-## 2. RULE-5 ruling (this session, gpt-5.6-sol): kernel-hook PW selftest APPROVED
+## 2. RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (this session, gpt-5.6-sol): kernel-hook PW selftest APPROVED
 Q5's user-mode vehicle premise REFUTED by inspection: tools/caw_verify.c = raw SCSI CAW/FUA sector checker; NO user-mode DLM build exists (pal/linux only, no pal/user, no mxfsd in tree; dlm_caw.c only in Kbuild). GPT: in-kernel modparam/debugfs-armed selftest driving mxfs_dlm_caw_lock/convert/unlock on a reserved resource "satisfies Q5's verification intent, arguably stronger"; user-mode re-host NOT justified. Approved ledger wording captured in transcript. CONDITIONS:
 - (A1) Do NOT claim WHICH grant site minted the re-mint token unless attributed; inequality only proves new tenure.
 - (A2) acquire-upgrade arm only if a supported shape — VERIFIED SUPPORTED: v5_mount.c:4347 comment names "normal held-mode upgrade path"; compat-add handles same-node upgrade in one CAS (P109-CLR-UPGRADE).

@@ -1,5 +1,5 @@
-<!-- sess437 RULE-5 ruling: recovery-owner liveness = (node_id,epoch) tuple never node_id; same-node/new-epoch = ordinary CAW takeover term+1; whole-clust… -->
-# sess437 RULE-5 ruling (GPT) — two liveness holes from chain 7 (sess436 s420 queue)
+<!-- sess437 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: recovery-owner liveness = (node_id,epoch) tuple never node_id; same-node/new-epoch = ordinary CAW takeover term+1; whole-clust… -->
+# sess437 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling (GPT) — two liveness holes from chain 7 (sess436 s420 queue)
 
 ## Evidence that prompted it
 - radv takeover arm (tests/evidence/20260829T024351Z_radv_takeover, chain7 log): harness rewrote the descriptor to owner=(R.node_id, R.epoch+1) mid-ladder. R's retry re-entered mxfs_v5_dlm_recovery_acquire: replay_authorized("reacquire") -> -EBUSY (recov_auth_holds fails), auth mask cleared, fresh claim -EBUSY -> v5_mount.c:5160 branch: owner_node alive (it is R) and !v5_node_is_dead -> P238-RECOV-OWNED wait every 30 s forever; all survivors wait too (owner node alive). v5_complete_classify (TAKEOVER) never reached. fails=4.

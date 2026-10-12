@@ -1,4 +1,4 @@
-<!-- sess404 RULE-5 ruling: production defaults = enforce=1, release_proof=1, tcp=0; REFUSE clustered RW mount if fua_disable=1 && !tcp (option A); flip g… -->
+<!-- sess404 RULE: CONSULT ANOTHER MODEL WHEN STUCK ruling: production defaults = enforce=1, release_proof=1, tcp=0; REFUSE clustered RW mount if fua_disable=1 && !tcp (option A); flip g… -->
 # sess404 GPT ruling — foreign-replay enforcement production defaults
 
 ## Facts given

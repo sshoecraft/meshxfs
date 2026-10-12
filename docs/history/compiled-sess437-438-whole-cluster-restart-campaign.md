@@ -4,7 +4,7 @@
 D-WHOLE-CLUSTER-CRASH-RESTART-REQUIRES-OPERATOR-437: recovering an MXFS
 cluster after ALL 32 nodes crash/reboot together, with no live peer to
 preempt a dead node's SCSI PR key. sess437-438 (fleet 0.41.10 -> 0.43.0)
-found two liveness holes, got binding GPT (RULE-5) design rulings for both,
+found two liveness holes, got binding GPT (RULE: CONSULT ANOTHER MODEL WHEN STUCK) design rulings for both,
 landed one build item, and had a proposed shortcut for the remaining items
 rejected. Chronological.
 
@@ -179,7 +179,7 @@ via a special-cased identity pass-1. Open design question carried to the
 next session: the bootstrap owner itself needs a slot before the survivor
 engine can run at all — needs a dedicated bootstrap record and a
 transitional GUARD/RECOVERING claim on the node's own old slot, flagged as
-requiring its own RULE-5 consult.
+requiring its own RULE: CONSULT ANOTHER MODEL WHEN STUCK consult.
 
 ## State at sess438 end
 

@@ -121,7 +121,7 @@ future 0.64.0 chain — not done in either session.
 
 ## Harness fixes and traps found along the way
 
-`run.sh`'s failure-artifact path was a RULE-3 violation: it printed a `mktemp` path under `/tmp`
+`run.sh`'s failure-artifact path was a RULE: A SCRIPT IS NEVER A TEMP FILE violation: it printed a `mktemp` path under `/tmp`
 that it then `rm -rf`'d, so the printed path never existed and the real copy was lost on host
 reboot (`docs/history/docs/history/compiled-sess464-465-d0523-d0524-dirshard-campaign.md`). Fixed sess465: copies now land in
 `tests/evidence/run_<name>_<RUN_ID>/` (gzipped kernlogs), and the printed path is the real one
