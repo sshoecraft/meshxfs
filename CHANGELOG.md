@@ -11,9 +11,10 @@
   secrets store when it runs.  It used to spell out the password's first
   four characters as its search pattern.
 - `notes/2node.md` names the repository as `sshoecraft/meshxfs`.
-- The README opens with a banner — "A POSIX clustered filesystem built on
-  XFS" — and a paragraph on what MeshXFS does, naming no one operating
-  system: the platform layer exists so that MeshXFS is not tied to one, and
+- The README opens with a left-aligned banner — "A POSIX clustered
+  filesystem built on XFS" — and a paragraph on what MeshXFS does, the way
+  the large infrastructure projects on GitHub open theirs, naming no one
+  operating system: the platform layer exists so that MeshXFS is not tied to one, and
   Proxmox VE is a supported platform with a plugin, not what it was built for.
 
 ## 2026-10-12 — 0.90.125 — the product is MeshXFS; lab VMs are built by osimager, not cloned

@@ -1,6 +1,4 @@
-<div align="center">
-
-# MeshXFS (`mxfs`)
+# MeshXFS
 
 ### A POSIX clustered filesystem built on XFS
 
@@ -8,15 +6,12 @@
 
 Shared SAN or DRBD storage · Network or on-disk locking · Fencing and journal recovery
 
-</div>
-
 MeshXFS is an open-source (GPL-2.0) clustered filesystem. Built on XFS, it
-supports concurrent read-write mounts on shared
-iSCSI SAN storage—validated with 2, 4, 8, and 16 nodes—or on dual-primary
-DRBD, with network-based or SCSI COMPARE AND WRITE locking. MeshXFS provides
-fencing and survivor-led journal recovery, is packaged as a DKMS module for
-Proxmox VE 9, RHEL 9, Ubuntu 24.04, and Debian 13, and includes a Proxmox VE
-storage plugin.
+supports concurrent read-write mounts on shared iSCSI SAN storage—validated
+with 2, 4, 8, and 16 nodes—or on dual-primary DRBD, with network-based or SCSI
+COMPARE AND WRITE locking. MeshXFS provides fencing and survivor-led journal
+recovery, is packaged as a DKMS module for Proxmox VE 9, RHEL 9, Ubuntu 24.04,
+and Debian 13, and includes a Proxmox VE storage plugin.
 
 On a system, MeshXFS goes by its short name `mxfs`: the `mxfs.ko` module,
 `mount -t mxfs`, the tools `mkfs.mxfs`, `chk_mxfs` (`fsck.mxfs`),
