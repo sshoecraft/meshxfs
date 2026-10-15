@@ -15,7 +15,7 @@
 # THE MEASUREMENT
 #   Emit a unique marker to /dev/kmsg, then poll `dmesg` for it as fast as the
 #   node will answer, over a single SSH session (so per-poll SSH setup cost is
-#   not charged to the latency).  Report, for each of N trials:
+#   not charged to the latency).  Report, for each of N attempts:
 #     stamp_s   printk timestamp the marker carries
 #     seen_s    node-local monotonic clock when dmesg first returned it
 #     lag_ms    (seen_s - stamp_s) — the window in which a snapshot lies
@@ -23,18 +23,18 @@
 # Both clocks are read ON THE NODE from the same source family
 # (/proc/uptime vs printk's monotonic stamp), never from the caller's clock.
 #
-# usage: kmsg_visibility_latency.sh [node=test2] [trials=10]
+# usage: kmsg_visibility_latency.sh [node=test2] [attempts=10]
 set -u
 NODE="${1:-test2}"
-TRIALS="${2:-10}"
+ATTEMPTS="${2:-10}"
 SSH=tools/mxfs_sshpass.sh
 
-echo "kmsg visibility latency: node=$NODE trials=$TRIALS"
+echo "kmsg visibility latency: node=$NODE attempts=$ATTEMPTS"
 
-$SSH "$NODE" "TRIALS=$TRIALS python3 - <<'PYEOF'
+$SSH "$NODE" "ATTEMPTS=$ATTEMPTS python3 - <<'PYEOF'
 import os, re, subprocess, time
 
-TRIALS = int(os.environ['TRIALS'])
+ATTEMPTS = int(os.environ['ATTEMPTS'])
 
 def uptime():
     with open('/proc/uptime') as f:
@@ -46,8 +46,8 @@ def dmesg():
 
 worst = 0.0
 misses = 0
-print('%-6s %-12s %-12s %-9s %s' % ('trial','stamp_s','seen_s','lag_ms','polls'))
-for i in range(TRIALS):
+print('%-6s %-12s %-12s %-9s %s' % ('attempt','stamp_s','seen_s','lag_ms','polls'))
+for i in range(ATTEMPTS):
     mark = 'KMSGLAT-%d-%d' % (os.getpid(), i)
     with open('/dev/kmsg', 'w') as k:
         k.write(mark + '\n')
@@ -73,8 +73,8 @@ for i in range(TRIALS):
     print('%-6d %-12.3f %-12.3f %-9.1f %d' % (i, stamp, seen, lag, polls))
 
 print()
-print('worst observed lag: %.1f ms   never-visible trials: %d/%d'
-      % (worst, misses, TRIALS))
+print('worst observed lag: %.1f ms   never-visible attempts: %d/%d'
+      % (worst, misses, ATTEMPTS))
 if misses:
     print('VERDICT: kmsg can be INVISIBLE to dmesg long after it is stamped —'
           ' single-snapshot harnesses are unsound.')

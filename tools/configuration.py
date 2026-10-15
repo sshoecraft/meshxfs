@@ -155,20 +155,20 @@ def parse(text: str) -> Configuration:
         raise ConfigurationError("%r: %s is named in the design but not implemented" % (raw, pair))
     if attach not in ATTACHES:
         raise ConfigurationError("%r: attach %r; expected one of %s" % (raw, attach, list(ATTACHES)))
-    if not ATTACHES[attach].get("implemented") and not trial_allowed(attach):
+    if not ATTACHES[attach].get("implemented") and not own_rig_allowed(attach):
         raise ConfigurationError("%r: attach %r is named in the design but not implemented"
                                  % (raw, attach))
     return Configuration(nodes, cls, method, attach)
 
 
-def trial_allowed(attach: str) -> bool:
-    """An unimplemented attachment the rig can still build, named by a caller that asked for it.
+def own_rig_allowed(attach: str) -> bool:
+    """An attachment verified by a rig and board of its own, named by a caller that runs that rig.
 
-    MXFS_TRIAL=1 is how a rig tool (scripts/drbd_rig.sh) runs the harness on an attachment the
-    module does not support yet, to see exactly where it stops. It never makes the attachment
-    implemented: implemented() -- the board's columns and the release matrix -- ignores it.
+    MXFS_OWN_RIG=1 is how such a rig (scripts/drbd_rig.sh) runs the harness on its attachment. It
+    does not make the attachment a column of the main board or an entry of the release matrix:
+    implemented() -- the board's columns and the release matrix -- ignores it.
     """
-    return bool(ATTACHES[attach].get("trial")) and os.environ.get("MXFS_TRIAL") == "1"
+    return bool(ATTACHES[attach].get("own_rig")) and os.environ.get("MXFS_OWN_RIG") == "1"
 
 
 def check_pattern(text: str) -> str:
@@ -359,15 +359,15 @@ def selftest() -> int:
             failures.append("retired %s: error does not name %s: %r" % (old, new, text))
     refuses("xfs at 2", parse, "2/xfs")
     refuses("unimplemented method", parse, "8/net/server/direct")
-    trial = os.environ.pop("MXFS_TRIAL", None)
-    refuses("unimplemented attach", parse, "2/net/mesh/drbd")
-    os.environ["MXFS_TRIAL"] = "1"
-    expect("trial attach", parse("2/net/mesh/drbd").device, "/dev/drbd0")
-    expect("trial not a column", "2/net/mesh/drbd" in board_configurations(), False)
-    refuses("trial still needs an implemented method", parse, "2/net/server/drbd")
-    os.environ.pop("MXFS_TRIAL")
-    if trial is not None:
-        os.environ["MXFS_TRIAL"] = trial
+    own_rig = os.environ.pop("MXFS_OWN_RIG", None)
+    refuses("own-rig attach without its rig", parse, "2/net/mesh/drbd")
+    os.environ["MXFS_OWN_RIG"] = "1"
+    expect("own-rig attach", parse("2/net/mesh/drbd").device, "/dev/drbd0")
+    expect("own-rig attach not a column", "2/net/mesh/drbd" in board_configurations(), False)
+    refuses("own-rig attach still needs an implemented method", parse, "2/net/server/drbd")
+    os.environ.pop("MXFS_OWN_RIG")
+    if own_rig is not None:
+        os.environ["MXFS_OWN_RIG"] = own_rig
     refuses("three fields", parse, "8/net/mesh")
     refuses("zero nodes", parse, "0/net/mesh/direct")
     refuses("bad pattern", check_pattern, "disk/cas")
@@ -399,10 +399,11 @@ def selftest() -> int:
     expect("translate xfs", translate_retired("1/xfs"), "1/xfs")
     expect("shape", parse("8/net/mesh/direct").shape, "net-mesh-direct")
     expect("shape xfs", parse("1/xfs").shape, "xfs")
-    expect("release matrix", len(release_matrix()), 6)
+    expect("release matrix", len(release_matrix()), 10)
     expect("release at 2", [c.key for c in release_matrix(2)],
-           ["2/net/mesh/direct", "2/disk/caw/direct"])
-    expect("release at 16", [c.key for c in release_matrix(16)], ["16/disk/caw/direct"])
+           ["2/net/mesh/direct", "2/disk/caw/direct", "2/disk/caw/mpath"])
+    expect("release at 16", [c.key for c in release_matrix(16)],
+           ["16/disk/caw/direct", "16/disk/caw/mpath"])
     expect("released earlier, not in the matrix",
            sorted(set(DEFS.get("released_earlier", {})) - {"_"} & set(DEFS["release_matrix"])), [])
 

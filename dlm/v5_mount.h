@@ -31,6 +31,24 @@
 #define MXFS_V5_TRANSPORT_TCP   1
 #define MXFS_V5_TRANSPORT_AUTO  2
 
+/* ─── Fence method (mount option fence=, docs/shared-disk-attachment.md) ─── */
+
+#define MXFS_V5_FENCE_SCSIPR    0       /* the storage: PREEMPT AND ABORT */
+#define MXFS_V5_FENCE_MANUAL    1       /* shared disk: an operator's confirmation */
+#define MXFS_V5_FENCE_VCENTER   2       /* shared disk: vCenter powers the VM off */
+#define MXFS_V5_FENCE_QUORUM    3       /* shared disk: corosync's vote; the loser resets */
+
+static inline const char *mxfs_v5_fence_method_name(int m)
+{
+	switch (m) {
+	case MXFS_V5_FENCE_SCSIPR:	return "scsipr";
+	case MXFS_V5_FENCE_MANUAL:	return "manual";
+	case MXFS_V5_FENCE_VCENTER:	return "vcenter";
+	case MXFS_V5_FENCE_QUORUM:	return "quorum";
+	}
+	return "?";
+}
+
 /* ─── Opaque v5 DLM context ─── */
 
 struct mxfs_v5_dlm;
@@ -61,6 +79,12 @@ struct mxfs_v5_dlm_opts {
 	 * manager can serve, beside a SAN LUN on COMPARE AND WRITE.
 	 */
 	bool            transport_explicit;
+	/*
+	 * Mount option fence=: how a dead peer is fenced (MXFS_V5_FENCE_*).
+	 * MANUAL and VCENTER select the shared attachment, a disk with no SCSI
+	 * reservations and no COMPARE AND WRITE (docs/shared-disk-attachment.md).
+	 */
+	int             fence_method;
 	uint16_t        dlm_port;           /* TCP port (default 7600) */
 	uint16_t        discovery_port;     /* UDP port (default 7601) */
 	/*

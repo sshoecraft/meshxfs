@@ -1153,7 +1153,7 @@ xfs_setattr_nonsize(
 	 * 	     Posix ACL code seems to care about this issue either.
 	 */
 	if (mask & ATTR_MODE) {
-		error = posix_acl_chmod(idmap, dentry, inode->i_mode);
+		error = mxfs_posix_acl_chmod(idmap, dentry, inode->i_mode);
 		if (error)
 			return error;
 	}
@@ -1345,6 +1345,20 @@ xfs_setattr_size(
 		    VFS_I(ip)->i_generation);
 		error = -ESTALE;
 		goto out_trans_cancel;
+	}
+
+	/*
+	 * mxfs: load the extent list the truncate below walks while the
+	 * transaction is still clean.  A reload that rejected the platter
+	 * image leaves a fork xfs_iread_extents refuses; found inside
+	 * xfs_itruncate_extents, after the size change below is logged, that
+	 * refusal cancels a dirty transaction and shuts the filesystem down.
+	 * Here it fails the truncate.
+	 */
+	if (newsize <= oldsize) {
+		error = xfs_iread_extents(tp, ip, XFS_DATA_FORK);
+		if (error)
+			goto out_trans_cancel;
 	}
 	xfs_trans_ijoin(tp, ip, 0);
 
@@ -1576,7 +1590,7 @@ xfs_vn_update_time(
 		 */
 		if (!((flags & S_VERSION) &&
 		      inode_maybe_inc_iversion(inode, false))) {
-			generic_update_time(inode, flags);
+			mxfs_generic_update_time(inode, flags);
 			return 0;
 		}
 #endif
@@ -1736,7 +1750,7 @@ xfs_vn_tmpfile(
 }
 
 static const struct inode_operations xfs_inode_operations = {
-	.get_inode_acl		= xfs_get_acl,
+	.MXFS_IOP_GET_INODE_ACL	= xfs_get_acl,
 	.set_acl		= xfs_set_acl,
 	.getattr		= xfs_vn_getattr,
 	.setattr		= xfs_vn_setattr,
@@ -1771,7 +1785,7 @@ static const struct inode_operations xfs_dir_inode_operations = {
 	.rmdir			= xfs_vn_unlink,
 	.mknod			= xfs_vn_mknod,
 	.rename			= xfs_vn_rename,
-	.get_inode_acl		= xfs_get_acl,
+	.MXFS_IOP_GET_INODE_ACL	= xfs_get_acl,
 	.set_acl		= xfs_set_acl,
 	.getattr		= xfs_vn_getattr,
 	.setattr		= xfs_vn_setattr,
@@ -1801,7 +1815,7 @@ static const struct inode_operations xfs_dir_ci_inode_operations = {
 	.rmdir			= xfs_vn_unlink,
 	.mknod			= xfs_vn_mknod,
 	.rename			= xfs_vn_rename,
-	.get_inode_acl		= xfs_get_acl,
+	.MXFS_IOP_GET_INODE_ACL	= xfs_get_acl,
 	.set_acl		= xfs_set_acl,
 	.getattr		= xfs_vn_getattr,
 	.setattr		= xfs_vn_setattr,

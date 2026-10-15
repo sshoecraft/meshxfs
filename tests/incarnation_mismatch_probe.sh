@@ -453,19 +453,24 @@ SUP=$(cnt "P237-FENCE-SUPERSEDED slot=$SLOT ")
 SUPR=$(cnt "P237-FENCE-SUPERSEDED-RETIRED slot=$SLOT ")
 MIS=$(cnt "P237-FENCE-INC-MISMATCH slot=$SLOT ")
 REDRIVE=$(cnt "P238-FENCE-REDRIVE slot=$SLOT ")
-UNOBS=$(cnt "P237-RECOV-INC-UNOBSERVED")
-# IS THAT COUNT A MEASUREMENT AT ALL?  P237-RECOV-INC-UNOBSERVED is emitted from
-# mxfs_disklock_recovery_begin BELOW its retirement return, so on a build where
-# that function is retired the string is not in mxfs.ko and the count is a
-# guaranteed zero.  The assertion below is that the probe NEVER fires, so an
-# absent probe makes it pass for free — silently, and in the direction of good
-# news.  Ask the module rather than assuming either way.
+# Did a caller reach the fence/descriptor path with no observed incarnation?
+# This used to count P237-RECOV-INC-UNOBSERVED, which the retired
+# mxfs_disklock_recovery_begin emitted below its retirement return: the string
+# is not in mxfs.ko, so the count was a guaranteed zero and the assertion that
+# it never fires passed for free.  The live path answers the same question at
+# its entry, v5_pr_fence_dead_node: a detector holding victim incarnation 0
+# logs P238-FENCE-NOINC and refuses — no PREEMPT AND ABORT, no certificate.
+# That refusal is the designed answer (another detector, or the heartbeat
+# monitor, owns the death), so it is reported, not failed.  The hazard the old
+# assertion stood for — a descriptor BUILT for incarnation 0 — is DESC_0 below,
+# counted on the live P236 certificate probes.  Both names are checked against
+# the built module, so neither can turn into a silence again.
+NOINC=$(cnt "P238-FENCE-NOINC slot=$SLOT ")
 KO=$(dirname "$0")/../mxfs.ko
-if [ -f "$KO" ] && strings -a "$KO" 2>/dev/null | grep -q 'P237-RECOV-INC-UNOBSERVED'; then
-    UNOBS_LIVE=1
-else
-    UNOBS_LIVE=0
-fi
+for p in P238-FENCE-NOINC P236-FENCE-INTENT P236-FENCE-CERTIFIED P236-FENCE-SEALED; do
+    strings -a "$KO" 2>/dev/null | grep -q "$p" \
+        || { echo "probe: ABORT — $p is not in $KO; this harness's counts of it would be its own silence"; exit 2; }
+done
 # descriptors: any certificate/intent line carrying the forbidden incarnation.
 # P234-RECOV-FENCED was dropped from this alternation in 0.89.60: it comes from
 # the same retired function and cannot appear, so listing it only made the
@@ -477,7 +482,7 @@ COMPLETE=$(cnt "P163-RECOVERY-COMPLETE slot=$SLOT ")
 REARM=$(cnt "P237-COMPLETE-REARMED"); PREARM=$(cnt "P237-PENDING-REARMED")
 REOCC=$(cnt "P237-SLOT-REOCCUPIED"); NOTOURS=$(cnt "P234-RECOV-NOTOURS")
 echo "probe: pending(E1)=$PEND_E1 pending(0)=$PEND_0 hb_inc_zero=$HBZ zeroinc=$ZEROINC redrive=$REDRIVE"
-echo "       superseded=$SUP retired=$SUPR mismatch=$MIS unobserved=$UNOBS"
+echo "       superseded=$SUP retired=$SUPR mismatch=$MIS noinc_refusals=$NOINC"
 echo "       descriptor lines: epoch=0:$DESC_0 epoch=E1:$DESC_E1 epoch=E2:$DESC_E2 complete=$COMPLETE"
 rc=0
 echo
@@ -488,11 +493,7 @@ if [ "$GUARD_AT" != "-" ]; then
 fi
 [ "$PEND_E1" -ge 1 ] || { echo "probe: FAIL — no survivor declared (slot=$SLOT node=$NODEID epoch=$PEPOCH) dead"; rc=1; }
 [ "$PEND_0" -eq 0 ] || { echo "probe: FAIL — $PEND_0 P163-RECOVERY-PENDING carried epoch=0: a death was declared for a zero incarnation"; rc=1; }
-if [ "$UNOBS_LIVE" = 1 ]; then
-    [ "$UNOBS" -eq 0 ] || { echo "probe: FAIL — $UNOBS P237-RECOV-INC-UNOBSERVED: a caller reached the descriptor path without an observed incarnation"; rc=1; }
-else
-    echo "probe: NOT-MEASURED — P237-RECOV-INC-UNOBSERVED is not in mxfs.ko, so its count of $UNOBS is this harness's own silence and not a statement about the filesystem.  The question it asked (did a caller reach the descriptor path with no observed incarnation?) is UNANSWERED by this run; re-point it at the probes the live fence/recovery path emits, or retire it."
-fi
+echo "probe: INFO — $NOINC P238-FENCE-NOINC refusal(s) for slot $SLOT: detectors that reached the fence path holding no observed incarnation and issued nothing"
 [ "$DESC_0" -eq 0 ] || { echo "probe: FAIL — $DESC_0 descriptor line(s) carry epoch=0 (a zero-incarnation descriptor was constructed)"; rc=1; }
 if [ "$ARM" = "zero" ]; then
     if [ "$HBZ" -lt 1 ]; then

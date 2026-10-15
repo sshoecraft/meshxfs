@@ -27,6 +27,9 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/limits.h>
+/* dlm/ declares its module parameters through this header; newer kernels
+ * reach moduleparam.h from slab.h or blkdev.h, 5.10 does not. */
+#include <linux/moduleparam.h>
 #ifndef UINT64_MAX
 #define UINT64_MAX  U64_MAX
 #endif
@@ -743,6 +746,7 @@ void mxfs_pal_log_capture_end(void);
  */
 void mxfs_pal_dump_stack(void);
 void mxfs_pal_dump_task_stack(int pid);	/* dump another task's kernel stack by pid (0 = no-op) */
+bool mxfs_pal_stall_stacks(void);	/* stall notices also print the task stack (mxfs.stall_stacks) */
 
 /* ─── Fail-stop ─── */
 
@@ -1035,6 +1039,37 @@ int mxfs_pal_scsi_pr_read_keys(mxfs_bdev_t *dev, uint64_t *keys,
  */
 int mxfs_pal_scsi_pr_read_full_status(mxfs_bdev_t *dev, uint64_t key,
                                       int *present, uint32_t *generation);
+
+/*
+ * Does the device implement PERSISTENT RESERVE at all?  One PR IN / READ
+ * KEYS sent straight to the device, with its sense read.  The block layer's
+ * pr_ops return only the SAM status, so a device that answers every PR
+ * command with ILLEGAL REQUEST / INVALID COMMAND OPERATION CODE (a VMware
+ * multi-writer VMDK does) looks exactly like a unit attention, and the
+ * caller can only report that it "could not decide".
+ *
+ * Returns 1 when READ KEYS was answered, 0 when the device answered
+ * ILLEGAL REQUEST with ASC 0x20 (the opcode is not implemented), and a
+ * negative errno when the question was not answered (-EOPNOTSUPP: no SCSI
+ * device behind dev).  DIAGNOSTIC ONLY: never a reason to proceed without
+ * reservations, and its answer must not change what a caller returns.
+ */
+int mxfs_pal_scsi_pr_implemented(mxfs_bdev_t *dev);
+
+/*
+ * Is the device reached through a VMware virtual SCSI adapter (pvscsi, or the
+ * LSI Logic / BusLogic adapters in a VMware VM)?  Then the initiator the
+ * storage sees is the ESXi host's, not this node's, and ESXi itself registers
+ * and unregisters this node's reservation key: a VM's key leaves the array
+ * when its VM is powered off (measured on ESXi 8.0.2, physical-mode RDM,
+ * tests/evidence/vsphere/probe-rdm-poweroff-key.txt), before any peer could
+ * fence it.
+ *
+ * Returns 1 and names the adapter in `name` ("vmw_pvscsi (host1)") when it
+ * is; 0 when it is not, including when no SCSI device is behind dev; -EINVAL
+ * on a bad argument.
+ */
+int mxfs_pal_scsi_hypervisor_adapter(mxfs_bdev_t *dev, char *name, size_t len);
 
 /* SPC persistent-reservation type codes MXFS cares about (WIRE values). */
 #define MXFS_PAL_PR_TYPE_WR_EX      0x01    /* Write Exclusive (single holder):
@@ -1377,6 +1412,167 @@ int mxfs_pal_drbd_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
 void mxfs_pal_drbd_cas_detach(mxfs_bdev_t *dev);
 /* The peer is fenced (a kind-25 certificate): clear a ticket it died holding. */
 void mxfs_pal_drbd_cas_peer_fenced(mxfs_bdev_t *dev);
+/*
+ * The same compare-and-swap on a plain shared disk with no COMPARE AND WRITE
+ * (docs/shared-disk-attachment.md): `endpoint` and `peer_endpoint` are the
+ * two nodes' mesh addresses, `host` and `boot` this node's identity, written
+ * into its lock register so a survivor can ask whether that boot ended.
+ * Detached by mxfs_pal_drbd_cas_detach, and its swaps reached through the
+ * same mxfs_pal_bdev_compare_and_write*, which ask mxfs_pal_shared_cas_on
+ * first: the device may be SCSI that answers COMPARE AND WRITE with INVALID
+ * COMMAND OPERATION CODE.  -ENODEV for a DRBD device.
+ */
+int mxfs_pal_shared_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
+			       unsigned int index, const uint8_t fs_uuid[16],
+			       const char *endpoint, const char *peer_endpoint,
+			       const uint8_t host[16], const uint8_t boot[16]);
+bool mxfs_pal_shared_cas_on(mxfs_bdev_t *dev);
+/*
+ * A swap waiting on the peer's flag of a shared attachment asks
+ * fenced(data, host, boot), under the attachment's lock, naming the host and
+ * boot recorded in the peer's register: 1 = the mount's fence method shows
+ * that boot ended, and the register as read is set aside (read as idle while
+ * unchanged, never written).  NULL detaches the mount; once this returns, no
+ * call into it remains.
+ */
+void mxfs_pal_shared_cas_set_fenced(mxfs_bdev_t *dev,
+				    int (*fenced)(void *data, const uint8_t *host,
+						  const uint8_t *boot, int act),
+				    void *data);
+/* Is this dotted IPv4 address one of this host's own? */
+bool mxfs_pal_ipv4_is_local(const char *addr);
+
+/*
+ * THE SHARED ATTACHMENT'S vCENTER HELPER (fence=vcenter).  Runs the node-local
+ * helper in one mode and waits, bounded, for its report:
+ *   ARM    tag this node's own VM (found by its BIOS UUID) with `host` and
+ *          `boot`; RESULT=ARMED, or REFUSED with DETAIL saying why;
+ *   CHECK  has boot `boot` of host `host` ended?  RESULT=ENDED with
+ *          HOW=POWERED_OFF or BOOTED_AGAIN, or RUNNING; nothing is changed;
+ *   FENCE  as CHECK, powering the VM off first when it is still running
+ *          that boot.
+ * Returns 0 when the helper ran (out->delivered says whether a complete
+ * report arrived), a negative errno when it could not be run.  Nothing it
+ * returns is a verdict: the caller judges the fields.
+ */
+#define MXFS_PAL_FENCEH_ARM	1
+#define MXFS_PAL_FENCEH_CHECK	2
+#define MXFS_PAL_FENCEH_FENCE	3
+#define MXFS_PAL_FENCEH_REPORT_MAX 2048
+struct mxfs_pal_fenceh_report {
+    bool     delivered;
+    uint64_t nonce;
+    uint32_t upcall_wall_ms;
+    char     reason[96];        /* why not delivered */
+    char     mode[12];
+    char     result[16];        /* ARMED, ENDED, RUNNING, REFUSED */
+    char     how[24];           /* POWERED_OFF, BOOTED_AGAIN (RESULT=ENDED) */
+    char     vm[96];            /* the VM's name and instance UUID */
+    char     power[24];         /* its power state as last read */
+    char     vm_boot[40];       /* the boot it is tagged with */
+    char     detail[192];
+    size_t   report_len;
+    char     report[MXFS_PAL_FENCEH_REPORT_MAX];
+};
+int mxfs_pal_fence_helper(int mode, const uint8_t host[16], const uint8_t boot[16],
+                          struct mxfs_pal_fenceh_report *out);
+
+/*
+ * THE SHARED ATTACHMENT'S OPERATOR CONFIRMATIONS (fence=manual).  Post the
+ * request naming exactly this incarnation, or find the one already posted:
+ * 1 = an operator confirmed it, 0 = waiting, <0 = error.  Listed and
+ * confirmed through /proc/fs/mxfs/fence_confirm.
+ */
+struct mxfs_pal_fence_req {
+    uint8_t  fs_uuid[16];
+    uint32_t slot;
+    uint32_t node;
+    uint64_t epoch;
+    uint8_t  host[16];
+    uint8_t  boot[16];
+    char     peer[48];          /* the victim's address, for the operator */
+};
+int mxfs_pal_fence_req_post(const struct mxfs_pal_fence_req *r);
+/* 1 = a confirmed request of this filesystem names exactly (host, boot) */
+int mxfs_pal_fence_req_boot_confirmed(const uint8_t fs_uuid[16],
+                                      const uint8_t host[16], const uint8_t boot[16]);
+/* Can an operator reach the confirmations at all? */
+bool mxfs_pal_fence_confirm_channel(void);
+
+/*
+ * THE SHARED ATTACHMENT'S QUORUM (fence=quorum, docs/quorum-takeover.md).  The
+ * node-local helper (mxfs_quorumd) reports corosync's votequorum state through
+ * /proc/fs/mxfs/quorum several times a second; each report renews this host's
+ * QUORUM LEASE while it says the host is quorate.  While any fence=quorum
+ * mount is armed, a lease that runs out or a report that says inquorate ENDS
+ * THIS BOOT (emergency_restart), from the lease timer or from the first write
+ * admitted after the deadline (mxfs_pal_quorum_gate).
+ *
+ *   arm      the lease is held, the QDevice votes, the cluster is not
+ *            two_node, and `peer` (an IPv4 address of the corosync nodelist)
+ *            is a member: 0, and the mount is counted as armed; -EPERM with
+ *            `why` otherwise.  disarm undoes one arm.
+ *   gone     1 = this host holds the vote now, and has held it without
+ *            `peer` in the membership, continuously, for the takeover bound:
+ *            going on now, or ending at or after `alive_ms` (this host's clock
+ *            when it last saw the victim alive; 0 = not known, and only an
+ *            absence going on counts).  0 otherwise, with `why`.
+ *   gate     called where a fence=quorum mount admits a write: false never
+ *            returns while the lease has run out (the boot is ended first).
+ *   takeover the module's bound on how long a quorum loser may still write
+ *            (quorum_takeover_ms).
+ */
+int mxfs_pal_quorum_arm(const char *peer, char *why, size_t whylen);
+void mxfs_pal_quorum_disarm(void);
+int mxfs_pal_quorum_peer_gone(const char *peer, uint64_t alive_ms,
+                              uint64_t *gone_ms, char *why, size_t whylen);
+void mxfs_pal_quorum_gate(const char *site);
+/* 1 = `peer` is a member now and announced, over corosync, the host and boot
+ * it runs (mxfs_quorumd's BOOTS); 0 = not known */
+int mxfs_pal_quorum_peer_boot(const char *peer, uint8_t host[16], uint8_t boot[16]);
+/* 1 = this host holds the vote now (a report within the lease said quorate),
+ * no member announces `host`, and the nodelist address that last announced it
+ * has been out of the membership for `absent_ms`; 0 otherwise.  Needs no
+ * armed mount: mxfs_quorumd reports wherever corosync runs. */
+int mxfs_pal_quorum_host_absent(const uint8_t host[16], uint64_t *absent_ms);
+uint64_t mxfs_pal_quorum_takeover_ms(void);
+/*
+ * THE ISOLATION EXCHANGE, over the same helper and corosync's CPG.  A host
+ * that has lost every path to the LUN while staying a corosync member stops
+ * beating, and nothing short of the death window tells its peers why; it,
+ * though, can tell them over the network it still has.
+ *
+ *   ask      a survivor whose own beats land, watching the heartbeat of
+ *            {node, incarnation} stand still, posts the question; the helper
+ *            multicasts it while it is posted (an ask lapses unless reposted
+ *            within MXFS_QUORUM_POST_MS)
+ *   asked    1 = a member's ask for {node, incarnation} is current
+ *            (mxfs_quorumd's ASKS)
+ *   closed   the asked node posts that its authority over the LUN is closed
+ *   peer_closed  1 = {node, incarnation} announced that, and the announcement
+ *            is current (mxfs_quorumd's CLOSED)
+ */
+void mxfs_pal_quorum_close_ask(uint32_t node, uint64_t incarnation);
+int mxfs_pal_quorum_close_asked(uint32_t node, uint64_t incarnation);
+void mxfs_pal_quorum_closed_post(uint32_t node, uint64_t incarnation);
+int mxfs_pal_quorum_peer_closed(uint32_t node, uint64_t incarnation);
+/*
+ * The logical-unit designators (VPD page 0x83, association 0) of the SCSI disk
+ * under `dev`, or of a path of it when `dev` is a multipath map: the length
+ * written to `out`, 0 when it has none.  lu_paths_offline: 1 = at least one
+ * SCSI disk carries that identity and every one of them is offline (its
+ * transport gave up on it); 0 = one is still online, or none was found.  Reads
+ * device state only, never the device.
+ */
+int mxfs_pal_bdev_lu_ident(mxfs_bdev_t *dev, uint8_t *out, int max);
+int mxfs_pal_lu_paths_offline(const uint8_t *ident, int len, int *npaths);
+/*
+ * The host and boot named in the peer's register of a shared attachment, as
+ * read from the disk now: 1 = a valid register of the peer naming both; 0 =
+ * none (never written, or not valid); <0 = the read failed.
+ */
+int mxfs_pal_shared_cas_peer_boot(mxfs_bdev_t *dev, uint8_t host[16],
+                                  uint8_t boot[16]);
 /*
  * The judgments a swap waiting on the peer's ticket may consult
  * (dlm/drbdfence.c): `excluded` lets it clear the ticket of a fenced peer;

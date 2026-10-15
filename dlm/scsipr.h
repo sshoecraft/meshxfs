@@ -593,6 +593,51 @@ enum mxfs_fence_kind {
 	 * v5_drbd_fence.
 	 */
 	MXFS_FENCE_KIND_DRBD_PEER_SECONDARY_V1 = 27,
+	/*
+	 * 0.90.128.  THE SHARED ATTACHMENT, fence=manual
+	 * (docs/shared-disk-attachment.md).  A disk with no SCSI arbitration
+	 * cannot cut a node off, so the victim's boot is proven ended by one of:
+	 *   - an operator's confirmation of the request naming exactly this
+	 *     incarnation (/proc/fs/mxfs/fence_confirm), which asserts that its
+	 *     machine is powered off or its access to the disk cut and that it
+	 *     will not return in that boot (observation OPERATOR_CONFIRMED);
+	 *   - the victim being an earlier boot of THIS host, which is running a
+	 *     later one (observation HOST_BOOTED_AGAIN).
+	 * Nothing in the storage witnessed either; the certificate says so
+	 * (basis NODE_STOPPED) and is accepted only on a mount whose fence method
+	 * is manual.  It is a death certificate, not a fence.  resv_type 0.
+	 */
+	MXFS_FENCE_KIND_SHARED_MANUAL_V1 = 28,
+	/*
+	 * 0.90.128.  THE SHARED ATTACHMENT, fence=vcenter.  vCenter, asked by
+	 * the node-local helper, reported the victim's VM poweredOff (after a
+	 * power-off this attempt requested, or already), or tagged by a later
+	 * boot than the victim's (observation HOST_BOOTED_AGAIN): one kernel runs
+	 * in a VM, and a new boot resets the virtual disk controller.  The VM is
+	 * the one tagged, from inside it at its own mount, with the host identity
+	 * the victim's frozen heartbeat record names.  That the hypervisor
+	 * finished a VM's outstanding disk commands before reporting it off is
+	 * the hypervisor's statement, not the storage's (basis NODE_STOPPED).
+	 * Accepted only on a mount whose fence method is vcenter.  A death
+	 * certificate, not a fence.  resv_type 0.
+	 */
+	MXFS_FENCE_KIND_SHARED_VCENTER_V1 = 29,
+	/*
+	 * 0.90.128.  THE SHARED ATTACHMENT, fence=quorum
+	 * (docs/quorum-takeover.md).  This node held corosync's vote (votequorum
+	 * with a QDevice) with the victim's node out of the membership,
+	 * continuously, for the takeover bound: a node that loses the vote ends
+	 * its own boot (emergency_restart) once its quorum lease runs out, and
+	 * the bound covers the longest it can still be told it is quorate, the
+	 * lease and the reset (observation QUORUM_LOSER_DEADLINE_PASSED).  Or the
+	 * victim's host runs a later boot, read from the peer's swap register or
+	 * this host's own (HOST_BOOTED_AGAIN).  The deadline passing counts as
+	 * the victim's boot having ended: the owner's decision for this method;
+	 * nothing observed the victim stop (basis NODE_STOPPED).  Accepted only
+	 * on a mount whose fence method is quorum.  A death certificate, not a
+	 * fence.  resv_type 0.
+	 */
+	MXFS_FENCE_KIND_SHARED_QUORUM_V1 = 30,
 };
 
 /*
@@ -628,6 +673,9 @@ static inline bool mxfs_fence_kind_proves_exclusion(enum mxfs_fence_kind k)
 	       k == MXFS_FENCE_KIND_DRBD_STONITH_WITNESSED_V1 || /* 0.90.40 */
 	       k == MXFS_FENCE_KIND_DRBD_REPLICA_EXCLUDED_V1 || /* 0.90.55 */
 	       k == MXFS_FENCE_KIND_DRBD_PEER_SECONDARY_V1 ||  /* 0.90.62 */
+	       k == MXFS_FENCE_KIND_SHARED_MANUAL_V1 ||   /* 0.90.128 */
+	       k == MXFS_FENCE_KIND_SHARED_VCENTER_V1 || /* 0.90.128 */
+	       k == MXFS_FENCE_KIND_SHARED_QUORUM_V1 ||  /* 0.90.128 */
 	       k == MXFS_FENCE_KIND_SELF_SUCCESSION_DONE ||    /* */
 	       k == MXFS_FENCE_KIND_EXCLUSIVE_WRITE_GATE ||    /* D-0904 */
 	       k == MXFS_FENCE_KIND_BOOT_SUCCESSION_ABSENT;    /* 0.75.71 */
@@ -696,7 +744,10 @@ static inline bool mxfs_fence_kind_resv_type_ok(enum mxfs_fence_kind k,
 	case MXFS_FENCE_KIND_DRBD_STONITH_WITNESSED_V1:
 	case MXFS_FENCE_KIND_DRBD_REPLICA_EXCLUDED_V1:
 	case MXFS_FENCE_KIND_DRBD_PEER_SECONDARY_V1:
-		/* a DRBD device has no reservation; a certificate claiming
+	case MXFS_FENCE_KIND_SHARED_MANUAL_V1:
+	case MXFS_FENCE_KIND_SHARED_VCENTER_V1:
+	case MXFS_FENCE_KIND_SHARED_QUORUM_V1:
+		/* a DRBD device or a shared disk has no reservation; a certificate claiming
 		 * one was not produced by this profile's only producer */
 		return resv_type == 0;
 	default:
@@ -798,12 +849,24 @@ enum mxfs_retire_basis {
 	MXFS_RETIRE_BASIS_NONE = 0,
 	MXFS_RETIRE_BASIS_TARGET_OP = 1,
 	MXFS_RETIRE_BASIS_QUALIFIED_CONTRACT = 2,  /* withdrawn 0.89.16 */
+	/*
+	 * 0.90.128, the shared attachment only (docs/shared-disk-attachment.md).
+	 * No operation ran at the storage, which on a disk with no SCSI
+	 * arbitration has none to run: the NODE that held the victim's writes is
+	 * stopped, by an operator's word or this host's own later boot (kind 28),
+	 * or by the hypervisor's report (kind 29).  The owner chose to carry such a disk with that evidence
+	 * rather than not at all.  It is its own value so no reader can take it
+	 * for a target operation, and the certifier accepts it for kinds 28 and
+	 * 29 and for nothing else.
+	 */
+	MXFS_RETIRE_BASIS_NODE_STOPPED = 3,
 };
 
 static inline const char *mxfs_retire_basis_name(uint8_t b)
 {
 	switch (b) {
 	case MXFS_RETIRE_BASIS_TARGET_OP:           return "completed-target-op";
+	case MXFS_RETIRE_BASIS_NODE_STOPPED:        return "node-stopped";
 	case MXFS_RETIRE_BASIS_QUALIFIED_CONTRACT:
 		return "qualified-contract(withdrawn)";
 	default:                                    return "none";
@@ -860,6 +923,21 @@ enum mxfs_retire_observation {
 	 * disks UpToDate, no I/O suspended, this node Primary and the peer
 	 * Secondary, as judged from a witness report taken in this attempt. */
 	MXFS_RETIRE_OBS_DRBD_CONNECTED_PEER_SECONDARY = 7,
+	/* 0.90.128, the shared attachment: an operator confirmed the request
+	 * naming this exact incarnation (/proc/fs/mxfs/fence_confirm). */
+	MXFS_RETIRE_OBS_OPERATOR_CONFIRMED = 8,
+	/* 0.90.128, the shared attachment: vCenter reported the VM tagged with
+	 * the victim's host identity poweredOff, read in this attempt. */
+	MXFS_RETIRE_OBS_VCENTER_VM_POWERED_OFF = 9,
+	/* 0.90.128, the shared attachment: the victim's host is running a later
+	 * boot than the victim's — this host itself, or (fence=vcenter) the VM
+	 * tagged with the victim's host identity, whose tag a later boot rewrote
+	 * from inside it, as vCenter reported in this attempt. */
+	MXFS_RETIRE_OBS_HOST_BOOTED_AGAIN = 10,
+	/* 0.90.128, the shared attachment under fence=quorum: this node held
+	 * corosync's vote with the victim's node out of the membership,
+	 * continuously, for the takeover bound (quorum_takeover_ms). */
+	MXFS_RETIRE_OBS_QUORUM_LOSER_DEADLINE_PASSED = 11,
 };
 
 static inline const char *mxfs_retire_observation_name(uint8_t o)
@@ -879,6 +957,14 @@ static inline const char *mxfs_retire_observation_name(uint8_t o)
 		return "drbd-disconnected-peer-outdated";
 	case MXFS_RETIRE_OBS_DRBD_CONNECTED_PEER_SECONDARY:
 		return "drbd-connected-peer-secondary";
+	case MXFS_RETIRE_OBS_OPERATOR_CONFIRMED:
+		return "operator-confirmed";
+	case MXFS_RETIRE_OBS_VCENTER_VM_POWERED_OFF:
+		return "vcenter-vm-powered-off";
+	case MXFS_RETIRE_OBS_HOST_BOOTED_AGAIN:
+		return "host-booted-again";
+	case MXFS_RETIRE_OBS_QUORUM_LOSER_DEADLINE_PASSED:
+		return "quorum-loser-deadline-passed";
 	default:
 		return "unknown";
 	}
@@ -924,6 +1010,23 @@ enum mxfs_retire_claim {
 	 * is outstanding or can still arrive.  Paired with
 	 * MXFS_RETIRE_OBS_DRBD_CONNECTED_PEER_SECONDARY. */
 	MXFS_RETIRE_CLAIM_DRBD_DEMOTION_DRAINED_PEER_WRITES = 5,
+	/* 0.90.128.  The operator asserts the victim's node is stopped and will
+	 * not write again.  Paired with MXFS_RETIRE_OBS_OPERATOR_CONFIRMED. */
+	MXFS_RETIRE_CLAIM_OPERATOR_ASSERTS_NODE_STOPPED = 6,
+	/* 0.90.128.  The hypervisor reports the victim's VM powered off, which it
+	 * does only once the VM's I/O has ended.  Paired with
+	 * MXFS_RETIRE_OBS_VCENTER_VM_POWERED_OFF. */
+	MXFS_RETIRE_CLAIM_HYPERVISOR_REPORTS_VM_OFF = 7,
+	/* 0.90.128.  The victim's boot has ended because its machine runs a later
+	 * one: one kernel runs on a machine, and a boot resets the disk
+	 * controller, so nothing the earlier kernel submitted is still
+	 * outstanding.  Paired with MXFS_RETIRE_OBS_HOST_BOOTED_AGAIN. */
+	MXFS_RETIRE_CLAIM_VICTIM_BOOT_ENDED = 8,
+	/* 0.90.128.  The victim's node lost corosync's vote and, by the module's
+	 * quorum lease, ended its own boot before the takeover bound passed; the
+	 * bound passing is taken as that boot having ended.  Paired with
+	 * MXFS_RETIRE_OBS_QUORUM_LOSER_DEADLINE_PASSED. */
+	MXFS_RETIRE_CLAIM_QUORUM_LOSER_ENDED_ITS_BOOT = 9,
 };
 
 static inline const char *mxfs_retire_claim_name(uint8_t c)
@@ -939,6 +1042,14 @@ static inline const char *mxfs_retire_claim_name(uint8_t c)
 		return "drbd-disconnect-drained-every-accepted-peer-write";
 	case MXFS_RETIRE_CLAIM_DRBD_DEMOTION_DRAINED_PEER_WRITES:
 		return "drbd-demotion-drained-every-peer-write";
+	case MXFS_RETIRE_CLAIM_OPERATOR_ASSERTS_NODE_STOPPED:
+		return "operator-asserts-the-node-stopped";
+	case MXFS_RETIRE_CLAIM_HYPERVISOR_REPORTS_VM_OFF:
+		return "hypervisor-reports-the-vm-powered-off";
+	case MXFS_RETIRE_CLAIM_VICTIM_BOOT_ENDED:
+		return "the-victim-boot-ended";
+	case MXFS_RETIRE_CLAIM_QUORUM_LOSER_ENDED_ITS_BOOT:
+		return "the-quorum-loser-ended-its-boot";
 	default:
 		return "none";
 	}

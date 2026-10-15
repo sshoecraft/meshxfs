@@ -212,7 +212,7 @@ fi
 rsx 60 "$B" "journalctl -k --since @$SMARK --no-pager | cut -c1-600" > "$OUT/B_stage_journal.txt"
 journalcap "$OUT/B_stage_journal.txt" "the kernel journal on $B across the staging mount"
 echo "--- staging: DECLINED=$(cnt "$OUT/B_stage_journal.txt" 'P238-FENCE-TAKEOVER-DECLINED') P-DEAD-INC(A1)=$(grep -a 'P-DEAD-INC' "$OUT/B_stage_journal.txt" | grep -ac "node=$PNODE ") verdict=UNKNOWN=$(cnt "$OUT/B_stage_journal.txt" 'verdict=UNKNOWN') verdict=REVOKED=$(cnt "$OUT/B_stage_journal.txt" 'verdict=REVOKED') TAKEOVER=$(cnt "$OUT/B_stage_journal.txt" 'P238-FENCE-TAKEOVER ') COMPLETE=$(cnt "$OUT/B_stage_journal.txt" 'P163-RECOVERY-COMPLETE')"
-grep -ah 'P238-FENCE-TAKEOVER-DECLINED\|P-DEAD-INC\|P163-RECOVERY-COMPLETE\|P-COMPLETE-TIMING\|mount ABORTED' "$OUT/B_stage_journal.txt" | sed 's/.*mxfs: /    /; s/.*XFS (sda): /    /' | cut -c1-190 | sort -u | head -8
+grep -ah 'P238-FENCE-TAKEOVER-DECLINED\|P-DEAD-INC\|P163-RECOVERY-COMPLETE\|P-COMPLETE-TIMING\|mount ABORTED' "$OUT/B_stage_journal.txt" | sed 's/.*mxfs: /    /; s/.*\(XFS\|mxfs\) (sda): /    /' | cut -c1-190 | sort -u | head -8
 ckge "staging: the classifier answered UNKNOWN while A1's record still stood (the fail-closed side)" "$(grep -a 'verdict=UNKNOWN' "$OUT/B_stage_journal.txt" | grep -ac "holder=$PNODE/")" 1
 ckge "staging: A1's fence certified and its incarnation was noted dead (P-DEAD-INC for A1)" "$(grep -a 'P-DEAD-INC' "$OUT/B_stage_journal.txt" | grep -ac "node=$PNODE ")" 1
 ckge "staging: the takeover was DECLINED by the knob after the holder was proved revoked" "$(cnt "$OUT/B_stage_journal.txt" 'P238-FENCE-TAKEOVER-DECLINED')" 1

@@ -15,10 +15,10 @@ Assorted group (the clusterer could not fit these to one topic): six independent
 
 ## Naming and paths
 
-- **Name the test cluster nodes `test1` and `test2`** (the real hostnames, as in `bench/rsync_bench.sh` output, ssh prompts, `mount` listings), never `T1`/`T2`. Applies to state files, lessons, dmesg commentary, bench summaries and chat. Existing T1/T2 text may stay, but rename when the surrounding text is being rewritten anyway. [[Use test1/test2, not T1/T2]]
-- **Mount MXFS on `/mnt/shared`**, never `/mnt/bench` or another path, for every MXFS or benchmark mount. [[MXFS mount path]]
+- **Name the test cluster nodes `test1` (192.168.120.186) and `test2` (192.168.120.182)** (the real hostnames, as in `bench/rsync_bench.sh` output, ssh prompts, `mount` listings), never `T1`/`T2`. User preference, sess33. Applies to state.md edits, lessons files, dmesg commentary, bench summaries and chat. Existing T1/T2 text (state.md, sess32_lessons.md, sess33_lessons.md) may stay, but rename when the surrounding text is being rewritten anyway. `Use test1/test2, not T1/T2`
+- **Mount MXFS on `/mnt/shared`**, never `/mnt/bench` or another path, for every MXFS or benchmark mount; any mount command for MXFS testing uses it. Reason: consistency across sessions and tests; the user corrected use of `/mnt/bench`. `MXFS mount path`
 
 ## Commands never to run
 
 - **Never run `find /` on clyde, for any reason.** Absolute and unconditional, not a "scope it better" guideline. `/src` and `/data` are QNAP NFS mounts, so a root crawl is slow and hammers the NFS server for the whole cluster, but the rule holds regardless of the reason you think you have. Origin: a `find /` hunting for an `fsx` binary. Alternatives that accomplish the goal: `command -v`/`which`/`dpkg -L <pkg>` for an installed binary; an exact known local directory; or check inside the test VM when the tool runs there. `never-find-root-nfs-mounts`
-- **Kill mkosimage/packer builds with plain `kill` (SIGTERM), never `kill -9`.** Their cleanup handlers remove temp files and destroy partially created VMs only on graceful termination; SIGKILL leaves orphaned VMs and temp files for manual cleanup. Send SIGTERM and wait for the process to exit. [[feedback_kill_builds]]
+- **Kill mkosimage/packer builds with plain `kill` (SIGTERM), never `kill -9`.** Their cleanup handlers remove temp files and destroy partially created VMs only on graceful termination; SIGKILL bypasses all cleanup and leaves orphaned VMs and temp files for manual cleanup. Any time a build is cancelled, send SIGTERM and wait for the process to exit cleanly. `feedback_kill_builds`

@@ -31,6 +31,8 @@
 # Env:
 #   PVE_PAIR   "<addr> <addr>" (default "192.168.1.80 192.168.1.81");
 #              participant 0 is the lower address
+#   MNT        the MXFS mount on both hosts (default /mnt/shared); on a SAN
+#              attachment (no DRBD resource) only the mount is checked
 #   CHURN      loops per host (default 4)
 #   WORK_S     seconds of churn (default 40)
 #   ARM_S      seconds between the arming and T (default 20)
@@ -74,7 +76,13 @@ on() {  # <host> <cmd> [timeout]
 for h in "$P0" "$P1"; do
     s=$(on "$h" "echo \"name=\$(hostname) mnt=\$(awk '\$2 == \"$MNT\" && \$3 == \"mxfs\" {print \$2}' /proc/mounts | head -1) role=\$(drbdadm role mxfs 2>/dev/null) cs=\$(drbdadm cstate mxfs 2>/dev/null) build=\$(cat /sys/module/mxfs/srcversion 2>/dev/null)\"" 20)
     say "$h: $s"
-    case "$s" in *"mnt=$MNT "*"role=Primary/Primary cs=Connected"*) ;; *) say "ABORT: $h is not a mounted, connected half of the pair"; exit 1 ;; esac
+    # a SAN attachment has no DRBD resource: its role is empty, and only the
+    # mount is required; a DRBD attachment must be a connected dual primary
+    case "$s" in
+        *"mnt=$MNT role= cs= "*) ;;
+        *"mnt=$MNT "*"role=Primary/Primary cs=Connected"*) ;;
+        *) say "ABORT: $h is not a mounted, connected half of the pair"; exit 1 ;;
+    esac
 done
 
 # One churn loop: <dir> <k> <T> <end> <tag>.  Each iteration's operations are
@@ -86,6 +94,7 @@ e=/dev/shm/$tag.err.$k
 echo $$ > /dev/shm/$tag.pid.$k
 python3 -I -c 'import sys, time; time.sleep(max(0.0, float(sys.argv[1]) - time.time()))' "$T"
 exec 9>/dev/shm/$tag.ops.$k
+echo "START ${EPOCHREALTIME/./}" >&9
 endus=$((end * 1000000))
 while [ "${EPOCHREALTIME/./}" -lt "$endus" ]; do
     i=$((i + 1))
@@ -158,10 +167,18 @@ T=$(( $(date +%s) + ARM_S ))
 END=$(( T + WORK_S ))
 say "arming $CHURN loops per host in $D for $(date -d @$T +%H:%M:%S) (T=$T), $WORK_S s"
 for h in "$P0" "$P1"; do
-    on "$h" "echo $(base64 -w0 <<<"$LOOP") | base64 -d > /dev/shm/$TAG.loop && echo $(base64 -w0 <<<"$SAMPLER") | base64 -d > /dev/shm/$TAG.sampler &&
-        for k in \$(seq 1 $CHURN); do nohup setsid bash /dev/shm/$TAG.loop $D \$k $T $END $TAG > /dev/null 2>&1 < /dev/null & done &&
+    # Each launch is backgrounded on its own inside the braces.  A trailing &
+    # after the && chain would background the whole chain instead, and the
+    # sampler would then run in the foreground of that background shell, which
+    # keeps this ssh's stdout open for the sampler's life: every arm took the
+    # full ssh timeout, so participant 1 was armed only after T and its loops
+    # began ~11 s late (measured on pve9-5/6), handing participant 0 a solo
+    # start that read as unfairness.
+    on "$h" "echo $(base64 -w0 <<<"$LOOP") | base64 -d > /dev/shm/$TAG.loop && echo $(base64 -w0 <<<"$SAMPLER") | base64 -d > /dev/shm/$TAG.sampler && {
+        for k in \$(seq 1 $CHURN); do nohup setsid bash /dev/shm/$TAG.loop $D \$k $T $END $TAG > /dev/null 2>&1 < /dev/null & done
         nohup setsid bash /dev/shm/$TAG.sampler $TAG $T $END > /dev/null 2>&1 < /dev/null &
-        echo ARMED" 30 | grep -q ARMED || { say "ABORT: could not arm $h"; exit 1; }
+        } && echo ARMED" 30 | grep -q ARMED || { say "ABORT: could not arm $h"; exit 1; }
+    say "$h armed, $(( T - $(date +%s) )) s before T"
 done
 python3 -I -c 'import sys, time; time.sleep(max(0.0, float(sys.argv[1]) - time.time()))' "$END"
 say "T+$WORK_S: the loops are due to stop"
@@ -187,17 +204,20 @@ if [ "${PROBES:-0}" = 1 ]; then
 fi
 on "$P0" "rm -rf $D; echo GONE" 120 >/dev/null
 
-python3 -I - "$EVID" "$P0" "$P1" "$CHURN" "$FAIR_MIN" <<'PY' | tee -a "$EVID/log"
+python3 -I - "$EVID" "$P0" "$P1" "$CHURN" "$FAIR_MIN" "$T" <<'PY' | tee -a "$EVID/log"
 import collections, sys
 evid, p0, p1, churn, fair_min = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]), float(sys.argv[5])
+t_us = int(sys.argv[6]) * 1000000
 names = ("append", "create", "rename", "remove", "sync")
-tot, errs = {}, []
+tot, errs, late = {}, [], []
 for h in (p0, p1):
-    counts, lat = {}, collections.defaultdict(list)
+    counts, lat, starts = {}, collections.defaultdict(list), {}
     for line in open(f"{evid}/ops.{h}"):
         f = line.split()
         if f[:1] == ["COUNT"] and len(f) == 3 and f[2].isdigit():
             counts[int(f[1])] = int(f[2])
+        elif f[:1] == ["OPS"] and len(f) == 4 and f[2] == "START" and f[3].isdigit():
+            starts[int(f[1])] = (int(f[3]) - t_us) / 1e6
         elif f[:1] == ["OPS"] and len(f) >= 3 and f[2] == "ERR":
             errs.append(f"{h} loop {f[1]}: {' '.join(f[3:])}")
         elif f[:1] == ["OPS"] and len(f) == 8:
@@ -211,6 +231,11 @@ for h in (p0, p1):
     missing = [k for k in range(1, churn + 1) if k not in counts]
     print(f"{h}: iterations {tot[h]} ({', '.join(f'loop {k} {counts[k]}' for k in sorted(counts))})"
           + (f"; loops with no count: {missing}" if missing else ""))
+    if starts:
+        print(f"  loops began {min(starts.values()):+.2f} to {max(starts.values()):+.2f} s from T")
+        late += [f"{h} loop {k} began {s:+.2f} s from T" for k, s in sorted(starts.items()) if s > 1.0]
+    else:
+        late.append(f"{h}: no loop recorded when it began")
     for n in names:
         v = sorted(lat[n])
         if v:
@@ -230,10 +255,14 @@ for h in (p0, p1):
         print(f"    {m:5d}  {c:6s} {s}  {k[:200]}")
 for e in errs:
     print(f"FAIL: loop error {e}")
+# a loop that began late ran a shorter window than the other host's, so the
+# two counts are not comparable: the run measured the start, not the sharing
+for e in late:
+    print(f"FAIL: start skew, {e}")
 a, b = tot[p0], tot[p1]
 ratio = min(a, b) / max(a, b) if max(a, b) else 0.0
 print(f"iterations {p0} {a}, {p1} {b}: the slower host made {ratio:.2f} of the faster's (pass at {fair_min})")
-if errs or ratio < fair_min:
+if errs or late or ratio < fair_min:
     print("FAIL")
     sys.exit(1)
 print("PASS")

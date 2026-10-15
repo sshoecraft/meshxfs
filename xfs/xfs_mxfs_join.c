@@ -140,6 +140,89 @@ module_param_named(dbg_join_prefreeze_delay_ms, mxfs_dbg_join_prefreeze_delay_ms
 		   uint, 0644);
 MODULE_PARM_DESC(dbg_join_prefreeze_delay_ms,
 	"TEST: ms to hold the join worker before its freeze (0 = off)");
+/*
+ * TEST ONLY (tests/bmbt_join_window_repro.sh mode 5): with
+ * dbg_join_flip_delay_ms set, halfway through that hold reclaim this one
+ * inode, if it is in core, so its tenure ends while the node is still alone.
+ * drop_caches cannot do this: it runs the buffer-cache shrinker in the same
+ * pass, which frees the inode's bmbt buffers before the inode (measured: the
+ * buffers went, the inode and its grant stayed), so the window's hazard -- a
+ * tenure gone, its bmbt blocks still cached -- never forms.  This takes the
+ * inode out of the cache (don't-cache, dentries pruned, last reference
+ * dropped) and runs XFS's own inode reclaim walk, the shrinker's inode half
+ * without its buffer half.  One shot: cleared when used.  0 = off.
+ */
+static unsigned long long mxfs_dbg_join_window_reclaim_ino;
+module_param_named(dbg_join_window_reclaim_ino,
+		   mxfs_dbg_join_window_reclaim_ino, ullong, 0644);
+MODULE_PARM_DESC(dbg_join_window_reclaim_ino,
+	"TEST: inode to reclaim inside the join window held by dbg_join_flip_delay_ms (0 = off, one shot)");
+
+static void
+mxfs_join_window_reclaim(
+	struct xfs_mount	*mp,
+	xfs_ino_t		ino)
+{
+	struct xfs_inode	*ip;
+	struct inode		*vi;
+	struct xfs_perag	*pag;
+	int			error, refs, intree = 0;
+	int			tagged = -1, clean = -1, pins = -1;
+	unsigned int		sick = 0;
+	unsigned int		mode, after_mode = 0;
+	unsigned long		after_flags = 0;
+
+	error = xfs_iget(mp, NULL, ino, XFS_IGET_INCORE, 0, &ip);
+	if (error) {
+		mxfs_pal_log(MXFS_LOG_WARN,
+			"mxfs: P-JOIN-WINDOW-RECLAIM ino=%llu incore=0 rc=%d -- TEST: not in core, nothing reclaimed",
+			(unsigned long long)ino, error);
+		return;
+	}
+	vi = VFS_I(ip);
+	mode = ip->i_dlm_mode;
+	d_mark_dontcache(vi);
+	d_prune_aliases(vi);
+	refs = atomic_read(&vi->i_count);
+	xfs_irele(ip);
+	/* a reclaim walk starts at the AG's saved cursor and stops at the end
+	 * of the AG, resetting the cursor to 0: an inode below the cursor is
+	 * reached only by the second walk */
+	xfs_reclaim_inodes_nr(mp, ULONG_MAX);
+	xfs_reclaim_inodes_nr(mp, ULONG_MAX);
+	/*
+	 * Read the cache tree itself: an XFS_IGET_INCORE lookup also refuses an
+	 * inode that is still cached but reclaimable or awaiting inactivation
+	 * (which a freeze holds back), and that is not a reclaimed inode -- it
+	 * keeps its grant until it really leaves.
+	 */
+	pag = xfs_perag_get(mp, XFS_INO_TO_AGNO(mp, ino));
+	if (pag) {
+		rcu_read_lock();
+		ip = radix_tree_lookup(&pag->pag_ici_root,
+				       XFS_INO_TO_AGINO(mp, ino));
+		if (ip && READ_ONCE(ip->i_ino) == ino) {
+			intree = 1;
+			after_flags = READ_ONCE(ip->i_flags);
+			after_mode = READ_ONCE(ip->i_dlm_mode);
+			/* what xfs_reclaim_igrab / xfs_reclaim_inode refuse on;
+			 * tag 0 is XFS_ICI_RECLAIM_TAG (private to xfs_icache.c) */
+			tagged = radix_tree_tag_get(&pag->pag_ici_root,
+					XFS_INO_TO_AGINO(mp, ino), 0);
+			clean = xfs_inode_clean(ip);
+			pins = xfs_ipincount(ip);
+			sick = ip->i_sick;
+		}
+		rcu_read_unlock();
+		xfs_perag_put(pag);
+	}
+	mxfs_pal_log(MXFS_LOG_WARN,
+		"mxfs: P-JOIN-WINDOW-RECLAIM ino=%llu incore=1 mode=%u refs=%d reclaimed=%d after_flags=0x%lx after_mode=%u reclaimable=%d need_inactive=%d tagged=%d clean=%d pins=%d sick=0x%x reclaim_hold=%d -- TEST: inode taken out of the cache inside the join window",
+		(unsigned long long)ino, mode, refs, !intree, after_flags,
+		after_mode, !!(after_flags & XFS_IRECLAIMABLE),
+		!!(after_flags & (XFS_NEED_INACTIVE | XFS_INACTIVATING)),
+		tagged, clean, pins, sick, READ_ONCE(mxfs_dbg_reclaim_hold));
+}
 
 /*
  * Count the clean cached extent-tree (bmbt) blocks whose owner inode holds
@@ -357,7 +440,11 @@ mxfs_dlm_join_prepare(
 			"unadmitted; the transition will be retried", error);
 		return error;
 	}
-	mp->m_mxfs_join_frozen = true;
+	WRITE_ONCE(mp->m_mxfs_join_frozen, true);
+	/* pairs with mxfs_bmbt_tenure_end_evict: a lone tenure that ends from
+	 * here on evicts its own bmbt blocks, and the drop below takes the
+	 * ones that ended before */
+	smp_mb();
 
 	/*
 	 * Frozen: the AIL is empty and the log covered.  The walk can still
@@ -375,10 +462,19 @@ mxfs_dlm_join_prepare(
 			unsigned int	dly = READ_ONCE(mxfs_dbg_join_flip_delay_ms);
 
 			if (dly) {
+				xfs_ino_t	rino;
+
 				mxfs_pal_log(MXFS_LOG_WARN,
 					"mxfs: P-JOIN-FLIP-DELAY ms=%u -- TEST: holding between the cached-view drop and the view flip",
 					dly);
-				msleep(dly);
+				rino = xchg(&mxfs_dbg_join_window_reclaim_ino, 0);
+				if (rino) {
+					msleep(dly / 2);
+					mxfs_join_window_reclaim(mp, rino);
+					msleep(dly - dly / 2);
+				} else {
+					msleep(dly);
+				}
 			}
 			return 0;
 		}

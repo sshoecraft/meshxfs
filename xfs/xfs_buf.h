@@ -427,6 +427,16 @@ struct xfs_buf {
 	 * drain probe names the exact caller that locked it and never relse'd.
 	 */
 	void			*b_lock_ip;
+	/*
+	 * The task that took b_sema and when (jiffies).  b_lock_ip names only
+	 * the immediate caller, which for every cache lookup is
+	 * xfs_buf_find_lock; the pid lets a report print the holder's own
+	 * stack while it still holds the lock.  Left as they were at unlock: an
+	 * async I/O's completion unlocks from another context, and the locker
+	 * is still the one to name.  Diagnostic only.
+	 */
+	pid_t			b_mxfs_lock_pid;
+	unsigned long		b_mxfs_lock_jif;
 
 	/*
 	 * Who last marked this buffer stale, and what it carried then: the
@@ -476,6 +486,10 @@ xfs_buf_incore(
 
 	return xfs_buf_get_map(target, &map, 1, XBF_INCORE | flags, bpp);
 }
+
+/* a cached buffer a trylock could not take: its state and its holder */
+void mxfs_buf_report_locked(struct xfs_buftarg *btp, xfs_daddr_t blkno,
+		size_t numblks, const char *why, unsigned long long ino);
 
 static inline int
 xfs_buf_get(

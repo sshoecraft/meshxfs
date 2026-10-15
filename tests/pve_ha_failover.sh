@@ -39,18 +39,19 @@
 #               without the dead host)
 #   SRC_VMID (9000, scripts/pve_cloud_guest.sh)  VMID (9200)  SHARED (mxfssan)
 #   MNT         the volume every host mounts (default /mnt/mxfssan)
-#   SAN_DEV     its device path on the hosts (default scripts/pve_caw_lun.sh's
-#               by-path link for target iqn.2026-05.local.mxfs:pve-caw-02 on
-#               portal 192.168.120.1)
+#   SAN_DEV     its device path on the hosts (default the pve9 multipath map,
+#               as tests/pve_storage_ops.sh; a single path's by-path link is
+#               not the device a multipathed host mounts, and the rejoin mount
+#               fails on it with "Can't lookup blockdev")
 #   WRITE_MB (32)  MAXF (32)  SETTLE_S (20)
 #   HA_BUDGET   seconds from the power-off to the guest's agent answering on a
 #               survivor (default 300: Proxmox documents up to two minutes for
 #               the dead node's lock to expire and the service to be recovered,
 #               plus the guest's boot, about 150 s, twice that)
 #   WRITE_BUDGET seconds a survivor may wait for its first fsynced write after
-#               the power-off (default 120: MXFS's own bound is its lease and
-#               fence of the dead host; no guest I/O timeout is longer than a
-#               minute, twice that)
+#               the power-off (default 32: twice the measured 15.2-15.5 s, a
+#               dead host declared after 5 heartbeat checks once corosync has
+#               dropped it, then fenced and replayed)
 #   BOOT_BUDGET seconds from a host's start to ssh answering (default 120)
 #   CLONE_BUDGET (400)  MIG_BUDGET (30)
 #   BYVMID      the bystander guest (default 9201): runs on the last host, which
@@ -68,16 +69,16 @@ read -r -a HOSTS <<<"${PVE_HOSTS:?PVE_HOSTS must name three or more hosts}"
 SRC_VMID=${SRC_VMID:-9000}; VMID=${VMID:-9200}; BYVMID=${BYVMID:-9201}; SHARED=${SHARED:-mxfssan}
 BY_BUDGET_MS=${BY_BUDGET_MS:-30000}
 MNT=${MNT:-/mnt/mxfssan}
-SAN_DEV=${SAN_DEV:-/dev/disk/by-path/ip-192.168.120.1:3260-iscsi-iqn.2026-05.local.mxfs:pve-caw-02-lun-0}
+SAN_DEV=${SAN_DEV:-/dev/disk/by-id/dm-uuid-mpath-23335366365663866}
 WRITE_MB=${WRITE_MB:-32}; MAXF=${MAXF:-32}; SETTLE_S=${SETTLE_S:-20}
-HA_BUDGET=${HA_BUDGET:-300}; WRITE_BUDGET=${WRITE_BUDGET:-120}; BOOT_BUDGET=${BOOT_BUDGET:-120}
+HA_BUDGET=${HA_BUDGET:-300}; WRITE_BUDGET=${WRITE_BUDGET:-32}; BOOT_BUDGET=${BOOT_BUDGET:-120}
 CLONE_BUDGET=${CLONE_BUDGET:-400}; MIG_BUDGET=${MIG_BUDGET:-30}
 CPU=${CPU:-x86-64-v2}
 TAG="mxfs HA failover test clone (tests/pve_ha_failover.sh)"
 EVID=${EVID:-$REPO/tests/evidence/pve_ha_failover/$(date -u +%Y%m%dT%H%M%SZ)}
 mkdir -p "$EVID" || exit 1
 LOG=$EVID/log
-BAD='I/O error|blocked for more than|WARNING:|BUG:|Oops|Shutting down filesystem|P-WITHDRAW|RECOVERY_BLOCKED|self-fenc|corrupt'
+BAD='I/O error|blocked for more than|WARNING:|BUG:|Oops|Shutting down filesystem|P-WITHDRAW|RECOVERY_BLOCKED|self-fenc|corrupt|Call Trace'
 bad=0
 
 on() { timeout "${3:-60}" "$SSHP" "$1" "$2" </dev/null 2>&1 | grep -avE '^Warning:|^Unauthorized|^If you|^$'; return "${PIPESTATUS[0]}"; }

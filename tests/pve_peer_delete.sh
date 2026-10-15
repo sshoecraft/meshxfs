@@ -15,6 +15,7 @@
 # Usage: tests/pve_peer_delete.sh [label]
 # Env:
 #   PVE_PAIR     "<addr> <addr>" (default the physical pair); participant 0 first
+#   MNT          the MXFS mount on both hosts (default /mnt/shared)
 #   FILES        files created (400)
 #   PHASE_BUDGET seconds any one phase may take (120)
 # Output: one line per phase with its wall; exit 0 when every phase finished
@@ -25,7 +26,7 @@ REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 SSHP="$REPO/tools/mxfs_sshpass.sh"
 LABEL=${1:-run}
 read -r -a H <<<"${PVE_PAIR:-192.168.1.80 192.168.1.81}"
-MNT=/mnt/shared
+MNT=${MNT:-/mnt/shared}
 FILES=${FILES:-400}
 BUDGET=${PHASE_BUDGET:-120}
 D=$MNT/peerdel/$(date -u +%H%M%S)-$LABEL

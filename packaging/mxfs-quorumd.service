@@ -1,0 +1,26 @@
+[Unit]
+# fence=quorum (docs/quorum-takeover.md): report corosync's votequorum to the
+# mxfs module four times a second.  Each quorate report renews the module's
+# quorum lease; while a fence=quorum filesystem is mounted, a lease that runs
+# out ends this host's boot, so this service stopping or hanging while one is
+# mounted resets the host.  Does nothing on a node without corosync.
+Description=MeshXFS: report corosync's quorum to the mxfs module (fence=quorum)
+Documentation=https://github.com/sshoecraft/meshxfs/blob/main/docs/quorum-takeover.md
+After=corosync.service corosync-qdevice.service
+Wants=corosync-qdevice.service
+ConditionPathExists=/etc/corosync/corosync.conf
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/mxfs_quorumd run
+# A restart well inside the module's 3 s lease keeps a mounted host's lease
+# renewed across a crash of this program; one that does not come back within
+# the lease ends the boot, which is the intended outcome.
+Restart=always
+RestartSec=200ms
+StartLimitIntervalSec=0
+OOMScoreAdjust=-1000
+Nice=-10
+
+[Install]
+WantedBy=multi-user.target

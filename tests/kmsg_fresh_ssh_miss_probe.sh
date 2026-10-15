@@ -3,7 +3,7 @@
 # kmsg_fresh_ssh_miss_probe.sh — reproduce the sess79 "grep missed a line that
 # was already there" failure, and name its cause.
 #
-#   tests/kmsg_fresh_ssh_miss_probe.sh <host> [trials]
+#   tests/kmsg_fresh_ssh_miss_probe.sh <host> [attempts]
 #
 # BACKGROUND.  sess79 twice grepped a node for P236-WITHDRAW-REFUSED, got
 # nothing, then found the same line later carrying an EARLIER printk stamp.
@@ -19,7 +19,7 @@
 # no-match because the caller sees only empty stdout.
 #
 # METHOD.  Emit one unique marker to /dev/kmsg over its own ssh session.  Then
-# poll for it `trials` times, each poll a NEW ssh session, using
+# poll for it `attempts` times, each poll a NEW ssh session, using
 # rig_dmesg_grep.sh so the three outcomes are separable:
 #   HIT   — matched
 #   MISS  — proven absent (dmesg ran, returned >0 lines, no match)
@@ -39,10 +39,10 @@
 set -u
 
 HOST="${1:-}"
-TRIALS="${2:-30}"
+ATTEMPTS="${2:-30}"
 
 if [ -z "$HOST" ]; then
-    echo "usage: $0 <host> [trials]" >&2
+    echo "usage: $0 <host> [attempts]" >&2
     exit 2
 fi
 
@@ -54,7 +54,7 @@ RDG="$HERE/rig_dmesg_grep.sh"
 # bash, $$ + SECONDS is enough and is stable inside the run.
 MARKER="RDGPROBE-$$-$RANDOM"
 
-echo "host=$HOST trials=$TRIALS marker=$MARKER"
+echo "host=$HOST attempts=$ATTEMPTS marker=$MARKER"
 
 if ! timeout 25 "$SSHPASS" "$HOST" "echo '$MARKER' > /dev/kmsg" >/dev/null 2>&1; then
     echo "SETUP-FAIL: could not write the marker to /dev/kmsg on $HOST" >&2
@@ -63,7 +63,7 @@ fi
 
 hit=0; miss=0; err=0
 first_bad=""
-for i in $(seq 1 "$TRIALS"); do
+for i in $(seq 1 "$ATTEMPTS"); do
     out=$("$RDG" "$HOST" "$MARKER" 2>&1)
     rc=$?
     case "$rc" in
@@ -79,18 +79,18 @@ for i in $(seq 1 "$TRIALS"); do
 done
 
 echo "---"
-echo "RESULT host=$HOST trials=$TRIALS hit=$hit miss=$miss error=$err"
+echo "RESULT host=$HOST attempts=$ATTEMPTS hit=$hit miss=$miss error=$err"
 if [ "$err" -gt 0 ]; then
-    echo "VERDICT: CONFIRMED — a fresh-ssh fetch failed to read the log ($err/$TRIALS)."
+    echo "VERDICT: CONFIRMED — a fresh-ssh fetch failed to read the log ($err/$ATTEMPTS)."
     echo "         An ad-hoc 'ssh host \"dmesg | grep PAT\"' would have reported"
     echo "         these as no-match.  First: $first_bad"
     exit 0
 fi
 if [ "$miss" -gt 0 ]; then
     echo "VERDICT: REFUTED, AND WORSE — the log read cleanly but a line known to"
-    echo "         exist was absent ($miss/$TRIALS).  First: $first_bad"
+    echo "         exist was absent ($miss/$ATTEMPTS).  First: $first_bad"
     echo "         This is a kernel-log consistency defect, not a harness bug."
     exit 0
 fi
-echo "VERDICT: NOT REPRODUCED at $TRIALS trials — all polls HIT."
+echo "VERDICT: NOT REPRODUCED at $ATTEMPTS attempts — all polls HIT."
 exit 0

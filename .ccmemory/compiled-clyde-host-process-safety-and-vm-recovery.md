@@ -1,9 +1,9 @@
 ---
 name: compiled-clyde-host-process-safety-and-vm-recovery
-description: Clyde host safety: pgrep/ps mmap_lock wedges, self-kill-by-pattern traps, D-state domain recovery, and rig resource exhaustion — all without a host r…
+description: Clyde host safety: pgrep/ps mmap_lock wedges, self-kill traps, D-state domain recovery, VM power control, rig resource exhaustion, no host reset
 metadata:
   type: project
-tags: [compiled, clyde, host-safety, pgrep, wedge, rig, libvirt]
+tags: [compiled, clyde, host-safety, pgrep, wedge, rig, libvirt, virsh]
 ---
 
 Clyde is the dev host: it runs libvirt, the SCST/iSCSI target, NFS, and Claude
@@ -11,13 +11,31 @@ Code itself. Per CLAUDE.md RULE: NEVER REBOOT THE LAB HOST, only the user resets
 incident below either has a recovery path that avoids that, or (mmap_lock)
 proves there isn't one and the only fix is not entering the state. Two
 standing reference procedures anchor the recovery paths that follow:
-node power control is `virsh -c qemu:///system destroy/start` (the default
-`qemu:///session` URI shows an unrelated, always-"shut off" VM set) —
-[[reference-node-power-control]] — and after any clyde reboot/power-loss,
+node power control (section below, `reference-node-power-control`), and after any clyde reboot/power-loss,
 three host-side things must be rebuilt before SSH/run works at all: the LIO
 LUN (`lio_tcm_setup.sh setup`), the persistent SSH password copy
 (`/home/steve/.mxfs/pass` → `/tmp/.mxfs_pass`, since `/tmp` does not survive
 reboot), and the test1/test2 VMs — `env-cluster-bringup-after-host-reboot`.
+
+## Node power control: system libvirt, not session (`reference-node-power-control`)
+
+The test1-4 cluster VMs run on THIS dev host (clyde, .120.1/br0) under the
+**system** libvirt instance, NOT the default session one.
+
+- `virsh list` (default `qemu:///session`) shows the VMs as "shut off" — WRONG/misleading; that is a different unused set.
+- `virsh -c qemu:///system list --all` (or `export LIBVIRT_DEFAULT_URI=qemu:///system`) shows the REAL cluster: test1,test2,test3,test4 = running.
+
+Recover a wedged node (D-state kernel threads after a stuck `reboot`; node pings DOWN but virsh shows "running"):
+```
+export LIBVIRT_DEFAULT_URI=qemu:///system
+virsh destroy testN ; sleep 2 ; virsh start testN
+```
+Boot takes ~60-90s. A guest `reboot` over ssh often does NOT complete on a
+CAW-starvation-wedged node (sshd dies but kernel hangs in shutdown, no
+watchdog) — use virsh destroy+start instead.
+
+Node IPs: test1=.114 test2=.143 test3=.140 test4=.174 (192.168.120.0/24, br0).
+Only test1-4 of the 16-name set are actually provisioned/running. See `project_test_cluster_scst`.
 
 ## The mmap_lock wedge (2026-08-07): the incident that set the rule
 

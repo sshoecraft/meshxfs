@@ -551,6 +551,15 @@ xfs_do_force_shutdown(
 	} else if (flags & SHUTDOWN_DEVICE_REMOVED) {
 		tag = XFS_PTAG_SHUTDOWN_IOERROR;
 		why = "Block device removal";
+	} else if (flags & SHUTDOWN_CLUSTER_FENCED) {
+		/*
+		 * The required stop of a node the cluster has cut off the
+		 * shared storage (a reservation conflict or a lost authority):
+		 * nothing in memory or on disk is corrupt, and the survivors
+		 * recover this node's journal.
+		 */
+		tag = XFS_PTAG_SHUTDOWN_IOERROR;
+		why = "Fenced by the cluster (this node lost its access to the shared storage)";
 	} else {
 		tag = XFS_PTAG_SHUTDOWN_IOERROR;
 		why = "Metadata I/O Error";

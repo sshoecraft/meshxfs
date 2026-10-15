@@ -139,6 +139,23 @@ MODULE_PARM_DESC(caw_inject_answer_lost_n,
                  "(0 = off).");
 
 /*
+ * TEST ONLY.  The next N swaps that write this node's waiter bit land on the
+ * target and then report an I/O error on every attempt (later copies are not
+ * sent), so the swap ends in the hard error a lost answer followed by a dead
+ * path would give: the bit is on the platter and the caller was told only
+ * that the swap failed.  answer_lost_n cannot reach this, because its retry
+ * meets its own write and resolves as landed.  A swap counts whether or not
+ * the bit was already set, so a retry over an orphaned bit is hit the same as
+ * one that registers afresh.
+ */
+static int mxfs_caw_inject_register_hard_n;
+module_param_named(caw_inject_register_hard_n, mxfs_caw_inject_register_hard_n, int, 0644);
+MODULE_PARM_DESC(caw_inject_register_hard_n,
+                 "TEST ONLY: the next N swaps that register this node as a "
+                 "waiter land and then fail every attempt with -EIO "
+                 "(0 = off).");
+
+/*
  * instrumentation for D-HOT-SLOT-CAW-SERIALIZES-LUN-PER-LBA-379.
  *
  * PROVED the serialization is per-LBA (direct READ(16)+FUA to the root
@@ -1754,6 +1771,7 @@ static int caw_slot_amb(struct mxfs_dlm_caw_ctx *ctx, uint32_t slot_index,
 {
 	uint32_t backoff = MXFS_CAW_IO_BACKOFF_MS;
 	bool answer_lost = false;	/* an earlier copy of this swap got no answer */
+	bool register_hard = false;	/* caw_inject_register_hard_n hit this swap */
 	int attempt;
 	int rc;
 
@@ -1839,6 +1857,10 @@ static int caw_slot_amb(struct mxfs_dlm_caw_ctx *ctx, uint32_t slot_index,
 				backoff = MXFS_CAW_IO_BACKOFF_MAX_MS;
 		}
 
+		if (register_hard) {
+			rc = -EIO;	/* TEST ONLY: the path stays dead */
+			continue;
+		}
 		if (caw_watch_armed(slot_index)) {
 			uint64_t t0 = mxfs_pal_time_ms();
 
@@ -1850,6 +1872,22 @@ static int caw_slot_amb(struct mxfs_dlm_caw_ctx *ctx, uint32_t slot_index,
 			rc = mxfs_pal_bdev_compare_and_write(ctx->dev,
 							     slot_offset(ctx, slot_index),
 							     compare, write);
+		}
+		if (rc == 0 && attempt == 0 &&
+		    READ_ONCE(mxfs_caw_inject_register_hard_n) > 0 &&
+		    (write->waiters & ctx->node_bit) &&
+		    write->generation != compare->generation) {
+			mxfs_caw_inject_register_hard_n--;
+			register_hard = true;
+			mxfs_pal_log(MXFS_LOG_WARN,
+			    "mxfs: P-CAW-REGISTER-HARD-INJECT slot=%u type=%u ino=%llu gen=%u->%u self=0x%llx left=%d -- TEST ONLY: the target applied this waiter registration and every attempt now reports an I/O error",
+			    slot_index, write->resource.type,
+			    (unsigned long long)write->resource.ino,
+			    compare->generation, write->generation,
+			    (unsigned long long)ctx->node_bit,
+			    mxfs_caw_inject_register_hard_n);
+			rc = -EIO;
+			continue;
 		}
 		if (rc == 0 && attempt == 0 &&
 		    mxfs_caw_inject_answer_lost_n > 0) {
@@ -6983,6 +7021,7 @@ static int caw_wait_for_grant(struct mxfs_dlm_caw_ctx *ctx,
 	uint64_t last_scrub_ms = 0;	/* out-of-closure scrub throttle */
 	bool quar_skip_lap = false;	/* one lap owed to ADOPT after a
 					 * cancel raced a direct handoff */
+	bool gave_up = false;		/* ended by wait_giveup_fn */
 	/* part D: last/max poll-read service time (see read site). */
 	uint64_t acq_read_t0 = 0, acq_read_ms = 0, acq_read_max_ms = 0;
 	/* acq_read_ms above is ASSIGNED per poll (the LAST read's
@@ -8289,6 +8328,29 @@ static int caw_wait_for_grant(struct mxfs_dlm_caw_ctx *ctx,
 				slot_reads);
 			break;
 		}
+		/*
+		 * The caller has nothing left to wait for (wait_giveup_fn):
+		 * the mount's root lookup, blocked while a peer that died
+		 * during this mount is recorded.  That peer's grants stay
+		 * frozen until the mount's own barrier replays its slice, so
+		 * the rest of the budget could only run out.  Same place and
+		 * same cancel path as the deadline above, so a grant on this
+		 * lap's read still wins.
+		 */
+		if ((resource->type == MXFS_LTYPE_INODE ||
+		     resource->type == MXFS_LTYPE_AG) && ctx->wait_giveup_fn &&
+		    ctx->wait_giveup_fn(ctx->wait_giveup_data, resource) > 0) {
+			gave_up = true;
+			mxfs_pal_log(MXFS_LOG_WARN,
+			    "mxfs: P-MPHASE-WAIT-GIVEUP type=%u ino=%llu ag=%u mode=%u el_ms=%llu reads=%d holders_ex=0x%llx -- a peer that died during this mount is recorded and only the mount's barrier can replay it; ending this wait now instead of at the end of its budget",
+				resource->type,
+				(unsigned long long)resource->ino,
+				resource->ag_number, mode,
+				(unsigned long long)(mxfs_pal_time_ms() - start),
+				slot_reads,
+				(unsigned long long)cur_slot->holders_ex);
+			break;
+		}
 		sleep_t0 = mxfs_pal_time_ms();
 		/* Never oversleep a live deadline: clamp this lap's poll. */
 		if (deadline_ms) {
@@ -8320,7 +8382,8 @@ static int caw_wait_for_grant(struct mxfs_dlm_caw_ctx *ctx,
 	 * expiry is an EXPECTED contention outcome already logged by
 	 * P-RESV-DEADLINE above — do not print the alarming base-timeout
 	 * line for it. */
-	if (!deadline_ms || mxfs_pal_time_ms() - start >= MXFS_CAW_WAIT_TIMEOUT_MS)
+	if (!gave_up &&
+	    (!deadline_ms || mxfs_pal_time_ms() - start >= MXFS_CAW_WAIT_TIMEOUT_MS))
 		mxfs_pal_log(MXFS_LOG_WARN,
 		     "mxfs: disk lock acquisition timed out after %llu ms "
 		     "(base %u ms, liveness-extended cap %u ms)",
@@ -10383,8 +10446,44 @@ static int caw_lock_body_inner(struct mxfs_dlm_caw_ctx *ctx,
 			ea_regwait++;
 			continue;
 		}
-		if (rc)
+		if (rc) {
+			/* a hard error (I/O after retries, gen-verify read
+			 * failure, -ESHUTDOWN) does not say the swap missed: it
+			 * may have landed, leaving this node's waiter bit on
+			 * the slot with no request behind it.  Peers then defer
+			 * readers to it, and a releaser's direct handoff can
+			 * grant it EX that this node never learns it holds.
+			 * Drop it as every other give-up does; the drop
+			 * publishes its obligation before any I/O, so a disk
+			 * that keeps failing leaves the bit owed, not lost. */
+			struct mxfs_caw_lock_slot *chk =
+				mxfs_pal_alloc(sizeof(*chk));
+			int drop_rc = 0, read_rc = -ENOMEM;
+			bool on_disk = false;
+
+			if (caw_may_have_written(rc))
+				drop_rc = caw_drop_own_waiter(ctx, slot_idx,
+							      resource, lreq,
+							      true, mode, false,
+							      0);
+			yreg_live = false;	/* dropped above */
+			/* what the give-up left on the platter, read back */
+			if (chk) {
+				read_rc = read_slot(ctx, slot_idx, chk);
+				on_disk = read_rc == 0 &&
+					  chk->magic == MXFS_CAW_MAGIC &&
+					  memcmp(&chk->resource, resource,
+						 sizeof(*resource)) == 0 &&
+					  (chk->waiters & ctx->node_bit);
+				mxfs_pal_free(chk);
+			}
+			mxfs_pal_log(MXFS_LOG_WARN,
+			    "dlm_caw: P-CAW-REGISTER-HARD-EXIT slot=%u type=%u ino=%llu mode=%u rc=%d drop_rc=%d read_rc=%d waiter_bit_on_disk=%d -- registering as a waiter failed with a hard error after the swap may have landed",
+			    slot_idx, resource->type,
+			    (unsigned long long)resource->ino, mode, rc,
+			    drop_rc, read_rc, on_disk ? 1 : 0);
 			goto out;
+		}
 		/* from here the registered waiter bit belongs to the
 		 * wait_for_grant / exhaustion cancel discipline (which drops
 		 * it on every failure exit); the fix-A bookkeeping must not
@@ -17237,6 +17336,17 @@ void mxfs_dlm_caw_set_wait_refuse_fn(struct mxfs_dlm_caw_ctx *ctx,
 		return;
 	ctx->wait_refuse_fn = fn;
 	ctx->wait_refuse_data = data;
+}
+
+void mxfs_dlm_caw_set_wait_giveup_fn(struct mxfs_dlm_caw_ctx *ctx,
+				     int (*fn)(void *data,
+					       const struct mxfs_resource_id *res),
+				     void *data)
+{
+	if (!ctx)
+		return;
+	ctx->wait_giveup_fn = fn;
+	ctx->wait_giveup_data = data;
 }
 
 /* (ruling item B): survivor-side out-of-closure scrub oracle

@@ -1439,6 +1439,33 @@ xfs_iread_extents(
 
 	xfs_assert_ilocked(ip, XFS_ILOCK_EXCL);
 
+	/*
+	 * if_needextents promises a btree root to walk.  An MXFS fork rebuild
+	 * that bypasses xfs_iformat_data_fork can leave the flag set over a
+	 * fork with no root (qemu-img's first ftruncate of a new file on
+	 * Proxmox oopsed reading if_broot->bb_level at NULL+4).  Name the
+	 * rebuild that left it and refuse the walk rather than dereference.
+	 */
+	if (unlikely(whichfork == XFS_DATA_FORK && ip->i_mxfs_fork_rejected)) {
+		/* the platter image was rejected at the last reload; this is
+		 * the on-disk corruption native XFS reports at iget */
+		pr_warn_ratelimited("mxfs: P-IREAD-REJECTED ino=%llu fmt=%d broot=%d comm=%s -- the last reload rejected this inode's platter image; refusing the fork until a reload rebuilds it\n",
+			(unsigned long long)ip->i_ino, (int)ifp->if_format,
+			ifp->if_broot ? 1 : 0, current->comm);
+		return -EFSCORRUPTED;
+	}
+	if (unlikely(ifp->if_format != XFS_DINODE_FMT_BTREE ||
+		     !ifp->if_broot)) {
+		pr_warn("mxfs: P-IREAD-NOROOT ino=%llu fork=%d fmt=%d broot=%d nextents=%llu bytes=%lld mode=0%o gen=%u size=%lld forkreset_src=%u comm=%s -- if_needextents set with no btree root\n",
+			(unsigned long long)ip->i_ino, whichfork,
+			(int)ifp->if_format, ifp->if_broot ? 1 : 0,
+			(unsigned long long)ifp->if_nextents,
+			(long long)ifp->if_bytes, VFS_I(ip)->i_mode,
+			VFS_I(ip)->i_generation, (long long)ip->i_disk_size,
+			(unsigned)ip->i_mxfs_forkreset_src, current->comm);
+		return -EFSCORRUPTED;
+	}
+
 	ir.loaded = 0;
 	xfs_iext_first(ifp, &ir.icur);
 	cur = xfs_bmbt_init_cursor(mp, tp, ip, whichfork);

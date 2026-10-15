@@ -114,8 +114,12 @@ for h in "$P0" "$P1"; do
         nohup setsid bash -c \"$WAIT_T; exec $FIO --time_based --runtime=$RUN_S --write_bw_log=/run/conc-$STAMP --log_avg_msec=1000 --log_unix_epoch=1 --output-format=json --output=/run/conc-$STAMP.json\" > /dev/null 2>&1 < /dev/null &
         echo ARMED" 30 | grep -q ARMED || { say "ABORT: could not arm $h"; exit 1; }
 done
-on "$P1" "echo $(base64 -w0 <<<"$SAMPLER") | base64 -d > /run/conc-$STAMP.sampler && nohup setsid bash /run/conc-$STAMP.sampler $MNT/conc/$STAMP/${NAME[$P1]} $T $END /run/conc-$STAMP /var/tmp/conc-$STAMP.probe > /dev/null 2>&1 < /dev/null &
-    echo SAMPLERS_ARMED" 30 | grep -q SAMPLERS_ARMED || { say "ABORT: could not arm $P1's samplers"; exit 1; }
+# the launch alone is backgrounded, inside the braces: a trailing & after the
+# && chain backgrounds the chain, which then holds this ssh's stdout open for
+# the sampler's life and the arm returns only at its timeout, after T
+on "$P1" "echo $(base64 -w0 <<<"$SAMPLER") | base64 -d > /run/conc-$STAMP.sampler && {
+    nohup setsid bash /run/conc-$STAMP.sampler $MNT/conc/$STAMP/${NAME[$P1]} $T $END /run/conc-$STAMP /var/tmp/conc-$STAMP.probe > /dev/null 2>&1 < /dev/null &
+    } && echo SAMPLERS_ARMED" 30 | grep -q SAMPLERS_ARMED || { say "ABORT: could not arm $P1's samplers"; exit 1; }
 
 # ssh from here to participant 1, every 2 s across the run
 python3 -I -c 'import sys, time; time.sleep(max(0.0, float(sys.argv[1]) - time.time()))' "$T"

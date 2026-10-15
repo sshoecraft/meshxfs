@@ -3024,7 +3024,7 @@ xfs_buf_item_push(
 
 	/* has a previous flush failed due to IO errors? */
 	if (bp->b_flags & XBF_WRITE_FAIL) {
-		xfs_buf_alert_ratelimited(bp, "XFS: Failing async write",
+		xfs_buf_alert_ratelimited(bp, "mxfs: Failing async write",
 	    "Failing async write on buffer block 0x%llx. Retrying async write.",
 					  (long long)xfs_buf_daddr(bp));
 	}

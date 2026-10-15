@@ -66,6 +66,10 @@ fi
 CFG_OUT=$(python3 "$REPO/tools/configuration.py" shell "$CONFIG_ARG") || exit 2
 eval "$CFG_OUT"
 CONFIG="$CFG_KEY"
+# On DRBD the module stays loaded across a prep (prep_node.sh MXFS_KEEP_LOADED):
+# it was loaded before the link came up, and loading it again holds a CPU for
+# ~1 s, past DRBD's 0.5 s ping timeout, so the peer is fenced mid-prep.
+KEEP_LOADED=0; [ "$CFG_ATTACH" = drbd ] && KEEP_LOADED=1
 N="$CFG_NODES"
 BASE_TRANSPORT="$CFG_TRANSPORT"
 if [ -n "$GROUP" ]; then
@@ -200,8 +204,14 @@ export MXFS_MARKER="$MARKER"
 # needs reform even at the same node count/transport (mirrors prep_cluster's
 # own existing build-mismatch check). xfs mode has no module, so it gets a
 # fixed sentinel instead.
+# MXFS_WANT_SRCVER names the build when the nodes do not run this host's .ko:
+# hosts on another kernel load their own DKMS build (prep_cluster's own
+# foreign-kernel rule, below), and a cluster set up by its installed package
+# (scripts/prun.sh) is never prepped here at all.
 if [ "$CFG_BASELINE" = 1 ]; then
     WANT_SRCVER="xfs-no-module"
+elif [ -n "${MXFS_WANT_SRCVER:-}" ]; then
+    WANT_SRCVER="$MXFS_WANT_SRCVER"
 else
     WANT_SRCVER=$(modinfo "$REPO/mxfs.ko" 2>/dev/null | awk '/^srcversion:/{print $2}')
 fi
@@ -336,6 +346,14 @@ elif [ -n "$GROUP" ]; then
     runlock_config "$CFG_SLUG" "$what" || exit 3
     echo "--- run lock: group $GROUP [${NODES[*]}] shares the rig; holds its nodes and $CONFIG ---"
     export MXFS_RUNLOCK_OWNER=$$
+    # The VM pool (tools/vm_pool.sh): the group's VMs are started if they are
+    # off, and once this run ends they are shut off unless a run or a driver's
+    # hold takes them again within the grace.  An idle guest left up starves
+    # the host, and a starved host fails rows for reasons that are not the
+    # filesystem's.
+    "$REPO/tools/vm_pool.sh" up "${NODES[@]}" \
+        || { echo "ERROR: could not start [${NODES[*]}] (tools/vm_pool.sh up)"; exit 3; }
+    setsid "$REPO/tools/vm_pool.sh" release --after $$ "${NODES[@]}" </dev/null >/dev/null 2>&1 &
 else
 exec 9>"$RUNLOCK"
 if ! flock -n 9; then
@@ -490,6 +508,40 @@ if [ "$CFG_BASELINE" != 1 ]; then
     fi
 fi
 
+# The nodes run the tree's own tools over /src: mkfs_mxfs and chk_mxfs in
+# prep and in the tests, fsx in the suite.  Linked against a newer glibc than
+# the node has, they do not start ("version `GLIBC_2.38' not found": clyde's
+# build on AlmaLinux 9), and the run used to discover it only at mkfs, after
+# the LUN was bound and the module loaded.  Whether they start on the first
+# node is asked directly, before any prep: a node with a newer glibc runs a
+# clyde build fine (the PVE pair does), so comparing distributions would
+# refuse a working fleet.  tools/.built_for, written by
+# scripts/platform_build.sh, says what the tree was last built on.
+if [ "$CFG_BASELINE" != 1 ]; then
+    _node_repo="/src/$(basename "$REPO")"
+    # A rig node has no fstab entry for clyde's /src: one restarted by a
+    # lap (virsh destroy/start) came back without the tree, and this probe
+    # read that as tools built for the wrong platform.  Mount it first, as
+    # scripts/vm_cycle.sh and scripts/mpath_up.sh do.
+    _tools_probe=$(ssh_node "$NODE1" "case $_node_repo in /src/*) mountpoint -q /src || { mkdir -p /src; timeout 60 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; } ;; esac
+        for b in tools/mkfs_mxfs tools/chk_mxfs tests/suite/tools/fsx; do
+            [ -x $_node_repo/\$b ] || { echo \"TOOL_MISSING \$b\"; continue; }
+            e=\$($_node_repo/\$b -h 2>&1 >/dev/null | grep -m1 -E 'GLIBC_|error while loading shared libraries|cannot execute')
+            [ -z \"\$e\" ] || echo \"TOOL_NOSTART \$b: \$e\"
+        done; echo TOOLS_PROBED" 2>/dev/null)
+    if ! grep -q '^TOOLS_PROBED' <<<"$_tools_probe"; then
+        echo "ERROR: could not ask $NODE1 whether the tree's tools start on it (no answer over ssh)"
+        exit 1
+    fi
+    if grep -qE '^TOOL_(MISSING|NOSTART)' <<<"$_tools_probe"; then
+        echo "ERROR: the tree's node-side tools do not run on $NODE1:"
+        grep -E '^TOOL_(MISSING|NOSTART)' <<<"$_tools_probe" | sed 's/^/    /'
+        echo "    tree built for: $(cat "$REPO/tools/.built_for" 2>/dev/null || echo 'unknown (no tools/.built_for)')"
+        echo "    rebuild the module and tools on this platform's first node: scripts/platform_build.sh $NODE1"
+        exit 1
+    fi
+fi
+
 # ---------------------------------------------------------------------------
 # Record one test's aggregated result into the board under "<N>/<dlm>".
 # elapsed/budget are seconds (integers; "" if not timed, e.g. SKIP markers).
@@ -540,6 +592,16 @@ record() {  # name status measured reason [elapsed] [budget]
     # "UNROOTED: which check failed is not yet captured" and why the Aug-1
     # 23:32 cache_coherency/zsl failures could not be attributed from the
     # record: the answer had been written down and then discarded.
+    # A lap that could not measure ends `RESULT: ABORT` (tests/lib/rig.sh).  The
+    # board has no ABORT, so criteria.py refused the write, the row's marker
+    # outlived it, and finalize recorded "run died while this test was
+    # executing" — the abort's own reason (which capture, which stage) gone.
+    # ABORTED is the board's result-unknown state; the reason says the lap,
+    # not the run, ended it.
+    if [ "$status" = ABORT ]; then
+        status=ABORTED
+        reason="the test ABORTed: it could not measure, a harness gap and not a verdict on the filesystem${reason:+; }$reason"
+    fi
     local args=(update "$name" --at "$CONFIG" -s "$status" -m "$measured")
     [ -n "$reason" ]  && args+=(--reason "$reason")
     [ -n "$elapsed" ] && args+=(-e "$elapsed")
@@ -1037,14 +1099,14 @@ d=json.load(open(sys.argv[1])); print((d.get(sys.argv[2]) or {}).get("task_retir
     echo "PREP LUN identity: wwid=${LUN_WWID:-none} fsid=$LUN_FSID (every node binds its device to it)"
 
     # 3. Form the cluster on node1 (load module w/ transport + mount).
-    out=$(ssh_node "$NODE1" "MXFS_DEV='$DEV' MXFS_FSID='$LUN_FSID' MXFS_LUN_WWID='$LUN_WWID' MXFS_KO_MD5='$KO_MD5' MXFS_REPO='$NODE_REPO' MXFS_EXTRA_MODARGS='${MXFS_EXTRA_MODARGS:-}' MXFS_RETIRE_CONTRACT='$RETIRE_CONTRACT' bash /src/mxfs/tests/setup/prep_node.sh $BASE_TRANSPORT")
+    out=$(ssh_node "$NODE1" "MXFS_DEV='$DEV' MXFS_FSID='$LUN_FSID' MXFS_LUN_WWID='$LUN_WWID' MXFS_KO_MD5='$KO_MD5' MXFS_REPO='$NODE_REPO' MXFS_KEEP_LOADED='$KEEP_LOADED' MXFS_EXTRA_MODARGS='${MXFS_EXTRA_MODARGS:-}' MXFS_RETIRE_CONTRACT='$RETIRE_CONTRACT' bash /src/mxfs/tests/setup/prep_node.sh $BASE_TRANSPORT")
     echo "$out" | grep -q NODE_PREP_OK || { echo "PREP FAIL (form $NODE1): $out"; return 1; }
 
     # 4. Join the remaining nodes in parallel.
     pids=()
     local tmpd; tmpd=$(mktemp -d)
     for n in "${NODES[@]:1}"; do
-        ( ssh_node "$n" "MXFS_DEV='$DEV' MXFS_FSID='$LUN_FSID' MXFS_LUN_WWID='$LUN_WWID' MXFS_KO_MD5='$KO_MD5' MXFS_REPO='$NODE_REPO' MXFS_EXTRA_MODARGS='${MXFS_EXTRA_MODARGS:-}' MXFS_RETIRE_CONTRACT='$RETIRE_CONTRACT' bash /src/mxfs/tests/setup/prep_node.sh $BASE_TRANSPORT" > "$tmpd/$n" 2>&1 ) &
+        ( ssh_node "$n" "MXFS_DEV='$DEV' MXFS_FSID='$LUN_FSID' MXFS_LUN_WWID='$LUN_WWID' MXFS_KO_MD5='$KO_MD5' MXFS_REPO='$NODE_REPO' MXFS_KEEP_LOADED='$KEEP_LOADED' MXFS_EXTRA_MODARGS='${MXFS_EXTRA_MODARGS:-}' MXFS_RETIRE_CONTRACT='$RETIRE_CONTRACT' bash /src/mxfs/tests/setup/prep_node.sh $BASE_TRANSPORT" > "$tmpd/$n" 2>&1 ) &
         pids+=($!)
     done
     for pid in "${pids[@]}"; do wait "$pid"; done
@@ -1196,6 +1258,9 @@ prep_cluster_xfs() {
         mountpoint -q '$MNT' && { fuser -km '$MNT' 2>/dev/null; umount '$MNT' 2>/dev/null; }
         lsmod | grep -q '^mxfs ' && { umount '$MNT' 2>/dev/null; rmmod mxfs 2>/dev/null; }
         mountpoint -q /src || { mkdir -p /src; mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp 2>/dev/null; }
+        # '$DEV' defaults to /dev/sda, a lent LUN on the qemu rig and the boot
+        # disk on a vSphere guest: nothing below touches a device in use.
+        bash /src/mxfs/tests/setup/refuse_inuse_dev.sh '$DEV' || exit 0
         # Clear stale SCSI PR left by the prior CAW cluster run (see
         # tests/setup/prep_fs.sh 3b) — otherwise mkfs.xfs fails 'Device or
         # resource busy' against a still-reserved LUN.
@@ -1284,8 +1349,14 @@ run_none() {  # name cat budget
         echo "  FAIL  $name (timeout >${kill_budget}s)"; return
     fi
     if [ -z "$line" ]; then record "$name" FAIL "no-result" "no RESULT line from $NODE1 after $attempt attempts" "$elapsed" "$real_budget"; echo "  FAIL  $name (no result)"; return; fi
-    local status; status=$(awk '{print $2}' <<<"$line")
-    record "$name" "$status" "$(echo "$line"|field measured)" "$(echo "$line"|field reason)" "$elapsed" "$real_budget"
+    local status reason; status=$(awk '{print $2}' <<<"$line")
+    reason=$(echo "$line"|field reason)
+    # tests/lib/rig.sh ends an unmeasurable lap with `RESULT: ABORT label= stage=
+    # evidence=` and says what failed on the `ABORT:` line before it.
+    if [ "$status" = ABORT ] && [ -z "$reason" ]; then
+        reason="$(echo "$out" | grep -a '^ABORT:' | tail -1 | cut -c1-400) [${line#RESULT: ABORT }]"
+    fi
+    record "$name" "$status" "$(echo "$line"|field measured)" "$reason" "$elapsed" "$real_budget"
     printf "  %-5s %s  (%ss/%ss)\n" "$status" "$name" "$elapsed" "$real_budget"
 }
 
@@ -1337,9 +1408,22 @@ run_host() {  # name cat budget
         echo "  FAIL  $name  (pre-assert: $fstype not mounted/readable on$pa_bad)"
         return
     fi
+    # The death oracle identifies the shared LUN by its WWID before it kills
+    # anything.  A pool run exports the allocation's; a run on a device the
+    # operator named (MXFS_DEV: a vSphere RDM, say) had only data/rigs.json to
+    # fall back on, which declares no LUN for such a rig, so crash_audit
+    # ABORTed in its first second on both RDM boards.  Read it from node 1 the
+    # way prep does (tests/setup/dev_identity.sh); the oracle still checks
+    # every node's device against it.
+    local host_wwid="${MXFS_LUN_WWID:-}"
+    if [ -z "$host_wwid" ] && [ -n "${MXFS_DEV:-}" ]; then
+        host_wwid=$(ssh_node "$NODE1" "echo $(base64 -w0 < "$REPO/tests/setup/dev_identity.sh") | base64 -d | sh -s '$DEV'" 2>/dev/null \
+                    | grep -a '^IDENT ' | tail -1 | sed -n 's/.* wwid=\([^ ]*\).*/\1/p')
+        case "$host_wwid" in none) host_wwid="" ;; esac
+    fi
     t0=$(date +%s)
     out=$(MXFS_NODES=$N MXFS_CONFIG=$CONFIG MXFS_CONFIG_SLUG=$CFG_SLUG MXFS_DEV="$DEV" MXFS_MNT="$MNT" \
-          MXFS_RUN_ID=$RUN_ID \
+          MXFS_RUN_ID=$RUN_ID MXFS_LUN_WWID="$host_wwid" \
           timeout --kill-after=5 "$kill_budget" bash "$script" 2>&1); rc=$?
     t1=$(date +%s); elapsed=$(( t1 - t0 ))
     line=$(echo "$out" | grep -E '^RESULT:' | tail -1)
@@ -1351,8 +1435,14 @@ run_host() {  # name cat budget
         record "$name" FAIL "no-result" "no RESULT line from the host script (rc=$rc); tail: $(echo "$out" | tail -3 | tr '\n' ';' | cut -c1-300)" "$elapsed" "$real_budget"
         echo "  FAIL  $name (no result)"; return
     fi
-    local status; status=$(awk '{print $2}' <<<"$line")
-    record "$name" "$status" "$(echo "$line"|field measured)" "$(echo "$line"|field reason)" "$elapsed" "$real_budget"
+    local status reason; status=$(awk '{print $2}' <<<"$line")
+    reason=$(echo "$line"|field reason)
+    # tests/lib/rig.sh ends an unmeasurable lap with `RESULT: ABORT label= stage=
+    # evidence=` and says what failed on the `ABORT:` line before it.
+    if [ "$status" = ABORT ] && [ -z "$reason" ]; then
+        reason="$(echo "$out" | grep -a '^ABORT:' | tail -1 | cut -c1-400) [${line#RESULT: ABORT }]"
+    fi
+    record "$name" "$status" "$(echo "$line"|field measured)" "$reason" "$elapsed" "$real_budget"
     printf "  %-5s %s  (%ss/%ss)\n" "$status" "$name" "$elapsed" "$real_budget"
 }
 
@@ -1375,6 +1465,15 @@ run_coord() {  # name cat budget scale
     # manifest column).
     local tt="$def_budget"
     [ "$scale" = linear ] && [ "$N" -gt 1 ] && tt=$(( def_budget * N ))
+    # A rig whose hardware the manifest's numbers were not derived on names
+    # its own: MXFS_RIG_BUDGETS is a file of "<row> <seconds> <derivation>"
+    # lines, each derived the manifest's way (native XFS on that hardware, x2)
+    # and saying so.  The rig's own measurement replaces a number measured on
+    # other hardware; it never widens one measured on this.
+    if [ -n "${MXFS_RIG_BUDGETS:-}" ]; then
+        local rb; rb=$(awk -v n="$name" '$1 == n && $2 ~ /^[0-9]+$/ {print $2}' "$MXFS_RIG_BUDGETS" 2>/dev/null | tail -1)
+        [ -n "$rb" ] && tt="$rb"
+    fi
     local ct="$COORD_TIMEOUT"
     case "$name" in
         dir_reuse_coherency)

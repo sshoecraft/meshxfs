@@ -631,3 +631,16 @@ Padding is not free. A wedge is the normal failure mode on this rig, and the
 padded number is exactly how long the session does nothing. A run that takes 8
 minutes under a 10-minute wrapper also reads as success when it is a budget
 failure.
+
+## The shared attachment on vSphere (tests/vsphere_shared_fence.sh, 2/net/mesh/shared)
+
+Measured on vstest1/vstest2 (nested ESXi 8.0.2, AlmaLinux 9.8, the lab's
+20 GB multi-writer VMDK), 0.90.128:
+
+| step | bound | derivation | measured |
+|---|---|---|---|
+| `up` mount, per node | 120 s | prep (rmmod/insmod, copy of the 88 MB module) ~6 s + vCenter arm ~0.6 s + join ~2 s, x2 is ~17 s; 120 s is the ssh bound around prep and was never approached | 7-11 s |
+| `up` format | 120 s | mkfs of 20 GB with its chk | 28 s |
+| `kill` recovery | 140 s | death detection ~62 s + vCenter answer (helper's own 60 s upcall bound; measured 0.4-0.9 s) + replay of a 6 s write burst ~7 s, then x2 on the variable part | 62-77 s (operator confirmation under `manual` came ~1 s after the request) |
+| `restart`, the first mount alone | 170 s | two frozen-table windows 129 s (fixed, as at 32 nodes above) + two slice replays ~7 s each + prep and arm ~9 s = 151 s | 144 s |
+| `work` (2 x 100 files of 256 KiB per node, each fsynced, then cross-read) | 300 s ssh bound | write wall measured 3-11 s; native-XFS baseline on this VMDK not yet measured | 10-17 s total |

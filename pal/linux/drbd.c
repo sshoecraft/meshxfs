@@ -58,6 +58,10 @@
 #include <linux/bio.h>
 #include <linux/mempool.h>
 #include <linux/sched.h>
+#include <linux/inet.h>
+#include <linux/uuid.h>
+#include <linux/reboot.h>
+#include <linux/workqueue.h>
 
 #include "../pal.h"
 #include "mxfs_ioq.h"
@@ -469,12 +473,33 @@ struct mxfs_drbd_reg {
 	__le32	pad;
 	__le64	raised;		/* 1: entering or holding the lock (version 1: the ticket) */
 	char	endpoint[MXFS_DRBD_EP_LEN];
-	u8	reserved[512 - 56 - MXFS_DRBD_EP_LEN - 4];
+	/*
+	 * The shared attachment only: the host and boot of the node that wrote
+	 * this register, so a survivor can ask the mount's fence method whether
+	 * that boot has ended (mxfs_shared_peer_set_aside_locked).  Zero on DRBD,
+	 * whose registers were all-zero here before these fields existed.
+	 */
+	u8	host[16];
+	u8	boot[16];
+	/*
+	 * THE SECTORS THIS FLAG CLAIMS: the ranges the writer's batch swaps
+	 * (mxfs_drbd_lock).  0 ranges claims every sector, which is what a
+	 * register written before these fields existed holds (it was zero here),
+	 * so a node that predates them is waited on for every swap, and itself
+	 * waits on every flag of ours: a mixed pair only waits more.
+	 */
+	__le16	nranges;
+	struct mxfs_drbd_range {
+		__le64	lba;
+		__le16	nsec;
+	} __packed ranges[32];
+	u8	reserved[512 - 56 - MXFS_DRBD_EP_LEN - 32 - 2 - 32 * 10 - 4];
 	__le32	crc;
 } __packed;
 
 /* A leader serves at most this many swaps under one acquisition of the lock, so the
- * peer's wait for the lock stays bounded by a few dozen sector writes. */
+ * peer's wait for the lock stays bounded by a few dozen sector writes.  A
+ * register names every one of them (struct mxfs_drbd_reg, ranges). */
 #define MXFS_DRBD_CAS_BATCH	32
 
 struct mxfs_drbd_cas {
@@ -562,6 +587,24 @@ struct mxfs_drbd_cas {
 	char			proc_buf[4096];
 	u64			witness_skipped;
 	/*
+	 * THE SHARED ATTACHMENT'S DEAD PEER (docs/shared-disk-attachment.md).  A
+	 * plain shared disk has no DRBD state to ask; the mount's fence method
+	 * is what proves the peer gone.  peer_fenced(peer_fenced_data, host,
+	 * boot) answers 1 when that method shows the boot that wrote the peer's
+	 * register ended (vCenter: its VM off, or tagged by a later boot; manual:
+	 * an operator confirmed it), and the register, as read before the
+	 * question, is then set aside exactly as void_img describes — never
+	 * written.  NULL on a DRBD attachment.  `shared` is set on an attachment
+	 * of a device that is not DRBD; host and boot are this node's, written
+	 * into every register it puts.
+	 */
+	int			(*peer_fenced)(void *data, const u8 *host, const u8 *boot,
+					       int act);
+	void			*peer_fenced_data;
+	bool			shared;
+	u8			host[16];
+	u8			boot[16];
+	/*
 	 * The critical section's buffers, under `lock`, kmalloc'd at attach (a
 	 * bio cannot be built on a caller's stack image): one read sector per
 	 * swap of a batch (crit_buf), one write buffer per swap of a wave, long
@@ -576,6 +619,21 @@ struct mxfs_drbd_cas {
 	int			crit_rc[MXFS_DRBD_CAS_BATCH];
 	int			crit_idx[MXFS_DRBD_CAS_BATCH];
 	u64			st_waves;	/* waves served, since the last stats line */
+	/*
+	 * THE RANGES (mxfs_drbd_lock).  ann_*: the sectors our register claims
+	 * while our flag or want is up, the current batch's, under `lock`.
+	 * peer_*: those the peer's register claimed when last read; peer_n 0
+	 * claims every sector (an older peer, a busy-invalid register).  qgen
+	 * counts swaps queued, under qlock, so a waiting leader sees new ones.
+	 */
+	u16			ann_n;
+	u64			ann_lba[MXFS_DRBD_CAS_BATCH];
+	u16			ann_nsec[MXFS_DRBD_CAS_BATCH];
+	u16			peer_n;
+	u64			peer_lba[MXFS_DRBD_CAS_BATCH];
+	u16			peer_nsec[MXFS_DRBD_CAS_BATCH];
+	u64			qgen, batch_qgen;
+	u64			partial, regroups;
 };
 #define MXFS_DRBD_STATS_EVERY	512
 #define MXFS_DRBD_CRIT_BUF_BYTES	(MXFS_DRBD_CAS_BATCH * 512)
@@ -584,6 +642,9 @@ struct mxfs_drbd_cas {
 
 static LIST_HEAD(mxfs_drbd_cas_list);
 static DEFINE_MUTEX(mxfs_drbd_cas_list_lock);
+/* Shared attachments on the list: while none exists, the SCSI swap path asks
+ * nothing (mxfs_pal_shared_cas_on). */
+static atomic_t mxfs_shared_cas_count = ATOMIC_INIT(0);
 
 /*
  * THE WAIT BOUND.  A critical section is one sector read and one replicated
@@ -666,11 +727,23 @@ static bool mxfs_drbd_all_zero(const void *sec)
 	return true;
 }
 
-/* Write this node's register: {want, raised}. */
+/* Write this node's register: {want, raised}, and while either is up the
+ * sectors the current batch claims (ann_*). */
 static int mxfs_drbd_reg_put(struct mxfs_drbd_cas *e, struct mxfs_drbd_reg *r,
 			     u32 want, u64 raised)
 {
+	int i;
+
+	BUILD_BUG_ON(sizeof(struct mxfs_drbd_reg) != 512);
+	BUILD_BUG_ON(ARRAY_SIZE(r->ranges) != MXFS_DRBD_CAS_BATCH);
 	memset(r, 0, sizeof(*r));
+	if (want || raised) {
+		r->nranges = cpu_to_le16(e->ann_n);
+		for (i = 0; i < e->ann_n; i++) {
+			r->ranges[i].lba = cpu_to_le64(e->ann_lba[i]);
+			r->ranges[i].nsec = cpu_to_le16(e->ann_nsec[i]);
+		}
+	}
 	r->magic = cpu_to_le32(MXFS_DRBD_REG_MAGIC);
 	r->version = cpu_to_le16(MXFS_DRBD_REG_VERSION);
 	r->index = cpu_to_le16(e->index);
@@ -680,6 +753,10 @@ static int mxfs_drbd_reg_put(struct mxfs_drbd_cas *e, struct mxfs_drbd_reg *r,
 	r->want = cpu_to_le32(want);
 	r->raised = cpu_to_le64(raised);
 	strscpy(r->endpoint, e->endpoint, sizeof(r->endpoint));
+	if (e->shared) {
+		memcpy(r->host, e->host, 16);
+		memcpy(r->boot, e->boot, 16);
+	}
 	r->crc = cpu_to_le32(mxfs_drbd_crc(r));
 	/*
 	 * Without FUA.  A register excludes only live participants: what the
@@ -711,8 +788,9 @@ static int mxfs_drbd_reg_get_peer(struct mxfs_drbd_cas *e, struct mxfs_drbd_reg 
 {
 	unsigned int peer = 1 - e->index;
 	int rc = mxfs_drbd_sec_read(e, e->area_lba + 1 + peer, r);
-	u16 ver;
+	u16 ver, i;
 
+	e->peer_n = 0;          /* every sector, unless a valid register says less */
 	if (rc)
 		return rc;
 	if (e->void_set) {
@@ -738,7 +816,9 @@ static int mxfs_drbd_reg_get_peer(struct mxfs_drbd_cas *e, struct mxfs_drbd_reg 
 	    memcmp(r->fs_uuid, e->fs_uuid, 16) ||
 	    strncmp(r->endpoint, e->peer_endpoint, sizeof(r->endpoint)) ||
 	    le32_to_cpu(r->want) > 1 ||
-	    (ver == MXFS_DRBD_REG_VERSION && le64_to_cpu(r->raised) > 1)) {
+	    (ver == MXFS_DRBD_REG_VERSION && le64_to_cpu(r->raised) > 1) ||
+	    (ver == MXFS_DRBD_REG_VERSION &&
+	     le16_to_cpu(r->nranges) > MXFS_DRBD_CAS_BATCH)) {
 		pr_err_ratelimited("mxfs: P-DRBD-CAS-PEER-REG-INVALID minor=%u peer_index=%u magic=0x%x version=%u crc_ok=%d index=%u endpoint='%.48s' want='%s' -- read as busy: the swap waits on it\n",
 				   MINOR(e->devt), peer, le32_to_cpu(r->magic), ver,
 				   le32_to_cpu(r->crc) == mxfs_drbd_crc(r),
@@ -760,7 +840,26 @@ static int mxfs_drbd_reg_get_peer(struct mxfs_drbd_cas *e, struct mxfs_drbd_reg 
 	}
 	*want = le32_to_cpu(r->want);
 	*raised = le64_to_cpu(r->raised);
+	e->peer_n = le16_to_cpu(r->nranges);
+	for (i = 0; i < e->peer_n; i++) {
+		e->peer_lba[i] = le64_to_cpu(r->ranges[i].lba);
+		e->peer_nsec[i] = le16_to_cpu(r->ranges[i].nsec);
+	}
 	return 0;
+}
+
+/* Does [lba, lba + nsec) overlap a sector the peer's register, as last read,
+ * claims?  A register naming no ranges claims them all. */
+static bool mxfs_drbd_peer_claims(const struct mxfs_drbd_cas *e, u64 lba, u32 nsec)
+{
+	u16 i;
+
+	if (!e->peer_n)
+		return true;
+	for (i = 0; i < e->peer_n; i++)
+		if (lba < e->peer_lba[i] + e->peer_nsec[i] && e->peer_lba[i] < lba + nsec)
+			return true;
+	return false;
 }
 
 /*
@@ -859,6 +958,44 @@ static int mxfs_drbd_peer_excluded_locked(struct mxfs_drbd_cas *e,
 	kfree(r);
 	kfree(zero);
 	return rc == 0;
+}
+
+/*
+ * Called with e->lock held from a swap waiting on the peer's flag on a shared
+ * attachment.  `reg` holds the peer's register as last read, before this
+ * question is asked.  If it is a valid register of the peer naming the host
+ * and boot that wrote it, and the mount's fence method shows that boot ended
+ * (peer_fenced), those exact 512 bytes are set aside as void_img describes:
+ * read as idle while the sector still holds them, and never written.  A boot
+ * that ended attaches no more; a later boot of the peer rewrites its register
+ * under a fresh boot_nonce when it attaches, which ends the setting aside.
+ * Zeroing the sector instead could erase the live flag of a peer that
+ * attached between the read and the write.  1 = set aside: the caller reads
+ * the peer's register again.
+ */
+static int mxfs_shared_peer_set_aside_locked(struct mxfs_drbd_cas *e,
+					     const struct mxfs_drbd_reg *reg,
+					     int act)
+{
+	static const u8 none[16];
+
+	if (le32_to_cpu(reg->magic) != MXFS_DRBD_REG_MAGIC ||
+	    le16_to_cpu(reg->version) != MXFS_DRBD_REG_VERSION ||
+	    le32_to_cpu(reg->crc) != mxfs_drbd_crc(reg) ||
+	    le16_to_cpu(reg->index) != 1 - e->index ||
+	    memcmp(reg->fs_uuid, e->fs_uuid, 16) ||
+	    !memcmp(reg->host, none, 16) || !memcmp(reg->boot, none, 16))
+		return 0;
+	if (e->peer_fenced(e->peer_fenced_data, reg->host, reg->boot, act) != 1)
+		return 0;
+	memcpy(e->void_img, reg, 512);
+	e->void_set = true;
+	pr_warn("mxfs: P-SHARED-CAS-PEER-SET-ASIDE dev=%u:%u index=%u peer=%s peer_want=%u peer_raised=%llu peer_nonce=%016llx host=%*phN boot=%*phN -- the mount's fence method shows the boot that wrote the peer's register ended; the register is read as idle while unchanged, and never written\n",
+		MAJOR(e->devt), MINOR(e->devt), e->index, e->peer_endpoint,
+		le32_to_cpu(reg->want), (unsigned long long)le64_to_cpu(reg->raised),
+		(unsigned long long)le64_to_cpu(reg->boot_nonce),
+		16, reg->host, 16, reg->boot);
+	return 1;
 }
 
 /*
@@ -974,6 +1111,129 @@ struct mxfs_drbd_cas_req {
 	bool			done;
 };
 
+static bool mxfs_drbd_reqs_overlap(const struct mxfs_drbd_cas_req *a,
+				   const struct mxfs_drbd_cas_req *b)
+{
+	return a->lba < b->lba + b->wlen / 512 && b->lba < a->lba + a->wlen / 512;
+}
+
+static u32 mxfs_drbd_mask_all(int n)
+{
+	return n >= 32 ? ~0u : (1u << n) - 1;
+}
+
+/*
+ * Which swaps of the batch the peer's flag, as last read, holds up: bit i set
+ * for a swap whose range the peer claims, and for every later swap overlapping
+ * one already held up, so that swaps on one sector keep their queue order.
+ */
+static u32 mxfs_drbd_held_mask(const struct mxfs_drbd_cas *e,
+			       struct mxfs_drbd_cas_req **batch, int n)
+{
+	u32 held = 0;
+	int i, k;
+
+	for (i = 0; i < n; i++) {
+		if (mxfs_drbd_peer_claims(e, batch[i]->lba, batch[i]->wlen / 512)) {
+			held |= 1u << i;
+			continue;
+		}
+		for (k = 0; k < i; k++)
+			if ((held & (1u << k)) && mxfs_drbd_reqs_overlap(batch[k], batch[i])) {
+				held |= 1u << i;
+				break;
+			}
+	}
+	return held;
+}
+
+/* Our register claims exactly the batch's ranges. */
+static void mxfs_drbd_announce(struct mxfs_drbd_cas *e,
+			       struct mxfs_drbd_cas_req **batch, int n)
+{
+	int i;
+
+	e->ann_n = n;
+	for (i = 0; i < n; i++) {
+		e->ann_lba[i] = batch[i]->lba;
+		e->ann_nsec[i] = batch[i]->wlen / 512;
+	}
+}
+
+/*
+ * A WAITING LEADER TAKES THE SWAPS QUEUED SINCE.  While the peer's flag holds
+ * every swap of the batch up, a swap queued behind it may target sectors the
+ * peer does not claim: the heartbeat of this node, above all, while the peer
+ * died holding its flag over a sector of its own.  So the batch is formed
+ * again from itself and the queue, every swap the peer's register (as last
+ * read) does not hold up first, in queue order, then the rest, up to the cap;
+ * what does not fit goes back to the head of the queue in its order.  A swap
+ * overlapping one held up counts as held up too (mxfs_drbd_held_mask), so
+ * swaps on one sector are never reordered.  True when the batch changed: our
+ * register must then claim the new ranges before the peer's is read again,
+ * which is what makes a sector added here safe to enter
+ * (tests/drbd_cas_lock_model.py --ranges, regroup).
+ */
+static bool mxfs_drbd_regroup(struct mxfs_drbd_cas *e,
+			      struct mxfs_drbd_cas_req **batch, int *n)
+{
+	struct mxfs_drbd_cas_req *cand[2 * MXFS_DRBD_CAS_BATCH], *r;
+	bool from_queue[2 * MXFS_DRBD_CAS_BATCH], taken[2 * MXFS_DRBD_CAS_BATCH];
+	bool held[2 * MXFS_DRBD_CAS_BATCH];
+	int nc = 0, nb = 0, i, k, pass;
+	bool changed = false;
+
+	spin_lock(&e->qlock);
+	if (e->qgen == e->batch_qgen || list_empty(&e->queue)) {
+		spin_unlock(&e->qlock);
+		return false;
+	}
+	e->batch_qgen = e->qgen;
+	for (i = 0; i < *n; i++) {
+		cand[nc] = batch[i];
+		from_queue[nc++] = false;
+	}
+	list_for_each_entry(r, &e->queue, node) {
+		if (nc == ARRAY_SIZE(cand))
+			break;
+		cand[nc] = r;
+		from_queue[nc++] = true;
+	}
+	for (i = 0; i < nc; i++) {
+		held[i] = mxfs_drbd_peer_claims(e, cand[i]->lba, cand[i]->wlen / 512);
+		for (k = 0; k < i && !held[i]; k++)
+			held[i] = held[k] && mxfs_drbd_reqs_overlap(cand[k], cand[i]);
+	}
+	/* pass 0 takes what the peer does not hold up, pass 1 the rest */
+	memset(taken, 0, sizeof(taken));
+	for (pass = 0; pass < 2; pass++) {
+		for (i = 0; i < nc; i++) {
+			if (nb == MXFS_DRBD_CAS_BATCH || held[i] != (pass == 1))
+				continue;
+			taken[i] = true;
+			batch[nb] = cand[i];
+			if (from_queue[i] || nb != i)
+				changed = true;
+			nb++;
+		}
+	}
+	if (!changed && nb == *n) {
+		spin_unlock(&e->qlock);
+		return false;
+	}
+	/* everything taken leaves the queue; every old member not taken returns
+	 * to its head, in order, ahead of what was queued after it */
+	for (i = 0; i < nc; i++)
+		if (from_queue[i] && taken[i])
+			list_del_init(&cand[i]->node);
+	for (i = nc - 1; i >= 0; i--)
+		if (!from_queue[i] && !taken[i])
+			list_add(&cand[i]->node, &e->queue);
+	spin_unlock(&e->qlock);
+	*n = nb;
+	return true;
+}
+
 /*
  * One pause while the peer's register holds this swap up, with our own
  * register written as {mywant, myraised}.  `*start` is when the swap first
@@ -1003,6 +1263,38 @@ static int mxfs_drbd_wait_step(struct mxfs_drbd_cas *e, struct mxfs_drbd_reg *re
 	 * (void_img).  Never on age alone.  Only in a DRBD state where either
 	 * can be true: mxfs_drbd_witness_could_pass says why.
 	 */
+	/*
+	 * The shared attachment's equivalent: no witness to run, but the mount's
+	 * fence method can say whether the boot that wrote the peer's register
+	 * has ended (vCenter: its VM off or booted again; manual: an operator
+	 * confirmed it).  Then the register is set aside, as for a quiescent
+	 * DRBD peer.  Never on age alone.  The question may run the vCenter
+	 * helper, so it is paced like the witness.
+	 */
+	if (e->peer_fenced && time_after(jiffies, *start + HZ) &&
+	    time_after_eq(jiffies, e->excl_next)) {
+		e->excl_next = jiffies + 2 * HZ;
+		if (mxfs_shared_peer_set_aside_locked(e, reg, 0)) {
+			*sleep_us = 100;
+			return 0;
+		}
+	}
+	/*
+	 * A peer that has held its flag for the whole wait bound has stalled
+	 * every swap of the cluster, the survivor's heartbeat among them, and
+	 * its death would be declared only after the survivor's own authority
+	 * lease ran out.  So before this swap fails, the mount's method is
+	 * asked to END that boot (vCenter powers the VM off; manual cannot, and
+	 * answers as it did above).  A critical section is a few sector writes:
+	 * nothing alive holds the flag this long.
+	 */
+	if (e->peer_fenced &&
+	    time_after(jiffies, *start + msecs_to_jiffies(mxfs_drbd_cas_wait_ms)) &&
+	    mxfs_shared_peer_set_aside_locked(e, reg, 1)) {
+		*start = jiffies;
+		*sleep_us = 100;
+		return 0;
+	}
 	if ((e->judge_excluded || e->judge_quiescent) &&
 	    time_after(jiffies, *start + HZ) &&
 	    time_after_eq(jiffies, e->excl_next)) {
@@ -1060,20 +1352,51 @@ static int mxfs_drbd_wait_step(struct mxfs_drbd_cas *e, struct mxfs_drbd_reg *re
  * callers have their results (rel_work), so a swap waits for one register
  * write and its own target write.
  *
- * Returns 0 holding the lock.  *dirty: our register was written, so a release
- * is owed whatever the outcome.  *t_raised: when the first raise completed.
+ * THE FLAG CLAIMS SECTORS.  Each register names the ranges its batch swaps
+ * (struct mxfs_drbd_reg, ranges), and a flag holds up only the swaps whose
+ * ranges it claims.  So a raise that finds the peer's flag up enters with
+ * every swap of its batch the peer does not claim (*held names the rest,
+ * which go back to the queue), and waits or backs off as above only when the
+ * peer claims them all; participant 0 defers only to a want claiming a sector
+ * of its batch, and participant 1 retries once any sector of its batch is
+ * free.  While it waits, a leader takes the swaps queued since
+ * (mxfs_drbd_regroup) and writes its register again before reading the
+ * peer's.  Without the ranges, a peer that died holding its flag over its own
+ * heartbeat sector held up every swap of the survivor, its heartbeat among
+ * them, until the survivor's authority lease ran out and it withdrew
+ * (D-SHARED-MANUAL-SWAP-HOLDER-DEATH-WITHDRAWS-SURVIVOR, fence=manual).
+ * Per-sector mutual exclusion, no deadlock and the fairness above, with a
+ * peer from before the ranges as well: tests/drbd_cas_lock_model.py --ranges
+ * [--old|--old0].
+ *
+ * Returns 0 holding the lock for every swap of the batch not in *held.  The
+ * batch (*n swaps) may have been formed again while waiting.  *dirty: our
+ * register was written, so a release is owed whatever the outcome.
+ * *t_raised: when the first raise completed.
  */
+static void mxfs_quorum_check(const char *site);
+
 static int mxfs_drbd_lock(struct mxfs_drbd_cas *e, struct mxfs_drbd_reg *reg,
+			  struct mxfs_drbd_cas_req **batch, int *n, u32 *held,
 			  bool *dirty, u64 *t_raised)
 {
 	unsigned long start = 0;
 	unsigned int sleep_us = 100;
-	u32 pwant, w = 0;
+	u32 pwant, w = 0, h;
 	u64 praised;
 	int rc;
 
+	/*
+	 * Coordination I/O is a write like any other: the heartbeat, the slot
+	 * claim and the ledger go through this lock, and a host that lost the
+	 * vote must not issue one (fence=quorum; a no-op when nothing is armed).
+	 */
+	if (e->shared)
+		mxfs_quorum_check("cas");
 	*dirty = false;
 	*t_raised = 0;
+	*held = 0;
+	mxfs_drbd_announce(e, batch, *n);
 	if (e->index == 0) {
 		unsigned long dstart = jiffies;
 		bool counted = false;
@@ -1086,6 +1409,8 @@ static int mxfs_drbd_lock(struct mxfs_drbd_cas *e, struct mxfs_drbd_reg *reg,
 				e->defer_stale_set = false;
 				break;
 			}
+			if (!mxfs_drbd_held_mask(e, batch, *n))
+				break;          /* its want claims none of our sectors */
 			if (e->defer_stale_set && !memcmp(reg, e->defer_stale_img, 512))
 				break;
 			if (time_after(jiffies, dstart + msecs_to_jiffies(MXFS_DRBD_DEFER_MS))) {
@@ -1120,12 +1445,26 @@ static int mxfs_drbd_lock(struct mxfs_drbd_cas *e, struct mxfs_drbd_reg *reg,
 				return rc;
 			if (!praised)
 				return 0;
+			h = mxfs_drbd_held_mask(e, batch, *n);
+			if (h != mxfs_drbd_mask_all(*n)) {
+				if (h)
+					e->partial++;
+				*held = h;
+				return 0;
+			}
 			if (e->index == 1)
 				break;
 			rc = mxfs_drbd_wait_step(e, reg, &start, &sleep_us, w, 1,
 						 pwant, praised);
 			if (rc)
 				return rc;
+			if (mxfs_drbd_regroup(e, batch, n)) {
+				e->regroups++;
+				mxfs_drbd_announce(e, batch, *n);
+				rc = mxfs_drbd_reg_put(e, reg, w, 1);
+				if (rc)
+					return rc;
+			}
 		}
 		/* participant 1 lost the race: flag down, want up, wait for 0 */
 		e->backoffs++;
@@ -1137,12 +1476,20 @@ static int mxfs_drbd_lock(struct mxfs_drbd_cas *e, struct mxfs_drbd_reg *reg,
 			rc = mxfs_drbd_reg_get_peer(e, reg, &pwant, &praised);
 			if (rc)
 				return rc;
-			if (!praised)
+			if (!praised ||
+			    mxfs_drbd_held_mask(e, batch, *n) != mxfs_drbd_mask_all(*n))
 				break;
 			rc = mxfs_drbd_wait_step(e, reg, &start, &sleep_us, 1, 0,
 						 pwant, praised);
 			if (rc)
 				return rc;
+			if (mxfs_drbd_regroup(e, batch, n)) {
+				e->regroups++;
+				mxfs_drbd_announce(e, batch, *n);
+				rc = mxfs_drbd_reg_put(e, reg, 1, 0);
+				if (rc)
+					return rc;
+			}
 		}
 	}
 }
@@ -1180,6 +1527,7 @@ static void mxfs_drbd_cas_serve(struct mxfs_drbd_cas *e)
 	bool dirty = false, spanw;
 	int n = 0, i, j, k, m, nw, rc, vrc;
 	u64 t1, t2, t3, t4, traised;
+	u32 held;
 
 	spin_lock(&e->qlock);
 	list_for_each_entry_safe(r, tmp, &e->queue, node) {
@@ -1188,6 +1536,7 @@ static void mxfs_drbd_cas_serve(struct mxfs_drbd_cas *e)
 		list_del_init(&r->node);
 		batch[n++] = r;
 	}
+	e->batch_qgen = e->qgen;
 	spin_unlock(&e->qlock);
 	if (!n)
 		return;
@@ -1214,12 +1563,30 @@ static void mxfs_drbd_cas_serve(struct mxfs_drbd_cas *e)
 	e->rel_ns = 0;
 
 	t1 = ktime_get_ns();
-	e->ops += n;
-	rc = mxfs_drbd_lock(e, reg, &dirty, &traised);
+	rc = mxfs_drbd_lock(e, reg, batch, &n, &held, &dirty, &traised);
 	t3 = t4 = ktime_get_ns();
 	t2 = traised ? traised : t3;
-	if (rc)
+	if (rc) {
+		e->ops += n;
 		goto release;
+	}
+	/*
+	 * The swaps the peer's flag still holds up go back to the head of the
+	 * queue, in order, for the next acquisition; the rest are served now.
+	 * Our register claimed them too, which only ever makes the peer wait.
+	 */
+	if (held) {
+		spin_lock(&e->qlock);
+		for (i = n - 1; i >= 0; i--)
+			if (held & (1u << i))
+				list_add(&batch[i]->node, &e->queue);
+		spin_unlock(&e->qlock);
+		for (i = 0, k = 0; i < n; i++)
+			if (!(held & (1u << i)))
+				batch[k++] = batch[i];
+		n = k;
+	}
+	e->ops += n;
 
 	/* critical section: every queued swap, in order */
 	{
@@ -1313,7 +1680,7 @@ release:
 		e->st_max = t4 - batch[0]->tq;
 	if (e->st_n >= MXFS_DRBD_STATS_EVERY) {
 		/* per swap: lock (its own wait); per batch: the rest */
-		mxfs_probe("mxfs: P-DRBD-CAS-STATS minor=%u swaps=%llu batches=%llu waves=%llu avg_us lock/swap=%llu enter/batch=%llu wait/batch=%llu crit/batch=%llu rel/batch=%llu max_us=%llu ops=%llu contended=%llu deferred=%llu backoffs=%llu miscompares=%llu witness_skipped=%llu\n",
+		mxfs_probe("mxfs: P-DRBD-CAS-STATS minor=%u swaps=%llu batches=%llu waves=%llu avg_us lock/swap=%llu enter/batch=%llu wait/batch=%llu crit/batch=%llu rel/batch=%llu max_us=%llu ops=%llu contended=%llu deferred=%llu backoffs=%llu miscompares=%llu witness_skipped=%llu partial=%llu regroups=%llu\n",
 			   MINOR(e->devt), e->st_n, e->st_batches, e->st_waves,
 			   e->st_lock / e->st_n / 1000,
 			   e->st_enter / e->st_batches / 1000,
@@ -1321,7 +1688,8 @@ release:
 			   e->st_crit / e->st_batches / 1000,
 			   e->st_rel / e->st_batches / 1000, e->st_max / 1000,
 			   e->ops, e->contended, e->deferred, e->backoffs,
-			   e->miscompares, e->witness_skipped);
+			   e->miscompares, e->witness_skipped, e->partial,
+			   e->regroups);
 		e->st_n = e->st_batches = e->st_waves = e->st_lock = e->st_enter = 0;
 		e->st_wait = e->st_crit = e->st_rel = e->st_max = 0;
 	}
@@ -1338,6 +1706,7 @@ static int mxfs_drbd_cas_run(struct mxfs_drbd_cas *e, u64 lba,
 
 	spin_lock(&e->qlock);
 	list_add_tail(&req.node, &e->queue);
+	e->qgen++;
 	spin_unlock(&e->qlock);
 	/*
 	 * Whoever holds e->lock serves the queue; a swap it took is done when
@@ -1473,6 +1842,7 @@ int mxfs_pal_drbd_cas_emulate_many(mxfs_bdev_t *dev, int n, const uint64_t *offs
 	for (i = 0; i < n; i++)
 		if (!reqs[i].done)
 			list_add_tail(&reqs[i].node, &e->queue);
+	e->qgen++;
 	spin_unlock(&e->qlock);
 	mutex_lock(&e->lock);
 	for (;;) {
@@ -1562,9 +1932,15 @@ static int mxfs_drbd_enroll(struct mxfs_drbd_cas *e)
 	return rc;
 }
 
-int mxfs_pal_drbd_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
-			     unsigned int index, const uint8_t fs_uuid[16],
-			     const char *endpoint, const char *peer_endpoint)
+/*
+ * The attach behind both attachments.  `shared`: the device is a plain shared
+ * disk (docs/shared-disk-attachment.md), not DRBD; the lock is the same, and
+ * its endpoints are the two nodes' mesh addresses instead of DRBD's.
+ */
+static int mxfs_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
+			   unsigned int index, const uint8_t fs_uuid[16],
+			   const char *endpoint, const char *peer_endpoint,
+			   bool shared, const uint8_t *host, const uint8_t *boot)
 {
 	struct block_device *bdev = mxfs_pal_bdev_get_bdev(dev);
 	struct mxfs_drbd_cas *e, *have;
@@ -1577,7 +1953,8 @@ int mxfs_pal_drbd_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
 	    strlen(endpoint) >= MXFS_DRBD_EP_LEN ||
 	    strlen(peer_endpoint) >= MXFS_DRBD_EP_LEN || (abs & 511))
 		return -EINVAL;
-	if (mxfs_pal_bdev_drbd_minor(dev) < 0)
+	if (shared ? mxfs_pal_bdev_drbd_minor(dev) >= 0 :
+		     mxfs_pal_bdev_drbd_minor(dev) < 0)
 		return -ENODEV;
 
 	mutex_lock(&mxfs_drbd_cas_list_lock);
@@ -1586,7 +1963,7 @@ int mxfs_pal_drbd_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
 		/* Another mount handle on this node: it must be the same pair. */
 		if (have->index != index || have->area_lba != abs / 512 ||
 		    memcmp(have->fs_uuid, fs_uuid, 16) ||
-		    strcmp(have->endpoint, endpoint)) {
+		    strcmp(have->endpoint, endpoint) || have->shared != shared) {
 			mutex_unlock(&mxfs_drbd_cas_list_lock);
 			return -EBUSY;
 		}
@@ -1609,6 +1986,11 @@ int mxfs_pal_drbd_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
 	e->bdev = bdev;
 	e->area_lba = abs / 512;
 	e->index = index;
+	e->shared = shared;
+	if (shared) {
+		memcpy(e->host, host, 16);
+		memcpy(e->boot, boot, 16);
+	}
 	memcpy(e->fs_uuid, fs_uuid, 16);
 	strscpy(e->endpoint, endpoint, sizeof(e->endpoint));
 	strscpy(e->peer_endpoint, peer_endpoint, sizeof(e->peer_endpoint));
@@ -1637,6 +2019,32 @@ int mxfs_pal_drbd_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
 		       le32_to_cpu(r->crc) == mxfs_drbd_crc(r));
 		rc = -EIO;
 	}
+	/*
+	 * The shared attachment: a peer register naming THIS host means the two
+	 * nodes share a machine identity (a clone that kept /etc/machine-id).
+	 * Every fence on this attachment names its victim by host, and the
+	 * manual method takes "an earlier boot of this host" as ended, so two
+	 * hosts under one identity could each certify the other's live boot.
+	 */
+	if (!rc && shared) {
+		struct mxfs_drbd_reg *p = kmalloc(512, GFP_KERNEL);
+
+		if (!p) {
+			rc = -ENOMEM;
+		} else {
+			rc = mxfs_drbd_sec_read(e, e->area_lba + 1 + (1 - index), p);
+			if (!rc && le32_to_cpu(p->magic) == MXFS_DRBD_REG_MAGIC &&
+			    le32_to_cpu(p->crc) == mxfs_drbd_crc(p) &&
+			    !memcmp(p->fs_uuid, fs_uuid, 16) &&
+			    !memcmp(p->host, host, 16)) {
+				pr_err("mxfs: P-SHARED-CAS-SAME-HOST dev=%u:%u index=%u peer=%.48s host=%*phN -- the peer's register names this host's own identity: the two nodes share a machine-id (regenerate /etc/machine-id on the clone); refusing\n",
+				       MAJOR(e->devt), MINOR(e->devt), index,
+				       p->endpoint, 16, host);
+				rc = -EEXIST;
+			}
+			kfree(p);
+		}
+	}
 	if (!rc)
 		rc = mxfs_drbd_reg_put(e, r, 0, 0);
 	kfree(r);
@@ -1656,14 +2064,119 @@ int mxfs_pal_drbd_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
 		return 0;
 	}
 	list_add(&e->list, &mxfs_drbd_cas_list);
+	if (shared)
+		atomic_inc(&mxfs_shared_cas_count);
 	mutex_unlock(&mxfs_drbd_cas_list_lock);
 	mxfs_pal_bdev_set_drbd_cas(dev, true);
-	pr_info("mxfs: P-DRBD-CAS-ATTACH minor=%u index=%u endpoint=%s peer=%s area_lba=%llu nonce=%016llx\n",
-		MINOR(e->devt), index, endpoint, peer_endpoint,
+	pr_info("mxfs: %s dev=%u:%u index=%u endpoint=%s peer=%s area_lba=%llu nonce=%016llx\n",
+		shared ? "P-SHARED-CAS-ATTACH" : "P-DRBD-CAS-ATTACH",
+		MAJOR(e->devt), MINOR(e->devt), index, endpoint, peer_endpoint,
 		(unsigned long long)e->area_lba, (unsigned long long)e->boot_nonce);
 	return 0;
 }
+
+int mxfs_pal_drbd_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
+			     unsigned int index, const uint8_t fs_uuid[16],
+			     const char *endpoint, const char *peer_endpoint)
+{
+	return mxfs_cas_attach(dev, region_off, index, fs_uuid, endpoint,
+			       peer_endpoint, false, NULL, NULL);
+}
 EXPORT_SYMBOL_GPL(mxfs_pal_drbd_cas_attach);
+
+int mxfs_pal_shared_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
+			       unsigned int index, const uint8_t fs_uuid[16],
+			       const char *endpoint, const char *peer_endpoint,
+			       const uint8_t host[16], const uint8_t boot[16])
+{
+	if (!host || !boot)
+		return -EINVAL;
+	return mxfs_cas_attach(dev, region_off, index, fs_uuid, endpoint,
+			       peer_endpoint, true, host, boot);
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_shared_cas_attach);
+
+/*
+ * Does this device's every swap go through the shared attachment's emulation?
+ * A shared disk may be a SCSI device (a multi-writer VMDK is a "VMware Virtual
+ * disk" to the guest) that answers COMPARE AND WRITE with INVALID COMMAND
+ * OPERATION CODE, so the swap path asks this before it asks for a SCSI device.
+ */
+bool mxfs_pal_shared_cas_on(mxfs_bdev_t *dev)
+{
+	struct mxfs_drbd_cas *e;
+
+	if (!atomic_read(&mxfs_shared_cas_count) || !dev ||
+	    !mxfs_pal_bdev_get_bdev(dev))
+		return false;
+	e = mxfs_drbd_cas_of(dev);
+	return e && e->shared;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_shared_cas_on);
+
+void mxfs_pal_shared_cas_set_fenced(mxfs_bdev_t *dev,
+				    int (*fenced)(void *data, const uint8_t *host,
+						  const uint8_t *boot, int act),
+				    void *data)
+{
+	struct block_device *bdev = dev ? mxfs_pal_bdev_get_bdev(dev) : NULL;
+	struct mxfs_drbd_cas *e;
+
+	if (!bdev)
+		return;
+	mutex_lock(&mxfs_drbd_cas_list_lock);
+	e = mxfs_drbd_cas_find(bdev->bd_dev);
+	mutex_unlock(&mxfs_drbd_cas_list_lock);
+	if (!e || !e->shared)
+		return;
+	/* under e->lock: a swap waiting on the peer calls it under the same lock,
+	 * so once this returns with NULL no call into the old owner remains */
+	mutex_lock(&e->lock);
+	e->peer_fenced = fenced;
+	e->peer_fenced_data = data;
+	mutex_unlock(&e->lock);
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_shared_cas_set_fenced);
+
+int mxfs_pal_shared_cas_peer_boot(mxfs_bdev_t *dev, uint8_t host[16],
+				  uint8_t boot[16])
+{
+	static const u8 none[16];
+	struct block_device *bdev = dev ? mxfs_pal_bdev_get_bdev(dev) : NULL;
+	struct mxfs_drbd_cas *e;
+	struct mxfs_drbd_reg *reg;
+	int rc;
+
+	if (!bdev)
+		return -ENODEV;
+	mutex_lock(&mxfs_drbd_cas_list_lock);
+	e = mxfs_drbd_cas_find(bdev->bd_dev);
+	mutex_unlock(&mxfs_drbd_cas_list_lock);
+	if (!e || !e->shared)
+		return -ENODEV;
+	reg = kmalloc(sizeof(*reg), GFP_KERNEL);
+	if (!reg)
+		return -ENOMEM;
+	rc = mxfs_drbd_sec_read(e, e->area_lba + 1 + (1 - e->index), reg);
+	if (rc) {
+		kfree(reg);
+		return rc;
+	}
+	if (le32_to_cpu(reg->magic) != MXFS_DRBD_REG_MAGIC ||
+	    le16_to_cpu(reg->version) != MXFS_DRBD_REG_VERSION ||
+	    le32_to_cpu(reg->crc) != mxfs_drbd_crc(reg) ||
+	    le16_to_cpu(reg->index) != 1 - e->index ||
+	    memcmp(reg->fs_uuid, e->fs_uuid, 16) ||
+	    !memcmp(reg->host, none, 16) || !memcmp(reg->boot, none, 16)) {
+		kfree(reg);
+		return 0;
+	}
+	memcpy(host, reg->host, 16);
+	memcpy(boot, reg->boot, 16);
+	kfree(reg);
+	return 1;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_shared_cas_peer_boot);
 
 void mxfs_pal_drbd_cas_detach(mxfs_bdev_t *dev)
 {
@@ -1675,18 +2188,22 @@ void mxfs_pal_drbd_cas_detach(mxfs_bdev_t *dev)
 	mutex_lock(&mxfs_drbd_cas_list_lock);
 	e = mxfs_drbd_cas_find(bdev->bd_dev);
 	mxfs_pal_bdev_set_drbd_cas(dev, false);
-	if (e && --e->refs == 0)
+	if (e && --e->refs == 0) {
 		list_del(&e->list);
-	else
+		if (e->shared)
+			atomic_dec(&mxfs_shared_cas_count);
+	} else {
 		e = NULL;
+	}
 	mutex_unlock(&mxfs_drbd_cas_list_lock);
 	if (!e)
 		return;
 	/* the last release lands before its buffer and work item are freed */
 	mxfs_drbd_rel_wait(e);
-	pr_info("mxfs: P-DRBD-CAS-DETACH minor=%u index=%u ops=%llu contended=%llu deferred=%llu backoffs=%llu miscompares=%llu witness_skipped=%llu\n",
+	pr_info("mxfs: P-DRBD-CAS-DETACH minor=%u index=%u ops=%llu contended=%llu deferred=%llu backoffs=%llu miscompares=%llu witness_skipped=%llu partial=%llu regroups=%llu\n",
 		MINOR(e->devt), e->index, e->ops, e->contended, e->deferred,
-		e->backoffs, e->miscompares, e->witness_skipped);
+		e->backoffs, e->miscompares, e->witness_skipped, e->partial,
+		e->regroups);
 	mxfs_drbd_cas_free(e);
 }
 EXPORT_SYMBOL_GPL(mxfs_pal_drbd_cas_detach);
@@ -2406,6 +2923,1167 @@ int mxfs_pal_drbd_exclusion_watch(mxfs_bdev_t *dev, void (*fn)(void *data),
 }
 EXPORT_SYMBOL_GPL(mxfs_pal_drbd_exclusion_watch);
 
+/* ═════════════════ the shared attachment's vCenter helper ═════════════════ */
+
+/*
+ * fence=vcenter (docs/shared-disk-attachment.md).  A node-local helper
+ * (/usr/sbin/mxfs_fence_vcenter.py) speaks to vCenter and writes a report back
+ * through /proc/fs/mxfs/fence_report, on the witness channel's terms: a fresh
+ * nonce in argv, required back in the report; one invocation outstanding at a
+ * time; a report naming another nonce discarded; a bound on the wait.  This
+ * file parses the report and decides nothing: v5_shared_fence does.
+ */
+#define MXFS_FENCEH_PROC_NAME	"fs/mxfs/fence_report"
+#define MXFS_FENCEH_PROC_PATH	"/proc/" MXFS_FENCEH_PROC_NAME
+#define MXFS_FENCEH_END_MARK	"MXFS-FENCEH-END"
+
+static char *mxfs_fence_vcenter_helper = "/usr/sbin/mxfs_fence_vcenter.py";
+module_param_named(fence_vcenter_helper, mxfs_fence_vcenter_helper, charp, 0644);
+MODULE_PARM_DESC(fence_vcenter_helper,
+		 "absolute path to the node-local vCenter fence helper");
+
+/*
+ * THE BOUND, derived: the helper's import and vCenter login take about a
+ * second, one property read of the VMs another, and a power-off task
+ * completes within seconds of being issued (ESXi ends the VM's world, then
+ * reports the state).  Each vCenter call is bounded by the helper's own 20 s
+ * socket timeout, and a FENCE makes at most three in a row.  A report that
+ * does not arrive within the bound is not evidence.
+ */
+static unsigned int mxfs_fence_vcenter_timeout_ms = 60000;
+module_param_named(fence_vcenter_timeout_ms, mxfs_fence_vcenter_timeout_ms, uint, 0644);
+MODULE_PARM_DESC(fence_vcenter_timeout_ms,
+		 "bound on one vCenter fence helper upcall; no report within it is no evidence");
+
+static DEFINE_MUTEX(mxfs_fenceh_invoke_lock);
+
+static struct {
+	spinlock_t		lock;
+	bool			armed;
+	bool			complete;
+	char			nonce_str[17];
+	size_t			len;
+	struct completion	done;
+	char			buf[MXFS_PAL_FENCEH_REPORT_MAX];
+} mxfs_fenceh_slot = {
+	.lock = __SPIN_LOCK_UNLOCKED(mxfs_fenceh_slot.lock),
+};
+
+static struct proc_dir_entry *mxfs_fenceh_pde;
+
+static ssize_t mxfs_fenceh_report_write(struct file *file,
+					const char __user *ubuf,
+					size_t count, loff_t *ppos)
+{
+	char *stage;
+	char nonce_seen[24];
+	size_t take;
+	bool finished = false;
+
+	if (count == 0)
+		return 0;
+	take = min_t(size_t, count, MXFS_PAL_FENCEH_REPORT_MAX);
+	stage = kmalloc(take, GFP_KERNEL);
+	if (!stage)
+		return -ENOMEM;
+	if (copy_from_user(stage, ubuf, take)) {
+		kfree(stage);
+		return -EFAULT;
+	}
+	spin_lock(&mxfs_fenceh_slot.lock);
+	if (!mxfs_fenceh_slot.armed || mxfs_fenceh_slot.complete) {
+		spin_unlock(&mxfs_fenceh_slot.lock);
+		kfree(stage);
+		return -EPERM;
+	}
+	if (mxfs_fenceh_slot.len + take > MXFS_PAL_FENCEH_REPORT_MAX - 1)
+		take = MXFS_PAL_FENCEH_REPORT_MAX - 1 - mxfs_fenceh_slot.len;
+	if (take) {
+		memcpy(mxfs_fenceh_slot.buf + mxfs_fenceh_slot.len, stage, take);
+		mxfs_fenceh_slot.len += take;
+		mxfs_fenceh_slot.buf[mxfs_fenceh_slot.len] = '\0';
+	}
+	if (mxfs_drbdw_field(mxfs_fenceh_slot.buf, mxfs_fenceh_slot.len, "NONCE",
+			     nonce_seen, sizeof(nonce_seen)) &&
+	    strcasecmp(nonce_seen, mxfs_fenceh_slot.nonce_str)) {
+		mxfs_fenceh_slot.len = 0;
+		mxfs_fenceh_slot.buf[0] = '\0';
+		spin_unlock(&mxfs_fenceh_slot.lock);
+		kfree(stage);
+		mxfs_probe("mxfs: P-FENCEH-STALE a report naming nonce=%s arrived while another invocation is outstanding -- discarded\n",
+			   nonce_seen);
+		return -EPERM;
+	}
+	if (strstr(mxfs_fenceh_slot.buf, MXFS_FENCEH_END_MARK)) {
+		mxfs_fenceh_slot.complete = true;
+		finished = true;
+	}
+	spin_unlock(&mxfs_fenceh_slot.lock);
+	kfree(stage);
+	if (finished)
+		complete(&mxfs_fenceh_slot.done);
+	*ppos += count;
+	return count;
+}
+
+static const struct proc_ops mxfs_fenceh_report_ops = {
+	.proc_write	= mxfs_fenceh_report_write,
+	.proc_lseek	= noop_llseek,
+};
+
+static const char *mxfs_fenceh_mode_name(int mode)
+{
+	switch (mode) {
+	case MXFS_PAL_FENCEH_ARM:	return "arm";
+	case MXFS_PAL_FENCEH_CHECK:	return "check";
+	case MXFS_PAL_FENCEH_FENCE:	return "fence";
+	}
+	return NULL;
+}
+
+int mxfs_pal_fence_helper(int mode, const uint8_t host[16], const uint8_t boot[16],
+			  struct mxfs_pal_fenceh_report *out)
+{
+	static char *envp[] = {
+		"HOME=/",
+		"PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin",
+		NULL
+	};
+	char nonce_str[17], host_str[33], boot_str[33], helper[192], nonce_seen[24];
+	const char *mode_name = mxfs_fenceh_mode_name(mode);
+	const char *rep;
+	char *argv[7];
+	unsigned long left;
+	ktime_t t0;
+	size_t n;
+	int rc;
+
+	if (!out || !mode_name || !host || !boot)
+		return -EINVAL;
+	memset(out, 0, sizeof(*out));
+	if (!mxfs_fenceh_pde) {
+		strscpy(out->reason, "no-report-channel", sizeof(out->reason));
+		return -ENODEV;
+	}
+	{
+		/* a path written to the parameter carries its newline: trim it */
+		const char *hp = mxfs_fence_vcenter_helper ? mxfs_fence_vcenter_helper : "";
+		size_t hn;
+
+		while (*hp == ' ' || *hp == '\t' || *hp == '\n' || *hp == '\r')
+			hp++;
+		hn = strlen(hp);
+		while (hn && (hp[hn - 1] == ' ' || hp[hn - 1] == '\t' ||
+			      hp[hn - 1] == '\n' || hp[hn - 1] == '\r'))
+			hn--;
+		if (hn >= sizeof(helper) || !hn || hp[0] != '/') {
+			strscpy(out->reason, "helper-path-unset", sizeof(out->reason));
+			return -ENOENT;
+		}
+		memcpy(helper, hp, hn);
+		helper[hn] = '\0';
+	}
+	snprintf(host_str, sizeof(host_str), "%16phN", host);
+	snprintf(boot_str, sizeof(boot_str), "%16phN", boot);
+
+	mutex_lock(&mxfs_fenceh_invoke_lock);
+	out->nonce = get_random_u64();
+	if (!out->nonce)
+		out->nonce = 1;
+	snprintf(nonce_str, sizeof(nonce_str), "%016llx", (unsigned long long)out->nonce);
+	spin_lock(&mxfs_fenceh_slot.lock);
+	strscpy(mxfs_fenceh_slot.nonce_str, nonce_str, sizeof(mxfs_fenceh_slot.nonce_str));
+	mxfs_fenceh_slot.len = 0;
+	mxfs_fenceh_slot.buf[0] = '\0';
+	mxfs_fenceh_slot.complete = false;
+	mxfs_fenceh_slot.armed = true;
+	spin_unlock(&mxfs_fenceh_slot.lock);
+	init_completion(&mxfs_fenceh_slot.done);
+
+	argv[0] = helper;
+	argv[1] = nonce_str;
+	argv[2] = (char *)mode_name;
+	argv[3] = host_str;
+	argv[4] = boot_str;
+	argv[5] = (char *)MXFS_FENCEH_PROC_PATH;
+	argv[6] = NULL;
+
+	t0 = ktime_get();
+	/* UMH_WAIT_EXEC: the wait is for the REPORT, which is bounded */
+	rc = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_EXEC);
+	if (rc) {
+		spin_lock(&mxfs_fenceh_slot.lock);
+		mxfs_fenceh_slot.armed = false;
+		spin_unlock(&mxfs_fenceh_slot.lock);
+		snprintf(out->reason, sizeof(out->reason), "exec-failed-%d", rc);
+		pr_err("mxfs: P-FENCEH-NOEXEC helper='%s' mode=%s rc=%d -- no report, no evidence\n",
+		       helper, mode_name, rc);
+		mutex_unlock(&mxfs_fenceh_invoke_lock);
+		return rc;
+	}
+	left = wait_for_completion_timeout(&mxfs_fenceh_slot.done,
+					   msecs_to_jiffies(mxfs_fence_vcenter_timeout_ms));
+	out->upcall_wall_ms = ktime_to_ms(ktime_sub(ktime_get(), t0));
+	spin_lock(&mxfs_fenceh_slot.lock);
+	mxfs_fenceh_slot.armed = false;
+	out->report_len = min_t(size_t, mxfs_fenceh_slot.len, sizeof(out->report) - 1);
+	memcpy(out->report, mxfs_fenceh_slot.buf, out->report_len);
+	out->report[out->report_len] = '\0';
+	spin_unlock(&mxfs_fenceh_slot.lock);
+	mutex_unlock(&mxfs_fenceh_invoke_lock);
+
+	rep = out->report;
+	n = out->report_len;
+	if (!left) {
+		strscpy(out->reason, n ? "report-truncated-at-bound" :
+			"no-report-within-bound", sizeof(out->reason));
+	} else if (!mxfs_drbdw_field(rep, n, "NONCE", nonce_seen, sizeof(nonce_seen)) ||
+		   strcasecmp(nonce_seen, nonce_str)) {
+		strscpy(out->reason, "nonce-mismatch", sizeof(out->reason));
+	} else {
+#define F(key, field) mxfs_drbdw_field(rep, n, key, out->field, sizeof(out->field))
+		F("MODE", mode);
+		F("RESULT", result);
+		F("HOW", how);
+		F("VM", vm);
+		F("POWER", power);
+		F("VM_BOOT", vm_boot);
+		F("DETAIL", detail);
+#undef F
+		if (strcmp(out->mode, mode_name))
+			strscpy(out->reason, "mode-mismatch", sizeof(out->reason));
+		else
+			out->delivered = true;
+	}
+	pr_info("mxfs: P-FENCEH-REPORT mode=%s host=%s boot=%s nonce=%s delivered=%d upcall_ms=%u reason=%s result=%s how=%s vm='%s' power=%s vm_boot=%s detail='%s'\n",
+		mode_name, host_str, boot_str, nonce_str, out->delivered,
+		out->upcall_wall_ms, out->delivered ? "-" : out->reason, out->result,
+		out->how, out->vm, out->power, out->vm_boot, out->detail);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_fence_helper);
+
+/* ═════════════ the shared attachment's operator confirmations ═════════════ */
+
+/*
+ * fence=manual (docs/shared-disk-attachment.md).  A mount that cannot prove a
+ * victim's boot ended posts a request naming exactly that incarnation, and an
+ * operator who has established that its machine is off (or its access to the
+ * disk cut, for good) writes `confirm <id>` to /proc/fs/mxfs/fence_confirm.
+ * Reading the file lists every request.  Each request carries a random id
+ * drawn when it is posted, so a confirmation can only ever name the request
+ * the operator read: a stale one names an id no later death is given.
+ * The table lives for the module's life, so a confirmation outlasts an
+ * unmount of the survivor; when full, the oldest request is reused.
+ */
+#define MXFS_FENCEC_PROC_NAME	"fs/mxfs/fence_confirm"
+#define MXFS_FENCEC_MAX		64
+
+static struct {
+	struct mxfs_pal_fence_req	req;
+	uint64_t			id;	/* 0: free */
+	uint64_t			posted_ms;
+	bool				confirmed;
+} mxfs_fencec[MXFS_FENCEC_MAX];
+static DEFINE_MUTEX(mxfs_fencec_lock);
+static struct proc_dir_entry *mxfs_fencec_pde;
+
+int mxfs_pal_fence_req_post(const struct mxfs_pal_fence_req *r)
+{
+	int i, slot = -1, rc;
+
+	if (!r)
+		return -EINVAL;
+	mutex_lock(&mxfs_fencec_lock);
+	for (i = 0; i < MXFS_FENCEC_MAX; i++) {
+		if (mxfs_fencec[i].id &&
+		    !memcmp(mxfs_fencec[i].req.fs_uuid, r->fs_uuid, 16) &&
+		    mxfs_fencec[i].req.node == r->node &&
+		    mxfs_fencec[i].req.epoch == r->epoch) {
+			rc = mxfs_fencec[i].confirmed ? 1 : 0;
+			mutex_unlock(&mxfs_fencec_lock);
+			return rc;
+		}
+		if (!mxfs_fencec[i].id && slot < 0)
+			slot = i;
+	}
+	if (slot < 0) {
+		slot = 0;
+		for (i = 1; i < MXFS_FENCEC_MAX; i++)
+			if (mxfs_fencec[i].posted_ms < mxfs_fencec[slot].posted_ms)
+				slot = i;
+	}
+	mxfs_fencec[slot].req = *r;
+	mxfs_fencec[slot].req.peer[sizeof(r->peer) - 1] = '\0';
+	do {
+		mxfs_fencec[slot].id = get_random_u64() & 0xffffffffffffULL;
+	} while (!mxfs_fencec[slot].id);
+	mxfs_fencec[slot].posted_ms = ktime_to_ms(ktime_get_boottime());
+	mxfs_fencec[slot].confirmed = false;
+	pr_warn("mxfs: P-FENCE-CONFIRM-NEEDED id=%llx slot=%u node=%u inc=%llu host=%*phN boot=%*phN peer=%s -- fence=manual: recovery of this incarnation waits for an operator.  Establish that its machine is powered off (or its access to the disk cut) and will not return in that boot, then: echo 'confirm %llx' > /proc/" MXFS_FENCEC_PROC_NAME "\n",
+		(unsigned long long)mxfs_fencec[slot].id, r->slot, r->node,
+		(unsigned long long)r->epoch, 16, r->host, 16, r->boot, r->peer,
+		(unsigned long long)mxfs_fencec[slot].id);
+	mutex_unlock(&mxfs_fencec_lock);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_fence_req_post);
+
+int mxfs_pal_fence_req_boot_confirmed(const uint8_t fs_uuid[16],
+				      const uint8_t host[16], const uint8_t boot[16])
+{
+	int i, hit = 0;
+
+	mutex_lock(&mxfs_fencec_lock);
+	for (i = 0; i < MXFS_FENCEC_MAX && !hit; i++)
+		hit = mxfs_fencec[i].id && mxfs_fencec[i].confirmed &&
+		      !memcmp(mxfs_fencec[i].req.fs_uuid, fs_uuid, 16) &&
+		      !memcmp(mxfs_fencec[i].req.host, host, 16) &&
+		      !memcmp(mxfs_fencec[i].req.boot, boot, 16);
+	mutex_unlock(&mxfs_fencec_lock);
+	return hit;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_fence_req_boot_confirmed);
+
+static ssize_t mxfs_fencec_read(struct file *file, char __user *ubuf,
+				size_t count, loff_t *ppos)
+{
+	char *buf;
+	size_t len = 0, cap = MXFS_FENCEC_MAX * 200 + 128;
+	ssize_t rc;
+	int i;
+
+	buf = kmalloc(cap, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+	len += scnprintf(buf + len, cap - len,
+			 "# id state slot node incarnation host boot peer\n");
+	mutex_lock(&mxfs_fencec_lock);
+	for (i = 0; i < MXFS_FENCEC_MAX; i++) {
+		if (!mxfs_fencec[i].id)
+			continue;
+		len += scnprintf(buf + len, cap - len,
+				 "%llx %s %u %u %llu %*phN %*phN %s\n",
+				 (unsigned long long)mxfs_fencec[i].id,
+				 mxfs_fencec[i].confirmed ? "confirmed" : "waiting",
+				 mxfs_fencec[i].req.slot, mxfs_fencec[i].req.node,
+				 (unsigned long long)mxfs_fencec[i].req.epoch,
+				 16, mxfs_fencec[i].req.host,
+				 16, mxfs_fencec[i].req.boot,
+				 mxfs_fencec[i].req.peer[0] ? mxfs_fencec[i].req.peer : "-");
+	}
+	mutex_unlock(&mxfs_fencec_lock);
+	rc = simple_read_from_buffer(ubuf, count, ppos, buf, len);
+	kfree(buf);
+	return rc;
+}
+
+static ssize_t mxfs_fencec_write(struct file *file, const char __user *ubuf,
+				 size_t count, loff_t *ppos)
+{
+	char buf[64], *p;
+	unsigned long long id;
+	int i, hit = -1;
+
+	if (count == 0 || count >= sizeof(buf))
+		return -EINVAL;
+	if (copy_from_user(buf, ubuf, count))
+		return -EFAULT;
+	buf[count] = '\0';
+	p = strim(buf);
+	if (strncmp(p, "confirm ", 8))
+		return -EINVAL;
+	p = skip_spaces(p + 8);
+	if (kstrtoull(p, 16, &id) || !id)
+		return -EINVAL;
+	mutex_lock(&mxfs_fencec_lock);
+	for (i = 0; i < MXFS_FENCEC_MAX; i++) {
+		if (mxfs_fencec[i].id == id) {
+			mxfs_fencec[i].confirmed = true;
+			hit = i;
+			break;
+		}
+	}
+	if (hit >= 0)
+		pr_warn("mxfs: P-FENCE-CONFIRMED id=%llx slot=%u node=%u inc=%llu host=%*phN boot=%*phN peer=%s -- an operator confirmed this incarnation's machine stopped; its recovery may proceed\n",
+			id, mxfs_fencec[hit].req.slot, mxfs_fencec[hit].req.node,
+			(unsigned long long)mxfs_fencec[hit].req.epoch,
+			16, mxfs_fencec[hit].req.host, 16, mxfs_fencec[hit].req.boot,
+			mxfs_fencec[hit].req.peer);
+	mutex_unlock(&mxfs_fencec_lock);
+	if (hit < 0)
+		return -ENOENT;
+	*ppos += count;
+	return count;
+}
+
+static const struct proc_ops mxfs_fencec_ops = {
+	.proc_read	= mxfs_fencec_read,
+	.proc_write	= mxfs_fencec_write,
+	.proc_lseek	= default_llseek,
+};
+
+/* ═════════════════════ the shared attachment's quorum ═════════════════════ */
+
+/*
+ * fence=quorum (docs/quorum-takeover.md).  The helper (/usr/sbin/mxfs_quorumd)
+ * reads corosync's votequorum every quarter second and writes one report per
+ * write(2):
+ *
+ *   QUORATE=0|1   this node is quorate
+ *   QDEVICE=0|1   the QDevice is registered, alive and casting its vote
+ *   TWONODE=0|1   votequorum's two_node is set (both halves of a split quorate)
+ *   NODES=a,b     the IPv4 ring0 address of every node of the nodelist
+ *   MEMBERS=a,b   those of them in the current membership
+ *   BOOTS=a/h/b,.. for a member that announced itself over corosync since it
+ *                 last joined: its machine-id (h) and the boot it runs (b)
+ *   END=1
+ *
+ * A report renews the QUORUM LEASE only when it says quorate.  This file keeps
+ * the state and ends the boot; v5_shared_* decide what a mount may do with it.
+ */
+#define MXFS_QUORUM_PROC_NAME	"fs/mxfs/quorum"
+#define MXFS_QUORUM_REPORT_MAX	4096
+#define MXFS_QUORUM_NODES_MAX	16
+/*
+ * The isolation exchange (pal.h): what this host posts for the helper to
+ * multicast, and what the helper last reported hearing.  A post lapses
+ * unless renewed within MXFS_QUORUM_POST_MS; the poster renews it every
+ * heartbeat interval or faster while it still holds.
+ */
+#define MXFS_QUORUM_XCHG_MAX	16
+#define MXFS_QUORUM_POST_MS	5000
+
+struct mxfs_quorum_xchg {
+	u32	node;
+	u64	inc;
+	u64	at_ms;		/* posted (local), 0 = free */
+};
+
+/*
+ * THE LEASE.  The helper reports every 250 ms, so a healthy host renews twelve
+ * times within it; a helper that dies, hangs or is stopped renews nothing, and
+ * the boot ends at the deadline.  It is one of the terms of the takeover
+ * bound below, so it stays short.
+ */
+static unsigned int mxfs_quorum_lease_ms = 3000;
+module_param_named(quorum_lease_ms, mxfs_quorum_lease_ms, uint, 0444);
+MODULE_PARM_DESC(quorum_lease_ms,
+		 "fence=quorum: how long one quorate report from mxfs_quorumd keeps this host's quorum lease");
+
+/*
+ * THE TAKEOVER BOUND: W = D_inq + L + T_reset (docs/quorum-takeover.md).  A
+ * node cut off from its peer can still be told it is quorate until corosync's
+ * membership change completes (token 3000 ms + consensus 3600 ms on a
+ * two-node default) and the QDevice's vote for it is withdrawn, which
+ * votequorum waits for at most its qdevice sync_timeout (30000 ms by
+ * default): D_inq <= 36.6 s.  Then its lease runs L = 3 s, and the reset
+ * executes at once.  45 s covers that with the margin the lease ruling asks
+ * for; it is checked against the measured D_inq, never only the
+ * configuration.  A survivor takes over only after holding the vote without
+ * the peer for this long.
+ */
+static unsigned int mxfs_quorum_takeover_ms = 45000;
+module_param_named(quorum_takeover_ms, mxfs_quorum_takeover_ms, uint, 0444);
+MODULE_PARM_DESC(quorum_takeover_ms,
+		 "fence=quorum: how long a survivor holds the vote without its peer before the peer's boot counts as ended");
+
+/* DEBUG: a lease that runs out is logged and the boot is NOT ended, so a test
+ * can show that a survivor refuses a peer that kept writing.  Never in
+ * production. */
+static int mxfs_dbg_quorum_no_reset;
+module_param_named(dbg_quorum_no_reset, mxfs_dbg_quorum_no_reset, int, 0644);
+MODULE_PARM_DESC(dbg_quorum_no_reset,
+		 "DEBUG: a lost quorum lease is logged and the boot is not ended. Never enable in production.");
+
+static struct {
+	spinlock_t	lock;
+	u64		report_ms;	/* the last valid report */
+	u64		renewed_ms;	/* the last report that said quorate */
+	u64		reports;
+	bool		quorate;
+	bool		qdevice;
+	bool		twonode;
+	u32		nnodes;
+	__be32		node[MXFS_QUORUM_NODES_MAX];
+	bool		member[MXFS_QUORUM_NODES_MAX];
+	/* since when this host has held the vote with node[i] not a member,
+	 * observed without a gap; 0 = not now */
+	u64		absent_since[MXFS_QUORUM_NODES_MAX];
+	/* the last time node[i] had been absent so for the whole takeover
+	 * bound (now, while such an absence goes on); 0 = never seen */
+	u64		long_end[MXFS_QUORUM_NODES_MAX];
+	/* the host and boot node[i] announced, while it is a member */
+	bool		boot_known[MXFS_QUORUM_NODES_MAX];
+	u8		host[MXFS_QUORUM_NODES_MAX][16];
+	u8		boot[MXFS_QUORUM_NODES_MAX][16];
+	/* host[i] holds the host node[i] last announced, kept after it leaves
+	 * the membership (carried by address, so a reordered nodelist keeps
+	 * each address's own host): what lets a survivor name the host behind
+	 * a heartbeat slot that corosync has dropped */
+	bool		host_seen[MXFS_QUORUM_NODES_MAX];
+	int		armed;
+	bool		ending;
+	/* the isolation exchange: this host's posts, and the last report's
+	 * ASKS and CLOSED */
+	struct mxfs_quorum_xchg ask_post[MXFS_QUORUM_XCHG_MAX];
+	struct mxfs_quorum_xchg closed_post[MXFS_QUORUM_XCHG_MAX];
+	struct mxfs_quorum_xchg asks[MXFS_QUORUM_XCHG_MAX];
+	struct mxfs_quorum_xchg closed[MXFS_QUORUM_XCHG_MAX];
+	u32		nasks;
+	u32		nclosed;
+} mxfs_quorum = {
+	.lock = __SPIN_LOCK_UNLOCKED(mxfs_quorum.lock),
+};
+
+static struct proc_dir_entry *mxfs_quorum_pde;
+static void mxfs_quorum_tick(struct work_struct *w);
+static DECLARE_DELAYED_WORK(mxfs_quorum_work, mxfs_quorum_tick);
+static DEFINE_MUTEX(mxfs_quorum_arm_lock);
+#define MXFS_QUORUM_TICK_MS	250
+
+/*
+ * END THIS BOOT.  Nothing is written first — no unmount, no log force, no
+ * heartbeat: a host that has lost the vote must not write again, and a peer
+ * may take its slice over once the takeover bound has passed.
+ */
+static void mxfs_quorum_end_boot(const char *why, u64 since_ms)
+{
+	if (READ_ONCE(mxfs_dbg_quorum_no_reset)) {
+		pr_emerg_ratelimited("mxfs: P-QUORUM-LOST-NO-RESET why=%s renewed_ms_ago=%llu -- dbg_quorum_no_reset is set: this boot is NOT ended\n",
+				     why, (unsigned long long)since_ms);
+		return;
+	}
+	pr_emerg("mxfs: P-QUORUM-LOST-RESET why=%s renewed_ms_ago=%llu lease_ms=%u -- this host no longer holds the cluster's vote while a fence=quorum filesystem is mounted; the boot is ended now, before the peer may take over\n",
+		 why, (unsigned long long)since_ms, mxfs_quorum_lease_ms);
+	emergency_restart();
+}
+
+/* Under mxfs_quorum.lock: has the lease run out?  why/since for the log. */
+static bool mxfs_quorum_lost_locked(u64 now, const char **why, u64 *since)
+{
+	*since = mxfs_quorum.renewed_ms ? now - mxfs_quorum.renewed_ms : 0;
+	if (!mxfs_quorum.renewed_ms) {
+		*why = "never-renewed";
+		return true;
+	}
+	if (now - mxfs_quorum.renewed_ms > mxfs_quorum_lease_ms) {
+		*why = mxfs_quorum.report_ms > mxfs_quorum.renewed_ms ?
+		       "inquorate" : "no-report";
+		return true;
+	}
+	return false;
+}
+
+static void mxfs_quorum_check(const char *site)
+{
+	const char *why = NULL;
+	u64 since = 0, now = mxfs_pal_time_ms();
+	bool lost;
+
+	spin_lock(&mxfs_quorum.lock);
+	lost = mxfs_quorum.armed > 0 && mxfs_quorum_lost_locked(now, &why, &since);
+	spin_unlock(&mxfs_quorum.lock);
+	if (lost) {
+		char w[64];
+
+		snprintf(w, sizeof(w), "%s@%s", why, site);
+		mxfs_quorum_end_boot(w, since);
+	}
+}
+
+static void mxfs_quorum_tick(struct work_struct *w)
+{
+	mxfs_quorum_check("timer");
+	if (READ_ONCE(mxfs_quorum.armed) > 0)
+		queue_delayed_work(system_highpri_wq, &mxfs_quorum_work,
+				   msecs_to_jiffies(MXFS_QUORUM_TICK_MS));
+}
+
+/* "a,b,c" -> addresses; false on anything that is not a list of IPv4s */
+static bool mxfs_quorum_parse_list(const char *s, __be32 *out, u32 max, u32 *n)
+{
+	const char *end;
+
+	*n = 0;
+	if (!*s)
+		return true;
+	for (;;) {
+		if (*n == max || !in4_pton(s, -1, (u8 *)&out[*n], ',', &end))
+			return false;
+		(*n)++;
+		if (!*end)
+			return true;
+		if (*end != ',')
+			return false;
+		s = end + 1;
+	}
+}
+
+/*
+ * "a/h/b,..." -> for each listed address that is one of nodes[], its host and
+ * boot UUIDs; false on anything malformed.
+ */
+static bool mxfs_quorum_parse_boots(const char *s, const __be32 *nodes, u32 nn,
+				    bool *known, u8 (*host)[16], u8 (*boot)[16])
+{
+	char tok[96];
+	const char *p = s, *e;
+	__be32 a;
+	uuid_t h, b;
+	size_t len;
+	u32 i;
+
+	while (*p) {
+		e = strchr(p, ',');
+		len = e ? (size_t)(e - p) : strlen(p);
+		if (len >= sizeof(tok))
+			return false;
+		memcpy(tok, p, len);
+		tok[len] = '\0';
+		{
+			char *s1 = strchr(tok, '/'), *s2 = s1 ? strchr(s1 + 1, '/') : NULL;
+
+			if (!s1 || !s2)
+				return false;
+			*s1 = '\0';
+			*s2 = '\0';
+			if (!in4_pton(tok, -1, (u8 *)&a, -1, NULL) ||
+			    uuid_parse(s1 + 1, &h) || uuid_parse(s2 + 1, &b))
+				return false;
+		}
+		for (i = 0; i < nn; i++)
+			if (nodes[i] == a) {
+				known[i] = true;
+				memcpy(host[i], h.b, 16);
+				memcpy(boot[i], b.b, 16);
+			}
+		if (!e)
+			break;
+		p = e + 1;
+	}
+	return true;
+}
+
+/* "node/inc,..." -> entries (at_ms left 0); false on anything malformed */
+static bool mxfs_quorum_parse_xchg(const char *s, struct mxfs_quorum_xchg *out,
+				   u32 max, u32 *n)
+{
+	char tok[48];
+	const char *p = s, *e;
+	size_t len;
+
+	*n = 0;
+	while (*p) {
+		char *sl;
+
+		e = strchr(p, ',');
+		len = e ? (size_t)(e - p) : strlen(p);
+		if (len >= sizeof(tok) || *n == max)
+			return false;
+		memcpy(tok, p, len);
+		tok[len] = '\0';
+		sl = strchr(tok, '/');
+		if (!sl)
+			return false;
+		*sl = '\0';
+		if (kstrtou32(tok, 10, &out[*n].node) ||
+		    kstrtou64(sl + 1, 10, &out[*n].inc))
+			return false;
+		out[*n].at_ms = 0;
+		(*n)++;
+		if (!e)
+			break;
+		p = e + 1;
+	}
+	return true;
+}
+
+static int mxfs_quorum_flag(const char *rep, size_t n, const char *key)
+{
+	char v[4];
+
+	if (!mxfs_drbdw_field(rep, n, key, v, sizeof(v)))
+		return -1;
+	if (!strcmp(v, "1"))
+		return 1;
+	if (!strcmp(v, "0"))
+		return 0;
+	return -1;
+}
+
+/* One report's parse, off the stack: the write handler would otherwise carry
+ * every per-node array in its frame. */
+struct mxfs_quorum_parse {
+	char	rep[MXFS_QUORUM_REPORT_MAX];
+	char	list[MXFS_QUORUM_REPORT_MAX];
+	__be32	nodes[MXFS_QUORUM_NODES_MAX];
+	__be32	mem[MXFS_QUORUM_NODES_MAX];
+	bool	member[MXFS_QUORUM_NODES_MAX];
+	bool	known[MXFS_QUORUM_NODES_MAX];
+	u8	host[MXFS_QUORUM_NODES_MAX][16];
+	u8	boot[MXFS_QUORUM_NODES_MAX][16];
+	u64	since[MXFS_QUORUM_NODES_MAX];
+	u64	lend[MXFS_QUORUM_NODES_MAX];
+	bool	pseen[MXFS_QUORUM_NODES_MAX];
+	u8	phost[MXFS_QUORUM_NODES_MAX][16];
+	struct mxfs_quorum_xchg asks[MXFS_QUORUM_XCHG_MAX];
+	struct mxfs_quorum_xchg closed[MXFS_QUORUM_XCHG_MAX];
+	u32	nasks;
+	u32	nclosed;
+};
+
+static ssize_t mxfs_quorum_write(struct file *file, const char __user *ubuf,
+				 size_t count, loff_t *ppos)
+{
+	struct mxfs_quorum_parse *r;
+	u32 nn, nm, i, j;
+	int q, qd, tn;
+	u64 now;
+	bool lost_now = false;
+
+	if (count == 0 || count >= MXFS_QUORUM_REPORT_MAX)
+		return -EINVAL;
+	r = kzalloc(sizeof(*r), GFP_KERNEL);
+	if (!r)
+		return -ENOMEM;
+	if (copy_from_user(r->rep, ubuf, count)) {
+		kfree(r);
+		return -EFAULT;
+	}
+	r->rep[count] = '\0';
+	q = mxfs_quorum_flag(r->rep, count, "QUORATE");
+	qd = mxfs_quorum_flag(r->rep, count, "QDEVICE");
+	tn = mxfs_quorum_flag(r->rep, count, "TWONODE");
+	if (q < 0 || qd < 0 || tn < 0 || !strstr(r->rep, "\nEND=1") ||
+	    !mxfs_drbdw_field(r->rep, count, "NODES", r->list, MXFS_QUORUM_REPORT_MAX) ||
+	    !mxfs_quorum_parse_list(r->list, r->nodes, MXFS_QUORUM_NODES_MAX, &nn) ||
+	    !mxfs_drbdw_field(r->rep, count, "MEMBERS", r->list, MXFS_QUORUM_REPORT_MAX) ||
+	    !mxfs_quorum_parse_list(r->list, r->mem, MXFS_QUORUM_NODES_MAX, &nm) ||
+	    !mxfs_drbdw_field(r->rep, count, "BOOTS", r->list, MXFS_QUORUM_REPORT_MAX) ||
+	    !mxfs_quorum_parse_boots(r->list, r->nodes, nn, r->known, r->host, r->boot)) {
+		kfree(r);
+		pr_warn_ratelimited("mxfs: P-QUORUM-REPORT-INVALID -- a report on /proc/%s is not a complete quorum report; it renews nothing\n",
+				    MXFS_QUORUM_PROC_NAME);
+		return -EINVAL;
+	}
+	/* ASKS and CLOSED are optional: a helper older than the isolation
+	 * exchange reports neither, and that is an empty exchange */
+	if ((mxfs_drbdw_field(r->rep, count, "ASKS", r->list, MXFS_QUORUM_REPORT_MAX) &&
+	     !mxfs_quorum_parse_xchg(r->list, r->asks, MXFS_QUORUM_XCHG_MAX, &r->nasks)) ||
+	    (mxfs_drbdw_field(r->rep, count, "CLOSED", r->list, MXFS_QUORUM_REPORT_MAX) &&
+	     !mxfs_quorum_parse_xchg(r->list, r->closed, MXFS_QUORUM_XCHG_MAX, &r->nclosed))) {
+		kfree(r);
+		pr_warn_ratelimited("mxfs: P-QUORUM-REPORT-INVALID -- a report on /proc/%s carries a malformed ASKS or CLOSED list; it renews nothing\n",
+				    MXFS_QUORUM_PROC_NAME);
+		return -EINVAL;
+	}
+	now = mxfs_pal_time_ms();
+	spin_lock(&mxfs_quorum.lock);
+	/*
+	 * An absence is timed only across reports that follow each other within
+	 * the lease: across a gap nobody watched the membership, so the timing
+	 * starts again.
+	 */
+	if (mxfs_quorum.report_ms && now - mxfs_quorum.report_ms > mxfs_quorum_lease_ms)
+		memset(mxfs_quorum.absent_since, 0, sizeof(mxfs_quorum.absent_since));
+	for (i = 0; i < nn; i++) {
+		u64 since = 0, lend = 0;
+
+		for (j = 0; j < nm; j++)
+			if (r->mem[j] == r->nodes[i])
+				r->member[i] = true;
+		for (j = 0; j < mxfs_quorum.nnodes; j++)
+			if (mxfs_quorum.node[j] == r->nodes[i]) {
+				since = mxfs_quorum.absent_since[j];
+				lend = mxfs_quorum.long_end[j];
+				r->pseen[i] = mxfs_quorum.host_seen[j];
+				memcpy(r->phost[i], mxfs_quorum.host[j], 16);
+			}
+		if (!q || r->member[i])
+			since = 0;
+		else if (!since)
+			since = now;
+		if (since && now - since >= mxfs_quorum_takeover_ms)
+			lend = now;
+		r->since[i] = since;
+		r->lend[i] = lend;
+	}
+	for (i = 0; i < MXFS_QUORUM_NODES_MAX; i++) {
+		mxfs_quorum.node[i] = i < nn ? r->nodes[i] : 0;
+		mxfs_quorum.member[i] = i < nn && r->member[i];
+		mxfs_quorum.absent_since[i] = i < nn ? r->since[i] : 0;
+		mxfs_quorum.long_end[i] = i < nn ? r->lend[i] : 0;
+		/* a node's announcement stands only while it is a member */
+		mxfs_quorum.boot_known[i] = i < nn && r->member[i] && r->known[i];
+		if (mxfs_quorum.boot_known[i]) {
+			memcpy(mxfs_quorum.host[i], r->host[i], 16);
+			memcpy(mxfs_quorum.boot[i], r->boot[i], 16);
+			mxfs_quorum.host_seen[i] = true;
+		} else {
+			mxfs_quorum.host_seen[i] = i < nn && r->pseen[i];
+			memcpy(mxfs_quorum.host[i], r->phost[i], 16);
+		}
+	}
+	mxfs_quorum.nnodes = nn;
+	memcpy(mxfs_quorum.asks, r->asks, sizeof(r->asks));
+	memcpy(mxfs_quorum.closed, r->closed, sizeof(r->closed));
+	mxfs_quorum.nasks = r->nasks;
+	mxfs_quorum.nclosed = r->nclosed;
+	mxfs_quorum.quorate = q;
+	mxfs_quorum.qdevice = qd;
+	mxfs_quorum.twonode = tn;
+	mxfs_quorum.report_ms = now;
+	mxfs_quorum.reports++;
+	if (q)
+		mxfs_quorum.renewed_ms = now;
+	else if (mxfs_quorum.armed > 0)
+		lost_now = true;
+	spin_unlock(&mxfs_quorum.lock);
+	kfree(r);
+	/* the report itself says this host lost the vote: no need to wait out
+	 * the lease */
+	if (lost_now)
+		mxfs_quorum_end_boot("inquorate-report", 0);
+	*ppos += count;
+	return count;
+}
+
+static ssize_t mxfs_quorum_read(struct file *file, char __user *ubuf,
+				size_t count, loff_t *ppos)
+{
+	char *buf;
+	size_t len = 0, sz = 4096;
+	u64 now = mxfs_pal_time_ms();
+	u32 i;
+	ssize_t rc;
+
+	buf = kmalloc(sz, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+	spin_lock(&mxfs_quorum.lock);
+	len += scnprintf(buf + len, sz - len,
+			 "armed=%d reports=%llu report_ms_ago=%lld renewed_ms_ago=%lld quorate=%d qdevice=%d twonode=%d lease_ms=%u takeover_ms=%u\n",
+			 mxfs_quorum.armed, (unsigned long long)mxfs_quorum.reports,
+			 mxfs_quorum.report_ms ? (long long)(now - mxfs_quorum.report_ms) : -1LL,
+			 mxfs_quorum.renewed_ms ? (long long)(now - mxfs_quorum.renewed_ms) : -1LL,
+			 mxfs_quorum.quorate, mxfs_quorum.qdevice, mxfs_quorum.twonode,
+			 mxfs_quorum_lease_ms, mxfs_quorum_takeover_ms);
+	for (i = 0; i < mxfs_quorum.nnodes; i++)
+		len += scnprintf(buf + len, sz - len,
+				 "node=%pI4 member=%d absent_ms=%lld long_absence_end_ms_ago=%lld\n",
+				 &mxfs_quorum.node[i], mxfs_quorum.member[i],
+				 mxfs_quorum.absent_since[i] ?
+				 (long long)(now - mxfs_quorum.absent_since[i]) : -1LL,
+				 mxfs_quorum.long_end[i] ?
+				 (long long)(now - mxfs_quorum.long_end[i]) : -1LL);
+	for (i = 0; i < mxfs_quorum.nnodes; i++)
+		if (mxfs_quorum.boot_known[i])
+			len += scnprintf(buf + len, sz - len,
+					 "node=%pI4 host=%pUb boot=%pUb\n",
+					 &mxfs_quorum.node[i], mxfs_quorum.host[i],
+					 mxfs_quorum.boot[i]);
+		else if (mxfs_quorum.host_seen[i])
+			len += scnprintf(buf + len, sz - len,
+					 "node=%pI4 last_host=%pUb\n",
+					 &mxfs_quorum.node[i], mxfs_quorum.host[i]);
+	/* the posts mxfs_quorumd multicasts: "ask" and "closed" lines */
+	for (i = 0; i < MXFS_QUORUM_XCHG_MAX; i++) {
+		const struct mxfs_quorum_xchg *a = &mxfs_quorum.ask_post[i];
+		const struct mxfs_quorum_xchg *c = &mxfs_quorum.closed_post[i];
+
+		if (a->at_ms && now - a->at_ms <= MXFS_QUORUM_POST_MS)
+			len += scnprintf(buf + len, sz - len,
+					 "ask node=%u inc=%llu\n", a->node,
+					 (unsigned long long)a->inc);
+		if (c->at_ms && now - c->at_ms <= MXFS_QUORUM_POST_MS)
+			len += scnprintf(buf + len, sz - len,
+					 "closed node=%u inc=%llu\n", c->node,
+					 (unsigned long long)c->inc);
+	}
+	for (i = 0; i < mxfs_quorum.nasks; i++)
+		len += scnprintf(buf + len, sz - len,
+				 "heard_ask node=%u inc=%llu\n",
+				 mxfs_quorum.asks[i].node,
+				 (unsigned long long)mxfs_quorum.asks[i].inc);
+	for (i = 0; i < mxfs_quorum.nclosed; i++)
+		len += scnprintf(buf + len, sz - len,
+				 "heard_closed node=%u inc=%llu\n",
+				 mxfs_quorum.closed[i].node,
+				 (unsigned long long)mxfs_quorum.closed[i].inc);
+	spin_unlock(&mxfs_quorum.lock);
+	rc = simple_read_from_buffer(ubuf, count, ppos, buf, len);
+	kfree(buf);
+	return rc;
+}
+
+static const struct proc_ops mxfs_quorum_ops = {
+	.proc_read	= mxfs_quorum_read,
+	.proc_write	= mxfs_quorum_write,
+	.proc_lseek	= default_llseek,
+};
+
+/* Under mxfs_quorum.lock: node[] index of `addr`, or -1. */
+static int mxfs_quorum_node_locked(const char *addr)
+{
+	__be32 a;
+	u32 i;
+
+	if (!addr || !in4_pton(addr, -1, (u8 *)&a, -1, NULL))
+		return -1;
+	for (i = 0; i < mxfs_quorum.nnodes; i++)
+		if (mxfs_quorum.node[i] == a)
+			return (int)i;
+	return -1;
+}
+
+int mxfs_pal_quorum_arm(const char *peer, char *why, size_t whylen)
+{
+	const char *lost_why;
+	u64 since, now = mxfs_pal_time_ms();
+	int idx, rc = 0;
+	bool start = false;
+
+	if (!mxfs_quorum_pde) {
+		snprintf(why, whylen, "/proc/%s does not exist", MXFS_QUORUM_PROC_NAME);
+		return -EPERM;
+	}
+	mutex_lock(&mxfs_quorum_arm_lock);
+	spin_lock(&mxfs_quorum.lock);
+	idx = mxfs_quorum_node_locked(peer);
+	if (!mxfs_quorum.report_ms || now - mxfs_quorum.report_ms > mxfs_quorum_lease_ms) {
+		snprintf(why, whylen, "no report from mxfs_quorumd within the last %u ms (is mxfs-quorumd.service running?)",
+			 mxfs_quorum_lease_ms);
+		rc = -EPERM;
+	} else if (mxfs_quorum_lost_locked(now, &lost_why, &since)) {
+		snprintf(why, whylen, "this node is not quorate (%s)", lost_why);
+		rc = -EPERM;
+	} else if (mxfs_quorum.twonode) {
+		snprintf(why, whylen, "corosync's votequorum has two_node set, which makes both halves of a split quorate");
+		rc = -EPERM;
+	} else if (!mxfs_quorum.qdevice) {
+		snprintf(why, whylen, "the QDevice is not casting its vote, so a two-node cluster has no third vote");
+		rc = -EPERM;
+	} else if (idx < 0) {
+		snprintf(why, whylen, "the peer %s is not a node of the corosync nodelist", peer);
+		rc = -EPERM;
+	} else if (!mxfs_quorum.member[idx]) {
+		snprintf(why, whylen, "the peer %s is not in the corosync membership", peer);
+		rc = -EPERM;
+	} else {
+		start = mxfs_quorum.armed++ == 0;
+	}
+	spin_unlock(&mxfs_quorum.lock);
+	if (start)
+		queue_delayed_work(system_highpri_wq, &mxfs_quorum_work,
+				   msecs_to_jiffies(MXFS_QUORUM_TICK_MS));
+	mutex_unlock(&mxfs_quorum_arm_lock);
+	return rc;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_quorum_arm);
+
+void mxfs_pal_quorum_disarm(void)
+{
+	bool stop = false;
+
+	mutex_lock(&mxfs_quorum_arm_lock);
+	spin_lock(&mxfs_quorum.lock);
+	if (mxfs_quorum.armed > 0)
+		stop = --mxfs_quorum.armed == 0;
+	spin_unlock(&mxfs_quorum.lock);
+	if (stop)
+		cancel_delayed_work_sync(&mxfs_quorum_work);
+	mutex_unlock(&mxfs_quorum_arm_lock);
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_quorum_disarm);
+
+int mxfs_pal_quorum_peer_gone(const char *peer, uint64_t alive_ms,
+			      uint64_t *gone_ms, char *why, size_t whylen)
+{
+	const char *lost_why;
+	u64 since, now = mxfs_pal_time_ms();
+	int idx, rc = 0;
+
+	*gone_ms = 0;
+	spin_lock(&mxfs_quorum.lock);
+	idx = mxfs_quorum_node_locked(peer);
+	if (mxfs_quorum_lost_locked(now, &lost_why, &since)) {
+		snprintf(why, whylen, "this node does not hold the vote (%s)", lost_why);
+	} else if (idx < 0) {
+		snprintf(why, whylen, "the peer %s is not a node of the corosync nodelist", peer);
+	} else if (alive_ms && mxfs_quorum.long_end[idx] >= alive_ms) {
+		/*
+		 * An absence of the whole bound that lasted until after the victim
+		 * was last seen alive: the victim was armed before it ended (it
+		 * was writing then), so before it began (a node out of the
+		 * membership is not quorate and cannot arm), and it ended its
+		 * boot within the bound.  It may be a member again by now: that
+		 * is a later boot.
+		 */
+		*gone_ms = mxfs_quorum.absent_since[idx] ?
+			   now - mxfs_quorum.absent_since[idx] : mxfs_quorum_takeover_ms;
+		rc = 1;
+	} else if (mxfs_quorum.member[idx] || !mxfs_quorum.absent_since[idx]) {
+		snprintf(why, whylen, "the peer %s is in the corosync membership, and no absence of the whole %u ms bound ended after it was last seen alive",
+			 peer, mxfs_quorum_takeover_ms);
+	} else {
+		*gone_ms = now - mxfs_quorum.absent_since[idx];
+		if (*gone_ms >= mxfs_quorum_takeover_ms)
+			rc = 1;
+		else
+			snprintf(why, whylen, "the vote has been held without the peer for %llu ms of the %u ms a quorum loser may still write",
+				 (unsigned long long)*gone_ms, mxfs_quorum_takeover_ms);
+	}
+	spin_unlock(&mxfs_quorum.lock);
+	return rc;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_quorum_peer_gone);
+
+void mxfs_pal_quorum_gate(const char *site)
+{
+	mxfs_quorum_check(site);
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_quorum_gate);
+
+int mxfs_pal_quorum_peer_boot(const char *peer, uint8_t host[16],
+			      uint8_t boot[16])
+{
+	const char *lost_why;
+	u64 since, now = mxfs_pal_time_ms();
+	int idx, rc = 0;
+
+	spin_lock(&mxfs_quorum.lock);
+	idx = mxfs_quorum_node_locked(peer);
+	if (idx >= 0 && !mxfs_quorum_lost_locked(now, &lost_why, &since) &&
+	    mxfs_quorum.member[idx] && mxfs_quorum.boot_known[idx]) {
+		memcpy(host, mxfs_quorum.host[idx], 16);
+		memcpy(boot, mxfs_quorum.boot[idx], 16);
+		rc = 1;
+	}
+	spin_unlock(&mxfs_quorum.lock);
+	return rc;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_quorum_peer_boot);
+
+int mxfs_pal_quorum_host_absent(const uint8_t host[16], uint64_t *absent_ms)
+{
+	const char *lost_why;
+	u64 since, now = mxfs_pal_time_ms();
+	int rc = 0;
+	u32 i;
+
+	*absent_ms = 0;
+	spin_lock(&mxfs_quorum.lock);
+	if (!mxfs_quorum.report_ms || now - mxfs_quorum.report_ms > mxfs_quorum_lease_ms ||
+	    mxfs_quorum_lost_locked(now, &lost_why, &since))
+		goto out;
+	/* the host announced from any member address is not absent */
+	for (i = 0; i < mxfs_quorum.nnodes; i++)
+		if (mxfs_quorum.member[i] && mxfs_quorum.host_seen[i] &&
+		    !memcmp(mxfs_quorum.host[i], host, 16))
+			goto out;
+	for (i = 0; i < mxfs_quorum.nnodes; i++)
+		if (!mxfs_quorum.member[i] && mxfs_quorum.host_seen[i] &&
+		    mxfs_quorum.absent_since[i] &&
+		    !memcmp(mxfs_quorum.host[i], host, 16)) {
+			*absent_ms = now - mxfs_quorum.absent_since[i];
+			rc = 1;
+			break;
+		}
+out:
+	spin_unlock(&mxfs_quorum.lock);
+	return rc;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_quorum_host_absent);
+
+uint64_t mxfs_pal_quorum_takeover_ms(void)
+{
+	return mxfs_quorum_takeover_ms;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_quorum_takeover_ms);
+
+/* Under mxfs_quorum.lock: renew {node, inc} in `t`, or take the free or
+ * oldest entry for it. */
+static void mxfs_quorum_post_locked(struct mxfs_quorum_xchg *t, u32 node,
+				    u64 inc, u64 now)
+{
+	u32 i, pick = 0;
+
+	for (i = 0; i < MXFS_QUORUM_XCHG_MAX; i++)
+		if (t[i].at_ms && t[i].node == node && t[i].inc == inc) {
+			t[i].at_ms = now;
+			return;
+		}
+	for (i = 0; i < MXFS_QUORUM_XCHG_MAX; i++) {
+		if (!t[i].at_ms || now - t[i].at_ms > MXFS_QUORUM_POST_MS) {
+			pick = i;
+			break;
+		}
+		if (t[i].at_ms < t[pick].at_ms)
+			pick = i;
+	}
+	t[pick].node = node;
+	t[pick].inc = inc;
+	t[pick].at_ms = now;
+}
+
+/* Under mxfs_quorum.lock: the last report is current and lists {node, inc}
+ * in `t` */
+static bool mxfs_quorum_heard_locked(const struct mxfs_quorum_xchg *t, u32 n,
+				     u32 node, u64 inc, u64 now)
+{
+	u32 i;
+
+	if (!mxfs_quorum.report_ms || now - mxfs_quorum.report_ms > mxfs_quorum_lease_ms)
+		return false;
+	for (i = 0; i < n; i++)
+		if (t[i].node == node && t[i].inc == inc)
+			return true;
+	return false;
+}
+
+void mxfs_pal_quorum_close_ask(uint32_t node, uint64_t incarnation)
+{
+	spin_lock(&mxfs_quorum.lock);
+	mxfs_quorum_post_locked(mxfs_quorum.ask_post, node, incarnation,
+				mxfs_pal_time_ms());
+	spin_unlock(&mxfs_quorum.lock);
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_quorum_close_ask);
+
+int mxfs_pal_quorum_close_asked(uint32_t node, uint64_t incarnation)
+{
+	bool heard;
+
+	spin_lock(&mxfs_quorum.lock);
+	heard = mxfs_quorum_heard_locked(mxfs_quorum.asks, mxfs_quorum.nasks,
+					 node, incarnation, mxfs_pal_time_ms());
+	spin_unlock(&mxfs_quorum.lock);
+	return heard;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_quorum_close_asked);
+
+void mxfs_pal_quorum_closed_post(uint32_t node, uint64_t incarnation)
+{
+	spin_lock(&mxfs_quorum.lock);
+	mxfs_quorum_post_locked(mxfs_quorum.closed_post, node, incarnation,
+				mxfs_pal_time_ms());
+	spin_unlock(&mxfs_quorum.lock);
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_quorum_closed_post);
+
+int mxfs_pal_quorum_peer_closed(uint32_t node, uint64_t incarnation)
+{
+	bool heard;
+
+	spin_lock(&mxfs_quorum.lock);
+	heard = mxfs_quorum_heard_locked(mxfs_quorum.closed, mxfs_quorum.nclosed,
+					 node, incarnation, mxfs_pal_time_ms());
+	spin_unlock(&mxfs_quorum.lock);
+	return heard;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_quorum_peer_closed);
+
 /* ═══════════════════════════ lifetime ═══════════════════════════ */
 
 int mxfs_pal_drbd_init(void)
@@ -2430,13 +4108,52 @@ int mxfs_pal_drbd_init(void)
 	if (!mxfs_drbdx_pde)
 		pr_warn("mxfs: P-DRBDX-NOCHAN could not create /proc/%s -- a DRBD peer's death waits out the TCP link's timeout and grace\n",
 			MXFS_DRBDX_PROC_NAME);
+	/* The shared attachment's two channels.  Without either, a mount using
+	 * that method is refused at arm (vcenter) or can never be given a
+	 * confirmation (manual, whose arm then refuses too). */
+	init_completion(&mxfs_fenceh_slot.done);
+	mxfs_fenceh_pde = proc_create(MXFS_FENCEH_PROC_NAME, 0200, NULL,
+				      &mxfs_fenceh_report_ops);
+	if (!mxfs_fenceh_pde)
+		pr_warn("mxfs: P-FENCEH-NOCHAN could not create %s -- fence=vcenter mounts are refused\n",
+			MXFS_FENCEH_PROC_PATH);
+	mxfs_fencec_pde = proc_create(MXFS_FENCEC_PROC_NAME, 0600, NULL,
+				      &mxfs_fencec_ops);
+	if (!mxfs_fencec_pde)
+		pr_warn("mxfs: P-FENCEC-NOCHAN could not create /proc/%s -- fence=manual mounts are refused\n",
+			MXFS_FENCEC_PROC_NAME);
+	mxfs_quorum_pde = proc_create(MXFS_QUORUM_PROC_NAME, 0600, NULL,
+				      &mxfs_quorum_ops);
+	if (!mxfs_quorum_pde)
+		pr_warn("mxfs: P-QUORUM-NOCHAN could not create /proc/%s -- fence=quorum mounts are refused\n",
+			MXFS_QUORUM_PROC_NAME);
 	return 0;
 }
+
+bool mxfs_pal_fence_confirm_channel(void)
+{
+	return mxfs_fencec_pde != NULL;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_fence_confirm_channel);
 
 void mxfs_pal_drbd_exit(void)
 {
 	struct mxfs_drbd_excl_watch *w, *n;
 
+	/* no mount is armed once the module can unload */
+	cancel_delayed_work_sync(&mxfs_quorum_work);
+	if (mxfs_quorum_pde) {
+		proc_remove(mxfs_quorum_pde);
+		mxfs_quorum_pde = NULL;
+	}
+	if (mxfs_fencec_pde) {
+		proc_remove(mxfs_fencec_pde);
+		mxfs_fencec_pde = NULL;
+	}
+	if (mxfs_fenceh_pde) {
+		proc_remove(mxfs_fenceh_pde);
+		mxfs_fenceh_pde = NULL;
+	}
 	if (mxfs_drbdx_pde) {
 		proc_remove(mxfs_drbdx_pde);
 		mxfs_drbdx_pde = NULL;

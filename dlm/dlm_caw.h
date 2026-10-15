@@ -665,6 +665,16 @@ struct mxfs_dlm_caw_ctx {
 	 * and I/O-free.  NULL = never asked. */
 	int                     (*authority_lost_fn)(void *data);
 	void                    *authority_lost_data;
+	/* Has the waiting task nothing left to wait for?  Asked every poll lap
+	 * of an inode or AG wait; >0 ends the wait with -ETIMEDOUT at once instead of
+	 * at the end of the budget.  The mount uses it for its root lookup: a
+	 * peer that died during the mount holds grants only the mount's own
+	 * barrier can replay, so the lookup gives up as soon as that death is
+	 * recorded, and the mount re-runs the barrier.  Must be cheap and
+	 * I/O-free.  NULL = never asked. */
+	int                     (*wait_giveup_fn)(void *data,
+						  const struct mxfs_resource_id *res);
+	void                    *wait_giveup_data;
 	/* (design-consult review items 2+3): SKIP-ONLY candidate hint — bit i set
 	 * iff this mount has imported a terminal AG_MASK refusal for heartbeat
 	 * slot i.  Published by v5 on every outcome import; read with no I/O.
@@ -1892,6 +1902,11 @@ void mxfs_dlm_caw_set_wait_refuse_fn(struct mxfs_dlm_caw_ctx *ctx,
 				     int (*fn)(void *data,
 					       const struct mxfs_resource_id *res),
 									 void *data);
+/* Registers the wait give-up oracle (see wait_giveup_fn in the ctx). */
+void mxfs_dlm_caw_set_wait_giveup_fn(struct mxfs_dlm_caw_ctx *ctx,
+				     int (*fn)(void *data,
+					       const struct mxfs_resource_id *res),
+				     void *data);
 void mxfs_dlm_caw_set_closure_scrub_fn(struct mxfs_dlm_caw_ctx *ctx,
 				       int (*fn)(void *data,
 						 uint8_t blocking_slot,

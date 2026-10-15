@@ -1,0 +1,295 @@
+{
+  "_": "The release table (tools/release_status.py): every configuration a release ships, one row each, and what proves it. A row is Ready only when every source below passes on the release build and no release-blocking defect (tools/defects.py <config> --release) is open for any of its configurations. 'boards' are criteria boards (tools/criteria.py): every cell PASS, recorded on the release build. 'runs' are verifications that are not boards: the newest file matching 'glob' must match 'pass' and name the release build ('build' is a regex whose group 1 is the srcversion, or 'version' whose group 1 is the MeshXFS version). A board on hosts that build the module against their own kernel names its build by the cluster marker that run recorded ('build_from_marker'), since its srcversion differs from this tree's .ko by construction. Every row carries the platform it runs on (data/platforms.json key), so a defect confined to another platform does not block it; the rig's rows run on the rig's Ubuntu 24.04. After the rows, every platform data/platforms.json marks released gets a row of its own, judged by its steps in tests/evidence/full_verify_<version>.log (the last result of each must be rc=0) and by the defects that reach its 2-node configurations on that platform. One row per independently verified unit (a configuration's board, a kernel's run), so a unit that has passed shows Ready whatever the others are doing.",
+  "rows": [
+    {
+      "nodes": "2",
+      "attachment": "DRBD dual-primary, physical Proxmox VE 9 hosts (pve1/pve2)",
+      "configs": [
+        "2/net/mesh/drbd"
+      ],
+      "platform": "pve9",
+      "runs": [
+        {
+          "what": "network-cable pull on the physical pair (tests/pve_cable_pull.sh)",
+          "glob": "tests/evidence/pve_cable_pull/*/result.txt",
+          "pass": "^RESULT: PASS",
+          "version": "version=(\\S+)"
+        }
+      ],
+      "_": "The physical pair is old hardware and is used for the one test VMs cannot do: a person pulling a host's network cable (owner's decision, 2026-10-15). The board, the crash rows and every other failure test of 2/net/mesh/drbd run on VMs (the test1/test2 rig row below)."
+    },
+    {
+      "nodes": "2",
+      "attachment": "DRBD dual-primary, failure tests (test1/test2 rig)",
+      "configs": [
+        "2/net/mesh/drbd"
+      ],
+      "runs": [
+        {
+          "what": "tests/drbd_release_verify.sh",
+          "glob": "tests/evidence/drbd_release_verify_{version}.out",
+          "pass": "^DRBD_RELEASE_VERIFY PASS ",
+          "build": "srcversion=([0-9A-F]{23})"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "2",
+      "attachment": "Shared SAN LUN, single path",
+      "configs": [
+        "2/disk/caw/direct"
+      ],
+      "boards": [
+        {
+          "config": "2/disk/caw/direct"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "4",
+      "attachment": "Shared SAN LUN, single path",
+      "configs": [
+        "4/disk/caw/direct"
+      ],
+      "boards": [
+        {
+          "config": "4/disk/caw/direct"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "8",
+      "attachment": "Shared SAN LUN, single path",
+      "configs": [
+        "8/disk/caw/direct"
+      ],
+      "boards": [
+        {
+          "config": "8/disk/caw/direct"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "16",
+      "attachment": "Shared SAN LUN, single path",
+      "configs": [
+        "16/disk/caw/direct"
+      ],
+      "boards": [
+        {
+          "config": "16/disk/caw/direct"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "2",
+      "attachment": "Shared SAN LUN, multipath",
+      "configs": [
+        "2/disk/caw/mpath"
+      ],
+      "boards": [
+        {
+          "config": "2/disk/caw/mpath"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "4",
+      "attachment": "Shared SAN LUN, multipath",
+      "configs": [
+        "4/disk/caw/mpath"
+      ],
+      "boards": [
+        {
+          "config": "4/disk/caw/mpath"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "8",
+      "attachment": "Shared SAN LUN, multipath",
+      "configs": [
+        "8/disk/caw/mpath"
+      ],
+      "boards": [
+        {
+          "config": "8/disk/caw/mpath"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "16",
+      "attachment": "Shared SAN LUN, multipath",
+      "configs": [
+        "16/disk/caw/mpath"
+      ],
+      "boards": [
+        {
+          "config": "16/disk/caw/mpath"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "3",
+      "attachment": "Proxmox VE 9 hosts on a multipath SAN, kernel 6.17 (failover, migration, HA)",
+      "configs": [
+        "3/disk/caw/mpath"
+      ],
+      "runs": [
+        {
+          "what": "scripts/pve_full_suite.sh on kernel 6.17 (the Proxmox VE 9.1 install)",
+          "glob": [
+            "tests/evidence/pve_full_suite/*/suite.txt",
+            "tests/evidence/pve_full_suite_*.out"
+          ],
+          "pass": "^SUITE: PASS ",
+          "host_build": "^192\\.\\S+ (?:[0-9.]+ )?([0-9A-F]{23}) ",
+          "kernel": "6.17.2-1-pve",
+          "terminal": "^SUITE: "
+        }
+      ],
+      "platform": "pve9"
+    },
+    {
+      "nodes": "3",
+      "attachment": "Proxmox VE 9 hosts on a multipath SAN, kernel 7.0 (failover, migration, HA)",
+      "configs": [
+        "3/disk/caw/mpath"
+      ],
+      "runs": [
+        {
+          "what": "scripts/pve_full_suite.sh on kernel 7.0 (proxmox-default-kernel)",
+          "glob": [
+            "tests/evidence/pve_full_suite/*/suite.txt",
+            "tests/evidence/pve_full_suite_*.out"
+          ],
+          "pass": "^SUITE: PASS ",
+          "host_build": "^192\\.\\S+ (?:[0-9.]+ )?([0-9A-F]{23}) ",
+          "kernel": "7.0.14-24-pve",
+          "terminal": "^SUITE: "
+        }
+      ],
+      "platform": "pve9"
+    },
+    {
+      "nodes": "2",
+      "attachment": "Shared LUN over the TCP lock network, single path",
+      "configs": [
+        "2/net/mesh/direct"
+      ],
+      "boards": [
+        {
+          "config": "2/net/mesh/direct"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "4",
+      "attachment": "Shared LUN over the TCP lock network, single path",
+      "configs": [
+        "4/net/mesh/direct"
+      ],
+      "boards": [
+        {
+          "config": "4/net/mesh/direct"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "8",
+      "attachment": "Shared LUN over the TCP lock network, single path",
+      "configs": [
+        "8/net/mesh/direct"
+      ],
+      "boards": [
+        {
+          "config": "8/net/mesh/direct"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "16",
+      "attachment": "Shared LUN over the TCP lock network, single path",
+      "configs": [
+        "16/net/mesh/direct"
+      ],
+      "boards": [
+        {
+          "config": "16/net/mesh/direct"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "2",
+      "attachment": "Shared LUN over the TCP lock network, multipath",
+      "configs": [
+        "2/net/mesh/mpath"
+      ],
+      "boards": [
+        {
+          "config": "2/net/mesh/mpath"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "4",
+      "attachment": "Shared LUN over the TCP lock network, multipath",
+      "configs": [
+        "4/net/mesh/mpath"
+      ],
+      "boards": [
+        {
+          "config": "4/net/mesh/mpath"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "8",
+      "attachment": "Shared LUN over the TCP lock network, multipath",
+      "configs": [
+        "8/net/mesh/mpath"
+      ],
+      "boards": [
+        {
+          "config": "8/net/mesh/mpath"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "16",
+      "attachment": "Shared LUN over the TCP lock network, multipath",
+      "configs": [
+        "16/net/mesh/mpath"
+      ],
+      "boards": [
+        {
+          "config": "16/net/mesh/mpath"
+        }
+      ],
+      "platform": "ubuntu2404"
+    }
+  ],
+  "platform_rounds": {
+    "log": "tests/evidence/full_verify_{version}.log",
+    "configs": [
+      "2/net/mesh/direct",
+      "2/disk/caw/direct"
+    ]
+  }
+}

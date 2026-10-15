@@ -830,6 +830,8 @@ xfs_buf_alloc(
 	bp->b_hold = 1;
 	mxfs_hold_ev(bp, MXFS_HS_ALLOC, 1, _RET_IP_);
 	sema_init(&bp->b_sema, 0); /* held, no waiters */
+	bp->b_mxfs_lock_pid = current->pid;
+	bp->b_mxfs_lock_jif = jiffies;
 	INIT_LIST_HEAD(&bp->b_mxfs_live);
 	spin_lock(&mxfs_buf_live_lock);
 	list_add_tail(&bp->b_mxfs_live, &mxfs_buf_live);
@@ -1245,6 +1247,83 @@ mxfs_dir_canonical_buf_ptr(
 	if (pag)
 		xfs_perag_put(pag);
 	return bp;
+}
+
+/*
+ * Report a cached buffer that a trylock could not take, without taking it:
+ * a hold keeps it alive while its state is read.  Prints the flags, the
+ * hold and pin counts, the I/O completion counters and event ring, the
+ * caller and task that locked it and how long ago, and that task's stack.
+ * For a caller that skipped the buffer and needs to know whether the holder
+ * is I/O in flight, writeback, or another task working on it.  Capped:
+ * the first 40 reports, the first 12 with a stack.
+ */
+extern void mxfs_pal_dump_task_stack(int pid);
+extern bool mxfs_pal_stall_stacks(void);
+void
+mxfs_buf_report_locked(
+	struct xfs_buftarg	*btp,
+	xfs_daddr_t		blkno,
+	size_t			numblks,
+	const char		*why,
+	unsigned long long	ino)
+{
+	static atomic_t		rl_n = ATOMIC_INIT(0);
+	struct xfs_buf_map	cmap = { .bm_bn = blkno, .bm_len = numblks };
+	struct xfs_buf_cache	*bch;
+	struct xfs_perag	*pag;
+	struct xfs_buf		*bp;
+	unsigned int		evi;
+	pid_t			pid;
+	int			n;
+
+	n = atomic_inc_return(&rl_n);
+	if (n > 40 || xfs_buf_map_verify(btp, &cmap))
+		return;
+	pag = xfs_buftarg_get_pag(btp, &cmap);
+	bch = xfs_buftarg_buf_cache(btp, pag);
+	rcu_read_lock();
+	bp = rhashtable_lookup(&bch->bc_hash, &cmap, xfs_buf_hash_params);
+	if (bp && !xfs_buf_try_hold(bp))
+		bp = NULL;
+	rcu_read_unlock();
+	if (pag)
+		xfs_perag_put(pag);
+	if (!bp) {
+		pr_warn("mxfs: P-BUFLOCK-HOLDER n=%d %s ino=%llu daddr=%lld -- no longer cached\n",
+			n, why, ino, (long long)blkno);
+		return;
+	}
+	evi = bp->b_mxfs_evi;
+	pid = READ_ONCE(bp->b_mxfs_lock_pid);
+	pr_warn("mxfs: P-BUFLOCK-HOLDER n=%d %s ino=%llu daddr=%lld ops=%s flags=0x%x sema=%d hold=%u pin=%d err=%d bli=%d delwri=%d lock_ip=%pS lock_pid=%d lock_age_ms=%u ioend_seen=%u relse_seen=%u syncw=%d evi=%u ev=[%016llx %016llx %016llx %016llx %016llx %016llx %016llx %016llx] comm=%s pid=%d tgid=%d\n",
+		n, why, ino, (long long)blkno,
+		bp->b_ops && bp->b_ops->name ? bp->b_ops->name : "?",
+		(unsigned int)bp->b_flags, READ_ONCE(bp->b_sema.count),
+		bp->b_hold, atomic_read(&bp->b_pin_count), bp->b_error,
+		bp->b_log_item ? 1 : 0,
+		(bp->b_flags & _XBF_DELWRI_Q) ? 1 : 0,
+		bp->b_lock_ip, pid,
+		jiffies_to_msecs(jiffies - READ_ONCE(bp->b_mxfs_lock_jif)),
+		bp->b_mxfs_ioend_seen, bp->b_mxfs_relse_seen,
+		atomic_read(&bp->b_mxfs_sync_waiters), evi,
+		bp->b_mxfs_evring[(evi + 0) & 7],
+		bp->b_mxfs_evring[(evi + 1) & 7],
+		bp->b_mxfs_evring[(evi + 2) & 7],
+		bp->b_mxfs_evring[(evi + 3) & 7],
+		bp->b_mxfs_evring[(evi + 4) & 7],
+		bp->b_mxfs_evring[(evi + 5) & 7],
+		bp->b_mxfs_evring[(evi + 6) & 7],
+		bp->b_mxfs_evring[(evi + 7) & 7],
+		current->comm, current->pid, current->tgid);
+	/* the holder's stack, and the reporting task's own (which caller
+	 * skipped the buffer) */
+	if (n <= 12 && mxfs_pal_stall_stacks()) {
+		if (pid > 0 && pid != current->pid)
+			mxfs_pal_dump_task_stack(pid);
+		dump_stack();
+	}
+	xfs_buf_rele(bp);
 }
 
 /*
@@ -2886,6 +2965,8 @@ xfs_buf_trylock(
 	if (locked) {
 		mxfs_buf_sema_dualock_check(bp, "trylock");
 		bp->b_lock_ip = __builtin_return_address(0);
+		bp->b_mxfs_lock_pid = current->pid;
+		bp->b_mxfs_lock_jif = jiffies;
 		trace_xfs_buf_trylock(bp, _RET_IP_);
 	} else
 		trace_xfs_buf_trylock_fail(bp, _RET_IP_);
@@ -2950,6 +3031,8 @@ xfs_buf_lock(
 	}
 	mxfs_buf_sema_dualock_check(bp, "lock");
 	bp->b_lock_ip = __builtin_return_address(0);
+	bp->b_mxfs_lock_pid = current->pid;
+	bp->b_mxfs_lock_jif = jiffies;
 
 	trace_xfs_buf_lock_done(bp, _RET_IP_);
 }
@@ -4034,7 +4117,7 @@ xfs_buf_ioerror_alert(
 	struct xfs_buf		*bp,
 	xfs_failaddr_t		func)
 {
-	xfs_buf_alert_ratelimited(bp, "XFS: metadata IO error",
+	xfs_buf_alert_ratelimited(bp, "mxfs: metadata IO error",
 		"metadata I/O error in \"%pS\" at daddr 0x%llx len %d error %d",
 				  func, (uint64_t)xfs_buf_daddr(bp),
 				  bp->b_length, -bp->b_error);
@@ -11081,7 +11164,16 @@ xfs_buf_submit_ex(
 				(unsigned long long)(p88_bip ?
 					p88_bip->bli_item.li_lsn : 0));
 			}
-			if (nr == 1 && p88_dd == 1 && p88_held == 0) {
+			/*
+			 * Not the task replaying a dead node's log: it writes
+			 * that node's logged images while not holding the AG
+			 * itself, and the dead node's EX on the AG is kept until
+			 * the replay completes, so no peer wrote the AG after
+			 * them.  On pve9 the replay after an HA power cut fired
+			 * this for an AG the dead host held EX when it died.
+			 */
+			if (nr == 1 && p88_dd == 1 && p88_held == 0 &&
+			    READ_ONCE(bp->b_mount->m_mxfs_freplay_task) != current) {
 				static bool p88_dumped;
 				if (!p88_dumped) {
 					p88_dumped = true;
@@ -13219,7 +13311,7 @@ xfs_buftarg_drain(
 			if (bp->b_flags & XBF_WRITE_FAIL) {
 				write_fail = true;
 				xfs_buf_alert_ratelimited(bp,
-					"XFS: Corruption Alert",
+					"mxfs: Corruption Alert",
 "Corruption Alert: Buffer at daddr 0x%llx had permanent write failures!",
 					(long long)xfs_buf_daddr(bp));
 			}
@@ -13315,7 +13407,7 @@ xfs_buftarg_shrink_scan(
 	struct shrinker		*shrink,
 	struct shrink_control	*sc)
 {
-	struct xfs_buftarg	*btp = shrink->private_data;
+	struct xfs_buftarg	*btp = mxfs_shrinker_private(shrink);
 	LIST_HEAD(dispose);
 	unsigned long		freed;
 
@@ -13337,7 +13429,7 @@ xfs_buftarg_shrink_count(
 	struct shrinker		*shrink,
 	struct shrink_control	*sc)
 {
-	struct xfs_buftarg	*btp = shrink->private_data;
+	struct xfs_buftarg	*btp = mxfs_shrinker_private(shrink);
 	return list_lru_shrink_count(&btp->bt_lru, sc);
 }
 
@@ -13360,6 +13452,8 @@ xfs_free_buftarg(
 	/* the main block device is closed by kill_block_super */
 	if (btp->bt_bdev != btp->bt_mount->m_super->s_bdev)
 		bdev_fput(btp->bt_file);
+	else
+		mxfs_sb_bdev_file_release(btp->bt_file);
 	kfree(btp);
 }
 
@@ -13449,12 +13543,12 @@ xfs_init_buftarg(
 		goto out_destroy_lru;
 
 	btp->bt_shrinker =
-		shrinker_alloc(SHRINKER_NUMA_AWARE, "xfs-buf:%s", descr);
+		shrinker_alloc(SHRINKER_NUMA_AWARE, "mxfs-buf:%s", descr);
 	if (!btp->bt_shrinker)
 		goto out_destroy_io_count;
 	btp->bt_shrinker->count_objects = xfs_buftarg_shrink_count;
 	btp->bt_shrinker->scan_objects = xfs_buftarg_shrink_scan;
-	btp->bt_shrinker->private_data = btp;
+	mxfs_shrinker_set_private(btp->bt_shrinker, btp);
 	shrinker_register(btp->bt_shrinker);
 	return 0;
 

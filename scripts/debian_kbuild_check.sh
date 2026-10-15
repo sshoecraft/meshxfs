@@ -50,13 +50,25 @@ if docker inspect "$NAME" >/dev/null 2>&1; then
 else
     docker run -d --name "$NAME" --network host -v "$SRCDIR:/src/mxfs:ro" \
         "$IMAGE" sleep infinity >/dev/null
-    docker exec "$NAME" bash -c '
-        set -e
-        export DEBIAN_FRONTEND=noninteractive
-        apt-get -q update >/dev/null
-        apt-get -q -y install gcc make rsync kmod libelf-dev linux-headers-amd64 >/dev/null
-    '
 fi
+# The marker is written only after the install succeeds, so a container whose
+# install failed is set up again on the next run rather than reused without
+# its compiler or headers.
+docker exec "$NAME" bash -c '
+    set -e
+    [ -f /root/.mxfs-kbuild-ready ] && exit 0
+    export DEBIAN_FRONTEND=noninteractive
+    # bullseye-security on deb.debian.org still lists packages whose files have
+    # moved to archive.debian.org, so every install from it 404s (lab/vms.md
+    # takes the Debian 11 VMs the same way).
+    if grep -q "^VERSION_CODENAME=bullseye$" /etc/os-release; then
+        sed -i "s#deb.debian.org/debian-security#archive.debian.org/debian-security#" \
+            /etc/apt/sources.list
+    fi
+    apt-get -q update >/dev/null
+    apt-get -q -y install gcc make rsync kmod libelf-dev linux-headers-amd64 >/dev/null
+    touch /root/.mxfs-kbuild-ready
+'
 
 docker exec -e KRELS="$*" "$NAME" bash -c '
 set -e

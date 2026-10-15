@@ -84,8 +84,8 @@ def test_concurrent_removes_both_persist():
             report(False, "ledger copy has fewer than 2 records")
             return
         lost = []
-        trials = 20
-        for trial in range(trials):
+        attempts = 20
+        for attempt in range(attempts):
             shutil.copy2(REAL_LEDGER, ledger)
             first, second = before[0], before[1]
             procs = [
@@ -101,9 +101,9 @@ def test_concurrent_removes_both_persist():
             after = ids_of(ledger)
             back = [i for i in (first, second) if i in after]
             if back:
-                lost.append((trial, back))
-        note("%d trials, %d with a resurrected record" % (trials, len(lost)))
-        report(not lost, "resurrected on %d/%d trials: %s" % (len(lost), trials, lost[:3]))
+                lost.append((attempt, back))
+        note("%d attempts, %d with a resurrected record" % (attempts, len(lost)))
+        report(not lost, "resurrected on %d/%d attempts: %s" % (len(lost), attempts, lost[:3]))
 
 
 def test_lock_actually_excludes():

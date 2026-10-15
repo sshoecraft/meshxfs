@@ -98,6 +98,29 @@ node and per fault, and every value is kept in the row's evidence so the
 distribution across runs is regression data. The bound in section 1 is the
 verdict; the expected figure from the settings is only a prediction.
 
+**A node that has lost every path says so (F7).** Its beats do not fail, they
+stand queued: with the settings of T4 multipath fails I/O only `no_path_retry`
+intervals after the last path is gone, about 35 s after the loss, by which
+time the node's own authority lease (30 s) has already closed. Its peers could
+only learn of the loss by waiting out the death window (34 s on SCSI), and
+every one of their operations that needs a lock the node held waited with
+them. The node is still a corosync member, though, and that network is the one
+it did not lose. So a survivor whose own beats land, after three checks of a
+live peer's stamp standing still, asks that node over corosync (the
+`mxfs-boot` CPG group `mxfs_quorumd` already uses) whether it has lost the
+LUN. The node closes its authority on that ask only when every SCSI path to the
+LUN is offline by its transport's own verdict and its beat has not landed for
+6 s; it then announces the close, and a survivor that hears it for that exact
+node and incarnation declares the death without the rest of the window. The
+close is what the window exists to wait for, so nothing is inferred from the
+clock; whatever the node had already submitted is stopped by the fence, which
+still has to prove exclusion on the target, exactly as after a lease expiry.
+The ask is what keeps this from unmounting the cluster when the target itself
+restarts: then every path of every host is offline, nobody's beats land, and
+nobody asks. The cost is a node that loses both paths for between ~15 s and
+the 30 s its lease would have ridden out, while its peers keep theirs: it now
+stops at the ask instead of carrying on when the paths return.
+
 F5-F8 and F10 exist because fencing is per path. A SCSI persistent reservation is held
 per initiator-target nexus, and a multipathed node has one nexus per path. Every
 way a path can be absent at the moment a registration is made, preempted or

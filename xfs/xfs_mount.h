@@ -317,6 +317,7 @@ typedef struct xfs_mount {
 	struct mxfs_static_peers *m_mxfs_peers;	/* peers= option; NULL = multicast */
 	char			*m_mxfs_cluster_name;	/* cluster= option; NULL = none */
 	int			m_mxfs_transport;	/* transport= option: MXFS_MOUNT_TRANSPORT_* */
+	int			m_mxfs_fence;		/* fence= option: MXFS_V5_FENCE_* (0 = scsipr) */
 	struct xfs_da_geometry	*m_dir_geo;	/* directory block geometry */
 	struct xfs_da_geometry	*m_attr_geo;	/* attribute block geometry */
 	struct xlog		*m_log;		/* log specific stuff */
@@ -1429,13 +1430,15 @@ void xfs_do_force_shutdown(struct xfs_mount *mp, uint32_t flags, char *fname,
 #define SHUTDOWN_CORRUPT_INCORE	(1u << 3) /* corrupt in-memory structures */
 #define SHUTDOWN_CORRUPT_ONDISK	(1u << 4)  /* corrupt metadata on device */
 #define SHUTDOWN_DEVICE_REMOVED	(1u << 5) /* device removed underneath us */
+#define SHUTDOWN_CLUSTER_FENCED	(1u << 6) /* the cluster fenced this node off the shared storage */
 
 #define XFS_SHUTDOWN_STRINGS \
 	{ SHUTDOWN_META_IO_ERROR,	"metadata_io" }, \
 	{ SHUTDOWN_LOG_IO_ERROR,	"log_io" }, \
 	{ SHUTDOWN_FORCE_UMOUNT,	"force_umount" }, \
 	{ SHUTDOWN_CORRUPT_INCORE,	"corruption" }, \
-	{ SHUTDOWN_DEVICE_REMOVED,	"device_removed" }
+	{ SHUTDOWN_DEVICE_REMOVED,	"device_removed" }, \
+	{ SHUTDOWN_CLUSTER_FENCED,	"cluster_fenced" }
 
 /*
  * Flags for xfs_mountfs

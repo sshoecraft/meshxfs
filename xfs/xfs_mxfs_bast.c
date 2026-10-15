@@ -5975,7 +5975,7 @@ skip_bast_cluster_stale:
 	if (mxfs_dir_bast_evict && S_ISDIR(vip->i_mode) && mp->m_mxfs_dlm &&
 	    !mxfs_v5_dlm_is_single_node(mp->m_mxfs_dlm)) {
 		if (xfs_ilock_nowait(ip, XFS_ILOCK_SHARED)) {
-			mxfs_dir_evict_data_blocks(ip);
+			mxfs_dir_evict_data_blocks(ip, false);
 			/* D-0532: nowait ILOCK had no DLM begin */
 			xfs_iunlock_nodlm(ip, XFS_ILOCK_SHARED);
 		}

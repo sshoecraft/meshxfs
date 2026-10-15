@@ -12,7 +12,7 @@ void xfs_printk_level(const char *kern_level, const struct xfs_mount *mp,
 
 #define xfs_printk_index_wrap(kern_level, mp, fmt, ...)		\
 ({								\
-	printk_index_subsys_emit("%sXFS%s: ", kern_level, fmt);	\
+	printk_index_subsys_emit("%smxfs%s: ", kern_level, fmt);	\
 	xfs_printk_level(kern_level, mp, fmt, ##__VA_ARGS__);	\
 })
 #define xfs_emerg(mp, fmt, ...) \
@@ -38,7 +38,7 @@ void xfs_printk_level(const char *kern_level, const struct xfs_mount *mp,
 
 #define xfs_alert_tag(mp, tag, fmt, ...)			\
 ({								\
-	printk_index_subsys_emit("%sXFS%s: ", KERN_ALERT, fmt);	\
+	printk_index_subsys_emit("%smxfs%s: ", KERN_ALERT, fmt);	\
 	_xfs_alert_tag(mp, tag, fmt, ##__VA_ARGS__);		\
 })
 

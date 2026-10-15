@@ -631,7 +631,7 @@ mxfs_ilk_note_long_hold(
 		(void *)ip->i_mxfs_ilk_wr_ret, ip->i_mxfs_ilk_wr_pid,
 		ip->i_mxfs_ilk_wr_comm, (void *)ret_ip, current->pid,
 		current->comm);
-	if (atomic_inc_return(&stacks) <= 16)
+	if (mxfs_pal_stall_stacks() && atomic_inc_return(&stacks) <= 16)
 		dump_stack();
 }
 
@@ -1941,7 +1941,7 @@ retry_iget:
 						"mxfs: P34H-POISON-ALIAS ino=%llu dentry=%pd d_count=%u children=%d d_flags=0x%x\n",
 						(unsigned long long)(*ipp)->i_ino, al,
 						d_count(al),
-						hlist_empty(&al->d_children) ? 0 : 1,
+						mxfs_dentry_has_children(al) ? 1 : 0,
 						al->d_flags);
 				spin_unlock(&vi->i_lock);
 			}
@@ -4646,6 +4646,16 @@ xfs_inactive_truncate(
 		return error;
 	}
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
+
+	/*
+	 * mxfs: load the extent list while the transaction is clean, as
+	 * xfs_setattr_size does: a fork whose platter image a reload rejected
+	 * is refused here instead of inside xfs_itruncate_extents, where the
+	 * logged size change below would make the cancel shut the fs down.
+	 */
+	error = xfs_iread_extents(tp, ip, XFS_DATA_FORK);
+	if (error)
+		goto error_trans_cancel;
 	xfs_trans_ijoin(tp, ip, 0);
 
 	/*

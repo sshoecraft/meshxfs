@@ -49,16 +49,35 @@ if [ -z "$LBA" ]; then
     fi
 fi
 
+[ -x "$CAW" ] || { emit FAIL setup "caw_verify missing"; exit 1; }
+# A helper that cannot start is not the array refusing the command: a
+# caw_verify linked against a newer glibc than the node's exited 1 with the
+# loader's message and read as caw=fail on a stack that does COMPARE AND WRITE.
+for t in "$FUA" "$CAW"; do
+    lo=$("$t" 2>&1 >/dev/null); lrc=$?
+    if [ "$lrc" = 127 ] || printf '%s' "$lo" | grep -aq -E "version .GLIBC_[0-9.]+. not found|error while loading shared libraries"; then
+        emit FAIL setup "$(basename "$t") does not start on this node: $(printf '%s' "$lo" | head -1 | cut -c1-200)"; exit 1
+    fi
+done
+
 fua=fail
 "$FUA" write "$DEV" "$LBA" ab >/dev/null 2>&1 && "$FUA" read "$DEV" "$LBA" >/dev/null 2>&1 && fua=ok
 caw=fail
-[ -x "$CAW" ] && "$CAW" write "$DEV" "$LBA" cd >/dev/null 2>&1 && "$CAW" read "$DEV" "$LBA" cd >/dev/null 2>&1 && caw=ok
+"$CAW" write "$DEV" "$LBA" cd >/dev/null 2>&1 && "$CAW" read "$DEV" "$LBA" cd >/dev/null 2>&1 && caw=ok
 
 measured="fua=$fua caw=$caw lba=$LBA"
 if [ "$fua" = ok ] && [ "$caw" = ok ]; then
   emit PASS "$measured"
-elif [ "$fua" != ok ] && [ "$caw" != ok ]; then
-  emit SKIP "$measured" "CAW/FUA SG_IO primitives unsupported on this stack (LIO/tcm_loop -> ILLEGAL REQUEST); TCP DLM does not require them — verify on SCST"
 else
-  emit PASS "$measured" "partial: one primitive supported"
+  # The disk transports lock with COMPARE AND WRITE and order with FUA, so on
+  # them a primitive that fails is a failed row, whichever one it is.
+  case "${MXFS_CONFIG:-}" in
+  */disk/*)
+    emit FAIL "$measured" "the ${MXFS_CONFIG} DLM needs both CAW and FUA on $DEV"; exit 1 ;;
+  esac
+  if [ "$fua" != ok ] && [ "$caw" != ok ]; then
+    emit SKIP "$measured" "CAW/FUA SG_IO primitives unsupported on this stack (LIO/tcm_loop -> ILLEGAL REQUEST); TCP DLM does not require them — verify on SCST"
+  else
+    emit PASS "$measured" "partial: one primitive supported (not a disk-transport configuration)"
+  fi
 fi

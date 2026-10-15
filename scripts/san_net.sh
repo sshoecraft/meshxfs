@@ -110,8 +110,26 @@ NODE_CONFIG='
                 || nmcli con add type ethernet ifname $i con-name mxfs-san-$i ipv4.method auto ipv4.never-default yes ipv4.ignore-auto-dns yes ipv6.method disabled connection.autoconnect yes >/dev/null 2>&1
             nmcli con up mxfs-san-$i >/dev/null 2>&1
         done
+    elif [ -f /etc/network/interfaces ] && command -v ifreload >/dev/null 2>&1; then
+        # Proxmox VE (ifupdown2): a static address on each storage network,
+        # below the DHCP pool, so no lease can rewrite the host resolver or
+        # routes; the host octet comes from the attach (STATIC_OCTET)
+        [ -n "STATIC_OCTET" ] || { echo "CONFIG_FAIL ifupdown node needs a static octet (a node name ending in 1-8)"; exit 0; }
+        grep -q "^source /etc/network/interfaces.d/" /etc/network/interfaces \
+            || echo "source /etc/network/interfaces.d/*" >> /etc/network/interfaces
+        mkdir -p /etc/network/interfaces.d
+        f=/etc/network/interfaces.d/mxfs-san
+        { for i in $nics; do
+              case "$(cat /sys/class/net/$i/address)" in
+                  MACA) pre=PREA ;;
+                  MACB) pre=PREB ;;
+                  *) continue ;;
+              esac
+              echo "auto $i"; echo "iface $i inet static"; echo "    address $pre.STATIC_OCTET/24"; echo
+          done; } > $f.new
+        cmp -s $f.new $f 2>/dev/null && rm -f $f.new || { mv $f.new $f; ifreload -a >/dev/null 2>&1; }
     else
-        echo "CONFIG_FAIL no netplan and no NetworkManager on this node"; exit 0
+        echo "CONFIG_FAIL no netplan, NetworkManager or ifupdown2 on this node"; exit 0
     fi
     for t in $(seq 1 20); do
         ok=0
@@ -126,7 +144,7 @@ NODE_CONFIG='
 
 cmd_attach() {
     [ "$#" -ge 1 ] || die "usage: attach <node>..."
-    local n k name mac macs portals snippet td bad="" nn
+    local n k name mac macs portals snippet td bad="" nn octet
     nn=$(echo $NETS | wc -w)
     portals=$(for k in $NETS; do echo -n "$(net_prefix "$k").1 "; done)
     td=$(mktemp -d)
@@ -144,6 +162,13 @@ cmd_attach() {
             fi
         done
         snippet=${NODE_CONFIG//MACS/$macs}; snippet=${snippet//NNICS/$nn}; snippet=${snippet//PORTALS/$portals}
+        snippet=${snippet//MACA/$(mac_of "$n" a)}; snippet=${snippet//MACB/$(mac_of "$n" b)}
+        snippet=${snippet//PREA/$(net_prefix a)}; snippet=${snippet//PREB/$(net_prefix b)}
+        # an ifupdown node's address on each storage network: .2-.9, below
+        # the DHCP pool, from the number its name ends in (pve9-5 -> .6)
+        octet=""
+        [[ "$n" =~ ([1-8])$ ]] && octet=$(( BASH_REMATCH[1] + 1 ))
+        snippet=${snippet//STATIC_OCTET/$octet}
         ( sleep 3; ssh_n "$n" "$snippet" 90 > "$td/$n" ) &
     done
     wait

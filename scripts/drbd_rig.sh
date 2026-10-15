@@ -57,6 +57,11 @@
 #                                           a pair outage whose bootstrap owner fails after adopting
 #                                           K: the term is taken over and finished (TAKEOVER_NOCAW_ARM=1
 #                                           first refuses the contender's takeover-journal swaps)
+#   scripts/drbd_rig.sh quorum-test <death|split|linkonly>
+#                                           the built-in authority deciding by corosync's vote
+#                                           (authority=quorum, a QDevice on QUORUM_QNETD): participant 0
+#                                           dies and participant 1 takes over; a split the vote gives to
+#                                           participant 1; a DRBD-only link loss the tie-break decides
 #   scripts/drbd_rig.sh remount-test        clean unmount/remount cycles, a crash-cut retirement and a
 #                                              whole-cluster restart, all on one filesystem
 #   scripts/drbd_rig.sh resolve-test        passthrough never resolves /dev/drbd0 (or dm on it) to its
@@ -89,8 +94,8 @@
 #
 # Evidence: tests/evidence/drbd_rig/<UTC stamp>-<subcommand>/ (one log per step,
 # fio.json with every leg).  Suite and fio_perf results go to a board of their
-# own, tests/evidence/drbd_rig/criteria.trial.json: a trial configuration is
-# never a column of data/criteria.json.
+# own, tests/evidence/drbd_rig/criteria.json: a configuration verified by its own
+# rig is never a column of data/criteria.json.
 #
 # LUNs.  A pool allocation binds one LUN to a node set, and one owner holds one
 # allocation; DRBD wants one LUN per node.  So each node's LUN is owned by a
@@ -185,7 +190,7 @@ take_locks() {
         lock_one "/tmp/mxfs_node.$n.lock" exclusive "$what" \
             || die "$n is held by another run: $(runlock_holder "/tmp/mxfs_node.$n.lock")"
     done
-    # The configuration's lock guards its trial board, which only fio and all
+    # The configuration's lock guards its own board, which only fio and all
     # write (suite goes through run.sh, which takes the lock itself); a step on
     # one pair never touches another pair's nodes, LUNs or DRBD, so two pairs
     # run their other steps side by side.
@@ -443,6 +448,12 @@ step_up() {
     done
     say "  $(grep -a '^INSTALL_OK' "$EVID/install.$N1")"
     install_fencing
+    # The module before any DRBD link (load_mxfs_node); step 5 keeps it.
+    # Loaded by step 5 with the link up instead, it cost the link and, under
+    # the built-in authority, test2 (drbd_release_verify 0.90.128, first run:
+    # Connected -> NetworkFailure 50 ms before insmod's first line, test2
+    # powered off and inhibited, every later mount refused).
+    for n in "${NODES[@]}"; do load_mxfs_node "$n" "${LUN_DEV[$n]}"; done
 
     # Fresh metadata on both disks, then up: they connect as Secondary/Inconsistent.
     # A pool LUN last used by a shared-LUN MXFS group still carries that
@@ -537,7 +548,7 @@ step_mxfs() {
     say "  mkfs on $N1: $(grep -a '^chk_mxfs' <<<"$out" | head -1)"
     local KO_MD5; KO_MD5=$(md5sum "$REPO/mxfs.ko" | awk '{print $1}')
     for n in "${NODES[@]}"; do
-        ssh_n "$n" "dmesg -C; MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1" 150 > "$EVID/mount.$n"
+        ssh_n "$n" "dmesg -C; MXFS_KEEP_LOADED=1 MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1" 150 > "$EVID/mount.$n"
         if ! grep -aq '^NODE_PREP_OK' "$EVID/mount.$n"; then
             # The kernel's reason, by its probe name, and the prep's.  Only the
             # refusal lines leave the node: a whole kernel log is not evidence
@@ -559,23 +570,23 @@ need_mounted() {
     done
 }
 
-# A trial configuration is not a column of the release board, so its cells go
+# A configuration verified by its own rig is not a column of the release board, so its cells go
 # to a board of their own, kept beside the evidence on the rig host.  It starts
 # as a copy of the release board for the criteria rows themselves.
-TRIAL_BOARD="$REPO/tests/evidence/drbd_rig/criteria.trial.json"
-trial_board() {
-    [ -s "$TRIAL_BOARD" ] || cp "$REPO/data/criteria.json" "$TRIAL_BOARD" || die "cannot create $TRIAL_BOARD"
+RIG_BOARD="$REPO/tests/evidence/drbd_rig/criteria.json"
+rig_board() {
+    [ -s "$RIG_BOARD" ] || cp "$REPO/data/criteria.json" "$RIG_BOARD" || die "cannot create $RIG_BOARD"
 }
 
 step_suite() {
-    trial_board
+    rig_board
     need_dual_primary
     need_mounted || die "step 6: MXFS is not mounted on $DRBD_DEV on both nodes (scripts/drbd_rig.sh mxfs) — the suite has nothing to run on"
     say "step 6: ./run.sh $CONFIG --group $GROUP $* (on $DRBD_DEV; no pool LUN, no rewiring)"
     # The locks this process holds would refuse run.sh its own; run.sh takes
     # them itself, and the LUN holders keep both nodes' disks while it runs.
-    MXFS_TRIAL=1 MXFS_DEV=$DRBD_DEV MXFS_LOG_SLICES=$LOG_SLICES \
-        MXFS_CRIT="$TRIAL_BOARD" \
+    MXFS_OWN_RIG=1 MXFS_DEV=$DRBD_DEV MXFS_LOG_SLICES=$LOG_SLICES \
+        MXFS_CRIT="$RIG_BOARD" \
         "$REPO/run.sh" "$CONFIG" --group "$GROUP" "$@" 2>&1 | tee "$EVID/suite.log"
     return "${PIPESTATUS[0]}"
 }
@@ -583,10 +594,10 @@ step_suite() {
 step_fio() {
     need_dual_primary
     if need_mounted; then
-        trial_board
+        rig_board
         say "step 7a: fio_perf on MXFS over DRBD (both nodes)"
-        MXFS_TRIAL=1 MXFS_DEV=$DRBD_DEV MXFS_LOG_SLICES=$LOG_SLICES \
-            MXFS_CRIT="$TRIAL_BOARD" \
+        MXFS_OWN_RIG=1 MXFS_DEV=$DRBD_DEV MXFS_LOG_SLICES=$LOG_SLICES \
+            MXFS_CRIT="$RIG_BOARD" \
             "$REPO/run.sh" "$CONFIG" --group "$GROUP" fio_perf > "$EVID/fio_perf.log" 2>&1
         say "  run.sh fio_perf rc=$? ($(grep -a -m3 -E 'seqW|seqR|randW|randR|PASS|FAIL' "$EVID/fio_perf.log" | tr '\n' ' ' | cut -c1-200))"
     else
@@ -846,7 +857,7 @@ death_refusal_report() {
         echo IMAGES=\$(dmesg | grep -ac 'P227-FR-REFUSED-IMAGE')
         echo OOPS=\$(dmesg | grep -acE 'BUG:|Oops|general protection|UBSAN|KASAN')" $((RECOVER_BUDGET + 40)))
     echo "$out" > "$EVID/death_refusal_counts"
-    ssh_n "$N1" "dmesg | grep -aE 'P227-FR-ATOMIC-SKIP|P227-FR-REFUSED|P-DBG-FR-TAINT|BUG:|Oops' | sed 's/^.*XFS ([^)]*): //' | cut -c1-400" 30 > "$EVID/death_refusal_kernlog"
+    ssh_n "$N1" "dmesg | grep -aE 'P227-FR-ATOMIC-SKIP|P227-FR-REFUSED|P-DBG-FR-TAINT|BUG:|Oops' | sed 's/^.*\(XFS\|mxfs\) ([^)]*): //' | cut -c1-400" 30 > "$EVID/death_refusal_kernlog"
     skips=$(sed -n 's/^SKIPS=//p' <<<"$out"); whys=$(sed -n 's/^WHYS=//p' <<<"$out")
     grep -q '^OOPS=0$' <<<"$out" || die "death test: an oops on $N1 during the refused replay: $out"
     [ "${skips:-0}" -ge 1 ] 2>/dev/null || die "death test: $N1 refused nothing in ${RECOVER_BUDGET}s: $(tr '\n' ' ' <<<"$out")"
@@ -945,14 +956,17 @@ step_death_test() {
 # The rig's node-fence configuration is kept as drbd-fence.conf.backup;
 # install_fencing writes it again afterwards.
 install_self_authority() {
-    local n peer prog handler witness pub hostkey out
-    prog=$(base64 -w0 < "$REPO/tools/mxfs_drbd_fence_self.py")
-    handler=$(base64 -w0 < "$REPO/tools/mxfs_drbd_fence_peer.sh")
-    witness=$(base64 -w0 < "$REPO/tools/mxfs_drbd_witness.py")
+    local n peer pub hostkey out src dst
+    # over stdin, not as an argument: the program alone is past the kernel's
+    # 128 KiB limit on one argument once base64-encoded
+    for n in "${NODES[@]}"; do
+        for src in mxfs_drbd_fence_self.py:mxfs-drbd-fence-self mxfs_drbd_fence_peer.sh:mxfs-drbd-fence-peer mxfs_drbd_witness.py:mxfs_drbd_witness.py; do
+            dst=/usr/sbin/${src#*:}
+            timeout 30 "$SSH" "$(lab_addr "$n")" "cat > $dst.new && chmod 755 $dst.new && mv $dst.new $dst" < "$REPO/tools/${src%%:*}" \
+                || die "self authority on $n: copying $dst failed"
+        done
+    done
     both selfauth "
-        echo $prog | base64 -d > /usr/sbin/mxfs-drbd-fence-self && chmod 755 /usr/sbin/mxfs-drbd-fence-self || { echo SELFAUTH_FAIL program; exit 1; }
-        echo $handler | base64 -d > /usr/sbin/mxfs-drbd-fence-peer && chmod 755 /usr/sbin/mxfs-drbd-fence-peer || { echo SELFAUTH_FAIL handler; exit 1; }
-        echo $witness | base64 -d > /usr/sbin/mxfs_drbd_witness.py && chmod 755 /usr/sbin/mxfs_drbd_witness.py || { echo SELFAUTH_FAIL witness; exit 1; }
         mkdir -p /etc/mxfs /var/lib/mxfs /root/.ssh && chmod 700 /root/.ssh
         if [ -e /etc/mxfs/drbd-fence.conf ] && ! grep -qx 'agent=self' /etc/mxfs/drbd-fence.conf; then
             cp -p /etc/mxfs/drbd-fence.conf /etc/mxfs/drbd-fence.conf.backup
@@ -1125,7 +1139,7 @@ step_self_death_test() {
         dmesg | grep -q 'P163-RECOVERY-COMPLETE' && echo RECOVERED || echo NOT_RECOVERED" $((SELF_RECOVER_BUDGET + 20)))
     tk=$(( $(date +%s) - t0 ))
     echo "$out" > "$EVID/sdeath_recovery"
-    ssh_n "$surv" "dmesg | grep -aE 'P238-DRBD|P236-FENCE|P-DRBD|P163|P239|P238-FENCE|P-RBLK|P240|P912|P-LKWAIT|P958|P-ACQ-LADDER|P960|mxfs-drbd-fence|no longer responding|P232-FREPLAY|elected' | sed 's/^\\(\\[[ 0-9.]*\\]\\).*\\(mxfs[-:]\\|XFS\\)/\\1 \\2/' | cut -c1-280" 20 > "$EVID/sdeath_kernlog"
+    ssh_n "$surv" "dmesg | grep -aE 'P238-DRBD|P236-FENCE|P-DRBD|P163|P239|P238-FENCE|P-RBLK|P240|P912|P-LKWAIT|P958|P-ACQ-LADDER|P960|mxfs-drbd-fence|no longer responding|P232-FREPLAY|elected' | sed 's/^\\(\\[[ 0-9.]*\\]\\).*\\(mxfs[-: ]\\|XFS\\)/\\1 \\2/' | cut -c1-280" 20 > "$EVID/sdeath_kernlog"
     ssh_n "$surv" "tail -5 /var/lib/mxfs/drbd-fence.$RES 2>/dev/null; cat /var/lib/mxfs/drbd-inhibit.$RES.json 2>/dev/null | tr -d '\n'; echo; drbdadm cstate $RES; drbdadm dstate $RES" 20 > "$EVID/sdeath_authority"
     grep -q '^RECOVERED' <<<"$(tail -1 <<<"$out")" || die "self death test: $surv did not complete recovery in ${SELF_RECOVER_BUDGET}s: $(head -1 <<<"$out")"
     say "  $surv recovered $vict's slice in ${tk}s: $(head -1 <<<"$out" | cut -c1-220)"
@@ -1185,6 +1199,204 @@ step_self_death_test() {
     say "  cold chk_mxfs clean"
     install_fencing
     say "self death test: passed (the rig's node fence is configured again; MXFS left unmounted)"
+}
+
+# ── the built-in authority deciding by a vote (authority=quorum) ────────────
+# docs/quorum-takeover.md: corosync's votequorum with a QDevice (qnetd on
+# QUORUM_QNETD, ffsplit) decides a lost link instead of the fixed tie-break,
+# so participant 1 can take the pair when participant 0 is the one that died.
+# quorum_setup makes the two nodes a corosync cluster of their own, with
+# corosync node id 1 given to participant 1: ffsplit's tie-break keeps the
+# vote with the lower node id, so in a split the vote and the fixed tie-break
+# pick different winners, and a vote the authority did not obey shows.
+#
+#   death     participant 0 is destroyed with MXFS mounted: participant 1 must
+#             win the vote, exclude it, recover its slice and keep every
+#             fsynced file
+#   split     every packet between the two is dropped on participant 0, both
+#             still reaching qnetd: participant 1 (node id 1) holds the vote
+#             and wins; participant 0 loses, keeps its I/O frozen and restarts
+#   noqnetd   qnetd is dropped on both, then participant 0 is destroyed:
+#             participant 1 holds 1 of 3 votes and must lose and wait
+#   linkonly  only the DRBD port is dropped, on participant 1; corosync still
+#             sees both, so neither is quorate without the other, and after
+#             QUORUM_SETTLE_S the fixed tie-break decides: participant 0 wins
+#
+# Then the loser is released by the winner's guard, rejoins, and reads what
+# the winner reads; a cold chk_mxfs closes it.  The rig's node fence is put
+# back and corosync stopped afterwards.
+QUORUM_QNETD=${QUORUM_QNETD:-192.168.1.5}
+# kill to P163-RECOVERY-COMPLETE: the self death's 18 s, with the handler's
+# vote in place of the tie-break (corosync's new membership 6.6 s, measured,
+# alongside DRBD's 6.5 s notice, then the verdict held 2 s): ~21 s, twice that
+QUORUM_RECOVER_BUDGET=42
+# linkonly: DRBD's notice, the authority's 45 s settle (QUORUM_SETTLE_S in
+# tools/mxfs_drbd_fence_self.py) and the rest of the self death's 18 s: ~63 s
+QUORUM_LINKONLY_BUDGET=126
+install_quorum_authority() {  # <participant 1> <participant 0>
+    local n out
+    "$REPO/scripts/quorum_setup.sh" "mxfs-drbd-$1-$2" "$QUORUM_QNETD" "$1=$(lab_addr "$1")" "$2=$(lab_addr "$2")" > "$EVID/quorum_setup" 2>&1 \
+        || die "quorum setup: $(tail -2 "$EVID/quorum_setup" | tr '\n' ' ')"
+    for n in "${NODES[@]}"; do
+        out=$(ssh_n "$n" "grep -v '^authority=' /etc/mxfs/drbd-fence.conf > /etc/mxfs/drbd-fence.conf.new; echo authority=quorum >> /etc/mxfs/drbd-fence.conf.new; mv /etc/mxfs/drbd-fence.conf.new /etc/mxfs/drbd-fence.conf; cat /etc/mxfs/drbd-fence.conf | tr '\n' ' '; /usr/sbin/mxfs_quorumd vote | tr '\n' ' '" 30)
+        echo "$out" > "$EVID/quorum_conf.$n"
+        grep -q 'agent=self authority=quorum' <<<"$out" && grep -q 'QUORATE=1' <<<"$out" && grep -q 'QDEVICE=1' <<<"$out" \
+            || die "quorum authority on $n: $out"
+    done
+    say "  built-in authority deciding by the vote (authority=quorum) on both; corosync node id 1 is $1"
+}
+remove_quorum_authority() {
+    both quorumoff "systemctl disable -q --now mxfs-quorumd corosync-qdevice corosync 2>/dev/null; sed -i '/^authority=/d' /etc/mxfs/drbd-fence.conf 2>/dev/null; echo QUORUM_OFF" 60
+}
+step_quorum_test() {
+    local how=$1 a1 a2 p0 p1 surv vict cut out t0 tk ssum vsum budget ep rel verdict vb0 sb0 b i
+    case "$how" in death|split|linkonly|noqnetd) ;; *) die "quorum-test <death|split|linkonly|noqnetd>" ;; esac
+    need_dual_primary
+    need_mounted || die "quorum test: MXFS is not mounted on both nodes (scripts/drbd_rig.sh mxfs)"
+    a1=$(lab_addr "$N1"); a2=$(lab_addr "$N2")
+    if python3 -I -c 'import ipaddress, sys; sys.exit(0 if ipaddress.ip_address(sys.argv[1]) < ipaddress.ip_address(sys.argv[2]) else 1)' "$a1" "$a2"; then
+        p0=$N1; p1=$N2
+    else
+        p0=$N2; p1=$N1
+    fi
+    case "$how" in
+        death)    surv=$p1; vict=$p0; verdict=win; budget=$QUORUM_RECOVER_BUDGET ;;
+        split)    surv=$p1; vict=$p0; verdict=win; budget=$QUORUM_RECOVER_BUDGET ;;
+        linkonly) surv=$p0; vict=$p1; verdict=tiebreak; budget=$QUORUM_LINKONLY_BUDGET ;;
+        # the vote denied to the survivor: it must lose and wait, as without a vote
+        noqnetd)  surv=$p1; vict=$p0; verdict=lose; budget=$QUORUM_RECOVER_BUDGET ;;
+    esac
+    install_self_authority
+    install_quorum_authority "$p1" "$p0"
+    say "quorum test ($how): participant 0 $p0, participant 1 $p1; expected winner $surv (verdict $verdict), loser $vict"
+    for n in "$surv" "$vict"; do self_dyndbg "$n" narrow || die "quorum test: cannot narrow the debug sites on $n"; done
+    out=$(ssh_n "$surv" "mkdir -p $MNT/qtest/s && for i in \$(seq 1 64); do head -c 65536 /dev/urandom > $MNT/qtest/s/f\$i; done && sync -f $MNT && cd $MNT/qtest/s && md5sum f* | sort -k2 | md5sum | cut -c1-32" 60)
+    ssum=$(tail -1 <<<"$out")
+    out=$(ssh_n "$vict" "mkdir -p $MNT/qtest/v && for i in \$(seq 1 64); do head -c 65536 /dev/urandom > $MNT/qtest/v/f\$i; done && sync -f $MNT && cd $MNT/qtest/v && md5sum f* | sort -k2 | md5sum | cut -c1-32" 60)
+    vsum=$(tail -1 <<<"$out")
+    [ ${#ssum} = 32 ] && [ ${#vsum} = 32 ] || die "quorum test: could not record checksums ($ssum / $vsum)"
+    ssh_n "$surv" "dmesg -C; echo '<5>mxfs-test: quorum-test $how' > /dev/kmsg" 10 >/dev/null
+    vb0=$(ssh_n "$vict" "cat /proc/sys/kernel/random/boot_id" 10)
+    sb0=$(ssh_n "$surv" "cat /proc/sys/kernel/random/boot_id" 10)
+    [ ${#vb0} = 36 ] || die "quorum test ($how): no boot id from $vict: $vb0"
+    t0=$(date +%s)
+    case "$how" in
+        death)
+            timeout 60 virsh -c qemu:///system destroy "$vict" >/dev/null 2>&1 || die "quorum test: virsh destroy $vict failed"
+            say "  $vict (participant 0) destroyed" ;;
+        noqnetd)
+            both qcut "nft add table inet qtest && nft add chain inet qtest in '{ type filter hook input priority -300; }' && nft add chain inet qtest out '{ type filter hook output priority -300; }' && nft add rule inet qtest in ip saddr $QUORUM_QNETD drop && nft add rule inet qtest out ip daddr $QUORUM_QNETD drop && echo QCUT" 15
+            for n in "${NODES[@]}"; do grep -q QCUT "$EVID/qcut.$n" || die "quorum test (noqnetd): could not cut qnetd on $n"; done
+            # the pair still holds 2 of 3 votes: let the QDevice's loss settle
+            sleep 15
+            out=$(ssh_n "$surv" "/usr/sbin/mxfs_quorumd vote | tr '\n' ' '" 15)
+            grep -q 'QUORATE=1' <<<"$out" && grep -q 'QDEVICE=0' <<<"$out" || die "quorum test (noqnetd): $surv is not quorate without its QDevice: $out"
+            timeout 60 virsh -c qemu:///system destroy "$vict" >/dev/null 2>&1 || die "quorum test: virsh destroy $vict failed"
+            say "  qnetd unreachable from both ($out); $vict (participant 0) destroyed" ;;
+        split)
+            cut="nft add table inet qtest && nft add chain inet qtest in '{ type filter hook input priority -300; }' && nft add chain inet qtest out '{ type filter hook output priority -300; }' && nft add rule inet qtest in ip saddr $(lab_addr "$surv") drop && nft add rule inet qtest out ip daddr $(lab_addr "$surv") drop && echo CUT"
+            ssh_n "$vict" "$cut" 15 | grep -q CUT || die "quorum test: could not cut $vict from $surv"
+            say "  every packet between $vict and $surv dropped on $vict; both reach qnetd" ;;
+        linkonly)
+            ssh_n "$vict" "iptables -I INPUT -p tcp --dport $DRBD_PORT -j DROP; iptables -I INPUT -p tcp --sport $DRBD_PORT -j DROP; echo CUT" 15 | grep -q CUT \
+                || die "quorum test: could not cut the DRBD link on $vict"
+            say "  the DRBD port dropped on $vict; corosync untouched" ;;
+    esac
+    out=$(ssh_n "$surv" "
+        for i in \$(seq 1 $budget); do
+            dmesg | grep -q 'P163-RECOVERY-COMPLETE' && break
+            sleep 1
+        done
+        dmesg | grep -q 'P163-RECOVERY-COMPLETE' && echo RECOVERED || echo NOT_RECOVERED" $((budget + 20)))
+    tk=$(( $(date +%s) - t0 ))
+    if [ "$how" = noqnetd ]; then
+        # no takeover: the survivor's handler loses, keeps its I/O frozen and,
+        # with MXFS mounted, restarts; it must hold no exclusion of the dead node
+        for i in $(seq 1 60); do
+            out=$(ssh_n "$surv" "cat /proc/sys/kernel/random/boot_id; awk '\$1 + 0 >= $t0' /var/lib/mxfs/drbd-fence.$RES 2>/dev/null | grep 'result=QUORUM_\|result=EXCLUDED'; ls /var/lib/mxfs/drbd-inhibit.$RES.json 2>/dev/null || echo NO_INHIBIT" 15)
+            b=$(head -1 <<<"$out")
+            [ ${#b} = 36 ] && [ "$b" != "$sb0" ] && break
+            sleep 3
+        done
+        echo "$out" > "$EVID/qtest_noqnetd"
+        grep -q RECOVERED <<<"$(ssh_n "$surv" "dmesg | grep -q P163-RECOVERY-COMPLETE && echo RECOVERED" 10)" && die "quorum test (noqnetd): $surv recovered without the vote"
+        grep -q 'result=QUORUM_LOSE ' <<<"$out" || die "quorum test (noqnetd): $surv's record has no QUORUM_LOSE: $out"
+        grep -q 'result=EXCLUDED ' <<<"$out" && die "quorum test (noqnetd): $surv excluded its peer without the vote: $out"
+        grep -q NO_INHIBIT <<<"$out" || die "quorum test (noqnetd): $surv holds an exclusion: $out"
+        [ ${#b} = 36 ] && [ "$b" != "$sb0" ] || die "quorum test (noqnetd): $surv did not restart after losing (boot $sb0, now '${b:-no answer}')"
+        say "  $surv lost the vote ($(grep -o 'result=QUORUM_LOSE .*' <<<"$out" | cut -c1-140)), excluded nothing, restarted (boot $sb0 -> $b)"
+        "$REPO/scripts/lab_power.sh" up "$vict" > "$EVID/qtest_power" 2>&1 || die "quorum test (noqnetd): $vict did not boot"
+        remove_quorum_authority
+        install_fencing
+        say "quorum test (noqnetd): passed -- no takeover without the vote; the pair is left down (scripts/drbd_rig.sh down, then up)"
+        return 0
+    fi
+    ssh_n "$surv" "dmesg | grep -aE 'P238-DRBD|P236-FENCE|P-DRBD|P163|P239|P238-FENCE|P-RBLK|P240|mxfs-drbd-fence|elected' | cut -c1-280" 20 > "$EVID/qtest_kernlog"
+    # only this run's records: the record outlives runs, and a stale line would
+    # satisfy every verdict grep below
+    ssh_n "$surv" "awk '\$1 + 0 >= $t0' /var/lib/mxfs/drbd-fence.$RES 2>/dev/null; cat /var/lib/mxfs/drbd-inhibit.$RES.json 2>/dev/null | tr -d '\n'; echo; drbdadm cstate $RES; drbdadm dstate $RES" 20 > "$EVID/qtest_authority"
+    grep -q '^RECOVERED' <<<"$out" || die "quorum test ($how): $surv did not complete recovery in ${budget}s"
+    say "  $surv recovered $vict's slice ${tk}s after the $how (budget ${budget}s)"
+    grep -q "result=QUORUM_${verdict^^} " "$EVID/qtest_authority" \
+        || die "quorum test ($how): no QUORUM_${verdict^^} verdict on $surv: $(head -4 "$EVID/qtest_authority" | cut -c1-200 | tr '\n' ' ')"
+    grep -q "result=EXCLUDED .*authority=quorum verdict=$verdict" "$EVID/qtest_authority" \
+        || die "quorum test ($how): no EXCLUDED receipt under the vote on $surv"
+    grep -q 'P238-DRBD-FENCE-WITNESSED' "$EVID/qtest_kernlog" || die "quorum test ($how): recovery completed without a DRBD witness"
+    if grep -qE "$RBLK_REFUSED" "$EVID/qtest_kernlog"; then
+        die "quorum test ($how): $surv refused operations as RECOVERY_BLOCKED"
+    fi
+    say "  $surv: $(grep -m1 "result=QUORUM_" "$EVID/qtest_authority" | sed 's/.* result=//' | cut -c1-200)"
+    if [ "$how" != death ]; then
+        # the loser: its handler lost, its I/O froze, and with MXFS mounted it
+        # restarted itself; it must hold no exclusion of the winner
+        # by its boot id: a boot time printed by the guest and read on this
+        # host crosses a timezone and proves nothing
+        for i in $(seq 1 60); do
+            out=$(ssh_n "$vict" "cat /proc/sys/kernel/random/boot_id; awk '\$1 + 0 >= $t0' /var/lib/mxfs/drbd-fence.$RES 2>/dev/null | grep 'result=QUORUM_\|result=TIEBREAK_LOST\|result=EXCLUDED'; ls /var/lib/mxfs/drbd-inhibit.$RES.json 2>/dev/null || echo NO_INHIBIT" 15)
+            b=$(head -1 <<<"$out")
+            [ ${#b} = 36 ] && [ "$b" != "$vb0" ] && break
+            sleep 3
+        done
+        echo "$out" > "$EVID/qtest_loser"
+        [ ${#b} = 36 ] && [ "$b" != "$vb0" ] || die "quorum test ($how): $vict did not restart after losing (boot $vb0, now '${b:-no answer}')"
+        grep -q NO_INHIBIT <<<"$out" || die "quorum test ($how): the loser $vict holds an exclusion too: $out"
+        case "$how" in
+            split)    grep -q 'result=QUORUM_LOSE ' <<<"$out" || die "quorum test (split): $vict's record has no QUORUM_LOSE: $out" ;;
+            linkonly) grep -q 'result=TIEBREAK_LOST ' <<<"$out" || die "quorum test (linkonly): $vict's record has no TIEBREAK_LOST: $out" ;;
+        esac
+        say "  $vict lost, restarted itself (boot $vb0 -> $b) and holds no exclusion"
+    fi
+    out=$(ssh_n "$surv" "cd $MNT/qtest/s && md5sum f* | sort -k2 | md5sum | cut -c1-32; cd $MNT/qtest/v && md5sum f* | sort -k2 | md5sum | cut -c1-32; touch $MNT/qtest/after && rm $MNT/qtest/after && echo FS_OK" 60)
+    [ "$(sed -n 1p <<<"$out")" = "$ssum" ] || die "quorum test ($how): $surv's own files changed: $out"
+    [ "$(sed -n 2p <<<"$out")" = "$vsum" ] || die "quorum test ($how): $vict's fsynced files are not intact on $surv: $out"
+    grep -q FS_OK <<<"$out" || die "quorum test ($how): $surv cannot write after the recovery: $out"
+    say "  every fsynced file of both nodes intact on $surv, which writes on"
+
+    ep=$(sed -n 's/.*"episode": *"\([^"]*\)".*/\1/p' "$EVID/qtest_authority" | head -1)
+    [ -n "$ep" ] || die "quorum test ($how): no inhibit episode on $surv"
+    ssh_n "$surv" "systemctl stop mxfs-rig-guard 2>/dev/null; systemd-run --unit=mxfs-rig-guard --collect /usr/sbin/mxfs-drbd-fence-self guard >/dev/null 2>&1 && echo GUARD_OK" 20 | grep -q GUARD_OK \
+        || die "quorum test ($how): cannot start the guard on $surv"
+    t0=$(date +%s)
+    [ "$how" = death ] && { "$REPO/scripts/lab_power.sh" up "$vict" > "$EVID/qtest_power" 2>&1 || die "quorum test: $vict did not boot"; }
+    rel=$(ssh_n "$surv" "for i in \$(seq 1 90); do grep -qE 'result=RELEASED .*episode=$ep' /var/lib/mxfs/drbd-fence.$RES && { grep -E 'result=RELEASED .*episode=$ep' /var/lib/mxfs/drbd-fence.$RES | tail -1; exit 0; }; sleep 1; done; echo NOT_RELEASED" 105)
+    echo "$rel" > "$EVID/qtest_release"
+    grep -q 'result=RELEASED' <<<"$rel" || die "quorum test ($how): the guard did not release $vict within 90 s"
+    say "  guard released $vict $(( $(date +%s) - t0 ))s after it was started"
+    rejoin_node "$vict" "$surv"
+    out=$(ssh_n "$vict" "cd $MNT/qtest/s && md5sum f* | sort -k2 | md5sum | cut -c1-32; cd $MNT/qtest/v && md5sum f* | sort -k2 | md5sum | cut -c1-32" 60)
+    [ "$(sed -n 1p <<<"$out")" = "$ssum" ] && [ "$(sed -n 2p <<<"$out")" = "$vsum" ] \
+        || die "quorum test ($how): the rejoined $vict reads different data: $out"
+    say "  $vict rejoined and reads both sets identically"
+    ssh_n "$surv" "systemctl stop mxfs-rig-guard 2>/dev/null; echo" 20 >/dev/null
+    self_dyndbg "$surv" all
+    both stop "$NODE_UNMOUNT; echo STOP_OK" 120
+    out=$(ssh_n "$surv" "$NODE_REPO/tools/chk_mxfs $DRBD_DEV 2>&1 | tail -3; echo CHK_RC=\${PIPESTATUS[0]}" 120)
+    echo "$out" > "$EVID/qtest_chk"
+    grep -q 'CHK_RC=0' <<<"$out" || die "quorum test ($how): chk_mxfs after the recovery: $(tail -3 <<<"$out" | tr '\n' ' ')"
+    say "  cold chk_mxfs clean"
+    remove_quorum_authority
+    install_fencing
+    say "quorum test ($how): passed (node fence configured again, corosync stopped; MXFS left unmounted)"
 }
 
 # ── several resources on one pair ──────────────────────────────────────────
@@ -1797,7 +2009,7 @@ step_self_outage_test() {
     done
     say "  DRBD Connected with both disks UpToDate at +${synced_at:-never} s"
     for n in "${NODES[@]}"; do
-        ssh_n "$n" "grep -aE 'mxfs-test|P-BOOT-|P-DRBD-|P236-FENCE|P238-|P163-|P239-|P-RBLK-|P240-RBLK-|mxfs-drbd-fence|P-DBG-DRBD|P-LOG-MOUNT-CANCEL|P-RMAN-|P-TAUTH-(IMPORT-RESIDUE|RETENTION|IMPORT-RETIRE|IMPORT-RETAINED|RETAINED-RELEASE)|Starting recovery|Ending recovery|Ending clean mount' /root/dmesg.stream | sed 's/^\\(\\[[ 0-9.]*\\]\\).*\\(mxfs[-:]\\|XFS\\)/\\1 \\2/' | cut -c1-300" 30 > "$EVID/sout_kernlog.$n"
+        ssh_n "$n" "grep -aE 'mxfs-test|P-BOOT-|P-DRBD-|P236-FENCE|P238-|P163-|P239-|P-RBLK-|P240-RBLK-|mxfs-drbd-fence|P-DBG-DRBD|P-LOG-MOUNT-CANCEL|P-RMAN-|P-TAUTH-(IMPORT-RESIDUE|RETENTION|IMPORT-RETIRE|IMPORT-RETAINED|RETAINED-RELEASE)|Starting recovery|Ending recovery|Ending clean mount' /root/dmesg.stream | sed 's/^\\(\\[[ 0-9.]*\\]\\).*\\(mxfs[-: ]\\|XFS\\)/\\1 \\2/' | cut -c1-300" 30 > "$EVID/sout_kernlog.$n"
         # base64: ssh_n filters lines, which a gzip stream would not survive
         ssh_n "$n" "gzip -c /root/dmesg.stream | base64 -w 76" 60 | base64 -d > "$EVID/sout_dmesg_stream.$n.gz"
         ssh_n "$n" "journalctl -b 0 --no-pager -o short-iso -u mxfs-rig-boot -t mxfs-drbd-fence | cut -c1-300 | tail -60; tail -5 /var/lib/mxfs/drbd-fence.$RES 2>/dev/null" 30 > "$EVID/sout_bootlog.$n"
@@ -1963,7 +2175,7 @@ step_self_restart_test() {
             sleep 5
         done; echo NOT_MOUNTED" $((SELF_RESTART_BUDGET + 30)))
     ssh_n "$surv" "journalctl -b 0 --no-pager -o short-iso -u mxfs-rig-boot -u mxfs-rig-guard -t mxfs-drbd-fence | cut -c1-400 | tail -40; tail -5 /var/lib/mxfs/drbd-fence.$RES" 30 > "$EVID/srestart_bootlog.$surv"
-    ssh_n "$surv" "grep -aE 'mxfs-test|P-BOOT-|P-DRBD-|P236-FENCE|P238-|P163-|P-RBLK-|P240-RBLK-|mxfs-drbd-fence' /root/dmesg.stream | sed 's/^\\(\\[[ 0-9.]*\\]\\).*\\(mxfs[-:]\\|XFS\\)/\\1 \\2/' | cut -c1-300" 30 > "$EVID/srestart_kernlog.$surv"
+    ssh_n "$surv" "grep -aE 'mxfs-test|P-BOOT-|P-DRBD-|P236-FENCE|P238-|P163-|P-RBLK-|P240-RBLK-|mxfs-drbd-fence' /root/dmesg.stream | sed 's/^\\(\\[[ 0-9.]*\\]\\).*\\(mxfs[-: ]\\|XFS\\)/\\1 \\2/' | cut -c1-300" 30 > "$EVID/srestart_kernlog.$surv"
     grep -q '^MOUNTED' <<<"$out" || die "self restart test: $surv did not mount alone within ${SELF_RESTART_BUDGET}s of its boot program's start ($(tail -1 <<<"$out")): $(grep -a 'mxfs-drbd-fence' "$EVID/srestart_bootlog.$surv" | tail -2 | cut -c1-300 | tr '\n' ' ') (evidence $EVID)"
     say "  $surv mounted alone $(( $(date +%s) - t0 ))s after its boot program started: $(grep -aoE 'P-DRBD-STARTUP-[A-Z-]+ [^—]*' "$EVID/srestart_kernlog.$surv" | head -1 | cut -c1-160)"
     grep -qE "$RBLK_REFUSED" "$EVID/srestart_kernlog.$surv" && die "self restart test: $surv refused operations as RECOVERY_BLOCKED"
@@ -2457,6 +2669,13 @@ step_outage_test() {
         [ "${out##*inhibit=}" = none ] || die "outage test: $n carries an inhibit after a pair outage: $out"
     done
     "$REPO/scripts/lab_power.sh" up "${NODES[@]}" > "$EVID/outage_power" 2>&1 || die "outage test: boot: $(tail -1 "$EVID/outage_power")"
+    # The module before any DRBD link, as the packages' boot program loads it:
+    # loading it holds a CPU for ~1 s, past DRBD's 0.5 s ping timeout, and on
+    # 2026-10-15 a load at mount time dropped the link and fenced the peer.
+    for n in "${NODES[@]}"; do
+        ssh_n "$n" "mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }" 40 >/dev/null
+        load_mxfs_node "$n" "$DRBD_DEV"
+    done
     both drbdup "$NODE_DRBD_UP
         for i in \$(seq 1 $REJOIN_BUDGET); do [ \"\$(drbdadm cstate $RES) \$(drbdadm dstate $RES)\" = 'Connected UpToDate/UpToDate' ] && break; sleep 1; done
         drbdadm primary $RES 2>&1 | tail -1
@@ -2465,10 +2684,12 @@ step_outage_test() {
     need_dual_primary
     say "  both booted; DRBD Primary/Primary UpToDate/UpToDate Connected"
     local KO_MD5; KO_MD5=$(md5sum "$REPO/mxfs.ko" | awk '{print $1}')
-    local PREP="MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1"
+    # MXFS_KEEP_LOADED: mount on the module loaded above, never reload it with the link up
+    local PREP="MXFS_KEEP_LOADED=1 MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1"
     # ── A ──
     h0=$(ssh_n "$N1" "$HASH" 30)
-    out=$(ssh_n "$N1" "dmesg -C; MXFS_EXTRA_MODARGS=dbg_cas_nocaw_ops=28672 $PREP | grep -a NODE_PREP | tail -1
+    # the kept module takes no load arguments, so the injection is set through sysfs
+    out=$(ssh_n "$N1" "dmesg -C; echo 28672 > /sys/module/mxfs/parameters/dbg_cas_nocaw_ops; $PREP | grep -a NODE_PREP | tail -1
         echo 0 > /sys/module/mxfs/parameters/dbg_cas_nocaw_ops 2>/dev/null
         mountpoint -q $MNT && echo STILL_MOUNTED
         echo \"injected=\$(dmesg | grep -ac 'P-DBG-CAS-NOCAW op=bootstrap')\"
@@ -2486,9 +2707,9 @@ step_outage_test() {
     #     standing), which must finish it. ──
     if [ "${OUTAGE_TOMB_ARM:-0}" = 1 ]; then
     local TOMBHASH="dd if=$DRBD_DEV iflag=direct bs=512 skip=$((sec + 32)) count=8 status=none | md5sum | cut -c1-32"
-    ssh_n "$N1" "umount $MNT 2>/dev/null; rmmod mxfs 2>/dev/null" 30 >/dev/null
+    ssh_n "$N1" "umount $MNT 2>/dev/null" 30 >/dev/null   # the module stays: the link is up
     h0=$(ssh_n "$N1" "$TOMBHASH" 30)
-    out=$(ssh_n "$N1" "dmesg -C; MXFS_EXTRA_MODARGS=dbg_cas_nocaw_ops=8192 $PREP | grep -a NODE_PREP | tail -1
+    out=$(ssh_n "$N1" "dmesg -C; echo 8192 > /sys/module/mxfs/parameters/dbg_cas_nocaw_ops; $PREP | grep -a NODE_PREP | tail -1
         echo 0 > /sys/module/mxfs/parameters/dbg_cas_nocaw_ops 2>/dev/null
         mountpoint -q $MNT && echo MOUNTED
         echo \"injected=\$(dmesg | grep -ac 'P-DBG-CAS-NOCAW op=bootstrap-tomb')\"
@@ -2576,16 +2797,21 @@ step_takeover_test() {
         [ "$(timeout 20 virsh -c qemu:///system domstate "$n")" = "shut off" ] || die "takeover test: $n is not off"
     done
     "$REPO/scripts/lab_power.sh" up "${NODES[@]}" > "$EVID/outage_power" 2>&1 || die "takeover test: boot: $(tail -1 "$EVID/outage_power")"
+    # the module before any DRBD link, as in the outage test
+    for n in "${NODES[@]}"; do
+        ssh_n "$n" "mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }" 40 >/dev/null
+        load_mxfs_node "$n" "$DRBD_DEV"
+    done
     both drbdup "$NODE_DRBD_UP
         for i in \$(seq 1 $REJOIN_BUDGET); do [ \"\$(drbdadm cstate $RES) \$(drbdadm dstate $RES)\" = 'Connected UpToDate/UpToDate' ] && break; sleep 1; done
         drbdadm primary $RES 2>&1 | tail -1
         mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }" $((REJOIN_BUDGET + 40))
     need_dual_primary
     local KO_MD5; KO_MD5=$(md5sum "$REPO/mxfs.ko" | awk '{print $1}')
-    local PREP="MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp"
+    local PREP="MXFS_KEEP_LOADED=1 MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp"
     # ── the owner: claims (its startup fence holds $N2 off), seals, adopts K
     if [ "$arm" = self ]; then
-        out=$(ssh_n "$owner" "dmesg -C; nohup env MXFS_EXTRA_MODARGS=bootstrap_inject=13 $PREP > /run/tk_owner.log 2>&1 < /dev/null &
+        out=$(ssh_n "$owner" "dmesg -C; echo 13 > /sys/module/mxfs/parameters/bootstrap_inject; nohup env $PREP > /run/tk_owner.log 2>&1 < /dev/null &
             for i in \$(seq 1 $OUTAGE_MOUNT_BUDGET); do dmesg | grep -q 'P-BOOT-INJECT-HOLD point=13' && break; sleep 1; done
             dmesg | grep -q 'P-BOOT-INJECT-HOLD point=13' && echo HELD || echo NOT_HELD" $((OUTAGE_MOUNT_BUDGET + 30)))
         ssh_n "$owner" "dmesg" 30 > "$EVID/kernlog_owner.$owner"
@@ -2605,7 +2831,7 @@ step_takeover_test() {
         grep -q '^ALONE Primary/' <<<"$out" || die "takeover test: $owner is not Primary alone after its reboot: $(tail -1 <<<"$out")"
         say "  $owner rebooted alone: $(grep '^ALONE' <<<"$out")"
     else
-        out=$(ssh_n "$owner" "dmesg -C; MXFS_EXTRA_MODARGS=bootstrap_inject=3 $PREP 2>&1 | grep -a NODE_PREP | tail -1
+        out=$(ssh_n "$owner" "dmesg -C; echo 3 > /sys/module/mxfs/parameters/bootstrap_inject; $PREP 2>&1 | grep -a NODE_PREP | tail -1
             mountpoint -q $MNT && echo STILL_MOUNTED
             echo 0 > /sys/module/mxfs/parameters/bootstrap_inject 2>/dev/null" $((OUTAGE_MOUNT_BUDGET + 30)))
         ssh_n "$owner" "dmesg" 30 > "$EVID/kernlog_owner.$owner"
@@ -2627,7 +2853,7 @@ step_takeover_test() {
     # ── TAKEOVER_NOCAW_ARM: the contender with its takeover-journal swaps refused
     if [ "${TAKEOVER_NOCAW_ARM:-0}" = 1 ]; then
         h0=$(ssh_n "$contender" "$TKHASH" 30)
-        out=$(ssh_n "$contender" "dmesg -C; MXFS_EXTRA_MODARGS=dbg_cas_nocaw_ops=16384 $PREP 2>&1 | grep -a NODE_PREP | tail -1
+        out=$(ssh_n "$contender" "dmesg -C; echo 16384 > /sys/module/mxfs/parameters/dbg_cas_nocaw_ops; $PREP 2>&1 | grep -a NODE_PREP | tail -1
             echo 0 > /sys/module/mxfs/parameters/dbg_cas_nocaw_ops 2>/dev/null
             mountpoint -q $MNT && echo STILL_MOUNTED
             echo \"injected=\$(dmesg | grep -ac 'P-DBG-CAS-NOCAW op=bootstrap-takeover')\"
@@ -2647,7 +2873,7 @@ step_takeover_test() {
     #    it (P-BOOT-CONTENDER-OWN-BOOT) instead of refusing to fence itself.
     if [ "${TAKEOVER_CLEAR_ARM:-0}" = 1 ]; then
         local P=/sys/module/mxfs/parameters
-        out=$(ssh_n "$contender" "dmesg -C; nohup env MXFS_EXTRA_MODARGS=bootstrap_inject=15 $PREP > /run/tk_clear.log 2>&1 < /dev/null &
+        out=$(ssh_n "$contender" "dmesg -C; echo 15 > /sys/module/mxfs/parameters/bootstrap_inject; nohup env $PREP > /run/tk_clear.log 2>&1 < /dev/null &
             for i in \$(seq 1 $TAKEOVER_MOUNT_BUDGET); do dmesg | grep -q 'P-BOOT-INJECT-HOLD point=15' && break; sleep 1; done
             dmesg | grep -q 'P-BOOT-INJECT-HOLD point=15' || { echo NOT_ELECTED; exit 0; }
             echo 16384 > $P/dbg_cas_nocaw_ops; sleep 3
@@ -2732,6 +2958,7 @@ case "$CMD" in
     self-outage-test) evid; take_locks; hold_luns adopt; step_self_outage_test ;;
     self-restart-test) evid; take_locks; hold_luns adopt; step_self_restart_test ;;
     takeover-test) evid; take_locks; hold_luns adopt; step_takeover_test "$@" ;;
+    quorum-test) evid; take_locks; hold_luns adopt; step_quorum_test "$@" ;;
     rejoin)      # [node]: the node to bring back (default $N2); the other is its survivor
         evid; take_locks; hold_luns adopt
         rj=${1:-$N2}; [ "$rj" = "$N1" ] && rs=$N2 || rs=$N1

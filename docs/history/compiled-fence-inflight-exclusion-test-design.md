@@ -68,7 +68,7 @@ raise the test device's `/sys/block/*/device/timeout` to ≥120s); use aligned
 O_DIRECT reads immediately below dm-delay (buffered reads of a loop device
 have up to 5 cache aliases) with `losetup --direct-io=on` CONFIRMED, never
 read the backing file buffered; run 0x04→0x05→0x04 so the discriminator is
-shown not to evaporate after one trial; rule out write-never-admitted, wrong
+shown not to evaporate after one attempt; rule out write-never-admitted, wrong
 path preempted, initiator-side SCSI EH masquerading as target cancellation,
 and dm-delay flush/FUA reordering (validate the delay stack standalone
 first). A below-delay sentinel can demonstrate clobbering but must not erase

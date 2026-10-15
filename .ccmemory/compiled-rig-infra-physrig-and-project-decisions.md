@@ -3,7 +3,7 @@ name: compiled-rig-infra-physrig-and-project-decisions
 description: Compiled: rig/infra traps that fabricate FS failures, the physical QNAP/PVE campaigns, the NET2 planning arc, and standing project decisions.
 metadata:
   type: project
-tags: [c, o, m, p, i, l, e, d, ,,  , i, n, f, r, a, ,,  , r, i, g, ,,  , p, h, y, s, r, i, g, ,,  , q, n, a, p, ,,  , p, v, e, ,,  , n, e, t, 2, ,,  , s, c, s, i, p, r, ,,  , p, r, o, j, e, c, t, -, d, e, c, i, s, i, o, n, s, ,,  , h, o, s, t, -, n, o, i, s, e]
+tags: [compiled, infra, rig, physrig, qnap, pve, net2, scsipr, project-decisions, host-noise, ccloop]
 ---
 
 # Rig infrastructure, the physical campaigns, and standing project decisions
@@ -22,9 +22,39 @@ opening a ledger entry.
   — the SOURCE was empty at write time** (`infra-node-root-disks-fill-and-fabricate-victim-failures`).
 - **ccloop leaves predecessor sessions ALIVE and WORKING.** At relay it spawns the next session
   but does not terminate the previous `claude`, which is orphaned to PPID=1 and keeps executing
-  its Stop-hook loop — launching rival `run.sh` invocations that power-cycle nodes mid-run.
-  One session found two predecessors alive, one of them 5.7h old and still launching retries.
-  **Kill them at session start** ([[infra-ccloop-leaves-stale-sessions-alive-KILL-AT-START]]).
+  its Stop-hook loop ("HAVE YOU MET THE CRITERIA? keep working") — launching rival `run.sh`
+  invocations that power-cycle nodes mid-run. Observed in ccloop run 46efd8b6, sess3 (2026-07-10):
+  both predecessors alive — sess1 claude (PID 1660037), alive 5.7h, idle since ~20:33; sess2 claude
+  (PID 1809191), ACTIVE, kept launching `timeout 3100 ./run.sh 16 caw dir_reuse_coherency` retry
+  after retry from its afterlife (`infra-ccloop-leaves-stale-sessions-alive-KILL-AT-START`).
+  - Damage, all of sess3's early evidence was sabotage: run1 (32-node) PREP FAIL "converged 17/15
+    split" — sess2's rogue 16-node prep power-cycled test21/22/23 mid-prep and its 16-node
+    convergence saw 17 members (sess3's mounts appearing). Run2 (040242Z): 0/32 FAIL, all of
+    test17-32 power-cycled at 04:06:17 mid-test (libvirt "is tainted" = domain start events) — the
+    rogue prep treated 17-32 as "extras holding mxfs" and destroy+started them. Survivors (1-16)
+    livelocked in a P7B-BASTNOTIFY ino=131 storm (dead nodes' holder bits never reaped — a separate
+    robustness gap; node-death recovery is not part of cache_coherency).
+  - Fabricated signatures to distrust: sudden membership splits, whole-cluster stalls, mass reboots
+    with NO panic on serial, `.cache_coherency` vanishing, nodes going EIO-dead when a rival
+    re-preps/mkfs/PR-registers the shared LUN mid-run.
+  - **MANDATORY at every ccloop session start:** (1) find stale ccloop `claude` sessions for THIS
+    project (not your own PID, not other projects'); your own session-id is in the env, predecessors
+    are listed in `.ccloop/runs/<run>/sessions.log`; `kill -9` the stale PIDs. The note's original
+    commands used `pgrep -af "claude --.*-src-mxfs|claude --.*session-id" | grep -v $$` or
+    `ps -eo pid,ppid,lstart,cmd | grep 'claude --'` — on this host use `tools/mxfs_pgrep.sh` or
+    `/proc/<pid>/comm` instead, since `pgrep -f`/`ps` can hang on a D-state task's mmap_lock.
+    (2) Sweep their orphaned work: local trees matching `run\.sh|dir_reuse|cache_coherency|mxfs_sshpass`;
+    per node `pkill -9 -f <suite script name>` (an ssh kill does NOT kill the remote bash).
+    (3) Check `/tmp/run_*` dirs and `/tmp/claude-1000/-src-mxfs/*/tasks/*.output` mtimes for runs you
+    didn't launch.
+  - Hardening added in sess3: `run.sh` takes an exclusive flock on `/tmp/mxfs_run.lock`; a second
+    concurrent `run.sh` FAILS FAST with a loud message instead of silently stomping the cluster. If
+    it reports the lock held, find and kill the holder (or a stale session).
+  - **Evidence-trust rule:** any run result from a window where a rival session was alive and
+    possibly active is CONTAMINATED — reproduce on a clean field before acting. Sess2's
+    clean-substrate A/B (031632Z floor=0 PASS vs 032702Z/033921Z floor=1 0/32 + ICD wedge)
+    completed while sess2 was still the sole active session (pre-22:46), so it PROBABLY stands, but
+    sess3 re-verified before fixing.
 - **…but a run-lock conflict is more often your OWN orphans.** A long stretch was spent hunting a
   "rival ccloop session" contending for `/tmp/mxfs_run.lock` with a fresh PID every 1-2 minutes.
   It was timeout-orphaned per-node ssh children. `readlink /proc/<pid>/cwd` settles it in seconds

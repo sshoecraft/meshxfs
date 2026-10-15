@@ -26,16 +26,17 @@
 # checks clean.
 #
 # the budget rule (derived): prep bounded by run.sh (measured 51-65 s) + A's
-# payload ~10 + B umount ~5 + B's mount: hold 15 + A's dead window 62 s inside
-# the first 120 s acquire budget (the give-up lands when that budget ends,
-# ~135 s after the hold) + the re-run's fence check and one-slice replay ~30 =
-# ~180 s, bounded 270 + read-back ~15 + umount ~10 + chk_mxfs ~60 + restart A
+# payload ~10 + B umount ~5 + B's mount: hold 15 + A's dead window (34 s on a
+# SCSI attachment, 62 s at most) — the lock wait gives up as soon as the death
+# is recorded (P-MPHASE-WAIT-GIVEUP; 44 s from the destroy to the mount's
+# return, measured twice) + the re-run's fence check and one-slice replay ~30,
+# bounded 270 + read-back ~15 + umount ~10 + chk_mxfs ~60 + restart A
 # ~5.  Summed at the bounds ~ 70 + 10 + 10 + 270 + 30 + 20 + 90 + 10 = 510 s
 # after prep; caller bound 700 s including prep.
 #
 # Usage: tests/mount_postbarrier_peer_death_2n.sh <label>
 # Env:   MXFS_NODE_LIST (default test1,test2), MXFS_CONFIG (2/disk/caw/direct),
-#        NFILES (32), HOLD_MS (15000), MOUNT_BOUND (270)
+#        NFILES (32), HOLD_MS (15000), MOUNT_BOUND (270), RETURN_BOUND (100)
 # Exit 0 PASS, 1 FAIL, 2 ABORT/INFRA.
 set -u
 LABEL=${1:?label}
@@ -49,6 +50,10 @@ MNT=/mnt/shared
 NFILES=${NFILES:-32}
 HOLD_MS=${HOLD_MS:-15000}
 MOUNT_BOUND=${MOUNT_BOUND:-270}
+# A's dead window (62 s at most) + one poll lap + the re-run's fence check
+# and one-slice replay (~30 s), from the destroy; was 142 s when the wait ran
+# out its 120 s budget after the death was recorded
+RETURN_BOUND=${RETURN_BOUND:-100}
 P=/sys/module/mxfs/parameters
 OUT=tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_pbd_$LABEL
 mkdir -p "$OUT"
@@ -111,8 +116,10 @@ while [ $(( $(date +%s) - tdestroy )) -lt $((MOUNT_BOUND + 20)) ]; do
     [ -n "$mrc" ] && break
     sleep 5
 done
-echo "STAGE B's mount returned '${mrc:-nothing}' $(( $(date +%s) - tdestroy ))s after A's destroy"
+tret=$(( $(date +%s) - tdestroy ))
+echo "STAGE B's mount returned '${mrc:-nothing}' ${tret}s after A's destroy"
 ck "B's mount returned (not killed at its bound)" "$([ -n "$mrc" ] && echo yes || echo no)" "yes"
+ck "B's mount returned within ${RETURN_BOUND}s of A's destroy (${tret}s)" "$([ "$tret" -le "$RETURN_BOUND" ] && echo yes || echo no)" "yes"
 ck "B's mount succeeded" "${mrc#rc=}" "0"
 
 measure "$B" 30 "$OUT/dmesg_$B.txt" '^DMESG_END$' "the kernel log on $B from the lap marker" "dmesg | sed -n \"/$MARK/,\\\$p\"; echo DMESG_END"
@@ -120,6 +127,8 @@ count_file_into n233 "$OUT/dmesg_$B.txt" "P233-MPHASE-DEATH slot=$aslot "
 ck "B recorded A's death during its mount (P233-MPHASE-DEATH slot=$aslot)" "$n233" "1"
 count_file_into ngive "$OUT/dmesg_$B.txt" 'P-MPHASE-ACQ-GIVEUP\|P-MPHASE-AGLOCK-GIVEUP'
 ckge "the root acquire gave up on A's frozen grant instead of waiting it out" "$ngive" 1
+count_file_into nwgive "$OUT/dmesg_$B.txt" 'P-MPHASE-WAIT-GIVEUP '
+ckge "the lock wait ended when A's death was recorded, not at the end of its budget" "$nwgive" 1
 count_file_into nreb "$OUT/dmesg_$B.txt" 'P-MPHASE-REBARRIER lap='
 ckge "the mount re-ran its barrier" "$nreb" 1
 count_file_into nrebf "$OUT/dmesg_$B.txt" 'P-MPHASE-REBARRIER-FAILED\|P-MPHASE-REBARRIER-EXHAUSTED'

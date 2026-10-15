@@ -132,6 +132,11 @@
 #                  on every debug line that goes through the module's logger
 #   READ_LIMIT_S   how long a slow fsynced-set read is let run, for its
 #                  evidence, past the 60 s bound that grades it (default 300)
+#   PHYSICAL_RESET_OK
+#                  the steps (space-separated) the owner has approved to reset
+#                  or restart physical hosts, for a release's validation on
+#                  the physical pair; every other step that stops a host still
+#                  runs on virtual machines only
 #   PVE_POWER_ON   the command that powers a host on, run here with {name}
 #                  replaced by the host's name and {addr} by its address; the
 #                  steps that keep a host off need it.  The nested pair:
@@ -461,6 +466,9 @@ vm_check() {  # <host>
     IS_VM[$1]=$(on "$1" "systemd-detect-virt --vm" 15 | tail -1)
 }
 vm_only() {  # <host> <what>
+    # a step the owner approved for physical hosts (PHYSICAL_RESET_OK, checked
+    # with the step list below); STEP_NOW is the step running
+    case " ${PHYSICAL_RESET_OK:-} " in *" ${STEP_NOW:-} "*) [ -n "${STEP_NOW:-}" ] && return 0 ;; esac
     case "${IS_VM[$1]:-}" in
         ""|none) die "refusing to $2 $1: not known to be a virtual machine (systemd-detect-virt: ${IS_VM[$1]:-not checked})" ;;
     esac
@@ -1223,8 +1231,13 @@ done
 # A step that resets, crashes, reboots or powers off a host, or makes one
 # restart itself, runs on virtual machines only.  The physical pair are
 # workstations over ten years old, and repeated resets killed one of them
-# (2026-10-07); those paths are proven on the nested pair.
+# (2026-10-07); those paths are proven on the nested pair.  The owner may
+# approve one for a release's validation on the physical hardware:
+# PHYSICAL_RESET_OK names the steps approved, and no other step is let through.
 for s in "${STEPS[@]}"; do
+    case " ${PHYSICAL_RESET_OK:-} " in
+        *" $s "*) echo "step $s: resetting physical hosts approved by the owner (PHYSICAL_RESET_OK)"; continue ;;
+    esac
     case "$s" in
         withdraw-both|withdraw-p1|withdraw-p0|withdraw-guests|slow-beat) ;;
         *) for h in "$P0" "$P1"; do
@@ -1239,6 +1252,7 @@ say "pve pair failover: participant 0 $P0, participant 1 $P1; steps: ${STEPS[*]}
 # a load an earlier run left behind would compete with this run's own
 for h in "$P0" "$P1"; do stop_loads "$h"; done
 for s in "${STEPS[@]}"; do
+    STEP_NOW=$s
     need_pair_up
     say "== $s (build $BUILD)"
     "step_${s//-/_}"

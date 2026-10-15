@@ -27,7 +27,7 @@ LOG=tests/evidence/ahphase_sweep_$LABEL.log
 s0=$(date +%s); n=0; pass=0
 # the lap's own derived bound: 750 with boot; the SILENT arm adds its
 # log-settle wait (see the lap header) — 850
-BOUND=750; [ "${SILENT:-0}" = 1 ] && BOUND=850
+BOUND=720; [ "${SILENT:-0}" = 1 ] && BOUND=790
 echo "SWEEP START label=$LABEL phases=[$PHASES] silent=${SILENT:-0} $(date -u +%FT%TZ)" >> "$LOG"
 for p in $PHASES; do
     n=$((n+1)); s=$(date +%s)

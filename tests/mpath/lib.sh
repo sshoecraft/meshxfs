@@ -28,6 +28,10 @@ mkdir -p "$OUT"
 . tools/mxfs_lab.sh
 BOUND_MS=$(( $(tools/mpath_settings.sh stall-bound) * 1000 ))
 DEV=${MXFS_DEV:-/dev/mapper/mpatha}
+# MXFS_MOUNT_OPTS: what a remount or rejoin mounts with, as the cluster was
+# mounted (a Proxmox host's packaged module forms clusters on TCP, so its SAN
+# volume is mounted with transport=caw); empty on the rig
+MOPT=${MXFS_MOUNT_OPTS:+-o $MXFS_MOUNT_OPTS}
 VIRSH="virsh -c qemu:///system"
 # A row in which a node dies: what the others may wait for it.  Peers declare
 # a silent node dead after the death window (62 s) and then fence it and
@@ -77,14 +81,14 @@ links_all_up() { local n k; for n in $NODES; do for k in a b; do scripts/san_net
 
 # state <node> <tag>: that node's paths into $OUT/state_<node>_<tag>.txt
 state() {
-    rsx 25 "$1" "sh /src/mxfs/tests/mpath/pathstate.sh" > "$OUT/state_$1_$2.txt"
+    rsx 25 "$1" "sh /src/mxfs/tests/mpath/pathstate.sh $DEV" > "$OUT/state_$1_$2.txt"
     capture_require "$OUT/state_$1_$2.txt" '^PATHS map=dm-[0-9]+ ' "the path state of $1 ($2)"
 }
 # states <tag> [<nodes>]: the same, from every node at once
 states() {
     local tag=$1 n pids=()
     for n in ${2:-$NODES}; do
-        rsx 25 "$n" "sh /src/mxfs/tests/mpath/pathstate.sh" > "$OUT/state_${n}_$tag.txt" &
+        rsx 25 "$n" "sh /src/mxfs/tests/mpath/pathstate.sh $DEV" > "$OUT/state_${n}_$tag.txt" &
         pids+=($!)
     done
     wait "${pids[@]}"
@@ -133,8 +137,11 @@ pf_start_gate() {
     # 4/net/mesh/mpath one ran 7.3M operations into the next lap and that
     # lap's first unmount answered busy.  Matched by its own command line
     # (tools/mxfs_pgrep.sh skips tasks in D state, so this cannot wedge).
+    # A node restarted outside the rig's own prep (a Proxmox host, whose /src
+    # is no fstab entry) comes back without /src, and everything a row runs
+    # there lives on it: mount it first, as the rejoin does after a reboot.
     for n in $NODES; do
-        stray=$(rs 20 "$n" "p=\$(/src/mxfs/tools/mxfs_pgrep.sh '^python3 /src/mxfs/tests/mpath/pathload[.]py run '); [ -n \"\$p\" ] && kill \$p 2>/dev/null; sleep 1; echo STRAY killed=\$(echo \$p | wc -w) left=\$(/src/mxfs/tools/mxfs_pgrep.sh '^python3 /src/mxfs/tests/mpath/pathload[.]py run ' | wc -l)" 2>/dev/null | grep -a '^STRAY ' | tail -1)
+        stray=$(rs 60 "$n" "mountpoint -q /src || { mkdir -p /src; timeout 40 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }; p=\$(/src/mxfs/tools/mxfs_pgrep.sh '^python3 /src/mxfs/tests/mpath/pathload[.]py run '); [ -n \"\$p\" ] && kill \$p 2>/dev/null; sleep 1; echo STRAY killed=\$(echo \$p | wc -w) left=\$(/src/mxfs/tools/mxfs_pgrep.sh '^python3 /src/mxfs/tests/mpath/pathload[.]py run ' | wc -l)" 2>/dev/null | grep -a '^STRAY ' | tail -1)
         [ "${stray:-}" = "STRAY killed=0 left=0" ] || echo "  INFO $n: load left running by an earlier run: ${stray:-unread}"
         case "$stray" in
             *" left=0") ;;
@@ -431,7 +438,7 @@ pf_victim_stopped() {
 pf_remount() {
     local n=$1 tag=$2
     measure "$n" 100 "$OUT/remount_${n}_$tag.txt" '^REMOUNT umount_rc=[0-9]+ mount_rc=[0-9]+ ms=[0-9]+ mounted=[01]$' "the remount of $n ($tag)" \
-        "s=\$(date +%s%3N); timeout 40 umount $MNT; u=\$?; timeout 45 mount -t mxfs $DEV $MNT; m=\$?; e=\$(date +%s%3N); grep -q ' $MNT mxfs ' /proc/mounts && k=1 || k=0; echo REMOUNT umount_rc=\$u mount_rc=\$m ms=\$((e-s)) mounted=\$k"
+        "s=\$(date +%s%3N); timeout 40 umount $MNT; u=\$?; timeout 45 mount -t mxfs $MOPT $DEV $MNT; m=\$?; e=\$(date +%s%3N); grep -q ' $MNT mxfs ' /proc/mounts && k=1 || k=0; echo REMOUNT umount_rc=\$u mount_rc=\$m ms=\$((e-s)) mounted=\$k"
     echo "  INFO $tag: $n $(grep -a '^REMOUNT ' "$OUT/remount_${n}_$tag.txt" | head -1)"
     ck "$tag: $n unmounted and mounted again (rc 0, 0)" "$(grep -a '^REMOUNT ' "$OUT/remount_${n}_$tag.txt" | head -1 | sed 's/ ms=[0-9]*//')" "REMOUNT umount_rc=0 mount_rc=0 mounted=1"
 }
@@ -453,8 +460,8 @@ pf_boot_rejoin() {
          j=0; while [ \$j -lt 90 ] && ! [ -e $DEV ]; do multipath >/dev/null 2>&1; sleep 3; j=\$((j+3)); done
          [ -e $DEV ] && d=1 || d=0
          j=0; while [ \$j -lt 40 ] && [ \"\$(multipathd show paths format '%t %T' 2>/dev/null | grep -c 'active ready')\" -lt 2 ]; do sleep 2; j=\$((j+2)); done
-         modprobe libcrc32c 2>/dev/null; lsmod | grep -q '^mxfs ' || insmod /root/mxfs.ko.prep dyndbg=+p $args; i=\$?
-         s=\$(date +%s%3N); timeout 60 mount -t mxfs $DEV $MNT; m=\$?; e=\$(date +%s%3N)
+         modprobe libcrc32c 2>/dev/null; i=0; if ! lsmod | grep -q '^mxfs '; then if [ -e /root/mxfs.ko.prep ]; then insmod /root/mxfs.ko.prep dyndbg=+p $args; else modprobe mxfs; fi; i=\$?; fi
+         s=\$(date +%s%3N); timeout 60 mount -t mxfs $MOPT $DEV $MNT; m=\$?; e=\$(date +%s%3N)
          grep -q ' $MNT mxfs ' /proc/mounts && k=1 || k=0
          echo REJOIN dev=\$d insmod_rc=\$i mount_rc=\$m ms=\$((e-s)) mounted=\$k"
     echo "  INFO $tag: $n $(grep -a '^REJOIN ' "$OUT/rejoin_${n}_$tag.txt" | head -1)"

@@ -136,7 +136,7 @@ enum {
 	Opt_uqnoenforce, Opt_gqnoenforce, Opt_pqnoenforce, Opt_qnoenforce,
 	Opt_discard, Opt_nodiscard, Opt_dax, Opt_dax_enum, Opt_max_open_zones,
 	Opt_lifetime, Opt_nolifetime, Opt_max_atomic_write, Opt_errortag,
-	Opt_peer, Opt_peers, Opt_cluster, Opt_transport,
+	Opt_peer, Opt_peers, Opt_cluster, Opt_transport, Opt_fence,
 };
 
 /* m_mxfs_transport: what the transport= mount option asked for */
@@ -205,6 +205,7 @@ static const struct fs_parameter_spec xfs_fs_parameters[] = {
 	fsparam_string("peers",		Opt_peers),
 	fsparam_string("cluster",	Opt_cluster),
 	fsparam_string("transport",	Opt_transport),
+	fsparam_string("fence",		Opt_fence),
 	{}
 };
 
@@ -344,6 +345,8 @@ xfs_fs_show_options(
 		seq_puts(m, ",transport=tcp");
 	else if (mp->m_mxfs_transport == MXFS_MOUNT_TRANSPORT_CAW)
 		seq_puts(m, ",transport=caw");
+	if (mp->m_mxfs_fence != MXFS_V5_FENCE_SCSIPR)
+		seq_printf(m, ",fence=%s", mxfs_v5_fence_method_name(mp->m_mxfs_fence));
 	if (mp->m_mxfs_peers) {
 		const struct mxfs_static_peers *sp = mp->m_mxfs_peers;
 		uint32_t i;
@@ -722,37 +725,37 @@ STATIC int
 xfs_init_mount_workqueues(
 	struct xfs_mount	*mp)
 {
-	mp->m_buf_workqueue = alloc_workqueue("xfs-buf/%s",
+	mp->m_buf_workqueue = alloc_workqueue("mxfs-buf/%s",
 			XFS_WQFLAGS(WQ_FREEZABLE | WQ_MEM_RECLAIM | WQ_PERCPU),
 			1, mp->m_super->s_id);
 	if (!mp->m_buf_workqueue)
 		goto out;
 
-	mp->m_unwritten_workqueue = alloc_workqueue("xfs-conv/%s",
+	mp->m_unwritten_workqueue = alloc_workqueue("mxfs-conv/%s",
 			XFS_WQFLAGS(WQ_FREEZABLE | WQ_MEM_RECLAIM | WQ_PERCPU),
 			0, mp->m_super->s_id);
 	if (!mp->m_unwritten_workqueue)
 		goto out_destroy_buf;
 
-	mp->m_reclaim_workqueue = alloc_workqueue("xfs-reclaim/%s",
+	mp->m_reclaim_workqueue = alloc_workqueue("mxfs-reclaim/%s",
 			XFS_WQFLAGS(WQ_FREEZABLE | WQ_MEM_RECLAIM | WQ_PERCPU),
 			0, mp->m_super->s_id);
 	if (!mp->m_reclaim_workqueue)
 		goto out_destroy_unwritten;
 
-	mp->m_blockgc_wq = alloc_workqueue("xfs-blockgc/%s",
+	mp->m_blockgc_wq = alloc_workqueue("mxfs-blockgc/%s",
 			XFS_WQFLAGS(WQ_UNBOUND | WQ_FREEZABLE | WQ_MEM_RECLAIM),
 			0, mp->m_super->s_id);
 	if (!mp->m_blockgc_wq)
 		goto out_destroy_reclaim;
 
-	mp->m_inodegc_wq = alloc_workqueue("xfs-inodegc/%s",
+	mp->m_inodegc_wq = alloc_workqueue("mxfs-inodegc/%s",
 			XFS_WQFLAGS(WQ_FREEZABLE | WQ_MEM_RECLAIM | WQ_PERCPU),
 			1, mp->m_super->s_id);
 	if (!mp->m_inodegc_wq)
 		goto out_destroy_blockgc;
 
-	mp->m_sync_workqueue = alloc_workqueue("xfs-sync/%s",
+	mp->m_sync_workqueue = alloc_workqueue("mxfs-sync/%s",
 			XFS_WQFLAGS(WQ_FREEZABLE | WQ_PERCPU), 0,
 			mp->m_super->s_id);
 	if (!mp->m_sync_workqueue)
@@ -2296,6 +2299,15 @@ mxfs_mount_write_admitted(
 		return true;
 	}
 
+	/*
+	 * fence=quorum: a host that no longer holds the cluster's vote ends its
+	 * boot here, before this write is issued — the first write after a
+	 * stall or a freeze finds the lease run out even if no timer has run
+	 * (docs/quorum-takeover.md).
+	 */
+	if (READ_ONCE(mp->m_mxfs_fence) == MXFS_V5_FENCE_QUORUM)
+		mxfs_pal_quorum_gate(site);
+
 	ok = mxfs_authority_ok(auth);
 
 	/*
@@ -3190,12 +3202,14 @@ xfs_fs_free_cached_objects(
 	return xfs_reclaim_inodes_nr(XFS_M(sb), sc->nr_to_scan);
 }
 
+#ifdef MXFS_HAVE_SOP_SHUTDOWN
 static void
 xfs_fs_shutdown(
 	struct super_block	*sb)
 {
 	xfs_force_shutdown(XFS_M(sb), SHUTDOWN_DEVICE_REMOVED);
 }
+#endif
 
 static int
 xfs_fs_show_stats(
@@ -3274,7 +3288,10 @@ static const struct super_operations xfs_super_operations = {
 	.show_options		= xfs_fs_show_options,
 	.nr_cached_objects	= xfs_fs_nr_cached_objects,
 	.free_cached_objects	= xfs_fs_free_cached_objects,
+#ifdef MXFS_HAVE_SOP_SHUTDOWN
+	/* the device went away (6.5); 6.1's XFS learns it from failed I/O */
 	.shutdown		= xfs_fs_shutdown,
+#endif
 	.show_stats		= xfs_fs_show_stats,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
 	.report_error		= xfs_fs_report_error,
@@ -3575,6 +3592,28 @@ xfs_fs_parse_param(
 			return -EINVAL;
 		}
 		return 0;
+	case Opt_fence:
+		/*
+		 * How a dead peer of THIS filesystem is fenced
+		 * (docs/shared-disk-attachment.md).  scsipr, the default, is the
+		 * storage's PREEMPT AND ABORT; manual, vcenter and quorum are the
+		 * shared attachment's, for a disk with no SCSI arbitration
+		 * (quorum: docs/quorum-takeover.md).
+		 */
+		if (!strcmp(param->string, "scsipr")) {
+			parsing_mp->m_mxfs_fence = MXFS_V5_FENCE_SCSIPR;
+		} else if (!strcmp(param->string, "manual")) {
+			parsing_mp->m_mxfs_fence = MXFS_V5_FENCE_MANUAL;
+		} else if (!strcmp(param->string, "vcenter")) {
+			parsing_mp->m_mxfs_fence = MXFS_V5_FENCE_VCENTER;
+		} else if (!strcmp(param->string, "quorum")) {
+			parsing_mp->m_mxfs_fence = MXFS_V5_FENCE_QUORUM;
+		} else {
+			xfs_warn(parsing_mp, "fence=: scsipr, manual, vcenter or quorum, not \"%s\"",
+				 param->string);
+			return -EINVAL;
+		}
+		return 0;
 	default:
 		xfs_warn(parsing_mp, "unknown mount option [%s].", param->key);
 		return -EINVAL;
@@ -3679,8 +3718,8 @@ struct mxfs_cache_caps {
 static struct mxfs_cache_caps mxfs_cache_caps;
 
 /*
- * DEAD-NODE DETECTION WINDOW in ms.  0 = disklock compile-time default
- * (62 s, production-conservative).  Test rigs set e.g. 15000 so crash
+ * DEAD-NODE DETECTION WINDOW in ms.  0 = the attachment's disklock default
+ * (34 s on SCSI, 62 s on DRBD or shared).  Test rigs set e.g. 15000 so crash
  * recovery — lock purge + foreign-slice replay — fires promptly.
  *
  * — THE NAME `lease_timeout_ms` IS A LIE, and it is kept only for
@@ -4647,7 +4686,9 @@ xfs_fs_fill_super(
 		xfs_err(mp, "unable to set blocksize");
 		return -EINVAL;
 	}
-	sb->s_xattr = xfs_xattr_handlers;
+	/* s_xattr became a pointer to const handlers in 6.7; the kernel only
+	 * reads through it */
+	sb->s_xattr = (typeof(sb->s_xattr))xfs_xattr_handlers;
 	sb->s_export_op = &xfs_export_operations;
 #ifdef CONFIG_XFS_QUOTA
 	sb->s_qcop = &xfs_quotactl_operations;
@@ -5325,6 +5366,7 @@ xfs_fs_fill_super(
 			.transport = mp->m_mxfs_transport == MXFS_MOUNT_TRANSPORT_TCP ?
 				     MXFS_V5_TRANSPORT_TCP : MXFS_V5_TRANSPORT_CAW,
 			.transport_explicit = mp->m_mxfs_transport != MXFS_MOUNT_TRANSPORT_MODULE,
+			.fence_method = mp->m_mxfs_fence,
 			.disklock_offset = mp->m_mxfs_disklock_offset,
 			.journal_offset = mp->m_mxfs_journal_offset,
 			.rman_offset = mp->m_mxfs_rman_offset,
@@ -6509,12 +6551,12 @@ xfs_init_workqueues(void)
 	 * AGs in all the filesystems mounted. Hence use the default large
 	 * max_active value for this workqueue.
 	 */
-	xfs_alloc_wq = alloc_workqueue("xfsalloc", XFS_WQFLAGS(WQ_MEM_RECLAIM | WQ_FREEZABLE | WQ_PERCPU),
+	xfs_alloc_wq = alloc_workqueue("mxfsalloc", XFS_WQFLAGS(WQ_MEM_RECLAIM | WQ_FREEZABLE | WQ_PERCPU),
 			0);
 	if (!xfs_alloc_wq)
 		return -ENOMEM;
 
-	xfs_discard_wq = alloc_workqueue("xfsdiscard", XFS_WQFLAGS(WQ_UNBOUND),
+	xfs_discard_wq = alloc_workqueue("mxfsdiscard", XFS_WQFLAGS(WQ_UNBOUND),
 			0);
 	if (!xfs_discard_wq)
 		goto out_free_alloc_wq;
@@ -6671,7 +6713,7 @@ MODULE_PARM_DESC(block_cache_max,
 
 module_param_named(dead_timeout_ms, mxfs_dead_timeout_ms, uint, 0644);
 MODULE_PARM_DESC(dead_timeout_ms,
-	"Dead-node detection window in ms (0 = 62 s default). Gates lock "
+	"Dead-node detection window in ms (0 = 34 s on SCSI, 62 s on DRBD or shared). Gates lock "
 	"purge + foreign log-slice replay after a peer dies.  This is the "
 	"DISKLOCK heartbeat threshold; the lease timeout is separate, fixed "
 	"at 600 s, and deliberately does not track it.");
@@ -6843,7 +6885,7 @@ init_xfs_fs(void)
 		       "dead-detection threshold.  Use dead_timeout_ms.  The "
 		       "lease timeout stays 600000 ms by design .\n",
 		       mxfs_lease_timeout_ms);
-	printk(KERN_INFO "mxfs: dead_timeout_ms=%u (0 = 62s default)\n",
+	printk(KERN_INFO "mxfs: dead_timeout_ms=%u (0 = 34 s on SCSI, 62 s on DRBD or shared)\n",
 	       mxfs_resolve_dead_timeout_ms());
 	/* (docs/whole-cluster-restart.md build item 1): read the host
 	 * and boot identities ONCE per module load; the P-HOSTID line is the

@@ -1,0 +1,36 @@
+#!/usr/bin/env bpftrace
+/*
+ * mkwrite_truncate_check.bt — what folio_mkwrite_check_truncate() sees on
+ * every iomap_page_mkwrite() call: the file's in-core i_size, and the HEAD
+ * folio of vmf->page (mapping match, index, order).  A page_mkwrite that
+ * answers VM_FAULT_NOPAGE without ever reaching ->iomap_begin failed exactly
+ * that check, and this names which half: the folio left the mapping, or the
+ * folio lies past the size the page-cache layer believes.
+ *
+ * vmf->page may be a tail page of a large folio, whose own ->mapping and
+ * ->index are not valid; the head is compound_head - 1 when bit 0 is set.
+ * Order lives in the first tail page's flags-adjacent field; read as
+ * _folio_order on kernels that have it, else compound_order.
+ *
+ * Usage (on a node, root):  bpftrace tests/bpf/mkwrite_truncate_check.bt
+ * Stops after 1 s.
+ */
+kprobe:iomap_page_mkwrite
+{
+	$vmf = (struct vm_fault *)arg0;
+	$f = $vmf->vma->vm_file;
+	$i = $f->f_inode;
+	$p = $vmf->page;
+	$ch = (uint64)$p->compound_head;
+	$head = ($ch & 1) ? (struct page *)($ch - 1) : $p;
+	$tail = ($ch & 1) ? 1 : 0;
+	@seen[$i->i_ino, $i->i_size, $tail, (uint64)$head->mapping == (uint64)$f->f_mapping,
+	      $head->index, $vmf->pgoff] = count();
+}
+
+kretprobe:iomap_page_mkwrite
+{
+	@ret[retval] = count();
+}
+
+interval:s:1 { exit(); }

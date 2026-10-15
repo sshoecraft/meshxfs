@@ -66,6 +66,16 @@ runlock_nodes() {  # <what> <node>... -> 0 iff every node's lock is taken
     return 0
 }
 
+vmhold_take() {  # <what> <vm>... -> holds every VM in use (tools/vm_pool.sh) while the caller lives
+    local what=$1 v fd; shift
+    for v in "$@"; do
+        exec {fd}>>"/tmp/mxfs_vmhold.$v.lock" || return 1
+        flock -s "$fd" || return 1
+        echo "$$ $(date -u +%FT%TZ) $what" >> "/tmp/mxfs_vmhold.$v.lock"
+    done
+    return 0
+}
+
 runlock_config() {  # <slug> <what> -> 0 iff the configuration's lock is taken
     runlock_take "/tmp/mxfs_config.$1.lock" exclusive "$2" || {
         echo "ERROR: configuration $1 is held by another run: $(runlock_holder "/tmp/mxfs_config.$1.lock")"

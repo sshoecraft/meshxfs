@@ -4,6 +4,7 @@
  */
 #define MXFS_TU_ID 10	/* igrab/iput call-site file id */
 #include "xfs_mxfs_dlm_priv.h"
+#include <linux/backing-dev.h>	/* drain watchdog: writeback progress */
 atomic64_t mxfs_dem_wedge_precond;     /* victim of a steal reached the demote-wait */
 atomic64_t mxfs_dem_inject_unclaim;    /* TEST-ONLY: forced unclaim before trailing irele */
 
@@ -46,6 +47,7 @@ atomic64_t mxfs_p6_repeat_max;
 atomic64_t mxfs_dem_punt_retain;		/* claims retained by the punt */
 atomic64_t mxfs_dem_punt_owner_clear;	/* retention ended by its own owner at ilock_end */
 atomic64_t mxfs_dem_punt_wipe;		/* retention's record dropped by a task that does not hold it */
+atomic64_t mxfs_dem_punt_kept;		/* retention's record kept at an unlock by a task that does not hold it */
 
 atomic64_t mxfs_dem_strand_n;		/* inodes named as stranded */
 
@@ -574,11 +576,14 @@ mxfs_drain_watch_fire(
 	struct mxfs_drain_watch	*w = container_of(t, struct mxfs_drain_watch, timer);
 
 	w->fires++;
-	pr_warn("mxfs: P-DRAINWB-STALL ino=%llu site=%d pid=%d waited_ms=%llu fire=%d realns=%llu -- release drain still inside its page flush; drain task stack follows\n",
+	pr_warn("mxfs: P-DRAINWB-STALL ino=%llu site=%d pid=%d waited_ms=%llu fire=%d realns=%llu nrpages=%lu dev_written=%lld -- release drain still inside its page flush\n",
 		(unsigned long long)w->ino, w->site, w->pid,
 		(unsigned long long)((ktime_get_ns() - w->t0) / NSEC_PER_MSEC),
-		w->fires, (unsigned long long)ktime_get_real_ns());
-	mxfs_pal_dump_task_stack(w->pid);
+		w->fires, (unsigned long long)ktime_get_real_ns(),
+		w->nrpages,
+		w->wb ? (long long)(wb_stat(w->wb, WB_WRITTEN) - w->written0) : -1LL);
+	if (mxfs_pal_stall_stacks())
+		mxfs_pal_dump_task_stack(w->pid);
 	if (w->fires < 3)
 		mod_timer(&w->timer,
 			  jiffies + msecs_to_jiffies(mxfs_drain_wb_watch_ms));
@@ -601,6 +606,9 @@ mxfs_drain_watch_arm(
 	w->t0 = ktime_get_ns();
 	w->site = site;
 	w->fires = 0;
+	w->wb = &inode_to_bdi(VFS_I(ip))->wb;
+	w->written0 = wb_stat(w->wb, WB_WRITTEN);
+	w->nrpages = VFS_I(ip)->i_mapping->nrpages;
 	w->armed = true;
 	mod_timer(&w->timer, jiffies + msecs_to_jiffies(ms));
 }
@@ -614,6 +622,15 @@ mxfs_drain_watch_disarm(
 	timer_delete_sync(&w->timer);
 	timer_destroy_on_stack(&w->timer);
 	w->armed = false;
+	/* a flush that outlived the first dump: how long it took in all, and
+	 * how many pages the device wrote back meanwhile, so a busy flush is
+	 * told from a stuck one */
+	if (w->fires)
+		pr_warn("mxfs: P-DRAINWB-DONE ino=%llu site=%d pid=%d total_ms=%llu fires=%d nrpages=%lu dev_written=%lld\n",
+			(unsigned long long)w->ino, w->site, w->pid,
+			(unsigned long long)((ktime_get_ns() - w->t0) / NSEC_PER_MSEC),
+			w->fires, w->nrpages,
+			(long long)(wb_stat(w->wb, WB_WRITTEN) - w->written0));
 }
 static int mxfs_dirring_dump_set(const char *val,
 				 const struct kernel_param *kp)
@@ -755,10 +772,12 @@ mxfs_demoter_dump_set(const char *val, const struct kernel_param *kp)
 	 * unpaired) and is knob-INDEPENDENT, so the negative-control arm
 	 * provably enters the same state; `reclaim` is the fix firing.
 	 */
-	pr_warn("mxfs: P213-PUNT retain=%lld owner_clear=%lld wipe=%lld reclaim=%lld selfclear=%lld stranded=%lld\n",
+	pr_warn("mxfs: P213-PUNT retain=%lld owner_clear=%lld ctx_end=%lld wipe=%lld kept=%lld reclaim=%lld selfclear=%lld stranded=%lld\n",
 		(long long)atomic64_read(&mxfs_dem_punt_retain),
 		(long long)atomic64_read(&mxfs_dem_punt_owner_clear),
+		(long long)atomic64_read(&mxfs_dem_punt_ctx_end),
 		(long long)atomic64_read(&mxfs_dem_punt_wipe),
+		(long long)atomic64_read(&mxfs_dem_punt_kept),
 		(long long)atomic64_read(&mxfs_dem_punt_reclaim_n),
 		(long long)atomic64_read(&mxfs_dem_punt_selfclear),
 		(long long)atomic64_read(&mxfs_dem_strand_n));

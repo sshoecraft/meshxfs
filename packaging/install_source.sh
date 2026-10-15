@@ -83,6 +83,13 @@ install_files() {
         systemctl daemon-reload 2>/dev/null || true
         systemctl enable --now mxfs-drbd-guard.service 2>/dev/null || true
         systemctl try-restart mxfs-drbd-guard.service 2>/dev/null || true
+        # The quorum helper, enabled as the packages enable it.  The unit
+        # starts only where corosync is configured; there it reports the
+        # membership the kernel shortens a dead host's window with, and
+        # fence=quorum mounts need it.  Restarted onto the program just
+        # installed, as the guard is.
+        systemctl enable --now mxfs-quorumd.service 2>/dev/null || true
+        systemctl try-restart mxfs-quorumd.service 2>/dev/null || true
     fi
 
     # `modprobe mxfs` does nothing while a module is loaded, so after an

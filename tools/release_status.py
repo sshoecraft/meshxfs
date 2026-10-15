@@ -1,0 +1,293 @@
+#!/usr/bin/env python3
+"""release_status.py — the release table: every configuration a release ships, and whether it is
+ready, computed from the evidence each row names in data/release_table.json.
+
+    tools/release_status.py              the table
+    tools/release_status.py -v           with the reason behind every row that is not ready
+    watch -n 10 tools/release_status.py
+
+A row is one of:
+    ✅ Ready             every source passes on the release build and nothing blocks it
+    ⏳ In progress       a board of the row has cells marked PENDING (a run is filling them)
+    ❌ Not ready: ...    the first thing in the way
+
+Every row is a configuration the release is meant to ship.  A ❌ row holds the
+release until it is Ready.
+
+What stands in the way, in the order it is reported:
+  1. a release-blocking defect open for any of the row's configurations (tools/defects.py's
+     own test: reaches the configuration, and its impact is not `noblock`);
+  2. a board cell that is not PASS (FAIL, FLAKY, UNKNOWN, ...) or that was earned on another
+     build (criteria.py calls that STALE);
+  3. a run whose newest evidence file does not end in PASS on the release build.
+
+The release build is this tree's mxfs.ko and VERSION. A board on hosts that build the module
+against their own kernel names its build by the marker its run recorded, since its srcversion
+differs from this tree's by construction; its cells must all carry that one build.
+
+It reads the boards and the queue directly, once, so it is fast enough to watch.
+"""
+from __future__ import annotations
+
+import argparse
+import glob
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+#: the table names configurations verified by a rig of their own (2/net/mesh/drbd)
+os.environ.setdefault("MXFS_OWN_RIG", "1")
+sys.path.insert(0, str(REPO / "tools"))
+import criteria   # noqa: E402
+import defects    # noqa: E402
+
+TABLE = REPO / "data" / "release_table.json"
+
+
+def release_build() -> tuple:
+    version = (REPO / "VERSION").read_text().strip()
+    srcv = ""
+    ko = REPO / "mxfs.ko"
+    if ko.is_file():
+        out = subprocess.run(["modinfo", "-F", "srcversion", str(ko)],
+                             capture_output=True, text=True).stdout.strip()
+        srcv = out
+    return version, srcv
+
+
+def board_problem(board: dict, srcv: str, crit_cache: dict) -> tuple:
+    """(state, reason) for one board: state is ok | progress | bad."""
+    config = board["config"]
+    path = REPO / board.get("crit", "data/criteria.json")
+    if path not in crit_cache:
+        try:
+            crit_cache[path] = json.loads(path.read_text()).get("criteria", [])
+        except (OSError, ValueError):
+            crit_cache[path] = None
+    entries = crit_cache[path]
+    if entries is None:
+        return "bad", f"{config}: no board ({path.relative_to(REPO)})"
+    want = srcv
+    if board.get("build_from_marker"):
+        try:
+            want = json.loads((REPO / board["build_from_marker"]).read_text()).get("srcversion", "")
+        except (OSError, ValueError):
+            return "bad", f"{config}: no cluster marker {board['build_from_marker']}"
+    rows = [e for e in entries if criteria.applies(e, config)]
+    if not rows:
+        return "bad", f"{config}: the board has no rows for it"
+    pending, failed, unrun = [], [], []
+    for entry in rows:
+        mark = criteria.cell_status(entry, config, want)
+        if mark in criteria.GREEN:
+            continue
+        if mark == "PENDING":
+            pending.append(entry["id"])
+        elif mark in ("STALE", "UNKNOWN"):
+            unrun.append(entry["id"])
+        else:
+            failed.append(f"{entry['id']} {mark}")
+    if failed:
+        return "fail", f"{config}: " + ", ".join(failed[:3]) + (f" (+{len(failed) - 3})" if len(failed) > 3 else "")
+    if pending:
+        return "progress", f"{config}: {len(pending)} row(s) running"
+    if unrun:
+        return "unrun", f"{config}: not run on the release build ({len(unrun)} row(s))"
+    return "ok", ""
+
+
+def release_builds(version: str) -> dict:
+    """The release's module build per kernel (data/release_builds.json), measured on hosts."""
+    try:
+        return json.loads((REPO / "data" / "release_builds.json").read_text()).get(version, {})
+    except (OSError, ValueError):
+        return {}
+
+
+def run_problem(run: dict, version: str, srcv: str) -> tuple:
+    globs = run["glob"] if isinstance(run["glob"], list) else [run["glob"]]
+    files = []
+    for g in globs:
+        files += glob.glob(str(REPO / g.replace("{version}", version)))
+    files = sorted(set(files), key=os.path.getmtime)
+    if run.get("kernel"):
+        #: a run on hosts that build against their own kernel: the release's build for that
+        #: kernel, and only the runs whose every host ran it
+        want = release_builds(version).get(run["kernel"])
+        if not want:
+            return "unrun", f"{run['what']}: no {version} build recorded for {run['kernel']}"
+        def on_release(f):
+            hosts = re.findall(run["host_build"], Path(f).read_text(errors="replace"), re.M)
+            return bool(hosts) and all(h == want for h in hosts)
+        files = [f for f in files if on_release(f)]
+        if not files:
+            return "unrun", f"{run['what']}: not run on {version}"
+        text = Path(files[-1]).read_text(errors="replace")
+        if run.get("terminal") and not re.search(run["terminal"], text, re.M):
+            #: the newest such run has not printed its verdict: it is still going
+            if any(re.search(run["pass"], Path(f).read_text(errors="replace"), re.M) for f in files[:-1]):
+                return "ok", ""
+            return "progress", f"{run['what']}: running ({os.path.relpath(files[-1], REPO)})"
+        if not re.search(run["pass"], text, re.M):
+            return "bad", f"{run['what']}: last run did not pass ({os.path.relpath(files[-1], REPO)})"
+        return "ok", ""
+    if run.get("select"):
+        #: only the runs this source is about (a kernel, say), read from the file itself
+        files = [f for f in files if re.search(run["select"], Path(f).read_text(errors="replace"))]
+    if not files:
+        return "unrun", f"{run['what']}: not run on {version}"
+    text = Path(files[-1]).read_text(errors="replace")
+    if not re.search(run["pass"], text, re.M):
+        return "bad", f"{run['what']}: last run did not pass ({os.path.relpath(files[-1], REPO)})"
+    if run.get("build"):
+        found = re.findall(run["build"], text, re.M)
+        if not found or found[-1] != srcv:
+            return "bad", f"{run['what']}: passed on {found[-1] if found else 'an unnamed build'}, not {srcv}"
+    if run.get("version"):
+        found = re.findall(run["version"], text, re.M)
+        if not found or found[-1] != version:
+            return "bad", f"{run['what']}: passed on {found[-1] if found else 'an unnamed version'}, not {version}"
+    return "ok", ""
+
+
+def platform_problem(platform: str, version: str, spec: dict, kernel: str = "") -> tuple:
+    """A released platform's round in full_verify's log: the last result of each of its steps.
+    With `kernel`, the steps tagged KERNEL=<another kernel> belong to another row."""
+    log = REPO / spec["log"].replace("{version}", version)
+    if not log.is_file():
+        return "bad", f"full_verify not run on {version}"
+    last = {}
+    for line in log.read_text(errors="replace").splitlines():
+        m = re.match(r"^=== rc=(\d+): ([a-z0-9]+): (.*) ===$", line)
+        if m and m.group(2) == platform:
+            tagged = re.search(r"KERNEL=(\S+)", m.group(3))
+            if kernel and tagged and not tagged.group(1).startswith(kernel):
+                continue
+            last[m.group(3)] = int(m.group(1))
+    if not any("packaged_round.sh" in step for step in last):
+        return "bad", f"not in full_verify {version}"
+    failed = [step for step, rc in last.items() if rc != 0]
+    if failed:
+        return "bad", f"{len(failed)} full_verify step(s) failed: {failed[0][:50]}"
+    return "ok", ""
+
+
+def defect_problem(configs: list, queue: list, platform: str = "") -> tuple:
+    hits = []
+    for config in configs:
+        nodes, selector, platform = defects.parse_at(config + (f"@{platform}" if platform else ""))
+        for entry in queue:
+            if str(entry.get("impact", "")).lower() == "noblock":
+                continue
+            if defects.blocks(entry, nodes, selector, platform) and entry["id"] not in hits:
+                hits.append(entry["id"])
+    if not hits:
+        return "ok", ""
+    if len(hits) == 1:
+        return "bad", f"open defect {hits[0]}"
+    return "bad", f"{len(hits)} open release-blocking defects"
+
+
+#: what a row's status is when its sources disagree, worst first: an open defect or a real
+#: failure is Not ready whatever else is running; a run still filling cells is In progress;
+#: a source with nothing on the release build yet is Not ready
+ORDER = ("bad", "fail", "progress", "unrun", "ok")
+
+
+def row_status(row: dict, version: str, srcv: str, queue: list, crit_cache: dict) -> tuple:
+    found = []   # (state, reason)
+    found.append(defect_problem(row.get("configs", []), queue, row.get("platform", "")))
+    for board in row.get("boards", []):
+        found.append(board_problem(board, srcv, crit_cache))
+    for run in row.get("runs", []):
+        found.append(run_problem(run, version, srcv))
+    found = [f for f in found if f[0] != "ok"]
+    found.sort(key=lambda f: ORDER.index(f[0]))
+    if not found:
+        return "ok", []
+    state = {"bad": "bad", "fail": "bad", "unrun": "bad", "progress": "progress"}[found[0][0]]
+    return state, [reason for _, reason in found]
+
+
+def table(rows: list) -> str:
+    head = ("Nodes", "Storage attachment", "Status")
+    widths = [max(len(head[i]), *(len(r[i]) for r in rows)) for i in range(3)]
+
+    def line(cells):
+        return "│ " + " │ ".join(c.ljust(w) for c, w in zip(cells, widths)) + " │"
+
+    def rule(left, mid, right):
+        return left + mid.join("─" * (w + 2) for w in widths) + right
+
+    out = [rule("┌", "┬", "┐"), line(head), rule("├", "┼", "┤")]
+    for i, r in enumerate(rows):
+        out.append(line(r))
+        out.append(rule("├", "┼", "┤") if i < len(rows) - 1 else rule("└", "┴", "┘"))
+    return "\n".join(out)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("-v", "--verbose", action="store_true", help="every reason behind each row")
+    args = ap.parse_args()
+
+    spec = json.loads(TABLE.read_text())
+    version, srcv = release_build()
+    queue = defects.load()["defects"]
+    crit_cache: dict = {}
+    out, notes = [], []
+    rows = list(spec["rows"])
+    #: every released platform gets a row of its own: listed from data/platforms.json, so a
+    #: platform the release claims cannot be missing from the table
+    rounds = spec.get("platform_rounds")
+    if rounds:
+        plats = json.loads((REPO / "data" / "platforms.json").read_text())
+        plats = plats.get("platforms", plats)
+        for key, info in (plats.items() if isinstance(plats, dict) else []):
+            if not isinstance(info, dict) or info.get("status") != "released":
+                continue
+            name = info.get("name") or info.get("label") or key
+            kernels = info.get("kernels") or [""]
+            #: a platform verified on several kernels gets a row per kernel: one passing must
+            #: show, whatever the other is doing
+            for k in (kernels if len(kernels) > 1 else [""]):
+                prefix = re.match(r"\s*([0-9]+\.[0-9]+)", k) if k else None
+                label = f"{re.sub(r' *[(].*', '', name)}, kernel {prefix.group(1)}" if prefix else name
+                rows.append({"nodes": "2", "attachment": f"Platform: {label} (packaged install, hung-node test)",
+                             "configs": rounds["configs"], "platform": key, "_platform_round": True,
+                             "_kernel": prefix.group(1) if prefix else ""})
+    for row in rows:
+        state, reasons = row_status(row, version, srcv, queue, crit_cache)
+        if row.get("_platform_round"):
+            s, r = platform_problem(row["platform"], version, rounds, row.get("_kernel", ""))
+            if s == "bad":
+                if state != "bad":
+                    reasons.insert(0, r)
+                else:
+                    reasons.append(r)
+                state = "bad"
+        if state == "ok":
+            status = "✅ Ready"
+        elif state == "progress":
+            status = "⏳ In progress"
+        else:
+            status = "❌ Not ready: " + (reasons[0] if reasons else "unknown")
+            if len(status) > 70:
+                status = status[:67] + "..."
+        out.append((row["nodes"], row["attachment"], status))
+        if args.verbose and reasons:
+            notes.append(f"{row['nodes']} {row['attachment']}:\n  " + "\n  ".join(reasons))
+    print(f"MeshXFS {version}  (release build {srcv or 'no mxfs.ko in the tree'})")
+    print(table(out))
+    if notes:
+        print()
+        print("\n".join(notes))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -749,7 +749,7 @@ root-cause investigation (Phase 3 D16).
 - We are **not** proposing to spend more sessions on D16
   (kernel SCSI passthrough non-persistence).  Sess30's measurement
   established that the underlying SCSI CAW persistence concern was
-  mitigated by Path A (manual-bio submission, default `caw_path=1`).
+  mitigated by Path A (manual-bio submission, now the only path).
   Residual CAW reliability issues at 15× scale appear to be elsewhere
   (LIO target config, scsi-mq dispatch — see sess30 conclusions).
   Those are server-side investigations, not architectural changes.

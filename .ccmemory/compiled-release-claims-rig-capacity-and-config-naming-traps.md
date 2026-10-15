@@ -1,6 +1,6 @@
 ---
 name: compiled-release-claims-rig-capacity-and-config-naming-traps
-description: Release claims need failure-mode tests; clyde VM capacity limits; caw/cawd/cawp key traps in defects queue and prose; timeouts as perf assertions; VM…
+description: Release claims need failure-mode tests; clyde VM capacity; caw/cawd/cawp key traps; timeouts as perf assertions; test VMs disposable
 metadata:
   type: feedback
 tags: [compiled, release, rig, clyde, defects, caw, mpath, timeouts]
@@ -31,7 +31,7 @@ Compiled from a topic group: what a release claim requires, how many rig VMs cly
 
 ## Rig VMs and clyde capacity
 
-- [[Test VMs are disposable]]: `virsh destroy` / `start` / rebuild of test1..test32 needs no permission (confirmed in the v0.3.4 session after a D-state self-deadlock on test2). The restriction applies only to the host (clyde and other production hosts).
+- `Test VMs are disposable`: `virsh destroy testN` / `virsh start testN` / full rebuild of test1..test32 needs no permission. There are 32 of them and the user can rebuild any in ~5 minutes. Confirmed 2026-04-25 in the v0.3.4 session, after a D-state self-deadlock on test2 (from v0.3.3) where permission to `virsh destroy` was asked; user (paraphrased): do whatever you need to with the test VMs, they don't matter. They are disposable test infrastructure for kernel module work. The `feedback_no_reboot.md` rule still applies to production hosts (clyde, serv, etc.); only the testN guest VMs are fair game.
 - `trap-32-idle-vms-running-exhausts-clyde-ram-harness-kills-background-tasks-shut-idle-vms` (2026-09-05). 32 VMs left running at ~1.2-1.4 GB RSS each put clyde at 0 free and 20 of 23 GB swap used. Claude Code killed the session's background Bash ("running low on memory"), but the chain it launched survived as an orphan and died later.
   - Before a long background rig job, check `free -g`. If swap is in use, shut the VMs the job does not need (test1-test4 stay for the 2- and 3-node arms).
   - `virsh shutdown` (ACPI) did not complete on any of 28 VMs within 60 s, so `virsh destroy` was needed. Delegate this to a rig-runner.

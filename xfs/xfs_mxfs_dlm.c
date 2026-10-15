@@ -1005,6 +1005,51 @@ MODULE_PARM_DESC(demoter_punt_grace_ms,
 	"minimum age of a trans-free-retained demoter claim before the SWEEP may reclaim it (ms); safety margin against clearing a live owner mid-unlock, not a tuning knob");
 atomic64_t mxfs_dem_punt_reclaim_n;	/* retained claims released again */
 atomic64_t mxfs_dem_punt_selfclear;	/* retained claim cleared normally */
+atomic64_t mxfs_dem_punt_ctx_end;	/* retention ended by its owner at the end of its completion batch or writeback pass */
+
+/*
+ * END A COMPLETION CONTEXT'S RETENTION WHEN THE CONTEXT ENDS.
+ *
+ * The trans-free punt also retains a claim when the committing task is an
+ * xfs_end_io worker or a writeback submitter (the ioend-ctx case).  There the
+ * claim covers the rest of THAT batch or pass: a later completion in the same
+ * xfs_end_io batch, or a later folio of the same writepages pass, takes this
+ * inode's ILOCK again, and the release the punt queued waits on exactly that
+ * writeback.  The task has already unlocked inside its own commit, so the
+ * owner-side end in mxfs_dlm_ilock_end never comes, and a worker that does
+ * not complete I/O on this inode again leaves the claim to the reclaim sweep,
+ * which runs only when something else touches the inode.  Measured on the SAN
+ * pair: an xfs-conv retention stood past a 15 s idle settle until the next
+ * run's traffic reclaimed it.
+ *
+ * The batch's last completion (or the pass's last folio) is the end of the
+ * window, and this is the task that took the claim, so it is ended here by
+ * its own owner: MXFS_CLEAR_DEMOTER releases only the caller's slot, as many
+ * times as the punt recorded.
+ */
+void
+mxfs_demoter_punt_ctx_end(struct xfs_inode *ip)
+{
+	if (likely(!READ_ONCE(ip->i_dlm_demoter_punt)) ||
+	    !mxfs_demoter_punt_reclaim)
+		return;
+
+	while (ip->i_dlm_punt_n[0] &&
+	       READ_ONCE(ip->i_dlm_demoter) == current) {
+		ip->i_dlm_punt_n[0]--;
+		atomic64_inc(&mxfs_dem_punt_ctx_end);
+		MXFS_CLEAR_DEMOTER(ip);
+	}
+	while (ip->i_dlm_punt_n[1] &&
+	       READ_ONCE(ip->i_dlm_demoter2) == current) {
+		ip->i_dlm_punt_n[1]--;
+		atomic64_inc(&mxfs_dem_punt_ctx_end);
+		MXFS_CLEAR_DEMOTER(ip);
+	}
+	WRITE_ONCE(ip->i_dlm_demoter_punt,
+		   (ip->i_dlm_punt_n[0] ? 1 : 0) |
+		   (ip->i_dlm_punt_n[1] ? 2 : 0));
+}
 
 
 void
@@ -1671,6 +1716,11 @@ module_param_cb(recycle_bast_kept, &mxfs_dbg_atomic_param_ops,
 		&mxfs_recycle_bast_kept, 0644);
 MODULE_PARM_DESC(recycle_bast_kept,
 		 "count of xfs_iget_recycle keeps of a SET i_dlm_bast_pending on a corpse whose cached grant is live (P-RECYCLE-BAST-KEEP) (write resets)");
+int mxfs_recycle_adopt_fail_refuse = 1;
+module_param_named(recycle_adopt_fail_refuse, mxfs_recycle_adopt_fail_refuse,
+		   int, 0644);
+MODULE_PARM_DESC(recycle_adopt_fail_refuse,
+		 "xfs_iget_recycle fails the recycle when the platter image of a different incarnation is rejected, instead of handing the inode out with the fork the rejection left; 1=on (default), 0=hand it out, for A/B");
 int mxfs_recycle_bast_keep = 1;
 module_param_named(recycle_bast_keep, mxfs_recycle_bast_keep, int, 0644);
 MODULE_PARM_DESC(recycle_bast_keep,
@@ -1926,6 +1976,34 @@ MODULE_PARM_DESC(dialloc_holepick_n,
  * so a harness can prove the check RAN -- a silent instrument and a clean
  * system are the same observation otherwise.  0 in production.
  */
+/*
+ * Test only: xfs_iformat_data_fork rejects the btree-format dinode of this one
+ * inode number, as xfs_iformat_btree does a corrupt one: after if_format and
+ * if_needextents are set and before the root is allocated.  It is how a test
+ * reaches the failure arms of the MXFS fork rebuilds (the recycle adopt in
+ * xfs_iget_recycle, the reload adopt), which a healthy platter never does.
+ * The counter proves the injection ran.  0 in production.
+ */
+unsigned long long mxfs_dbg_iformat_reject_ino = 0;
+module_param_named(dbg_iformat_reject_ino, mxfs_dbg_iformat_reject_ino,
+		   ullong, 0644);
+MODULE_PARM_DESC(dbg_iformat_reject_ino,
+		 "TEST ONLY: reject this inode's btree-format data fork as corrupt when it is read from disk; 18446744073709551615 (~0) = every one the recycle adopt rebuilds (0=off)");
+atomic_t mxfs_dbg_iformat_rejected = ATOMIC_INIT(0);
+/*
+ * Test only: background and shrinker inode reclaim skip every inode while
+ * this is set, so an evicted inode stays a reclaimable shell for the next
+ * lookup to recycle (unmount still reclaims).  How a test reaches
+ * xfs_iget_recycle, which eviction and the shrinker in one drop_caches pass
+ * otherwise leave no window for.  0 in production.
+ */
+int mxfs_dbg_reclaim_hold = 0;
+module_param_named(dbg_reclaim_hold, mxfs_dbg_reclaim_hold, int, 0644);
+MODULE_PARM_DESC(dbg_reclaim_hold,
+		 "TEST ONLY: background and shrinker inode reclaim skip every inode, so evicted inodes stay reclaimable shells (unmount still reclaims; 0=off)");
+module_param_cb(dbg_iformat_rejected, &mxfs_dbg_atomic_param_ops,
+		&mxfs_dbg_iformat_rejected, 0644);
+
 int mxfs_dbg_recycle_platter_assert = 0;
 module_param_named(dbg_recycle_platter_assert, mxfs_dbg_recycle_platter_assert,
 		   int, 0644);
@@ -2420,6 +2498,8 @@ mxfs_dlm_inode_init(
 	ip->i_dlm_p6skip_n = 0;			/* H4: no P6 skip streak yet */
 	ip->i_mxfs_self_created = false;	/* v0.5.4: only xfs_create's success path sets this */
 	ip->i_mxfs_dead_incarn_gen = 0;	/* no dead-incarnation verdict */
+	ip->i_mxfs_forkreset_src = 0;	/* no MXFS fork rebuild yet */
+	ip->i_mxfs_fork_rejected = false;	/* no platter image rejected */
 	ip->i_mxfs_freeob = 0;		/* no FREE obligation */
 	ip->i_mxfs_freeob_strikes = 0;
 	ip->i_mxfs_freepub_epoch = 0;	/* no FREE-publication claim */

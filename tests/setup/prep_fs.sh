@@ -58,6 +58,9 @@ fi
 if mount | grep -q " on .* type mxfs .*$MXFS_DEV"; then
     fail "$MXFS_DEV appears mounted somewhere on this node — refusing to mkfs"
 fi
+# A boot disk passes both checks above: its holders and mounts hang off its
+# partitions.  A shared LUN has no partitions, mounts or volume signatures.
+guard=$(bash "$(dirname "$0")/refuse_inuse_dev.sh" "$MXFS_DEV") || fail "$guard — refusing to mkfs a device this node uses for something else"
 
 # 3a. NEVER mkfs under a live heartbeat writer (measured s62e: a node from
 #     the previous lap was still mounted and heartbeating while mkfs zeroed

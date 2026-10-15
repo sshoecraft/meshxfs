@@ -144,7 +144,85 @@
 
 #define MXFS_DISKLOCK_HB_INTERVAL_MS    2000
 #define MXFS_DISKLOCK_LIVE_THRESHOLD    2
+/*
+ * A dead window shortened by corosync: a live slot whose stamp has stood for
+ * this many checks, on a host corosync has dropped from the membership this
+ * host holds the vote in for at least MEMBER_GONE_MS, is declared dead without
+ * waiting out the rest of dead_threshold (hb_member_gone).
+ */
+#define MXFS_DISKLOCK_MEMBER_GONE_SAMPLES 5
+#define MXFS_DISKLOCK_MEMBER_GONE_MS    2000
+/*
+ * A dead window shortened by the node itself (mxfs_authority_isolation_check,
+ * hb_peer_closed).  A survivor whose own beat landed this cycle and that has
+ * seen a live slot's stamp stand for ASK_SAMPLES checks asks that node, over
+ * corosync, whether it has lost the LUN.  The node closes its authority only
+ * when every SCSI path to the LUN is offline and its own beat has not landed
+ * for ISOLATED_MS, then announces the close; a survivor that hears it, for
+ * that exact node and incarnation, with the stamp standing for at least
+ * CLOSED_SAMPLES checks, declares the death without waiting out the window.
+ *
+ * Why waiting is unnecessary then: the window exists so that the node has
+ * closed its own authority before anyone acts on its death (the lease comment
+ * below).  Here that close is not inferred from elapsed time; the node did it
+ * and said so.  What it submitted before the close and may still execute is
+ * the fence's to stop, exactly as after a lease expiry: the fence still has to
+ * prove exclusion on the target before anything is replayed.
+ *
+ * Why only on a peer's ask: a target that goes away for every host at once
+ * takes every path of every host offline, and a host that closed on that
+ * alone would turn a target restart the multipath queue rides out into the
+ * whole cluster unmounting.  A survivor's ask carries the proof that the LUN
+ * still answers someone.
+ *
+ * Measured before this (Proxmox VE 9, three hosts on one multipathed LUN,
+ * tests/mpath/path_all_lost.sh): a host that lost both paths while staying a
+ * corosync member was fenced 35 s after the loss and its peers' creates in a
+ * shared directory stalled 39-41 s.  Its beats did not fail in that time,
+ * they stood queued: multipath fails I/O only no_path_retry intervals after
+ * the last path is gone (tools/mpath_settings.sh: about 35 s from the loss).
+ */
+#define MXFS_DISKLOCK_ASK_SAMPLES       3
+#define MXFS_DISKLOCK_CLOSED_SAMPLES    2
+#define MXFS_DISKLOCK_ISOLATED_MS       6000
+#define MXFS_DISKLOCK_ISO_SCAN_MS       1000
+#define MXFS_DISKLOCK_LU_IDENT_MAX      256
+/*
+ * The dead window in checks.  31 (62 s) on a DRBD or shared attachment, whose
+ * authority lease is derived FROM the window (below).  On a SCSI attachment the
+ * derivation runs the other way: the window only has to outlast the 30 s
+ * authority lease, so that a node whose beats stopped landing has closed its
+ * own authority before any peer can declare it dead.
+ *
+ *   A peer's count of equal checks starts no earlier than the read that first
+ *   saw the stale stamp, which is after that beat landed, which is after the
+ *   node anchored its deadline.  Checks are never closer together than one
+ *   interval (the monitor sleeps a full interval after each pass, it never
+ *   catches up), so the declaration comes at least 17 x 2 s = 34 s after the
+ *   anchor.  The lease ends 30 s after it.  The 4 s between them covers the
+ *   pump's lateness (one 250 ms tick) and guest clock rate error (±500 ppm
+ *   each way is 34 ms across the window), with 3.7 s to spare.
+ *
+ * What made the other 28 s of the 62 s window necessary there is the term the
+ * lease comment below cannot bound: commands the node submitted that may still
+ * execute after its lease closed.  On a SCSI attachment nothing a death hands
+ * to a survivor runs before a fence certificate whose kind proves exclusion
+ * (the recovery claim and the replay gate refuse anything else), and every
+ * such SCSI kind ends with an excluding Write Exclusive reservation held and
+ * the victim's key gone from the target.  A command of the victim's that
+ * reaches the target after that, however late, meets RESERVATION CONFLICT.
+ * That exclusion is the target's, so it does not depend on the victim being
+ * alive enough to cooperate, and it does not depend on how long the commands
+ * were queued.
+ *
+ * Measured with the 62 s window (Proxmox VE 9, three hosts on one multipathed
+ * LUN, 2026-10-14): a host that lost both SAN paths while staying a corosync
+ * member stalled survivors' creates in a shared directory for 69.5-71.3 s
+ * (tests/mpath/path_all_lost.sh, path_fenced_return.sh); the fence, replay
+ * and purge after the declaration took under a second.
+ */
 #define MXFS_DISKLOCK_DEAD_THRESHOLD    31
+#define MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD 17
 
 /*
  * THE LOCAL AUTHORITY LEASE (0.89.20).  How long a landed heartbeat buys this
@@ -169,6 +247,12 @@
  *   itself); guest clock error against the peer's (±500 ppm each way is 62 ms
  *   across the whole window); and the time already-submitted old-epoch
  *   commands take to become incapable of executing.
+ *
+ *   That is the window on a DRBD or shared attachment.  On a SCSI attachment
+ *   the window is 34 s (MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD), the 4 s below it
+ *   covers the first two terms, and the third is closed by the fence
+ *   certificate's reservation rather than by time — derived where that
+ *   constant is defined.
  *
  * THE LAST TERM IS NOT BOUNDED BY ANYTHING THIS CODE CAN SEE, and 31.7 s of
  * unallocated budget is not a proof that it fits.  Completing a Linux request
@@ -251,6 +335,17 @@ struct mxfs_authority {
 	volatile uint64_t       incarnation;
 	volatile uint32_t       node;
 	volatile int            slot;
+	/*
+	 * The LUN's logical-unit identity (VPD 0x83), taken when the heartbeat
+	 * starts on a SCSI attachment; 0 length elsewhere.  Kept here, not on
+	 * the disklock, because the withdraw thread that runs the isolation
+	 * check (mxfs_authority_isolation_check) may outlive the disklock and
+	 * the device it borrows; an identity needs neither.
+	 */
+	uint8_t                 lu_ident[MXFS_DISKLOCK_LU_IDENT_MAX];
+	volatile int            lu_ident_len;
+	uint64_t                iso_checked_ms; /* last path scan; withdraw thread only */
+	bool                    iso_refused_logged;
 };
 
 /*
@@ -270,6 +365,13 @@ void mxfs_authority_renew(struct mxfs_authority *auth, uint64_t anchor_ms,
 void mxfs_authority_close(struct mxfs_authority *auth, int reason,
 			  const char *why);
 bool mxfs_authority_take_withdraw(struct mxfs_authority *auth, int *reason_out);
+/*
+ * The node side of the isolation exchange (MXFS_DISKLOCK_ASK_SAMPLES): asked
+ * by a peer about this incarnation, close if the LUN is gone from here, and
+ * announce a closed authority.  Called by the withdraw thread every tick; it
+ * touches only the authority object and device state.
+ */
+void mxfs_authority_isolation_check(struct mxfs_authority *auth);
 
 /*
  * (D-REJOIN-CLAIM-ENOSPC-DURING-TRANSIENT-SWEEP-GUARD-AT-CAPACITY-0523,
@@ -1826,8 +1928,17 @@ struct mxfs_disklock_ctx {
 	 * (mxfs_disklock_set_transport_tcp refuses once local_slot >= 0) and
 	 * compared against every live record by the join gate and monitor. */
 	bool                    transport_tcp;
-	/* own records carry MXFS_HB_FEAT_DRBD; set before the claim only */
+	/* own records carry MXFS_HB_FEAT_DRBD; set before the claim only.  Set
+	 * for the shared attachment too (docs/shared-disk-attachment.md): it
+	 * holds no key either, and its clean release is its retirement. */
 	bool                    attach_drbd;
+	/*
+	 * The mount's fence method (MXFS_DISKLOCK_FENCE_*, mount option fence=).
+	 * Kinds 28 and 29 are certified and consumed only on a mount whose method
+	 * produced them: an operator's confirmation is no evidence on a mount
+	 * that fences by vCenter, nor either on one that fences by the storage.
+	 */
+	int                     fence_method;
 	/* own records carry MXFS_HB_FEAT_BOOT_ADOPTED (a bootstrap adoption) */
 	bool                    boot_adopted;
 	mxfs_thread_t           *hb_thread;
@@ -1923,9 +2034,12 @@ struct mxfs_disklock_ctx {
 	mxfs_node_id_t                   slot_node_id[MXFS_DISKLOCK_HB_SLOTS];
 
 	/* v0.5.0: dead-declaration threshold in stale HB samples.  Defaults
-	 * to MXFS_DISKLOCK_DEAD_THRESHOLD (62 s at 2 s/sample); overridden
-	 * via mxfs_disklock_set_dead_timeout_ms (lease_timeout_ms param). */
+	 * to the attachment's window (disklock_default_dead_threshold: 34 s on
+	 * a PR-fenced SCSI attachment, 62 s on DRBD or shared); overridden via
+	 * mxfs_disklock_set_dead_timeout_ms (dead_timeout_ms param), which
+	 * sets dead_window_set so a later attachment change keeps it. */
 	uint32_t                         dead_threshold;
+	bool                             dead_window_set;
 	mxfs_disklock_expire_cb          expire_cb;
 	void                             *expire_cb_data;
 
@@ -2195,6 +2309,25 @@ void mxfs_disklock_set_snlocal(struct mxfs_disklock_ctx *ctx, bool snlocal);
 void mxfs_disklock_set_transport_tcp(struct mxfs_disklock_ctx *ctx, bool tcp);
 /* write-time attachment marker (MXFS_HB_FEAT_DRBD); before the claim only */
 void mxfs_disklock_set_attach_drbd(struct mxfs_disklock_ctx *ctx, bool drbd);
+
+/* The mount's fence method, as the v5 mount's MXFS_V5_FENCE_* numbers it. */
+#define MXFS_DISKLOCK_FENCE_SCSIPR	0
+#define MXFS_DISKLOCK_FENCE_MANUAL	1
+#define MXFS_DISKLOCK_FENCE_VCENTER	2
+#define MXFS_DISKLOCK_FENCE_QUORUM	3
+void mxfs_disklock_set_fence_method(struct mxfs_disklock_ctx *ctx, int method);
+/*
+ * May a certificate of `kind` with retirement basis `basis` stand on this
+ * mount?  The storage's kinds carry MXFS_RETIRE_BASIS_TARGET_OP and stand on
+ * any mount; the shared attachment's (28, 29, 30) carry NODE_STOPPED and stand
+ * only on a mount whose fence method produced that kind.  NULL `why` allowed.
+ */
+bool mxfs_disklock_cert_method_ok(const struct mxfs_disklock_ctx *ctx,
+				  uint16_t kind, uint8_t basis, const char **why);
+/* 1 = `slot`'s heartbeat record changed between two fresh reads `gap_ms`
+ * apart; 0 = unchanged; <0 = not read (treat as changed) */
+int mxfs_disklock_slot_hb_changing(struct mxfs_disklock_ctx *ctx, int slot,
+				   uint32_t gap_ms);
 
 /*
  * 0.75.0: the platter's transport census, taken BEFORE a mount selects its

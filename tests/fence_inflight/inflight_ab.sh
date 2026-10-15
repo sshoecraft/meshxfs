@@ -166,7 +166,7 @@ sudo "$P" clearua "$SURVIVOR" >> "$OUT/pr_setup.txt" 2>&1
 setup_step "$VICTIM"   0x06 0x0  "$VK" "register victim"    || exit 3
 setup_step "$SURVIVOR" 0x06 0x0  "$SK" "register survivor"  || exit 3
 setup_step "$SURVIVOR" 0x01 "$SK" 0x0  "RESERVE WE-RO"      || exit 3
-# Both registrations MUST be present before the trial can mean anything.
+# Both registrations MUST be present before the attempt can mean anything.
 sudo "$P" prin "$SURVIVOR" 0x00 > "$OUT/pr_keys_setup.txt" 2>&1
 grep -q "feed0001" "$OUT/pr_keys_setup.txt" || { say "SETUP FAILED: victim key absent after setup"; exit 3; }
 grep -q "feed0002" "$OUT/pr_keys_setup.txt" || { say "SETUP FAILED: survivor key absent after setup"; exit 3; }
@@ -225,7 +225,7 @@ grep -q '\[mono\]' "$OUT/trace_clock.txt" || {
 
 sudo bash "$STACK" delay "$W_MS" >> "$OUT/run.log" 2>&1
 
-# ------------------------------------------------------------------ the trial
+# ------------------------------------------------------------------ the attempt
 say "starting O_DIRECT poller on $LOOP (below dm-delay)"
 sudo "$P" poll "$LOOP" "$PHYS" 4096 "$PAT" $((W_MS + 45000)) 50 > "$OUT/poll.txt" 2>&1 &
 POLLPID=$!

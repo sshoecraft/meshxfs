@@ -12,7 +12,9 @@
 #include "xfs_mount.h"
 
 /*
- * XFS logging functions
+ * Logging functions.  Every message this module prints goes out under its
+ * own name: a line reading "XFS (sdb): ... Shutting down filesystem" is taken
+ * for the kernel's XFS failing, and that report lands on the wrong team.
  */
 static void
 __xfs_printk(
@@ -21,10 +23,10 @@ __xfs_printk(
 	struct va_format	*vaf)
 {
 	if (mp && mp->m_super) {
-		printk("%sXFS (%s): %pV\n", level, mp->m_super->s_id, vaf);
+		printk("%smxfs (%s): %pV\n", level, mp->m_super->s_id, vaf);
 		return;
 	}
-	printk("%sXFS: %pV\n", level, vaf);
+	printk("%smxfs: %pV\n", level, vaf);
 }
 
 void

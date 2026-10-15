@@ -49,6 +49,12 @@ INSTALL="set -o pipefail
     apt-get install -y git build-essential proxmox-headers-\$(uname -r) open-iscsi sg3-utils > /root/mxfs-apt.log 2>&1 || { echo APT_FAIL; tail -3 /root/mxfs-apt.log; exit 1; }
     rm -rf /root/mxfs-tree && mkdir /root/mxfs-tree && tar -xzf /root/mxfs-tree.tar.gz -C /root/mxfs-tree && cd /root/mxfs-tree || exit 1
     make > /root/mxfs-make.log 2>&1 && make install >> /root/mxfs-make.log 2>&1 || { echo MAKE_FAIL; tail -5 /root/mxfs-make.log; exit 1; }
+    # a module already loaded from an earlier install stays loaded through
+    # modprobe: unload it first, which only an unmounted host allows
+    if [ -d /sys/module/mxfs ]; then
+        grep -q ' mxfs ' /proc/mounts && { echo STILL_MOUNTED; exit 1; }
+        rmmod mxfs || { echo RMMOD_FAIL; exit 1; }
+    fi
     modprobe mxfs || { echo MODPROBE_FAIL; exit 1; }
     echo INSTALLED version=\$(cat /sys/module/mxfs/version) srcversion=\$(cat /sys/module/mxfs/srcversion) tools=\$(ls /usr/sbin | grep -c mxfs)"
 for h in "${HOSTS[@]}"; do

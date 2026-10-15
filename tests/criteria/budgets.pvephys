@@ -1,0 +1,8 @@
+# Row budgets for the physical Proxmox pair pve1/pve2 (scripts/prun.sh,
+# MXFS_RIG_BUDGETS): <row> <seconds> <derivation>.  Each is native XFS on the
+# same hardware, x2, as tests/criteria/TIMEOUT_BUDGETS.md derives every budget.
+# A row not listed keeps the manifest's.
+#
+# The pair replicates over gigabit DRBD (protocol C), ~100 MB/s for any write,
+# where the manifest's fio budget was derived on the rig's ~2 GB/s LUN.
+fio_perf 230 native XFS on /dev/drbd0 (pve1, Samsung 850 EVO whole-disk DRBD, pve2 connected) ran tests/suite/fio_perf.sh in 115 s on 2026-10-14 (seqW 101 MiB/s, seqR 222, randW 17237 iops, randR 51848); x2

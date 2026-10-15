@@ -35,16 +35,27 @@ effect once every MeshXFS filesystem is unmounted and the module is reloaded
 (`rmmod mxfs && modprobe mxfs`).
 
 Both nodes must run the same MeshXFS version. Check with
-`cat /sys/module/mxfs/srcversion` on each.
+`cat /sys/module/mxfs/version` on each. (`srcversion` is not the check: DKMS
+builds the module against each kernel, so two hosts on different kernels, as
+during a rolling update, show different srcversions for the same release.
+That mix is supported: a pair with one host on Proxmox's 6.17 kernel and the
+other on 7.0 recovered from a hard reset of one host with every file intact.)
 
 ## 2. A backing device on each node
 
-DRBD needs a block device of the same size on each node: a partition, a disk or
-an LVM logical volume. On Proxmox the `pve` volume group's thin pool works:
+Give DRBD the disk that will hold your VMs: a whole disk on each node is the
+usual choice (a partition or an LVM logical volume also works). The two need
+not be the same size; DRBD uses the smaller. Name each by its
+`/dev/disk/by-id` path, which stays the same across reboots where `/dev/sdX`
+may not:
 
 ```
-lvcreate -V 40G -T pve/data -n mxfs        # both nodes
+ls -l /dev/disk/by-id/ | grep -v -- -part            # find the disk
+wipefs -a /dev/disk/by-id/<this node's disk>         # both nodes
 ```
+
+`wipefs` removes old partition tables and filesystem signatures, so nothing
+mistakes the disk for what it held before. Everything on it is lost.
 
 Do not use a loop device on a file. It is not recreated at boot, so the
 resource cannot come back after a restart.
@@ -52,7 +63,8 @@ resource cannot come back after a restart.
 ## 3. The DRBD resource
 
 `/etc/drbd.d/mxfs.res`, identical on both nodes. The `on` names must be the
-hosts' names exactly as `hostname` prints them.
+hosts' names exactly as `hostname` prints them, and each `disk` is that node's
+own disk from section 2.
 
 ```
 resource mxfs {
@@ -76,13 +88,13 @@ resource mxfs {
     }
     on pve1 {
         device    /dev/drbd0 minor 0;
-        disk      /dev/pve/mxfs;
+        disk      /dev/disk/by-id/ata-Samsung_SSD_850_EVO_250GB_S2R5NB0HA78204Z;
         address   192.168.1.80:7788;
         meta-disk internal;
     }
     on pve2 {
         device    /dev/drbd0 minor 0;
-        disk      /dev/pve/mxfs;
+        disk      /dev/disk/by-id/ata-Samsung_SSD_850_EVO_500GB_S2RANXAH208584Y;
         address   192.168.1.81:7788;
         meta-disk internal;
     }
@@ -103,25 +115,34 @@ keep-alive is sent only when the link is otherwise idle, so the shorter
 interval adds no traffic under load. A change to `ping-int` on a running pair
 takes effect when the connection is next made.
 
-## 4. First synchronisation
+## 4. Bring DRBD up, with no initial copy
 
 ```
 drbdadm create-md mxfs && drbdadm up mxfs        # both nodes
-drbdadm primary --force mxfs                     # node A only, this one time
+drbdadm -- --clear-bitmap new-current-uuid mxfs  # node A only, once both show Connected
 ```
 
-Wait until `cat /proc/drbd` shows `ds:UpToDate/UpToDate` on both nodes. The
-first sync copies the whole device, so it takes as long as the slower of the
-link and the receiving disk needs: on `pve1`/`pve2` (gigabit, older SATA SSDs
-under a thin volume) 40 GiB took 22 minutes, at 31 MB/s. Then:
+On a disk that held anything before, `create-md` stops at "Found some data
+==> This might destroy existing data! <==" and asks whether to proceed: it
+looked where it keeps its own records, at the end of the disk, and found
+bytes there. Type `yes`. (`wipefs` clears signatures, not that area.)
 
-```
-drbdadm primary mxfs                             # node B
-```
+`cat /proc/drbd` then shows `cs:Connected ro:Secondary/Secondary
+ds:UpToDate/UpToDate` on both nodes, at once.
+
+DRBD's default for a new resource is to copy one whole disk to the other,
+because it cannot know the disks hold nothing anyone needs. Here they do not:
+the next step formats the device, and every write from then on, the format's
+included, goes to both disks. What was on the disks before stays only in what
+the new filesystem calls free space, which it never reads before writing.
+So the copy is skipped; on a 250 GB disk over gigabit it would take about an
+hour. (`drbdadm verify` compares every block, so it will list blocks the
+filesystem has never written as different. They are never read.)
 
 ## 5. Format, once
 
 ```
+drbdadm primary mxfs                             # node A only
 mkfs.mxfs /dev/drbd0                             # node A only
 ```
 
@@ -170,6 +191,12 @@ AES-NI), use `x86-64-v2`:
 ```
 qm set <vmid> --cpu x86-64-v2
 ```
+
+Give every VM disk on the storage `cache=none`, the Proxmox default (Hard
+Disk → Cache → "Default (No cache)"). It writes the guest's I/O straight to
+the DRBD device with `O_DIRECT`; `writeback` and `writethrough` hold it in
+one host's page cache first, and they are not the modes this pair was
+validated with.
 
 `tests/pve_live_migrate.sh` checks a pair end to end: a guest writing and
 fsyncing throughout is migrated back and forth, and after every move each

@@ -39,8 +39,16 @@ H0=${HOSTS[0]}
 existing=$(on "$H0" "qm config $VMID 2>/dev/null | sed -n 's/^description: //p'" 30)
 if [ -n "$existing" ]; then
     [[ "$existing" == *pve_cloud_guest* ]] || die "VM $VMID exists and was not made by this script ($existing)"
-    echo "VM $VMID already exists (made by this script); leaving it"
-    echo "PVE_CLOUD_GUEST_OK vmid=$VMID"; exit 0
+    # the config outlives its disk when the volume is formatted again
+    # (scripts/pve_mxfs_san_disk.sh up), so a config alone is not a guest
+    disk=$(on "$H0" "p=\$(pvesm path \$(qm config $VMID | sed -n 's/^virtio0: \\([^,]*\\).*/\\1/p') 2>/dev/null) && [ -s \"\$p\" ] && echo DISK_PRESENT" 30)
+    if [[ "$disk" == *DISK_PRESENT* ]]; then
+        echo "VM $VMID already exists (made by this script); leaving it"
+        echo "PVE_CLOUD_GUEST_OK vmid=$VMID"; exit 0
+    fi
+    echo "VM $VMID exists but its disk is gone; destroying the config and building it again"
+    on "$H0" "qm destroy $VMID --purge 1 --skiplock 1 >/dev/null 2>&1; qm config $VMID >/dev/null 2>&1 && echo STILL_THERE || echo DESTROYED" 60 | grep -q DESTROYED \
+        || die "could not destroy the diskless VM $VMID"
 fi
 
 # the user-data snippet on every host; `local` must allow snippets

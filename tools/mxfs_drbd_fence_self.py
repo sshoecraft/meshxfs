@@ -42,6 +42,13 @@ docs/rulings/drbd-two-node-self-exclusion.md; in short:
     that was Secondary when the link failed cannot know what its peer did
     since, so a promotion is granted only under this node's own standing
     exclusion of the peer, never on the tie-break.
+  * authority=quorum in the config (docs/quorum-takeover.md): corosync's vote
+    with a QDevice decides a lost link instead of the tie-break.  The node
+    quorate without its peer wins, whichever participant it is; a node that
+    is not quorate loses; only a peer that stays in the quorate membership
+    (the replication link alone failed) leaves it to the tie-break.  Under
+    the vote nobody takes the pair alone on DRBD's Outdated record at boot,
+    and either participant may hold an exclusion it won.
 
 Subcommands:
   fence-peer                      DRBD's handler action (DRBD_RESOURCE,
@@ -160,6 +167,23 @@ QEMU_PID_DIR = "/var/run/qemu-server"
 EXCLUSION_NOTICE = ("m=$(drbdadm sh-minor %s 2>/dev/null) && "
                     "[ -w /proc/fs/mxfs/drbd_excluded ] && "
                     "echo \"$m\" > /proc/fs/mxfs/drbd_excluded")
+FENCE_CONF = "/etc/mxfs/drbd-fence.conf"
+# authority=quorum (docs/quorum-takeover.md): corosync's votequorum with a
+# QDevice decides a lost link instead of the fixed tie-break.  Asked through
+# the quorum reporter's one-shot `vote` report.
+QUORUMD = "/usr/sbin/mxfs_quorumd"
+QUORUM_POLL_S = 0.5
+# A verdict counts once it has held this long, so one report taken in the
+# middle of a membership change decides nothing.
+QUORUM_STABLE_S = 2.0
+# How long the peer must stay in this node's quorate membership after the
+# link loss before the fixed tie-break decides (the replication link failed,
+# corosync's did not).  A node keeps a membership its peer has already left
+# for at most D_inq; this is the takeover bound the shared attachment uses
+# for the same quantity (quorum_takeover_ms), well past the D_inq measured.
+QUORUM_SETTLE_S = 45
+# With no stable verdict by then (reports flapping), this node loses.
+QUORUM_GIVE_UP_S = QUORUM_SETTLE_S + 30
 
 
 def log(msg, crit=False):
@@ -436,6 +460,107 @@ def exclude(res, peer, peer_addr, drbd_port, detail):
     return episode
 
 
+# ------------------------------------------------------------------ quorum
+
+def fence_authority():
+    """`tiebreak` (the default: no file, no authority= line) or `quorum`.
+    Anything else is returned as written, and the callers refuse it."""
+    try:
+        with open(FENCE_CONF) as f:
+            vals = [l.strip()[len("authority="):] for l in f if l.strip().startswith("authority=")]
+    except FileNotFoundError:
+        return "tiebreak"
+    return vals[-1].strip() if vals else "tiebreak"
+
+
+def quorum_vote():
+    """One `mxfs_quorumd vote` report: a dict of its fields, or None when
+    the reporter cannot be run or does not answer in its bound."""
+    try:
+        p = subprocess.run([QUORUMD, "vote"], stdin=subprocess.DEVNULL,
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    rep = {}
+    for line in p.stdout.decode(errors="replace").splitlines():
+        if "=" in line:
+            k, v = line.split("=", 1)
+            rep[k.strip()] = v.strip()
+    return rep if rep.get("END") == "1" else None
+
+
+def quorum_peer_addr(rep, peer, peer_addr):
+    """The peer's address in corosync's nodelist: its DRBD address if the
+    nodelist has it, else the address its DRBD host name resolves to."""
+    nodes = [a for a in rep.get("NODES", "").split(",") if a]
+    if peer_addr in nodes:
+        return peer_addr
+    try:
+        a = socket.gethostbyname(peer)
+    except OSError:
+        return None
+    return a if a in nodes else None
+
+
+def quorum_decision(res, peer, peer_addr):
+    """What the vote says about a lost link: ("win" | "lose" | "tiebreak",
+    detail).
+
+    win       this node is quorate in a membership without the peer.  With a
+              QDevice under ffsplit at most one side of a split is quorate
+              once the membership has changed, so the peer cannot be too.
+    lose      this node is not quorate (cut off from the peer and from
+              qnetd, or denied by qnetd), or corosync cannot be asked, or
+              the configuration cannot give an exclusive vote (two_node, the
+              peer not in the nodelist).
+    tiebreak  the peer stayed in this node's quorate membership for
+              QUORUM_SETTLE_S: only the replication link failed and both
+              nodes are alive, so the fixed tie-break decides as without a
+              vote.  The peer, in the same membership, reaches the same
+              verdict: neither can be quorate without the other while both
+              stay members.
+
+    Each verdict must hold through consecutive reports (QUORUM_STABLE_S, or
+    QUORUM_SETTLE_S for tiebreak) before it counts.  I/O stays frozen
+    meanwhile."""
+    t0 = time.monotonic()
+    state, since, detail, said = None, t0, "", 0.0
+    while True:
+        rep = quorum_vote()
+        now = time.monotonic()
+        if rep is None:
+            st, why = "lose", "the quorum reporter (%s vote) gave no report" % QUORUMD
+        elif rep.get("TWONODE") == "1":
+            st, why = "lose", "corosync has two_node set, so both halves of a split are quorate"
+        else:
+            pa = quorum_peer_addr(rep, peer, peer_addr)
+            members = [a for a in rep.get("MEMBERS", "").split(",") if a]
+            if pa is None:
+                st, why = "lose", ("%s (%s) is not in corosync's nodelist (%s)"
+                                   % (peer, peer_addr, rep.get("NODES", "")))
+            elif rep.get("QUORATE") != "1":
+                st, why = "lose", "this node is not quorate (votes %s)" % rep.get("VOTES", "?")
+            elif pa in members:
+                st, why = "tiebreak", ("%s is still in this node's quorate membership (%s)"
+                                       % (peer, ",".join(members)))
+            else:
+                st, why = "win", ("quorate (votes %s, qdevice %s) in a membership without %s (%s)"
+                                  % (rep.get("VOTES", "?"), rep.get("QDEVICE", "?"),
+                                     peer, ",".join(members)))
+        if st != state:
+            state, since = st, now
+        detail = why
+        need = QUORUM_SETTLE_S if st == "tiebreak" else QUORUM_STABLE_S
+        if now - since >= need:
+            return st, "%s (held %.1f s, %.1f s after the link loss)" % (detail, now - since, now - t0)
+        if now - t0 >= QUORUM_GIVE_UP_S:
+            return "lose", "no verdict held within %d s; last: %s" % (QUORUM_GIVE_UP_S, detail)
+        if now - said >= 10:
+            log("fence-peer: DRBD %s: waiting for the vote to settle (%s)" % (res, detail))
+            said = now
+        time.sleep(QUORUM_POLL_S)
+
+
 # --------------------------------------------------------------- fence-peer
 
 def resume_frozen_io(res):
@@ -509,6 +634,11 @@ def cmd_fence_peer():
         # Not a lost link: the module's startup fence after a pair outage
         # runs the handler too.  A connected, live peer is not excluded.
         return cmd_fence(peer, me)
+    authority = fence_authority()
+    if authority not in ("tiebreak", "quorum"):
+        log("fence-peer: %s names authority=%s, which this authority does not know "
+            "(tiebreak or quorum); I/O stays frozen" % (FENCE_CONF, authority), crit=True)
+        return 1
 
     # DRBD runs this handler for two requests (drbd_nl.c): a Primary that lost
     # its link, and the promotion of a disconnected Secondary whose peer is
@@ -533,9 +663,10 @@ def cmd_fence_peer():
             "nothing is granted" % (res, mine_role or "?", mine or "?"), crit=True)
         return 1
     if mine_role != "Primary":
-        # Only participant 0 ever excludes; an inhibit on participant 1 can
-        # only be an earlier version's, and grants nothing.
-        inh = read_inhibit(res) if idx == 0 else None
+        # Under the tie-break only participant 0 ever excludes; an inhibit on
+        # participant 1 can only be an earlier version's, and grants nothing.
+        # Under the vote either participant may hold one it won.
+        inh = read_inhibit(res) if idx == 0 or authority == "quorum" else None
         if inh and inh.get("peer") == peer:
             try:
                 nft_apply(res, peer_addr, drbd_port)
@@ -564,16 +695,35 @@ def cmd_fence_peer():
     # promoting.  A peer that leaves on purpose disconnects gracefully (its
     # unit unmounts, steps down and takes DRBD down, outdating its own disk),
     # and DRBD runs no handler for that.
-    if idx == 1:
-        append_record(res, record_line(res, peer_addr, peer, "TIEBREAK_LOST",
-                                       "participant=1"))
-        log("DRBD %s lost its peer %s (%s). This node (%s, participant 1) loses the "
-            "pair's fixed tie-break: its I/O stays frozen and nothing it holds reaches "
-            "a disk. If %s is alive it excludes this node and carries on. If %s is "
-            "DOWN, this two-node pair cannot recover automatically (no third vote, no "
-            "node fence): bring %s back, or configure a node fence (IPMI/PDU) in "
-            "/etc/mxfs/drbd-fence.conf." % (res, peer, peer_addr, me, peer, peer, peer),
-            crit=True)
+    #
+    # Under authority=quorum the vote decides first (quorum_decision): a node
+    # quorate without its peer wins whichever participant it is, a node that
+    # is not quorate loses, and only a peer that stays in the quorate
+    # membership (the replication link alone failed) leaves it to the
+    # tie-break.  The two rules are never mixed on one decision: the
+    # tie-break applies only where the vote has said both nodes are members.
+    verdict, vdetail = "tiebreak", ""
+    if authority == "quorum":
+        verdict, vdetail = quorum_decision(res, peer, peer_addr)
+        append_record(res, record_line(res, peer_addr, peer, "QUORUM_" + verdict.upper(),
+                                       "participant=%d %s" % (idx, vdetail)))
+    if verdict == "lose" or (verdict == "tiebreak" and idx == 1):
+        if verdict == "lose":
+            log("DRBD %s lost its peer %s (%s). This node (%s, participant %d) does not "
+                "hold the vote: %s. Its I/O stays frozen and nothing it holds reaches a "
+                "disk. If %s holds the vote it excludes this node and carries on; if "
+                "neither node holds it (qnetd unreachable from both), the pair waits until "
+                "one does." % (res, peer, peer_addr, me, idx, vdetail, peer), crit=True)
+        else:
+            append_record(res, record_line(res, peer_addr, peer, "TIEBREAK_LOST",
+                                           "participant=1"))
+            log("DRBD %s lost its peer %s (%s). This node (%s, participant 1) loses the "
+                "pair's fixed tie-break: its I/O stays frozen and nothing it holds reaches "
+                "a disk. If %s is alive it excludes this node and carries on. If %s is "
+                "DOWN, this two-node pair cannot recover automatically (no third vote, no "
+                "node fence): bring %s back, or configure a node fence (IPMI/PDU) in "
+                "/etc/mxfs/drbd-fence.conf." % (res, peer, peer_addr, me, peer, peer, peer),
+                crit=True)
         # The survivor fences this whole host (every MXFS port, every shared
         # resource's link), so any MXFS state here is state it is replacing:
         # a mount of this resource, of another one, or one still in progress,
@@ -594,20 +744,25 @@ def cmd_fence_peer():
                              stderr=subprocess.DEVNULL)
         return 1
 
-    # participant 0: the winner.  Isolation first, then the durable inhibit,
-    # then the receipt; only then does DRBD get the exit code that resumes I/O.
+    # The winner (participant 0 on the tie-break, or the node holding the
+    # vote).  Isolation first, then the durable inhibit, then the receipt;
+    # only then does DRBD get the exit code that resumes I/O.
     try:
-        episode = exclude(res, peer, peer_addr, drbd_port, "agent=self participant=0")
+        episode = exclude(res, peer, peer_addr, drbd_port,
+                          "agent=self participant=%d authority=%s verdict=%s"
+                          % (idx, authority, verdict))
     except Exception as e:  # any failure leaves DRBD frozen: never exit 7 half-done
         log("fence-peer: excluding %s failed (%s); I/O stays frozen" % (peer, e), crit=True)
         return 1
-    log("DRBD %s lost its peer %s (%s). This node (%s, participant 0) wins the pair's "
-        "fixed tie-break: %s is isolated from this host (the DRBD port of every resource "
+    why = ("holds the vote: %s" % vdetail if verdict == "win"
+           else "wins the pair's fixed tie-break%s" % (" (%s)" % vdetail if vdetail else ""))
+    log("DRBD %s lost its peer %s (%s). This node (%s, participant %d) %s. %s is "
+        "isolated from this host (the DRBD port of every resource "
         "the two share, and the MXFS ports, so each shared resource's link fails and is "
         "excluded under its own episode), the "
         "resource goes StandAlone, and %s is held out (episode %s) until it reports no "
         "live MXFS and DRBD not Primary (a restart does that). I/O resumes now."
-        % (res, peer, peer_addr, me, peer, peer, episode), crit=True)
+        % (res, peer, peer_addr, me, idx, why, peer, peer, episode), crit=True)
     resume_frozen_io(res)
     # StandAlone after DRBD has the answer: disconnecting from inside the
     # handler would wait on the state machine the handler is holding.  The
@@ -1195,6 +1350,16 @@ class Boot:
                 "endpoints including this host; waiting for the peer" % self.res, crit=True)
             return None
         me, my_addr, _, peer, peer_addr, drbd_port = ep
+        if fence_authority() != "tiebreak":
+            # DRBD's record can be stale (set before a crash, the peer
+            # resynced and carried on since), and only the tie-break makes it
+            # safe to act on: participant 1 never carries on alone.  Under the
+            # vote either node may have, so neither takes the pair alone on
+            # the record; a node that won holds its own exclusion instead.
+            log("%s: DRBD's record holds %s Outdated, but under authority=%s %s may have "
+                "carried on alone since that record was written; waiting for it to "
+                "connect" % (self.res, peer, fence_authority(), peer))
+            return None
         if participant_index(my_addr, peer_addr) != 0:
             log("%s: DRBD's record holds %s Outdated, but this node (%s) is participant 1, "
                 "which never takes the pair alone; waiting for %s to connect"
@@ -1369,9 +1534,10 @@ def cmd_boot(res, mountpoint):
     write_boot_state(res, "starting")
     inh = read_inhibit(res)
     ep = drbd_endpoints(res)
-    if inh and ep and participant_index(ep[1], ep[4]) == 1:
-        # Only participant 0 ever excludes; this inhibit is an earlier
-        # version's and authorises nothing.  Its isolation would keep DRBD
+    if inh and ep and participant_index(ep[1], ep[4]) == 1 and fence_authority() == "tiebreak":
+        # Under the tie-break only participant 0 ever excludes; this inhibit
+        # is an earlier version's (or a vote's, the pair since switched back
+        # to the tie-break) and authorises nothing.  Its isolation would keep DRBD
         # from connecting, and connecting is how this node gets back in:
         # DRBD's handshake decides which replica is the newer.  The inhibit
         # goes first, so the guard stops re-applying the isolation, and

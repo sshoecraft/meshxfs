@@ -18,7 +18,7 @@ facts live," compiled because these notes were reference-only and aging
 
 ### Machines
 
-[[Network topology]] + [[test-environment]]: clyde is the dev host, two
+`Network topology` + [[test-environment]]: clyde is the dev host, two
 NICs — `192.168.1.166` (main LAN, physical nodes' iSCSI path) and
 `192.168.120.1` (lab/VM bridge, `br0`, dnsmasq DNS+DHCP, test VMs' iSCSI
 path). Same box, same underlying LUN reachable both ways. ~94G RAM — the

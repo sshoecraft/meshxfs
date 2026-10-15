@@ -1253,12 +1253,17 @@ xfs_iget_recycle(
 					VFS_I(ip)->i_generation);
 				error = -EFSCORRUPTED;
 			} else if (recycle_adopt) {
+				uint32_t	pre_gen = VFS_I(ip)->i_generation;
+				int		fd_error;
+
 				/*
 				 * A different incarnation, live on the platter
 				 * (the ino 1862 lag signature — platter one
 				 * generation below a shell this node freed in
 				 * core — is excluded above).
 				 */
+				ip->i_mxfs_forkreset_src = 1 * 2 +
+					(ip->i_df.if_needextents ? 1 : 0);
 				xfs_idestroy_fork(&ip->i_df);
 				/* (D-0535): zap, not destroy — a stale
 				 * if_bytes/if_format must not survive into an
@@ -1271,7 +1276,47 @@ xfs_iget_recycle(
 							ip->i_cowfp);
 					ip->i_cowfp = NULL;
 				}
-				if (xfs_inode_from_disk(ip, dip) == 0) {
+				fd_error = xfs_inode_from_disk(ip, dip);
+				if (fd_error &&
+				    !READ_ONCE(mxfs_recycle_adopt_fail_refuse)) {
+					pr_warn_ratelimited(
+					    "mxfs: P-RECYCLE-ADOPT-FROMDISK-FAIL-HANDOUT ino=%llu rc=%d fmt=%d needextents=%d broot=%d -- recycle_adopt_fail_refuse=0: handing out the rejected image's fork\n",
+						(unsigned long long)ip->i_ino,
+						fd_error, ip->i_df.if_format,
+						ip->i_df.if_needextents ? 1 : 0,
+						ip->i_df.if_broot ? 1 : 0);
+				} else if (fd_error) {
+					/*
+					 * The platter image was rejected, and
+					 * xfs_iformat_data_fork has already set
+					 * the format (a BTREE one with
+					 * if_needextents and no root: the state
+					 * that walked a NULL root in qemu-img).
+					 * Never hand that out.  Fail the
+					 * recycle so the shell goes back to
+					 * reclaim; leave it an empty fork that
+					 * reclaim can destroy, give it back the
+					 * generation it had so the next recycle
+					 * takes the same adopt decision, and keep
+					 * it stale (below) so that recycle reads
+					 * the platter again.
+					 */
+					pr_warn_ratelimited(
+					    "mxfs: P-RECYCLE-ADOPT-FROMDISK-FAIL ino=%llu rc=%d disk_mode=0%o disk_gen=%u incore_gen=%u fmt=%d -- platter image rejected; recycle failed, shell kept stale\n",
+						(unsigned long long)ip->i_ino,
+						fd_error,
+						be16_to_cpu(dip->di_mode),
+						be32_to_cpu(dip->di_gen),
+						pre_gen, ip->i_df.if_format);
+					xfs_idestroy_fork(&ip->i_df);
+					ip->i_df.if_format =
+						XFS_DINODE_FMT_EXTENTS;
+					ip->i_df.if_bytes = 0;
+					ip->i_df.if_data = NULL;
+					ip->i_df.if_nextents = 0;
+					VFS_I(ip)->i_generation = pre_gen;
+					error = fd_error;
+				} else {
 					i_size_write(VFS_I(ip),
 						     ip->i_disk_size);
 					/* adopted a DIFFERENT
@@ -1319,6 +1364,8 @@ xfs_iget_recycle(
 				 * (xfs_inode_init); a plain lookup correctly
 				 * sees a free inode.
 				 */
+				ip->i_mxfs_forkreset_src = 2 * 2 +
+					(ip->i_df.if_needextents ? 1 : 0);
 				xfs_idestroy_fork(&ip->i_df);
 				/* (D-0535): zap, not destroy — a stale
 				 * if_bytes/if_format must not survive into an
@@ -1355,7 +1402,8 @@ xfs_iget_recycle(
 			xfs_buf_relse(rbp);
 		}
 		kfree(sr_tmp);
-		ip->i_dlm_stale = false;
+		if (!error)
+			ip->i_dlm_stale = false;
 	}
 
 	/*
@@ -3222,6 +3270,18 @@ xfs_reclaim_igrab(
 		return false;
 	}
 
+	/*
+	 * Test only: hold background and shrinker reclaim off so an evicted
+	 * inode stays a reclaimable shell that the next lookup recycles
+	 * (xfs_iget_recycle).  Unmount asks for sick inodes too and is never
+	 * held.
+	 */
+	if (unlikely(READ_ONCE(mxfs_dbg_reclaim_hold)) &&
+	    (!icw || !(icw->icw_flags & XFS_ICWALK_FLAG_RECLAIM_SICK))) {
+		spin_unlock(&ip->i_flags_lock);
+		return false;
+	}
+
 	__xfs_iflags_set(ip, XFS_IRECLAIM);
 	spin_unlock(&ip->i_flags_lock);
 	return true;
@@ -4816,7 +4876,7 @@ xfs_inodegc_shrinker_count(
 	struct shrinker		*shrink,
 	struct shrink_control	*sc)
 {
-	struct xfs_mount	*mp = shrink->private_data;
+	struct xfs_mount	*mp = mxfs_shrinker_private(shrink);
 	struct xfs_inodegc	*gc;
 	int			cpu;
 
@@ -4837,7 +4897,7 @@ xfs_inodegc_shrinker_scan(
 	struct shrinker		*shrink,
 	struct shrink_control	*sc)
 {
-	struct xfs_mount	*mp = shrink->private_data;
+	struct xfs_mount	*mp = mxfs_shrinker_private(shrink);
 	struct xfs_inodegc	*gc;
 	int			cpu;
 	bool			no_items = true;
@@ -4874,7 +4934,7 @@ xfs_inodegc_register_shrinker(
 	struct xfs_mount	*mp)
 {
 	mp->m_inodegc_shrinker = shrinker_alloc(SHRINKER_NONSLAB,
-						"xfs-inodegc:%s",
+						"mxfs-inodegc:%s",
 						mp->m_super->s_id);
 	if (!mp->m_inodegc_shrinker)
 		return -ENOMEM;
@@ -4883,7 +4943,7 @@ xfs_inodegc_register_shrinker(
 	mp->m_inodegc_shrinker->scan_objects = xfs_inodegc_shrinker_scan;
 	mp->m_inodegc_shrinker->seeks = 0;
 	mp->m_inodegc_shrinker->batch = XFS_INODEGC_SHRINKER_BATCH;
-	mp->m_inodegc_shrinker->private_data = mp;
+	mxfs_shrinker_set_private(mp->m_inodegc_shrinker, mp);
 
 	shrinker_register(mp->m_inodegc_shrinker);
 

@@ -649,7 +649,7 @@ xfs_iwalk_threaded(
 	ASSERT(start_agno < mp->m_sb.sb_agcount);
 	ASSERT(!(flags & ~XFS_IWALK_FLAGS_ALL));
 
-	error = xfs_pwork_init(mp, &pctl, xfs_iwalk_ag_work, "xfs_iwalk");
+	error = xfs_pwork_init(mp, &pctl, xfs_iwalk_ag_work, "mxfs_iwalk");
 	if (error)
 		return error;
 

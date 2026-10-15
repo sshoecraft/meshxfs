@@ -37,6 +37,9 @@
 # Config /etc/mxfs/drbd-fence.conf (absent = agent=self, the built-in default):
 #   agent=self                  the pair's built-in authority, no node fence
 #                               (/usr/sbin/mxfs-drbd-fence-self)
+#   authority=quorum            with agent=self only: corosync's vote decides a
+#                               lost link instead of the fixed tie-break
+#                               (docs/quorum-takeover.md)
 #   agent=ssh                   ssh to an authority's forced command (rig-virsh: older name)
 #   host=192.168.120.1          ... on this host
 #   user=steve
@@ -70,6 +73,13 @@ conf() { sed -n "s/^$1=//p" "$CONF" 2>/dev/null | tail -1; }
 # (tools/mxfs_drbd_fence_self.py; docs/rulings/drbd-two-node-self-exclusion.md).
 if [ ! -r "$CONF" ] || [ "$(conf agent)" = self ]; then
     exec /usr/sbin/mxfs-drbd-fence-self fence-peer
+fi
+# authority= chooses how the built-in authority decides (tiebreak, or quorum:
+# docs/quorum-takeover.md); a node fence decides by powering the loser off,
+# and a vote beside it would be a second rule on the same split
+if [ -n "$(conf authority)" ]; then
+    record FAIL - "authority=$(conf authority) belongs to agent=self, not agent=$(conf agent)"
+    exit 1
 fi
 agent=$(conf agent); host=$(conf host); user=$(conf user); key=$(conf key); delay=$(conf delay); cmd=$(conf cmd)
 self=$(awk '$1 == "self" {print $2}' "$CONF" | tail -1)

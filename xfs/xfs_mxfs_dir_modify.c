@@ -1419,7 +1419,7 @@ mxfs_dlm_dir_modify_refresh(struct xfs_inode *dp)
 		xfs_iflags_set(dp, MXFS_IF_DIR_LEAF_STALE);
 
 	/* caller already holds ILOCK_EXCL — do NOT re-lock */
-	if (mxfs_dir_evict_data_blocks(dp)) {
+	if (mxfs_dir_evict_data_blocks(dp, true)) {
 		dp->i_dlm_dir_evicted_gen = dp->i_dlm_dir_gen;
 		dp->i_dlm_dir_evicted_incarn = VFS_I(dp)->i_generation;
 	}
@@ -3313,7 +3313,7 @@ mxfs_dir_drain_evict_data_blocks(struct xfs_inode *ip)
 	/* Overflow tail (rare large dirs): non-draining evict of clean blocks. */
 	if (overflow) {
 		down_read(&ip->i_lock);
-		mxfs_dir_evict_data_blocks(ip);
+		mxfs_dir_evict_data_blocks(ip, false);
 		up_read(&ip->i_lock);
 		skipped++;	/* conservative: not all blocks drained */
 	}

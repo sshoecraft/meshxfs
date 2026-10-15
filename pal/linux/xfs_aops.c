@@ -27,6 +27,7 @@
 
 /* declared locally (as in xfs_da_btree.c) — not exported via a header. */
 extern bool mxfs_v5_dlm_is_single_node(struct mxfs_v5_dlm *ctx);
+extern void mxfs_demoter_punt_ctx_end(struct xfs_inode *ip);
 
 struct xfs_writepage_ctx {
 	struct iomap_writepage_ctx ctx;
@@ -144,7 +145,8 @@ xfs_setfilesize(
 
 STATIC void
 xfs_end_ioend(
-	struct iomap_ioend	*ioend)
+	struct iomap_ioend	*ioend,
+	bool			last)
 {
 	struct xfs_inode	*ip = XFS_I(ioend->io_inode);
 	struct xfs_mount	*mp = ip->i_mount;
@@ -233,6 +235,14 @@ done:
 				(unsigned long long)i_size_read(VFS_I(ip)),
 				(unsigned long long)ip->i_disk_size);
 	}
+	/*
+	 * A demoter claim this worker's commit retained covers the batch's
+	 * later completions, and this is the last one.  Ended before its folios
+	 * finish: their writeback is what keeps the inode from being evicted
+	 * under us, and ending it after the last of them would not be safe.
+	 */
+	if (last)
+		mxfs_demoter_punt_ctx_end(ip);
 	iomap_finish_ioends(ioend, error);
 	memalloc_nofs_restore(nofs_flag);
 }
@@ -270,7 +280,7 @@ xfs_end_io(
 			io_list))) {
 		list_del_init(&ioend->io_list);
 		iomap_ioend_try_merge(ioend, &tmp);
-		xfs_end_ioend(ioend);
+		xfs_end_ioend(ioend, list_empty(&tmp));
 		cond_resched();
 	}
 }
@@ -1568,6 +1578,8 @@ xfs_vm_writepages(
 		    wpc.ended_again, ret, wbc->sync_mode == WB_SYNC_ALL,
 		    current->comm);
 #endif
+	/* the pass's later folios were what a retained claim covered */
+	mxfs_demoter_punt_ctx_end(XFS_I(mapping->host));
 	xfs_wptask_exit(&wpt);
 	return ret;
 }

@@ -184,6 +184,12 @@ enum mxfs_self_fence_reason {
 	 * been fenced, has noticed nothing, and finds a LUN that has since lost
 	 * its last reservation and refuses nobody. */
 	MXFS_SELF_FENCE_AUTHORITY_LEASE_EXPIRED,
+	/* Local authority, closed early: every SCSI path to the LUN is offline,
+	 * this node's beat has not landed for MXFS_DISKLOCK_ISOLATED_MS, and a
+	 * peer whose own beats land has asked over corosync whether it is gone.
+	 * It closes now and says so, so the peer fences without waiting out the
+	 * death window. */
+	MXFS_SELF_FENCE_SAN_ISOLATED,
 };
 
 static inline const char *mxfs_self_fence_reason_name(int reason)
@@ -201,6 +207,8 @@ static inline const char *mxfs_self_fence_reason_name(int reason)
 		return "PR_CONFLICT_FENCED";
 	case MXFS_SELF_FENCE_AUTHORITY_LEASE_EXPIRED:
 		return "AUTHORITY_LEASE_EXPIRED";
+	case MXFS_SELF_FENCE_SAN_ISOLATED:
+		return "SAN_ISOLATED";
 	default:
 		return "UNKNOWN";
 	}
@@ -237,6 +245,12 @@ static inline const char *mxfs_self_fence_reason_desc(int reason)
 		       "may already have declared it dead and fenced it -- this "
 		       "mount stops writing without waiting to be told, and "
 		       "the device is intact";
+	case MXFS_SELF_FENCE_SAN_ISOLATED:
+		return "every path from this host to the shared LUN is offline "
+		       "and its heartbeat has stopped landing, while a peer's "
+		       "still land -- this mount stops writing and tells its "
+		       "peers, so they fence it at once instead of waiting out "
+		       "the death window; the device is intact";
 	default:
 		return "unknown self-fence detector";
 	}

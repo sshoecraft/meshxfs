@@ -3,7 +3,7 @@
 ## Overview
 Disk-based heartbeat and lock persistence for shared-storage node liveness detection. Provides ~62-second dead-node detection via iSCSI/storage path, completely bypassing TCP/network congestion that affects DLM and UDP lease heartbeats.
 
-The disklock subsystem writes periodic heartbeats and monitors remote heartbeats on the shared block device. When a remote node's heartbeat stalls for ~62 seconds (31 consecutive stale reads @ 2s intervals), disklock fires an expire callback that triggers node purge, SCSI PR preemption, and journal recovery.
+The disklock subsystem writes periodic heartbeats and monitors remote heartbeats on the shared block device. When a remote node's heartbeat stalls for the dead window (on a SCSI attachment 34 s, 17 consecutive stale reads @ 2s intervals; on DRBD or shared 62 s, 31 reads — derivation on MXFS_DISKLOCK_DEAD_THRESHOLD in disklock.h), disklock fires an expire callback that triggers node purge, SCSI PR preemption, and journal recovery.
 
 ## On-Disk Layout
 Heartbeat and lock records are stored in a reserved region starting at disklock_offset (mount option).
@@ -83,7 +83,7 @@ For each monitored slot (tracked in monitored[]):
 
 Monitor logic per remote node:
 - **LIVE threshold**: 2 consecutive fresh reads (changed_samples >= 2)
-- **DEAD threshold**: 31 consecutive stale reads (equal_samples >= 31) @ ~62 seconds
+- **DEAD threshold**: equal_samples >= dead_threshold: 17 (34 s) on a SCSI attachment, 31 (62 s) on DRBD or shared
 - **Epoch change**: Immediate DEAD declaration (node rebooted without graceful shutdown)
 
 Example timeline:
@@ -105,7 +105,7 @@ MXFS uses three independent, overlapping mechanisms to detect node failure:
 | Path | Speed | Mechanism | Bypass |
 |------|-------|-----------|--------|
 | **TCP disconnect** (peer.c) | Seconds | Socket error in DLM transport | Network routing issues only (rare) |
-| **Disklock heartbeat** (disklock.c) | ~62s | Storage I/O, block device visible to all nodes | Storage outage (affects all nodes) |
+| **Disklock heartbeat** (disklock.c) | 34 s SCSI, 62 s DRBD/shared | Storage I/O, block device visible to all nodes | Storage outage (affects all nodes) |
 | **UDP lease** (lease.c) | ~10 min | Multicast heartbeat + UDP ACKs | Multicast filtering or network storm |
 
 All three paths use a per-peer cooldown (30s in mount.c) to prevent duplicate processing of the same failure.

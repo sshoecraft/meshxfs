@@ -18,16 +18,6 @@ On a system, MeshXFS goes by its short name `mxfs`: the `mxfs.ko` module,
 `resize_mxfs` and `mxfs_admin`, and the `mxfs` and `pve-storage-mxfs`
 packages.
 
-> **⚠️ THIS REPOSITORY IS THE DEVELOPMENT TREE, NOT A RELEASE. DO NOT INSTALL
-> MeshXFS FROM IT.**
->
-> **The code on this branch is work in progress. It has not been verified to
-> release quality and cannot be considered production quality. To install
-> MeshXFS, use a release package from the
-> [Releases page](https://github.com/sshoecraft/meshxfs/releases). Clone and build
-> this repository only to run the latest development code, knowing it is not
-> a release.**
-
 > **A shared-LUN clustered filesystem written entirely by AI.**
 >
 > Every line of the clustering, coordination, distributed-lock, fencing, and
@@ -37,6 +27,69 @@ packages.
 > and the AI has since modified much of it heavily (see "How this was built").
 > Everything that turns XFS into a filesystem many machines can mount at once
 > is AI-authored.
+
+> ## 0.90.129: Shared Proxmox Storage, Faster DRBD Setup, Stronger Recovery
+>
+> What changed for someone upgrading from 0.90.124, the last published release
+> (0.90.125 to 0.90.128 were never published; their work ships here):
+>
+> - **Proxmox VE 9 hosts share one SAN LUN as their datastore, over
+>   multipath** (0.90.129).  Three hosts on one iSCSI LUN over two storage
+>   networks run guests on it: live migration with the guest writing
+>   throughout, HA restart after a host loses power, snapshots and rollback,
+>   backup and restore, disk moves, templates and linked clones, containers,
+>   and a storage path lost and returned under load.  Verified on both
+>   Proxmox VE 9 kernels: 6.17, which the 9.1 installer ships, and 7.0, which
+>   `proxmox-default-kernel` now installs.
+> - **A DRBD pair is set up in minutes, on whole disks** (0.90.129).  The
+>   guide gives DRBD the disk that will hold the VMs and skips DRBD's first
+>   copy of it, which took about an hour per 250 GB: the device is formatted
+>   next, so nothing on it before is ever read.  Two physical Proxmox VE 9
+>   hosts set up this way wrote at the replication link's full speed and
+>   passed live migration, datastore operations, a full disk, a host reset
+>   under load, a host leaving and returning cleanly, and the 31-row suite,
+>   on both kernels, and through a rolling kernel upgrade with one host on
+>   each.
+> - **A DRBD pair whose first host dies recovers, given a QDevice** (0.90.128):
+>   `authority=quorum` in `/etc/mxfs/drbd-fence.conf` lets corosync's vote
+>   decide which host carries on.
+> - **Fixes to locking and recovery** (0.90.128, 0.90.129): a host that dies no
+>   longer stalls the others for a minute; a new lock tenure is no longer
+>   taken for one already released; a waiter registration that fails no
+>   longer leaves its mark on the lock; a fenced host reports being fenced,
+>   not corruption; a new file on a reused inode number no longer crashes its
+>   creator; a shared `mmap` write no longer hangs on RHEL 9; a full DRBD
+>   filesystem refuses a write at once instead of hanging the writer.
+> - **vSphere shared disks** (0.90.128): MeshXFS mounts a multi-writer VMDK
+>   or a physical-mode RDM with `fence=vcenter`, `fence=manual` or
+>   `fence=quorum`.  Not yet a released configuration.
+> - **The module's messages say MeshXFS** (0.90.128), not XFS, and the
+>   product is named MeshXFS throughout (0.90.125).
+> - **Proxmox VM disk settings are documented** (0.90.129): give VM disks on
+>   MeshXFS `cache=none`, the Proxmox default and the mode every Proxmox
+>   validation ran with (see "Proxmox VE: VM disk settings" below).
+>
+> **Released configurations and what 0.90.129 was validated on:**
+>
+> | configuration | nodes | storage | validated on 0.90.129 |
+> |---|---|---|---|
+> | `2/net/mesh/drbd` | 2 | each host's own disk, DRBD 8.4 dual-primary | `tests/drbd_release_verify.sh`; two physical Proxmox VE 9 hosts set up from `docs/drbd-setup.md` (the 31-row suite, live migration, datastore operations, a full disk, a host reset and a clean departure, kernels 6.17 and 7.0) |
+> | `2/net/mesh/direct` | 2 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+> | `4/net/mesh/direct` | 4 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+> | `2/disk/caw/direct` | 2 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+> | `4/disk/caw/direct` | 4 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+> | `8/disk/caw/direct` | 8 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+> | `16/disk/caw/direct` | 16 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+> | `2/disk/caw/mpath` | 2 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+> | `4/disk/caw/mpath` | 4 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+> | `8/disk/caw/mpath` | 8 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+> | `16/disk/caw/mpath` | 16 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig; three Proxmox VE 9 hosts on two paths (path faults, live migration, datastore operations, HA power loss), kernels 6.17 and 7.0 |
+>
+> The test rig is Ubuntu 24.04 (kernel 6.8.0-101-generic).  "Installed
+> packages" means the release packages on two nodes of each released
+> platform: Proxmox VE 9 (kernels 6.17 and 7.0), RHEL 9.8, Ubuntu 24.04
+> and Debian 13.  Every host in a cluster needs the same MeshXFS
+> version; hosts on different kernels are fine.
 
 > ## 0.90.124: Multipath SAN Support, Stronger Recovery, Better Scalability
 >
@@ -395,23 +448,23 @@ packages.
 > | `4/disk/caw/mpath` | 0.90.51, again in 0.90.124 | Ubuntu 24.04 |
 > | `8/disk/caw/mpath` | 0.90.51, again in 0.90.124 | Ubuntu 24.04 |
 > | `16/disk/caw/mpath` | 0.90.51, again in 0.90.124 | Ubuntu 24.04 |
-> | `2/net/mesh/drbd` | 0.90.41, again in 0.90.107 | Proxmox VE 9 (kernel 6.17.2-1-pve, two physical hosts and a nested pair), Ubuntu 24.04 (the test rig); DRBD 8.4.11, installed from source with `make install` |
+> | `2/net/mesh/drbd` | 0.90.41, again in 0.90.107 | Proxmox VE 9 (kernels 6.17 and 7.0, two physical hosts set up from the guide with the release package), Ubuntu 24.04 (the test rig); DRBD 8.4.11 |
 >
-> All eleven were verified on the current release, 0.90.124: each `direct`
+> All eleven were verified on the current release, 0.90.129: each `direct`
 > configuration's suite on the test rig at its node count, and the installed
-> packages on two nodes of each of the four platforms; each `mpath`
+> packages on two nodes of each released platform; each `mpath`
 > configuration's suite and path-fault rows on the test rig at its node
 > count; `2/net/mesh/drbd` on its own rig and on Proxmox VE 9 as described at
 > the top of this file. A release claims exactly the configurations it lists.
 >
 > ### Released in an earlier version
 >
-> An earlier release claimed these; 0.90.124 does not.  Each was verified on
+> An earlier release claimed these; 0.90.129 does not.  Each was verified on
 > the version given, and open defects found since then cross the release bar
 > on it (`tools/defects.py <configuration> --release` lists them).  Until those
 > are fixed and the configuration is verified again, treat it as unreleased.  0.90.51
 > was never published as packages.  The last release published before
-> 0.90.124 is 0.90.116.
+> 0.90.129 is 0.90.124.
 >
 > | configuration | verified in | platforms |
 > |---|---|---|
@@ -474,8 +527,9 @@ packages.
 > |---|---|---|---|
 > | `direct` | yes | yes | its own initiator, one path: bare metal, or an in-guest iSCSI login |
 > | `mpath` | yes | `disk/caw` at 2, 4, 8 and 16 nodes: released in 0.90.51, not claimed from 0.90.107, released again in 0.90.124; `net/mesh` in 0.90.51 only (see "Released in an earlier version") | its own initiator over two or more paths, assembled by dm-multipath |
-> | `pass` | yes | no | the hypervisor's initiator: the LUN is passed into the VM (QEMU SCSI passthrough, VMware RDM) |
+> | `pass` | yes | no | the hypervisor's initiator: the LUN is passed into the VM (QEMU SCSI passthrough). A VMware RDM mounts as `shared` instead: ESXi drops a VM's reservation key when the VM is powered off |
 > | `drbd` | yes | yes: released in 0.90.41, withdrawn on 2026-10-06, released again in 0.90.107 | a DRBD dual-primary replica of two local disks: no shared storage at all |
+> | `shared` | yes | no | a disk two VMs share through the hypervisor with no reservation fence MeshXFS can use (a vSphere multi-writer VMDK or physical-mode RDM): two nodes, `net/mesh`, a dead node fenced by vCenter powering its VM off or by an operator's confirmation ([`docs/shared-disk-attachment.md`](docs/shared-disk-attachment.md)) |
 >
 > A configuration that names a method or an attach that is not implemented does
 > not exist yet. `drbd` can never be more than two nodes, because DRBD allows
@@ -488,7 +542,10 @@ packages.
 >
 > Both implemented methods fence a dead node with SCSI persistent reservations
 > on the LUN, so both need storage that implements them
-> ([`docs/fencing.md`](docs/fencing.md)).
+> ([`docs/fencing.md`](docs/fencing.md)), except on `drbd` (above) and on
+> `shared`, which is mounted with `-o fence=vcenter` or `-o fence=manual` and
+> `peers=<this node>/<the other node>`, and proves a dead node's writes ended
+> by its boot having ended.
 >
 > **Running 0.90.37 or earlier?  Upgrade.**  0.90.36 and earlier have defects
 > that can lose data, and 0.90.37 has races that could crash or wedge a node
@@ -512,11 +569,11 @@ packages.
 > to clear to be released, and `tools/defects.py <configuration> --release`
 > shows it for each one.  The defect queue itself is public
 > (`data/defects.json`, read with `tools/defects.py`), and every record carries
-> its evidence.  It holds 124 open records.  58 of them reach only
+> its evidence.  It holds 121 open records.  61 of them reach only
 > configurations this release does not claim, such as clusters larger than 16
 > nodes and the ones under "Released in an earlier version".
-> The 66 that reach a released
-> configuration (between 14 and 49 each, depending on the configuration) are
+> The 60 that reach a released
+> configuration (between 11 and 45 each, depending on the configuration) are
 > each classified as not crossing that bar, most of them as
 > slowness in a particular operation: `tools/defects.py --at 2/net/mesh/drbd -d`
 > lists them for one configuration.
@@ -527,7 +584,7 @@ packages.
 > `mpath` each node reached it through a dm-multipath map over two paths to
 > the same target (Ubuntu 24.04, multipath-tools 0.9.4, the settings of
 > `tools/mpath_settings.sh`), with paths taken away under load as
-> `docs/mpath-verification.md` describes; 0.90.124 claims it for `disk/caw`
+> `docs/mpath-verification.md` describes; 0.90.129 claims it for `disk/caw`
 > at 2, 4, 8 and 16 nodes, and `net/mesh/mpath` was last verified in 0.90.51
 > (see "Released in an earlier version"). `pass` is not
 > verified with either method: it carries the fencing reservations and, for
@@ -793,7 +850,7 @@ headers are the reference for what follows.
    installed module-options file, the storage guides and the module's own
    parameter descriptions against it: the Released table, the current
    version, the defect counts, the cluster sizes, and any wording that calls
-   a released thing a trial, unverified, unsupported or in development.
+   a released thing experimental, unverified, unsupported or in development.
    `scripts/release.sh` runs it before it builds a package and again before
    it publishes, and stops on a failure.
 7. **The configurations with a rig of their own.** `2/net/mesh/drbd` is
@@ -960,6 +1017,31 @@ They share the host's ports: a lock-manager connection or datagram reaches the
 filesystem it is for.  Each filesystem may run its own transport with the
 `transport=tcp|caw` mount option, so a DRBD resource and a SAN LUN can be
 mounted side by side; see "Choosing the transport".
+
+### Proxmox VE: VM disk settings
+
+Add the mount as shared directory storage once (it is cluster-wide):
+
+```
+pvesm add dir shared --path /mnt/shared --shared 1 --is_mountpoint yes \
+      --content images,iso,vztmpl,backup,snippets
+```
+
+Give every VM disk on it **`cache=none`**, the Proxmox default (Hard Disk →
+Cache → "Default (No cache)"):
+
+```
+qm set <vmid> --scsi0 shared:<vmid>/vm-<vmid>-disk-0.qcow2,cache=none
+```
+
+`cache=none` opens the image with `O_DIRECT`: each guest write goes to the
+storage array, and the array's own write cache is used as it is for any
+other host.  `writeback` and `writethrough` put the host's page cache in
+between, so guest writes take the filesystem's buffered-write path and sit
+in one host's RAM before they reach the shared LUN.  Every Proxmox
+validation of MeshXFS (live migration, HA power loss, snapshots, backup and
+restore, disk moves, path faults) ran with `cache=none`; the other modes are
+not validated.
 
 ### DRBD dual-primary (`2/net/mesh/drbd`)
 

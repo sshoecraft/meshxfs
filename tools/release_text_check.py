@@ -10,8 +10,8 @@ release matrix and the configurations verified by a rig of their own;
 pages, the installed module-options file, the storage guide and the module's
 own parameter descriptions repeat it in prose, and prose does not update
 itself.  Measured on 2026-10-04, two releases after sixteen nodes shipped and
-with multipath and DRBD verified: the README still called DRBD a "trial ... not
-in any release", `mxfs(5)` listed DRBD as unsupported and dm-multipath as not
+with multipath and DRBD verified: the README still called DRBD "not in any
+release", `mxfs(5)` listed DRBD as unsupported and dm-multipath as not
 verified, four places said the lock managers were released up to eight nodes on
 one path, `modinfo` described disk/caw as "in development", and the README
 quoted a defect count that was two records old.  Readers, and the tools that
@@ -117,12 +117,6 @@ def attach_rule(rel: list[str]) -> tuple[str, str] | None:
 # (file, exact stripped line, reason).  The line must still be in the file: a
 # stale exemption fails the check, so this list cannot outlive what it excuses.
 ALLOWED = [
-    ("README.md",
-     "a released thing a trial, unverified, unsupported or in development.",
-     "the README's description of this check"),
-    ("docs/attachment-methods.md",
-     "attachment carries a flag named `trial` and is parsed only for a caller that",
-     "names the tooling flag and says, two lines on, that it is not release status"),
     ("README.md",
      "> the 2-, 4- and 8-node configurations and all four platforms were verified",
      "the 0.90.42 news item: the smaller sizes re-verified when sixteen nodes shipped"),

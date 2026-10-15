@@ -148,8 +148,12 @@ arm() {
     local h=$1 t=$2 tag=$3 p="/dev/shm/mxfs-walk-$STAMP-$3"
     local args="$DIR $p $OBSERVE_S $SAMPLE_S walk"
     [ "${4:-}" = seed ] && args="$MNT/walkseed/$STAMP $p $OBSERVE_S $SAMPLE_S seed $p.py $SEED_DIRS $SEED_FILES"
-    on "$h" "echo $WALKER_B64 | base64 -d > $p.sh && echo $SEEDPY_B64 | base64 -d > $p.py && mkdir -p $MNT/walkseed/$STAMP && nohup setsid bash -c 'bash $p.sh $t $args > $p.result 2>&1' > /dev/null 2>&1 < /dev/null &
-        echo ARMED" 30 | grep -q ARMED
+    # the launch alone is backgrounded, inside the braces: a trailing & after
+    # the && chain backgrounds the chain, which then holds this ssh's stdout
+    # open for the walk's life and the arm returns only at its timeout
+    on "$h" "echo $WALKER_B64 | base64 -d > $p.sh && echo $SEEDPY_B64 | base64 -d > $p.py && mkdir -p $MNT/walkseed/$STAMP && {
+        nohup setsid bash -c 'bash $p.sh $t $args > $p.result 2>&1' > /dev/null 2>&1 < /dev/null &
+        } && echo ARMED" 30 | grep -q ARMED
 }
 # collect <host> <tag>: wait for the walk's result, then copy what it left
 collect() {

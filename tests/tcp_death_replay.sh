@@ -304,7 +304,10 @@ REFUSED=0; { [ "$VERIFY_INJECT" = 1 ] || [ "$AGMASK_INJECT" = 1 ] || \
              [ "$VICTIM_INJECT" = 1 ]; } && REFUSED=1
 cd "$(dirname "$0")/.." || exit 2
 SSH=tools/mxfs_sshpass.sh
-VIRSH="sudo virsh -c qemu:///system"
+# Kills and restarts V on whichever hypervisor hosts it: libvirt for the qemu
+# rig, a forced power-off in vCenter for the vSphere guests, which libvirt does
+# not know (a bare `virsh destroy` there exits 1 and the victim lives on).
+VIRSH=tools/node_power.sh
 MNT=${MXFS_MNT:-/mnt/shared}
 P=/sys/module/mxfs/parameters
 OUT=tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_tcpdr_$LABEL
@@ -353,11 +356,26 @@ PLAIN=1
 { [ "$BLOCK_INJECT" != 0 ] || [ "$VERIFY_INJECT" != 0 ] || [ "$AGMASK_INJECT" != 0 ] || \
   [ "$FALSE_APPLY" != 0 ] || [ "$VICTIM_INJECT" != 0 ] || [ "${TDR_REJOIN:-0}" = 1 ]; } && PLAIN=0
 TREESV=$(modinfo mxfs.ko 2>/dev/null | sed -n 's/^srcversion: *//p')
+TREEKR=$(modinfo -F vermagic mxfs.ko 2>/dev/null | awk '{print $1}')
+# A member on another kernel (a node that built the module from its
+# package against its own kernel) cannot carry the tree's srcversion: the
+# kernel-API probe header is part of the source it hashes.  Such a fleet is
+# held to ONE build instead: every member the same installed srcversion.
+FOREIGNSV=""
 FT=""
 for n in ${MEMBERS//,/ }; do
-    info=$(timeout 15 $SSH "$n" "echo sv=\$(cat /sys/module/mxfs/srcversion) ft=\$(cat $P/force_transport) m=\$(grep -c ' mxfs ' /proc/mounts)" 2>/dev/null | filt | tr -d '\r')
+    info=$(timeout 15 $SSH "$n" "echo sv=\$(cat /sys/module/mxfs/srcversion) kr=\$(uname -r) ft=\$(cat $P/force_transport) m=\$(grep -c ' mxfs ' /proc/mounts)" 2>/dev/null | filt | tr -d '\r')
     echo "  INFO $n $info"
-    [[ "$info" == *"sv=$TREESV"* ]] || { echo "ABORT: $n srcversion != tree '$TREESV' ($info)"; exit 2; }
+    nkr=$(printf '%s' "$info" | grep -ao 'kr=[^ ]*' | cut -d= -f2)
+    if [ -n "$nkr" ] && [ -n "$TREEKR" ] && [ "$nkr" != "$TREEKR" ]; then
+        nsv=$(printf '%s' "$info" | grep -ao 'sv=[0-9A-F]*' | cut -d= -f2)
+        [ -n "$nsv" ] || { echo "ABORT: $n srcversion unreadable ($info)"; exit 2; }
+        [ -z "$FOREIGNSV" ] || [ "$FOREIGNSV" = "$nsv" ] || { echo "ABORT: $n runs build $nsv, another member $FOREIGNSV: one build per cluster"; exit 2; }
+        [ -n "$FOREIGNSV" ] || echo "  INFO foreign-kernel fleet: build ref = node-installed $nsv (tree ko is for $TREEKR, $n runs $nkr)"
+        FOREIGNSV=$nsv
+    else
+        [[ "$info" == *"sv=$TREESV"* ]] || { echo "ABORT: $n srcversion != tree '$TREESV' ($info)"; exit 2; }
+    fi
     nft=$(printf '%s' "$info" | grep -ao 'ft=[0-9]*' | cut -d= -f2)
     case $nft in
         1) ;;

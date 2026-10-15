@@ -60,7 +60,7 @@ xfs_deprecated_dointvec_minmax(
 {
 	if (write) {
 		printk_ratelimited(KERN_WARNING
-				"XFS: %s sysctl option is deprecated.\n",
+				"mxfs: %s sysctl option is deprecated.\n",
 				ctl->procname);
 	}
 	return proc_dointvec_minmax(ctl, write, buffer, lenp, ppos);

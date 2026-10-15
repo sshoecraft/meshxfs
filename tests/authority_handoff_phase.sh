@@ -20,12 +20,13 @@
 # THE ARITHMETIC THE CLAIM RESTS ON, and why it is not self-evident.  A beat
 # that lands at T sets deadline = T + MXFS_DISKLOCK_AUTH_LEASE_MS
 # (dlm/disklock.h:181, 30000).  The peer declares death after
-# MXFS_DISKLOCK_HB_INTERVAL_MS * dead_threshold (disklock.h:145, 2000; 62 s on
-# this rig), counted from ITS OWN last observation of this node's record — and
-# that observation can be as much as one heartbeat interval BEFORE T, because
-# the peer samples on its own cadence and the two are unsynchronised.  So the
-# nominal margin is 62000 - 2000 - 30000 = 30 s, and it SHRINKS with the
-# relative phase of the two clocks.  Assuming the margin rather than measuring
+# MXFS_DISKLOCK_HB_INTERVAL_MS * dead_threshold (2000 ms; 17 checks, 34 s, on a
+# SCSI attachment, 31, 62 s, on DRBD or shared), counted from ITS OWN last
+# observation of this node's record — and the most pessimistic reading takes
+# that observation as much as one heartbeat interval BEFORE T, because the peer
+# samples on its own cadence and the two are unsynchronised.  So the nominal
+# margin on SCSI is 34000 - 2000 - 30000 = 2 s (30 s on DRBD), and it SHRINKS
+# with the relative phase of the two clocks.  Assuming the margin rather than measuring
 # it is exactly what this record refuses.
 #
 # WHAT IS SWEPT, AND WHAT THE SWEEP CAN HONESTLY CLAIM.  The peer's sampling
@@ -103,17 +104,17 @@
 # THE BUDGET (derived; a timeout is a failure and never a safety net):
 #   prep 300 (measured 233) + anchors and identities 30 + the phase wait 2 +
 #   the pause armed and confirmed 20 + the victim's lease expiring 30 (it is
-#   MXFS_DISKLOCK_AUTH_LEASE_MS by construction) + the peer's dead window 62 +
-#   the fence starting 30 + captures 60 + cleanup and the heartbeat resuming 40
-#   = 574.  Caller bound 600 s, plus up to 150 s of boot when the domains start
-#   powered off — caller bound 750 s.  SILENT=1 adds the log-settle wait
-#   (SILENT_SETTLE_S, 70: two passes of the 30 s log worker cover an idle
-#   log) — caller bound 700 s, 850 s with boot.
+#   MXFS_DISKLOCK_AUTH_LEASE_MS by construction) + the peer's dead window 34
+#   (a SCSI attachment's; 62 on DRBD) + the fence starting 30 + captures 60 +
+#   cleanup and the heartbeat resuming 40 = 546.  Caller bound 570 s, plus up
+#   to 150 s of boot when the domains start powered off — caller bound 720 s.
+#   SILENT=1 adds the log-settle wait (SILENT_SETTLE_S, 70: two passes of the
+#   30 s log worker cover an idle log) — caller bound 640 s, 790 s with boot.
 #
 # Usage: tests/authority_handoff_phase.sh <label> [phase_ms]
 # Env:   MXFS_NODE_LIST (default test1,test2 — the SECOND node is the one whose
 #        heartbeat is paused), PHASE_MS (0), PAUSE_MS (150000 — it must outlast
-#        the 62 s dead window and the fence, or the victim's beat resumes
+#        the dead window and the fence, or the victim's beat resumes
 #        mid-measurement and the lap measures a recovery instead of a handoff),
 #        ANCHOR_TOL_S (3), SILENT (0; 1 = no writer, the silent-death arm),
 #        SILENT_SETTLE_S (70).

@@ -89,6 +89,24 @@ clock_steady() {
     echo "  INFO $n's clock moved from ${was} ms to ${now} ms against this host's since its load started"
     return 1
 }
+# clock_resync <node>: a guest frozen with `virsh suspend` comes back with its
+# clock behind by the time it was frozen (kvmclock stops with the vCPUs), and
+# chrony then slews it back at most 83 ms a second.  Measured on pve9-7 after
+# path_fenced_return froze it: 22.1 s behind, still 14.7 s behind two rows
+# later, and the next row aborted because the slew moved its clock during the
+# row.  Steps it to this host's clock (`date -s`; not `chronyc makestep`,
+# whose offset estimate right after a thaw is still the one from before the
+# freeze, so it steps by nothing) and reads the offset back; the ssh latency
+# leaves it a few hundred ms behind, which chrony slews out.  Returns 1 when
+# it is still over 2 s off.
+clock_resync() {
+    local n=$1 off
+    rs 15 "$n" "date -s @$(date +%s.%N) >/dev/null" >/dev/null
+    clock_measure "$n" "$OUT/clock_$n.resync" >/dev/null || return 1
+    off=$(awk '{print $1 + 0; exit}' "$OUT/clock_$n.resync")
+    echo "  INFO $n's clock stepped after its thaw: now ${off} ms from this host's"
+    [ $(( off < 0 ? -off : off )) -le 2000 ]
+}
 
 # rsx <timeout> <node> <cmd>: a MEASUREMENT.
 #   - stdout is the remote command's stdout, banner-filtered, byte for byte
@@ -812,7 +830,9 @@ rig_start_victim() {  # <victim> <survivor>
             [ "$st" = "RELEASED $v episode=$ep" ] || return 1
         fi ;;
     esac
-    timeout 60 sudo virsh -c qemu:///system start "$v" >/dev/null 2>&1
+    # Through node_power.sh, not virsh: a vSphere guest is not a libvirt
+    # domain, and `virsh start` on one exits 1 and leaves it powered off.
+    "$MXFS_RIG_LIB_DIR/../../tools/node_power.sh" start "$v" >/dev/null 2>&1
 }
 rig_drbd_rejoin() {  # <node>: after boot, the node's DRBD back to Primary, UpToDate on both sides
     local n=$1 q

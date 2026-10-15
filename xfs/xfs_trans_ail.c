@@ -23,6 +23,7 @@
 #include "xfs_inode.h"
 #include "xfs_inode_item.h"
 #include <linux/sched/debug.h>	/* sched_show_task: xfsaild's stack in the P128 dump */
+extern bool mxfs_pal_stall_stacks(void);
 
 /* mxfs log-wedge diagnostic gate (defined in xfs_mxfs_dlm.c, module param mxfs.instr) */
 extern int mxfs_instr_enabled;
@@ -891,9 +892,10 @@ xfs_ail_push_all_sync(
 			 * costs a stack every ~100 s rather than every 30.
 			 */
 			if (ailp->ail_task && ((iter / 3000) % 3) == 1) {
-				pr_warn("mxfs: P128-AILSTUCK xfsaild pid=%d -- its state and stack follow\n",
+				pr_warn("mxfs: P128-AILSTUCK xfsaild pid=%d -- sync AIL push still waiting on it\n",
 					ailp->ail_task->pid);
-				sched_show_task(ailp->ail_task);
+				if (mxfs_pal_stall_stacks())
+					sched_show_task(ailp->ail_task);
 			}
 		}
 		prepare_to_wait(&ailp->ail_empty, &wait, TASK_UNINTERRUPTIBLE);
@@ -1682,7 +1684,7 @@ xfs_trans_ail_init(
 	INIT_LIST_HEAD(&ailp->ail_buf_list);
 	init_waitqueue_head(&ailp->ail_empty);
 
-	ailp->ail_task = kthread_run(xfsaild, ailp, "xfsaild/%s",
+	ailp->ail_task = kthread_run(xfsaild, ailp, "mxfsaild/%s",
 				mp->m_super->s_id);
 	if (IS_ERR(ailp->ail_task))
 		goto out_free_ailp;

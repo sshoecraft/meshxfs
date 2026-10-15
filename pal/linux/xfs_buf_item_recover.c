@@ -523,12 +523,12 @@ xlog_recover_do_reg_buffer(
 		   (XFS_BLF_UDQUOT_BUF|XFS_BLF_PDQUOT_BUF|XFS_BLF_GDQUOT_BUF)) {
 			if (item->ri_buf[i].iov_base == NULL) {
 				xfs_alert(mp,
-					"XFS: NULL dquot in %s.", __func__);
+					"NULL dquot in %s.", __func__);
 				goto next;
 			}
 			if (item->ri_buf[i].iov_len < size_disk_dquot) {
 				xfs_alert(mp,
-					"XFS: dquot too small (%zd) in %s.",
+					"dquot too small (%zd) in %s.",
 					item->ri_buf[i].iov_len, __func__);
 				goto next;
 			}

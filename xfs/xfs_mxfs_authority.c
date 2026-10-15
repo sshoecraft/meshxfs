@@ -316,7 +316,7 @@ mxfs_inode_relmark_before_unlock(
 		return 0;
 	/*
 	 * Irrevocability first: from here on an install that offers this
-	 * {resource, epoch} is refused (see
+	 * {resource, lineage, epoch} is refused (see
 	 * mxfs_inode_authority_install_durable_ex_locked), whether or not the
 	 * publish below succeeds — refusing is the conservative direction.
 	 */
@@ -536,10 +536,20 @@ mxfs_inode_authority_install_durable_ex_locked(struct xfs_inode *ip,
 	 * caw_grant_epoch_update never minted); refuse to resurrect it as
 	 * authority — the tenure writes fail-closed (class NONE) until a real
 	 * grant CAS mints a fresh epoch.
+	 *
+	 * The certified identity is the whole tuple {resource, lineage, epoch},
+	 * exactly as replay's marker lookup and the cluster-class guard match
+	 * it.  A claim that did not inherit this resource's tombstone binds a
+	 * NEW lineage and restarts the epoch sequence, so its first tenure is
+	 * epoch 1 again: a distinct tenure that no marker covers.  Refusing it
+	 * on {resource, epoch} alone stamped its images class NONE, which
+	 * replay refuses — measured 45/45 refusals with a differing lineage on
+	 * three Proxmox VE 9 nodes under multipath fabric loss and path flap.
 	 */
 	if (gres->grant_epoch &&
 	    gres->grant_epoch == READ_ONCE(ip->i_mxfs_relmark_epoch) &&
-	    gres->resource == READ_ONCE(ip->i_mxfs_relmark_res)) {
+	    gres->resource == READ_ONCE(ip->i_mxfs_relmark_res) &&
+	    gres->resource_lineage == READ_ONCE(ip->i_mxfs_relmark_lineage)) {
 		static atomic_t p_relmark_reinst_n = ATOMIC_INIT(0);
 
 		atomic64_inc(&mxfs_auth_ref_releasing_n);

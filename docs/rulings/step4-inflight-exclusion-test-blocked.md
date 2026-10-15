@@ -61,7 +61,7 @@ Buffered reads of the loop device are NOT sound — up to five cache aliases
 (SCST's bdev, dm-delay, /dev/loopN, the loop backing file, the backing fs).
 Use **aligned O_DIRECT reads against the device immediately below dm-delay**,
 with `losetup --direct-io=on` CONFIRMED (not silently fallen back). Never read
-the backing file buffered. Per trial: write+flush+read-back a baseline, fresh LBA
+the backing file buffered. Per attempt: write+flush+read-back a baseline, fresh LBA
 and unique pattern; afterwards wait > W, ensure the victim command terminated,
 flush, final direct read, and do not tear down the dm target until all delayed
 work has drained. A 50 ms poll bounds landing to an interval only — report
@@ -85,7 +85,7 @@ live (the real bug this must catch); dm-delay flush/FUA reordering (validate the
 delay stack standalone first: single write, no P&A, confirm nothing below before
 ~W and landing after ~W); a sentinel hiding P; A/B state contamination — rebuild
 PR + data state per arm, fresh LBA/pattern, and run **0x04 -> 0x05 -> 0x04** so
-the discriminator is shown not to have evaporated after the first trial.
+the discriminator is shown not to have evaporated after the first attempt.
 
 ## Ruled staged plan (Q6: yes, step 4 is the right priority)
 1. Harness feasibility on a delayed **blockio** LUN, single path — prove the held

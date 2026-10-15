@@ -104,7 +104,7 @@ done
 say "  $P0 recovered $P1 $(( $(date +%s) - t0 )) s after the reset: $out"
 
 on_prog "$P0" "read $F $BLOCK $STRIDE $durable" 120 > "$EVID/read.$P0"
-on "$P0" "journalctl -k --no-pager -o short-iso --since @$t0 | grep -aE 'P77-|P163-|P236-FENCE-CERTIFIED|P226-|foreign replay|XFS' | cut -c1-500" 60 > "$EVID/klog.$P0"
+on "$P0" "journalctl -k --no-pager -o short-iso --since @$t0 | grep -aE 'P77-|P163-|P236-FENCE-CERTIFIED|P226-|foreign replay|XFS|mxfs \(' | cut -c1-500" 60 > "$EVID/klog.$P0"
 on "$P0" "echo 'format P77-FRINODE -p' > /proc/dynamic_debug/control" 15 >/dev/null
 v0=$(awk '{print $3}' "$EVID/read.$P0" | sort | uniq -c | tr '\n' ' ')
 say "  $P0 reads the $nd durable blocks: $v0"

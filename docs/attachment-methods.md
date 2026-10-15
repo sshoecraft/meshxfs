@@ -125,6 +125,60 @@ Each attachment has its own way of breaking the requirements above:
   by its reservation key then also cuts off a healthy node on the same host.
   Reservations and COMPARE AND WRITE also have to survive the hypervisor's SCSI
   forwarding; QEMU forwards reservations only through `qemu-pr-helper`.
+- **`pass` on VMware**, measured on ESXi 8.0.2:
+  - A physical-mode RDM on a controller with physical bus sharing forwards
+    COMPARE AND WRITE, FUA and persistent reservations to the array, but
+    under the ESXi host's own initiator. Two VMs on one host are one I_T
+    nexus: the second VM's REGISTER conflicts on the first VM's key. MeshXFS
+    then refuses the second node (`P305-PR-NEXUS-SHARED-WITH-PEER`), because
+    its reservation fence cannot separate them. An RDM cluster needs one VM
+    per ESXi host, the "cluster across boxes" layout VMware's own shared-disk
+    clustering uses.
+  - Powering a VM off removes that VM's registration from the array: ESXi
+    unregisters the key within 3 s and does not restore it when the VM
+    powers on again (`tests/evidence/vsphere/probe-rdm-poweroff-key.txt`).
+    The survivor's lease declares the death about 60 s later, finds the key
+    already gone, and has nothing for PREEMPT AND ABORT to name. An absent
+    registration does not retire the victim's accepted commands
+    (`docs/retirement-witness-and-what-refusal-means.md`), and a guest
+    behind pvscsi cannot witness an LU reset reaching the array: its reset
+    is forwarded as a LUN RESET, but it also returns success, in 5 ms, while
+    the ESXi host cannot reach the array at all
+    (`tests/evidence/vsphere/probe-rdm-reset-witness.txt`). So after a hypervisor
+    power-off the dead node's slice could only be refused, never replayed.
+    A reservation fence that the most common vSphere failure defeats does
+    not make a node fenceable, so MeshXFS refuses `fence=scsipr` on any disk
+    behind VMware's virtual SCSI adapters (pvscsi, and LSI Logic or BusLogic
+    in a VMware VM): `P305-PR-HYPERVISOR-INITIATOR`. An RDM mounts instead
+    as the `shared` attachment, `fence=vcenter` or `fence=manual`
+    (`docs/shared-disk-attachment.md`), whose evidence is the victim's boot
+    having ended and needs no key. The disk then carries the emulated swap,
+    not its own COMPARE AND WRITE, and the network lock manager.
+  - A multi-writer VMDK answers neither reservations nor COMPARE AND WRITE
+    (INVALID COMMAND OPERATION CODE), on a controller with physical bus
+    sharing as well as on one without. Since ESXi 7.0 the multi-writer flag
+    carries no reservations for clustered VMs (Broadcom KB 395751); on 6.x
+    it was a common Windows-cluster shared disk. Such a disk has no
+    `scsipr` fence; it mounts as the `shared` attachment, `fence=vcenter`
+    or `fence=manual`, with the network lock manager and the swap emulated
+    on the disk (`docs/shared-disk-attachment.md`).
+  - A clustered VMDK is the 7.0+ successor: ESXi emulates SCSI-3
+    reservations per VM at the vSCSI layer, on a physical-bus-sharing
+    controller, on a VMFS6 datastore with the Clustered VMDK capability.
+    VMware supports it on FC-attached storage, and from 8.0 U3 on NVMe/TCP
+    arrays; not on iSCSI or FCoE, whose supported shared disks are the
+    physical-mode RDM and vVols (vSphere 9.0 WSFC guide, KB 313472). The
+    backing device must also do ATS and Write Exclusive All Registrants
+    reservations. vCenter refuses the capability (NotSupported) on a VMFS6
+    datastore on an iSCSI LUN, and on one on a disk both ESXi hosts see
+    directly (transport `parallel`, ATS unsupported). Linux's NVMe target
+    cannot back one: it has reservations but no fused commands, which ESXi
+    uses for ATS on NVMe. Per-VM
+    reservations would give MeshXFS its `scsipr` fence. COMPARE AND WRITE
+    is not expected through a VMDK, which would leave the TCP transport.
+  - An initiator inside each guest (`direct`) gives every VM its own nexus
+    and the array's full command set. It does not depend on ESXi's SCSI
+    forwarding at all.
 - **`drbd`**: see below.
 
 ### DRBD dual-primary
@@ -188,6 +242,24 @@ in `docs/rulings/drbd-dual-primary-attachment.md`):
    so a swap waits for one register write and its target write. A register of
    the bakery's version reads as busy unless both of its fields are zero, so a
    pair running the two versions fails its swaps instead of both entering.
+
+   A flag claims sectors, not the device. Each register names the ranges its
+   batch swaps, and a raised flag holds up only the swaps whose ranges it
+   claims: a participant that raises and finds the other's flag up enters at
+   once with every swap the other does not claim, and waits or backs off only
+   for the rest. Participant 0 defers only to a `want` claiming one of its
+   sectors, participant 1 retries once any of its sectors is free, and a
+   waiting participant that takes newly queued swaps into its batch writes its
+   register again before it reads the other's. Swaps on one sector keep their
+   queue order. A register that names no ranges claims every sector, which is
+   what a node from before the ranges writes, so a mixed pair only waits more.
+   This is what keeps a node alive when its peer dies holding the flag: the
+   dead peer's register claims the sectors of the swap it was in, and the
+   survivor's own heartbeat, on another sector, goes on landing. Without it
+   every swap of the survivor waited on that flag until its authority lease ran
+   out. The model checks per-sector mutual exclusion, freedom from deadlock and
+   the fairness above with the ranges, regrouping and a peer from before them
+   (`tests/drbd_cas_lock_model.py --ranges`, `--old`, `--old0`).
 3. **A fence proof profile of its own, kind 25 (`DRBD_STONITH_WITNESSED_V1`).**
    DRBD's `fencing resource-and-stonith` freezes a Primary's I/O when it loses
    its peer and runs the fence-peer handler (`tools/mxfs_drbd_fence_peer.sh`),
@@ -297,9 +369,8 @@ and no SCSI fence, it is verified by that rig and not by the suite's ordinary
 board columns: its results go to a board of their own
 (`tests/evidence/drbd_rig/`), and a release that claims `2/net/mesh/drbd` runs
 `scripts/drbd_rig.sh` on the build being released. (In the tooling the
-attachment carries a flag named `trial` and is parsed only for a caller that
-sets `MXFS_TRIAL=1`; that flag selects the separate rig and board, and says
-nothing about release status.)
+attachment carries a flag named `own_rig`, which selects that rig and its
+board.)
 
 ## Fabric is a separate question
 

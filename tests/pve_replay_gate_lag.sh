@@ -155,7 +155,7 @@ sleep 10
 on "$P0" "touch /dev/shm/gatelag.stop; sleep 3; for k in \$(seq 1 $CHURN); do cat /root/gatelag.err.\$k 2>/dev/null; echo DURABLE.\$k=\$(cat /root/gatelag.durable.\$k 2>/dev/null); done" 30 > "$EVID/churn.$P0"
 on "$P0" "echo 1 > $PARAMS/replay_gate_platter; echo 0 > $PARAMS/dbg_replay_gate_buf_lag; echo 'file xfs_inode_item_recover.c -p' > /proc/dynamic_debug/control" 15 >/dev/null
 LEFT=""
-on "$P0" "journalctl -k --no-pager -o short-iso --since @$t0 | grep -aE 'P77-|P163-|P236-FENCE-CERTIFIED|P-RBLK|XFS|corrupt|Corruption|shutdown' | cut -c1-400" 60 > "$EVID/klog.$P0"
+on "$P0" "journalctl -k --no-pager -o short-iso --since @$t0 | grep -aE 'P77-|P163-|P236-FENCE-CERTIFIED|P-RBLK|XFS|mxfs \(|corrupt|Corruption|shutdown' | cut -c1-400" 60 > "$EVID/klog.$P0"
 inj=$(grep -c 'P77-GATE-LAG-INJECT' "$EVID/klog.$P0")
 apply=$(grep -c 'P77-FRINODE foreign.*verdict=APPLY' "$EVID/klog.$P0")
 skip=$(grep -c 'P77-FRINODE foreign.*verdict=SKIP' "$EVID/klog.$P0")

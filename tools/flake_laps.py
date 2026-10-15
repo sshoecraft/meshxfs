@@ -7,7 +7,7 @@ carries no detector-defect amendment).  With the newest such FAIL at window
 index k (0 = the live run), the cell needs 11-k further runs of that row, and
 the board run that follows the laps is one of them.
 
-Read-only.  Usage: tools/flake_laps.py [<configuration> ...]   (default: every
+Read-only.  Usage: [MXFS_CRIT=<board.json>] tools/flake_laps.py [<configuration> ...]   (default: every
 configuration that has a cell with a genuine FAIL in its window)
 Prints: <configuration> <row> k=<k> window=<n> more_runs=<11-k> laps_before_board=<10-k>
 """
@@ -21,7 +21,10 @@ import criteria  # noqa: E402  (the board's own constants and noise pattern)
 
 def main():
     want = set(sys.argv[1:])
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "criteria.json")
+    #: MXFS_CRIT selects an alternate board (the vSphere guests keep theirs in
+    #: tests/evidence/vsphere/criteria.json), as it does for criteria.py.
+    path = os.environ.get("MXFS_CRIT") or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "data", "criteria.json")
     board = json.load(open(path))
     rows = board["criteria"] if isinstance(board, dict) else board
     for c in rows:

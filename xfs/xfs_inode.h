@@ -1026,6 +1026,8 @@ typedef struct xfs_inode {
 	uint64_t		i_mxfs_freepub_epoch;
 	uint64_t		i_mxfs_freepub_seq;
 	uint32_t		i_mxfs_freepub_gen;
+	bool			i_mxfs_fork_rejected; /* a reload's xfs_inode_from_disk rejected the platter image after the data fork was destroyed: core fields already carry the rejected image and the fork is torn (BTREE with no root).  Nothing in core is worth keeping, so the next reload must rebuild from the platter even when every field it compares matches; xfs_iread_extents refuses the fork until then.  Cleared by a successful from_disk. */
+	uint8_t			i_mxfs_forkreset_src; /* the last MXFS site that rebuilt i_df outside xfs_iformat_data_fork, times 2, plus 1 when if_needextents was still set as it ran (1=icache_adopt 2=icache_deadshell 3=reload_adopt 4=reload_fromdisk_fail 5=reset4create); read by P-IREAD-NOROOT */
 	uint32_t		i_mxfs_dead_incarn_gen; /* D3 ROOT FIX: the di_gen of a NEWER on-disk incarnation of this ino, recorded when a reload dirent-validated a genuine type-flip (RELOAD-TYPEFLIP-DIRENT-OK: disk+parent-dirent agree the number was freed and reused) but had to bail because a release drain raced it (P34J-RELOAD-RACE-BAIL).  While set, this in-core object is a DEAD PRIOR INCARNATION: the drain's clean-but-unlanded re-log (P146V) and xfs_iflush MUST NOT write its core over the peer's live slot (the proven ino-167 cluster clobber: stale storm-dir dinode re-logged at NL and iflush_cluster'd over the peer's current file — 22/32 nodes lost the rename).  Cleared when a reload successfully adopts the disk incarnation, and at init. */
 
 	/* (instrumented): ILOCK last-locker forensics for the 16-node

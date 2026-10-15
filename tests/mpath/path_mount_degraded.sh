@@ -53,7 +53,7 @@ um() {  # <tag>: the victim's unmount, bounded
 }
 mo() {  # <tag>: the victim's mount, bounded
     measure "$V" 70 "$OUT/mount_$1.txt" '^MOUNT_RC=[0-9]+ ms=[0-9]+ mounted=[01]$' "the victim's mount ($1)" \
-        "s=\$(date +%s%3N); timeout 60 mount -t mxfs $DEV $MNT; rc=\$?; e=\$(date +%s%3N); grep -q ' $MNT mxfs ' /proc/mounts && m=1 || m=0; echo MOUNT_RC=\$rc ms=\$((e-s)) mounted=\$m"
+        "s=\$(date +%s%3N); timeout 60 mount -t mxfs $MOPT $DEV $MNT; rc=\$?; e=\$(date +%s%3N); grep -q ' $MNT mxfs ' /proc/mounts && m=1 || m=0; echo MOUNT_RC=\$rc ms=\$((e-s)) mounted=\$m"
     echo "  INFO $1: $(grep -a '^MOUNT_RC=' "$OUT/mount_$1.txt" | head -1)"
     ck "$1: $V mounted (rc 0)" "$(grep -a '^MOUNT_RC=' "$OUT/mount_$1.txt" | head -1 | sed 's/ ms=[0-9]*//')" "MOUNT_RC=0 mounted=1"
 }

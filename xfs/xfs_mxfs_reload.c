@@ -1242,6 +1242,8 @@ static void mxfs_reload_adopt_disk_fork(struct xfs_inode *ip,
 	 * LOCAL fork with if_bytes>0 and if_data==NULL, which is an
 	 * unrepairable shortform directory that shuts the filesystem down. */
 	if (!reload_identical) {
+		ip->i_mxfs_forkreset_src = 3 * 2 +
+			(ip->i_df.if_needextents ? 1 : 0);
 		xfs_idestroy_fork(&ip->i_df);
 		/* (D-0535): zap, not destroy — if_bytes/if_format must
 		 * not survive into an image that has no attr fork (see
@@ -1264,6 +1266,8 @@ static void mxfs_reload_adopt_disk_fork(struct xfs_inode *ip,
 		mxfs_pal_log(MXFS_LOG_WARN,
 			"mxfs: DLM inode from_disk FAILED: ino=%llu rc=%d",
 			(unsigned long long)ip->i_ino, error);
+		ip->i_mxfs_forkreset_src = 4 * 2 +
+			(ip->i_df.if_needextents ? 1 : 0);
 		/*
 		 *  the destroy above already ran, so on
 		 * a from_disk failure the fork is torn exactly like the P34J
@@ -1282,6 +1286,20 @@ static void mxfs_reload_adopt_disk_fork(struct xfs_inode *ip,
 			ip->i_df.if_bytes = 0;
 			ip->i_df.if_nextents = 0;
 		}
+		/*
+		 * from_disk copied the rejected image's core fields (generation,
+		 * size, change count, extent count) before its fork check failed,
+		 * so the next reload would find disk == in-core on every field it
+		 * compares and keep this torn fork forever.  Mark it: that reload
+		 * rebuilds, and xfs_iread_extents refuses the fork until it does.
+		 * if_needextents routes every mapping lookup through that refusal:
+		 * a rejected EXTENTS image leaves an empty list that would
+		 * otherwise read back as holes.
+		 */
+		ip->i_mxfs_fork_rejected = true;
+		if (ip->i_df.if_format == XFS_DINODE_FMT_EXTENTS ||
+		    ip->i_df.if_format == XFS_DINODE_FMT_BTREE)
+			ip->i_df.if_needextents = 1;
 		ip->i_dlm_stale = true; ip->i_dlm_stale_src = 21;
 		kfree(merge_ours);		/* drop unused snapshot */
 		merge_ours = NULL;
@@ -1289,6 +1307,8 @@ static void mxfs_reload_adopt_disk_fork(struct xfs_inode *ip,
 		/* (D3): adoption succeeded — in-core now IS the disk
 		 * incarnation; clear any dead-incarnation verdict. */
 		ip->i_mxfs_dead_incarn_gen = 0;
+		if (!reload_identical)
+			ip->i_mxfs_fork_rejected = false;
 		/*
 		 * (D3 residual): the in-core image was just REPLACED by
 		 * the platter image, so by construction nothing in core is
@@ -1913,6 +1933,14 @@ static void mxfs_reload_check_identical(struct xfs_dinode *dip,
 					struct xfs_buf **bp_ref)
 {
 	bool reload_identical = *reload_identical_io;
+
+	/* a rejected image left the fork torn: matching fields prove nothing */
+	if (ip->i_mxfs_fork_rejected) {
+		pr_warn_ratelimited("mxfs: P-RELOAD-REJECTED-REBUILD ino=%llu gen=%u fmt=%u -- the last reload rejected the platter image; rebuilding the fork\n",
+			(unsigned long long)ip->i_ino, VFS_I(ip)->i_generation,
+			ip->i_df.if_format);
+		return;
+	}
 
 	if (mxfs_reload_skip_identical && dip && dip->di_version >= 3 &&
 	    be16_to_cpu(dip->di_mode) != 0 &&
@@ -5606,7 +5634,8 @@ mxfs_dlm_reload_inode_under(
 	 * a type flip, or a genuinely newer/equal disk image adopt exactly as
 	 * before.
 	 */
-	if (!reload_identical && dip && dip->di_version >= 3 &&
+	if (!reload_identical && !ip->i_mxfs_fork_rejected &&
+	    dip && dip->di_version >= 3 &&
 	    be16_to_cpu(dip->di_mode) != 0 &&
 	    (be16_to_cpu(dip->di_mode) & S_IFMT) ==
 			(VFS_I(ip)->i_mode & S_IFMT) &&
@@ -5685,7 +5714,8 @@ mxfs_dlm_reload_inode_under(
 	 * Directories are exempt: their data lives in the buffer cache and
 	 * the dir-specific guards above own that logic.
 	 */
-	if (!reload_identical && S_ISREG(VFS_I(ip)->i_mode)) {
+	if (!reload_identical && !ip->i_mxfs_fork_rejected &&
+	    S_ISREG(VFS_I(ip)->i_mode)) {
 		struct address_space *dd_map = VFS_I(ip)->i_mapping;
 		bool dd_dirty = ip->i_delayed_blks > 0 ||
 			(dd_map &&
@@ -5783,6 +5813,7 @@ mxfs_dlm_reload_inode_under(
 	 * (P188) — but it is not a licence to revert 29 of a peer's.
 	 */
 	if (mxfs_reload_oblig_keep && !reload_identical &&
+	    !ip->i_mxfs_fork_rejected &&
 	    S_ISDIR(VFS_I(ip)->i_mode) && dip &&
 	    be16_to_cpu(dip->di_mode) != 0 &&
 	    be32_to_cpu(dip->di_gen) == VFS_I(ip)->i_generation &&
@@ -6155,7 +6186,9 @@ mxfs_dlm_reload_inode_under(
 	/* A real reload happened, so the skip streak is broken (see
 	 * i_dlm_p6skip_n in xfs_inode.h). */
 	ip->i_dlm_p6skip_n = 0;
-	ip->i_dlm_stale = false;
+	/* a rejected platter image was not a reload: stay stale so the next
+	 * access tries the platter again */
+	ip->i_dlm_stale = ip->i_mxfs_fork_rejected;
 
 	up_write(&ip->i_lock);
 
@@ -6254,6 +6287,7 @@ mxfs_dlm_reset_inode_for_create(
 		truncate_inode_pages(inode->i_mapping, 0);
 	}
 
+	ip->i_mxfs_forkreset_src = 5 * 2 + (ip->i_df.if_needextents ? 1 : 0);
 	xfs_idestroy_fork(&ip->i_df);
 	/*
 	 * (D-0535, chain 115 s473b on 0.64.22): xfs_idestroy_fork frees

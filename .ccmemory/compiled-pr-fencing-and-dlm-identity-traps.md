@@ -127,7 +127,7 @@ arms carries this same landmine: it passes for months, then dies in the one
 arm that matters the day that arm first runs. Fixed in 0.75.89: a real
 default for `MXFS_DEV`, and the PR-state block now refuses to compare an
 empty reading and says so explicitly
-([[trap-set-u-unbound-var-inside-a-conditional-arm-turns-into-two-false-fencing-FAILs]]).
+(`trap-set-u-unbound-var-inside-a-conditional-arm-turns-into-two-false-fencing-FAILs`).
 
 ## The shape, again
 

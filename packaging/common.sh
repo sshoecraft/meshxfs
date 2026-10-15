@@ -176,6 +176,14 @@ mxfs_stage_node_files() {
     # default path).  Without it that fence is refused and the survivor stays
     # frozen, so it ships with the module, not with the test rig.
     install -m 755 "$SRCDIR/tools/mxfs_lu_reset_witness.py" "$root/usr/sbin/mxfs_lu_reset_witness.py"
+    # The shared attachment's vCenter helper (fence=vcenter): the module runs
+    # it at mount and at a peer's death (pal/linux/drbd.c).  Without it every
+    # fence=vcenter mount is refused.  It needs pyVmomi on the node.
+    install -m 755 "$SRCDIR/tools/mxfs_fence_vcenter.py" "$root/usr/sbin/mxfs_fence_vcenter.py"
+    # The quorum reporter (fence=quorum): renews the module's quorum lease
+    # from corosync's votequorum.  Without it every fence=quorum mount is
+    # refused.  It needs corosync's libvotequorum on the node.
+    install -m 755 "$SRCDIR/tools/mxfs_quorumd.py" "$root/usr/sbin/mxfs_quorumd"
 
     # The DRBD dual-primary attachment's two node-side pieces: the witness the
     # module upcalls at mount, at a peer's death and before each recovery step
@@ -191,6 +199,10 @@ mxfs_stage_node_files() {
     mkdir -p "$root/lib/systemd/system"
     install -m 644 "$pkgdir/mxfs-drbd-guard.service" "$root/lib/systemd/system/mxfs-drbd-guard.service"
     install -m 644 "$pkgdir/mxfs-drbd@.service" "$root/lib/systemd/system/mxfs-drbd@.service"
+    # fence=vcenter: tags the VM with each new boot before anything mounts
+    install -m 644 "$pkgdir/mxfs-vcenter-tag.service" "$root/lib/systemd/system/mxfs-vcenter-tag.service"
+    # fence=quorum: reports corosync's vote to the module while it runs
+    install -m 644 "$pkgdir/mxfs-quorumd.service" "$root/lib/systemd/system/mxfs-quorumd.service"
     # Where the operator writes per-resource mount settings and, optionally,
     # a node fence (drbd-setup.md writes here before anything else does).
     mkdir -p "$root/etc/mxfs"

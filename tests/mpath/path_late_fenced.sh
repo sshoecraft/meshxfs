@@ -70,7 +70,7 @@ while [ $((SECONDS - s)) -lt 40 ]; do
     sleep 2
 done
 ck "multipathd failed $V's path a (within 40 s)" "$one" 1
-measure "$V" 70 "$OUT/mount_one.txt" '^MOUNT_RC=[0-9]+$' "the victim's mount on one path" "timeout 60 mount -t mxfs $DEV $MNT; echo MOUNT_RC=\$?"
+measure "$V" 70 "$OUT/mount_one.txt" '^MOUNT_RC=[0-9]+$' "the victim's mount on one path" "timeout 60 mount -t mxfs $MOPT $DEV $MNT; echo MOUNT_RC=\$?"
 ck "$V mounted on path b alone" "$(grep -a '^MOUNT_RC=' "$OUT/mount_one.txt" | head -1)" MOUNT_RC=0
 [ "$fails" = 0 ] || { finish FAIL "stage=degraded-mount"; exit 1; }
 KV=$(klog 'P-PR-PATHS-REGISTERED' | tail -1 | sed -n 's/.* key=\(0x[0-9a-f]*\) .*/\1/p')

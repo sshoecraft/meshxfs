@@ -1655,11 +1655,29 @@ mxfs_bmbt_tenure_end_evict(struct xfs_inode *ip, const char *why)
 	int			nevict = 0, nlocal = 0, nbusy = 0, nover = 0;
 	int			attempt, i;
 	bool			forced = false;
+	bool			join_window = false;
 	u64			deadline;
 
-	if (!mxfs_tenure_end_evict || !mp->m_mxfs_dlm ||
-	    mxfs_v5_dlm_is_single_node(mp->m_mxfs_dlm))
+	if (!mxfs_tenure_end_evict || !mp->m_mxfs_dlm)
 		return 0;
+	/*
+	 * Alone, nobody can free and reuse a block of this tree, so nothing is
+	 * evicted -- except inside a join.  The join's prepare drops every
+	 * clean cached block under its freeze, but the freeze stops writers,
+	 * not readers or inode reclaim, and the node stays alone until the view
+	 * flips: a tenure that read a bmbt block after the drop and ended before
+	 * the flip would carry that block, with no grant behind it, into the
+	 * multi-node view.  m_mxfs_join_frozen is set before the drop walk and
+	 * cleared only after the flip, so it covers exactly that window.  The
+	 * barrier pairs with the one after prepare sets the flag: either the
+	 * drop walk sees this tenure's block, or this read sees the flag.
+	 */
+	if (mxfs_v5_dlm_is_single_node(mp->m_mxfs_dlm)) {
+		smp_mb();
+		if (!READ_ONCE(mp->m_mxfs_join_frozen))
+			return 0;
+		join_window = true;
+	}
 
 	/*
 	 * Collect under the walk's RCU section with a non-sleeping hold.  The
@@ -1810,6 +1828,13 @@ out:
 				nheld, nevict, nlocal, nbusy, ip->i_dlm_mode,
 				current->comm);
 	}
+	/* a tenure that ended alone inside a join's window: a few seconds per
+	 * join at most, so always logged */
+	if (join_window)
+		mxfs_pal_log(MXFS_LOG_WARN,
+			"mxfs: P-JOIN-WINDOW-TENURE-EVICT ino=%llu why=%s evicted=%d local=%d busy=%d -- a tenure ended alone between the join's cached-view drop and the view flip; its extent-tree blocks are retired as if multi-node",
+			(unsigned long long)ip->i_ino, why, nevict, nlocal,
+			nbusy);
 	if (nlocal)
 		return -EIO;
 	if (nbusy)

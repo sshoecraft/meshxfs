@@ -54,6 +54,16 @@ REMOTE='
 set -u
 K=/sys/module/mxfs/parameters/dbg_refuse_data_n
 [ -w $K ] || { echo "NO_KNOB: this build has no dbg_refuse_data_n"; exit 3; }
+# The verdict asserts that P294-WB-ENDED-IOEND-AGAIN never fires.  It is
+# emitted from the 6.17-and-later writeback path only, so a module built for an
+# older kernel has no such string and that assertion would pass for free.  Ask
+# the loaded module, which must be the file modinfo names.
+ko=$(modinfo -n mxfs 2>/dev/null)
+[ -n "$ko" ] && [ "$(modinfo -F srcversion "$ko" 2>/dev/null)" = "$(cat /sys/module/mxfs/srcversion)" ] \
+    || { echo "NO_PROBE_CHECK: the loaded mxfs is not the file modinfo names ($ko), so its probes cannot be read"; exit 3; }
+for p in P294-WB-ENDED-IOEND-AGAIN P294-WB-ENDED-IOEND-AGAIN-PASS P293-TEST-REFUSED-DATA; do
+    grep -aq "$p" "$ko" || { echo "NO_PROBE: $p is not in $ko; its absence from the log would be the silence of this test, not a measurement"; exit 3; }
+done
 m=$(awk -v p='"$MNT"' '\''$2 == p && $3 == "mxfs" {print $2}'\'' /proc/mounts | head -1)
 [ -n "$m" ] || { echo "NOT_MOUNTED: '"$MNT"'"; exit 3; }
 echo "BUILD=$(cat /sys/module/mxfs/srcversion) VERSION=$(cat /sys/module/mxfs/version 2>/dev/null)"

@@ -20,7 +20,10 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/file.h>
+/* file locking moved out of fs.h into its own header in 6.3 */
+#if __has_include(<linux/filelock.h>)
 #include <linux/filelock.h>
+#endif
 #include <linux/swap.h>
 #include <linux/errno.h>
 #include <linux/sched/signal.h>
@@ -49,7 +52,11 @@
 #include <linux/ratelimit.h>
 #include <linux/rhashtable.h>
 #include <linux/xattr.h>
+/* idmapped mounts arrived in 5.12; before them no inode operation takes a
+ * mapping */
+#if __has_include(<linux/mnt_idmapping.h>)
 #include <linux/mnt_idmapping.h>
+#endif
 #include <linux/debugfs.h>
 #include <asm/page.h>
 #include <asm/div64.h>
@@ -62,6 +69,20 @@
  * A shim gated on one of these is defined only where the kernel lacks the API,
  * whatever its version number says. */
 #include "../pal/linux/mxfs_kcompat.h"
+
+/*
+ * Before 6.3 the mount's idmapping is a struct user_namespace, passed in
+ * exactly the places a struct mnt_idmap is passed now, with the identity
+ * mapping init_user_ns.  Naming one as the other gives every inode operation
+ * and helper the signature its kernel declares (the shape OpenZFS uses).
+ * Defined before any prototype in this tree names the type.
+ */
+#ifndef MXFS_HAVE_MNT_IDMAP
+#define mnt_idmap		user_namespace
+#define nop_mnt_idmap		init_user_ns
+#define file_mnt_idmap(f)	file_mnt_user_ns(f)
+#endif
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
 #include <linux/unaligned.h>
 #else
@@ -157,8 +178,20 @@ static inline void mapping_set_folio_min_order(struct address_space *mapping,
 	 * 4KB writes per 700MB dd = 2x wall vs native on iSCSI).
 	 * min_folio_order is 0 on 4K-block filesystems, so enabling
 	 * large folios is the entire remaining semantic.
+	 *
+	 * Only where native XFS itself enables them: upstream turned large
+	 * folios on for XFS in 5.18, after iomap's write-fault path went
+	 * folio.  RHEL 9 reports 5.14 and carries the helper, but its
+	 * iomap_page_mkwrite is still page-based: it checks a TAIL page's
+	 * ->mapping, which never equals the file's, and answers
+	 * VM_FAULT_NOPAGE on every call — a shared-mmap write to any page
+	 * past a folio's first faults for ever (measured on AlmaLinux 9.8,
+	 * 5.14.0-687: ~11.5k NOPAGE returns per second, the task never
+	 * leaves the fault).  RHEL's own XFS leaves them off there.
 	 */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
 	mapping_set_large_folios(mapping);
+#endif
 }
 #endif
 
@@ -195,9 +228,38 @@ static inline void super_set_uuid(struct super_block *sb, const u8 *uuid,
 }
 #endif
 
-/* bdev file API changed in v6.9: bdev_handle → struct file (RHEL 9.8 has the
- * file API on 5.14) */
-#ifndef MXFS_HAVE_BDEV_FILE_OPEN
+/*
+ * An open block device is a struct file from v6.9 (RHEL 9.8 has that on
+ * 5.14), a struct bdev_handle in 6.7 and 6.8, and a bare block_device opened
+ * with blkdev_get_by_path() before that (6.1).  The XFS code carries every
+ * device as a struct file *; on the two older generations that pointer is a
+ * cast of the handle or of an MXFS-owned holder, never dereferenced as a file.
+ *
+ * mxfs_sb_bdev_file() is the super_block's own device in that form.  Before
+ * 6.7 the super_block holds no handle, so a holder is allocated for it, and
+ * mxfs_sb_bdev_file_release() frees that holder where xfs_free_buftarg()
+ * leaves the device itself for kill_block_super() to close.
+ */
+#ifndef MXFS_HAVE_BLK_MODE_T
+typedef fmode_t blk_mode_t;
+#define BLK_OPEN_READ	FMODE_READ
+#define BLK_OPEN_WRITE	FMODE_WRITE
+#endif
+#ifndef MXFS_HAVE_SB_OPEN_MODE
+static inline blk_mode_t sb_open_mode(unsigned int flags)
+{
+	return BLK_OPEN_READ | ((flags & SB_RDONLY) ? 0 : BLK_OPEN_WRITE);
+}
+#endif
+#ifndef MXFS_HAVE_FS_HOLDER_OPS
+/* no holder callbacks before 6.6: the address only travels into the shim */
+struct blk_holder_ops;
+#define fs_holder_ops	(*(const struct blk_holder_ops *)NULL)
+#endif
+
+#if defined(MXFS_HAVE_BDEV_FILE_OPEN)
+/* the kernel's own file API: nothing to shim for an open */
+#elif defined(MXFS_HAVE_BDEV_OPEN_BY_PATH)
 static inline struct file *bdev_file_open_by_path(const char *path,
 		blk_mode_t mode, void *holder, const struct blk_holder_ops *hops)
 {
@@ -205,8 +267,7 @@ static inline struct file *bdev_file_open_by_path(const char *path,
 	handle = bdev_open_by_path(path, mode, holder, hops);
 	if (IS_ERR(handle))
 		return ERR_CAST(handle);
-	/* Stash handle pointer in file's private_data for bdev_fput/file_bdev */
-	return (struct file *)handle;  /* cast — compat only */
+	return (struct file *)handle;
 }
 static inline struct block_device *file_bdev(struct file *f)
 {
@@ -216,13 +277,70 @@ static inline void bdev_fput(struct file *f)
 {
 	bdev_release((struct bdev_handle *)f);
 }
+#else
+struct mxfs_bdev_holder {
+	struct block_device	*bdev;
+	fmode_t			mode;	/* what blkdev_put() must be given */
+};
+static inline struct file *bdev_file_open_by_path(const char *path,
+		blk_mode_t mode, void *holder, const struct blk_holder_ops *hops)
+{
+	struct mxfs_bdev_holder *h;
+	struct block_device *bdev;
+
+	h = kmalloc(sizeof(*h), GFP_KERNEL);
+	if (!h)
+		return ERR_PTR(-ENOMEM);
+	/* a holder claims the device exclusively, as the newer opens do */
+	h->mode = mode | (holder ? FMODE_EXCL : 0);
+	bdev = blkdev_get_by_path(path, h->mode, holder);
+	if (IS_ERR(bdev)) {
+		kfree(h);
+		return ERR_CAST(bdev);
+	}
+	h->bdev = bdev;
+	return (struct file *)h;
+}
+static inline struct block_device *file_bdev(struct file *f)
+{
+	return ((struct mxfs_bdev_holder *)f)->bdev;
+}
+static inline void bdev_fput(struct file *f)
+{
+	struct mxfs_bdev_holder *h = (struct mxfs_bdev_holder *)f;
+
+	blkdev_put(h->bdev, h->mode);
+	kfree(h);
+}
 #endif
 
-/* super_block s_bdev_file vs s_bdev_handle compat */
-#ifdef MXFS_HAVE_SB_BDEV_FILE
-#define mxfs_sb_bdev_file(sb) ((sb)->s_bdev_file)
+/*
+ * The super_block's device in the same form as an opened one.  Chosen by
+ * what the super_block holds, and only where that matches the open form
+ * above: a mismatched pair would hand file_bdev() a pointer of another type.
+ */
+#if defined(MXFS_HAVE_SB_BDEV_FILE) && defined(MXFS_HAVE_BDEV_FILE_OPEN)
+#define mxfs_sb_bdev_file(sb)		((sb)->s_bdev_file)
+#define mxfs_sb_bdev_file_release(f)	do { } while (0)
+#elif defined(MXFS_HAVE_SB_BDEV_HANDLE) && !defined(MXFS_HAVE_BDEV_FILE_OPEN) && \
+      defined(MXFS_HAVE_BDEV_OPEN_BY_PATH)
+#define mxfs_sb_bdev_file(sb)		((struct file *)(sb)->s_bdev_handle)
+#define mxfs_sb_bdev_file_release(f)	do { } while (0)
+#elif !defined(MXFS_HAVE_SB_BDEV_FILE) && !defined(MXFS_HAVE_SB_BDEV_HANDLE) && \
+      !defined(MXFS_HAVE_BDEV_FILE_OPEN) && !defined(MXFS_HAVE_BDEV_OPEN_BY_PATH)
+/* the super_block's device: a holder that names it and never closes it */
+static inline struct file *mxfs_sb_bdev_file(struct super_block *sb)
+{
+	struct mxfs_bdev_holder *h;
+
+	h = kmalloc(sizeof(*h), GFP_KERNEL | __GFP_NOFAIL);
+	h->bdev = sb->s_bdev;
+	h->mode = 0;
+	return (struct file *)h;
+}
+#define mxfs_sb_bdev_file_release(f)	kfree(f)
 #else
-#define mxfs_sb_bdev_file(sb) ((struct file *)(sb)->s_bdev_handle)
+#error "this kernel's super_block device and its block device open API are of different generations"
 #endif
 
 /* inode_generic_drop added in ~6.19 */
@@ -403,12 +521,289 @@ static inline void super_set_sysfs_name_id(struct super_block *sb) { }
 /* freeze_super/thaw_super gained 3rd arg (owner) in v6.16 (commit
  * 1af3331764b9, "super: add filesystem freezing helpers for suspend and
  * hibernate") */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 16, 0)
+#if !defined(MXFS_HAVE_FREEZE_HOLDER)
+/*
+ * No freeze holders before 6.6: one freeze state shared by the kernel and
+ * userspace, so a FITHAW from userspace also ends a kernel freeze (the join's
+ * in xfs_mxfs_join.c), and a userspace freeze makes the kernel's fail -EBUSY.
+ */
+enum freeze_holder {
+	FREEZE_HOLDER_KERNEL	= (1U << 0),
+	FREEZE_HOLDER_USERSPACE	= (1U << 1),
+};
+#define mxfs_freeze_super(sb, who) freeze_super(sb)
+#define mxfs_thaw_super(sb, who) thaw_super(sb)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(6, 16, 0)
 #define mxfs_freeze_super(sb, who) freeze_super(sb, who)
 #define mxfs_thaw_super(sb, who) thaw_super(sb, who)
 #else
 #define mxfs_freeze_super(sb, who) freeze_super(sb, who, NULL)
 #define mxfs_thaw_super(sb, who) thaw_super(sb, who, NULL)
+#endif
+
+/* bdev_freeze/bdev_thaw are 6.8's names for freeze_bdev/thaw_bdev */
+#ifndef MXFS_HAVE_BDEV_FREEZE
+#define bdev_freeze(bdev)	freeze_bdev(bdev)
+#define bdev_thaw(bdev)		thaw_bdev(bdev)
+#endif
+
+/* inode timestamp accessors: the ctime family (6.6) came before atime and
+ * mtime (6.7), and a stable kernel may carry either without the other */
+#ifndef MXFS_HAVE_INODE_GET_CTIME
+static inline struct timespec64 inode_get_ctime(const struct inode *inode)
+{
+	return inode->i_ctime;
+}
+static inline struct timespec64 inode_set_ctime_to_ts(struct inode *inode,
+						      struct timespec64 ts)
+{
+	inode->i_ctime = ts;
+	return ts;
+}
+static inline struct timespec64 inode_set_ctime_current(struct inode *inode)
+{
+	return inode_set_ctime_to_ts(inode, current_time(inode));
+}
+#endif
+#ifndef MXFS_HAVE_INODE_GET_CTIME_SEC
+static inline time64_t inode_get_ctime_sec(const struct inode *inode)
+{
+	return inode_get_ctime(inode).tv_sec;
+}
+static inline long inode_get_ctime_nsec(const struct inode *inode)
+{
+	return inode_get_ctime(inode).tv_nsec;
+}
+#endif
+#ifndef MXFS_HAVE_INODE_GET_MTIME
+static inline struct timespec64 inode_get_atime(const struct inode *inode)
+{
+	return inode->i_atime;
+}
+static inline struct timespec64 inode_get_mtime(const struct inode *inode)
+{
+	return inode->i_mtime;
+}
+static inline struct timespec64 inode_set_atime_to_ts(struct inode *inode,
+						      struct timespec64 ts)
+{
+	inode->i_atime = ts;
+	return ts;
+}
+static inline struct timespec64 inode_set_mtime_to_ts(struct inode *inode,
+						      struct timespec64 ts)
+{
+	inode->i_mtime = ts;
+	return ts;
+}
+static inline struct timespec64 inode_set_atime(struct inode *inode,
+						time64_t sec, long nsec)
+{
+	struct timespec64 ts = { .tv_sec = sec, .tv_nsec = nsec };
+
+	return inode_set_atime_to_ts(inode, ts);
+}
+#endif
+#ifndef MXFS_HAVE_INODE_GET_MTIME_SEC
+static inline time64_t inode_get_atime_sec(const struct inode *inode)
+{
+	return inode_get_atime(inode).tv_sec;
+}
+static inline long inode_get_atime_nsec(const struct inode *inode)
+{
+	return inode_get_atime(inode).tv_nsec;
+}
+static inline time64_t inode_get_mtime_sec(const struct inode *inode)
+{
+	return inode_get_mtime(inode).tv_sec;
+}
+static inline long inode_get_mtime_nsec(const struct inode *inode)
+{
+	return inode_get_mtime(inode).tv_nsec;
+}
+#endif
+
+/*
+ * A shrinker is allocated with a private pointer from 6.7; before that the
+ * caller embeds one and registers it by name.  The older form is wrapped so
+ * the callers keep one shape, reading their pointer with
+ * mxfs_shrinker_private().
+ */
+#include <linux/shrinker.h>
+#ifdef MXFS_HAVE_SHRINKER_ALLOC
+#define mxfs_shrinker_private(s)	((s)->private_data)
+#define mxfs_shrinker_set_private(s, p)	((s)->private_data = (p))
+#else
+struct mxfs_shrinker {
+	struct shrinker	shrinker;
+	void		*private_data;
+	char		*name;
+	bool		registered;
+};
+#define mxfs_shrinker_of(s)	container_of(s, struct mxfs_shrinker, shrinker)
+#define mxfs_shrinker_private(s)	(mxfs_shrinker_of(s)->private_data)
+#define mxfs_shrinker_set_private(s, p)	(mxfs_shrinker_of(s)->private_data = (p))
+static inline __printf(2, 3) struct shrinker *shrinker_alloc(unsigned int flags,
+		const char *fmt, ...)
+{
+	struct mxfs_shrinker *ms;
+	va_list ap;
+
+	ms = kzalloc(sizeof(*ms), GFP_KERNEL);
+	if (!ms)
+		return NULL;
+	va_start(ap, fmt);
+	ms->name = kvasprintf(GFP_KERNEL, fmt, ap);
+	va_end(ap);
+	if (!ms->name) {
+		kfree(ms);
+		return NULL;
+	}
+	ms->shrinker.flags = flags;
+	return &ms->shrinker;
+}
+static inline void shrinker_register(struct shrinker *s)
+{
+	struct mxfs_shrinker *ms = mxfs_shrinker_of(s);
+
+	/* the 6.7 call cannot fail; a shrinker that did not register is
+	 * simply never called, as an unregistered one is there */
+	ms->registered = !register_shrinker(s, "%s", ms->name);
+}
+static inline void shrinker_free(struct shrinker *s)
+{
+	struct mxfs_shrinker *ms;
+
+	if (!s)
+		return;
+	ms = mxfs_shrinker_of(s);
+	if (ms->registered)
+		unregister_shrinker(s);
+	kfree(ms->name);
+	kfree(ms);
+}
+#endif
+
+/* a dentry's children are an hlist from 6.8, a list_head before */
+#ifdef MXFS_HAVE_DENTRY_D_CHILDREN
+#define mxfs_dentry_has_children(d)	(!hlist_empty(&(d)->d_children))
+#else
+#define mxfs_dentry_has_children(d)	(!list_empty(&(d)->d_subdirs))
+#endif
+
+#ifndef MXFS_HAVE_LIST_COUNT_NODES
+static inline size_t list_count_nodes(struct list_head *head)
+{
+	struct list_head *pos;
+	size_t count = 0;
+
+	list_for_each(pos, head)
+		count++;
+	return count;
+}
+#endif
+
+#ifndef abs_diff
+#define abs_diff(a, b) ({			\
+	typeof(a) mxfs_ad_a = (a);		\
+	typeof(b) mxfs_ad_b = (b);		\
+	mxfs_ad_a > mxfs_ad_b ? mxfs_ad_a - mxfs_ad_b : mxfs_ad_b - mxfs_ad_a; \
+})
+#endif
+
+/* rwsem ownership assertions (6.9).  The kernel has no write-ownership test
+ * outside lockdep before them, so the nolockdep form checks the lock is held
+ * at all: weaker, never wrong. */
+#ifndef MXFS_HAVE_RWSEM_ASSERT_HELD
+#define rwsem_assert_held(sem)			lockdep_assert_held(sem)
+#define rwsem_assert_held_write(sem)		lockdep_assert_held_write(sem)
+#define rwsem_assert_held_write_nolockdep(sem)	WARN_ON_ONCE(!rwsem_is_locked(sem))
+#endif
+
+/* 6.1's generic_update_time() takes the time to set; the caller sets the
+ * current time, as the later two-argument form does itself */
+#ifdef MXFS_HAVE_GENERIC_UPDATE_TIME_TIMESPEC
+static inline int mxfs_generic_update_time(struct inode *inode, int flags)
+{
+	struct timespec64 now = current_time(inode);
+
+	return generic_update_time(inode, &now, flags);
+}
+#else
+#define mxfs_generic_update_time(inode, flags)	generic_update_time(inode, flags)
+#endif
+
+/* posix_acl_chmod() took the inode until 6.2 */
+#ifdef MXFS_HAVE_POSIX_ACL_CHMOD_DENTRY
+#define mxfs_posix_acl_chmod(idmap, dentry, mode) \
+	posix_acl_chmod(idmap, dentry, mode)
+#else
+#define mxfs_posix_acl_chmod(idmap, dentry, mode) \
+	posix_acl_chmod(idmap, d_inode(dentry), mode)
+#endif
+
+/* ->get_acl took the inode-based form's name until 6.2 */
+#ifdef MXFS_HAVE_GET_INODE_ACL
+#define MXFS_IOP_GET_INODE_ACL	get_inode_acl
+#else
+#define MXFS_IOP_GET_INODE_ACL	get_acl
+#endif
+
+/* the 6.6 helper, as it maps an error to a fault result */
+#ifndef MXFS_HAVE_VMF_FS_ERROR
+static inline vm_fault_t vmf_fs_error(int err)
+{
+	if (err == 0)
+		return VM_FAULT_LOCKED;
+	if (err == -EFAULT || err == -EAGAIN)
+		return VM_FAULT_NOPAGE;
+	if (err == -ENOMEM)
+		return VM_FAULT_OOM;
+	return VM_FAULT_SIGBUS;
+}
+#endif
+
+#ifndef MXFS_HAVE_FILEMAP_SPLICE_READ
+#define filemap_splice_read	generic_file_splice_read
+#endif
+
+/* a memory-failure flag 6.1 never passes, so never set there */
+#ifndef MXFS_HAVE_MF_MEM_PRE_REMOVE
+#define MF_MEM_PRE_REMOVE	0
+#endif
+
+/* Without per-block dirty state (6.6) iomap dirties a whole folio, and
+ * filemap_dirty_folio is what that kernel's own XFS installs. */
+#ifndef MXFS_HAVE_IOMAP_DIRTY_FOLIO
+#define iomap_dirty_folio	filemap_dirty_folio
+#endif
+
+/* defined in xfs/xfs_stubs.c on the kernels that need it; 6.1 does not
+ * declare it at all */
+#ifndef MXFS_HAVE_BIO_ADD_FOLIO_NOFAIL
+void bio_add_folio_nofail(struct bio *bio, struct folio *folio, size_t len,
+			  size_t off);
+#endif
+
+/* list_lru_add_obj/_del_obj are 6.8's names for the NUMA-aware add/del;
+ * before them list_lru_add/_del took the item alone and found its node */
+#ifndef MXFS_HAVE_LIST_LRU_ADD_OBJ
+#include <linux/list_lru.h>
+#define list_lru_add_obj(lru, item)	list_lru_add(lru, item)
+#define list_lru_del_obj(lru, item)	list_lru_del(lru, item)
+#endif
+
+#ifndef MXFS_HAVE_MM_ACCOUNT_RECLAIMED_PAGES
+static inline void mm_account_reclaimed_pages(unsigned long pages)
+{
+	if (current->reclaim_state)
+		current->reclaim_state->reclaimed_slab += pages;
+}
+#endif
+
+/* a cache that may not be merged with another (6.5); 6.1 merges by default */
+#ifndef SLAB_NO_MERGE
+#define SLAB_NO_MERGE	0
 #endif
 
 /* fd_file/fd_empty added in v6.12 (commit 1da91ea87aef, "introduce

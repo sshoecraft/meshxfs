@@ -77,6 +77,17 @@ import configuration  # noqa: E402  (tools/configuration.py: the only parser of 
 #: primary board without a second copy of this tool.
 CRITERIA = Path(os.environ["MXFS_CRIT"]) if os.environ.get("MXFS_CRIT") \
     else ROOT / "data" / "criteria.json"
+#: An attachment verified by a rig of its own (data/configurations.json attaches.<a>.board, e.g.
+#: drbd) keeps its board there; naming such a configuration reads and writes that board, as its
+#: rig does, so `criteria.py 2/net/mesh/drbd` needs no environment.
+if not os.environ.get("MXFS_CRIT"):
+    for board_arg in sys.argv[1:]:
+        board_match = re.match(r"^\d+/[a-z]+/[a-z]+/([a-z]+)$", board_arg)
+        board_path = board_match and configuration.ATTACHES.get(board_match.group(1), {}).get("board")
+        if board_path:
+            os.environ.setdefault("MXFS_OWN_RIG", "1")
+            CRITERIA = ROOT / board_path
+            break
 
 #: Held across the whole read-modify-write of every mutating subcommand. Rig groups run several
 #: boards at once, each run.sh writing its own column into this one file, and the board is
@@ -298,6 +309,22 @@ def cell_of(entry: dict, config: str) -> dict:
     return (entry.get("per_config") or {}).get(config) or {}
 
 
+def budget_of(entry: dict):
+    """The row's budget: the board's, or the one a rig whose hardware the board's budgets were
+    not derived on names for itself (run.sh reads the same file): "<row> <seconds>
+    <derivation>" lines in MXFS_RIG_BUDGETS, each native XFS on that hardware x2."""
+    budget = entry.get("budget_s")
+    rig_budgets = os.environ.get("MXFS_RIG_BUDGETS", "")
+    if rig_budgets and os.path.isfile(rig_budgets):
+        with open(rig_budgets) as handle:
+            for line in handle:
+                fields = line.split()
+                if (len(fields) >= 2 and not fields[0].startswith("#")
+                        and fields[0] == entry.get("id") and fields[1].isdigit()):
+                    budget = int(fields[1])
+    return budget
+
+
 def stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -458,8 +485,8 @@ def show_one(entry: dict, paint: Paint, build: str) -> int:
         mark = cell_status(entry, config, build)
         detail = flat(cell.get("measured", ""), 52)
         elapsed = cell.get("elapsed_s")
-        if elapsed is not None and entry.get("budget_s"):
-            detail = "%ss/%ss  %s" % (elapsed, entry["budget_s"], detail)
+        if elapsed is not None and budget_of(entry):
+            detail = "%ss/%ss  %s" % (elapsed, budget_of(entry), detail)
         bad, seen = flake_count(entry, config)
         if bad:
             detail = "%s  [%d genuine FAIL(s) in last %d runs]" % (detail, bad, seen)
@@ -511,7 +538,7 @@ def board(criteria: list, paint: Paint, verbose: bool, at: str, build: str) -> i
         if verbose and phase and phase != last_phase:
             print(paint(f"\n  -- {phase} --", "1"))
             last_phase = phase
-        budget = entry.get("budget_s")
+        budget = budget_of(entry)
         cost = "%s/%ss" % (elapsed, budget) if elapsed is not None and budget else (
             "%ss" % budget if budget else "—")
         print("%-3d | %s | %s | %-10s | %s" %
@@ -673,7 +700,7 @@ def cmd_update(data: dict, args) -> int:
         reason = args.reason or ""
         overrun = ""
         if args.elapsed_s is not None:
-            budget = entry.get("budget_s")
+            budget = budget_of(entry)
             #: A budget is a performance assertion, so an overrun is a FAILURE and not a slow
             #: pass -- even with zero errors, even when the caller says PASS. The board cannot be
             #: the place where "it finished eventually" becomes green.

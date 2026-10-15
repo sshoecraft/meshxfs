@@ -26,8 +26,10 @@
 # Read from each host's counters (demoter_dump), over the run:
 #   P215-DEFER set      releases deferred into a transaction (the claim taken)
 #   P213-PUNT retain    of those, claims the punt retained
-#   owner_clear/reclaim/selfclear   retained claims ended afterwards
-#   outstanding = retain - owner_clear - reclaim - selfclear: still held
+#   owner_clear/ctx_end/reclaim/selfclear   retained claims ended afterwards
+#              (ctx_end: by the completion worker or writeback submitter
+#              that retained it, when its batch or pass ended)
+#   outstanding = retain - owner_clear - ctx_end - reclaim - selfclear: still held
 # and the kernel log for P214-DEMOTER-STRANDED / P-DEMOTER-DEAD-REAP.
 #
 # Verdict: FAIL when either host has a retained claim outstanding after the
@@ -40,6 +42,13 @@
 #              lower address
 #   WORK_S     seconds of the two loops (default 60)
 #   APPEND_KIB size of each O_DSYNC append (default 64)
+#   APPEND_B   size of each append in bytes, instead of APPEND_KIB.  New data
+#              extents are allocated unwritten, so an append that starts a new
+#              block completes through unwritten conversion, which unlocks after
+#              its commit; only an append inside an already-written tail block
+#              completes through xfs_setfilesize (e.g. APPEND_B=1024: three of
+#              every four)
+#   MNT        the MXFS mount on both hosts (default /mnt/shared)
 #   WRITERS    concurrent append loops on participant 0 (default 1)
 #   READERS    concurrent stat+read loops on participant 1 (default 1)
 #   SETTLE_S   idle seconds before the counters are read (default 15: three
@@ -51,7 +60,10 @@
 #              transaction for certain, instead of by a lucky race
 #
 # Also reported per host: wipe, the retentions whose record a task that does
-# not hold the claim dropped at its own unlock (P-PUNT-WIPE).
+# not hold the claim dropped at its own unlock (P-PUNT-WIPE), and kept, the
+# unlocks by such a task that left the record in place for the reclaim sweep
+# (P-PUNT-KEPT).  A run with kept=0 never reached the unlock the fix for
+# P-PUNT-WIPE changed, so it says nothing about that fix.
 #
 # Budget: arming 5 s + WORK_S + SETTLE_S + collection ~20 s; 100 s at the
 # defaults, so the outer timeout is WORK_S + SETTLE_S + 60.
@@ -69,6 +81,8 @@ else
 fi
 WORK_S=${WORK_S:-60}
 APPEND_KIB=${APPEND_KIB:-64}
+APPEND_B=${APPEND_B:-$((APPEND_KIB * 1024))}
+MNT=${MNT:-/mnt/shared}
 SETTLE_S=${SETTLE_S:-15}
 WRITERS=${WRITERS:-1}
 READERS=${READERS:-1}
@@ -76,7 +90,7 @@ LABEL=${1:-}
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 EVID="$REPO/tests/evidence/pve_append_release_race/$STAMP${LABEL:+-$LABEL}"
 mkdir -p "$EVID" || exit 2
-D=/mnt/shared/appendrace-$STAMP
+D=$MNT/appendrace-$STAMP
 F=$D/f
 MARK="mxfs-test: pve_append_release_race $STAMP start"
 
@@ -98,10 +112,10 @@ counters() {  # <host>
     on "$1" "echo 1 > /sys/module/mxfs/parameters/demoter_dump; sleep 1; journalctl -k --no-pager -n 400 -o cat | grep -aE 'P215-DEFER|P213-PUNT |P75-DEMOTER-DRAIN' | tail -3" 30 \
         | grep -oE '[a-z_]+=-?[0-9]+' | tr '\n' ' '
 }
-val() { grep -oE "(^| )$1=-?[0-9]+" <<<"$2" | tail -1 | cut -d= -f2; }
+val() { local v; v=$(grep -oE "(^| )$1=-?[0-9]+" <<<"$2" | tail -1 | cut -d= -f2); echo "${v:-0}"; }
 
 for h in "${H[@]}"; do
-    say "$h build+mounted: $(on "$h" "cat /sys/module/mxfs/srcversion; awk '\$2 == \"/mnt/shared\" && \$3 == \"mxfs\"' /proc/mounts | wc -l" 20 | tr '\n' ' ')"
+    say "$h build+mounted: $(on "$h" "cat /sys/module/mxfs/srcversion; awk '\$2 == \"$MNT\" && \$3 == \"mxfs\"' /proc/mounts | wc -l" 20 | tr '\n' ' ')"
     probes "$h" +p || say "$h: could not turn the probes on"
     on "$h" "echo '<5>$MARK' > /dev/kmsg" 20
 done
@@ -114,7 +128,7 @@ if [ -n "${HOLD_MS:-}" ]; then
 fi
 T=$(( $(date +%s) + 5 ))
 for w in $(seq 1 "$WRITERS"); do
-    on "${H[0]}" "cd $D; sleep \$(( $T - \$(date +%s) )); n=0; e=0; end=\$(( $T + $WORK_S )); while [ \$(date +%s) -lt \$end ]; do dd if=/dev/zero of=$F bs=${APPEND_KIB}k count=1 oflag=append,dsync conv=notrunc status=none || e=\$((e+1)); n=\$((n+1)); done; echo APPENDS=\$n ERRORS=\$e" $((WORK_S + 30)) > "$EVID/p0-$w.out" 2>&1 &
+    on "${H[0]}" "cd $D; sleep \$(( $T - \$(date +%s) )); n=0; e=0; end=\$(( $T + $WORK_S )); while [ \$(date +%s) -lt \$end ]; do dd if=/dev/zero of=$F bs=$APPEND_B count=1 oflag=append,dsync conv=notrunc status=none || e=\$((e+1)); n=\$((n+1)); done; echo APPENDS=\$n ERRORS=\$e" $((WORK_S + 30)) > "$EVID/p0-$w.out" 2>&1 &
 done
 for r in $(seq 1 "$READERS"); do
     on "${H[1]}" "sleep \$(( $T - \$(date +%s) )); n=0; e=0; end=\$(( $T + $WORK_S )); while [ \$(date +%s) -lt \$end ]; do stat -c %s $F > /dev/null && head -c 1 $F > /dev/null || e=\$((e+1)); n=\$((n+1)); done; echo READS=\$n ERRORS=\$e" $((WORK_S + 30)) > "$EVID/p1-$r.out" 2>&1 &
@@ -130,15 +144,16 @@ set_total=0
 for h in "${H[@]}"; do
     c1=$(counters "$h")
     d() { echo $(( $(val "$1" "$c1") - $(val "$1" "${C0[$h]}") )); }
-    set_n=$(d set); retain=$(d retain); oc=$(d owner_clear); rc=$(d reclaim); sc=$(d selfclear); reap=$(d dead_reap)
+    set_n=$(d set); retain=$(d retain); oc=$(d owner_clear); rc=$(d reclaim); sc=$(d selfclear); ce=$(d ctx_end); reap=$(d dead_reap)
     wipe=$(( $(val wipe "$c1") - $(val wipe "${C0[$h]}") ))
-    out=$(( retain - oc - rc - sc ))
+    kept=$(( $(val kept "$c1") - $(val kept "${C0[$h]}") ))
+    out=$(( retain - oc - ce - rc - sc ))
     set_total=$(( set_total + set_n ))
     on "$h" "journalctl -k --no-pager -o short-monotonic | awk -v m='$MARK' 'index(\$0, m) {p=1} p' | sed 's/^.*kernel: //' | grep -a 'mxfs'" 60 > "$EVID/klog-$h"
     strand=$(grep -ac 'P214-DEMOTER-STRANDED' "$EVID/klog-$h")
     punts=$(grep -ac 'P152-TRANSDRAIN-PUNT' "$EVID/klog-$h")
-    say "$h deferred=$set_n punted=$punts retained=$retain owner_clear=$oc reclaim=$rc selfclear=$sc wipe=$wipe outstanding=$out dead_reap=$reap strand=$strand"
-    grep -aE 'P-SFS-HOLD|P-PUNT-WIPE' "$EVID/klog-$h" | cut -c1-220 | head -6 | sed "s/^/  $h: /" | tee -a "$EVID/log"
+    say "$h deferred=$set_n punted=$punts retained=$retain owner_clear=$oc ctx_end=$ce reclaim=$rc selfclear=$sc wipe=$wipe kept=$kept outstanding=$out dead_reap=$reap strand=$strand"
+    grep -aE 'P-SFS-HOLD|P-PUNT-WIPE|P-PUNT-KEPT|P213-PUNT-RECLAIM' "$EVID/klog-$h" | cut -c1-220 | head -6 | sed "s/^/  $h: /" | tee -a "$EVID/log"
     grep -a 'P152-TRANSDRAIN-PUNT' "$EVID/klog-$h" | sed 's/^.*why=/why=/' | sort | uniq -c | sed "s/^/  $h: /" | tee -a "$EVID/log"
     [ "$out" -le 0 ] && [ "$reap" = 0 ] && [ "$strand" = 0 ] || fail=1
     probes "$h" -p || say "$h: could not turn the probes off"

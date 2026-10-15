@@ -62,11 +62,13 @@ cp "$SRCDIR/tools/mxfs_admin.c" "$TARDIR/tools/"
 cp "$SRCDIR/tools/mxfs_offline.h" "$TARDIR/tools/"
 cp "$SRCDIR/tools/crc32c.h" "$TARDIR/tools/"
 cp "$SRCDIR/tools/mxfs_lu_reset_witness.py" "$TARDIR/tools/"
+cp "$SRCDIR/tools/mxfs_fence_vcenter.py" "$TARDIR/tools/"
+cp "$SRCDIR/tools/mxfs_quorumd.py" "$TARDIR/tools/"
 cp "$SRCDIR/tools/mxfs_drbd_witness.py" "$TARDIR/tools/"
 cp "$SRCDIR/tools/mxfs_drbd_fence_peer.sh" "$TARDIR/tools/"
 cp "$SRCDIR/tools/mxfs_drbd_fence_self.py" "$TARDIR/tools/"
 mkdir -p "$TARDIR/systemd" "$TARDIR/doc"
-cp "$SCRIPTDIR/mxfs-drbd-guard.service" "$SCRIPTDIR/mxfs-drbd@.service" "$TARDIR/systemd/"
+cp "$SCRIPTDIR/mxfs-drbd-guard.service" "$SCRIPTDIR/mxfs-drbd@.service" "$SCRIPTDIR/mxfs-vcenter-tag.service" "$SCRIPTDIR/mxfs-quorumd.service" "$TARDIR/systemd/"
 cp "$SRCDIR/docs/drbd-setup.md" "$TARDIR/doc/"
 cp -r "$SRCDIR/include" "$TARDIR/tools/"
 
@@ -140,6 +142,10 @@ install -m 755 tools/mxfs_admin %{buildroot}/usr/sbin/mxfs_admin
 ln -sf chk_mxfs %{buildroot}/usr/sbin/fsck.mxfs
 # the witnessed LOGICAL UNIT RESET helper the module upcalls (see mkdeb.sh)
 install -m 755 tools/mxfs_lu_reset_witness.py %{buildroot}/usr/sbin/mxfs_lu_reset_witness.py
+# the shared attachment's vCenter fence helper (fence=vcenter, see common.sh)
+install -m 755 tools/mxfs_fence_vcenter.py %{buildroot}/usr/sbin/mxfs_fence_vcenter.py
+# the shared attachment's quorum reporter (fence=quorum, see common.sh)
+install -m 755 tools/mxfs_quorumd.py %{buildroot}/usr/sbin/mxfs_quorumd
 # the DRBD attachment's witness and fence-peer handler (see mkdeb.sh)
 install -m 755 tools/mxfs_drbd_witness.py %{buildroot}/usr/sbin/mxfs_drbd_witness.py
 install -m 755 tools/mxfs_drbd_fence_peer.sh %{buildroot}/usr/sbin/mxfs-drbd-fence-peer
@@ -147,6 +153,8 @@ install -m 755 tools/mxfs_drbd_fence_self.py %{buildroot}/usr/sbin/mxfs-drbd-fen
 mkdir -p %{buildroot}/usr/lib/systemd/system %{buildroot}/usr/share/doc/mxfs
 install -m 644 systemd/mxfs-drbd-guard.service %{buildroot}/usr/lib/systemd/system/mxfs-drbd-guard.service
 install -m 644 systemd/mxfs-drbd@.service %{buildroot}/usr/lib/systemd/system/mxfs-drbd@.service
+install -m 644 systemd/mxfs-vcenter-tag.service %{buildroot}/usr/lib/systemd/system/mxfs-vcenter-tag.service
+install -m 644 systemd/mxfs-quorumd.service %{buildroot}/usr/lib/systemd/system/mxfs-quorumd.service
 install -m 644 doc/drbd-setup.md %{buildroot}/usr/share/doc/mxfs/drbd-setup.md
 
 # Man pages
@@ -187,6 +195,11 @@ udevadm control --reload-rules 2>/dev/null || true
 udevadm trigger --subsystem-match=block 2>/dev/null || true
 systemctl daemon-reload 2>/dev/null || true
 systemctl enable --now mxfs-drbd-guard.service 2>/dev/null || true
+# runs at each boot, and only where /etc/mxfs/vcenter.conf exists
+systemctl enable mxfs-vcenter-tag.service 2>/dev/null || true
+# runs only where corosync is configured (fence=quorum)
+systemctl enable --now mxfs-quorumd.service 2>/dev/null || true
+systemctl try-restart mxfs-quorumd.service 2>/dev/null || true
 # an upgraded guard runs the old program until it is restarted
 systemctl try-restart mxfs-drbd-guard.service 2>/dev/null || true
 # installed into the policy store even while SELinux is disabled, so a host
@@ -248,6 +261,8 @@ fi
 # with no module at all.
 if [ "\$1" = 0 ]; then
     dkms remove -m mxfs -v %{version} --all 2>/dev/null || true
+    systemctl disable mxfs-vcenter-tag.service 2>/dev/null || true
+    systemctl disable mxfs-quorumd.service 2>/dev/null || true
 fi
 
 %postun
@@ -266,11 +281,15 @@ fi
 /usr/sbin/mxfs_admin
 /usr/sbin/fsck.mxfs
 /usr/sbin/mxfs_lu_reset_witness.py
+/usr/sbin/mxfs_fence_vcenter.py
+/usr/sbin/mxfs_quorumd
 /usr/sbin/mxfs_drbd_witness.py
 /usr/sbin/mxfs-drbd-fence-peer
 /usr/sbin/mxfs-drbd-fence-self
 /usr/lib/systemd/system/mxfs-drbd-guard.service
 /usr/lib/systemd/system/mxfs-drbd@.service
+/usr/lib/systemd/system/mxfs-vcenter-tag.service
+/usr/lib/systemd/system/mxfs-quorumd.service
 /usr/share/doc/mxfs/drbd-setup.md
 /usr/share/man/man5/*.5.gz
 /usr/share/man/man8/*.8.gz

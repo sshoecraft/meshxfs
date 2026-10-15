@@ -92,7 +92,7 @@ owner="$(id -u):$(id -g)"
 # The text a user reads must say what the release data says, before anything is
 # built from it and again before it is published: the README, the manual pages
 # and the installed module-options file go into the packages.  Two releases
-# shipped describing released configurations as trials or as unverified.
+# shipped describing released configurations as unreleased or unverified.
 python3 "$SRCDIR/tools/release_text_check.py" || {
     echo "ERROR: the public text disagrees with the release data (lines above); fix the text, then run this again" >&2
     exit 1

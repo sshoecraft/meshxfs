@@ -44,6 +44,18 @@ if [ ! -r "$PASSFILE" ] || [ ! -s "$PASSFILE" ]; then
     exit 96
 fi
 
+# A node no resolver knows (a host on a fixed address, such as the nested
+# Proxmox hosts) is reached by the address the lab resolves for it
+# (tools/mxfs_lab.sh lab_addr: its `addr` line, else what libvirt sees), so
+# the harnesses can name it like any other node.
+case "$HOST" in
+    *[!0-9.]*)
+        if ! getent ahostsv4 "$HOST" >/dev/null 2>&1; then
+            . "$(dirname "$0")/mxfs_lab.sh"
+            HOST=$(lab_addr "$HOST")
+        fi ;;
+esac
+
 if [ "$1" = "SCP" ]; then
     shift
     SRC="$1"

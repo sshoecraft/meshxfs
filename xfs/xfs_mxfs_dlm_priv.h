@@ -656,6 +656,9 @@ struct mxfs_drain_watch {
 	int			site;
 	int			fires;
 	bool			armed;
+	struct bdi_writeback	*wb;		/* the inode's writeback context */
+	s64			written0;	/* its pages written back at arm */
+	unsigned long		nrpages;	/* pages cached for the inode at arm */
 };
 
 /*
@@ -1602,6 +1605,8 @@ extern atomic64_t mxfs_dem_punt_reclaim_n;
 extern atomic64_t mxfs_dem_punt_selfclear;
 extern atomic64_t mxfs_dem_punt_owner_clear;
 extern atomic64_t mxfs_dem_punt_wipe;
+extern atomic64_t mxfs_dem_punt_kept;
+extern atomic64_t mxfs_dem_punt_ctx_end;
 extern atomic64_t mxfs_dem_strand_n;
 extern atomic64_t mxfs_dem_defer_set;
 extern atomic64_t mxfs_dem_defer_clear;
@@ -1776,6 +1781,7 @@ extern atomic64_t mxfs_dem_punt_gen_reject;
 extern atomic64_t mxfs_dem_drain_deferred;
 void mxfs_demoter_test_window(void);
 void mxfs_demoter_punt_reclaim_check(struct xfs_inode *ip, int site);
+void mxfs_demoter_punt_ctx_end(struct xfs_inode *ip);
 void mxfs_inode_authority_revoke_locked(struct xfs_inode *ip, u32 line);
 void mxfs_inode_authority_begin_release_locked(struct xfs_inode *ip, u32 line);
 void mxfs_inode_authority_check_published(struct xfs_inode *ip, u32 line);
@@ -1835,7 +1841,9 @@ bool mxfs_inode_cluster_durable(struct xfs_inode *ip);
 void __mxfs_dlm_dir_inode_durable(struct xfs_inode *dp);
 void mxfs_dir_evict_owned_dir_blocks(struct xfs_inode *ip, bool leaf_only);
 bool mxfs_file_yield_gate(const struct xfs_inode *ip, int mode);
-bool mxfs_dir_evict_data_blocks(struct xfs_inode *ip);
+/* rmw_base: the caller is a create/rename/remove about to read-modify-write
+ * the blocks this evict leaves cached (it holds ILOCK_EXCL) */
+bool mxfs_dir_evict_data_blocks(struct xfs_inode *ip, bool rmw_base);
 void mxfs_dir_release_invalidate_data_blocks(struct xfs_inode *ip);
 int mxfs_dir_stale_data_blocks(struct xfs_inode *ip);
 int mxfs_dir_drain_evict_data_blocks(struct xfs_inode *ip);

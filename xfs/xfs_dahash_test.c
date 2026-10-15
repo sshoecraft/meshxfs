@@ -664,7 +664,7 @@ xfs_dahash_test(void)
 	}
 
 	if (errors) {
-		printk(KERN_ERR "xfs dir/attr hash test failed %u times!",
+		printk(KERN_ERR "mxfs: dir/attr hash test failed %u times!",
 				errors);
 		return -ERANGE;
 	}

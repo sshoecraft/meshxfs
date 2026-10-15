@@ -97,6 +97,11 @@ udevadm control --reload-rules 2>/dev/null || true
 udevadm trigger --subsystem-match=block 2>/dev/null || true
 systemctl daemon-reload 2>/dev/null || true
 systemctl enable --now mxfs-drbd-guard.service 2>/dev/null || true
+# runs at each boot, and only where /etc/mxfs/vcenter.conf exists
+systemctl enable mxfs-vcenter-tag.service 2>/dev/null || true
+# runs only where corosync is configured (fence=quorum)
+systemctl enable --now mxfs-quorumd.service 2>/dev/null || true
+systemctl try-restart mxfs-quorumd.service 2>/dev/null || true
 # an upgraded guard runs the old program until it is restarted
 systemctl try-restart mxfs-drbd-guard.service 2>/dev/null || true
 echo "MXFS ${VERSION} installed. Module will auto-load on boot."
@@ -116,6 +121,8 @@ set -e
 echo "Removing MXFS ${VERSION} from DKMS ..."
 dkms remove -m mxfs -v ${VERSION} --all 2>/dev/null || true
 rm -f /etc/udev/rules.d/60-mxfs-blkid.rules
+[ "\$1" = remove ] && { systemctl disable mxfs-vcenter-tag.service 2>/dev/null || true; }
+[ "\$1" = remove ] && { systemctl disable mxfs-quorumd.service 2>/dev/null || true; }
 udevadm control --reload-rules 2>/dev/null || true
 PRERMEOF
 chmod 755 "$STAGING/DEBIAN/prerm"

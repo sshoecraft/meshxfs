@@ -825,7 +825,7 @@ xfs_qm_init_quotainfo(
 	if (XFS_IS_PQUOTA_ON(mp))
 		xfs_qm_set_defquota(mp, XFS_DQTYPE_PROJ, qinf);
 
-	qinf->qi_shrinker = shrinker_alloc(SHRINKER_NUMA_AWARE, "xfs-qm:%s",
+	qinf->qi_shrinker = shrinker_alloc(SHRINKER_NUMA_AWARE, "mxfs-qm:%s",
 					   mp->m_super->s_id);
 	if (!qinf->qi_shrinker) {
 		error = -ENOMEM;

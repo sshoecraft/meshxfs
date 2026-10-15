@@ -87,6 +87,9 @@ PF_BOUND_MS=$DEATH_BOUND_MS pf_window fence "$T0" "$(now_ms)" "$OTHERS"
 
 # 7. it stopped
 pf_victim_stopped fenced "$TV"
+# its clock lost the frozen time; put it right before its new incarnation's
+# load is placed against this host's clock, and before the next row
+clock_resync "$V" || { why="$V's clock could not be stepped after its thaw"; finish ABORT "stage=clock-resync"; exit 2; }
 
 # 8. a new incarnation
 pf_remount "$V" rejoin

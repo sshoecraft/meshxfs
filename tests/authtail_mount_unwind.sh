@@ -388,7 +388,7 @@ run_arm() {
     echo "  STAGE [$arm] ${ARM_BARR_DONE:-barrier complete line absent}"
     echo "  STAGE [$arm] meta_detached=$ARM_META refused_meta=$ARM_REF tail_admit_meta=$ARM_TADM tail_admit_any=$ARM_TADL blind_meta=$ARM_BLND no_authority=$ARM_NOAU bug=$ARM_BUG"
     grep -a 'P291-ADMISSION-REFUSE-INJECTED\|P291-AUTH-UNWIND-PARK\|P291-AUTH-META-DETACHED\|P290-AUTH-REFUSED-META\|P291-AUTH-TAIL-ADMIT\|P291-AUTH-TAIL-BLIND\|P163-RECOVERED\|barrier complete\|recovery barrier failed' \
-        "$M/journal.txt" | sed 's/.*mxfs: /      /; s/.*MXFS: /      /; s/.*XFS (sd[a-z]): /      /' | cut -c1-190 | head -12
+        "$M/journal.txt" | sed 's/.*mxfs: /      /; s/.*MXFS: /      /; s/.*\(XFS\|mxfs\) (sd[a-z]): /      /' | cut -c1-190 | head -12
     return 0
 }
 

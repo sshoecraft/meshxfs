@@ -671,6 +671,8 @@ static const struct flags_map shutdown_map[] = {
 	{ SHUTDOWN_CORRUPT_INCORE,	XFS_HEALTH_SHUTDOWN_CORRUPT_INCORE },
 	{ SHUTDOWN_CORRUPT_ONDISK,	XFS_HEALTH_SHUTDOWN_CORRUPT_ONDISK },
 	{ SHUTDOWN_DEVICE_REMOVED,	XFS_HEALTH_SHUTDOWN_DEVICE_REMOVED },
+	/* the health ABI has no fence bit: a fenced node lost its I/O */
+	{ SHUTDOWN_CLUSTER_FENCED,	XFS_HEALTH_SHUTDOWN_META_IO_ERROR },
 };
 
 static inline unsigned int
@@ -1237,7 +1239,7 @@ xfs_ioc_health_monitor(
 	 * it again.  This must go last because we can't undo a fd table
 	 * installation.
 	 */
-	ret = anon_inode_getfd("xfs_healthmon", &xfs_healthmon_fops, hm,
+	ret = anon_inode_getfd("mxfs_healthmon", &xfs_healthmon_fops, hm,
 			O_CLOEXEC | O_RDONLY);
 	if (ret < 0)
 		goto out_mp;

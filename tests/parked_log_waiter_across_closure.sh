@@ -533,7 +533,7 @@ count_file_into pumphold "$OUT/V_window.txt" 'P-DBG-AUTH-WITHDRAW-PAUSE'
 count_file_into ailpin  "$OUT/V_window.txt" "P-AILPIN-HOLD ino=$PINO "
 count_file_into oops    "$OUT/V_window.txt" 'BUG:\|Oops\|kernel NULL pointer'
 echo "STAGE window on $V: auth-closed=$aclose auth-withdraw=$awith self-fence=$sfence shutdown=$shut pump-hold=$pumphold ail-pin-holds=$ailpin oops=$oops"
-grep -a 'P290-AUTH-\|P131-SELF-FENCE\|P-DBG-AUTH-WITHDRAW-PAUSE' "$OUT/V_window.txt" | tail -6 | sed 's/.*mxfs: /    /; s/.*XFS (sd[a-z]): /    /' | cut -c1-200
+grep -a 'P290-AUTH-\|P131-SELF-FENCE\|P-DBG-AUTH-WITHDRAW-PAUSE' "$OUT/V_window.txt" | tail -6 | sed 's/.*mxfs: /    /; s/.*\(XFS\|mxfs\) (sd[a-z]): /    /' | cut -c1-200
 
 # ---- 9. the verdict
 ck "no BUG/Oops on $V" "$oops" 0

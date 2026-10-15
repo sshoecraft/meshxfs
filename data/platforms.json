@@ -195,18 +195,21 @@
     },
     "debian12": {
       "name": "Debian 12",
-      "status": "planned",
+      "status": "development",
       "kernels": [
-        "6.1.x (bookworm)"
+        "6.1.0-53-amd64 (Debian 12)"
       ],
       "packages": [
         "mxfs_<v>_amd64.deb"
       ],
-      "notes": "Large installed base (Debian's previous stable, LTS to mid-2028). 6.1 is below the 6.8 floor MXFS builds on today, so it is a port (VFS/block API shims for 6.1), smaller than RHEL 8's. The release packages are already built in a debian:bookworm container, so the userspace tools run there.",
+      "notes": "Added to the release list 2026-10-13 by the owner, and taken off it 2026-10-14 by the owner: not part of the 0.90.129 release. The module builds clean against 6.1.0-53-amd64 (scripts/debian_kbuild_check.sh -i debian:12, 0 errors, 0 warnings, 0.90.127's 6.1 shims); it has never been loaded on a Debian 12 node. The debian12-1/debian12-2 pair in lab/vms.md is not built yet, and no lab-file entry exists. Until a verification is recorded, scripts/release.sh refuses to publish.",
       "priority": 7,
       "arch": [
         "amd64"
-      ]
+      ],
+      "build_check": "scripts/debian_kbuild_check.sh -i debian:12",
+      "verify_env": "two Debian 12 nodes on the claimed kernel built as lab/vms.md describes (debian12-1, debian12-2), sharing one iSCSI LUN that supports SCSI persistent reservations and COMPARE AND WRITE (clyde's SCST target), attached in-guest; which nodes and which LUN come from this site's lab file (tools/mxfs_lab.sh nodes debian12), for the packaged round (tests/packaged_round.sh debian12). Platform rounds run on two nodes, the node and a peer to fence; scale is verified on the development rig by the release boards.",
+      "verify_tests": "on each configuration of the release matrix: install the .deb from the built packages on every node of the set with a DKMS build and a module loaded from updates/dkms; mount with no options on every node, transport announced by every mount; cross-node checksums (each node's data read on every other); create/remote-delete counts; chk_mxfs clean; peer= between two nodes and peers= across the set with multicast blocked; O_DIRECT read on a stable-writes device; every node rebooted, module auto-loaded with the configured transport, remount, earlier data intact (CONFIG=<configuration> tests/packaged_round.sh debian12); hung-node freeze on each configuration (CONFIG=<configuration> PREP=debian12 tests/tcp_peer_freeze_death.sh: the set's second node frozen, the first measured)"
     },
     "debian11": {
       "name": "Debian 11",

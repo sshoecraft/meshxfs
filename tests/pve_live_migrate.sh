@@ -286,7 +286,7 @@ say "guest dmesg: $(wc -l < "$EVID/guest-dmesg.txt") lines, bad=$(grep -c . <<<"
 for h in "${PAIR[@]}"; do
     since=$(cat "$EVID/t0-$h")
     on "$h" "journalctl -k --since @$since --no-pager -o short-monotonic" 60 > "$EVID/kmsg-$h.txt"
-    hbad=$(grep -aE 'I/O error|blocked for more than|WARNING:|BUG:|Oops|Shutting down filesystem|P-WITHDRAW|RECOVERY_BLOCKED|self-fence|corrupt' "$EVID/kmsg-$h.txt")
+    hbad=$(grep -aE 'I/O error|blocked for more than|WARNING:|BUG:|Oops|Shutting down filesystem|P-WITHDRAW|RECOVERY_BLOCKED|self-fence|corrupt|Call Trace' "$EVID/kmsg-$h.txt")
     say "$h kernel log: $(wc -l < "$EVID/kmsg-$h.txt") lines, mxfs $(grep -ac mxfs "$EVID/kmsg-$h.txt"), bad=$(grep -c . <<<"$hbad")"
     [ -z "$hbad" ] || fail "$h logged: $(head -3 <<<"$hbad" | tr '\n' ' ')"
     whole "$h" || fail "$h is not whole at the end"

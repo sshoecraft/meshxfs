@@ -17,7 +17,7 @@ with open(fn, 'r', errors='replace') as f:
 window = lines[start_line-1:end_line]
 print("num lines in window:", len(window))
 
-PREFIX_RE = re.compile(r'(?:mxfs:|XFS \(dm-1\):)\s*(.*)')
+PREFIX_RE = re.compile(r'(?:mxfs:|(?:XFS|mxfs) \(dm-1\):)\s*(.*)')
 NUM_RE = re.compile(r'^-?\d+$|^0x[0-9a-fA-F]+$')
 
 counter = collections.Counter()
@@ -40,7 +40,7 @@ for line in window:
     prefix = " ".join(picked)
     counter[prefix] += 1
 
-print("total matched lines (mxfs: or XFS (dm-1):) in window:", matched_lines)
+print("total matched lines (mxfs: or XFS/mxfs (dm-1):) in window:", matched_lines)
 print("top 15 prefixes:")
 for prefix, c in counter.most_common(15):
     print(f"  {c:6d}  {prefix}")

@@ -662,6 +662,105 @@ static void hb_ident_freeze_victim(struct mxfs_disklock_ctx *ctx,
 			     o->conflict, o->node, (unsigned long long)o->epoch);
 }
 
+/*
+ * THE DEAD WINDOW, SHORTENED BY COROSYNC.  The full window (dead_threshold
+ * checks, 34 s on SCSI) exists so that a live node whose heartbeat writes
+ * stall, in a path failover or a SCSI error-handling ladder, is not declared
+ * dead and fenced.  That stall is in the storage; corosync runs over the
+ * hosts' network and keeps such a node a member.  A node whose stamp has stood
+ * for MEMBER_GONE_SAMPLES checks AND whose host corosync has dropped from the
+ * membership this host holds the vote in is not stalled storage: it is down,
+ * or cut off from both networks at once, and either way the cluster it runs
+ * in has already left it behind.  Declaring it dead here changes only WHEN
+ * the fence runs: the fence leg still has to prove the exclusion on the
+ * target (PREEMPT AND ABORT, a witnessed LU reset), the confirm read below
+ * still cancels on a stamp that moved, and a host where mxfs_quorumd does not
+ * run reports nothing, so its slots keep the whole window.
+ *
+ * Not on a DRBD replica: the heartbeat there is replicated over the same
+ * network corosync uses, so a cut link stops both, and the pair's own fence
+ * authority already decides early (the EXCLUDED-SEEN arm).
+ *
+ * Measured before this (Proxmox VE 9, three hosts on one multipathed LUN,
+ * tests/pve_ha_failover.sh 20261014T032955Z): a powered-off host was declared
+ * dead 64 s after the power-off, and survivors' creates in the shared root
+ * directory waited all of it; the fence, replay and purge after it took 0.7 s.
+ */
+static bool hb_member_gone(struct mxfs_disklock_ctx *ctx, uint32_t slot,
+			   const struct mxfs_disklock_node_track *nt,
+			   mxfs_node_id_t node)
+{
+	const struct mxfs_disklock_ident_obs *o = &ctx->ident_obs[slot];
+	uint64_t absent_ms = 0;
+
+	if (ctx->attach_drbd || !nt->live ||
+	    nt->equal_samples < MXFS_DISKLOCK_MEMBER_GONE_SAMPLES ||
+	    nt->equal_samples >= ctx->dead_threshold)
+		return false;
+	if (!o->valid || o->conflict || o->node != node ||
+	    !inc_eq(o->epoch, nt->last_epoch))
+		return false;
+	if (mxfs_pal_quorum_host_absent(o->host_uuid, &absent_ms) != 1 ||
+	    absent_ms < MXFS_DISKLOCK_MEMBER_GONE_MS)
+		return false;
+	mxfs_pal_log(MXFS_LOG_WARN,
+		     "mxfs: P163-MEMBER-GONE slot=%u node=%u inc=%llu eq=%d "
+		     "absent_ms=%llu -- the heartbeat has stood for %d checks and "
+		     "corosync dropped this node's host from the membership; "
+		     "declaring the death now instead of after %d checks",
+		     slot, node, (unsigned long long)nt->last_epoch,
+		     nt->equal_samples, (unsigned long long)absent_ms,
+		     nt->equal_samples, ctx->dead_threshold);
+	return true;
+}
+
+/*
+ * THE DEAD WINDOW, SHORTENED BY THE NODE ITSELF (disklock.h, at
+ * MXFS_DISKLOCK_ASK_SAMPLES).  Asks a live slot's node whether it lost the
+ * LUN while this node's own beat lands, and reports whether it answered that
+ * its authority is closed.  The confirm read after this still cancels on a
+ * stamp that moved, and the fence still has to prove exclusion.
+ */
+static bool hb_peer_closed(struct mxfs_disklock_ctx *ctx, uint32_t slot,
+			   const struct mxfs_disklock_node_track *nt,
+			   mxfs_node_id_t node)
+{
+	const struct mxfs_disklock_ident_obs *o = &ctx->ident_obs[slot];
+	uint64_t now = mxfs_pal_time_ms(), own = ctx->hb_last_ok_ms;
+
+	if (ctx->attach_drbd || !nt->live ||
+	    nt->equal_samples < MXFS_DISKLOCK_CLOSED_SAMPLES ||
+	    nt->equal_samples >= ctx->dead_threshold)
+		return false;
+	if (!o->valid || o->conflict || o->node != node ||
+	    !inc_eq(o->epoch, nt->last_epoch))
+		return false;
+	if (nt->equal_samples >= MXFS_DISKLOCK_ASK_SAMPLES && own &&
+	    now - own <= 2 * MXFS_DISKLOCK_HB_INTERVAL_MS) {
+		if (nt->equal_samples == MXFS_DISKLOCK_ASK_SAMPLES)
+			mxfs_pal_log(MXFS_LOG_WARN,
+				     "mxfs: P-SAN-ISOLATED-ASK slot=%u node=%u inc=%llu "
+				     "eq=%d own_beat_age_ms=%llu -- the heartbeat has "
+				     "stood for %d checks while this node's own land; "
+				     "asking that node over corosync whether it lost "
+				     "the LUN",
+				     slot, node, (unsigned long long)nt->last_epoch,
+				     nt->equal_samples, (unsigned long long)(now - own),
+				     nt->equal_samples);
+		mxfs_pal_quorum_close_ask(node, (uint64_t)nt->last_epoch);
+	}
+	if (mxfs_pal_quorum_peer_closed(node, (uint64_t)nt->last_epoch) != 1)
+		return false;
+	mxfs_pal_log(MXFS_LOG_WARN,
+		     "mxfs: P-SAN-ISOLATED-PEER-CLOSED slot=%u node=%u inc=%llu "
+		     "eq=%d -- that node announced over corosync that its "
+		     "authority over the LUN is closed; declaring the death now "
+		     "instead of after %d checks",
+		     slot, node, (unsigned long long)nt->last_epoch,
+		     nt->equal_samples, ctx->dead_threshold);
+	return true;
+}
+
 bool mxfs_disklock_victim_identity(struct mxfs_disklock_ctx *ctx, int slot,
 				   mxfs_node_id_t node, mxfs_epoch_t epoch,
 				   uint8_t host_uuid[16], uint8_t boot_uuid[16])
@@ -2370,12 +2469,12 @@ static void disklock_hb_watchdog_fn(void *arg)
 				last_log_ms = now;
 				mxfs_pal_log(MXFS_LOG_ERR,
 				    "mxfs: P278-HB-STALL node %u slot %d stage=%s "
-				    "age_ms=%llu hb_pid=%d -- heartbeat cycle stuck; "
-				    "dumping heartbeat task stack",
+				    "age_ms=%llu hb_pid=%d -- heartbeat cycle stuck",
 				    ctx->local_node, ctx->local_slot,
 				    hb_stage_name(stage),
 				    (unsigned long long)(now - entered), ctx->hb_pid);
-				mxfs_pal_dump_task_stack(ctx->hb_pid);
+				if (mxfs_pal_stall_stacks())
+					mxfs_pal_dump_task_stack(ctx->hb_pid);
 			}
 		} else {
 			stall_entered = 0;
@@ -2634,6 +2733,53 @@ bool mxfs_authority_take_withdraw(struct mxfs_authority *auth, int *reason_out)
 	if (reason_out)
 		*reason_out = auth->close_reason;
 	return true;
+}
+
+void mxfs_authority_isolation_check(struct mxfs_authority *auth)
+{
+	uint64_t now, last_ok;
+	int npaths = 0, off;
+	char why[192];
+
+	if (!auth || auth->lu_ident_len <= 0 ||
+	    !mxfs_pal_quorum_close_asked(auth->node, auth->incarnation))
+		return;
+	if (mxfs_atomic32_get(&auth->state) == MXFS_AUTH_ADMITTED) {
+		now = mxfs_pal_time_ms();
+		last_ok = auth->last_ok_ms;
+		if (!last_ok || now - last_ok < MXFS_DISKLOCK_ISOLATED_MS ||
+		    now - auth->iso_checked_ms < MXFS_DISKLOCK_ISO_SCAN_MS)
+			return;
+		auth->iso_checked_ms = now;
+		off = mxfs_pal_lu_paths_offline(auth->lu_ident, auth->lu_ident_len,
+						&npaths);
+		if (off != 1) {
+			if (!auth->iso_refused_logged) {
+				auth->iso_refused_logged = true;
+				mxfs_pal_log(MXFS_LOG_WARN,
+					     "mxfs: P-SAN-ISOLATED-NOT node %u slot %d "
+					     "incarnation=%llu beat_age_ms=%llu paths=%d -- "
+					     "a peer asks whether this node lost the LUN; "
+					     "its beat is late, but %s, so it keeps its "
+					     "authority and its lease decides",
+					     auth->node, auth->slot,
+					     (unsigned long long)auth->incarnation,
+					     (unsigned long long)(now - last_ok), npaths,
+					     npaths ? "a path to the LUN is still online" :
+						      "no SCSI disk carries the LUN's identity");
+			}
+			return;
+		}
+		snprintf(why, sizeof(why),
+			 "every path to the LUN is offline (%d), this node's beat has "
+			 "not landed for %llu ms, and a peer whose beats land asked",
+			 npaths, (unsigned long long)(now - last_ok));
+		mxfs_authority_close(auth, MXFS_SELF_FENCE_SAN_ISOLATED, why);
+	}
+	if (mxfs_atomic32_get(&auth->state) != MXFS_AUTH_CLOSED)
+		return;
+	/* closed, for this reason or any other: say so while asked */
+	mxfs_pal_quorum_closed_post(auth->node, auth->incarnation);
 }
 
 /*
@@ -4063,7 +4209,9 @@ check_dead:
 					    "death on the ordinary path",
 					    slot, victim_node, (unsigned long long)victim_epoch,
 					    nt->equal_samples);
-				if (nt->equal_samples >= ctx->dead_threshold &&
+				if ((nt->equal_samples >= ctx->dead_threshold ||
+				     hb_member_gone(ctx, slot, nt, victim_node) ||
+				     hb_peer_closed(ctx, slot, nt, victim_node)) &&
 				    (nt->live || nt->last_timestamp != 0)) {
 					/*
 					 * the monitor read above (mxfs_pal_bdev_read) is
@@ -4384,7 +4532,9 @@ struct mxfs_disklock_ctx *mxfs_disklock_create(mxfs_bdev_t *dev,
 	memset(ctx->slot_node_id, 0, sizeof(ctx->slot_node_id));
 	ctx->expire_cb = NULL;
 	ctx->expire_cb_data = NULL;
-	ctx->dead_threshold = MXFS_DISKLOCK_DEAD_THRESHOLD;
+	/* a SCSI attachment until mxfs_disklock_set_attach_drbd says otherwise */
+	ctx->dead_threshold = MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD;
+	ctx->dead_window_set = false;
 	ctx->evict_cb = NULL;
 	ctx->evict_cb_data = NULL;
 	ctx->evict_head_seq = 0;
@@ -4512,11 +4662,24 @@ void mxfs_disklock_set_transport_tcp(struct mxfs_disklock_ctx *ctx, bool tcp)
  * death window is set; the mount sets both before its claim, so before any
  * beat renews.
  */
+/*
+ * The dead window an attachment gets when none was configured (disklock.h, at
+ * MXFS_DISKLOCK_DEAD_THRESHOLD): on DRBD or shared the lease is derived from
+ * the window, on SCSI the window from the lease.
+ */
+static uint32_t disklock_default_dead_threshold(const struct mxfs_disklock_ctx *ctx)
+{
+	return ctx->attach_drbd ? MXFS_DISKLOCK_DEAD_THRESHOLD :
+				  MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD;
+}
+
 static void disklock_auth_lease_update(struct mxfs_disklock_ctx *ctx)
 {
 	uint64_t window = (uint64_t)ctx->dead_threshold * MXFS_DISKLOCK_HB_INTERVAL_MS;
 	uint32_t lease = MXFS_DISKLOCK_AUTH_LEASE_MS;
 
+	/* the shared attachment too: a peer replays its slice only once its
+	 * node is stopped (kinds 28, 29), so its last term is zero as well */
 	if (ctx->attach_drbd &&
 	    window > (uint64_t)MXFS_DISKLOCK_AUTH_LEASE_MS + MXFS_DISKLOCK_HB_INTERVAL_MS)
 		lease = (uint32_t)(window - MXFS_DISKLOCK_HB_INTERVAL_MS);
@@ -4524,8 +4687,8 @@ static void disklock_auth_lease_update(struct mxfs_disklock_ctx *ctx)
 		mxfs_pal_log(MXFS_LOG_INFO,
 			     "disklock: authority lease %u ms%s", lease,
 			     lease == MXFS_DISKLOCK_AUTH_LEASE_MS ? "" :
-			     " (DRBD attachment: the death window less one "
-			     "heartbeat interval)");
+			     " (DRBD or shared attachment: the death window less "
+			     "one heartbeat interval)");
 	ctx->auth->lease_ms = lease;
 }
 
@@ -4542,7 +4705,52 @@ void mxfs_disklock_set_attach_drbd(struct mxfs_disklock_ctx *ctx, bool drbd)
 		return;
 	}
 	ctx->attach_drbd = drbd;
+	if (!ctx->dead_window_set)
+		ctx->dead_threshold = disklock_default_dead_threshold(ctx);
 	disklock_auth_lease_update(ctx);
+}
+
+/* The descriptor records no basis: the certifier admitted each kind under
+ * exactly one, so a consumer reads it back from the kind. */
+static uint8_t cert_basis_of_kind(uint16_t kind)
+{
+	return kind == MXFS_FENCE_KIND_SHARED_MANUAL_V1 ||
+	       kind == MXFS_FENCE_KIND_SHARED_VCENTER_V1 ||
+	       kind == MXFS_FENCE_KIND_SHARED_QUORUM_V1 ?
+	       MXFS_RETIRE_BASIS_NODE_STOPPED : MXFS_RETIRE_BASIS_TARGET_OP;
+}
+
+void mxfs_disklock_set_fence_method(struct mxfs_disklock_ctx *ctx, int method)
+{
+	if (ctx)
+		ctx->fence_method = method;
+}
+
+bool mxfs_disklock_cert_method_ok(const struct mxfs_disklock_ctx *ctx,
+				  uint16_t kind, uint8_t basis, const char **why)
+{
+	const char *reason = NULL;
+	int want = -1;
+
+	if (kind == MXFS_FENCE_KIND_SHARED_MANUAL_V1)
+		want = MXFS_DISKLOCK_FENCE_MANUAL;
+	else if (kind == MXFS_FENCE_KIND_SHARED_VCENTER_V1)
+		want = MXFS_DISKLOCK_FENCE_VCENTER;
+	else if (kind == MXFS_FENCE_KIND_SHARED_QUORUM_V1)
+		want = MXFS_DISKLOCK_FENCE_QUORUM;
+	if (want < 0) {
+		if (basis == MXFS_RETIRE_BASIS_NODE_STOPPED)
+			reason = "a node-stopped basis on a kind that is not the "
+				 "shared attachment's";
+	} else if (basis != MXFS_RETIRE_BASIS_NODE_STOPPED) {
+		reason = "a shared-attachment kind without its node-stopped basis";
+	} else if (!ctx || ctx->fence_method != want) {
+		reason = "a shared-attachment kind minted under another fence "
+			 "method than this mount's";
+	}
+	if (why)
+		*why = reason;
+	return reason == NULL;
 }
 
 void mxfs_disklock_set_slot_limit(struct mxfs_disklock_ctx *ctx, uint32_t limit)
@@ -4604,6 +4812,13 @@ int mxfs_disklock_start_heartbeat(struct mxfs_disklock_ctx *ctx)
 			     "disklock: heartbeat already running");
 		return 0;
 	}
+
+	/* the identity the isolation check finds this LUN's paths by: before the
+	 * first beat, so it is in place before anyone can ask */
+	if (!ctx->attach_drbd && !ctx->auth->lu_ident_len)
+		ctx->auth->lu_ident_len =
+			mxfs_pal_bdev_lu_ident(ctx->dev, ctx->auth->lu_ident,
+					       MXFS_DISKLOCK_LU_IDENT_MAX);
 
 	ctx->running = true;
 
@@ -9583,8 +9798,32 @@ int mxfs_disklock_recovery_fence_certify(struct mxfs_disklock_ctx *ctx, int slot
 	 * whose own accepted commands the target may still be finishing, and no
 	 * value of a parameter observes that.  So this gate now has no exception
 	 * at all, which is the only shape in which it is a choke point.
+	 *
+	 * 0.90.128: ONE OTHER BASIS, AND ONLY WHERE THE OWNER CHOSE IT.  The
+	 * shared attachment (docs/shared-disk-attachment.md) is a disk with no
+	 * SCSI arbitration at all, so no target operation exists to run on it.
+	 * Its certificates (kinds 28, 29) rest on the victim's NODE being stopped
+	 * instead — powered off as vCenter reports it, rebooted into a later
+	 * boot, or confirmed stopped by an operator — and say so in their own
+	 * basis value.  They pass here only on a mount whose fence= named the
+	 * method that produced them (mxfs_disklock_cert_method_ok): no SCSI
+	 * mount, and no mount of the other method, can certify one.
 	 */
-	if (retire_basis != MXFS_RETIRE_BASIS_TARGET_OP) {
+	if (retire_basis == MXFS_RETIRE_BASIS_NODE_STOPPED) {
+		const char *mwhy = NULL;
+
+		if (!mxfs_disklock_cert_method_ok(ctx, fence_kind, retire_basis,
+						  &mwhy)) {
+			mxfs_pal_log(MXFS_LOG_ERR,
+			    "disklock: P236-FENCE-NODE-STOPPED-REFUSED slot=%d victim=%u "
+			    "kind=%s obs=%s fence_method=%d -- REFUSING TO CERTIFY: %s",
+			    slot, auth->victim_node,
+			    mxfs_fence_kind_name((enum mxfs_fence_kind)fence_kind),
+			    mxfs_retire_observation_name(retire_obs),
+			    ctx->fence_method, mwhy ? mwhy : "?");
+			return -EPERM;
+		}
+	} else if (retire_basis != MXFS_RETIRE_BASIS_TARGET_OP) {
 		mxfs_pal_log(MXFS_LOG_ERR,
 		    "disklock: P236-FENCE-NO-RETIREMENT slot=%d victim=%u kind=%s "
 		    "basis=%s obs=%s -- REFUSING TO CERTIFY.  Exclusion was proved, "
@@ -10597,6 +10836,9 @@ int mxfs_disklock_recovery_claim(struct mxfs_disklock_ctx *ctx, int slot,
 	if (!mxfs_recov_cert_proves_exclusion(d,
 		    ctx->have_fs_identity ? ctx->fs_gen : 0,
 		    slot, victim, victim_epoch, &why) ||
+		!mxfs_disklock_cert_method_ok(ctx, d->fence_kind,
+					      cert_basis_of_kind(d->fence_kind),
+					      &why) ||
 		(!recov_mptr_of(cur) &&
 		 (why = "certified but carries no valid fence-time manifest pointer"))) {
 		mxfs_pal_log_repeating(MXFS_LOG_WARN,
@@ -10962,6 +11204,9 @@ int mxfs_disklock_recovery_replay_authorized(struct mxfs_disklock_ctx *ctx,
 	if (!mxfs_recov_cert_proves_exclusion(d,
 		    ctx->have_fs_identity ? ctx->fs_gen : 0,
 		    slot, victim, victim_epoch, &why) ||
+		!mxfs_disklock_cert_method_ok(ctx, d->fence_kind,
+					      cert_basis_of_kind(d->fence_kind),
+					      &why) ||
 		(!recov_mptr_of(cur) &&
 		 (why = "certified but carries no valid fence-time manifest pointer"))) {
 		mxfs_pal_log(MXFS_LOG_ERR,
@@ -11142,8 +11387,8 @@ void mxfs_disklock_monitor_node(struct mxfs_disklock_ctx *ctx,
 /*
  * v0.5.0: override the dead-declaration window.  The monitor declares a
  * peer dead after dead_threshold consecutive stale heartbeat samples at
- * MXFS_DISKLOCK_HB_INTERVAL_MS each; the compile-time default (62 s) is
- * production-conservative.  Test rigs need fast fail-detect — crash
+ * MXFS_DISKLOCK_HB_INTERVAL_MS each; 0 restores the attachment's default
+ * (34 s on SCSI, 62 s on DRBD or shared).  Test rigs need fast fail-detect — crash
  * recovery (lock purge + foreign-slice replay) is gated on this.
  * Floor of 2 samples: one stale sample is sampling-phase noise, not death.
  */
@@ -11155,13 +11400,15 @@ void mxfs_disklock_set_dead_timeout_ms(struct mxfs_disklock_ctx *ctx,
 	if (!ctx)
 		return;
 	if (timeout_ms == 0) {
-		ctx->dead_threshold = MXFS_DISKLOCK_DEAD_THRESHOLD;
+		ctx->dead_window_set = false;
+		ctx->dead_threshold = disklock_default_dead_threshold(ctx);
 		disklock_auth_lease_update(ctx);
 		return;
 	}
 	samples = timeout_ms / MXFS_DISKLOCK_HB_INTERVAL_MS;
 	if (samples < 2)
 		samples = 2;
+	ctx->dead_window_set = true;
 	ctx->dead_threshold = samples;
 	mxfs_pal_log(MXFS_LOG_INFO,
 	    "disklock: dead-declaration window set to %u ms (%u samples)",
@@ -11281,6 +11528,47 @@ bool mxfs_disklock_slot_holds_incarnation(struct mxfs_disklock_ctx *ctx,
 		!hb_gen_foreign(ctx, hb));
 	mxfs_pal_free(hb);
 	return held;
+}
+
+/*
+ * Is `slot`'s heartbeat record still being written?  Two FRESH priority reads
+ * `gap_ms` apart, compared whole: 1 = it changed between them (a writer is
+ * still beating there), 0 = unchanged, <0 = a read failed (the caller treats
+ * that as changed: silence is never concluded from an unread sector).  The
+ * heartbeat monitor stops tracking a slot once its death is declared, so a
+ * caller that must know the victim stopped writing reads the disk itself.
+ */
+int mxfs_disklock_slot_hb_changing(struct mxfs_disklock_ctx *ctx, int slot,
+				   uint32_t gap_ms)
+{
+	struct mxfs_disklock_heartbeat *a, *b;
+	uint64_t off;
+	int rc;
+
+	if (!ctx || !ctx->dev || slot < 0 || slot >= MXFS_DISKLOCK_HB_SLOTS)
+		return -EINVAL;
+	a = mxfs_pal_alloc(sizeof(*a));
+	b = mxfs_pal_alloc(sizeof(*b));
+	if (!a || !b) {
+		mxfs_pal_free(a);
+		mxfs_pal_free(b);
+		return -ENOMEM;
+	}
+	off = ctx->base_offset + (uint64_t)slot * MXFS_DISKLOCK_RECORD_SIZE;
+	mxfs_pal_mutex_lock(ctx->lock);
+	rc = mxfs_pal_bdev_read_prio(ctx->dev, off, a, sizeof(*a));
+	mxfs_pal_mutex_unlock(ctx->lock);
+	if (rc >= 0) {
+		mxfs_pal_sleep_ms(gap_ms);
+		mxfs_pal_mutex_lock(ctx->lock);
+		rc = mxfs_pal_bdev_read_prio(ctx->dev, off, b, sizeof(*b));
+		mxfs_pal_mutex_unlock(ctx->lock);
+	}
+	if (rc >= 0)
+		rc = memcmp(a, b, sizeof(*a)) ? 1 : 0;
+	mxfs_pal_free(a);
+	mxfs_pal_free(b);
+	return rc;
 }
 
 /*

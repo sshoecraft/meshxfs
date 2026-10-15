@@ -28,7 +28,7 @@ Same shape one session later: `grep -q "PENDING"` against `showstat.sh`'s own
 totals line (`0 PENDING`) can never go false, because the word is present
 whether or not anything is pending — a 420s wait loop burned its whole budget
 on a board that had finished minutes earlier
-([[trap-grep-q-PENDING-matches-the-summary-lines-own-zero-pending]]). Rule:
+(`trap-grep-q-PENDING-matches-the-summary-lines-own-zero-pending`). Rule:
 anchor extraction to the owning line (`sed -n 's/.*REJOIN mount_rc=\([0-9]*\).*/\1/p'`),
 or parse a number and compare it, never match on the presence of a word that
 the "all clear" message also contains.

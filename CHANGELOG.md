@@ -1,3 +1,1090 @@
+## 2026-10-13 — 0.90.129 — Shared Proxmox Storage, Faster DRBD Setup, Stronger Recovery
+
+What changed for someone upgrading from 0.90.124, the last published release
+(0.90.125 to 0.90.128 were never published; their work ships here):
+
+- **Proxmox VE 9 hosts share one SAN LUN as their datastore, over
+  multipath** (0.90.129).  Three hosts on one iSCSI LUN over two storage
+  networks run guests on it: live migration with the guest writing
+  throughout, HA restart after a host loses power, snapshots and rollback,
+  backup and restore, disk moves, templates and linked clones, containers,
+  and a storage path lost and returned under load.  Verified on both
+  Proxmox VE 9 kernels: 6.17, which the 9.1 installer ships, and 7.0, which
+  `proxmox-default-kernel` now installs.
+- **A DRBD pair is set up in minutes, on whole disks** (0.90.129).  The
+  guide gives DRBD the disk that will hold the VMs and skips DRBD's first
+  copy of it, which took about an hour per 250 GB: the device is formatted
+  next, so nothing on it before is ever read.  Two physical Proxmox VE 9
+  hosts set up this way wrote at the replication link's full speed and
+  passed live migration, datastore operations, a full disk, a host reset
+  under load, a host leaving and returning cleanly, and the 31-row suite,
+  on both kernels, and through a rolling kernel upgrade with one host on
+  each.
+- **A DRBD pair whose first host dies recovers, given a QDevice** (0.90.128):
+  `authority=quorum` in `/etc/mxfs/drbd-fence.conf` lets corosync's vote
+  decide which host carries on.
+- **Fixes to locking and recovery** (0.90.128, 0.90.129): a host that dies no
+  longer stalls the others for a minute; a new lock tenure is no longer
+  taken for one already released; a waiter registration that fails no
+  longer leaves its mark on the lock; a fenced host reports being fenced,
+  not corruption; a new file on a reused inode number no longer crashes its
+  creator; a shared `mmap` write no longer hangs on RHEL 9; a full DRBD
+  filesystem refuses a write at once instead of hanging the writer.
+- **Installing on a small host no longer runs it out of memory** (0.90.129):
+  building the module checks which kernel features the host has, and those
+  checks now run a few at a time instead of all at once.  A check that cannot
+  finish stops the build and names itself, where before it could quietly
+  build the module wrong.
+- **vSphere shared disks** (0.90.128): MeshXFS mounts a multi-writer VMDK
+  or a physical-mode RDM with `fence=vcenter`, `fence=manual` or
+  `fence=quorum`.  Not yet a released configuration.
+- **The module's messages say MeshXFS** (0.90.128), not XFS, and the
+  product is named MeshXFS throughout (0.90.125).
+- **Proxmox VM disk settings are documented** (0.90.129): the README and the
+  DRBD guide say to give VM disks on MeshXFS `cache=none`, the Proxmox
+  default and the mode every Proxmox validation ran with.
+
+**Released configurations and what 0.90.129 was validated on:**
+
+| configuration | nodes | storage | validated on 0.90.129 |
+|---|---|---|---|
+| `2/net/mesh/drbd` | 2 | each host's own disk, DRBD 8.4 dual-primary | `tests/drbd_release_verify.sh`; two physical Proxmox VE 9 hosts set up from `docs/drbd-setup.md` (the 31-row suite, live migration, datastore operations, a full disk, a host reset and a clean departure, kernels 6.17 and 7.0) |
+| `2/net/mesh/direct` | 2 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+| `4/net/mesh/direct` | 4 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+| `2/disk/caw/direct` | 2 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `4/disk/caw/direct` | 4 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `8/disk/caw/direct` | 8 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `16/disk/caw/direct` | 16 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `2/disk/caw/mpath` | 2 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+| `4/disk/caw/mpath` | 4 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+| `8/disk/caw/mpath` | 8 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+| `16/disk/caw/mpath` | 16 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig; three Proxmox VE 9 hosts on two paths (path faults, live migration, datastore operations, HA power loss), kernels 6.17 and 7.0 |
+
+The test rig is Ubuntu 24.04 (kernel 6.8.0-101-generic).  "Installed
+packages" means the release packages on two nodes of each released
+platform: Proxmox VE 9 (kernels 6.17 and 7.0), RHEL 9.8, Ubuntu 24.04
+and Debian 13.  Every host in a cluster needs the same MeshXFS
+version; hosts on different kernels are fine.
+
+### 0.90.129 in detail
+
+- **Three Proxmox VE 9 hosts on one LUN over two storage networks.**
+  `scripts/san_net.sh` now configures hosts that use ifupdown (Proxmox): each
+  gets a fixed address on each storage network (.2-.9, below the DHCP pool,
+  so no lease can rewrite the host's DNS), and `san_net.sh link <host> a|b
+  down` unplugs one path from the hypervisor side for path-loss tests.
+- **`scripts/pve_caw_lun.sh` presents a LUN over several portals**
+  (`PORTALS="192.168.121.1 192.168.123.1"`): it installs `multipath-tools`,
+  writes the verified multipath and iSCSI settings
+  (`tools/mpath_settings.sh`), logs in on every portal and reports the
+  multipath map (`dev=/dev/disk/by-id/dm-uuid-mpath-<wwid>`), which must have
+  every path active.  A path whose disk appeared before `multipath-tools` was
+  installed has no udev record of the properties its rules add, and
+  multipathd blacklisted it ("udev property missing"), so the map came up with
+  one path of two; the script now replays udev on every path of the target
+  first.  Each session is bound to the NIC that reaches its portal (an iSCSI
+  iface `mxfs-<nic>`), as the rig's LUN pool does: unbound, a session whose
+  cable was pulled reconnects through the default route, since clyde answers
+  for the portal address on that route too, and a path taken away is not
+  lost.  An unbound session left by an earlier login is replaced only while
+  no MXFS volume is mounted.
+- **The multipath fault rows (`tests/mpath/`) run on Proxmox hosts.**
+  `tools/mxfs_sshpass.sh` reaches a node that no resolver knows by the
+  address `tools/mxfs_lab.sh` resolves for it (its lab-file `addr` line), so
+  the rows can name the fixed-address hosts pve9-5/6/7 like rig nodes; the
+  path probe is handed the row's device instead of assuming `/mnt/shared`;
+  `MXFS_MOUNT_OPTS` gives remounts and rejoins the options the cluster was
+  mounted with (`transport=caw` on Proxmox, whose packaged module forms TCP
+  clusters); and a rebooted node with no rig module (`/root/mxfs.ko.prep`)
+  loads the installed one.  Every row's start gate mounts clyde's `/src` on
+  a node that lacks it: a Proxmox host has no `fstab` entry for it, so one
+  restarted between rows came back without the harness and the next row
+  aborted at its first capture.
+- **Verified on pve9-5/6/7** (Proxmox VE 9, three nested hosts, the 30 GiB
+  LUN `pve-caw-02` on two paths, build srcversion `62EB76441F21B8AE0B6BD45`):
+  - live migration (`tests/pve_live_migrate.sh`, 6 laps round the three
+    hosts, the guest writing throughout): 12-14 s a move, downtime 65-97 ms,
+    every file verified after every move, no bad kernel line;
+  - path loss and return under load on all three (`tests/mpath/path_failover.sh`,
+    F1/F2, victim pve9-7): longest stall 15.3-15.8 s against a 30 s bound, no
+    operation failed, no double grant, 6,143 acknowledged files read back
+    from another host, reservations intact.
+- **`scripts/pve_tree_install.sh` replaces a loaded module.**  `modprobe`
+  leaves an already loaded `mxfs` in place, so a reinstall kept running the
+  old build; an unmounted host now unloads it first, and a mounted one
+  refuses.
+- **A fenced node no longer reports corruption.**  A node cut off from the
+  storage that took a reservation conflict (`xfs/xfs_mxfs_ilock.c`), or whose
+  lock authority was withdrawn, shut its filesystem down as "Corruption of
+  in-memory data"; it now shuts down with its own reason, "Fenced by the
+  cluster (this node lost its access to the shared storage)".  The two
+  livelock shutdowns keep the corruption reason.
+- **A new lock tenure is no longer mistaken for one already released.**  A
+  node that released a file's write lock records that tenure as cleanly
+  released, and refuses to take the same tenure back as write authority.  It
+  matched the tenure on the file and its grant number only; but when the
+  file's lock record is re-created in another slot it gets a new identity
+  (its lineage) and its grant numbers start again at 1, so the first write
+  lock on it looked like the released one.  The node then wrote with no
+  authority behind its changes, and a recovery replaying its log would have
+  discarded them.  It now matches lineage too, as recovery and the cluster
+  lock already did (`xfs/xfs_mxfs_authority.c`).  Seen 45 times on
+  pve9-5/6/7 during the whole-fabric and path-flap rows, every one with a
+  different lineage.  With the fix, all six multipath fault rows pass on
+  the three hosts (whole fabric, flap, a death on one path, a fenced node's
+  return, every path lost, a peer withdrawn) and no host refused once.
+  The fenced node in `path_fenced_return` now logs "Fenced by the cluster",
+  and no row's evidence says "Corruption of in-memory data".
+- **A directory warning no longer cries clobber where nothing is
+  rewritten.**  "P36-EVICT-LOCKED ... stale base KEPT -- clobber risk" fired
+  dozens of times per host in the fault rows.  With the lock holder's and
+  the reporter's stacks captured, every one that had a stack came from a
+  lookup refreshing its cached directory blocks while a sibling thread of
+  the same process was reading the same block; a lookup rewrites nothing.
+  The evict now knows whether its caller is about to read-modify-write the
+  block (`mxfs_dir_evict_data_blocks(ip, rmw_base)`): only a create, rename
+  or remove warns and reports the holder, and the others log a debug line.
+  Through all seven fault rows and the Proxmox tests the modify path fired
+  0 times on all three hosts, and an offline `chk_mxfs` afterwards was clean.
+- **Slow-holder notices are one line.**  The drain-flush, heartbeat, ILOCK
+  hold, AIL push and buffer-holder notices dumped a task stack whenever a
+  holder was slow, and a busy host's log filled with Call Traces that read
+  as hangs (`tests/pve_storage_ops.sh` failed twice on them: lock handoffs
+  that flushed 0.5-3.4 GB of another host's cached pages in 316-574 ms).
+  The stack is now printed only with the module option
+  `mxfs.stall_stacks=1`, and a slow drain flush reports its total time.  On
+  pve9 these notices fired 46 times through the full pass with no Call
+  Trace.
+- **Replaying a dead host's log no longer reports a clobber.**  A check
+  left from an earlier lost-update investigation (P88 in
+  `pal/linux/xfs_buf.c`) dumped a stack, "writing pristine bnobt while NOT
+  holding AG DLM", when the survivor replaying the dead host's log wrote a
+  free-space btree block of an AG the dead host held.  The replay writes
+  under the dead host's retained hold, not its own, and an offline
+  `chk_mxfs` after the HA test found every AG's free-space btrees
+  consistent.  The check now leaves the replaying task alone.  On the
+  rebuilt module twelve replays ran on pve9 (ten in the fence rows, two
+  after the HA power cut) with no P88 line and no Call Trace on any host,
+  and `chk_mxfs` afterwards was clean.
+- **A write completion no longer leaves a lock-release claim behind.**  When
+  a peer asks for a file back while a write completion on this host is
+  committing to it, the release is handed to a worker and the completion
+  keeps a claim on the file until it is done, so its later completions are
+  not held up behind that release.  The claim was ended only at the
+  completion's own next unlock of the file, which never comes: it had
+  already unlocked inside its commit.  Another task's unlock dropped the
+  record of the claim, and the claim then stood until its worker thread
+  exited.  A lookup that met the file's number after it was freed and
+  reused (as a directory, by the peer) waited out 201 reload rounds and
+  failed with "Stale file handle" (nested pair A: 326 s, `find` failing in
+  3 of 4 walks).  Now another task's unlock keeps the record
+  (`xfs/xfs_mxfs_ilock.c`), and the completion ends its claim before the
+  last write completion it is processing finishes (`pal/linux/xfs_aops.c`),
+  as writeback does at the end of its pass.  `tests/pve_append_release_race.sh`
+  (two hosts, one appending 1 KiB with `O_DSYNC`, the other reading,
+  a 3 s hold on the first completion so the release is deferred for certain)
+  reports where each claim ended; on pve9-5/6, five of five runs: 80 claims,
+  all ended by the completion that took them, none outstanding, no strand.
+- **A host that dies no longer holds the others up for a minute.**  A
+  survivor declared a peer dead only after its heartbeat had stood for 31
+  checks (62 s), and everything that needed a lock the dead host held waited
+  all of it: on pve9-5/6/7 a create in the shared root directory took 67.8 s
+  after a host was powered off, while the fence, the replay of its log and
+  the purge of its locks then took 0.7 s.  The window is there so that a host
+  whose storage writes stall, in a path failover or the SCSI error ladder, is
+  not fenced while alive; such a host stays in the corosync membership, which
+  runs over the hosts' own network.  So a slot whose heartbeat has stood for
+  5 checks, on a host corosync has dropped from the membership this host
+  holds the vote in (for at least 2 s), is now declared dead at once
+  (`P163-MEMBER-GONE`, `dlm/disklock.c`); the confirm read still cancels on
+  a heartbeat that moved, and the fence still has to prove the exclusion on
+  the storage.  The membership comes from `mxfs_quorumd`, which matches a
+  slot's host by the machine id in its heartbeat; the kernel now remembers
+  the host each corosync node announced after it leaves the membership
+  (`/proc/fs/mxfs/quorum` prints it as `last_host=`).  A host without the
+  helper, and a DRBD pair (whose heartbeat stops with the link corosync uses),
+  keep the whole window.  `make install` now enables `mxfs-quorumd.service`
+  as the packages do; it starts only where corosync is configured.
+- **On a SAN fenced with SCSI reservations the dead window is 34 s, not
+  62 s.**  A host that loses every path to the LUN stays a corosync member, so
+  the membership cannot shorten its window: on pve9-5/6/7 survivors' creates
+  in a shared directory waited 69.5-71.3 s in the rows that cut a host's paths.
+  Two facts make most of that window unnecessary.  A host whose heartbeat has
+  not landed for 30 s has already closed its own right to write (the authority
+  lease), and a window of 17 checks (34 s) cannot end before that lease does.
+  The rest of the 62 s was kept for writes the host had already queued that
+  might still reach the disk late.  On a SCSI attachment nothing of a dead
+  host's is replayed or purged without a fence certificate, and every SCSI
+  certificate ends with the survivors' Write Exclusive reservation held and
+  the victim's key gone, so the target refuses such a write however late it
+  arrives.  DRBD and shared attachments keep 62 s, because their lease is
+  derived from the window.  `dead_timeout_ms` still overrides both.
+- **`scripts/pve_cloud_guest.sh` rebuilds a source guest whose disk is gone.**
+  It used to accept any VM 9000 it had made, but formatting the volume again
+  removes the disk and leaves the config, and the VM tests then failed at
+  their first clone.
+- **A new file on a reused inode number no longer crashes its creator.**
+  `qemu-img`, creating a cloud-init disk during the HA test, hit a NULL
+  dereference on its first `ftruncate`, died holding its locks and hung all
+  three hosts.  The number had belonged to a fragmented (btree-format) image
+  that this host had reloaded from disk without reading its extent map, and
+  another host then deleted.  Reusing the number for a create rebuilt the
+  in-memory fork, but left its "extent map not yet read" flag set, and the
+  first extent lookup walked a btree root that no longer existed.
+  `xfs_idestroy_fork` now clears that flag with the root it frees.
+  `xfs_iread_extents` now refuses, with `P-IREAD-NOROOT` naming the
+  rebuild that left it, any walk of a fork that has no root, rather than
+  dereferencing it.  `tests/pve_recycled_btree_inode.sh` reproduces it on two
+  hosts in a second.
+- **An inode image rejected while it is read from disk no longer leaves a
+  broken file behind, or shuts the filesystem down.**  Both places that
+  rebuild an inode from disk on a host that already has it cached (reusing a
+  cached inode for a number a peer reallocated, and reloading an inode a peer
+  changed) destroyed the in-memory extent map before reading the new one, and
+  when the disk image was rejected they kept going with a map that had no
+  root.  Reusing a cached inode handed that inode out: after the image was
+  good again, every one of 40 files still read EIO on that host.  Reloading
+  left the file EIO for as long as the host held its lock, because the
+  reload had already copied the rejected image's fields and the next reload
+  judged it current; a truncate found the broken map after its size change
+  was logged, and the cancelled transaction shut the filesystem down.  Now:
+  - a rejected reuse fails the lookup and puts the cached inode back, with
+    its old generation, to be read again; the lookup retries it a bounded
+    number of times (about 440 ms) instead of 400 × 20 ms, because an idle
+    cached inode is no longer mistaken for one being torn down;
+  - a rejected reload marks the inode: the extent map is refused with
+    `P-IREAD-REJECTED` (EFSCORRUPTED, what XFS returns for a corrupt inode)
+    until a reload rebuilds it, the next reload rebuilds it however current
+    it looks (`P-RELOAD-REJECTED-REBUILD`), the inode stays marked for
+    reload, and a host holding the inode's lock retries the disk at its next
+    access;
+  - truncate and the truncate that frees an unlinked inode read the extent
+    map before their transaction changes anything, so a refusal fails the
+    call instead of shutting the filesystem down.
+  Test-only controls: `dbg_iformat_reject_ino` rejects one inode's data-fork
+  image as it is read, extent-list or btree (`~0`: every reused one),
+  `dbg_reclaim_hold` keeps evicted inodes cached so reuse can happen at all,
+  and `recycle_adopt_fail_refuse=0` restores the old reuse behaviour for a
+  before/after run.  `tests/pve_recycle_adopt_reject.sh` and
+  `tests/pve_reload_reject.sh` reproduce both on two Proxmox hosts; the
+  reload test passes read, write and truncate on an extent-list file
+  (`EXTENTS=4`) and a btree file (`EXTENTS=64`) alike.
+- **A lock swap (SCSI COMPARE AND WRITE) that landed is never reported as
+  one that did not.**  COMPARE AND WRITE cannot safely run twice: a copy sent
+  again after its first answer was lost compares the old image against its
+  own new write and miscompares.  Two non-default paths could do exactly
+  that, or report a landed swap as a miscompare by another route:
+  - the `caw_path=0` submission (`scsi_execute_cmd`) asked the SCSI midlayer
+    for one retry.  It was also the path recorded as returning success for
+    swaps that did not persist under stress, which is why `caw_path=1`
+    became the default long ago.  The knob and that path are gone; every
+    swap goes out once, through the request built the way SG_IO builds one,
+    and the only reissue left is for a UNIT ATTENTION, which a target
+    returns instead of executing the command;
+  - `caw_verify=1`, whose read-back after a successful swap returned
+    "miscompare" whenever it did not see the image, now returns an I/O
+    error (outcome unknown).  The read cannot tell a target that did not
+    persist from a peer's swap that landed on top of ours, and callers acted
+    on "miscompare" as "my write did not happen": the lock release ended as
+    not committed, the reservation ledger wrote a second entry for one key,
+    and a slot claim was redone as a reclaim.  An I/O error goes through the
+    lock manager's answer-lost handling instead, which re-reads the slot,
+    recognises its own write, and tells the release when it cannot.
+- **`scripts/pve_mxfs_san_disk.sh off` unmounts a shut-down filesystem.**  It
+  asked `mountpoint`, which fails with EIO on a shut-down mount, reported
+  "not mounted", and the install that followed then refused that host.
+- **`scripts/pve_mxfs_san_disk.sh join` adds the Proxmox storage back** when
+  `off` removed it, so a module update (off, install, join) leaves the
+  datastore as it found it.
+- **Verified on pve9-5/6/7 after the last source change** (host build
+  srcversion `DF704B968F3DAE756FC53D6`): all seven multipath fault rows
+  (`path_all_lost` survivors stall 40.8 s, down from 70 s with the 34 s
+  window; a powered-off host is declared dead in 15-19 s), live migration
+  (six laps, 65-105 ms downtime), storage operations (snapshots, rollbacks,
+  resize, backup and restore, disk move, template and linked clone,
+  container), HA power-cut failover (survivors' fsynced writes 15.6-15.9 s,
+  a bystander guest's longest 419 ms) and the reused-inode reproducer (six
+  laps, 192 reused numbers) pass, every file verified; the kernel logs of
+  every boot since the run start hold no Call Trace, warning, BUG or hung
+  task; offline `chk_mxfs` clean before and after the HA run.
+- **`tests/pve_live_migrate.sh` and `tests/pve_ha_failover.sh` count a host
+  Call Trace as a bad kernel line**, as `tests/pve_storage_ops.sh` already
+  did; the HA test had passed with that P88 stack in a survivor's log.
+- **`scripts/pve_full_suite.sh` runs the whole Proxmox suite** in one go: the
+  multipath fault rows (now with `path_answer_lost`), live migration, storage
+  operations, HA failover, the reused-inode reproducer both ways, then every
+  host's kernel log since its start mark; one verdict per stage, `SUITE: PASS`
+  only when all pass.
+- **`tests/pve_ha_failover.sh` mounts the multipath map when the dead host
+  returns**, as `tests/pve_storage_ops.sh` already did.  Its default was one
+  path's by-path link, which a multipathed host cannot mount ("Can't lookup
+  blockdev"); the run passed only when the caller exported the map.
+- **`tests/pve_recycled_btree_inode.sh` refuses to start on a host that does
+  not hold the mount.**  On one that did not, it wrote into the bare
+  mountpoint directory and reported a failure that measured nothing.
+- **A host that dies no longer stalls the survivors for a minute.**
+  Survivors' operations that need a lock the dead host held waited out the
+  whole 62 s heartbeat dead window, although the fence, replay and purge
+  after it take under a second; on Proxmox a host loss froze creates in
+  shared directories (new disks, backups, uploads) for over a minute.  A
+  stale host is now declared dead after 5 checks once corosync has dropped
+  it from this host's membership for 2 s (`mxfs-quorumd`, now enabled by the
+  installer), and on a SCSI attachment the window is 34 s instead of 62.
+  Verified on pve9-5/6/7 (`tests/pve_ha_failover.sh`, host build
+  `E540B4E74E8509D949D90F5`): survivors' first fsynced write after the
+  power-off took 15.2 and 15.4 s, against 67.6 and 67.8 s before; a frozen
+  host's survivors stall 18.7-19.0 s (`path_fenced_return`,
+  `path_fence_degraded`), against 69.5-69.7 s.  The HA test's
+  `WRITE_BUDGET` is now 32 s, twice what was measured.  A host that loses
+  every path while staying in the corosync membership still stalls
+  survivors about 39 s (`path_all_lost`, 38.7 s against 71.3 s before).
+- **A host that loses every SAN path says so, and its peers fence it at
+  once.**  Such a host is alive and stays in the corosync membership, so the
+  member-gone signal cannot fire, and its heartbeats do not fail: they stand
+  queued in multipath, which fails I/O only `no_path_retry` intervals after
+  the last path goes, about 35 s after the loss, by when the host's own 30 s
+  lease has already closed.  Its peers waited out the whole 34 s window.
+  Now a peer whose own heartbeats land and that sees a live host's stamp
+  stand for 3 checks asks that host, over the corosync group `mxfs-quorumd`
+  already uses for boot announcements, whether it lost the LUN.  The asked
+  host closes its authority (reason `SAN_ISOLATED`) only if every SCSI path
+  to the LUN is offline (the iSCSI session past its replacement timeout, or a
+  Fibre Channel port past `dev_loss_tmo`) and its own heartbeat has not landed
+  for 6 s, then answers that it has closed.  Peers that hear that answer for
+  that exact node and mount incarnation declare the death at once; the fence
+  still has to prove the host cut off at the target.  When the target goes
+  away for every host, nobody's heartbeats land and nobody asks, so a target
+  restart does not unmount the cluster.  The cost is that a host that loses
+  both paths for 15-30 s while its peers keep theirs now stops, where it
+  used to ride that out (`dlm/disklock.c`, `dlm/v5_mount.c`,
+  `pal/linux/kern.c`, `pal/linux/drbd.c`, `tools/mxfs_quorumd.py`; design in
+  `docs/mpath-verification.md`).  Measured on pve9-5/6/7 (`path_all_lost`,
+  host build `907EADEDC9BF20638E7203E`, victim pve9-7): the peers asked
+  6.2 s after the loss, the victim refused while its sessions were still
+  recovering (`P-SAN-ISOLATED-NOT paths=2`), closed 15.9 s after the loss
+  once both sessions went offline, both peers heard it 16.4 s after, and the
+  fence was certified the same second; the victim's keys left the target
+  in 18 s against 35 s, and the survivors' longest stall was 22.7 s against
+  38.7 s, with no failed operation and every file read back.  The full
+  Proxmox suite then passed on the same build (`scripts/pve_full_suite.sh`,
+  run `v130c`): all eight multipath fault rows, with no live host fenced in
+  the whole-fabric, flap and degraded-mount rows (longest stalls 16.1, 6.9
+  and 15.2 s) and `path_all_lost` again 18 s to the fence and 23.3 s of
+  stall; live migration; storage operations; HA power-cut failover
+  (survivors' fsynced writes 16.3-16.6 s, a bystander guest's longest
+  401 ms); the reused-inode reproducer both ways (24 and 32 numbers reused);
+  and no bad line in any host's kernel log.
+- **A guest frozen by a test gets its clock back when it is thawed**
+  (`clock_resync` in `tests/lib/rig.sh`, called by `path_fenced_return` and
+  `fenced_takeover_stop`).  `virsh suspend` stops the guest's clock with it:
+  pve9-7 came back 22.1 s behind, chrony slewed it back at its 83 ms a
+  second, and two rows later `path_answer_lost` aborted because the clock
+  moved 5.4 s while its load ran.
+- **`scripts/platform_build.sh` fails when it cannot write its platform
+  marker.**  A build run as root on a node over NFS left `tools/.built_for`
+  owned by root; the next build, on clyde, could not overwrite it, still
+  printed `PLATFORM_BUILD_OK`, and `run.sh` went on naming the previous
+  platform and telling the operator to rebuild on the wrong node.  The marker
+  is now replaced, and read back.
+- **A mount stops waiting on a peer that died during it once that death is
+  recorded** (`dlm/dlm_caw.c`, `dlm/v5_mount.c`).  The root lookup of a mount
+  whose peer died after the admission barrier waited out its whole 120 s lock
+  budget on the dead peer's grant, although the death was declared, fenced
+  and recorded about 60 s earlier; only then did the lookup give up and the
+  mount re-run its barrier to replay the peer.  The lock wait now asks, every
+  poll, whether the waiting task is that lookup (its inode lock, or the AG
+  lock its untrusted inode read takes, which is the one measured waiting on
+  the dead peer) and such a death is recorded,
+  and ends at once (P-MPHASE-WAIT-GIVEUP), through the same cancel as a
+  bounded acquire's deadline, so a grant seen on the last read still wins.
+  Verified on 2/disk/caw/direct (`tests/mount_postbarrier_peer_death_2n.sh`,
+  two laps, tree `6F6ECD7B34FA67020CF5925`): the mount returns 44 s after the
+  peer is destroyed instead of 142 s, every file reads back identical, the
+  volume checks clean.
+- **`run.sh` mounts clyde's `/src` on the first node before asking whether
+  the tree's tools start there.**  A rig node has no fstab entry for it, so
+  one restarted by a lap came back without the tree, and the probe reported
+  tools built for the wrong platform and named a rebuild that could not help.
+- **A node alone at its last close clears the open mark it published while
+  shared, verified.**  The fix (0.89.75, `mxfs_dlm_open_last_close`) was held
+  open on a suspicion that it caused a peer's held descriptor to read empty
+  bytes; that was the eviction-ring fault fixed in 0.89.76.  Re-measured on
+  build `6F6ECD7B34FA67020CF5925` with the unchanged
+  `tests/open_mark_lone_close.sh`: the lone arm (mark published, the other
+  host leaves, the file is closed alone, the host rejoins and unlinks) freed
+  the inode with no deferral, the shared control likewise, and the openalone
+  arm (opened alone, the peer joins and unlinks) deferred the free while the
+  descriptor was open, which read back the original bytes.  Record removed:
+  D-OPEN-LAST-CLOSE-SKIPS-THE-CLEAR-WHEN-ALONE-LEAVING-A-DURABLE-OPEN-MARK.
+- **A host mounted alone no longer carries stale extent-map blocks into the
+  shared view when a second host joins** (`xfs/xfs_mxfs_dir_bmbt.c`,
+  `xfs/xfs_mxfs_join.c`).  The join freezes the lone mount and drops every
+  clean cached block, but a freeze stops writers, not readers or inode
+  reclaim, and until the view flips the host is alone and skipped the
+  tenure-end eviction of an inode's cached extent-tree blocks.  An inode read
+  and then reclaimed in that window left its blocks cached with no lock behind
+  them; once shared, the other host could free and reuse those addresses and
+  this host would serve the old extent map.  Measured with a test injector
+  that reclaims one inode inside the window (`dbg_join_window_reclaim_ino`,
+  `tests/bmbt_join_window_repro.sh` mode 5): the old behaviour carried 2
+  orphan blocks into the shared view in 2 of 2 runs; the eviction now runs on
+  a lone mount while it is frozen for a join (`P-JOIN-WINDOW-TENURE-EVICT`),
+  and 3 of 3 runs left none.  The harness had never exercised the window
+  before: it launched its loop from a path the nodes do not have, and
+  `drop_caches` frees the blocks in the same pass that reclaims the inode.
+  Record removed: D-BMBT-TENURE-END-EVICT-SKIP-WINDOW-BETWEEN-JOIN-DROP-AND-FLIP.
+- **A failed waiter registration no longer leaves its bit on the lock**
+  (`dlm/dlm_caw.c`).  A node that has to wait for a lock writes itself into
+  the lock's waiter set with a COMPARE AND WRITE.  When that swap ended in a
+  hard error (an I/O error on every retry, a failed verify read, shutdown),
+  the node gave up without removing the bit, though the swap may have landed.
+  The bit then had no request behind it: other hosts held their readers back
+  for it, and a releasing host could hand it the lock, which the node would
+  hold without knowing.  That exit now removes the bit as every other give-up
+  does, reads the lock back and logs what it found
+  (`P-CAW-REGISTER-HARD-EXIT`).  Measured with a new test injector,
+  `caw_inject_register_hard_n` (the swap lands, then every attempt reports an
+  I/O error), and `tests/caw_register_hard_waiter.sh` on two hosts: with the
+  removal disabled the bit stayed on disk at 3 of 3 failed registrations;
+  with it, 0 of 9 over three runs, no waiter bit left afterwards and no
+  kernel fault.  Record removed:
+  D-CAW-REGISTER-WAITER-HARD-ERROR-LEAVES-ORPHAN-WAITER-BIT.
+- **A full DRBD filesystem refuses a write promptly, verified.**  On the
+  physical pair, set up on whole Samsung 850 EVOs by `docs/drbd-setup.md`, the
+  full-size overcommit test (`tests/pve_delalloc_overcommit.sh`: 3 GiB left,
+  both hosts writing 2 GiB at once) passed 4 of 4 runs: one host's write
+  finished in 21 s with its fsync clean, the other's was refused at `write()`
+  once the space was gone, and no task was reported hung.  The hang it was
+  opened for came from the full-disk retry flushing every dirty page on the
+  host, which 0.90.105 skips on a cluster mount; it had not been re-run at
+  full size since.  Record removed:
+  D-DRBD-ENOSPC-WRITER-WAITS-FOR-WHOLE-DIRTY-SET-HUNG-TASK.
+- **`docs/drbd-setup.md` sets a pair up on whole disks, without the hour-long
+  first copy.**  Section 2 gives DRBD the disk that will hold the VMs, named by
+  its `/dev/disk/by-id` path, cleared with `wipefs`; the two need not match in
+  size.  Section 4 skips DRBD's initial copy with `--clear-bitmap
+  new-current-uuid`: the device is formatted next, every write from then on
+  goes to both disks, and what the disks held before stays only in space the
+  new filesystem never reads before writing it.  On pve1/pve2 the setup took
+  about four minutes from `wipefs` to both hosts mounted; a 50 GiB write then
+  ran at 105 MB/s, the gigabit link's rate.  The guide also says what to
+  answer when `create-md` finds old bytes where it keeps its records.
+
+## 2026-10-12 — 0.90.128 — VMware: MeshXFS on vSphere, its shared disks and how to fence on them
+
+- **`fence=quorum`: a shared VMDK or RDM fenced with no credential to
+  anything** (`docs/quorum-takeover.md`).  `fence=vcenter` needs a vCenter
+  account able to power VMs off on every node; this needs only corosync.
+  corosync's votequorum with a QDevice (qnetd on a third machine, `ffsplit`)
+  decides which node may carry on.  The module holds a 3 s quorum lease that
+  `mxfs_quorumd` renews four times a second while the node is quorate; a node
+  that loses the vote, or whose helper stops, while a `fence=quorum`
+  filesystem is mounted ends its own boot with `emergency_restart()`, from the
+  report, the lease timer, or the first write after the deadline (the
+  admission gate and the emulated swap's lock both check it).  A survivor
+  takes over (proof kind 30) when it has held the vote without the peer for
+  45 s and the peer's heartbeat, read twice from the disk, no longer changes,
+  or when the peer, back in the membership, announces a later boot over
+  corosync's CPG.  A passed deadline counts as the victim's boot being over:
+  the owner's decision.  The mount refuses a node that is not quorate with its
+  peer, whose QDevice does not vote, or whose corosync has `two_node`.  New:
+  `tools/mxfs_quorumd.py` (`/usr/sbin/mxfs_quorumd`) and
+  `mxfs-quorumd.service` in both packages, and `scripts/quorum_setup.sh`, which
+  makes two lab nodes a corosync cluster with QDevice certificates signed by a
+  qnetd host.  Verified on vstest1/vstest2 (ESXi 8.0.2, AlmaLinux 9.8, the
+  cross-host physical RDM, qnetd on serv), build srcversion
+  `CC54CCA6EE7210901855D5B` and the builds before it on the same code paths:
+  - split (`tests/vsphere_shared_fence.sh split`: vstest2 cut from vstest1,
+    both reaching qnetd): vstest2 ended its boot 13 s after the cut
+    (`P-QUORUM-LOST-RESET why=inquorate-report`, caught on netconsole),
+    vstest1 kept its boot and recovered in 79-80 s from vstest2's announced
+    new boot; 501, 250 acknowledged files read back;
+  - power-off of vstest2 and panic of vstest1 (the lower node id): taken over
+    on the 45 s bound in 74-78 s and 64 s; 309, 293 and 286 files read back;
+  - `mxfs_quorumd` stopped with SIGSTOP on a mounted node: the lease timer
+    ended its boot 3,090 ms after the last renewal;
+  - whole-cluster restart: vstest1 mounted alone in 142 s, each old boot
+    ended by its announced new one, nothing powered off; 210 + 211 files read
+    back;
+  - a loser whose reset was suppressed (`dbg_quorum_no_reset`) and kept
+    writing its heartbeat for 9.5 min was never taken over: the lease layer's
+    death issued no certificate (`P238-FENCE-NOINC`); powered off, it was
+    taken over in 73 s;
+  - `chk_mxfs` clean after the runs.
+  - `D_inq`, how long a cut-off node is still told it is quorate, measured
+    rather than read off corosync's timeouts (`vsphere_shared_fence.sh dinq`,
+    12 cycles each at a random phase): cut from its peer 6.1-6.7 s, cut from
+    its peer and qnetd 8.7-11.6 s; the worst plus the lease is 14.9 s of the
+    45 s takeover bound;
+  - a vSphere suspend of a writing guest past the takeover (`freeze guest`):
+    taken over in 77 s, no write of the guest's landed after it.
+  **Not safe on a hypervisor host that freezes** (queued as
+  `D-QUORUM-FROZEN-HOST-LATE-WRITES-AFTER-TAKEOVER`, critical): with the
+  nested ESXi host paused under the victim (`freeze host`), 4 of its blocks
+  changed on disk after the survivor had taken it over. Three were commands
+  ESXi held at the pause and issued on unpause. One was a new write: the
+  guest's clock did not advance across the pause, so its lease still read
+  valid, and its corosync merged back without reporting it inquorate, so it
+  never reset.  A storage barrier is needed under the vote.
+- **A DRBD pair whose participant 0 dies now recovers, given a QDevice.**  With
+  `agent=self` and `authority=quorum` in `/etc/mxfs/drbd-fence.conf`, the
+  fence-peer handler decides a lost link by corosync's vote rather than the
+  fixed tie-break.  A node quorate without its peer wins, whichever
+  participant it is; an inquorate node loses.  A peer that stays in the
+  quorate membership for 45 s (only the replication link failed) is left to
+  the tie-break.  Under the vote neither node mounts alone on DRBD's possibly
+  stale Outdated record at boot, and either may hold an exclusion it won.
+  `mxfs_quorumd vote` is the handler's fast query.  `D-DRBD-PAIR-NO-EXTERNAL-QUORUM-SO-P1-CANNOT-TAKE-OVER-WHEN-P0-DIES`
+  removed, FIXED AND VERIFIED on test1/test2 (srcversion
+  `E700D68F0D0A547CA304160`, qnetd on serv, `scripts/drbd_rig.sh quorum-test`):
+  - death of participant 0 (twice): participant 1 won the vote 2.4 s after the
+    link loss and recovered in 13 s;
+  - a split with both reaching qnetd: participant 1 won, participant 0 lost
+    and restarted, recovery 13 s;
+  - a DRBD-only link loss: the tie-break decided after 45.3 s, recovery 56 s;
+  - qnetd unreachable from both, then participant 0 destroyed: participant 1
+    lost, excluded nothing and restarted, with no takeover.
+  Every fsynced file was intact, every rejoin read identically, and each cold
+  `chk_mxfs` was clean.  `scripts/quorum_setup.sh` now installs with apt as
+  well as dnf and reaches nodes by address, and the rig copies the authority
+  over stdin (its program is past the 128 KiB argument limit).
+- `scripts/vsphere_lun.sh` gives the nested ESXi hosts (esxhost1, esxhost2) one
+  shared LUN from clyde's SCST target and formats it as a VMFS6 datastore, the
+  storage under the multi-writer VMDK, clustered VMDK and physical RDM tests.
+  It is outside the rig's LUN pool, which formats whatever it lends and drives
+  Linux initiators over ssh.  Only the hosts' initiators are in the LUN's
+  group, and each host reaches it through a static target: a SendTargets
+  entry would log the host in to every pool target on the portal.
+- `scripts/vsphere_node_setup.sh` makes the vSphere guests (vstest1 on
+  esxhost1, vstest2 on esxhost2) MeshXFS test nodes: EPEL, DKMS and the
+  running kernel's headers, clyde's `/src`, firewalld with only MeshXFS's
+  ports open, and the RPM built from this tree on the node so DKMS compiles
+  the module for the guest's kernel.  Its install bound comes from the
+  measured DKMS compile, about 7.5 minutes per kernel on a 4-vCPU nested
+  guest: the package builds for every kernel that has headers, and dnf
+  brings a newer kernel's headers with DKMS, so a fresh node compiles twice.
+- **The module no longer presents itself as XFS.**  Every message from the
+  filesystem code it forked from XFS printed as `XFS (sdb): ...` — a MeshXFS
+  self-fence read `XFS (sdb): ... Shutting down filesystem`, which anyone,
+  the XFS maintainers included, takes for the kernel's own XFS failing.  The
+  message sink (`xfs_message.c`, the printk index in `xfs_message.h`, and
+  `mxfs_xfs_probe`) now prints `mxfs (sdb):` / `mxfs:`, matching the module's
+  other messages; six messages that hard-coded an `XFS:` of their own lost
+  it, as did the dir/attr hash self-test and the build-time layout assertions.
+  The names the module shows to `ps`, ftrace and the shrinker list carry its
+  name too: `mxfsaild/<dev>` (was `xfsaild/<dev>`, which sat beside the real
+  kernel XFS's `xfsaild/sda2` on the same host), the `mxfs-buf`, `-conv`,
+  `-reclaim`, `-blockgc`, `-inodegc`, `-sync`, `-log`, `-cil`, `-zone-gc`
+  workqueues, `mxfsalloc`, `mxfsdiscard`, `mxfs_mru_cache`, the
+  `mxfs-buf`, `mxfs-qm` and `mxfs-inodegc` shrinkers, the `mxfs_iwalk` pool
+  and the `mxfs_healthmon` anon inode.  Text that names the XFS on-disk format
+  MeshXFS carries ("XFS data at offset", "the XFS sb lacks ...") is unchanged:
+  it is accurate.  Harness matchers that parsed the old prefix accept both,
+  since saved logs keep it.  Verified on two AlmaLinux 9.8 nodes: after the
+  new module loaded, every per-device line reads `mxfs (sdb):` and the AIL
+  thread is `mxfsaild/sdb`.
+- `scripts/vsphere_host_setup.sh <host>` gives a rebuilt nested ESXi host
+  what esxhost1 has: the lab network (`vSwitch1`, MTU 9000, uplink `vmnic1`
+  active, port group `192.168.120.0:24` allowing promiscuous mode, forged
+  transmits and MAC changes), vMotion on `vmk0`, the `vms` and `iso` NFS
+  datastores from clyde read-write, software iSCSI and the shared
+  `mxfs-shared` LUN, and maintenance mode off.  The rebuilt esxhost2 had none
+  of it; an uplink added to an existing switch lands as standby, and vMotion
+  refused to move a guest onto a port group with other security policies.
+  The host VM itself needs a second NIC on the vmnet Workstation bridges to
+  `br0` (`esx1`, `esx2`), or it has no `vmnic1`.
+- `scripts/platform_build.sh <first node>` builds the module and the node-side
+  tools in the shared tree on the first node of the platform about to be
+  tested, and records it in `tools/.built_for`.  Built on clyde, the tools need
+  glibc 2.38 and do not start on AlmaLinux 9 (2.34); the first vSphere board
+  found that at `mkfs_mxfs`, after the LUN was bound and the module loaded.
+  `run.sh` now asks the first node whether `mkfs_mxfs`, `chk_mxfs` and `fsx`
+  start before it preps anything, and refuses with the marker and the rebuild
+  command when they do not.  It asks rather than compares distributions: the
+  PVE pair runs clyde's build because its glibc is newer.
+- **vstest2 hung mid-board with mxfs mounted (soft lockups on CPU0
+  kworker/0:1 and CPU2 bash, unreachable)** — DISPROVED: not an MXFS defect.
+  A memory snapshot of the hung guest, converted per vCPU with `vmss2core` and
+  read against the exact kernel's debug symbols, has all four vCPUs in the
+  timer interrupt catching up an 87 s clock jump (`tick_limited_update_jiffies64`
+  at 6696.7 s against hrtimer 6784.4 s), interrupting execve, exit_mmap, clone
+  and user space; no word of any interrupted stack falls in the module range
+  mxfs.ko is loaded in.  The jump is the nested hypervisor not running the
+  guest.  Evidence: `/home/steve/src/vstest2-hang-evidence/`.
+- **A write to a shared mmap of a MeshXFS file never finished on RHEL 9**
+  (D-RHEL9-LARGE-FOLIO-MMAP-WRITE-FAULT-LIVELOCK) — FIXED AND VERIFIED.  The
+  task spun in the page fault for ever: `page_mkwrite` answered
+  `VM_FAULT_NOPAGE` about 11,500 times a second and the write never landed,
+  so `mmap_coherency` exhausted its budget on both vSphere guests every run.
+  The compat shim behind `mapping_set_folio_min_order` turned large folios on
+  for every kernel older than 6.12, but RHEL 9's `iomap_page_mkwrite` (5.14
+  base) is still page-based: it checks a tail page's `->mapping`, which never
+  matches the file's, and refuses.  The shim now enables large folios only
+  from 5.18, where upstream XFS turned them on; RHEL 9's own XFS leaves them
+  off.  6.1, 6.8, 6.12 and later are unchanged.  Verified on vstest1/vstest2
+  with the rebuilt module: `mmap_coherency` PASS 5/5 checks in 6 s of 30 s,
+  and a 256-page mmap write completed and read back with every
+  `iomap_page_mkwrite` returning `VM_FAULT_LOCKED`.
+- `scripts/vsphere_node_setup.sh` builds the mosquitto 2.0.18 clients,
+  statically linked, into `/usr/local/bin` on each node.  EL9's 2.0.22
+  `mosquitto_pub` waits out a full extra second after its DISCONNECT before it
+  exits: 1014-1017 ms per QoS-1 publish on the vSphere guests, against
+  10-14 ms for 2.0.18 built on the same guest, and the suite publishes on
+  every barrier, value and signal.  The tarball is pinned by sha256.
+- `tools/mxfs_rig_tag.sh` tells the vSphere guests from the qemu rig.  Both
+  reach the same SCST LUN, so the array's vendor string matched and vSphere
+  would have been scored against the qemu rig's native-XFS yardstick; the
+  path is ten times slower (native XFS on a vSphere guest: 108-113 MiB/s
+  sequential write, 217-233 MiB/s read, against ~2 GB/s on the qemu rig).  A
+  node whose DMI vendor is VMware now resolves to `<vendor>-vmware`
+  (`scst-fio-vmware`); QEMU guests and physical hosts keep the bare vendor,
+  so every recorded tag stays valid.  The vSphere yardstick is
+  `.xfs_fio_baseline.disk-caw-direct.scst-fio-vmware.json`.
+- The vSphere board (`tests/evidence/vsphere/criteria.json`) budgets
+  `fio_perf` at 364 s: native XFS on a vSphere guest moving the 2-node row's
+  aggregate volume took 182 s, doubled.  The qemu rig's 120 s assumes its
+  ~2 GB/s LUN and is unchanged; native XFS needs 112 s on vSphere for half
+  that volume.
+- `tests/guest_thread_sampler.sh` runs on a test node and records every mxfs
+  thread's state and kernel stack, every task in D state and the shared
+  device's in-flight counts every 2 s, so a stall that prints nothing still
+  leaves its blocked stacks.  `tests/bpf/mkwrite_truncate_check.bt` shows what
+  `page_mkwrite`'s truncate check sees.
+- **The vSphere self-fences were the guests' clocks stopping on esxhost1,
+  not lost heartbeats.**  vstest1 fenced vstest2 because vstest2's last
+  landed beat carried its 04:54:00 stamp and nothing newer; vstest2 then
+  logged nothing for four minutes, then soft lockups on CPU0 and RCU stalls,
+  and its own timers fired again only at 05:03.  The same second its userspace
+  VMware Tools daemon stopped heartbeating to the hypervisor: the whole guest
+  stalled, not the module.  vstest2's `vmware.log` holds 14 such freezes in
+  3.5 hours, each 4 min 32 s, idle or loaded.  A memory image taken during one
+  shows the guest's clock itself stopped — the timekeeper and every CPU's last
+  tick frozen at one instant, wakeup queues empty — while vCenter shows the VM
+  scheduled (ready 100-250 ms per 20 s, co-stop 0).  Swapping the guests
+  between hosts moved the freezes with esxhost1: vstest1 froze within 28
+  minutes of landing there, with the same signature; vstest2 on esxhost2 ran
+  45 minutes clean.  With both guests on esxhost2 the full `2/disk/caw/direct`
+  board ran with no freeze and 30 of 31 rows PASS.  esxhost1's Workstation
+  `.vmx` differs from esxhost2's by `monitor_control.virtual_rdtsc = FALSE`,
+  `monitor_control.halt_aware = TRUE`, `hpet0.present = FALSE` and memory
+  settings; which of them stops the nested guests' clock is not established.
+- **The vSphere self-fences (D-VSPHERE-2NODE-CAW-SELFFENCE-LEASE-EXPIRED-AND-AG-SYNC-WEDGE)**
+  — DISPROVED: not an MXFS defect.  In the first incident both guests froze:
+  vstest1 00:07:51–00:24:10 and vstest2 00:14:10–00:18:43, per their VMX
+  logs.  vstest2 fenced the frozen vstest1 with a certified PREEMPT AND ABORT
+  and replayed its slice.  Each guest then self-fenced the moment it thawed
+  with its lease expired, and the survivor's refusal to fence came from a node
+  already withdrawn.  The "sync wedged in msleep" samples fall inside
+  vstest1's clock stop, where `msleep` cannot return.  The second incident is
+  the freeze already read out of vstest2's memory image.  With both guests on
+  esxhost2 and zero freezes on either: nine consecutive full
+  `2/disk/caw/direct` boards passed every row, nine node kills by
+  `crash_audit` among them (fence, replay, every acknowledged file
+  verified), and the full `2/net/mesh/direct` board passed 31 of 31.
+- The `net-mesh-direct` native-XFS yardstick for the vSphere guests
+  (`.xfs_fio_baseline.net-mesh-direct.scst-fio-vmware.json`): 122 MiB/s
+  sequential write, 234 MiB/s read, 20,713 / 27,983 IOPS random write / read.
+  MeshXFS over the TCP DLM measured 119% / 115% / 95% / 100% of it.
+- **What a physical-mode RDM passes to a vSphere guest**, measured with
+  `scripts/vsphere_shared_disks.sh probe rdm` on vstest1 and vstest2, both on
+  esxhost2, sharing one RDM of an SCST LUN on a paravirtual controller with
+  physical bus sharing (`tests/evidence/vsphere/probe-rdm.txt`):
+  - the LUN's identity, the Block Limits VPD (COMPARE AND WRITE up to 255
+    blocks), COMPARE AND WRITE and FUA writes, all from both guests;
+  - persistent reservations, but not per guest.  Both guests reach the array
+    through esxhost2's one software iSCSI initiator, so they are one I_T
+    nexus to it.  vstest2's REGISTER was refused with a reservation conflict
+    on the key vstest1 had just registered, and both guests read back the
+    one key.
+  A reservation fence cannot separate two nodes on one ESXi host this way.
+- **A node sharing an initiator with a live peer is told so, not told it
+  left a dirty predecessor.**  On that RDM, MeshXFS refused, correctly, to
+  mount the second guest: its REGISTER conflicted on the first guest's key.
+  But the refusal read as a predecessor of this host that departed without
+  retiring its key, and it offered two remedies: let a peer PREEMPT AND ABORT
+  the key (the peer holding it is the live first node), and
+  `single_node_exclusive=1` (an assertion that no other initiator exists,
+  while a cluster member uses this one).  When every key READ KEYS returns
+  is the PR key of another boot's disklock record, the key on this nexus is
+  one of them, so that member registered through this initiator.  The mount
+  now logs `P305-PR-NEXUS-SHARED-WITH-PEER`, which names the member and its
+  slot, says SCSI reservations cannot fence one node of a shared initiator
+  without the other, says to give each node its own initiator, and warns
+  against `single_node_exclusive`.  A truncated key view, or a key no other
+  boot's record names, leaves the P305 diagnosis standing.  The mount is
+  refused either way.  Verified on the same RDM with the rebuilt module: the
+  second guest logged `P305-PR-NEXUS-SHARED-WITH-PEER` naming the first
+  guest's node id and slot 0, then refused.
+- **What a multi-writer VMDK on a controller WITHOUT bus sharing passes to
+  a vSphere guest**: almost nothing (`tests/evidence/vsphere/probe-vmdk.txt`,
+  an eager-zeroed thick 20 GB VMDK on the VMFS6 datastore, attached to both
+  guests with `sharingMultiWriter` on their `noSharing` controller).  That
+  is not the shared-disk cluster layout, which puts the disk on a
+  physical-bus-sharing controller.
+  - Every PERSISTENT RESERVE command, in or out, fails with ILLEGAL REQUEST,
+    invalid opcode.
+  - The Block Limits VPD reports COMPARE AND WRITE as not implemented.
+  - FUA writes work.
+  MeshXFS has no fence on such a disk, so it does not mount it (measured:
+  `TCP mount: SCSI PR register failed (2) -- aborting mount`).
+- **A multi-writer VMDK on a physical-bus-sharing controller, one VM per
+  ESXi host** (the shared-disk layout Windows failover clusters used on
+  vSphere 6.x) answers the same on ESXi 8.0.2: no PERSISTENT RESERVE (invalid
+  opcode), no COMPARE AND WRITE, FUA working
+  (`tests/evidence/vsphere/probe-vmdk-mw-physbus.txt`).  This matches
+  Broadcom KB 395751: since ESXi 7.0 the multi-writer flag no longer carries
+  reservations for clustered VMs.  Its successor, the clustered VMDK (SCSI-3
+  reservations emulated per VM at the vSCSI layer), needs the datastore's
+  Clustered VMDK capability.  vCenter refuses to enable it on the lab's
+  iSCSI-backed VMFS6 datastore (`EnableClusteredVmdkSupport`: NotSupported;
+  `clusteredVmdkSupported=false`, `tools/vsphere_clustered_vmdk.py`), in line
+  with KB 313472, which lists FC and NVMe-oF for vSphere 8.x and not iSCSI.
+- **A physical-mode RDM with one VM per ESXi host carries everything MeshXFS
+  needs** (`tests/evidence/vsphere/probe-rdm-crosshost.txt`, vstest1 on
+  esxhost1, vstest2 on esxhost2):
+  - each guest registers its own key and both read both;
+  - vstest1's PREEMPT AND ABORT removed vstest2's key, and vstest2's next
+    write failed with a reservation conflict while vstest1's landed;
+  - COMPARE AND WRITE and FUA work from both.
+  Full boards on it (`2/disk/caw/pass`, `2/net/mesh/pass`) passed 29 of 30
+  rows each; `crash_audit` did not.
+- **`crash_audit` names the LUN on a device the operator chose.**  Its death
+  oracle identifies the shared LUN by WWID before it kills anything.  A pool
+  run exports the allocation's; a run on `MXFS_DEV` (the RDM) had only
+  `data/rigs.json`, which declares no LUN for the vSphere rig, so the row
+  ABORTed in its first second on both RDM boards.  `run.sh` now reads the
+  WWID from node 1 the way prep does, and the oracle still checks every
+  node's device against it.
+- **On the cross-host RDM, recovery after a hypervisor power-off is refused,
+  as designed.**  With the WWID fixed, `crash_audit` killed vstest2; vstest1
+  declared it dead 60 s later, found its key already absent (`P-PR-FENCE-ABSENT`,
+  kind `KEY_ABSENT_UNPROVEN`), could not witness an LU reset through the
+  paravirtual disk (`not-an-iscsi-lun`), and refused the slice ("no proven
+  exclusion of the dead node").  `tools/vsphere_poweroff_key_probe.sh`
+  measured why: ESXi unregisters a VM's key within 3 s of the VM powering
+  off, and does not restore it at power-on
+  (`tests/evidence/vsphere/probe-rdm-poweroff-key.txt`, PR generation 0x3a ->
+  0x3c, the victim's key gone).  An absent registration does not retire the
+  victim's accepted commands, so the refusal stands.  Queued as
+  D-VSPHERE-RDM-POWEROFF-UNREGISTERS-KEY-RECOVERY-REFUSED.
+- **A vSphere guest's reset on an RDM is not a witness that the array reset
+  the LU.**  A device or bus reset from the guest does reach clyde's SCST as
+  `TM fn LUN_RESET` from the ESXi host's initiator.  But with clyde dropping
+  that host's iSCSI traffic, the guest's device reset still returned rc=0 in
+  5 ms and no TMF reached the target (`tools/vsphere_reset_witness_probe.sh`,
+  `tests/evidence/vsphere/probe-rdm-reset-witness.txt`).  The guest's success
+  is ESXi's answer, so the LU-reset witness rightly stays limited to a guest's
+  own iSCSI session.
+- **Clustered VMDK cannot be stood up in this lab.**
+  `scripts/vsphere_esxhost_shared_disk.sh` attaches one Workstation disk file
+  to both nested ESXi host VMs (own pvscsi controller, `sharedBus = virtual`,
+  `disk.locking = FALSE`), taking each host down through maintenance mode;
+  `scripts/vsphere_cvmdk_datastore.sh` finds the disk on both hosts, makes
+  the VMFS6 datastore `mxfs-cvmdk` and asks for Clustered VMDK support.  Both
+  hosts see one device (`naa.6000c29b9c0b05f5dc119cf7e3bd6eac`, transport
+  `parallel`, ATS unsupported) and mount the datastore; vCenter refuses the
+  capability, NotSupported (`tests/evidence/vsphere/cvmdk-datastore.txt`).
+  VMware supports clustered VMDKs on FC-attached storage and, from 8.0 U3, on
+  NVMe/TCP arrays, with ATS and Write Exclusive All Registrants reservations
+  on the device.  The lab's ESXi is 8.0.2, it has no FC, and Linux's NVMe
+  target has no fused commands (`drivers/nvme/target/core.c`), which ESXi's
+  ATS on NVMe needs.
+- `scripts/vsphere_shared_disks.sh vmdk` takes the disk's sharing and name
+  from `VMDK_DISK_SHARING` and `VMDK_NAME` (defaults: the multi-writer
+  `mxfs-mw/shared`), so it attaches a clustered VMDK (`sharingNone` on a
+  physical-bus-sharing controller) as well.
+- **esxhost1 no longer stops its guests' clocks** after
+  `monitor_control.virtual_rdtsc = "FALSE"` was removed from its Workstation
+  `.vmx` (one line; the host powered off for the edit).  That was the only
+  change: Workstation logs `monitor_control.halt_aware` as an unrecognized
+  monitor control, so that line never had an effect.  With vstest1 on
+  esxhost1 and vstest2 on esxhost2, two consecutive full `2/disk/caw/direct`
+  boards passed every row, with no Tools heartbeat timeout and no soft
+  lockup on either guest over the 36 minutes.  Before the change, esxhost1's
+  guests froze for 4 min 32 s about every 15 minutes, loaded or idle.
+- **A device with no reservations is named as such.**  The block layer's PR
+  operations return only the SCSI status, so a device that answers PERSISTENT
+  RESERVE with INVALID COMMAND OPERATION CODE looked like a unit attention.
+  The register path retried it five times and reported "could not decide
+  whether this nexus holds our key"; the operator saw `mount: permission
+  denied`.  `mxfs_pal_scsi_pr_implemented()` (both PALs) sends one READ KEYS
+  straight to the device and reads its sense.  When a mount's PR
+  registration fails and the device does not implement the opcode, the
+  mount logs `P305-PR-NOT-IMPLEMENTED`: no node using that disk can be
+  fenced, a multi-writer VMDK forwards no reservations, and the nodes need a
+  disk whose reservations reach the array.  It changes no return code: it
+  only logs, and the mount is refused as before.  Verified on the
+  multi-writer VMDK with the rebuilt module.
+- With that module (srcversion D54B1EBB6BA3BE229C7C760), on the in-guest
+  iSCSI LUN: full `2/disk/caw/direct` and `2/net/mesh/direct` boards, each
+  31 of 31 with every row run, and no freeze on either guest.  Again after
+  both ESXi hosts were restarted to attach the Workstation-shared disk, with
+  vstest1 on esxhost1 and vstest2 on esxhost2: a full `2/disk/caw/direct`
+  board, 31 of 31, `crash_audit` among them, in 1076 s, no freeze
+  (`tests/evidence/vsphere/laps-verify-202610130839`).
+- `scripts/vsphere_shared_disks.sh rdm|vmdk|probe|detach` attaches a
+  physical-mode RDM or a multi-writer VMDK to both vSphere guests and
+  measures what reaches the device.  `tools/vsphere_rdm_attach.py`
+  (pyvmomi) attaches an existing RDM mapping file, which govc cannot: it
+  attaches an existing file only as a flat VMDK, and vSphere refuses that for
+  a mapping.  The mapping itself is made on the VMFS datastore through a
+  powered-off shim VM, because govc writes it into the VM's home, which for
+  the test guests is NFS.
+- `crash_audit` can kill a vSphere node.  Its death oracle killed the victim
+  with `virsh destroy` and restarted it with `virsh start`, and the vSphere
+  guests are not libvirt domains: `virsh destroy vstest2` exited 1, vstest2
+  kept running, and the row waited out its whole window for a death that
+  never happened.  `tools/node_power.sh destroy|start <node>` sends a libvirt
+  domain through virsh as before and any other node to vCenter as a forced
+  power-off or a power-on; `tests/tcp_death_replay.sh` and
+  `rig_start_victim` (`tests/lib/rig.sh`) go through it.  Measured on
+  vstest1/vstest2: the forced power-off landed, vstest1 certified the fence
+  (`PREEMPT_ABORT_PROVEN_V1 proves_excl=1`), replayed vstest2's slice 73 s
+  after the kill and verified all 349 acknowledged files, before and after
+  dropping caches.
+- `dlm_lock_correctness` PASSed on vSphere with `caw=fail`.  The COMPARE AND
+  WRITE probe never ran: `tools/caw_verify` is a single-file program outside
+  `tools/Makefile`, `make clean` leaves it, and the copy linked on clyde
+  (glibc 2.38) survived the platform rebuild and exited at the loader on
+  AlmaLinux 9.  The row then graded "one primitive failed" as a partial PASS.
+  `scripts/platform_build.sh` now also builds `caw_verify`, `caw_slotdump`,
+  `recov_forge`, `mxfs_mmapio`, `tests/caw/caw_align_probe` and
+  `tests/fence_inflight/prprobe` on the platform's first node, the five that
+  needed glibc 2.38 among them.  The row FAILs when either helper cannot start,
+  saying so, and on a disk-transport configuration FAILs when either primitive
+  does, since that DLM locks with one and orders with the other.
+- The vSphere guests boot with `log_buf_len=16M`
+  (`scripts/vsphere_node_setup.sh`), as the qemu rig's nodes do.  The default
+  1 MB ring held under a minute of a board's mxfs messages, so `crash_audit`'s
+  mark had rotated out before the row read its window, and the row ABORTed.
+- A row that ends `RESULT: ABORT` is recorded as ABORTED with its own reason.
+  `run.sh` passed the status through as-is, criteria.py refused it (the board
+  has no ABORT), the refusal went to /dev/null, and the leftover marker was
+  finalized as "run died while this test was executing"; the `ABORT:` line
+  saying which capture failed was lost.
+- **A prep no longer formats a device the node is using.**  The `1/xfs`
+  baseline's default device is `/dev/sda`: a lent LUN on the qemu rig, and
+  the boot disk on a vSphere guest.  Run on vstest1 without `MXFS_DEV`, its
+  prep sent a PR CLEAR to the boot disk and ran `mkfs.xfs -f /dev/sda`.  The
+  kernel refused the exclusive open because the disk's partitions were
+  mounted, and that refusal is all that kept the root filesystem (verified
+  afterwards: GPT, every partition signature and the LVM intact).  The mxfs
+  prep's holder check would not have stopped it either, since a boot disk's
+  holders hang off its partitions.  `tests/setup/refuse_inuse_dev.sh` refuses
+  any device with something stacked on it, partitions or volumes beneath it,
+  a mount or swap anywhere in that tree, or an LVM, RAID, LUKS or ZFS
+  signature.  `prep_cluster_xfs` (`run.sh`) and `tests/setup/prep_fs.sh` both
+  run it before they touch the device.  On vstest1 it refuses `/dev/sda` and
+  names all five reasons, and passes the shared LUN.
+- `scripts/board_laps.sh <configuration> <laps>` runs a configuration's whole
+  board back to back, keeps each lap's log and board, and stops at the first
+  lap that leaves a row neither PASS nor FLAKY.  `tools/flake_laps.py` honours
+  `MXFS_CRIT`, so it answers for the vSphere board too.
+- `tools/vsphere_freeze_check.sh <since> <vm>...` lists every freeze a VM's
+  VMX log recorded since a time (Tools heartbeat timeout and recovery, across
+  the rotated `vmware-N.log` files) and exits 1 if any VM froze: a vSphere
+  board is evidence about MeshXFS only if neither guest froze during it.
+- Tools for reading a vSphere guest from outside it:
+  `tools/vsphere_guest_run.sh` runs a command in a guest through VMware Tools
+  when its network is down (shipped base64, because `govc guest.run` appends
+  its output redirect to the end of the command line and returned only the
+  last command's output); `tools/vsphere_freeze_catch.sh` watches a VM's
+  `vmware.log` for a Tools heartbeat timeout and takes a memory snapshot
+  during the freeze; `tools/vmss_cpu_state.py` reads each vCPU's wakeup queue,
+  ksoftirqd, timer base, tick and the timekeeper out of a `vmss2core` image;
+  `tools/vsphere_vm_cpu_samples.sh` prints vCenter's per-20 s run, ready,
+  co-stop, wait and idle for a VM; `tests/guest_timer_probe.sh` shows whether
+  any CPU of a running guest has stopped ticking or taking interrupts.
+- **MeshXFS mounts a vSphere multi-writer VMDK** (and any shared disk that
+  forwards no SCSI arbitration) as `2/net/mesh/shared`: `mount -t mxfs -o
+  fence=vcenter|manual,peers=<this node>/<the other node>`, the network lock
+  manager, COMPARE AND WRITE emulated on the disk by the two-party lock DRBD
+  uses, and a dead node certified by its boot having ended instead of fenced
+  by the storage (`docs/shared-disk-attachment.md`).
+  - `fence=vcenter`: each node tags its own VM in vCenter at mount
+    (`mxfs.host`, `mxfs.boot`); a dead peer is ended when vCenter shows its VM
+    off or tagged by a later boot, and otherwise the survivor powers it off
+    through `/usr/sbin/mxfs_fence_vcenter.py` (pyVmomi,
+    `/etc/mxfs/vcenter.conf`).
+  - `fence=manual`: the survivor posts a request naming the dead incarnation,
+    and recovery waits for `echo 'confirm <id>' > /proc/fs/mxfs/fence_confirm`.
+  - `scripts/vsphere_fence_setup.sh` puts pyVmomi, the helper, the boot-time
+    tag unit and a root-only vCenter configuration on the guests;
+    `tests/vsphere_shared_fence.sh up|work|kill|rejoin|restart|chk` is the
+    attachment's harness; `tests/setup/prep_node.sh` passes `MXFS_MOUNT_OPTS`
+    to its mount.  `data/configurations.json` names the attachment `shared`
+    (verified by its own harness, not a board column).
+  - Verified on vstest1/vstest2 with the lab's 20 GB eager-zeroed
+    multi-writer VMDK on a physical-bus-sharing controller, ESXi 8.0.2,
+    AlmaLinux 9.8 (`tests/evidence/vsphere/`), under both methods: format and
+    mount of both, a two-node workload in which each node reads back every
+    file the other wrote, a forced power-off of a writing node and a kernel
+    panic of one (the VM stays on, so the survivor's fence acts), each
+    followed by the survivor's death certificate, the victim slice's replay,
+    `P163-RECOVERY-COMPLETE`, no shutdown on the survivor and every
+    fsync-acknowledged file reading back (238 to 614 per lap), the victim
+    rejoining, and a clean `chk_mxfs`.
+- **A node whose peer dies holding the swap lock no longer withdraws.**
+  (D-SHARED-MANUAL-SWAP-HOLDER-DEATH-WITHDRAWS-SURVIVOR, fixed and verified,
+  removed from the queue.)  The
+  emulated swap's lock was one flag for the whole device.  A peer that died
+  with it raised held up every swap of the survivor, its heartbeat among them;
+  under `fence=manual` nothing could end that peer, the survivor's heartbeat
+  stopped landing, and its authority lease ran out 62 s later
+  (`P290-AUTH-WITHDRAW`, `Shutting down filesystem`), before the dead peer's
+  death was even declared, so no operator request was ever posted
+  (`tests/evidence/vsphere/manual-hold-1`, the victim armed with
+  `dbg_drbd_cas_hold_ms` and panicked).  Each lock register now names the
+  sector ranges its batch swaps, and a raised flag holds up only the swaps on
+  those sectors: a participant enters at once with every swap the other's
+  flag does not claim, defers, waits and backs off only for the rest, and a
+  waiting participant that takes newly queued swaps writes its register again
+  before it reads the other's.  A register with no ranges, as a node from
+  before them writes, claims every sector, so a mixed pair only waits more.
+  `tests/drbd_cas_lock_model.py --ranges` (and `--old`, `--old0` for a mixed
+  pair) checks per-sector mutual exclusion, no deadlock and participant 1's
+  fairness over every interleaving and every order in which a write lands on
+  DRBD's two disks; `--broken` still fails.  The same lap afterwards, twice
+  under `fence=manual` and once under `fence=vcenter`: the victim died with
+  its flag raised over a page of its ledger (its register read off the disk
+  after the kill: `raised=1 nranges=1 ranges=628728+8`), the survivor never
+  waited on it, posted the request, recovered after the confirmation and read
+  back every acknowledged file.
+- **A whole-cluster restart under `fence=vcenter` powers off no VM that has
+  booted again.**  The recovering node certified a peer's earlier boot ended
+  only from vCenter's tag, and a peer re-tagged only when it mounted: a peer
+  that had booted but not yet mounted was powered off (in the first restart
+  lap the peer escaped only because its own refused mount attempt re-tagged it
+  8 s before phase 3 reached it).  `mxfs-vcenter-tag.service`, installed and
+  enabled by both packages and doing nothing without `/etc/mxfs/vcenter.conf`,
+  runs the helper's new `boot` mode at each boot, which tags the VM with the
+  boot now running under the same refusals as a mount's arm.  The VM's
+  vCenter `runtime.bootTime` was measured and not used: it changed on a guest
+  reboot as well as on a power-on.  Verified: both VMs force-powered off while
+  both wrote, both powered on, vstest1 mounted alone in 144 s (two
+  frozen-table windows and two replays) and certified vstest2's earlier boot
+  ended by its boot-time tag, vstest2 stayed on and then mounted in 10 s, and
+  all 662 acknowledged files of both read back
+  (`tests/evidence/vsphere/restart-vcenter-2`).
+- **A vCenter power-off ends a VM's writes by the time vCenter reports it
+  off**, measured the way `fence=vcenter` relies on it
+  (`tests/vsphere_poweroff_quiesce.sh`): the victim wrote 4 KiB direct I/O
+  from eight threads (about 13,000 blocks/s) to a ring on the shared disk,
+  the survivor read the ring in a loop, powered the victim off through vCenter
+  itself (task 0.64-0.67 s), and over the following 20 s, 31-32 read passes
+  that began after the report saw no further write land, in 3 of 3 attempts;
+  writes did keep landing until the report.
+- **A physical-mode RDM on vSphere recovers from a power-off: it mounts as the
+  `shared` attachment, and the reservation fence is refused on it.**
+  (D-VSPHERE-RDM-POWEROFF-UNREGISTERS-KEY-RECOVERY-REFUSED, fixed and
+  verified, removed from the queue.)  With
+  `fence=scsipr` on the cross-host RDM, ESXi took a powered-off VM's key off
+  the array within 3 s, and the survivor, finding no key to preempt and no LU
+  reset it could witness through the virtual adapter, refused the dead node's
+  slice for good.  A reservation fence that the most common vSphere failure
+  defeats does not make a node fenceable, so a mount now refuses
+  `fence=scsipr` on any disk reached through VMware's virtual SCSI adapters
+  (`vmw_pvscsi`, and `mptspi`, `mptsas` or `BusLogic` in a VMware VM), on
+  either lock transport: `P305-PR-HYPERVISOR-INITIATOR adapter=...`, naming
+  `fence=vcenter` / `fence=manual` and in-guest iSCSI as the ways to mount it
+  (`mxfs_pal_scsi_hypervisor_adapter`, kernel and user PAL).  The
+  `P305-PR-NOT-IMPLEMENTED` advice for a multi-writer VMDK now names the same
+  options instead of the RDM.  Verified on vstest1/vstest2 (esxhost1,
+  esxhost2), ESXi 8.0.2, AlmaLinux 9.8, srcversion 83A9CE180ABDD4E1B48B754:
+  - `tests/vsphere_shared_fence.sh refuse` on the RDM: the `fence=scsipr`
+    mount is refused on TCP and on CAW, the line names `vmw_pvscsi (host1)`,
+    nothing stays mounted (`tests/evidence/vsphere/rdm-83A9-1/refuse_2`).
+  - The same RDM under `fence=vcenter`: format, both mounts, the two-node
+    workload, a power-off of a writing node (74 s to recovery, 257
+    acknowledged files read back), the victim rejoining, clean unmounts and
+    `chk_mxfs`; under `fence=manual`: a panic (request posted 53 s after the
+    kill, recovered at 65 s, 287 files) and a power-off (74 s, 246 files),
+    each victim rejoining, `chk_mxfs` clean
+    (`tests/evidence/vsphere/rdm-83A9-1/laps.txt`).  The build before the
+    refusal passed the same laps under `fence=vcenter` with a power-off (73
+    s, 285 files) and a panic (65 s, 265 files)
+    (`tests/evidence/vsphere/rdm-vcenter-1`).
+  - What `fence=vcenter` rests on holds on the RDM as on the VMDK
+    (`tests/vsphere_poweroff_quiesce.sh`, `SHARED_WWID` the RDM): the victim
+    writing 4 KiB direct I/O from eight threads, the survivor powering it off
+    through vCenter (task 0.65-0.69 s), and 29-32 read passes that began after
+    the report saw no further write land, in 3 of 3 attempts
+    (`tests/evidence/vsphere/quiesce-rdm-83A9`).
+  - In-guest iSCSI is untouched: both guests mounted the pool LUN
+    (`iscsi_tcp`) with `fence=scsipr`, each registered its key
+    (`P-PRKEY-REGISTERED ... keys=2`), no refusal was logged, and a file
+    written on one read back on the other
+    (`tests/evidence/vsphere/rdm-83A9-1/direct-admit`).
+- `tests/vsphere_shared_fence.sh`: `work` and `baseline` print, per node and
+  per directory kind, the latency of creating each file and of writing and
+  fsyncing it (p50/p90/p99/max), so the two-node load's distance from native
+  XFS reads as where it is spent; `refuse` is the check above.  It takes
+  `NODE_REPO`, the tree the guests run from.
+- `scripts/platform_build.sh` with `PLATFORM_TREE=<path>` copies the shared
+  tree's sources to that path on the node and builds there, leaving the
+  shared tree's build alone, so the vSphere guests (EL9) and the DRBD rig
+  (clyde's kernel) can be tested at the same time from one source tree.
+- `tools/node_kmsg_stream.sh start|keep|stop|status` holds a test node's
+  kernel log on clyde as it is written (an ssh `cat /dev/kmsg`, less the
+  per-I/O iomap debug line); `keep` starts a new stream at each new boot.  The
+  rig's guests keep their journal in memory, so a node the fence powered off
+  took its view of the failure with it (D-DRBD-RIG-LINK-LOSS-STONITHS-PEER-MID-VERIFICATION).
+- `scripts/drbd_rig.sh up` loads the module on both nodes before the DRBD
+  link comes up, and the mount step keeps it loaded.  The release
+  verification's first run loaded it at mount with the link up: the link
+  dropped 50 ms before the load's first line, the fence authority powered
+  test2 off, and every later step was refused.
+
+## 2026-10-12 — 0.90.127 — older kernels: Debian 12 (6.1), then Debian 11 and RHEL 8
+
+- **Toward a 6.1 build (Debian 12).**  Each API that 6.1 lacks is found by a
+  `pal/linux/kcompat_probe.sh` probe, never a version number, and has a shim
+  used only where the probe finds it missing; on 6.8, 6.12, 6.17, 7.0 and RHEL
+  9.8 every new probe reads present, so what they compile is unchanged.
+  - Block devices open with `blkdev_get_by_path()` before the `bdev_handle`
+    (6.7) and file (6.9) generations; the super_block's own device is named by
+    a holder that `xfs_free_buftarg()` frees.  A kernel whose super_block and
+    open API are of different generations fails the build instead of passing
+    one kind of pointer as the other.
+  - Idmapped-mount signatures: before 6.3 the mapping is a `user_namespace`.
+  - Inode timestamp accessors, freeze holders, `bdev_freeze`, the shrinker
+    allocation API, `list_lru_*_obj`, `vmf_fs_error`, `filemap_splice_read`,
+    `iomap_dirty_folio`, `->get_inode_acl`, `->shutdown` and the smaller
+    helpers.
+  - **Persistent reservations.**  6.1's `pr_ops` cannot read the reservation
+    table, and every MXFS proof that rests on it — the unregister read-back,
+    READ RESERVATION before trusting a key's absence, READ FULL STATUS — had a
+    pre-6.3 branch that answered "not supported".  Without the block layer's
+    reads, MXFS now sends READ KEYS and READ RESERVATION down the scsi_device
+    itself, and READ FULL STATUS and REPORT CAPABILITIES use the older
+    `scsi_execute()`.  6.1's `pr_ops` return the raw SCSI result where later
+    kernels return an `enum pr_status`; every result is mapped as
+    `sd_scsi_to_pr_err()` maps it, so a path failure is never read as some
+    other answer.  The status byte is read as the result's low byte: 6.1 still
+    declares an obsolete `status_byte()` that shifts it.
+  - **The FUA read and write kept their checks only above 6.3.**  On an older
+    kernel the FUA read — the coherency read of shared metadata — compiled
+    to one bare `scsi_execute()`: no short-transfer check (a command can
+    return GOOD having transferred less than asked, and the partly filled
+    buffer was the answer), no retry, no move to another multipath path, no
+    I/O budget.  The FUA write likewise reported a short transfer as written.
+    Only the command itself now differs by kernel; both report what was not
+    transferred, and the same checks run on every kernel.  The 6.1 build's
+    `defined but not used` warnings for the read loop's helpers are what
+    showed it.
+- `scripts/debian_kbuild_check.sh -i debian:11` installs its build packages.
+  deb.debian.org's `bullseye-security` index still lists packages whose files
+  have moved to archive.debian.org, so every install 404'd; a bullseye
+  container now takes `bullseye-security` from archive.debian.org, as
+  `lab/vms.md` already does for the Debian 11 VMs.  A container whose package
+  install failed is set up again on the next run instead of being reused
+  half-installed.
+- The module's headers compile on kernels that predate three headers:
+  `<linux/filelock.h>` (6.3) and `<linux/mnt_idmapping.h>` (5.12) are
+  included only where they exist, and `pal/pal.h` includes
+  `<linux/moduleparam.h>` itself — newer kernels reached it through other
+  headers, so `dlm/`'s module parameters did not compile on 5.10.
+
 ## 2026-10-12 — 0.90.126 — the project's working memory sheds what its summaries already hold
 
 - `scripts/memory_prune_folded.py` deletes each raw `.ccmemory` note that a
@@ -2533,7 +3620,7 @@ the probe and on both hosts' DRBD receiver threads did not help (max 0.83 ->
 took the whole 2/net/mesh/drbd configuration's lock for every step, so only
 one pair on the rig could run a step at a time although no step of one pair
 touches another's nodes, LUNs or DRBD. The configuration lock is now taken only
-by `fio` and `all`, the steps that write the configuration's trial board
+by `fio` and `all`, the steps that write the configuration's own board
 (`suite` goes through run.sh, which takes it itself). `MXFS_NODES="<a> <b>"`
 names a pair's two nodes directly, for pairs beyond the two-node groups g2 and
 g2b; such a pair cannot run `suite`, `fio` or `all`, which need a group.
@@ -3242,7 +4329,7 @@ on it got I/O errors. Installers failed and one guest's kernel panicked.
   `scripts/release.sh --publish` will not claim it.
 - `tools/release_text_check.py`'s rule against calling an attachment unreleased
   now covers only the attachments the data releases. It was written when the
-  README still called a released DRBD a trial, and it would have rejected the
+  README still called a released DRBD unreleased, and it would have rejected the
   withdrawal.
 
 **Also:**
@@ -4741,7 +5828,7 @@ reads, and falls back to the dm uuid only when the paths carry none or
 disagree.
 
 **The documentation says what is released.**  `2/net/mesh/drbd` was labelled
-"trial" in the README, the attachment table and the manual page, although it
+unreleased in the README, the attachment table and the manual page, although it
 passed the cluster suite and the fence, split, node-death, pair-outage and
 takeover tests on the build it shipped in (0.90.41); it is listed as released,
 on Ubuntu 24.04 with DRBD 8.4.11, with the package-install round and the other
@@ -4761,7 +5848,7 @@ release matrix, the platform ledger, the version and the defect queue, and
 reads the README, the manual pages, the installed module-options file, the
 storage guides and the module's parameter descriptions against it: the
 Released table, the current version, the defect counts, the cluster sizes,
-and wording that calls a released thing a trial, unverified, unsupported or in
+and wording that calls a released thing experimental, unverified, unsupported or in
 development.  `scripts/release.sh` runs it before building a package and
 before publishing and stops on a failure; `tests/full_verify.sh` records it
 with the build's audits.  `2/net/mesh/drbd`, which is verified by a rig of
@@ -5002,8 +6089,8 @@ pair-outage laps also PASS.
   - RHEL 9.8, SELinux enforcing with sVirt
   - Ubuntu 24.04
   - Debian 13
-- **DRBD:** `2/net/mesh/drbd` stays a trial attachment, outside the release
-  matrix.
+- **DRBD:** `2/net/mesh/drbd` stays outside the release matrix, verified by
+  its own rig.
 
 **Removed from the defect queue as fixed and verified:**
 `D-BOOTSTRAP-RESUME-AFTER-PARTIAL-COMPLETION-ABORTS`,
@@ -5156,8 +6243,8 @@ C68F8AF0D0A78C228EB0020:
 - *fio_perf* on the mount: seqW 388-1288 MiB/s, seqR 2.5-2.9 GiB/s, randW
   23-25K IOPS, randR 42-46K IOPS (host load 1-3, single runs each).
 
-**`2/net/mesh/drbd` stays a trial configuration** (`MXFS_TRIAL=1`, its own
-board), as before.
+**`2/net/mesh/drbd` stays verified by its own rig** (its own board), as
+before.
 
 **Open, in the defect queue:**
 
@@ -16924,7 +18011,7 @@ not empty, and it composes with `--json`.
 
 `tests/test_defects_ledger.py` pins all three against sandboxed copies of the
 real ledger, and asserts at the end that the real one was never written.  It
-covers the lost update over twenty paired-remove trials, mutual exclusion while
+covers the lost update over twenty paired-remove attempts, mutual exclusion while
 the lock is held by another process, the absence of torn reads under twelve
 concurrent writers, the refusal of a bar with no reason, a `noblock` record
 leaving `--release` while remaining in the plain queue, and both exit codes.

@@ -125,6 +125,7 @@ void mxfs_dlm_recycle_grant_check(struct xfs_inode *ip);
  * P-RECYCLE-BAST-KEEP), 1 = dropped (grant live, recycle_bast_keep=0,
  * P-RECYCLE-BAST-DROP), 0 = stale (grant NL, P-RECYCLE-BAST-STALE). */
 extern int mxfs_recycle_bast_keep;
+extern int mxfs_recycle_adopt_fail_refuse;
 void mxfs_dlm_recycle_bast_note(struct xfs_inode *ip, uint8_t prev_state,
 				uint8_t prev_mode, int outcome);
 
@@ -846,6 +847,11 @@ int mxfs_dbg_disk_di_read_coherent(struct xfs_mount *mp, uint64_t ino,
 /* D-0946, test only: read the platter dinode at EVERY create-path recycle
  * (xfs_iget_recycle) and fail a LIVE one; the counters say the check ran. */
 extern int mxfs_dbg_recycle_platter_assert;
+/* test only: reject one inode's btree-format data fork as corrupt on read */
+extern unsigned long long mxfs_dbg_iformat_reject_ino;
+extern atomic_t mxfs_dbg_iformat_rejected;
+/* test only: inode reclaim skips every inode (unmount excepted) */
+extern int mxfs_dbg_reclaim_hold;
 void mxfs_dbg_recycle_platter_note(bool live);
 /* D-0946: the allocator's own-obligation arm, counted exactly (the dmesg lines
  * are print-budgeted); writing a counter resets it. */

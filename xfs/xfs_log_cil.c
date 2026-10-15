@@ -2013,7 +2013,7 @@ xlog_cil_init(
 	 * Limit the CIL pipeline depth to 4 concurrent works to bound the
 	 * concurrency the log spinlocks will be exposed to.
 	 */
-	cil->xc_push_wq = alloc_workqueue("xfs-cil/%s",
+	cil->xc_push_wq = alloc_workqueue("mxfs-cil/%s",
 			XFS_WQFLAGS(WQ_FREEZABLE | WQ_MEM_RECLAIM | WQ_UNBOUND),
 			4, log->l_mp->m_super->s_id);
 	if (!cil->xc_push_wq)

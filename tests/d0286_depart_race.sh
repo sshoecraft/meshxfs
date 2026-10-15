@@ -93,12 +93,13 @@ if [ "$PT" = 1 ]; then
     ck "p1: heartbeat record NOT cleanly released (no P-GOODBYE/clean stamp)" "$(grep -ac 'clean-release stamp\|release_slot' "$OUT/dmesg_$N.txt")" "0"
     # observer: no goodbye consumed, death path engages within the grace.
     # budget: the grace is DERIVED from the observer's dead-declaration
-    # window — dead_timeout_ms (0 = compile default 31 samples x 2 s =
-    # 62 s, dlm/disklock.h MXFS_DISKLOCK_DEAD_THRESHOLD) + one HB sample
-    # of monitor phase + ~10 s fence/dead-confirm re-read.  sess419: a
-    # fixed 45 s window produced a false FAIL on CAW (test1 needed 62 s).
+    # window — dead_timeout_ms (0 = the SCSI attachment's default, 17
+    # samples x 2 s = 34 s, dlm/disklock.h MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD)
+    # + one HB sample of monitor phase + ~10 s fence/dead-confirm re-read.
+    # sess419: a fixed 45 s window produced a false FAIL on CAW (test1 then
+    # needed the old 62 s default).
     dtm=$(timeout 15 $SSH "$W" "cat $P/dead_timeout_ms" 2>/dev/null | filt | tr -dc '0-9')
-    [ "${dtm:-0}" -eq 0 ] && dtm=62000
+    [ "${dtm:-0}" -eq 0 ] && dtm=34000
     grace=$(( dtm / 1000 + 2 + 10 ))
     echo "  INFO $W dead_timeout_ms=$dtm -> death-path grace ${grace}s"
     i=0; dp=0

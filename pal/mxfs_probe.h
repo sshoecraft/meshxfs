@@ -47,11 +47,11 @@
 
 /*
  * mxfs_xfs_probe(mp, fmt, ...): a probe written where XFS code would use
- * xfs_notice(mp, ...).  Same "XFS (<dev>): " prefix and appended newline as
+ * xfs_notice(mp, ...).  Same "mxfs (<dev>): " prefix and appended newline as
  * xfs_printk, so the line reads the same when probes are on.
  */
 #define mxfs_xfs_probe(mp, fmt, ...)					\
-	pr_debug("XFS (%s): " fmt "\n",					\
+	pr_debug("mxfs (%s): " fmt "\n",				\
 		 ((mp) && (mp)->m_super) ? (mp)->m_super->s_id : "?",	\
 		 ##__VA_ARGS__)
 

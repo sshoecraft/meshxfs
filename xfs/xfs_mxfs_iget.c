@@ -252,6 +252,7 @@ mxfs_dlm_iget_shell_reload(
 	struct xfs_inode	*ip;
 	struct inode		*vip = NULL;
 	int			acted = 0;
+	bool			idle_shell = false;
 
 	if (!mp->m_mxfs_dlm || mxfs_v5_dlm_is_single_node(mp->m_mxfs_dlm))
 		return 0;
@@ -267,10 +268,24 @@ mxfs_dlm_iget_shell_reload(
 		if (!(ip->i_flags & (XFS_IRECLAIMABLE | XFS_INEW |
 				     XFS_IRECLAIM)))
 			vip = igrab(VFS_I(ip));
+		/*
+		 * A reclaimable shell nobody is reclaiming is at rest, not
+		 * mid-teardown: the iget that failed has just recycled it
+		 * (a rejected platter image fails the recycle and puts it
+		 * back).  Waiting does not change it, so it takes the bounded
+		 * nudge/reload laps below, not the teardown wait.  Measured
+		 * before this (tests/pve_recycle_adopt_reject.sh refuse1):
+		 * every lookup of such a number spun the full 400 x 20 ms.
+		 */
+		else if ((ip->i_flags & (XFS_IRECLAIMABLE | XFS_INEW |
+					 XFS_IRECLAIM)) == XFS_IRECLAIMABLE)
+			idle_shell = true;
 		spin_unlock(&ip->i_flags_lock);
 	}
 	spin_unlock(&pag->pag_ici_lock);
 	xfs_perag_put(pag);
+	if (idle_shell)
+		return 0;
 	if (ip && !vip) {
 		/*
 		 * FIX-D v3: a shell EXISTS but igrab failed — it is

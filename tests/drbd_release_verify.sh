@@ -6,7 +6,7 @@
 # 2/net/mesh/drbd has no pool LUN to share and no SCSI fence, so it is not a
 # column of the board the other configurations are graded on; it is verified
 # by its own rig (scripts/drbd_rig.sh) and its own board
-# (tests/evidence/drbd_rig/criteria.trial.json).  That made it easy to leave
+# (tests/evidence/drbd_rig/criteria.json).  That made it easy to leave
 # out: 0.90.42 and the first run of 0.90.48 re-verified sixteen configurations
 # and never ran this one.  scripts/release.sh --publish now refuses a version
 # whose evidence file from this script does not end in a PASS
@@ -43,6 +43,14 @@ set -u
 V="${1:?usage: tests/drbd_release_verify.sh VERSION}"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$HERE" || exit 1
+# Hold the pair's VMs for the whole run (tools/vm_pool.sh): the steps between
+# the suite's run.sh and the end -- death, fence, outage, takeover -- run no
+# run.sh to hold them, and each run.sh releases its nodes when it ends.  Once
+# this script ends they are shut off after the pool's grace.
+. tests/lib/runlock.sh
+RIG_VMS=$(tools/mxfs_lab.sh group "${MXFS_GROUP:-g2}")
+vmhold_take "drbd_release_verify $V" $RIG_VMS || { echo "could not hold [$RIG_VMS]"; exit 1; }
+setsid tools/vm_pool.sh release --after $$ $RIG_VMS </dev/null >/dev/null 2>&1 &
 O="tests/evidence/drbd_release_verify_$V.out"
 SV=$(modinfo -F srcversion mxfs.ko 2>/dev/null)
 MV=$(modinfo -F version mxfs.ko 2>/dev/null)

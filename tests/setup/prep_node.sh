@@ -15,6 +15,7 @@
 #   NFS_SERVER 192.168.120.1:/src   NFS_MOUNT /src   SCSI_TIMEOUT 180
 #   MXFS_NO_MOUNT=1   load and prepare, but leave the mount to someone else
 #                     (the DRBD boot program, as on a Proxmox host at boot)
+#   MXFS_MOUNT_OPTS   options for the mount, e.g. "-o fence=vcenter,peers=a/b"
 #
 # Prints NODE_PREP_OK on success, NODE_PREP_FAIL: <reason> + exit 1 otherwise.
 
@@ -325,9 +326,11 @@ ADMIT=$("$MXFS_REPO/tools/mxfs_admit_check.sh" "$MXFS_DEV" 2>&1); admit_rc=$?
 echo "$ADMIT" | tail -3
 [ "$admit_rc" = 0 ] || fail "admission preflight refused (rc=$admit_rc): $(echo "$ADMIT" | grep -m1 '^ADMIT_')"
 
-# 6. Mount the FS.
+# 6. Mount the FS.  MXFS_MOUNT_OPTS (as tests/criteria/lib.sh takes it,
+#    "-o fence=vcenter,peers=a/b") carries what an attachment needs at mount:
+#    the shared attachment names its fence method and its two peers there.
 mkdir -p "$MXFS_MOUNT"
-mount -t mxfs "$MXFS_DEV" "$MXFS_MOUNT" || fail "mount -t mxfs $MXFS_DEV $MXFS_MOUNT failed"
+mount -t mxfs ${MXFS_MOUNT_OPTS:-} "$MXFS_DEV" "$MXFS_MOUNT" || fail "mount -t mxfs ${MXFS_MOUNT_OPTS:-} $MXFS_DEV $MXFS_MOUNT failed"
 mountpoint -q "$MXFS_MOUNT" || fail "$MXFS_MOUNT not mounted after mount"
 
 echo "NODE_PREP_OK transport=$TRANSPORT dev=$MXFS_DEV mount=$MXFS_MOUNT module=$MODULE_SOURCE srcversion=$(cat /sys/module/mxfs/srcversion 2>/dev/null) timeout=$(cat /sys/block/$DEVNAME/device/timeout 2>/dev/null)"

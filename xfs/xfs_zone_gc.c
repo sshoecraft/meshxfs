@@ -1200,7 +1200,7 @@ xfs_zone_gc_mount(
 	}
 
 	zi->zi_gc_thread = kthread_create(xfs_zoned_gcd, data,
-			"xfs-zone-gc/%s", mp->m_super->s_id);
+			"mxfs-zone-gc/%s", mp->m_super->s_id);
 	if (IS_ERR(zi->zi_gc_thread)) {
 		xfs_warn(mp, "unable to create zone gc thread");
 		error = PTR_ERR(zi->zi_gc_thread);

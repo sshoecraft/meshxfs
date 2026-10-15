@@ -104,6 +104,37 @@ xfs_iformat_local(
  * The file consists of a set of extents all of which fit into the on-disk
  * inode.
  */
+/*
+ * Test only: reject one inode's data-fork image where a corrupt one is
+ * rejected, so the fork is left as a real rejection leaves it (format set,
+ * if_needextents set for BTREE, no root or extent list).  See
+ * mxfs_dbg_iformat_reject_ino.
+ */
+static bool
+mxfs_dbg_iformat_reject(
+	struct xfs_inode	*ip,
+	int			whichfork,
+	const char		*what)
+{
+	extern unsigned long long mxfs_dbg_iformat_reject_ino;
+	extern atomic_t mxfs_dbg_iformat_rejected;
+	unsigned long long	rino = READ_ONCE(mxfs_dbg_iformat_reject_ino);
+	int			n;
+
+	/* ~0 names every inode the recycle adopt in xfs_iget_recycle is
+	 * rebuilding: that arm sets forkreset_src to 1 * 2 (+1) just before
+	 * xfs_inode_from_disk. */
+	if (likely(!rino) || whichfork != XFS_DATA_FORK ||
+	    (rino != ip->i_ino &&
+	     !(rino == ~0ULL && ip->i_mxfs_forkreset_src >> 1 == 1)))
+		return false;
+	n = atomic_inc_return(&mxfs_dbg_iformat_rejected);
+	pr_warn("mxfs: P-IFORMAT-REJECT-INJECT ino=%llu n=%d comm=%s forkreset_src=%u -- test injection: %s data fork rejected as corrupt\n",
+		(unsigned long long)ip->i_ino, n, current->comm,
+		(unsigned)ip->i_mxfs_forkreset_src, what);
+	return true;
+}
+
 STATIC int
 xfs_iformat_extents(
 	struct xfs_inode	*ip,
@@ -119,6 +150,9 @@ xfs_iformat_extents(
 	struct xfs_bmbt_rec	*dp;
 	struct xfs_bmbt_irec	new;
 	int			i;
+
+	if (unlikely(mxfs_dbg_iformat_reject(ip, whichfork, "extents")))
+		return -EFSCORRUPTED;
 
 	/*
 	 * If the number of extents is unreasonable, then something is wrong and
@@ -190,6 +224,9 @@ xfs_iformat_btree(
 	size = xfs_bmap_broot_space(mp, dfp);
 	nrecs = be16_to_cpu(dfp->bb_numrecs);
 	level = be16_to_cpu(dfp->bb_level);
+
+	if (unlikely(mxfs_dbg_iformat_reject(ip, whichfork, "btree")))
+		return -EFSCORRUPTED;
 
 	/*
 	 * blow out if -- fork has less extents than can fit in
@@ -510,6 +547,20 @@ xfs_idestroy_fork(
 			xfs_iext_destroy(ifp);
 		break;
 	}
+
+	/*
+	 * Nothing is left to read in: the root is gone with everything else.
+	 * Upstream never re-uses a destroyed fork, but MXFS rebuilds live
+	 * ones in place (the reset of a reused inode number for a create, the
+	 * peer-freed shell reset, the reload adopt).  A BTREE fork this host
+	 * had loaded from the dinode but never walked kept if_needextents=1
+	 * through mxfs_dlm_reset_inode_for_create into the new file, and its
+	 * first ftruncate walked a NULL root (qemu-img on Proxmox,
+	 * xfs_bmbt_init_cursor reading NULL+4; reproduced by
+	 * tests/pve_recycled_btree_inode.sh).  A rebuild that loads a BTREE
+	 * image sets it again in xfs_iformat_data_fork/xfs_iformat_attr_fork.
+	 */
+	smp_store_release(&ifp->if_needextents, 0);
 }
 
 /*

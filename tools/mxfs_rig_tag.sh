@@ -116,23 +116,42 @@ vendor_of() {  # vendor_of <device> — the SCSI vendor of a device on THIS host
     cat "/sys/block/$b/device/vendor" 2>/dev/null
 }
 
+# 5. ...and the path to it, when the path is a different machine.  The vSphere
+#    guests reach the very same SCST LUN as the qemu rig, so the array's vendor
+#    string is identical, but through in-guest iSCSI across nested ESXi: native
+#    XFS measured 108 MiB/s sequential write there against the qemu rig's
+#    ~2 GB/s.  Scoring one against the other's yardstick is the cross-rig
+#    comparison this resolver exists to prevent, so a node that is a VMware
+#    guest carries "-vmware" after the vendor.  QEMU guests and physical hosts
+#    keep the vendor alone, so every tag recorded before this stays valid.
+platform_suffix() {  # platform_suffix <dmi sys_vendor>
+    case "$1" in
+        "VMware, Inc."*) echo "-vmware" ;;
+    esac
+}
+
 vendor=$(vendor_of "$DEV")
-if [ -z "${vendor:-}" ]; then
+if [ -n "${vendor:-}" ]; then
+    suffix=$(platform_suffix "$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)")
+else
     # MXFS_RIG_NODE first: the prep that establishes the identity may be
     # writing a marker for the first time (a new rig group's), and a marker
     # that does not exist yet names no node to ask.
     NODE=${MXFS_RIG_NODE:-$(mk node_list | cut -d, -f1)}
     [ -n "$NODE" ] && [ -x "$REPO/tools/mxfs_sshpass.sh" ] || exit 1
-    vendor=$(timeout 25 "$REPO/tools/mxfs_sshpass.sh" "$NODE" "
+    answer=$(timeout 25 "$REPO/tools/mxfs_sshpass.sh" "$NODE" "
         d=\$(readlink -f '$DEV' 2>/dev/null) || exit 1
         b=\$(basename \"\$d\")
         [ -r /sys/block/\$b/device/vendor ] || b=\$(echo \"\$b\" | sed 's/[0-9]*\$//')
         case \"\$b\" in
             dm-*) b=\$(ls /sys/block/\$(basename \"\$d\")/slaves 2>/dev/null | head -1) ;;
         esac
-        cat /sys/block/\$b/device/vendor 2>/dev/null
-      " 2>/dev/null | grep -av '^Unauthorized\|^Warning:\|^If you\|^$' | head -1)
+        echo \"RIGVENDOR=\$(cat /sys/block/\$b/device/vendor 2>/dev/null)\"
+        echo \"RIGDMI=\$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)\"
+      " 2>/dev/null)
+    vendor=$(printf '%s\n' "$answer" | sed -n 's/^RIGVENDOR=//p' | head -1)
+    suffix=$(platform_suffix "$(printf '%s\n' "$answer" | sed -n 's/^RIGDMI=//p' | head -1)")
 fi
 vendor=$(sanitise "${vendor:-}")
 [ -n "$vendor" ] || exit 1
-echo "$vendor"
+echo "$vendor${suffix:-}"

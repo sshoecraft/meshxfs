@@ -2385,10 +2385,19 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 		 *     — keep the fail-fast shutdown.
 		 */
 		if (rc) {
+			/*
+			 * -EBADE is the reservation conflict a fenced node's
+			 * commands get, -ESHUTDOWN a withdrawn lock authority:
+			 * the node was cut off, which is not in-core corruption.
+			 */
+			bool fenced = (rc == -EBADE || rc == -ESHUTDOWN);
+
 			mxfs_pal_log(MXFS_LOG_ERR,
-				"mxfs: DLM inode lock unrecoverable: ino=%llu mode=%u rc=%d comm=%s -- shutting down filesystem",
+				"mxfs: DLM inode lock unrecoverable: ino=%llu mode=%u rc=%d comm=%s -- %s, shutting down filesystem",
 				(unsigned long long)ip->i_ino, mode, rc,
-				current->comm);
+				current->comm,
+				fenced ? "this node was fenced off the shared storage" :
+					 "lock coordination failed");
 			/* Clear ACQUIRING so subsequent ops see a deterministic
 			 * post-shutdown state, and wake any waiters so they
 			 * unblock and observe the shutdown via the normal
@@ -2403,7 +2412,8 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 			spin_unlock(&ip->i_dlm_lock);
 			wake_up_all(&ip->i_dlm_wait);
 			xfs_force_shutdown(ip->i_mount,
-					   SHUTDOWN_CORRUPT_INCORE);
+					   fenced ? SHUTDOWN_CLUSTER_FENCED :
+						    SHUTDOWN_CORRUPT_INCORE);
 			{ block_outcome = MXFS_BLOCK_RETURN; goto mxfs_ilock_acquire_from_dlm_exit; }
 		}
 	}
@@ -4580,6 +4590,20 @@ restart:
 	if (unlikely(ip->i_ino == 0))
 		return;
 
+	/*
+	 * A reload under the grant still held here rejected the platter image
+	 * and left the fork refused.  The cached-grant fast path below serves
+	 * an EX holder without consulting i_dlm_stale, so nothing else would
+	 * read the platter again while this node keeps the grant: the file
+	 * stayed EIO here after the image was good (tests/pve_reload_reject.sh,
+	 * write and truncate).  Retry it now, while no ILOCK is held.  Without
+	 * a grant the acquire below reloads anyway.
+	 */
+	if (unlikely(READ_ONCE(ip->i_mxfs_fork_rejected)) &&
+	    (ip->i_dlm_mode == MXFS_LOCK_EX ||
+	     ip->i_dlm_mode == MXFS_LOCK_PR))
+		mxfs_dlm_reload_inode(ip, XFS_DIR3_FT_UNKNOWN, false);
+
 	spin_lock(&ip->i_dlm_lock);
 
 	/* TEST ONLY: a planted claim whose grant still covers this request met
@@ -5646,24 +5670,34 @@ mxfs_dlm_ilock_end(
 			MXFS_CLEAR_DEMOTER(ip);
 		}
 		/*
-		 * If a slot is no longer ours, some other path already released
-		 * it; drop the residual bookkeeping so the mask cannot go stale
-		 * and be mistaken for a live retention by the sweep.
-		 */
-		/*
-		 * Instrument: a slot that is held, but not by this task, still
-		 * carries the retention its punt recorded.  Dropping its count here
-		 * leaves the punt mask 0 with the claim in place, and the reclaim
-		 * sweep acts only on a set mask.  Count and name every such drop.
+		 * A slot that is not ours keeps its retention record while the
+		 * claim the punt retained is still in it — held by another task
+		 * at the generation the punt recorded.  That task may never come
+		 * back to an unlock of this inode (an I/O-completion worker that
+		 * unlocked inside its own commit does not), and the reclaim sweep
+		 * acts only on a set punt mask, so dropping the record here is
+		 * what stranded the claim until its owner exited: P-PUNT-WIPE,
+		 * measured on the SAN pair, a dd's unlock dropping a kworker's
+		 * retention.  The record goes only when it is stale: the slot is
+		 * empty, or its generation moved (a later claim, which the sweep
+		 * would refuse anyway).
 		 */
 		{
 			struct task_struct *h1 = READ_ONCE(ip->i_dlm_demoter);
 			struct task_struct *h2 = READ_ONCE(ip->i_dlm_demoter2);
 
+			if (h1 != current &&
+			    (!h1 || READ_ONCE(ip->i_dlm_demoter_gen[0]) !=
+				    ip->i_dlm_punt_gen[0]))
+				ip->i_dlm_punt_n[0] = 0;
+			if (h2 != current &&
+			    (!h2 || READ_ONCE(ip->i_dlm_demoter_gen[1]) !=
+				    ip->i_dlm_punt_gen[1]))
+				ip->i_dlm_punt_n[1] = 0;
 			if ((ip->i_dlm_punt_n[0] && h1 && h1 != current) ||
 			    (ip->i_dlm_punt_n[1] && h2 && h2 != current)) {
-				atomic64_inc(&mxfs_dem_punt_wipe);
-				pr_warn_ratelimited("mxfs: P-PUNT-WIPE ino=%llu n1=%u s1_pid=%d s1_comm=%s n2=%u s2_pid=%d s2_comm=%s pid=%d comm=%s -- an unlock by a task that does not hold the retained claim drops its retention record\n",
+				atomic64_inc(&mxfs_dem_punt_kept);
+				pr_warn_ratelimited("mxfs: P-PUNT-KEPT ino=%llu n1=%u s1_pid=%d s1_comm=%s n2=%u s2_pid=%d s2_comm=%s pid=%d comm=%s -- an unlock by a task that does not hold the retained claim keeps its retention record for the reclaim sweep\n",
 					(unsigned long long)ip->i_ino,
 					ip->i_dlm_punt_n[0], h1 ? ip->i_dlm_demoter_pid : 0,
 					h1 ? ip->i_dlm_demoter_comm : "-",
@@ -5672,10 +5706,6 @@ mxfs_dlm_ilock_end(
 					current->pid, current->comm);
 			}
 		}
-		if (READ_ONCE(ip->i_dlm_demoter) != current)
-			ip->i_dlm_punt_n[0] = 0;
-		if (READ_ONCE(ip->i_dlm_demoter2) != current)
-			ip->i_dlm_punt_n[1] = 0;
 		WRITE_ONCE(ip->i_dlm_demoter_punt,
 			   (ip->i_dlm_punt_n[0] ? 1 : 0) |
 			   (ip->i_dlm_punt_n[1] ? 2 : 0));

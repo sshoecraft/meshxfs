@@ -37,6 +37,8 @@
 #   CHURN      loops per host in the churn (default 8)
 #   WORK_S     seconds of churn per lap (default 40)
 #   STRAND_MS  demoter_strand_ms for the run (default 5000, the module's)
+#   MNT        the MXFS mount on both hosts (default /mnt/shared), passed on to
+#              the churn and the walk
 #
 # Budget per lap: the churn's ARM_S 20 + WORK_S + ~30 s of collection, the
 # walk's create + stat + remove (~15 s healthy on this pair), so ~110 s at the
@@ -52,6 +54,7 @@ LAPS=${LAPS:-4}
 CHURN=${CHURN:-8}
 WORK_S=${WORK_S:-40}
 STRAND_MS=${STRAND_MS:-5000}
+export MNT=${MNT:-/mnt/shared}
 LABEL=${1:-}
 EVID="$REPO/tests/evidence/pve_demoter_strand/$(date -u +%Y%m%dT%H%M%SZ)${LABEL:+-$LABEL}"
 mkdir -p "$EVID" || exit 2
@@ -74,7 +77,7 @@ probes() {  # <host> <+p|-p>
 }
 
 for h in "${H[@]}"; do
-    b=$(on "$h" "cat /sys/module/mxfs/srcversion; awk '\$2 == \"/mnt/shared\" && \$3 == \"mxfs\"' /proc/mounts | wc -l" 20 | tr '\n' ' ')
+    b=$(on "$h" "cat /sys/module/mxfs/srcversion; awk '\$2 == \"$MNT\" && \$3 == \"mxfs\"' /proc/mounts | wc -l" 20 | tr '\n' ' ')
     say "$h build+mounted: $b"
     probes "$h" +p || say "$h: could not turn the probes on"
     on "$h" "echo $STRAND_MS > /sys/module/mxfs/parameters/demoter_strand_ms; echo '<5>$MARK' > /dev/kmsg; echo OK" 20 | grep -q OK \
@@ -103,7 +106,9 @@ for h in "${H[@]}"; do
     n_reap=$(grep -ac 'P-DEMOTER-DEAD-REAP' "$EVID/klog-$h")
     n_bail=$(grep -ac 'P34J-RELOAD-DEMOTE-BAIL' "$EVID/klog-$h")
     n_p201=$(grep -ac 'P201-TYPEFLIP-UNRESOLVED-FAIL' "$EVID/klog-$h")
-    say "$h strand=$n_strand dead_reap=$n_reap demote_bail=$n_bail typeflip_fail=$n_p201"
+    n_wipe=$(grep -ac 'P-PUNT-WIPE' "$EVID/klog-$h")
+    say "$h strand=$n_strand dead_reap=$n_reap demote_bail=$n_bail typeflip_fail=$n_p201 punt_wipe=$n_wipe"
+    grep -a 'P-PUNT-WIPE' "$EVID/klog-$h" | head -4 | cut -c1-300 | sed "s/^/  $h: /" | tee -a "$EVID/log"
     grep -aE 'P215-DEFER|P213-PUNT |P216-CLAIM|P75-DEMOTER-DRAIN' "$EVID/klog-$h" | tail -4 | sed "s/^/  $h: /" | tee -a "$EVID/log"
     grep -aE 'P214-DEMOTER-STRANDED|P-DEMOTER-DEAD-REAP' "$EVID/klog-$h" | head -6 | cut -c1-300 | sed "s/^/  $h: /" | tee -a "$EVID/log"
     [ $((n_strand + n_reap + n_p201)) = 0 ] || fail=1

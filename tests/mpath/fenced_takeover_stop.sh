@@ -65,13 +65,13 @@ done
 
 # 3. A alone, its takeover pass held open
 measure "$A" 60 "$OUT/mount_alone_$A.txt" '^MOUNT rc=[0-9]+ pause=[0-9]+$' "the lone mount of $A" \
-    "echo $FT_PAUSE_MS > $P/dl_takeover_pause_ms; timeout 45 mount -t mxfs $DEV $MNT; echo MOUNT rc=\$? pause=\$(cat $P/dl_takeover_pause_ms)"
+    "echo $FT_PAUSE_MS > $P/dl_takeover_pause_ms; timeout 45 mount -t mxfs $MOPT $DEV $MNT; echo MOUNT rc=\$? pause=\$(cat $P/dl_takeover_pause_ms)"
 ck "$A mounted alone with the takeover pass held ${FT_PAUSE_MS} ms a page" "$(grep -a '^MOUNT ' "$OUT/mount_alone_$A.txt" | head -1)" "MOUNT rc=0 pause=$FT_PAUSE_MS"
 [ "$fails" = 0 ] || { finish FAIL "stage=alone"; exit 1; }
 sleep 5
 
 # 4. B joins
-measure "$B" 60 "$OUT/mount_join_$B.txt" '^MOUNT rc=[0-9]+$' "the join of $B" "timeout 45 mount -t mxfs $DEV $MNT; echo MOUNT rc=\$?"
+measure "$B" 60 "$OUT/mount_join_$B.txt" '^MOUNT rc=[0-9]+$' "the join of $B" "timeout 45 mount -t mxfs $MOPT $DEV $MNT; echo MOUNT rc=\$?"
 ck "$B joined (mount rc 0)" "$(grep -a '^MOUNT ' "$OUT/mount_join_$B.txt" | head -1)" "MOUNT rc=0"
 [ "$fails" = 0 ] || { finish FAIL "stage=join"; exit 1; }
 sleep 5
@@ -113,6 +113,8 @@ cklt "reservation conflicts from $A's initiator on the host in the 30 s after th
 
 # back to two members: A leaves and joins as a new incarnation
 V=$A pf_remount "$A" rejoin
+# its clock lost the frozen time; the next row places its load on it
+clock_resync "$A" || { why="$A's clock could not be stepped after its thaw"; finish ABORT "stage=clock-resync"; exit 2; }
 pf_done "pause_ms=$FT_PAUSE_MS fenced_s=$tf interrupted=${intr:-?} ticket_fail=${tick:-?} host_conflicts=${hc:-?}"
 }
 main 2>&1 | tee "$OUT/row.log"

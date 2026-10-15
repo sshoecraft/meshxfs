@@ -1616,6 +1616,12 @@ const char *mxfs_fence_kind_name(enum mxfs_fence_kind k)
 		return "DRBD_REPLICA_EXCLUDED_V1";
 	case MXFS_FENCE_KIND_DRBD_PEER_SECONDARY_V1:
 		return "DRBD_PEER_SECONDARY_V1";
+	case MXFS_FENCE_KIND_SHARED_MANUAL_V1:
+		return "SHARED_MANUAL_V1";
+	case MXFS_FENCE_KIND_SHARED_VCENTER_V1:
+		return "SHARED_VCENTER_V1";
+	case MXFS_FENCE_KIND_SHARED_QUORUM_V1:
+		return "SHARED_QUORUM_V1";
 	case MXFS_FENCE_KIND_PREEMPT_ABORT_DONE:
 		return "PREEMPT_ABORT_DONE_RETIRED16";
 	case MXFS_FENCE_KIND_SINGLE_NODE_EXCLUSIVE: return "SINGLE_NODE_EXCLUSIVE";
@@ -2666,6 +2672,22 @@ bool mxfs_fence_durable_kind_supported(enum mxfs_fence_record_family family,
 		 * on both disks.  One producer, v5_drbd_fence.  Accepted in both
 		 * families: what a bootstrap-owner record needs of an old owner is
 		 * exactly its death, and that fact holds on either replica. */
+		return true;
+	case MXFS_FENCE_KIND_SHARED_MANUAL_V1:
+	case MXFS_FENCE_KIND_SHARED_VCENTER_V1:
+	case MXFS_FENCE_KIND_SHARED_QUORUM_V1:
+		/* 0.90.128.  The shared attachment's three profiles
+		 * (docs/shared-disk-attachment.md, docs/quorum-takeover.md): the
+		 * victim's boot ended, by an operator's confirmation of that exact
+		 * incarnation or this host's later boot (28), by vCenter reporting
+		 * its VM off or booted again (29), or by the victim having lost
+		 * corosync's vote for the takeover bound, or its host running a
+		 * later boot (30).  One producer, v5_shared_fence.  Classified here in either
+		 * family; whether THIS mount may act on one is the mount's fence
+		 * method, which the disklock context carries
+		 * (mxfs_disklock_cert_method_ok): a certificate minted under
+		 * fence=manual is no evidence on a fence=scsipr or fence=vcenter
+		 * mount. */
 		return true;
 	case MXFS_FENCE_KIND_SINGLE_NODE_EXCLUSIVE:
 		reason = "REVOKED kind 17: the operator's single-node assertion is "

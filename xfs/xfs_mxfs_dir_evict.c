@@ -463,7 +463,7 @@ MODULE_PARM_DESC(dir_no_reada,
 EXPORT_SYMBOL(mxfs_dir_no_reada);
 
 bool
-mxfs_dir_evict_data_blocks(struct xfs_inode *ip)
+mxfs_dir_evict_data_blocks(struct xfs_inode *ip, bool rmw_base)
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_iext_cursor	icur;
@@ -676,9 +676,29 @@ mxfs_dir_evict_data_blocks(struct xfs_inode *ip)
 				}
 				if (ierr == -EAGAIN) {
 					all_evicted = false;
+					/*
+					 * Only a modify reads this block as the
+					 * base it rewrites.  A lookup, readdir or
+					 * BAST-side evict that finds it locked
+					 * rewrites nothing: on pve9 every one of
+					 * these was a lookup whose sibling thread
+					 * held the block while reading it under
+					 * the same shared ILOCK.  Leaving
+					 * evicted_gen behind makes the next
+					 * refresh try again.
+					 */
+					if (!rmw_base) {
+						mxfs_probe_ratelimited("mxfs: P36-EVICT-LOCKED-READ ino=%llu daddr=%llu after %d retries -- left cached for the next refresh\n",
+							(unsigned long long)ip->i_ino,
+							(unsigned long long)d, w);
+						continue;
+					}
 					pr_warn_ratelimited("mxfs: P36-EVICT-LOCKED ino=%llu daddr=%llu (stale base KEPT after %d-retry -- clobber risk)\n",
 						(unsigned long long)ip->i_ino,
 						(unsigned long long)d, w);
+					mxfs_buf_report_locked(mp->m_ddev_targp, d,
+							dir_blk_bb, "P36-EVICT-LOCKED",
+							(unsigned long long)ip->i_ino);
 					continue;
 				}
 				if (w > 0)
@@ -1702,7 +1722,7 @@ mxfs_dlm_dir_consumer_refresh_impl(struct xfs_inode *dp, int fallible)
 		 * i_dlm_dir_evicted_gen behind so the next read retries it once
 		 * durable (else it survives until the gen next advances = the
 		 * residual unlink/create-visibility survivor). */
-		if (mxfs_dir_evict_data_blocks(dp)) {
+		if (mxfs_dir_evict_data_blocks(dp, false)) {
 			dp->i_dlm_dir_evicted_gen = dp->i_dlm_dir_gen;
 			dp->i_dlm_dir_evicted_incarn = VFS_I(dp)->i_generation;
 		}

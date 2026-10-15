@@ -1,0 +1,20 @@
+[Unit]
+# fence=vcenter (docs/shared-disk-attachment.md): tag this VM in vCenter with
+# the boot now running, before anything mounts.  After a whole-cluster
+# restart the node recovering the outage then takes every VM that has booted
+# again as ended by its new tag, instead of powering it off.  Does nothing on
+# a node without /etc/mxfs/vcenter.conf.
+Description=MeshXFS: tag this VM's boot in vCenter (fence=vcenter)
+Documentation=https://github.com/sshoecraft/meshxfs/blob/main/docs/shared-disk-attachment.md
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/mxfs/vcenter.conf
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/mxfs_fence_vcenter.py boot
+# six attempts ten seconds apart, each bounded by the helper's 20 s call timeout
+TimeoutStartSec=200
+
+[Install]
+WantedBy=multi-user.target

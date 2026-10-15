@@ -173,7 +173,7 @@ struct mxfs_dlm_caw_ctx {
 4. **`mxfs_v5_dlm_ag_lock` may sleep up to 120s.** Callers MUST NOT hold short-term mutexes (xfs `pag_dlm_acquire_lock` excepted, since iodone path doesn't use it).
 5. **Stale BAST messages must be tolerable.** UDP multicast can duplicate/lose; receiver must treat BAST as advisory + verify slot state on disk.
 6. **`held.slots[]` and `mem_locks[]` are heap-allocated, sized by `max_held`** (v5 sess33). Pre-sess33 they were `[MXFS_CAW_MAX_HELD]` arrays — too small (4096) for real workloads.
-7. **A mount may mutate the shared LUN only while it holds an unexpired AUTHORITY LEASE** (0.89.20). Authority is held to a deadline, not lost when something says so: `MXFS_AUTH_NOT_ADMITTED -> ADMITTED(deadline) -> CLOSED`, and `CLOSED` is sticky — only a fresh coordinated admission under a new incarnation leaves it. `MXFS_DISKLOCK_AUTH_LEASE_MS` is 30 s against a 62 s peer death window; the derivation, and why it is not a ratio of it, is on the constant in `dlm/disklock.h`.
+7. **A mount may mutate the shared LUN only while it holds an unexpired AUTHORITY LEASE** (0.89.20). Authority is held to a deadline, not lost when something says so: `MXFS_AUTH_NOT_ADMITTED -> ADMITTED(deadline) -> CLOSED`, and `CLOSED` is sticky — only a fresh coordinated admission under a new incarnation leaves it. `MXFS_DISKLOCK_AUTH_LEASE_MS` is 30 s. The peer death window is 34 s on a SCSI attachment (it must outlast the lease; the reservation in every SCSI fence certificate closes the late-command term) and 62 s on DRBD or shared (whose lease is derived from it); both derivations are on the constants in `dlm/disklock.h`.
    - The deadline is anchored at the instant a heartbeat is **issued** (`hb_t0`), never at its completion, so local authority can never look younger than the authority peers observe.
    - A renewal is accepted only while the previous authority is still valid. A heartbeat CAS succeeds fine against a target that has released its reservation, so a beat issued after the lease lapsed renews nothing.
    - Every mutating submission asks `mxfs_v5_dlm_write_admitted()` (→ `mxfs_disklock_authority_ok()`), which closes the epoch itself if it finds the deadline passed. Correctness must not depend on the periodic evaluator having run — it and the heartbeat thread can be stalled along with the rest of the VM.
@@ -1405,7 +1405,7 @@ harness `tests/d0287_remaster_measure.sh`.
   through `mxfs_v5_dlm_recovery_publish_refusal`.  `mxfs_v5_dlm_dbg_purge_node(ctx, id)` runs the
   normal purge path from a non-elected survivor (`P-DBG-PURGE-TRIGGER node= rc= purged=`).
 - **Dead window fact**: `dead_timeout_ms=0` (fleet default) = `MXFS_DISKLOCK_DEAD_THRESHOLD`
-  31 × 2 s = 62 s; any observer-side wait in a harness must be derived from it.
+  17 × 2 s = 34 s on SCSI, 31 × 2 s = 62 s on DRBD or shared; any observer-side wait in a harness must be derived from it.
 - Unclaimed-bucket sweep (`xfs_mxfs_dlm.c mxfs_unclaimed_bucket_scan`) is armed at every
   mount settle and after recovery batches — NOT periodically; a cleanly departed slot's
   deferred open-unlink zombies are freed by the NEXT mount of any node.

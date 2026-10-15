@@ -27,12 +27,15 @@
 #include <sys/syscall.h>
 #include <sys/utsname.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
+#include <dirent.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <linux/fs.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <ifaddrs.h>
 #include <scsi/sg.h>
 #include <scsi/scsi.h>
 
@@ -428,6 +431,11 @@ void mxfs_pal_dump_task_stack(int pid)
  * is a kernel diagnostic — no-op here. */
 void mxfs_pal_dump_stack(void)
 {
+}
+
+bool mxfs_pal_stall_stacks(void)
+{
+	return false;
 }
 
 /* ─── Mutex ─── */
@@ -1826,6 +1834,164 @@ void mxfs_pal_drbd_cas_peer_fenced(mxfs_bdev_t *dev)
 	(void)dev;
 }
 
+/* The shared attachment's swap is the kernel's; user mode attaches none. */
+int mxfs_pal_shared_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
+			       unsigned int index, const uint8_t fs_uuid[16],
+			       const char *endpoint, const char *peer_endpoint,
+			       const uint8_t host[16], const uint8_t boot[16])
+{
+	(void)dev; (void)region_off; (void)index; (void)fs_uuid;
+	(void)endpoint; (void)peer_endpoint; (void)host; (void)boot;
+	return -EOPNOTSUPP;
+}
+
+/* The shared attachment's fence channels are the kernel's; user mode has
+ * neither, so nothing it asks is ever evidence. */
+int mxfs_pal_fence_helper(int mode, const uint8_t host[16], const uint8_t boot[16],
+			  struct mxfs_pal_fenceh_report *out)
+{
+	(void)mode; (void)host; (void)boot;
+	if (out)
+		memset(out, 0, sizeof(*out));
+	return -EOPNOTSUPP;
+}
+
+int mxfs_pal_fence_req_post(const struct mxfs_pal_fence_req *r)
+{
+	(void)r;
+	return -EOPNOTSUPP;
+}
+
+int mxfs_pal_fence_req_boot_confirmed(const uint8_t fs_uuid[16],
+				      const uint8_t host[16], const uint8_t boot[16])
+{
+	(void)fs_uuid; (void)host; (void)boot;
+	return 0;
+}
+
+bool mxfs_pal_fence_confirm_channel(void)
+{
+	return false;
+}
+
+bool mxfs_pal_shared_cas_on(mxfs_bdev_t *dev)
+{
+	(void)dev;
+	return false;
+}
+
+void mxfs_pal_shared_cas_set_fenced(mxfs_bdev_t *dev,
+				    int (*fenced)(void *data, const uint8_t *host,
+						  const uint8_t *boot, int act),
+				    void *data)
+{
+	(void)dev;
+	(void)fenced;
+	(void)data;
+}
+
+int mxfs_pal_shared_cas_peer_boot(mxfs_bdev_t *dev, uint8_t host[16],
+				  uint8_t boot[16])
+{
+	(void)dev; (void)host; (void)boot;
+	return -ENODEV;
+}
+
+/* The quorum lease is the kernel's: user mode never holds the vote, so it can
+ * arm nothing and nothing it reports is evidence. */
+int mxfs_pal_quorum_arm(const char *peer, char *why, size_t whylen)
+{
+	(void)peer;
+	snprintf(why, whylen, "user mode has no quorum channel");
+	return -EOPNOTSUPP;
+}
+
+void mxfs_pal_quorum_disarm(void)
+{
+}
+
+int mxfs_pal_quorum_peer_gone(const char *peer, uint64_t alive_ms,
+			      uint64_t *gone_ms, char *why, size_t whylen)
+{
+	(void)peer; (void)alive_ms;
+	*gone_ms = 0;
+	snprintf(why, whylen, "user mode has no quorum channel");
+	return 0;
+}
+
+void mxfs_pal_quorum_gate(const char *site)
+{
+	(void)site;
+}
+
+int mxfs_pal_quorum_host_absent(const uint8_t host[16], uint64_t *absent_ms)
+{
+	(void)host;
+	*absent_ms = 0;
+	return 0;
+}
+
+int mxfs_pal_quorum_peer_boot(const char *peer, uint8_t host[16], uint8_t boot[16])
+{
+	(void)peer; (void)host; (void)boot;
+	return 0;
+}
+
+uint64_t mxfs_pal_quorum_takeover_ms(void)
+{
+	return 0;
+}
+
+void mxfs_pal_quorum_close_ask(uint32_t node, uint64_t incarnation)
+{
+	(void)node; (void)incarnation;
+}
+
+int mxfs_pal_quorum_close_asked(uint32_t node, uint64_t incarnation)
+{
+	(void)node; (void)incarnation;
+	return 0;
+}
+
+void mxfs_pal_quorum_closed_post(uint32_t node, uint64_t incarnation)
+{
+	(void)node; (void)incarnation;
+}
+
+int mxfs_pal_quorum_peer_closed(uint32_t node, uint64_t incarnation)
+{
+	(void)node; (void)incarnation;
+	return 0;
+}
+
+int mxfs_pal_bdev_lu_ident(mxfs_bdev_t *dev, uint8_t *out, int max)
+{
+	(void)dev; (void)out; (void)max;
+	return 0;
+}
+
+int mxfs_pal_lu_paths_offline(const uint8_t *ident, int len, int *npaths)
+{
+	(void)ident; (void)len;
+	*npaths = 0;
+	return 0;
+}
+
+bool mxfs_pal_ipv4_is_local(const char *addr)
+{
+	struct ifaddrs *ifa, *i;
+	struct in_addr want;
+	bool hit = false;
+
+	if (!addr || inet_pton(AF_INET, addr, &want) != 1 || getifaddrs(&ifa))
+		return false;
+	for (i = ifa; i && !hit; i = i->ifa_next)
+		hit = i->ifa_addr && i->ifa_addr->sa_family == AF_INET &&
+		      ((struct sockaddr_in *)i->ifa_addr)->sin_addr.s_addr == want.s_addr;
+	freeifaddrs(ifa);
+	return hit;
+}
+
 void mxfs_pal_drbd_cas_set_judge(mxfs_bdev_t *dev,
 				 int (*excluded)(const struct mxfs_pal_drbd_report *r,
 						 char *why, size_t whylen),
@@ -2116,6 +2282,130 @@ int mxfs_pal_scsi_pr_read_reservation(mxfs_bdev_t *dev,
 	out->type = (uint32_t)(resp[21] & 0x0F);
 	out->held = true;
 
+	return 0;
+}
+
+/* See the contract in pal.h.  Sense in fixed (0x70/0x71: key byte 2, ASC
+ * byte 12) or descriptor (0x72/0x73: key byte 1, ASC byte 2) format. */
+int mxfs_pal_scsi_pr_implemented(mxfs_bdev_t *dev)
+{
+	uint8_t cdb[10], resp[512], sense[32];
+	struct sg_io_hdr io;
+	int key, asc, ua;
+
+	if (!dev || dev->fd < 0)
+		return -EINVAL;
+	for (ua = 0; ua < 5; ua++) {		/* the kernel PAL's MXFS_PR_UA_RETRIES */
+		memset(cdb, 0, sizeof(cdb));
+		cdb[0] = PR_IN_CMD;			/* READ KEYS: service action 0 */
+		cdb[7] = (uint8_t)(sizeof(resp) >> 8);
+		cdb[8] = (uint8_t)sizeof(resp);
+		memset(&io, 0, sizeof(io));
+		memset(sense, 0, sizeof(sense));
+		io.interface_id = 'S';
+		io.dxfer_direction = SG_DXFER_FROM_DEV;
+		io.cmd_len = sizeof(cdb);
+		io.cmdp = cdb;
+		io.dxfer_len = sizeof(resp);
+		io.dxferp = resp;
+		io.sbp = sense;
+		io.mx_sb_len = sizeof(sense);
+		io.timeout = 30000;
+		if (ioctl(dev->fd, SG_IO, &io) < 0)
+			return -errno;
+		if (io.status == 0)
+			return 1;
+		if (io.status != 0x02 || io.sb_len_wr < 3)
+			return -EIO;
+		if ((sense[0] & 0x7F) >= 0x72) {
+			key = sense[1] & 0x0F;
+			asc = sense[2];
+		} else {
+			key = sense[2] & 0x0F;
+			asc = io.sb_len_wr > 12 ? sense[12] : -1;
+		}
+		if (key == 0x06)			/* UNIT ATTENTION: ask again */
+			continue;
+		return (key == 0x05 && asc == 0x20) ? 0 : -EIO;
+	}
+	return -EIO;
+}
+
+/* The first line of a sysfs file, without its newline; "" when unreadable. */
+static void sysfs_line(const char *path, char *buf, size_t len)
+{
+	FILE *f = fopen(path, "r");
+
+	buf[0] = '\0';
+	if (!f)
+		return;
+	if (!fgets(buf, (int)len, f))
+		buf[0] = '\0';
+	fclose(f);
+	buf[strcspn(buf, "\n")] = '\0';
+}
+
+/* See the contract in pal.h.  The kernel PAL asks the scsi_device; here the
+ * same facts come from sysfs: the disk's (or, for a device-mapper device, its
+ * first slave's) SCSI host, that host's proc_name, and the DMI vendor. */
+int mxfs_pal_scsi_hypervisor_adapter(mxfs_bdev_t *dev, char *name, size_t len)
+{
+	static const struct { const char *proc; bool only_vmware; } virt[] = {
+		{ "vmw_pvscsi", false },
+		{ "mptspi", true },
+		{ "mptsas", true },
+		{ "BusLogic", true },
+	};
+	char path[512], link[4096], proc[64], vendor[128], slave[256];
+	const char *host;
+	struct dirent *de;
+	struct stat st;
+	unsigned int hostno;
+	ssize_t n;
+	DIR *d;
+	size_t i;
+
+	if (name && len)
+		name[0] = '\0';
+	if (!dev || dev->fd < 0)
+		return -EINVAL;
+	if (fstat(dev->fd, &st) || !S_ISBLK(st.st_mode))
+		return 0;
+	slave[0] = '\0';
+	snprintf(path, sizeof(path), "/sys/dev/block/%u:%u/slaves",
+		 major(st.st_rdev), minor(st.st_rdev));
+	d = opendir(path);
+	if (d) {
+		while ((de = readdir(d)) != NULL)
+			if (de->d_name[0] != '.') {
+				snprintf(slave, sizeof(slave), "%s", de->d_name);
+				break;
+			}
+		closedir(d);
+	}
+	if (slave[0])
+		snprintf(path, sizeof(path), "/sys/class/block/%s/device", slave);
+	else
+		snprintf(path, sizeof(path), "/sys/dev/block/%u:%u/device",
+			 major(st.st_rdev), minor(st.st_rdev));
+	n = readlink(path, link, sizeof(link) - 1);
+	if (n <= 0)
+		return 0;
+	link[n] = '\0';
+	host = strstr(link, "/host");
+	if (!host || sscanf(host, "/host%u/", &hostno) != 1)
+		return 0;
+	snprintf(path, sizeof(path), "/sys/class/scsi_host/host%u/proc_name", hostno);
+	sysfs_line(path, proc, sizeof(proc));
+	sysfs_line("/sys/class/dmi/id/sys_vendor", vendor, sizeof(vendor));
+	for (i = 0; i < sizeof(virt) / sizeof(virt[0]); i++) {
+		if (strcmp(proc, virt[i].proc) ||
+		    (virt[i].only_vmware && strncmp(vendor, "VMware", 6)))
+			continue;
+		if (name && len)
+			snprintf(name, len, "%s (host%u)", proc, hostno);
+		return 1;
+	}
 	return 0;
 }
 

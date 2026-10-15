@@ -8,16 +8,16 @@
 
 #define XFS_CHECK_STRUCT_SIZE(structname, size) \
 	static_assert(sizeof(structname) == (size), \
-		"XFS: sizeof(" #structname ") is wrong, expected " #size)
+		"mxfs: sizeof(" #structname ") is wrong, expected " #size)
 
 #define XFS_CHECK_OFFSET(structname, member, off) \
 	static_assert(offsetof(structname, member) == (off), \
-		"XFS: offsetof(" #structname ", " #member ") is wrong, " \
+		"mxfs: offsetof(" #structname ", " #member ") is wrong, " \
 		"expected " #off)
 
 #define XFS_CHECK_VALUE(value, expected) \
 	static_assert((value) == (expected), \
-		"XFS: value of " #value " is wrong, expected " #expected)
+		"mxfs: value of " #value " is wrong, expected " #expected)
 
 #define XFS_CHECK_SB_OFFSET(field, offset) \
 	XFS_CHECK_OFFSET(struct xfs_dsb, field, offset); \

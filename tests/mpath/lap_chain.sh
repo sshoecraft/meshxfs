@@ -51,6 +51,13 @@ laps)
     done
     [ "$delay" -gt 0 ] && sleep "$delay"
     export PF_KEEP_KMSG=1
+    # Hold the group's VMs for every lap (tools/vm_pool.sh): each run.sh
+    # releases them when it ends, and the chain still needs them for the next.
+    . tests/lib/runlock.sh
+    vmhold_take "lap_chain $tag" $(tools/mxfs_lab.sh group "$group") \
+        || { echo "lap_chain: could not hold the VMs of group $group"; exit 2; }
+    setsid tools/vm_pool.sh release --after $$ $(tools/mxfs_lab.sh group "$group") \
+        </dev/null >/dev/null 2>&1 &
     [ -n "$knobs" ] && export PF_KNOBS="$knobs"
     if [ "$prep" = 1 ]; then
         MXFS_FORCE_PREP=1 ./run.sh "$config" --group "$group" prep_cluster \

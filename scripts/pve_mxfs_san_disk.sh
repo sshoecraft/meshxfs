@@ -18,7 +18,8 @@
 #        it from host A (whatever is on it is lost), mounts it on both at once,
 #        adds the storage
 #   join mount the volume on every host that does not hold it (a host back
-#        from a reset), joining the cluster the others hold; never formats
+#        from a reset), joining the cluster the others hold, and adds the
+#        storage back if `off` removed it; never formats
 #   off  storage removed, both unmounted (bounded), the LUN left as it is
 # Env:
 #   PVE_PAIR  "<addr> <addr> ..." (default "192.168.1.80 192.168.1.81"): host A
@@ -87,6 +88,8 @@ join() {   # mount on every host of PAIR that does not have it; never formats
         [[ "$r" == *"already mounted"* || "$r" == *"mount rc=0"* ]] || rc=1
     done
     [ "$rc" = 0 ] || die "the volume did not mount on every host"
+    # `off` removes the storage; a join after it (a module update) puts it back
+    on "${PAIR[0]}" "pvesm status --storage $STORE >/dev/null 2>&1 || pvesm add dir $STORE --path $MNT --shared 1 --is_mountpoint yes --content images; pvesm status --storage $STORE" 60
 }
 
 off() {
@@ -95,7 +98,7 @@ off() {
     # B then A; each unmount bounded: one that hangs is a defect to report,
     # never a reason to force it
     for h in "${PAIR[@]:1}" "${PAIR[0]}"; do
-        on "$h" "if mountpoint -q $MNT; then timeout 120 umount $MNT; echo \"\$(hostname): umount rc=\$?\"; else echo \"\$(hostname): not mounted\"; fi" 150
+        on "$h" "if grep -q ' $MNT mxfs ' /proc/mounts; then timeout 120 umount $MNT; echo \"\$(hostname): umount rc=\$?\"; else echo \"\$(hostname): not mounted\"; fi" 150
     done
 }
 

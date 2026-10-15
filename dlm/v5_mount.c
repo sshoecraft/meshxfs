@@ -763,6 +763,21 @@ struct mxfs_v5_dlm {
 	uint64_t                    drbd_excl_notice_ms;
 	uint64_t                    drbd_excl_asked_ms;
 	mxfs_node_id_t              drbd_excluded_node;
+	/* The fence method (mount option fence=, MXFS_V5_FENCE_*).  MANUAL and
+	 * VCENTER are the shared attachment (docs/shared-disk-attachment.md): a
+	 * disk with no SCSI arbitration, which like DRBD holds no PR context and
+	 * runs on the emulated compare-and-swap, and whose dead peer is fenced
+	 * by an operator's confirmation, by vCenter, or (QUORUM) by corosync's
+	 * vote, the loser ending its own boot (docs/quorum-takeover.md). */
+	int                         fence_method;
+	/* fence=quorum: this mount holds one arm of the host's quorum lease
+	 * (mxfs_pal_quorum_arm), released at the end of teardown */
+	bool                        quorum_armed;
+	/* the shared attachment's two endpoints, from peers= at arm: this
+	 * node's address and the other node's (the operator's view of who a
+	 * request to confirm is about) */
+	char                        shared_local[MXFS_PEER_ADDR_LEN];
+	char                        shared_peer[MXFS_PEER_ADDR_LEN];
 
 	/* Transport */
 	int                         transport;
@@ -1795,6 +1810,20 @@ struct mxfs_v5_dlm {
 	 * the read-modify-publish runs under this lock. */
 	mxfs_mutex_t                   *closure_lock;
 };
+
+/* The shared attachment: a disk with no SCSI arbitration, its dead peer fenced
+ * by an operator or by vCenter (docs/shared-disk-attachment.md). */
+static inline bool v5_shared_attach(const struct mxfs_v5_dlm *ctx)
+{
+	return ctx->drbd_minor < 0 && ctx->fence_method != MXFS_V5_FENCE_SCSIPR;
+}
+
+/* No SCSI arbitration under this mount: no PR context, no registrations and
+ * no COMPARE AND WRITE, the swap emulated (DRBD, or the shared attachment). */
+static inline bool v5_noscsi(const struct mxfs_v5_dlm *ctx)
+{
+	return ctx->drbd_minor >= 0 || v5_shared_attach(ctx);
+}
 
 /* out-of-closure scrub oracle — defined with the closure purge
  * family below, registered at CAW create time above it. */
@@ -5105,9 +5134,10 @@ static int v5_p305_settle_retire_pending(struct mxfs_v5_dlm *ctx)
 								     (uint32_t)slot, node,
 								     epoch, key,
 								     "own-registration-bracket");
-			} else if (key == 0 && ctx->drbd_minor >= 0) {
-				/* A DRBD incarnation names no key; its record settles
-				 * by the DRBD rule, which checks the record's own
+			} else if (v5_noscsi(ctx)) {
+				/* A DRBD incarnation names no key, and a shared one only
+				 * a derived key nothing registered; its record settles
+				 * by the no-key rule, which checks the record's own
 				 * attachment marker and refuses (WAITING) without it. */
 				rs = mxfs_disklock_retire_settle_slot(ctx->disklock,
 								      (uint32_t)slot, true);
@@ -5276,8 +5306,8 @@ static int v5_bootstrap_setup(struct mxfs_v5_dlm *ctx)
 	     r->state == MXFS_BOOTSTRAP_RECOVERING) &&
 		r->owner_node == ctx->boot_resume_node &&
 		r->owner_epoch == ctx->boot_resume_epoch &&
-		/* a DRBD owner's key is derived from its claim identity */
-		r->owner_pr_key == (ctx->drbd_minor >= 0 ?
+		/* a DRBD or shared owner's key is derived from its claim identity */
+		r->owner_pr_key == (v5_noscsi(ctx) ?
 				    v5_drbd_victim_key(ctx->boot_resume_node,
 						       ctx->boot_resume_epoch) :
 				    ctx->pr_key)) {
@@ -5980,8 +6010,9 @@ static int v5_bootstrap_resume_prepare(struct mxfs_v5_dlm *ctx,
 
 	*k_resumed = false;
 	rc = mxfs_bootstrap_resume(ctx->bootstrap, hid->host_uuid, hid->boot_uuid,
-				   /* a DRBD owner's key is derived from its claim identity */
-				   ctx->drbd_minor >= 0 ?
+				   /* a DRBD or shared owner's key is derived from its
+				    * claim identity */
+				   v5_noscsi(ctx) ?
 				   v5_drbd_victim_key(ctx->boot_resume_node,
 						      ctx->boot_resume_epoch) : ctx->pr_key,
 				   ctx->pr_key_gen, &node, &epoch);
@@ -6143,9 +6174,10 @@ static int v5_bootstrap_resume_prepare(struct mxfs_v5_dlm *ctx,
 			}
 			break;
 		case MXFS_BOOT_MF_VICTIM_NOSLICE:
-			/* on DRBD nothing registered: the startup fence certifies it,
-			 * and phase 3 accepts it without a registrant fence */
-			if (ctx->drbd_minor >= 0)
+			/* on DRBD or a shared disk nothing registered: the startup
+			 * fence (DRBD) or the victim's own evidence (shared)
+			 * certifies it in phase 3, without a registrant fence */
+			if (v5_noscsi(ctx))
 				break;
 			/* the ledger's FENCED entry is the durable certificate */
 			if (mxfs_prledger_find_by_key(ctx->prledger, me->pr_key, le) == 0 &&
@@ -6378,9 +6410,10 @@ static void v5_boot_fill_identity(struct mxfs_v5_dlm *ctx,
 	id->node_id = ctx->node_id;
 	id->key_gen = ctx->pr_key_gen;
 	id->epoch = ctx->disklock->epoch;
-	/* a DRBD contender holds no registration: its key is derived like the
-	 * claim's, so the term it reseals names it the way a resume checks */
-	id->pr_key = ctx->drbd_minor >= 0 ?
+	/* a DRBD or shared contender holds no registration: its key is derived
+	 * like the claim's, so the term it reseals names it the way a resume
+	 * checks */
+	id->pr_key = v5_noscsi(ctx) ?
 		     v5_drbd_victim_key(id->node_id, id->epoch) : ctx->pr_key;
 	id->host_src = (uint32_t)hid->host_src;
 }
@@ -6413,6 +6446,12 @@ static int v5_drbd_fence(struct mxfs_v5_dlm *ctx, int dead_slot,
 			 mxfs_node_id_t dead_node, mxfs_epoch_t dead_epoch,
 			 uint64_t victim_key, const uint8_t *victim_host,
 			 const uint8_t *victim_boot, struct mxfs_fence_result *fres);
+static int v5_shared_tk_fence(struct mxfs_v5_dlm *ctx,
+			      const struct mxfs_bootstrap_takeover_id *who,
+			      const char *what, uint32_t *kind_out);
+static int v5_shared_victim_ended(struct mxfs_v5_dlm *ctx, mxfs_node_id_t node,
+				  mxfs_epoch_t epoch, const uint8_t *host,
+				  const uint8_t *boot);
 
 /*
  * The DRBD takeover's exclusion of an old owner or a stale contender.  A DRBD
@@ -6548,6 +6587,8 @@ static int v5_boot_tk_fence_key(struct mxfs_v5_dlm *ctx,
 		return -EINVAL;
 	if (ctx->drbd_minor >= 0)
 		return v5_drbd_tk_fence(ctx, who, what, kind_out);
+	if (v5_shared_attach(ctx))
+		return v5_shared_tk_fence(ctx, who, what, kind_out);
 	if (mxfs_scsipr_key_present(ctx->scsipr, who->pr_key)) {
 		memset(&fres, 0, sizeof(fres));
 		rc = mxfs_scsipr_fence_node(ctx->scsipr, who->node_id, who->pr_key, 1,
@@ -6780,9 +6821,10 @@ static int v5_bootstrap_takeover_run(struct mxfs_v5_dlm *ctx,
 
 	if (!r0 || !ctx->bootstrap || !ctx->disklock)
 		return -EINVAL;
-	/* a DRBD contender has no registration, ledger or key: the attachment's
-	 * fence (kind 25) is its proof, as it is the claim's */
-	if (ctx->drbd_minor < 0 && (!ctx->scsipr || !ctx->prledger || !ctx->pr_key))
+	/* a DRBD or shared contender has no registration, ledger or key: the
+	 * attachment's fence (kinds 25, 28, 29) is its proof, as it is the
+	 * claim's */
+	if (!v5_noscsi(ctx) && (!ctx->scsipr || !ctx->prledger || !ctx->pr_key))
 		return -EINVAL;
 	if (!hid || !hid->host_valid || !hid->boot_valid)
 		return -ENOENT;
@@ -7399,8 +7441,10 @@ static int v5_bootstrap_takeover_run(struct mxfs_v5_dlm *ctx,
 	}
 	/* every key on the target must be explained by T+1's manifest; a DRBD
 	 * device has no registrations, and what the reconcile proves on SCSI is
-	 * here the startup fence still standing (asked at completion too) */
-	if (ctx->drbd_minor >= 0)
+	 * here the startup fence still standing (asked at completion too).  A
+	 * shared disk has none either, and its victims' certificates are death
+	 * certificates, which cannot lapse. */
+	if (v5_noscsi(ctx))
 		goto keys_explained;
 	rc = mxfs_scsipr_read_keys(ctx->scsipr, keys, 256, &nkeys, &prgen, &total);
 	if (rc == 0 && total > nkeys)
@@ -7800,7 +7844,7 @@ static int v5_bootstrap_run(struct mxfs_v5_dlm *ctx)
 		rc = -EPERM;
 		goto out;
 	}
-	if (ctx->drbd_minor >= 0)
+	if (v5_noscsi(ctx))
 		v5_drbd_name_victims(e, n);
 	/*
 	 * Every frozen record belongs to THIS host's THIS boot: a same-boot
@@ -7853,6 +7897,18 @@ static int v5_bootstrap_run(struct mxfs_v5_dlm *ctx)
 		rc = v5_drbd_startup_fence(ctx);
 		if (rc)
 			goto out;
+	} else if (v5_shared_attach(ctx)) {
+		/*
+		 * The shared attachment fences nothing up front.  Its records
+		 * carry identity blocks, so phase 3 certifies each victim from its
+		 * own boot having ended (v5_shared_fence): this host's earlier
+		 * boots by this one, another host's by vCenter or an operator.
+		 */
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "mxfs: P-SHARED-STARTUP victims=%u fence=%s -- total outage "
+			     "on a shared disk: each victim is certified in phase 3 "
+			     "from its own boot having ended",
+			     n, mxfs_v5_fence_method_name(ctx->fence_method));
 	} else if (!ctx->scsipr || !ctx->prledger || !ctx->pr_key) {
 		mxfs_pal_log(MXFS_LOG_ERR,
 			     "mxfs: P-BOOT-NOPR -- total outage detected (%u victims) "
@@ -7869,8 +7925,9 @@ static int v5_bootstrap_run(struct mxfs_v5_dlm *ctx)
 	id.node_id = ctx->node_id;
 	id.key_gen = ctx->pr_key_gen;
 	id.epoch = ctx->disklock->epoch;    /* drawn at create; pre-drawn below */
-	/* a DRBD owner holds no registration: its key is derived like a victim's */
-	id.pr_key = ctx->drbd_minor >= 0 ?
+	/* a DRBD or shared owner holds no registration: its key is derived like
+	 * a victim's */
+	id.pr_key = v5_noscsi(ctx) ?
 		    v5_drbd_victim_key(id.node_id, id.epoch) : ctx->pr_key;
 	id.host_src = (uint32_t)hid->host_src;
 	for (attempt = 0; attempt < 3; attempt++) {
@@ -7913,7 +7970,7 @@ sealscan:
 					  MXFS_BOOTSTRAP_SCAN_EARLY_MS, e,
 					  MXFS_BOOT_MF_MAX, &n, &victims, &moved,
 					  &unread, &noident);
-	if (rc == 0 && ctx->drbd_minor >= 0)
+	if (rc == 0 && v5_noscsi(ctx))
 		v5_drbd_name_victims(e, n);
 	if (rc == 0 && (moved || unread || (noident && ctx->drbd_minor < 0) ||
 			n == 0)) {
@@ -7926,9 +7983,10 @@ sealscan:
 	}
 	if (rc == 0 && ctx->boot_hb_lost)
 		rc = -ESTALE;
-	/* a DRBD attachment has no registrations to classify: its victims are
-	 * the manifest's records, all excluded by the startup fence */
-	if (rc == 0 && ctx->drbd_minor < 0)
+	/* a DRBD or shared attachment has no registrations to classify: its
+	 * victims are the manifest's records, excluded by the startup fence
+	 * (DRBD) or each certified from its own evidence (shared) */
+	if (rc == 0 && !v5_noscsi(ctx))
 		rc = v5_boot_classify_keys(ctx, e, &n, MXFS_BOOT_MF_MAX, &prgen,
 					   &nreg, &nabsent);
 	if (rc == 0)
@@ -8069,8 +8127,13 @@ phase3:
 				break;
 			case MXFS_BOOT_MF_VICTIM_NOSLICE:
 				/* no slice to replay; on DRBD no registration either, and
-				 * the startup fence already excludes its endpoint */
+				 * the startup fence already excludes its endpoint.  On a
+				 * shared disk its own boot must be shown ended, as for a
+				 * victim with a slice. */
 				rc = ctx->drbd_minor >= 0 ? 0 :
+				     v5_shared_attach(ctx) ?
+				     v5_shared_victim_ended(ctx, me->node_id, me->epoch,
+							    me->host_uuid, me->boot_uuid) :
 				     v5_boot_fence_registrant(ctx, ctx->boot_mf, n, i);
 				if (rc == 0) {
 					done[i] = 1;
@@ -8081,6 +8144,19 @@ phase3:
 						v5_note_dead_node(ctx, me->node_id);
 						v5_note_dead_inc(ctx, me->node_id, me->epoch);
 					}
+				} else if (v5_shared_attach(ctx)) {
+					/* not shown ended YET (an operator has not
+					 * confirmed, or vCenter did not answer): the term is
+					 * left RECOVERING for a resume, which finds the
+					 * confirmation, rather than made terminal */
+					mxfs_pal_log(MXFS_LOG_ERR,
+						     "mxfs: P-BOOT-SHARED-VICTIM-WAITING slot=%u "
+						     "node=%u inc=%llu fence=%s -- this victim's "
+						     "boot is not shown ended; the mount is refused "
+						     "and the term stays for a resume",
+						     me->slot, me->node_id,
+						     (unsigned long long)me->epoch,
+						     mxfs_v5_fence_method_name(ctx->fence_method));
 				} else {
 					refuse_reason = MXFS_BOOT_REFUSE_FENCE_UNPROVEN;
 					refuse_slot = me->slot;
@@ -8491,6 +8567,118 @@ static int v5_self_succeed(struct mxfs_v5_dlm *ctx)
 	memcpy(ctx->pr_succ.old_boot, old_boot, 16);
 	ctx->pr_succeeded = true;
 	return 0;
+}
+
+/*
+ * A REGISTER that conflicted on this nexus (-EEXIST) is diagnosed as a dirty
+ * predecessor of this host, and the remedies P305 offers fit that case.  They
+ * do not fit the other way to get here: two nodes reaching the LU through ONE
+ * initiator, as two VMs on one hypervisor host do through a passthrough disk
+ * (measured on vSphere: two guests on one ESXi host sharing a physical-mode
+ * RDM; the second guest's REGISTER conflicted on the key the first had just
+ * registered).  Then the key on our nexus is a live peer's, a peer's PREEMPT
+ * AND ABORT of it would cut off that peer and us together, and
+ * single_node_exclusive=1 would assert there is no other initiator while a
+ * cluster member is using this one.
+ *
+ * Proof, not inference from a name: our nexus holds some registered key.  If
+ * every key READ KEYS returns is the pr_key of a disklock record of ANOTHER
+ * boot, the key on our nexus is one of them, so that node registered through
+ * our initiator.  A truncated READ KEYS view, a key no record of another boot
+ * names, or an I/O error leaves the P305 diagnosis standing.  The mount is
+ * refused either way; this only says why.
+ */
+static void v5_shared_nexus_diag(struct mxfs_v5_dlm *ctx)
+{
+	const struct mxfs_host_identity *hid = mxfs_host_identity();
+	struct mxfs_disklock_heartbeat *r = NULL;
+	uint64_t *keys = NULL;
+	uint64_t matched = 0;          /* bit i: keys[i] names a record of another boot */
+	char peers[160];
+	int count = 0, total = 0, len = 0, i;
+	uint32_t slot;
+
+	if (!ctx->scsipr || !hid)
+		return;
+	keys = mxfs_pal_alloc(64 * sizeof(*keys));
+	r = mxfs_pal_alloc(sizeof(*r));
+	if (!keys || !r)
+		goto out;
+	if (mxfs_scsipr_read_keys(ctx->scsipr, keys, 64, &count, NULL, &total) ||
+	    count <= 0 || total > count)
+		goto out;
+	peers[0] = '\0';
+	for (slot = 0; slot < MXFS_DISKLOCK_HB_SLOTS; slot++) {
+		if (mxfs_pal_bdev_read_prio(ctx->dev, ctx->disklock_offset +
+					    (uint64_t)slot * MXFS_DISKLOCK_RECORD_SIZE,
+					    r, sizeof(*r)))
+			goto out;
+		if (r->magic != MXFS_DISKLOCK_MAGIC ||
+		    (r->flags != MXFS_DISKLOCK_FLAG_ACTIVE &&
+		     r->flags != MXFS_DISKLOCK_FLAG_WITHDRAWN) ||
+		    !mxfs_hb_identity_valid(r, slot) || r->ident.pr_key == 0 ||
+		    memcmp(r->ident.boot_uuid, hid->boot_uuid, 16) == 0)
+			continue;
+		for (i = 0; i < count; i++) {
+			if (keys[i] != r->ident.pr_key)
+				continue;
+			if (!(matched & (1ULL << i)) && len < (int)sizeof(peers) - 48)
+				len += snprintf(peers + len, sizeof(peers) - len,
+						"%snode %u (slot %u, %s, key 0x%llx)",
+						len ? ", " : "", r->node_id, slot,
+						r->flags == MXFS_DISKLOCK_FLAG_ACTIVE ?
+						"ACTIVE" : "WITHDRAWN",
+						(unsigned long long)r->ident.pr_key);
+			matched |= 1ULL << i;
+		}
+	}
+	for (i = 0; i < count; i++)
+		if (!(matched & (1ULL << i)))
+			goto out;
+	mxfs_pal_log(MXFS_LOG_ERR,
+		     "mxfs: P305-PR-NEXUS-SHARED-WITH-PEER -- every key registered "
+		     "on this LU belongs to another cluster member (%s), yet "
+		     "REGISTER on this node's I_T nexus conflicted: this node reaches "
+		     "the LU through the SAME initiator as that member, as VMs on "
+		     "one hypervisor host do through a passthrough disk (a VMware "
+		     "RDM, a QEMU SCSI passthrough).  SCSI reservations cannot fence "
+		     "one node of a shared initiator without the other.  Give each "
+		     "node its own initiator: one VM per hypervisor host, or an "
+		     "initiator inside each guest.  Do NOT set "
+		     "single_node_exclusive=1 here: a cluster member is using this "
+		     "initiator.", peers);
+out:
+	mxfs_pal_free(r);
+	mxfs_pal_free(keys);
+}
+
+/*
+ * Why a mount's PR registration failed, said in the operator's terms, for
+ * the two causes a deployment can get wrong: an initiator shared with a
+ * live peer (-EEXIST, above), and a device that implements no reservations
+ * at all, which the register path otherwise reports only as "could not
+ * decide whether this nexus holds our key" after retrying an unimplemented
+ * opcode as if it were a unit attention.  Logs only; the mount is refused
+ * by the caller whatever this finds.
+ */
+static void v5_pr_failure_diag(struct mxfs_v5_dlm *ctx, int rc)
+{
+	if (rc == -EEXIST) {
+		if (!ctx->single_node_exclusive)
+			v5_shared_nexus_diag(ctx);
+		return;
+	}
+	if (ctx->dev && mxfs_pal_scsi_pr_implemented(ctx->dev) == 0)
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P305-PR-NOT-IMPLEMENTED -- the device answers "
+			     "PERSISTENT RESERVE with ILLEGAL REQUEST / INVALID COMMAND "
+			     "OPERATION CODE: it implements no SCSI reservations, so no "
+			     "node using it can be fenced by the storage (fence=scsipr). "
+			     " A VMware multi-writer VMDK forwards none: mount it with "
+			     "fence=quorum, fence=vcenter or fence=manual and "
+			     "peers=<this node>/<the other node> "
+			     "(docs/shared-disk-attachment.md), or give the "
+			     "nodes an initiator inside each guest.");
 }
 
 /*
@@ -9517,7 +9705,7 @@ static void v5_gate_terminal_release(struct mxfs_v5_dlm *ctx, int dead_slot)
 static void v5_pr_worker_start(struct mxfs_v5_dlm *ctx)
 {
 	if (!ctx || ctx->fence_retry_thread || !ctx->disklock ||
-	    (!ctx->scsipr && ctx->drbd_minor < 0))
+	    (!ctx->scsipr && !v5_noscsi(ctx)))
 		return;
 	ctx->fence_retry_stop = 0;
 	ctx->fence_retry_thread =
@@ -10083,6 +10271,37 @@ static int v5_authority_lost_cb(void *data)
 	return (ctx && !mxfs_authority_ok(ctx->authority)) ? 1 : 0;
 }
 
+/*
+ * The CAW wait's give-up oracle (wait_giveup_fn).  A task that registered its
+ * inode acquire as fallible (the mount's root lookup) has nothing to wait for
+ * once a peer that died during this mount is recorded: that peer's grants stay
+ * frozen until the mount barrier replays its slice, and the barrier runs again
+ * only after the lookup fails.  This is the condition the XFS layer's
+ * P-MPHASE-ACQ-GIVEUP arm tests after the acquire returns; asking it every lap
+ * ends the wait when the death is recorded, not when the budget runs out.
+ * The lookup's AG acquire (the untrusted iget's, registered by
+ * mxfs_ag_dlm_lock_fallible_for) is asked too: it is the wait measured on
+ * the dead peer's grant (P-MPHASE-AGLOCK-GIVEUP rc=-110 after 120 s), and the
+ * XFS layer turns its failure into the same barrier re-run.
+ */
+static int v5_wait_giveup_cb(void *data, const struct mxfs_resource_id *res)
+{
+	struct mxfs_v5_dlm *ctx = data;
+	int fallible;
+
+	if (!ctx || !res)
+		return 0;
+	if (res->type == MXFS_LTYPE_INODE)
+		fallible = mxfs_acq_task_fallible_for(res->ino);
+	else if (res->type == MXFS_LTYPE_AG)
+		fallible = mxfs_acq_task_fallible_for_ag(res->ag_number);
+	else
+		return 0;
+	if (!fallible)
+		return 0;
+	return mxfs_v5_dlm_mount_peek_late_deaths(ctx) != 0 ? 1 : 0;
+}
+
 static int v5_recovery_blocked_cb(void *data, mxfs_node_id_t node)
 {
 	return mxfs_v5_dlm_node_recovery_blocked(data, node);
@@ -10610,12 +10829,13 @@ static void v5_fence_retry_worker_fn(void *arg)
 		 * recovery-pending marker, and v5_node_death_fence_and_recover already
 		 * routes that case to the deferred late-death dispatch.
 		 */
-		/* A DRBD mount fences through its witness (v5_drbd_fence), not a PR
-		 * context, so its deaths are drained and its attempts re-driven here
-		 * too; every PR-only step below keeps its own ctx->scsipr test. */
-		if (ctx->disklock && (ctx->scsipr || ctx->drbd_minor >= 0))
+		/* A DRBD or shared mount fences through its own method
+		 * (v5_drbd_fence, v5_shared_fence), not a PR context, so its
+		 * deaths are drained and its attempts re-driven here too; every
+		 * PR-only step below keeps its own ctx->scsipr test. */
+		if (ctx->disklock && (ctx->scsipr || v5_noscsi(ctx)))
 			v5_death_fence_drain(ctx);
-		if (!ctx->disklock || (!ctx->scsipr && ctx->drbd_minor < 0) ||
+		if (!ctx->disklock || (!ctx->scsipr && !v5_noscsi(ctx)) ||
 		    !ctx->mounted)
 			continue;
 
@@ -11803,6 +12023,570 @@ static int v5_drbd_fence(struct mxfs_v5_dlm *ctx, int dead_slot,
 	return 0;
 }
 
+/* ════════════════════ THE SHARED ATTACHMENT ════════════════════
+ *
+ * docs/shared-disk-attachment.md.  A disk both nodes read and write with no
+ * SCSI arbitration at all (a multi-writer VMDK): no reservation to fence by,
+ * no COMPARE AND WRITE.  Like DRBD it holds no PR context and runs on the
+ * emulated compare-and-swap; unlike DRBD there is no replication link whose
+ * state could say anything about the peer, so the evidence that a victim
+ * can no longer write is about its NODE: the boot that ran it has ended.
+ *
+ *   - an earlier boot of THIS host has ended, because this host runs a later
+ *     one (one kernel per machine; a boot resets the disk controller).  Two
+ *     nodes never share a host identity: the swap's attach refuses it.
+ *   - fence=vcenter: the helper asks vCenter about the VM its node tagged,
+ *     from inside it, with the victim's host identity; the boot ended when
+ *     that VM is powered off (by this request or already) or tagged by a
+ *     later boot.
+ *   - fence=manual: an operator confirmed the request naming exactly that
+ *     incarnation.
+ *
+ * Each is a death certificate: a boot that ended does not return, so nothing
+ * re-takes it (v5_exclusion_recheck), and the peer's later boot is a new
+ * incarnation that meets admission like any other.
+ */
+
+/* An identity block needs a nonzero key; the shared attachment registers
+ * none, so it carries one derived from this incarnation, as DRBD's
+ * certificates do. */
+static uint64_t v5_shared_ident_key(const struct mxfs_v5_dlm *ctx)
+{
+	return v5_drbd_victim_key(ctx->node_id,
+				  ctx->disklock ? (mxfs_epoch_t)ctx->disklock->epoch : 1);
+}
+
+/* Dotted IPv4 to a host-order value; false when it is not one. */
+static bool v5_ipv4_value(const char *s, uint32_t *out)
+{
+	uint32_t v = 0, part;
+	int dots = 0, digits;
+
+	if (!s || !*s)
+		return false;
+	for (;;) {
+		part = 0;
+		digits = 0;
+		while (*s >= '0' && *s <= '9' && digits < 4) {
+			part = part * 10 + (uint32_t)(*s - '0');
+			s++;
+			digits++;
+		}
+		if (!digits || part > 255)
+			return false;
+		v = (v << 8) | part;
+		if (*s == '.' && dots < 3) {
+			dots++;
+			s++;
+			continue;
+		}
+		break;
+	}
+	if (*s || dots != 3)
+		return false;
+	*out = v;
+	return true;
+}
+
+static bool v5_uuid_zero(const uint8_t *u)
+{
+	static const uint8_t none[16];
+
+	return !u || !memcmp(u, none, 16);
+}
+
+/*
+ * Has boot `boot` of host `host` ended?  1 = yes, with *obs saying how;
+ * 0 = not shown (why says what is missing); never an error a caller could
+ * mistake for evidence.  `act`: fence=vcenter may power the VM off first.
+ * fence=manual consults only the confirmations already given.
+ */
+static int v5_shared_boot_ended(struct mxfs_v5_dlm *ctx, const uint8_t *host,
+				const uint8_t *boot, bool act, uint64_t alive_ms,
+				int slot, uint8_t *obs, char *why, size_t whylen)
+{
+	const struct mxfs_host_identity *hid = mxfs_host_identity();
+	struct mxfs_pal_fenceh_report *r;
+	int rc, ended = 0;
+
+	*obs = MXFS_RETIRE_OBS_UNKNOWN;
+	if (v5_uuid_zero(host) || v5_uuid_zero(boot)) {
+		snprintf(why, whylen, "the victim's host or boot is not recorded");
+		return 0;
+	}
+	if (!hid || !hid->host_valid || !hid->boot_valid) {
+		snprintf(why, whylen, "this host's own identity is not known");
+		return 0;
+	}
+	if (!memcmp(host, hid->host_uuid, 16)) {
+		if (!memcmp(boot, hid->boot_uuid, 16)) {
+			snprintf(why, whylen, "the victim is this host's current boot");
+			return 0;
+		}
+		*obs = MXFS_RETIRE_OBS_HOST_BOOTED_AGAIN;
+		return 1;
+	}
+	if (ctx->fence_method == MXFS_V5_FENCE_MANUAL) {
+		if (mxfs_pal_fence_req_boot_confirmed(ctx->volume_uuid, host, boot) == 1) {
+			*obs = MXFS_RETIRE_OBS_OPERATOR_CONFIRMED;
+			return 1;
+		}
+		snprintf(why, whylen, "no operator has confirmed that boot stopped");
+		return 0;
+	}
+	if (ctx->fence_method == MXFS_V5_FENCE_QUORUM) {
+		uint8_t ph[16], pb[16];
+		uint64_t gone_ms = 0;
+
+		/*
+		 * The peer's swap register names the boot of the peer's latest
+		 * attachment: a later boot of the victim's host has attached, so
+		 * the victim's boot is over without waiting out the bound.
+		 */
+		if (mxfs_pal_shared_cas_peer_boot(ctx->dev, ph, pb) == 1 &&
+		    !memcmp(ph, host, 16) && memcmp(pb, boot, 16)) {
+			*obs = MXFS_RETIRE_OBS_HOST_BOOTED_AGAIN;
+			return 1;
+		}
+		/*
+		 * Or the peer, a member again, announced over corosync that its
+		 * host runs a later boot (mxfs_quorumd): a loser that reset and
+		 * came back before the bound ran out, not mounted yet.
+		 */
+		if (mxfs_pal_quorum_peer_boot(ctx->shared_peer, ph, pb) == 1 &&
+		    !memcmp(ph, host, 16) && memcmp(pb, boot, 16)) {
+			*obs = MXFS_RETIRE_OBS_HOST_BOOTED_AGAIN;
+			return 1;
+		}
+		/*
+		 * Otherwise the vote: held by this node with the peer out of the
+		 * membership for the whole takeover bound, by the end of which a
+		 * loser has ended its own boot (docs/quorum-takeover.md) — an
+		 * absence going on, or one that ended after the victim was last
+		 * seen alive (alive_ms).
+		 */
+		if (mxfs_pal_quorum_peer_gone(ctx->shared_peer, alive_ms,
+					      &gone_ms, why, whylen) != 1)
+			return 0;
+		/*
+		 * The deadline proves the boot over only for a loser that did end
+		 * it.  A peer whose heartbeat is still being written did not, and
+		 * nothing is taken over from it (docs/quorum-takeover.md,
+		 * takeover condition 3).  A death the TCP or lease layer declared
+		 * leaves the disk monitor no longer watching the slot, so it is
+		 * read here, twice, more than a heartbeat apart.
+		 */
+		if (slot >= 0 && ctx->disklock) {
+			int moving = mxfs_disklock_slot_hb_changing(
+				ctx->disklock, slot,
+				MXFS_DISKLOCK_HB_INTERVAL_MS * 5 / 2);
+
+			if (moving != 0) {
+				snprintf(why, whylen, "the vote has been held without the "
+					 "peer for the whole bound, but its heartbeat in slot "
+					 "%d is %s: it did not end its boot",
+					 slot, moving > 0 ? "still being written" :
+					 "unreadable");
+				mxfs_pal_log_repeating(MXFS_LOG_ERR,
+					     "mxfs: P-QUORUM-LOSER-STILL-WRITING slot=%d "
+					     "peer=%s rc=%d -- this node holds the vote without "
+					     "the peer, yet the peer's heartbeat still changes: "
+					     "it lost the vote and did not end its boot.  "
+					     "Nothing is taken over from it",
+					     slot, ctx->shared_peer, moving);
+				return 0;
+			}
+		}
+		*obs = MXFS_RETIRE_OBS_QUORUM_LOSER_DEADLINE_PASSED;
+		return 1;
+	}
+	if (ctx->fence_method != MXFS_V5_FENCE_VCENTER) {
+		snprintf(why, whylen, "no shared-attachment fence method");
+		return 0;
+	}
+	r = mxfs_pal_alloc(sizeof(*r));
+	if (!r) {
+		snprintf(why, whylen, "no memory for the helper's report");
+		return 0;
+	}
+	rc = mxfs_pal_fence_helper(act ? MXFS_PAL_FENCEH_FENCE : MXFS_PAL_FENCEH_CHECK,
+				   host, boot, r);
+	if (rc || !r->delivered) {
+		snprintf(why, whylen, "the vCenter helper gave no report (rc=%d %s)",
+			 rc, r->reason);
+	} else if (!strcmp(r->result, "ENDED") && !strcmp(r->how, "POWERED_OFF")) {
+		*obs = MXFS_RETIRE_OBS_VCENTER_VM_POWERED_OFF;
+		ended = 1;
+	} else if (!strcmp(r->result, "ENDED") && !strcmp(r->how, "BOOTED_AGAIN")) {
+		*obs = MXFS_RETIRE_OBS_HOST_BOOTED_AGAIN;
+		ended = 1;
+	} else {
+		snprintf(why, whylen, "vCenter: result=%s how=%s vm='%s' power=%s "
+			 "vm_boot=%s detail='%s'", r->result, r->how, r->vm, r->power,
+			 r->vm_boot, r->detail);
+	}
+	mxfs_pal_free(r);
+	return ended;
+}
+
+/*
+ * THE SHARED FENCE LEG (kinds 28, 29).  Nothing is issued to the storage, so
+ * every outcome is PRECOMMAND until the victim's boot is shown ended: an
+ * attempt that cannot show it yet (no confirmation, vCenter unreachable) is
+ * retried with nothing consumed, and the fence series' BLOCKED state then
+ * fails the dead node's grants fast while it waits.  The victim's host and
+ * boot are the caller's (a takeover's record) or its identity block frozen at
+ * the death.
+ */
+static int v5_shared_fence(struct mxfs_v5_dlm *ctx, int dead_slot,
+			   mxfs_node_id_t dead_node, mxfs_epoch_t dead_epoch,
+			   uint64_t victim_key, const uint8_t *victim_host,
+			   const uint8_t *victim_boot, struct mxfs_fence_result *fres)
+{
+	uint8_t host[16], boot[16], obs = MXFS_RETIRE_OBS_UNKNOWN;
+	char why[256];
+	uint64_t alive_ms;
+	bool known;
+	int ended;
+
+	memset(fres, 0, sizeof(*fres));
+	fres->phase = MXFS_FENCE_PHASE_PRECOMMAND;
+	fres->kind = MXFS_FENCE_KIND_NOT_REGISTERED;
+	fres->victim_key = victim_key;
+	if (dead_node == ctx->node_id)
+		return -EINVAL;
+	why[0] = '\0';
+	if (victim_host && victim_boot) {
+		memcpy(host, victim_host, 16);
+		memcpy(boot, victim_boot, 16);
+		known = true;
+	} else {
+		known = ctx->disklock && dead_slot >= 0 &&
+			mxfs_disklock_victim_identity(ctx->disklock, dead_slot,
+						      dead_node, dead_epoch, host, boot);
+	}
+	if (!known) {
+		mxfs_pal_log_repeating(MXFS_LOG_WARN,
+			     "mxfs: P238-SHARED-FENCE-NOIDENT slot=%d node=%u epoch=%llu "
+			     "-- no identity block names the victim's host and boot, so "
+			     "nothing can be asked about it.  Nothing was issued; the "
+			     "attempt is retried",
+			     dead_slot, dead_node, (unsigned long long)dead_epoch);
+		return 0;
+	}
+	/* when this node last saw the victim's heartbeat change (fence=quorum
+	 * asks for an absence of the peer that ended after it); 0 = unknown */
+	alive_ms = ctx->disklock && dead_slot >= 0 &&
+		   dead_slot < MXFS_DISKLOCK_HB_SLOTS ?
+		   ctx->disklock->node_track[dead_slot].last_change_ms : 0;
+	ended = v5_shared_boot_ended(ctx, host, boot, true, alive_ms, dead_slot,
+				     &obs, why, sizeof(why));
+	if (!ended && ctx->fence_method == MXFS_V5_FENCE_MANUAL &&
+	    !v5_uuid_zero(host) && !v5_uuid_zero(boot)) {
+		struct mxfs_pal_fence_req req;
+
+		memset(&req, 0, sizeof(req));
+		memcpy(req.fs_uuid, ctx->volume_uuid, 16);
+		req.slot = (uint32_t)dead_slot;
+		req.node = dead_node;
+		req.epoch = (uint64_t)dead_epoch;
+		memcpy(req.host, host, 16);
+		memcpy(req.boot, boot, 16);
+		snprintf(req.peer, sizeof(req.peer), "%s", ctx->shared_peer);
+		if (mxfs_pal_fence_req_post(&req) == 1) {
+			obs = MXFS_RETIRE_OBS_OPERATOR_CONFIRMED;
+			ended = 1;
+		}
+	}
+	if (!ended) {
+		mxfs_pal_log_repeating(MXFS_LOG_WARN,
+			     "mxfs: P238-SHARED-FENCE-NOT-YET slot=%d node=%u epoch=%llu "
+			     "fence=%s -- %s.  Nothing was issued; the attempt is "
+			     "retried",
+			     dead_slot, dead_node, (unsigned long long)dead_epoch,
+			     mxfs_v5_fence_method_name(ctx->fence_method), why);
+		return 0;
+	}
+	fres->kind = ctx->fence_method == MXFS_V5_FENCE_MANUAL ?
+		     MXFS_FENCE_KIND_SHARED_MANUAL_V1 :
+		     ctx->fence_method == MXFS_V5_FENCE_QUORUM ?
+		     MXFS_FENCE_KIND_SHARED_QUORUM_V1 :
+		     MXFS_FENCE_KIND_SHARED_VCENTER_V1;
+	fres->resv_type = 0;
+	fres->phase = MXFS_FENCE_PHASE_VERIFIED;
+	fres->retire_basis = MXFS_RETIRE_BASIS_NODE_STOPPED;
+	fres->retire_obs = obs;
+	fres->retire_claim =
+		obs == MXFS_RETIRE_OBS_VCENTER_VM_POWERED_OFF ?
+			MXFS_RETIRE_CLAIM_HYPERVISOR_REPORTS_VM_OFF :
+		obs == MXFS_RETIRE_OBS_OPERATOR_CONFIRMED ?
+			MXFS_RETIRE_CLAIM_OPERATOR_ASSERTS_NODE_STOPPED :
+		obs == MXFS_RETIRE_OBS_QUORUM_LOSER_DEADLINE_PASSED ?
+			MXFS_RETIRE_CLAIM_QUORUM_LOSER_ENDED_ITS_BOOT :
+			MXFS_RETIRE_CLAIM_VICTIM_BOOT_ENDED;
+	{
+		char hs[37], bs[37];
+
+		mxfs_uuid_format(host, hs);
+		mxfs_uuid_format(boot, bs);
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "mxfs: P238-SHARED-FENCE-ENDED slot=%d node=%u epoch=%llu "
+			     "fence=%s kind=%d obs=%s host=%s boot=%s -- the victim's "
+			     "boot has ended (a death certificate, not a fence)",
+			     dead_slot, dead_node, (unsigned long long)dead_epoch,
+			     mxfs_v5_fence_method_name(ctx->fence_method), fres->kind,
+			     mxfs_retire_observation_name(obs), hs, bs);
+	}
+	return 0;
+}
+
+/* A bootstrap victim with no slice: 0 once its boot is shown ended. */
+static int v5_shared_victim_ended(struct mxfs_v5_dlm *ctx, mxfs_node_id_t node,
+				  mxfs_epoch_t epoch, const uint8_t *host,
+				  const uint8_t *boot)
+{
+	struct mxfs_fence_result fres;
+
+	v5_shared_fence(ctx, -1, node, epoch, v5_drbd_victim_key(node, epoch),
+			host, boot, &fres);
+	return mxfs_fence_kind_proves_exclusion(fres.kind) ? 0 : -EAGAIN;
+}
+
+/*
+ * The shared takeover's exclusion of an old owner or a stale contender: its
+ * boot shown ended, asked through the fence leg.  Bounded like DRBD's: a
+ * vCenter power-off completes within it; an operator's confirmation usually
+ * does not, and the takeover is then refused with the request posted, so the
+ * next mount attempt finds it confirmed.
+ */
+#define V5_SHARED_TK_FENCE_MS	20000
+static int v5_shared_tk_fence(struct mxfs_v5_dlm *ctx,
+			      const struct mxfs_bootstrap_takeover_id *who,
+			      const char *what, uint32_t *kind_out)
+{
+	struct mxfs_fence_result fres;
+	uint64_t t0 = mxfs_pal_time_ms();
+	int rc;
+
+	for (;;) {
+		rc = v5_shared_fence(ctx, -1, who->node_id, who->epoch, who->pr_key,
+				     who->host_uuid, who->boot_uuid, &fres);
+		if (rc)
+			break;
+		if (mxfs_fence_kind_proves_exclusion(fres.kind)) {
+			mxfs_pal_log(MXFS_LOG_WARN,
+				     "mxfs: P-BOOT-TAKEOVER-FENCE-SHARED what=%s node=%u "
+				     "inc=%llu key=0x%llx kind=%d obs=%s waited_ms=%llu -- "
+				     "its boot has ended", what, who->node_id,
+				     (unsigned long long)who->epoch,
+				     (unsigned long long)who->pr_key, fres.kind,
+				     mxfs_retire_observation_name(fres.retire_obs),
+				     (unsigned long long)(mxfs_pal_time_ms() - t0));
+			*kind_out = fres.kind;
+			return 0;
+		}
+		if (mxfs_pal_time_ms() - t0 > V5_SHARED_TK_FENCE_MS) {
+			rc = -ETIMEDOUT;
+			break;
+		}
+		if (mxfs_pal_fatal_signal_pending()) {
+			rc = -EINTR;
+			break;
+		}
+		mxfs_pal_sleep_ms(2000);
+	}
+	mxfs_pal_log(MXFS_LOG_ERR,
+		     "mxfs: P-BOOT-TAKEOVER-FENCE-SHARED-UNPROVEN what=%s node=%u "
+		     "inc=%llu rc=%d waited_ms=%llu -- its boot is not shown ended; "
+		     "the takeover is refused (record left as it stands)",
+		     what, who->node_id, (unsigned long long)who->epoch, rc,
+		     (unsigned long long)(mxfs_pal_time_ms() - t0));
+	return rc;
+}
+
+/* The emulated swap's question about the boot that wrote the peer's register
+ * (pal/linux/drbd.c, mxfs_shared_peer_set_aside_locked). */
+static int v5_shared_peer_fenced(void *data, const uint8_t *host,
+				 const uint8_t *boot, int act)
+{
+	struct mxfs_v5_dlm *ctx = data;
+	char why[256] = "";
+	uint8_t obs;
+	int ended = v5_shared_boot_ended(ctx, host, boot, act != 0, 0, -1, &obs,
+					 why, sizeof(why));
+
+	if (!ended && act)
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P-SHARED-CAS-PEER-STALLED peer=%s fence=%s -- the "
+			     "peer has held the swap lock past the wait bound and its "
+			     "boot is not shown ended (%s); this swap fails",
+			     ctx->shared_peer,
+			     mxfs_v5_fence_method_name(ctx->fence_method), why);
+	return ended;
+}
+
+/*
+ * THE SHARED ATTACHMENT'S ADMISSION.  The cluster is exactly two nodes named
+ * by peers= (exclusive: no stranger is admitted by multicast), one of them
+ * this host; the lower address is participant 0 of the emulated swap.  The
+ * method arms first: vCenter tags this node's own VM with its host and boot
+ * identity (refused if vCenter cannot be reached, the VM cannot be found
+ * uniquely, or another VM carries this host's tag); manual says loudly that
+ * no automatic fence exists.  Then the swap is attached on the bootstrap
+ * region's reserved sectors, as DRBD's is.
+ */
+static int v5_shared_arm(struct mxfs_v5_dlm *ctx,
+			 const struct mxfs_static_peers *peers)
+{
+	const struct mxfs_host_identity *hid = mxfs_host_identity();
+	uint32_t i, nlocal = 0, nother = 0, a_local = 0, a_peer = 0;
+	int rc, index;
+
+	ctx->shared_local[0] = '\0';
+	ctx->shared_peer[0] = '\0';
+	if (!mxfs_static_peers_exclusive(peers)) {
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P-SHARED-ARM-REFUSED fence=%s -- a shared disk "
+			     "needs the whole cluster named: mount with "
+			     "peers=<this node>/<the other node>",
+			     mxfs_v5_fence_method_name(ctx->fence_method));
+		return -EPERM;
+	}
+	for (i = 0; i < peers->count; i++) {
+		if (mxfs_pal_ipv4_is_local(peers->addr[i])) {
+			nlocal++;
+			snprintf(ctx->shared_local, sizeof(ctx->shared_local), "%s",
+				 peers->addr[i]);
+		} else {
+			nother++;
+			snprintf(ctx->shared_peer, sizeof(ctx->shared_peer), "%s",
+				 peers->addr[i]);
+		}
+	}
+	if (nlocal != 1 || nother != 1 ||
+	    !v5_ipv4_value(ctx->shared_local, &a_local) ||
+	    !v5_ipv4_value(ctx->shared_peer, &a_peer)) {
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P-SHARED-ARM-REFUSED fence=%s local=%u other=%u -- "
+			     "peers= must name exactly two IPv4 addresses, one of them "
+			     "this host's: the shared attachment's swap is a two-party "
+			     "lock",
+			     mxfs_v5_fence_method_name(ctx->fence_method), nlocal, nother);
+		return -EPERM;
+	}
+	index = a_local < a_peer ? 0 : 1;
+	if (!ctx->bootstrap_offset) {
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P-SHARED-ARM-REFUSED -- the volume has no bootstrap "
+			     "region, so no sectors for the compare-and-swap");
+		return -EPERM;
+	}
+	if (!hid || !hid->host_valid || !hid->boot_valid) {
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P-SHARED-ARM-REFUSED -- this host's identity "
+			     "(/etc/machine-id and the boot id) is not known, and every "
+			     "fence on a shared disk names its victim by it");
+		return -EPERM;
+	}
+	if (ctx->fence_method == MXFS_V5_FENCE_VCENTER) {
+		struct mxfs_pal_fenceh_report *r = mxfs_pal_alloc(sizeof(*r));
+
+		if (!r)
+			return -ENOMEM;
+		rc = mxfs_pal_fence_helper(MXFS_PAL_FENCEH_ARM, hid->host_uuid,
+					   hid->boot_uuid, r);
+		if (rc || !r->delivered || strcmp(r->result, "ARMED")) {
+			mxfs_pal_log(MXFS_LOG_ERR,
+				     "mxfs: P-SHARED-ARM-REFUSED fence=vcenter rc=%d "
+				     "reason=%s result=%s vm='%s' detail='%s' -- this "
+				     "node's VM could not be tagged in vCenter, so a peer "
+				     "could not fence it (see /etc/mxfs/vcenter.conf and "
+				     "docs/shared-disk-attachment.md)",
+				     rc, r->delivered ? "-" : r->reason, r->result,
+				     r->vm, r->detail);
+			mxfs_pal_free(r);
+			return -EPERM;
+		}
+		mxfs_pal_log(MXFS_LOG_INFO,
+			     "mxfs: P-SHARED-ARM-VCENTER vm='%s' power=%s upcall_ms=%u "
+			     "-- this node's VM carries its host and boot identity",
+			     r->vm, r->power, r->upcall_wall_ms);
+		mxfs_pal_free(r);
+	} else if (ctx->fence_method == MXFS_V5_FENCE_MANUAL) {
+		if (!mxfs_pal_fence_confirm_channel()) {
+			mxfs_pal_log(MXFS_LOG_ERR,
+				     "mxfs: P-SHARED-ARM-REFUSED fence=manual -- "
+				     "/proc/fs/mxfs/fence_confirm does not exist, so no "
+				     "operator could ever confirm a dead peer");
+			return -EPERM;
+		}
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "mxfs: P-SHARED-ARM-MANUAL peer=%s -- fence=manual: this "
+			     "disk has no automatic fence.  When a node dies, its "
+			     "recovery waits until an operator confirms, through "
+			     "/proc/fs/mxfs/fence_confirm, that its machine is powered "
+			     "off; until then what it held stays frozen",
+			     ctx->shared_peer);
+	} else if (ctx->fence_method == MXFS_V5_FENCE_QUORUM) {
+		char why[192] = "";
+
+		/*
+		 * Armed only while this node holds corosync's vote with the peer in
+		 * the membership and the QDevice voting.  From here on this host's
+		 * boot ends if it loses the vote while the filesystem is mounted
+		 * (docs/quorum-takeover.md).
+		 */
+		rc = mxfs_pal_quorum_arm(ctx->shared_peer, why, sizeof(why));
+		if (rc) {
+			mxfs_pal_log(MXFS_LOG_ERR,
+				     "mxfs: P-SHARED-ARM-REFUSED fence=quorum peer=%s rc=%d "
+				     "-- %s (docs/quorum-takeover.md)",
+				     ctx->shared_peer, rc, why);
+			return -EPERM;
+		}
+		ctx->quorum_armed = true;
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "mxfs: P-SHARED-ARM-QUORUM peer=%s takeover_ms=%llu -- "
+			     "fence=quorum: this host holds corosync's vote with its "
+			     "peer; if it loses the vote while mounted, its boot is "
+			     "ended at once",
+			     ctx->shared_peer,
+			     (unsigned long long)mxfs_pal_quorum_takeover_ms());
+	} else {
+		return -EINVAL;
+	}
+	rc = mxfs_pal_shared_cas_attach(ctx->dev,
+					ctx->bootstrap_offset +
+					(uint64_t)MXFS_BOOT_SEC_DRBD_CAS *
+					MXFS_BOOTSTRAP_REC_BYTES,
+					(unsigned int)index, ctx->volume_uuid,
+					ctx->shared_local, ctx->shared_peer,
+					hid->host_uuid, hid->boot_uuid);
+	if (rc) {
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P-SHARED-ARM-REFUSED -- the compare-and-swap "
+			     "could not be attached (rc=%d)", rc);
+		if (ctx->quorum_armed) {
+			mxfs_pal_quorum_disarm();
+			ctx->quorum_armed = false;
+		}
+		return rc;
+	}
+	mxfs_pal_shared_cas_set_fenced(ctx->dev, v5_shared_peer_fenced, ctx);
+	{
+		char hs[37], bs[37];
+
+		mxfs_uuid_format(hid->host_uuid, hs);
+		mxfs_uuid_format(hid->boot_uuid, bs);
+		mxfs_pal_log(MXFS_LOG_INFO,
+			     "mxfs: P-SHARED-ARM-ADMITTED fence=%s index=%d local=%s "
+			     "peer=%s host=%s boot=%s",
+			     mxfs_v5_fence_method_name(ctx->fence_method), index,
+			     ctx->shared_local, ctx->shared_peer, hs, bs);
+	}
+	return 0;
+}
+
 static int v5_pr_fence_prove_locked(struct mxfs_v5_dlm *ctx,
 				    mxfs_node_id_t dead_node,
 				    int dead_slot, mxfs_epoch_t dead_epoch,
@@ -11842,7 +12626,7 @@ static int v5_pr_fence_prove_locked(struct mxfs_v5_dlm *ctx,
 		return -ENODATA;
 	}
 
-	if (!ctx->scsipr && ctx->drbd_minor < 0) {
+	if (!ctx->scsipr && !v5_noscsi(ctx)) {
 		/*
 		 * No PR context at all.  This must fail closed — no foreign replay,
 		 * no grant release, no sector zeroing.  Say so once, here, where the
@@ -11914,7 +12698,7 @@ static int v5_pr_fence_prove_locked(struct mxfs_v5_dlm *ctx,
 	 * instead (v5_drbd_victim_key) — the same incarnation the descriptor's
 	 * own victim fields name, carried where the key field requires a value.
 	 */
-	intent_key = ctx->drbd_minor >= 0 ?
+	intent_key = v5_noscsi(ctx) ?
 	    v5_drbd_victim_key(dead_node, dead_epoch) :
 	    mxfs_disklock_victim_key(ctx->disklock, dead_slot, dead_node,
 				     dead_epoch, NULL);
@@ -12020,6 +12804,21 @@ static int v5_pr_fence_prove_locked(struct mxfs_v5_dlm *ctx,
 		 * proves nothing stays PRECOMMAND and is retried. */
 		fret = v5_drbd_fence(ctx, dead_slot, dead_node, dead_epoch,
 				     intent_key, NULL, NULL, &fres);
+		/* the summary every fence leg reports, whatever proved it */
+		mxfs_pal_log_attempt(mxfs_fence_kind_proves_exclusion(fres.kind),
+			     MXFS_LOG_WARN,
+			     "mxfs: P236-FENCEKIND node=%u kind=%s(%d) proves_excl=%d "
+			     "gen=%u rc=%d [prover slot=%d term=%u]",
+			     dead_node, mxfs_fence_kind_name(fres.kind),
+			     (int)fres.kind,
+			     mxfs_fence_kind_proves_exclusion(fres.kind) ? 1 : 0,
+			     fres.pr_generation, fres.rc, dead_slot, fauth.fence_term);
+	} else if (v5_shared_attach(ctx)) {
+		/* The shared attachment: the victim's boot shown ended by the
+		 * mount's method.  Nothing is issued to the storage, so an attempt
+		 * that proves nothing stays PRECOMMAND and is retried. */
+		fret = v5_shared_fence(ctx, dead_slot, dead_node, dead_epoch,
+				       intent_key, NULL, NULL, &fres);
 		/* the summary every fence leg reports, whatever proved it */
 		mxfs_pal_log_attempt(mxfs_fence_kind_proves_exclusion(fres.kind),
 			     MXFS_LOG_WARN,
@@ -14280,6 +15079,9 @@ static void v5_auth_withdraw_worker_fn(void *arg)
 				     "mxfs: P-DBG-AUTH-WITHDRAW-THREAD-PAUSE-END node=%u -- "
 				     "TEST: the withdraw thread resumes", ctx->node_id);
 		}
+		/* a peer may be asking whether this node lost the LUN: answer
+		 * before the pump, so a close made here withdraws on this tick */
+		mxfs_authority_isolation_check(ctx->authority);
 		v5_authority_withdraw_pump(ctx, "withdraw-thread");
 	}
 }
@@ -16413,6 +17215,28 @@ static int v5_exclusion_recheck(struct mxfs_v5_dlm *ctx, mxfs_node_id_t victim,
 	if (ctx->drbd_minor >= 0 &&
 	    cert_kind == MXFS_FENCE_KIND_DRBD_PEER_SECONDARY_V1)
 		return 0;
+	/*
+	 * So are the shared attachment's (kinds 28, 29): a boot that ended — its
+	 * VM powered off or booted again, or confirmed stopped — does not come
+	 * back.  A later boot of that host is a new incarnation, which reaches
+	 * this slice only through admission.  The VM may well be running again by
+	 * now, which is no lapse.  Any other kind on such a mount has nothing to
+	 * re-take it with: the code below asks SCSI or DRBD.
+	 */
+	if (v5_shared_attach(ctx)) {
+		if (cert_kind == MXFS_FENCE_KIND_SHARED_MANUAL_V1 ||
+		    cert_kind == MXFS_FENCE_KIND_SHARED_VCENTER_V1 ||
+		    cert_kind == MXFS_FENCE_KIND_SHARED_QUORUM_V1)
+			return 0;
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P239-SHARED-KIND-REFUSED site=%s slot=%u victim=%u "
+			     "kind=%s -- a shared-disk mount re-takes only its own "
+			     "death certificates; NOTHING further is replayed, purged "
+			     "or published for this slice",
+			     site, dead_slot, victim,
+			     mxfs_fence_kind_name((enum mxfs_fence_kind)cert_kind));
+		return -EPERM;
+	}
 
 	/*
 	 * THE DRBD ATTACHMENT RE-TAKES ITS WITNESS.  A kind-25 certificate's
@@ -18496,6 +19320,15 @@ int mxfs_v5_dlm_bootstrap_finish(struct mxfs_v5_dlm *ctx)
 		}
 		goto complete;
 	}
+	/*
+	 * No registrant list on the shared attachment either, and nothing to
+	 * re-take: every victim was certified from a boot that ended (kinds 28,
+	 * 29), which cannot lapse.  An incarnation that started since met this
+	 * term at its own bootstrap peek and wrote nothing the manifest must
+	 * explain.
+	 */
+	if (v5_shared_attach(ctx))
+		goto complete;
 	keys = mxfs_pal_alloc(sizeof(*keys) * 256);
 	if (!keys)
 		return -ENOMEM;
@@ -19118,6 +19951,7 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 	}
 
 	ctx->transport = opts->transport;
+	ctx->fence_method = opts->fence_method;
 #ifdef __KERNEL__
 	if (mxfs_force_transport == 1 && !opts->transport_explicit) {
 		ctx->transport = MXFS_V5_TRANSPORT_TCP;
@@ -19171,19 +20005,31 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 		goto err_free;
 	}
 	ctx->drbd_minor = mxfs_pal_bdev_drbd_minor(ctx->dev);
+	/* A DRBD device is fenced by its replication link's method, never an
+	 * operator's or a hypervisor's: those act on a node, and a DRBD peer's
+	 * replica is what must be cut off. */
+	if (ctx->drbd_minor >= 0 && ctx->fence_method != MXFS_V5_FENCE_SCSIPR) {
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P-FENCE-METHOD-REFUSED minor=%d fence=%s -- a DRBD "
+			     "device is fenced by its own method; mount it without "
+			     "fence=", ctx->drbd_minor,
+			     mxfs_v5_fence_method_name(ctx->fence_method));
+		goto err_dev;
+	}
 	/*
 	 * A DRBD device has one transport, the network lock manager (see the
 	 * refusal below), so a mount that did not name one gets it whatever
 	 * the module default: a host whose default is COMPARE AND WRITE, for
-	 * the SAN LUNs it mounts, still mounts its DRBD resources.
+	 * the SAN LUNs it mounts, still mounts its DRBD resources.  So does a
+	 * shared attachment, which has no COMPARE AND WRITE either.
 	 */
-	if (ctx->drbd_minor >= 0 && !opts->transport_explicit &&
+	if (v5_noscsi(ctx) && !opts->transport_explicit &&
 	    ctx->transport != MXFS_V5_TRANSPORT_TCP) {
 		ctx->transport = MXFS_V5_TRANSPORT_TCP;
 		mxfs_pal_log(MXFS_LOG_INFO,
-			     "mxfs: DRBD minor %d -> TCP transport (a DRBD device "
-			     "runs the network lock manager only)",
-			     ctx->drbd_minor);
+			     "mxfs: %s -> TCP transport (a device with no SCSI "
+			     "arbitration runs the network lock manager only)",
+			     ctx->drbd_minor >= 0 ? "DRBD" : "shared attachment");
 	}
 
 	mxfs_pal_log(MXFS_LOG_DEBUG,
@@ -19230,7 +20076,7 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 		/* a transport the mount named, or a DRBD device's, is pinned
 		 * exactly as force_transport=1 pins TCP: it forms on it, and
 		 * never joins the other */
-		if (opts->transport_explicit || ctx->drbd_minor >= 0)
+		if (opts->transport_explicit || v5_noscsi(ctx))
 			forced = true;
 		trc = mxfs_disklock_scan_transport(ctx->dev, ctx->disklock_offset,
 						   fs_gen, &cen);
@@ -19326,6 +20172,52 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 			     "only",
 			     ctx->drbd_minor);
 		goto err_dev;
+	}
+	/* Likewise the shared attachment: no COMPARE AND WRITE to carry the disk
+	 * lock manager's table (docs/shared-disk-attachment.md). */
+	if (v5_shared_attach(ctx) && ctx->transport != MXFS_V5_TRANSPORT_TCP) {
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P-SHARED-TRANSPORT-REFUSED fence=%s -- a shared "
+			     "disk mounts with the network lock manager "
+			     "(transport=tcp) only",
+			     mxfs_v5_fence_method_name(ctx->fence_method));
+		goto err_dev;
+	}
+	/*
+	 * The reservation fence names a dead node by its key, and a disk behind
+	 * VMware's virtual SCSI adapter (a physical-mode RDM) has its key
+	 * registered and unregistered by ESXi: powering the VM off takes the key
+	 * off the array within 3 s, long before a peer declares the death
+	 * (tests/evidence/vsphere/probe-rdm-poweroff-key.txt).  The survivor then
+	 * finds nothing to preempt, cannot witness an LU reset through the
+	 * virtual adapter, and refuses the dead node's slice for good
+	 * (crash_audit on 2/disk/caw/pass, the cross-host RDM).  A node admitted
+	 * on a fence that the most common vSphere failure defeats is not
+	 * fenceable, so it is not admitted; the same disk recovers under
+	 * fence=vcenter, which needs no key (docs/shared-disk-attachment.md).
+	 */
+	if (!v5_noscsi(ctx) && !ctx->single_node_exclusive) {
+		char adapter[48];
+
+		if (mxfs_pal_scsi_hypervisor_adapter(ctx->dev, adapter,
+						     sizeof(adapter)) == 1) {
+			mxfs_pal_log(MXFS_LOG_ERR,
+				     "mxfs: P305-PR-HYPERVISOR-INITIATOR adapter=%s -- "
+				     "this disk reaches the storage through VMware's "
+				     "virtual SCSI adapter, so the array sees the ESXi "
+				     "host's initiator and ESXi registers and "
+				     "unregisters this node's reservation key itself: "
+				     "powering the VM off removes the key before any "
+				     "peer can fence it, and the dead node's writes can "
+				     "then never be proven ended.  fence=scsipr is "
+				     "refused here.  Mount with fence=quorum, "
+				     "fence=vcenter or fence=manual and peers=<this "
+				     "node>/<the other node> "
+				     "(docs/shared-disk-attachment.md), or give "
+				     "each guest its own initiator (in-guest iSCSI).",
+				     adapter);
+			goto err_dev;
+		}
 	}
 
 	if (ctx->transport == MXFS_V5_TRANSPORT_TCP) {
@@ -19471,6 +20363,17 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 				v5_tcp_transport_unwind(ctx);
 				goto err_scsipr;
 			}
+		} else if (v5_shared_attach(ctx)) {
+			/* The shared attachment: no reservations and no COMPARE
+			 * AND WRITE either.  Its method arms (vCenter tags this
+			 * node's VM; manual says it has no automatic fence) and the
+			 * emulated swap is attached between the two mesh
+			 * endpoints.  No PR context is created. */
+			ret = v5_shared_arm(ctx, opts->peers);
+			if (ret) {
+				v5_tcp_transport_unwind(ctx);
+				goto err_scsipr;
+			}
 		} else if (!ctx->scsipr) {
 			if (v5_prkey_setup(ctx)) {      /* ledger-selected key */
 				mxfs_pal_log(MXFS_LOG_ERR,
@@ -19567,10 +20470,11 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 									   "publishing this mount's key");
 				}
 				if (rrc) {
+					v5_pr_failure_diag(ctx, rrc);
 					mxfs_pal_log(MXFS_LOG_ERR,
 						     "mxfs: TCP mount: SCSI PR register failed (%d)%s "
 						     "-- aborting mount", rrc,
-						     rrc == -EEXIST ? " (predecessor key present "
+						     rrc == -EEXIST ? " (another registration is "
 						     "on this nexus, see P305 above)" : "");
 					v5_tcp_transport_unwind(ctx);
 					goto err_scsipr;
@@ -19705,10 +20609,12 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 							  ctx->single_node_exclusive);
 				/* 0.75.0: every record of this tenure names its transport */
 				mxfs_disklock_set_transport_tcp(ctx->disklock, true);
-				/* ... and a DRBD tenure its attachment, which is what
-				 * lets its clean release retire it */
+				/* ... and a DRBD or shared tenure its attachment, which
+				 * is what lets its clean release retire it */
 				mxfs_disklock_set_attach_drbd(ctx->disklock,
-							      ctx->drbd_minor >= 0);
+							      v5_noscsi(ctx));
+				mxfs_disklock_set_fence_method(ctx->disklock,
+							       ctx->fence_method);
 				/* identity block on every record from the claim on */
 				if (ctx->pr_key) {
 					const struct mxfs_host_identity *hid = mxfs_host_identity();
@@ -19717,6 +20623,32 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 								   hid->boot_uuid,
 								   (uint32_t)hid->host_src,
 								   ctx->pr_key, ctx->pr_key_gen);
+				} else if (v5_shared_attach(ctx)) {
+					/*
+					 * The shared attachment registers no key, but its
+					 * records must name their host and boot: that is
+					 * what its fence asks vCenter or an operator about
+					 * (docs/shared-disk-attachment.md).  The key field
+					 * carries a value derived from this incarnation's
+					 * node id and boot, which nothing registers.
+					 */
+					const struct mxfs_host_identity *hid = mxfs_host_identity();
+
+					if (!hid || !hid->host_valid || !hid->boot_valid ||
+					    mxfs_disklock_set_identity(ctx->disklock,
+								       hid->host_uuid,
+								       hid->boot_uuid,
+								       (uint32_t)hid->host_src,
+								       v5_shared_ident_key(ctx),
+								       0)) {
+						mxfs_pal_log(MXFS_LOG_ERR,
+							     "mxfs: P-SHARED-NOIDENT -- this host's "
+							     "identity is unknown, so no record of "
+							     "this mount could name the host its "
+							     "fence must act on; refusing");
+						v5_tcp_transport_unwind(ctx);
+						goto err_disklock;
+					}
 				}
 				/* 0.75.3: the RETIRE_PENDING machinery exists BEFORE the
 				 * claim — the P305 settle of this boot's own record runs
@@ -19869,8 +20801,11 @@ tcp_bootstrap_again:
 						 * and its empty flush is local: the commit
 						 * needs no flush (tauth_store.h) */
 						ctx->tauth.store.fua_durable = ctx->drbd_minor >= 0;
-						/* and one swap there writes a whole page */
-						ctx->tauth.store.span_commit = ctx->drbd_minor >= 0;
+						/* and one swap there writes a whole page, as on
+						 * the shared attachment, whose every swap is the
+						 * same emulation (its FUA and flush are the
+						 * hypervisor's, so the flush stays) */
+						ctx->tauth.store.span_commit = v5_noscsi(ctx);
 						ctx->dlm->slot_node_cb = v5_slot_node_cb;
 						ctx->dlm->bootstrap_cb = v5_bootstrap_cb;
 						ctx->dlm->bootstrap_node_cb = v5_bootstrap_node_cb;
@@ -20224,10 +21159,11 @@ tcp_bootstrap_again:
 			}
 		}
 		if (ret) {
+			v5_pr_failure_diag(ctx, ret);
 			mxfs_pal_log(MXFS_LOG_ERR,
 				     "mxfs: CAW mount: SCSI PR register failed (%d) -- "
 				     "refusing to join unfenced%s", ret,
-				     ret == -EEXIST ? " (predecessor key present on "
+				     ret == -EEXIST ? " (another registration is on "
 				     "this nexus, see P305 above)" : "");
 			goto err_scsipr;
 		}
@@ -20507,6 +21443,9 @@ bootstrap_again:
 	mxfs_dlm_caw_set_wait_refuse_fn(ctx->dlm_caw, v5_wait_refuse, ctx);
 	/* the same authority oracle the TCP acquire asks */
 	mxfs_dlm_caw_set_authority_lost_fn(ctx->dlm_caw, v5_authority_lost_cb, ctx);
+	/* the mount's root lookup stops waiting once a peer that died during
+	 * the mount is recorded */
+	mxfs_dlm_caw_set_wait_giveup_fn(ctx->dlm_caw, v5_wait_giveup_cb, ctx);
 
 	/*
 	 * 4. Reclaim our own stale locks — a previous instance of us may have
@@ -20863,6 +21802,11 @@ err_scsipr:
 	}
 err_dev:    /* 0.75.0: transport-census refusals — only the device is wrapped */
 	mxfs_pal_drbd_exclusion_watch(ctx->dev, NULL, ctx);
+	mxfs_pal_shared_cas_set_fenced(ctx->dev, NULL, NULL);
+	if (ctx->quorum_armed) {
+		mxfs_pal_quorum_disarm();
+		ctx->quorum_armed = false;
+	}
 	mxfs_pal_bdev_close_clone(ctx->dev);
 err_free:
 	if (ctx->member_lock)
@@ -21120,9 +22064,12 @@ void mxfs_v5_dlm_shutdown_defer_release(struct mxfs_v5_dlm *ctx,
 		WRITE_ONCE(mxfs_auth_withdraw_threads,
 			   READ_ONCE(mxfs_auth_withdraw_threads) - 1);
 	}
-	/* no exclusion notice may reach a context being torn down */
+	/* no exclusion notice may reach a context being torn down, nor a
+	 * swap's question about a dead peer */
 	if (ctx->drbd_minor >= 0)
 		mxfs_pal_drbd_exclusion_watch(ctx->dev, NULL, ctx);
+	if (v5_shared_attach(ctx))
+		mxfs_pal_shared_cas_set_fenced(ctx->dev, NULL, NULL);
 	/* stop the deferred-TCP-death grace-checker before tearing down
 	 * the lease/dlm it touches. */
 	if (ctx->tcp_death_thread) {
@@ -21414,9 +22361,10 @@ void mxfs_v5_dlm_shutdown_defer_release(struct mxfs_v5_dlm *ctx,
 			/* (0.60.0, D5 ruling): topology exclusion only —
 			 * fence_capability_override no longer authorises it. */
 			late->self_retire_ok = ctx->single_node_exclusive;
-			/* A DRBD attachment has no key, and its clean release is its
-			 * retirement (MXFS_HB_FEAT_DRBD): it completes its own. */
-			if (ctx->drbd_minor >= 0)
+			/* A DRBD or shared attachment has no key, and its clean
+			 * release is its retirement (MXFS_HB_FEAT_DRBD): it
+			 * completes its own. */
+			if (v5_noscsi(ctx))
 				late->self_retire_ok = true;
 			ctx->disklock = NULL;
 			ctx->dev = NULL;
@@ -21441,6 +22389,7 @@ void mxfs_v5_dlm_shutdown_defer_release(struct mxfs_v5_dlm *ctx,
 			mxfs_dlm_caw_set_closure_scrub_fn(ctx->dlm_caw, NULL, NULL);
 			mxfs_dlm_caw_set_wait_refuse_fn(ctx->dlm_caw, NULL, NULL);
 			mxfs_dlm_caw_set_authority_lost_fn(ctx->dlm_caw, NULL, NULL);
+			mxfs_dlm_caw_set_wait_giveup_fn(ctx->dlm_caw, NULL, NULL);
 			mxfs_dlm_caw_set_closure_cand_mask(ctx->dlm_caw, 0);
 			mxfs_dlm_caw_set_holders_alive_fn(ctx->dlm_caw, NULL, NULL);
 		}
@@ -21541,6 +22490,16 @@ void mxfs_v5_dlm_shutdown_defer_release(struct mxfs_v5_dlm *ctx,
 	if (ctx->lease) {
 		mxfs_lease_destroy(ctx->lease);
 		ctx->lease = NULL;
+	}
+	/*
+	 * fence=quorum: nothing of this mount writes any more — the heartbeat,
+	 * the DLM and the swap's users are gone — so a lost vote no longer needs
+	 * this boot ended.  A quarantined context returned above with the arm
+	 * kept: its stuck worker may still write.
+	 */
+	if (ctx->quorum_armed) {
+		mxfs_pal_quorum_disarm();
+		ctx->quorum_armed = false;
 	}
 	if (ctx->dev)
 		mxfs_pal_bdev_close_clone(ctx->dev);
