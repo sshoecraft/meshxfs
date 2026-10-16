@@ -50,7 +50,7 @@ cd "$HERE" || exit 1
 . tests/lib/runlock.sh
 RIG_VMS=$(tools/mxfs_lab.sh group "${MXFS_GROUP:-g2}")
 vmhold_take "drbd_release_verify $V" $RIG_VMS || { echo "could not hold [$RIG_VMS]"; exit 1; }
-setsid tools/vm_pool.sh release --after $$ $RIG_VMS </dev/null >/dev/null 2>&1 &
+( setsid tools/vm_pool.sh release --after $$ $RIG_VMS </dev/null >/dev/null 2>&1 & )   # never a child a bare wait would block on
 O="tests/evidence/drbd_release_verify_$V.out"
 SV=$(modinfo -F srcversion mxfs.ko 2>/dev/null)
 MV=$(modinfo -F version mxfs.ko 2>/dev/null)

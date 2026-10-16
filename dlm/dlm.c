@@ -2187,6 +2187,171 @@ int mxfs_dlm_seal_owner(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t node,
 	return 0;
 }
 
+/* A member answers within its own drain bound plus one request-worker queue
+ * wait and the round trip (measured worker waits are milliseconds; 1 s). */
+#define DLM_SEAL_BARRIER_MS     (DLM_SEAL_SETTLE_MS + 1000u)
+
+static int dlm_send_owner_seal(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t target,
+			       uint16_t type, mxfs_node_id_t victim, uint64_t inc,
+			       uint32_t seal_id, int32_t rc)
+{
+	struct mxfs_dlm_owner_seal msg;
+
+	if (!ctx->send_cb || target == ctx->local_node)
+		return -ENOTCONN;
+	memset(&msg, 0, sizeof(msg));
+	msg.hdr.magic = MXFS_DLM_MAGIC;
+	msg.hdr.version = MXFS_DLM_VERSION;
+	msg.hdr.type = type;
+	msg.hdr.length = sizeof(msg);
+	msg.hdr.sender = ctx->local_node;
+	msg.hdr.target = target;
+	msg.hdr.epoch = ctx->current_epoch;
+	msg.victim = victim;
+	msg.victim_inc = inc;
+	msg.seal_id = seal_id;
+	msg.rc = rc;
+	return ctx->send_cb(ctx, target, &msg, sizeof(msg));
+}
+
+int mxfs_dlm_seal_barrier(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t node,
+			  uint64_t inc)
+{
+	mxfs_node_id_t members[MXFS_MAX_NODES];
+	mxfs_node_id_t unanswered = 0;
+	int n = 0, i, rc, pending = 0;
+	int32_t member_rc = 0;
+	uint32_t id;
+	uint64_t t0;
+
+	rc = mxfs_dlm_seal_owner(ctx, node, inc);
+	if (rc)
+		return rc;
+
+	mxfs_pal_mutex_lock(ctx->active_nodes.lock);
+	for (i = 0; i < ctx->active_nodes.count && n < MXFS_MAX_NODES; i++) {
+		mxfs_node_id_t m = ctx->active_nodes.nodes[i];
+
+		if (m == 0 || m == ctx->local_node || m == node)
+			continue;
+		members[n++] = m;
+	}
+	mxfs_pal_mutex_unlock(ctx->active_nodes.lock);
+	if (n == 0)
+		return 0;       /* this node is the only authority: the local seal is the cut */
+
+	mxfs_pal_rwlock_wrlock(ctx->table_rwlock);
+	if (ctx->seal_bar_n) {
+		/* another victim's barrier is still collecting answers */
+		mxfs_pal_rwlock_unlock(ctx->table_rwlock);
+		return -EAGAIN;
+	}
+	id = ++ctx->seal_bar_id;
+	if (!id)
+		id = ++ctx->seal_bar_id;
+	ctx->seal_bar_victim = node;
+	for (i = 0; i < n; i++) {
+		ctx->seal_bar_nodes[i] = members[i];
+		ctx->seal_bar_acked[i] = false;
+		ctx->seal_bar_rc[i] = 0;
+	}
+	ctx->seal_bar_n = n;
+	mxfs_pal_rwlock_unlock(ctx->table_rwlock);
+
+	t0 = mxfs_pal_time_ms();
+	for (i = 0; i < n; i++) {
+		if (dlm_send_owner_seal(ctx, members[i], MXFS_MSG_OWNER_SEAL, node, inc,
+					id, 0)) {
+			unanswered = members[i];
+			pending = 1;
+			goto done;
+		}
+	}
+	for (;;) {
+		pending = 0;
+		member_rc = 0;
+		mxfs_pal_rwlock_rdlock(ctx->table_rwlock);
+		for (i = 0; i < n; i++) {
+			if (!ctx->seal_bar_acked[i]) {
+				if (!pending)
+					unanswered = ctx->seal_bar_nodes[i];
+				pending++;
+			} else if (ctx->seal_bar_rc[i] && !member_rc) {
+				member_rc = ctx->seal_bar_rc[i];
+				unanswered = ctx->seal_bar_nodes[i];
+			}
+		}
+		mxfs_pal_rwlock_unlock(ctx->table_rwlock);
+		if (!pending || member_rc)
+			break;
+		if (mxfs_pal_time_ms() - t0 > DLM_SEAL_BARRIER_MS)
+			break;
+		mxfs_pal_sleep_ms(DLM_SEAL_POLL_MS);
+	}
+done:
+	mxfs_pal_rwlock_wrlock(ctx->table_rwlock);
+	ctx->seal_bar_n = 0;
+	mxfs_pal_rwlock_unlock(ctx->table_rwlock);
+	if (member_rc) {
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "mxfs: P-TAUTH-SEAL-BARRIER-FAIL node=%u inc=%llu member=%u rc=%d "
+			     "-- a member could not seal the victim; the snapshot is retried",
+			     node, (unsigned long long)inc, unanswered, member_rc);
+		return member_rc;
+	}
+	if (pending) {
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "mxfs: P-TAUTH-SEAL-BARRIER-FAIL node=%u inc=%llu member=%u "
+			     "unanswered=%d of %d ms=%llu -- not every authority has sealed "
+			     "the victim, so its records cannot be collected yet; the "
+			     "snapshot is retried",
+			     node, (unsigned long long)inc, unanswered, pending, n,
+			     (unsigned long long)(mxfs_pal_time_ms() - t0));
+		return -EAGAIN;
+	}
+	mxfs_pal_log(MXFS_LOG_DEBUG,
+		     "mxfs: P-TAUTH-SEAL-BARRIER node=%u inc=%llu members=%d ms=%llu -- "
+		     "every authority has sealed the victim",
+		     node, (unsigned long long)inc, n,
+		     (unsigned long long)(mxfs_pal_time_ms() - t0));
+	return 0;
+}
+
+void mxfs_dlm_process_owner_seal(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t sender,
+				 const struct mxfs_dlm_owner_seal *msg)
+{
+	int rc;
+
+	if (msg->victim == 0 || msg->victim == ctx->local_node)
+		rc = -EINVAL;   /* never seal this node itself, nor no one */
+	else
+		rc = mxfs_dlm_seal_owner(ctx, msg->victim, msg->victim_inc);
+	mxfs_pal_log(MXFS_LOG_DEBUG,
+		     "mxfs: P-TAUTH-SEAL-REQ victim=%u inc=%llu from=%u seal_id=%u rc=%d",
+		     msg->victim, (unsigned long long)msg->victim_inc, sender,
+		     msg->seal_id, rc);
+	dlm_send_owner_seal(ctx, sender, MXFS_MSG_OWNER_SEAL_ACK, msg->victim,
+			    msg->victim_inc, msg->seal_id, rc);
+}
+
+void mxfs_dlm_process_owner_seal_ack(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t sender,
+				     const struct mxfs_dlm_owner_seal *msg)
+{
+	int i;
+
+	mxfs_pal_rwlock_wrlock(ctx->table_rwlock);
+	if (ctx->seal_bar_n && msg->seal_id == ctx->seal_bar_id &&
+	    msg->victim == ctx->seal_bar_victim) {
+		for (i = 0; i < ctx->seal_bar_n; i++) {
+			if (ctx->seal_bar_nodes[i] != sender)
+				continue;
+			ctx->seal_bar_acked[i] = true;
+			ctx->seal_bar_rc[i] = msg->rc;
+		}
+	}
+	mxfs_pal_rwlock_unlock(ctx->table_rwlock);
+}
+
 /* Caller holds table_rwlock (write).  Install one imported holder unless a
  * live table entry already represents it. */
 static void dlm_import_holder(struct mxfs_dlm_ctx *ctx,

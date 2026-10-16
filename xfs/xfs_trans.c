@@ -365,7 +365,15 @@ xfs_trans_alloc(
 	 */
 retry:
 	tp = __xfs_trans_alloc(mp, flags);
-	WARN_ON(mp->m_super->s_writers.frozen == SB_FREEZE_COMPLETE);
+	/*
+	 * Nothing may log on a frozen filesystem -- except the clean-release
+	 * marker: a frozen node still answers a peer's request for a lock it
+	 * holds, and the release must make its marker durable before the
+	 * unlock (xfs_relmark_item.c).
+	 */
+	WARN_ON(mp->m_super->s_writers.frozen == SB_FREEZE_COMPLETE &&
+		!((flags & XFS_TRANS_MXFS_FROZEN_OK) &&
+		  (flags & XFS_TRANS_NO_WRITECOUNT)));
 	/*
 	 * (D-0133 seal probe): after put_super's locked final SB
 	 * summary sync nothing may log any more — a transaction here is an

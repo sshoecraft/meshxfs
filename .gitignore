@@ -98,6 +98,8 @@ tests/logs/
 /tests/tauth/tauth_test
 /tests/tauth/unowned_page_test
 /tests/tauth/view_format_test
+/tests/tauth/seal_barrier_test
+/tools/.built_for
 
 # ---- ccloop session transcripts: symlinks to full raw session JSONL under
 # ---- ~/.claude/projects/, absolute-path (non-portable) and can carry

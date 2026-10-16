@@ -2349,6 +2349,7 @@ struct v5_rrq_item {
 		struct mxfs_dlm_lock_req        req;
 		struct mxfs_dlm_lock_release    rel;
 		struct mxfs_dlm_lock_cancel     cancel;
+		struct mxfs_dlm_owner_seal      seal;
 	} m;
 };
 
@@ -2426,6 +2427,12 @@ static void v5_rrq_process(struct mxfs_v5_dlm *ctx, mxfs_node_id_t sender,
 		if (!READ_ONCE(ctx->mounted))
 			return;
 		mxfs_dlm_process_cancel(ctx->dlm, sender, msg);
+		break;
+	case MXFS_MSG_OWNER_SEAL:
+		/* on a worker: the seal drains the victim's committing releases */
+		if (!READ_ONCE(ctx->mounted))
+			return;
+		mxfs_dlm_process_owner_seal(ctx->dlm, sender, msg);
 		break;
 	}
 }
@@ -2776,6 +2783,23 @@ static void v5_peer_msg_cb_tcp_dispatch(struct mxfs_v5_dlm *ctx, mxfs_node_id_t 
 		const struct mxfs_dlm_cancel_ack *a = msg;
 		if (len >= sizeof(*a))
 			mxfs_dlm_process_cancel_ack(ctx->dlm, a);
+		break;
+	}
+	case MXFS_MSG_OWNER_SEAL: {
+		const struct mxfs_dlm_owner_seal *s = msg;
+		struct mxfs_resource_id r;
+
+		if (len >= sizeof(*s)) {
+			memset(&r, 0, sizeof(r));
+			r.ino = s->victim;      /* a shard per victim */
+			v5_rrq_submit(ctx, sender, MXFS_MSG_OWNER_SEAL, s, sizeof(*s), &r);
+		}
+		break;
+	}
+	case MXFS_MSG_OWNER_SEAL_ACK: {
+		const struct mxfs_dlm_owner_seal *s = msg;
+		if (len >= sizeof(*s))
+			mxfs_dlm_process_owner_seal_ack(ctx->dlm, sender, s);
 		break;
 	}
 	case MXFS_MSG_LOCK_RELEASE: {
@@ -11733,7 +11757,9 @@ static int v5_rman_snapshot(struct mxfs_v5_dlm *ctx, int slot,
 			rc = -ENOMEM;
 			goto out;
 		}
-		rc = mxfs_dlm_seal_owner(ctx->dlm, victim, (uint64_t)victim_epoch);
+		/* every authority, not just this one: a victim that lost its
+		 * storage but not its network releases through any master */
+		rc = mxfs_dlm_seal_barrier(ctx->dlm, victim, (uint64_t)victim_epoch);
 		if (rc) {
 			mxfs_pal_log(MXFS_LOG_ERR,
 				     "mxfs: P-RMAN-SNAPSHOT-FAIL slot=%d victim=%u "

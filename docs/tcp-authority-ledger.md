@@ -1043,13 +1043,25 @@ filesystem can let go of it.
      victim's heartbeat slot as exclusive holder, `-ENOENT` otherwise — so
      `P-RMAN-POSTSEAL-MUTATION` / `P-RMAN-LIVECHECK-ERR` keep their
      meaning; the pre-purge verification runs on TCP for the same reason.
-   - What the N-survivor case still owes: the ruling's SEAL message to every
-     surviving authority with an acked watermark.  With one survivor the
-     local seal is the whole barrier; with several, a release the victim
-     sent to ANOTHER master just before dying can still commit at that
-     master after this prover's scan (the record then reads FREE at replay
-     time and the gate aborts the attempt fail-closed — never applies over
-     a mutated authority — so the exposure is availability, not integrity).
+   - The seal is a barrier across every authority
+     (`mxfs_dlm_seal_barrier`): the prover seals locally, sends
+     `MXFS_MSG_OWNER_SEAL` to every other live member, and collects only
+     after each has answered `OWNER_SEAL_ACK` with its own
+     `mxfs_dlm_seal_owner` result.  A member seals on a request worker
+     (the seal drains, so it may sleep) and its remote-release handler then
+     refuses the victim like the prover's.  A member that does not answer
+     within its drain bound plus a second, or answers with an error, fails
+     the barrier, and the snapshot is retried rather than taken.  With one
+     survivor the local seal is the whole barrier.  Before the barrier only
+     the prover sealed, and a victim that had lost its storage but not its
+     network (multipath, every path down) kept releasing through the other
+     masters until its own lease ran out, about 35 s; one such release
+     retired a record after the collect, the replay read it as a post-seal
+     mutation, and the outcome was a TERMINAL FSWIDE quarantine — every
+     survivor's operations failed EIO and the victim could not remount.
+     Usermode proof: `tests/tauth/seal_barrier_test.c` (the old local cut
+     reproduces the retirement; the barrier refuses it; an unanswered member
+     fails the barrier).
    - Cost: the collect reads the whole region (0.4 % of the device) at
      fence time on the heartbeat thread, in 64 KiB transfers; measured
      walls are printed by `P-RMAN-COLLECT-TAUTH ... ms=`.

@@ -17,11 +17,22 @@
 # the run after a fault would be scored on whatever the fault left behind.
 # Prints one line per lap and LAPS_DONE <ran>/<laps> at the end; exit 0 when
 # every lap ran clean.
+#   --group <g> runs every lap on that rig group (`./run.sh <cfg> --group <g>`),
+#   so two configurations' laps can run side by side on disjoint groups with
+#   no environment assignment at the prompt.
+#
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-CFG="${1:?usage: $0 <configuration> <laps> [<log-dir>]}"
-LAPS="${2:?usage: $0 <configuration> <laps> [<log-dir>]}"
-DIR="${3:-$HERE/tests/evidence/board_laps_$(date -u +%Y%m%dT%H%M%SZ)}"
+USAGE="usage: $0 <configuration> <laps> [--group <g>] [<log-dir>]"
+CFG="${1:?$USAGE}"
+LAPS="${2:?$USAGE}"
+shift 2
+GRP=()
+if [ "${1:-}" = --group ]; then
+    GRP=(--group "${2:?$USAGE}")
+    shift 2
+fi
+DIR="${1:-$HERE/tests/evidence/board_laps_$(date -u +%Y%m%dT%H%M%SZ)${GRP[1]:+_${GRP[1]}}}"
 mkdir -p "$DIR"
 cd "$HERE" || exit 2
 
@@ -29,9 +40,18 @@ ran=0
 for i in $(seq 1 "$LAPS"); do
     log="$DIR/lap-$i.log"
     s=$(date +%s)
-    ./run.sh "$CFG" > "$log" 2>&1
+    ./run.sh "$CFG" "${GRP[@]}" > "$log" 2>&1
     rc=$?
     w=$(( $(date +%s) - s ))
+    # A run.sh that never ran a row (preflight, lock or VM start refused it)
+    # leaves the board as the previous lap wrote it: reading that board again
+    # reported a lap that did not run as clean (g4 lap 4, 2026-10-15, a 9 s
+    # host-preflight abort counted as 37 PASS).
+    if grep -aq -E '^=== run\.sh ABORTED|^ERROR: could not start|^ERROR: .* held by another run' "$log"; then
+        echo "lap $i/$LAPS rc=$rc wall=${w}s DID NOT RUN: $(grep -a -m1 -E '^=== run\.sh ABORTED|^ERROR:' "$log" | cut -c1-160)"
+        echo "LAPS_DONE $ran/$LAPS stopped: lap $i did not run (log $log)"
+        exit 2
+    fi
     ran=$i
     board=$(tools/criteria.py "$CFG" 2>&1)
     echo "$board" > "$DIR/lap-$i.board"

@@ -84,10 +84,6 @@ BACKING_SIZE=${BACKING_SIZE:-200G}
 # The package install, whose DKMS build of the module on these hosts is the
 # build `make` did, measured 2-4 min each on the HP Z400s; twice the slow end.
 BUILD_BUDGET=480
-# Building the package from the tree in release.sh's image on clyde:
-# measured 54 s with the image cached; twice that, rounded up
-PKG_BUDGET=${PKG_BUDGET:-120}
-DEB_IMAGE=$(sed -n 's/^DEB_IMAGE="\(.*\)"$/\1/p' "$REPO/scripts/release.sh")
 PHASES=("$@")
 [ "${#PHASES[@]}" -gt 0 ] || PHASES=(teardown guide verify)
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
@@ -189,15 +185,13 @@ guide() {
     mkdir -p "$EVID/deb" || die "no package directory"
     if [ "${FROM_TREE:-0}" = 1 ]; then
         say "== guide: docs/drbd-setup.md sections 1-6, with a package built from this working tree ($(cat "$REPO/VERSION"))"
-        [ -n "$DEB_IMAGE" ] || die "could not read DEB_IMAGE from scripts/release.sh"
         t0=$(date +%s)
-        timeout "$PKG_BUDGET" docker run --rm --network host -v "$REPO:/src/mxfs:ro" -v "$EVID/deb:/out" "$DEB_IMAGE" bash -ec "
-            apt-get update -qq
-            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gcc make rsync dpkg-dev >/dev/null
-            /src/mxfs/packaging/mkdeb.sh /out
-            chown $(id -u):$(id -g) /out/*.deb" > "$EVID/deb/build.log" 2>&1 \
-            || die "the package build failed or overran ${PKG_BUDGET}s (see $EVID/deb/build.log)"
-        say "   package built in $(( $(date +%s) - t0 ))s in $DEB_IMAGE"
+        # built the way release.sh builds it: on the debian12 lab node, each
+        # step under that script's own budget
+        "$REPO/scripts/vm_package_build.sh" deb "$EVID/deb" > "$EVID/deb/build.log" 2>&1 \
+            || die "the package build failed (see $EVID/deb/build.log)"
+        rm -f "$EVID"/deb/pve-storage-mxfs_*.deb
+        say "   package built in $(( $(date +%s) - t0 ))s on the debian12 lab node"
     else
         say "== guide: docs/drbd-setup.md sections 1-6, with the latest release's package from $REPO_URL"
         url=$(timeout 60 curl -fsSL "https://api.github.com/repos/${REPO_URL#https://github.com/}/releases/latest" \

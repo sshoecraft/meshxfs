@@ -18,7 +18,8 @@
 #   1. record the mount (source, options) and the device's stable_writes;
 #   2. unmount, set stable_writes=1, mount again with the same options;
 #   3. write SIZE_MB of random data buffered, fsync, record its sha256;
-#   4. drop the page cache, read it back with dd iflag=direct, compare;
+#   4. drop the page cache, read it back O_DIRECT in 1 MiB page-aligned
+#      chunks, compare;
 #   5. unmount, restore stable_writes, mount again, remove the file.
 # PASS: the direct read's sha256 matches and the node is still answering.
 # A kernel oops ends the ssh session; the node's serial log then has it.
@@ -78,7 +79,25 @@ dd if=/tmp/dio_swr.src of="\$F" bs=1M conv=fsync status=none || { echo "RESULT F
 sync; echo 3 > /proc/sys/vm/drop_caches
 echo "direct read starting"
 t0=\$(date +%s.%N)
-got=\$(dd if="\$F" iflag=direct bs=1M status=none | sha256sum | awk '{print \$1}')
+# Not dd: Ubuntu 26.04's dd is uutils coreutils 0.10.0, whose iflag=direct
+# fails every read of a plain ext4 file ("IO error: Invalid input"), so this
+# step graded the platform's dd instead of the filesystem.  The reader
+# page-aligns its own 1 MiB buffer, the read GNU dd bs=1M iflag=direct issues.
+got=\$(python3 -c '
+import os, mmap, sys, hashlib
+fd = os.open(sys.argv[1], os.O_RDONLY | os.O_DIRECT)
+buf = mmap.mmap(-1, 1 << 20)
+h = hashlib.sha256(); n = 0
+try:
+    while True:
+        r = os.readv(fd, [buf])
+        if r <= 0: break
+        h.update(buf[:r]); n += r
+except OSError as e:
+    sys.stderr.write("direct read failed after %d bytes: %s\n" % (n, e))
+    sys.exit(1)
+print(h.hexdigest())
+' "\$F")
 t1=\$(date +%s.%N)
 echo "direct read done in \$(awk -v a="\$t0" -v b="\$t1" 'BEGIN{print b - a}') s"
 echo "want=\$want"

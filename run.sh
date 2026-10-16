@@ -353,7 +353,11 @@ elif [ -n "$GROUP" ]; then
     # filesystem's.
     "$REPO/tools/vm_pool.sh" up "${NODES[@]}" \
         || { echo "ERROR: could not start [${NODES[*]}] (tools/vm_pool.sh up)"; exit 3; }
-    setsid "$REPO/tools/vm_pool.sh" release --after $$ "${NODES[@]}" </dev/null >/dev/null 2>&1 &
+    # Started from a subshell that exits at once, so the helper is never a
+    # child of this shell: it waits for this run to exit, and this run's bare
+    # `wait`s (one per parallel step) waited for it in turn, so every run.sh
+    # hung at its first one.  $$ in the subshell is still this run's pid.
+    ( setsid "$REPO/tools/vm_pool.sh" release --after $$ "${NODES[@]}" </dev/null >/dev/null 2>&1 & )
 else
 exec 9>"$RUNLOCK"
 if ! flock -n 9; then

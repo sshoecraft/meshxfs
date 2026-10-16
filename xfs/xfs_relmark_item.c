@@ -33,6 +33,7 @@ struct kmem_cache	*xfs_relmark_cache;
 static atomic64_t mxfs_relmark_published = ATOMIC64_INIT(0);
 static atomic64_t mxfs_relmark_publish_fail = ATOMIC64_INIT(0);
 static atomic64_t mxfs_relmark_publish_skip_noid = ATOMIC64_INIT(0);
+static atomic64_t mxfs_relmark_on_frozen = ATOMIC64_INIT(0);
 
 static inline struct xfs_relmark_item *RELMARK_ITEM(struct xfs_log_item *lip)
 {
@@ -105,6 +106,19 @@ static struct xfs_trans_res mxfs_relmark_tres = {
  * AIL progress exactly like the drain's own xfs_log_force(SYNC) calls; the
  * reservation is tiny and is taken as the last step of a release whose
  * dirty state has already been pushed out of the AIL.
+ *
+ * A frozen node still answers a peer's request for a lock it holds, so the
+ * marker is committed on a frozen filesystem: inside the single-to-multi
+ * join's freeze (xfs_mxfs_join.c), where the newcomer's mount asks for the
+ * incumbent's AG and root-inode tenures, and under a userspace freeze
+ * (fsfreeze -f).  What a freeze promises here is that no filesystem data or
+ * metadata changes -- a frozen node keeps writing the shared LUN for the
+ * cluster (its disklock heartbeat; on CAW the unlock itself) -- and the
+ * marker keeps that promise: it logs no metadata, is never AIL-resident
+ * (XFS_ITEM_RELEASE_WHEN_COMMITTED) and goes to this node's own journal
+ * slice.  XFS_TRANS_MXFS_FROZEN_OK tells xfs_trans_alloc's frozen check so.
+ * Holding the release until the thaw instead would stall every peer that
+ * wants the lock for as long as the freeze lasts.
  */
 int
 mxfs_relmark_publish(
@@ -139,8 +153,16 @@ mxfs_relmark_publish(
 		return -ENOENT;
 	}
 
+	if (mp->m_super->s_writers.frozen == SB_FREEZE_COMPLETE) {
+		atomic64_inc(&mxfs_relmark_on_frozen);
+		xfs_notice_ratelimited(mp,
+			"mxfs: P-RELMARK-ON-FROZEN class=%u res=%llu who=%s join=%d -- clean-release marker committed on a frozen filesystem (join=1: the join's freeze; 0: a userspace freeze)",
+			(unsigned)auth_class, (unsigned long long)resource,
+			who ? who : "?", READ_ONCE(mp->m_mxfs_join_frozen) ? 1 : 0);
+	}
 	error = xfs_trans_alloc(mp, &mxfs_relmark_tres, 0, 0,
-				XFS_TRANS_NO_WRITECOUNT, &tp);
+				XFS_TRANS_NO_WRITECOUNT |
+				XFS_TRANS_MXFS_FROZEN_OK, &tp);
 	if (error) {
 		atomic64_inc(&mxfs_relmark_publish_fail);
 		mxfs_probe_ratelimited("mxfs: P-RELMARK-FAIL class=%u res=%llu gepoch=%llu who=%s rc=%d -- clean-release marker NOT published (transaction)\n",
@@ -186,8 +208,11 @@ void
 mxfs_relmark_counters(
 	uint64_t		*published,
 	uint64_t		*failed,
-	uint64_t		*skipped_noid)
+	uint64_t		*skipped_noid,
+	uint64_t		*on_frozen)
 {
+	if (on_frozen)
+		*on_frozen = atomic64_read(&mxfs_relmark_on_frozen);
 	if (published)
 		*published = atomic64_read(&mxfs_relmark_published);
 	if (failed)

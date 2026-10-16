@@ -474,6 +474,16 @@ struct mxfs_dlm_ctx {
 	struct { mxfs_node_id_t node; uint64_t inc; } sealed_owners[MXFS_MAX_NODES];
 	int                     sealed_owner_count;
 	uint64_t                sealed_releases_refused;
+	/* The seal barrier this node is running as prover, if any
+	 * (mxfs_dlm_seal_barrier): the members asked to seal seal_bar_victim
+	 * under seal_bar_id, and which of them have answered with what.  Under
+	 * table_rwlock; seal_bar_n == 0 when no barrier is in progress. */
+	uint32_t                seal_bar_id;
+	mxfs_node_id_t          seal_bar_victim;
+	mxfs_node_id_t          seal_bar_nodes[MXFS_MAX_NODES];
+	int32_t                 seal_bar_rc[MXFS_MAX_NODES];
+	bool                    seal_bar_acked[MXFS_MAX_NODES];
+	int                     seal_bar_n;
 	/* (D-0342): owners whose ledger purge did NOT complete (a page
 	 * commit failed or the view moved mid-walk).  Their imported blockers
 	 * stay in the table — they mirror the bits still on the platter — and
@@ -1297,6 +1307,25 @@ int mxfs_dlm_purge_node_selective(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t node)
  */
 int mxfs_dlm_seal_owner(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t node,
 			uint64_t inc);
+
+/*
+ * The seal cut on every authority, not just this one: seal {node, inc}
+ * here, then ask every other live member to seal it (MXFS_MSG_OWNER_SEAL)
+ * and wait until each has answered that it has.  On TCP each ledger page is
+ * committed by its own master, so a victim still on the network can release
+ * through any of them; only when all have sealed is the platter image the
+ * collector reads the image the replay gate will re-check.  0; -EBUSY when a
+ * member's seal did not settle; -EAGAIN when a member did not answer within
+ * the bound or could not be sent to.  On error the caller retries the
+ * snapshot, as for mxfs_dlm_seal_owner.
+ */
+int mxfs_dlm_seal_barrier(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t node,
+			  uint64_t inc);
+/* Inbound MXFS_MSG_OWNER_SEAL (may sleep: the seal drains) and its ack. */
+void mxfs_dlm_process_owner_seal(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t sender,
+				 const struct mxfs_dlm_owner_seal *msg);
+void mxfs_dlm_process_owner_seal_ack(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t sender,
+				     const struct mxfs_dlm_owner_seal *msg);
 
 /* ─── ordered page handoff (tcp-authority-ledger step 4) ─── */
 

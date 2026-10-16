@@ -107,7 +107,10 @@ REBOOT_S=420
 
 case "$PLAT" in
     pve*)             FAM=pve; PKGS="mxfs_${V}_amd64.deb pve-storage-mxfs_${V}_all.deb" ;;
-    rhel*)            FAM=rpm; PKGS="mxfs-${V}-1.el8.x86_64.rpm" ;;
+    # el8 up to 0.90.129 (built in an EL8 container), el9 from 0.90.130
+    # (built on the rhel9 lab node): the version's own file, whichever it is
+    rhel*)            FAM=rpm; PKGS=$(cd "$DIST" 2>/dev/null && ls mxfs-"${V}"-1.el*.x86_64.rpm 2>/dev/null | head -1)
+                      [ -n "$PKGS" ] || PKGS="mxfs-${V}-1.el9.x86_64.rpm" ;;
     debian*|ubuntu*)  FAM=deb; PKGS="mxfs_${V}_amd64.deb" ;;
     *) echo "no package family for platform '$PLAT'" >&2; exit 2 ;;
 esac
@@ -260,8 +263,11 @@ t0=$(now)
 # failed silently left the previous build loaded, the install then succeeded,
 # and the round stopped at "did not load the DKMS build" with the new build
 # installed but not running (rhel9 0.89.93, alma9-2).  Retried for 10 s, and
-# the outcome is printed either way.
-UNLOAD="for i in 1 2 3 4 5 6 7 8 9 10; do lsmod | grep -q '^mxfs ' || break; modprobe -r mxfs 2>/dev/null && break; sleep 1; done
+# the outcome is printed either way.  rmmod when modprobe -r cannot: a module
+# insmod'ed from outside /lib/modules on a node with no package installed is
+# "not found" to modprobe (tests/buffered_write_pos_verify.sh's build on a
+# fresh ubuntu2604 node failed this round with refcnt=0 mounts=0).
+UNLOAD="for i in 1 2 3 4 5 6 7 8 9 10; do lsmod | grep -q '^mxfs ' || break; { modprobe -r mxfs || rmmod mxfs; } 2>/dev/null && break; sleep 1; done
         lsmod | grep -q '^mxfs ' && { echo \"UNLOAD_FAILED refcnt=\$(cat /sys/module/mxfs/refcnt) mounts=\$(grep -c ' mxfs ' /proc/mounts)\"; exit 1; }; echo UNLOADED"
 if every install $INSTALL_S "grep -q ' mxfs ' /proc/mounts && umount $MNT; $UNLOAD; dkms remove mxfs/$V --all >/dev/null 2>&1; $inst"; then
     pass "install on all $NN ($(since $t0) s)"

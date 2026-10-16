@@ -11,7 +11,7 @@ supports concurrent read-write mounts on shared iSCSI SAN storage—validated
 with 2, 4, 8, and 16 nodes—or on dual-primary DRBD, with network-based or SCSI
 COMPARE AND WRITE locking. MeshXFS provides fencing and survivor-led journal
 recovery, is packaged as a DKMS module for Proxmox VE 9, RHEL 9, Ubuntu 24.04,
-and Debian 13, and includes a Proxmox VE storage plugin.
+Ubuntu 26.04, Debian 12 and Debian 13, and includes a Proxmox VE storage plugin.
 
 On a system, MeshXFS goes by its short name `mxfs`: the `mxfs.ko` module,
 `mount -t mxfs`, the tools `mkfs.mxfs`, `chk_mxfs` (`fsck.mxfs`),
@@ -27,6 +27,53 @@ packages.
 > and the AI has since modified much of it heavily (see "How this was built").
 > Everything that turns XFS into a filesystem many machines can mount at once
 > is AI-authored.
+
+> ## 0.90.130: Stronger Recovery, Broader Platform Support
+>
+> What changed for someone upgrading from 0.90.129:
+>
+> - **The network lock manager over multipath, at 2, 4, 8 and 16 nodes, and
+>   over a single path at 8 and 16** (0.90.130).  A node that loses every
+>   storage path is fenced and its journal replayed while the others keep
+>   writing; every other node now refuses the fenced node's late lock
+>   releases before recovery collects its locks, so none of them can land
+>   afterwards and leave the filesystem refusing every write.
+> - **Ubuntu 26.04 and Debian 12 are supported** (0.90.130): the .deb, on
+>   Ubuntu 26.04's kernel 7.0 and Debian 12's 6.1.
+> - **Fixes** (0.90.130): on kernels before 6.5 (Debian 12) every buffered
+>   write now advances the file position (it rewrote the same offset); a
+>   node frozen by a backup or snapshot tool (`fsfreeze`) answers another
+>   node's lock request without a kernel warning, which on a host that sets
+>   `panic_on_warn` was a crash; on kernels before 6.6 a userspace thaw no
+>   longer ends the freeze a node holds while another node joins.
+>
+> **Released configurations and what 0.90.130 was validated on:**
+>
+> | configuration | nodes | storage | validated on 0.90.130 |
+> |---|---|---|---|
+> | `2/net/mesh/drbd` | 2 | each host's own disk, DRBD 8.4 dual-primary | `tests/drbd_release_verify.sh`; two physical Proxmox VE 9 hosts, a network cable pulled under load and plugged back in |
+> | `2/net/mesh/direct` | 2 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+> | `4/net/mesh/direct` | 4 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+> | `8/net/mesh/direct` | 8 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig |
+> | `16/net/mesh/direct` | 16 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig |
+> | `2/net/mesh/mpath` | 2 | one shared iSCSI LUN over two paths, network lock manager | the 31-row suite plus eight path-fault rows on the test rig |
+> | `4/net/mesh/mpath` | 4 | one shared iSCSI LUN over two paths, network lock manager | the 31-row suite plus eight path-fault rows on the test rig |
+> | `8/net/mesh/mpath` | 8 | one shared iSCSI LUN over two paths, network lock manager | the 31-row suite plus eight path-fault rows on the test rig |
+> | `16/net/mesh/mpath` | 16 | one shared iSCSI LUN over two paths, network lock manager | the 31-row suite plus eight path-fault rows on the test rig |
+> | `2/disk/caw/direct` | 2 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+> | `4/disk/caw/direct` | 4 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+> | `8/disk/caw/direct` | 8 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+> | `16/disk/caw/direct` | 16 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+> | `2/disk/caw/mpath` | 2 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+> | `4/disk/caw/mpath` | 4 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+> | `8/disk/caw/mpath` | 8 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+> | `16/disk/caw/mpath` | 16 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig; three Proxmox VE 9 hosts on two paths (path faults, live migration, datastore operations, HA power loss), kernels 6.17 and 7.0 |
+>
+> The test rig is Ubuntu 24.04 (kernel 6.8.0-101-generic).  "Installed
+> packages" means the release packages on two nodes of each supported
+> platform: Proxmox VE 9 (kernels 6.17 and 7.0), RHEL 9.8, Ubuntu 24.04,
+> Ubuntu 26.04, Debian 12 and Debian 13.  Every host in a cluster needs the
+> same MeshXFS version; hosts on different kernels are fine.
 
 > ## 0.90.129: Shared Proxmox Storage, Faster DRBD Setup, Stronger Recovery
 >
@@ -428,7 +475,7 @@ packages.
 > - All six released configurations were verified on this version, and the
 >   release boards now run side by side, each on its own fixed-size test LUN.
 
-> ## Released: eleven configurations, on the `direct`, `mpath` and `drbd` attachments
+> ## Released: seventeen configurations, on the `direct`, `mpath` and `drbd` attachments
 >
 > A configuration is four fields, `<nodes>/<class>/<method>/<attach>`, for
 > example `8/net/mesh/direct`. Each field is explained in the tables below and in
@@ -438,19 +485,25 @@ packages.
 >
 > | configuration | first released in | platforms |
 > |---|---|---|
-> | `2/net/mesh/direct` | 0.89.77 | Ubuntu 24.04 from 0.89.77, Proxmox VE 9 from 0.89.78, RHEL 9.8 from 0.89.84, Debian 13 from 0.90.0 |
-> | `2/disk/caw/direct` | 0.90.7 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Debian 13 |
-> | `4/net/mesh/direct` | 0.90.24 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Debian 13 |
-> | `4/disk/caw/direct` | 0.90.24 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Debian 13 |
-> | `8/disk/caw/direct` | 0.90.36 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Debian 13 |
-> | `16/disk/caw/direct` | 0.90.42 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Debian 13 |
+> | `2/net/mesh/direct` | 0.89.77 | Ubuntu 24.04 from 0.89.77, Proxmox VE 9 from 0.89.78, RHEL 9.8 from 0.89.84, Debian 13 from 0.90.0, Ubuntu 26.04 and Debian 12 from 0.90.130 |
+> | `2/disk/caw/direct` | 0.90.7 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Ubuntu 26.04, Debian 12, Debian 13 |
+> | `4/net/mesh/direct` | 0.90.24 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Ubuntu 26.04, Debian 12, Debian 13 |
+> | `4/disk/caw/direct` | 0.90.24 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Ubuntu 26.04, Debian 12, Debian 13 |
+> | `8/net/mesh/direct` | 0.90.51, again in 0.90.130 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Ubuntu 26.04, Debian 12, Debian 13 |
+> | `8/disk/caw/direct` | 0.90.36 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Ubuntu 26.04, Debian 12, Debian 13 |
+> | `16/net/mesh/direct` | 0.90.51, again in 0.90.130 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Ubuntu 26.04, Debian 12, Debian 13 |
+> | `16/disk/caw/direct` | 0.90.42 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Ubuntu 26.04, Debian 12, Debian 13 |
+> | `2/net/mesh/mpath` | 0.90.51, again in 0.90.130 | Ubuntu 24.04 |
+> | `4/net/mesh/mpath` | 0.90.51, again in 0.90.130 | Ubuntu 24.04 |
+> | `8/net/mesh/mpath` | 0.90.51, again in 0.90.130 | Ubuntu 24.04 |
+> | `16/net/mesh/mpath` | 0.90.51, again in 0.90.130 | Ubuntu 24.04 |
 > | `2/disk/caw/mpath` | 0.90.51, again in 0.90.124 | Ubuntu 24.04 |
 > | `4/disk/caw/mpath` | 0.90.51, again in 0.90.124 | Ubuntu 24.04 |
 > | `8/disk/caw/mpath` | 0.90.51, again in 0.90.124 | Ubuntu 24.04 |
-> | `16/disk/caw/mpath` | 0.90.51, again in 0.90.124 | Ubuntu 24.04 |
+> | `16/disk/caw/mpath` | 0.90.51, again in 0.90.124 | Ubuntu 24.04; Proxmox VE 9 (kernels 6.17 and 7.0, three hosts) |
 > | `2/net/mesh/drbd` | 0.90.41, again in 0.90.107 | Proxmox VE 9 (kernels 6.17 and 7.0, two physical hosts set up from the guide with the release package), Ubuntu 24.04 (the test rig); DRBD 8.4.11 |
 >
-> All eleven were verified on the current release, 0.90.129: each `direct`
+> All seventeen were verified on the current release, 0.90.130: each `direct`
 > configuration's suite on the test rig at its node count, and the installed
 > packages on two nodes of each released platform; each `mpath`
 > configuration's suite and path-fault rows on the test rig at its node
@@ -459,25 +512,13 @@ packages.
 >
 > ### Released in an earlier version
 >
-> An earlier release claimed these; 0.90.129 does not.  Each was verified on
-> the version given, and open defects found since then cross the release bar
-> on it (`tools/defects.py <configuration> --release` lists them).  Until those
-> are fixed and the configuration is verified again, treat it as unreleased.  0.90.51
-> was never published as packages.  The last release published before
-> 0.90.129 is 0.90.124.
->
-> | configuration | verified in | platforms |
-> |---|---|---|
-> | `8/net/mesh/direct` | 0.90.51 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Debian 13 |
-> | `16/net/mesh/direct` | 0.90.51 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Debian 13 |
-> | `2/net/mesh/mpath` | 0.90.51 | Ubuntu 24.04 |
-> | `4/net/mesh/mpath` | 0.90.51 | Ubuntu 24.04 |
-> | `8/net/mesh/mpath` | 0.90.51 | Ubuntu 24.04 |
-> | `16/net/mesh/mpath` | 0.90.51 | Ubuntu 24.04 |
->
-> The `net/mesh/mpath` configurations were verified on the test rig only,
-> which runs Ubuntu 24.04 (kernel 6.8.0-101-generic, multipath-tools 0.9.4),
-> with the path-fault rows of `docs/mpath-verification.md` in each board.
+> None: 0.90.130 claims every configuration an earlier release claimed.
+> `8/net/mesh/direct`, `16/net/mesh/direct` and `net/mesh/mpath` at 2, 4, 8
+> and 16 nodes, released in 0.90.51 and not claimed from 0.90.107, are
+> released again in 0.90.130.  The `net/mesh/mpath` configurations were
+> verified on the test rig only, which runs Ubuntu 24.04 (kernel
+> 6.8.0-101-generic, multipath-tools 0.9.4), with the path-fault rows of
+> `docs/mpath-verification.md` in each board.
 >
 > ### Implemented, not yet released
 >
@@ -526,7 +567,7 @@ packages.
 > | attach | implemented | released | the node's path to the LUN |
 > |---|---|---|---|
 > | `direct` | yes | yes | its own initiator, one path: bare metal, or an in-guest iSCSI login |
-> | `mpath` | yes | `disk/caw` at 2, 4, 8 and 16 nodes: released in 0.90.51, not claimed from 0.90.107, released again in 0.90.124; `net/mesh` in 0.90.51 only (see "Released in an earlier version") | its own initiator over two or more paths, assembled by dm-multipath |
+> | `mpath` | yes | at 2, 4, 8 and 16 nodes: `disk/caw` released in 0.90.51, not claimed from 0.90.107, released again in 0.90.124; `net/mesh` released in 0.90.51, not claimed from 0.90.107, released again in 0.90.130 | its own initiator over two or more paths, assembled by dm-multipath |
 > | `pass` | yes | no | the hypervisor's initiator: the LUN is passed into the VM (QEMU SCSI passthrough). A VMware RDM mounts as `shared` instead: ESXi drops a VM's reservation key when the VM is powered off |
 > | `drbd` | yes | yes: released in 0.90.41, withdrawn on 2026-10-06, released again in 0.90.107 | a DRBD dual-primary replica of two local disks: no shared storage at all |
 > | `shared` | yes | no | a disk two VMs share through the hypervisor with no reservation fence MeshXFS can use (a vSphere multi-writer VMDK or physical-mode RDM): two nodes, `net/mesh`, a dead node fenced by vCenter powering its VM off or by an operator's confirmation ([`docs/shared-disk-attachment.md`](docs/shared-disk-attachment.md)) |
@@ -569,10 +610,10 @@ packages.
 > to clear to be released, and `tools/defects.py <configuration> --release`
 > shows it for each one.  The defect queue itself is public
 > (`data/defects.json`, read with `tools/defects.py`), and every record carries
-> its evidence.  It holds 121 open records.  61 of them reach only
+> its evidence.  It holds 123 open records.  54 of them reach only
 > configurations this release does not claim, such as clusters larger than 16
-> nodes and the ones under "Released in an earlier version".
-> The 60 that reach a released
+> nodes.
+> The 69 that reach a released
 > configuration (between 11 and 45 each, depending on the configuration) are
 > each classified as not crossing that bar, most of them as
 > slowness in a particular operation: `tools/defects.py --at 2/net/mesh/drbd -d`
@@ -584,9 +625,8 @@ packages.
 > `mpath` each node reached it through a dm-multipath map over two paths to
 > the same target (Ubuntu 24.04, multipath-tools 0.9.4, the settings of
 > `tools/mpath_settings.sh`), with paths taken away under load as
-> `docs/mpath-verification.md` describes; 0.90.129 claims it for `disk/caw`
-> at 2, 4, 8 and 16 nodes, and `net/mesh/mpath` was last verified in 0.90.51
-> (see "Released in an earlier version"). `pass` is not
+> `docs/mpath-verification.md` describes; 0.90.130 claims it for `disk/caw`
+> and `net/mesh` at 2, 4, 8 and 16 nodes. `pass` is not
 > verified with either method: it carries the fencing reservations and, for
 > `disk/caw`, the COMPARE AND WRITE lock commands through a layer no release
 > has tested. Fibre Channel and SAS are not verified. A device without SCSI
@@ -603,12 +643,20 @@ packages.
 > What a build has to pass before it is called a release, and what that does
 > not cover, is in "How a release is validated" below.
 >
-> **The exception, on `2/net/mesh/direct`:** once, in 39 attempts on RHEL 9.8,
-> a file create on the surviving node stalled for about 60 s after its peer was
-> declared dead, fenced and replayed, and then resumed
-> (`D-SURVIVOR-CREATE-STALLS-60S-AFTER-PEER-DEATH-UNTIL-RESUMED-VICTIM-UNMOUNTS`).
-> Its cause is not known, it has not recurred since, and it is shipped open by
-> the owner's decision.
+> **Two exceptions, each seen once and shipped open by the owner's decision:**
+>
+> - **On `2/net/mesh/direct`:** once, in 39 attempts on RHEL 9.8, a file
+>   create on the surviving node stalled for about 60 s after its peer was
+>   declared dead, fenced and replayed, and then resumed
+>   (`D-SURVIVOR-CREATE-STALLS-60S-AFTER-PEER-DEATH-UNTIL-RESUMED-VICTIM-UNMOUNTS`).
+>   Its cause is not known and it has not recurred since.
+> - **On `2/disk/caw/mpath`:** once, in 21 runs of the path-fault row in which
+>   a node loses one path and is frozen, the healthy node returned I/O errors
+>   for 236 s and shut its mount down instead of fencing the frozen node
+>   (`D-CAWMPATH-FENCED-RETURN-SURVIVOR-EIO-VICTIM-UNFENCED`).  Its cause is
+>   not known: that run kept no kernel log.  The 11 runs on the 0.90.130 build
+>   since then passed, as did the same row on the 4-, 8- and 16-node
+>   `disk/caw/mpath` boards, and the row now keeps every node's kernel log.
 >
 > **Directory sharding** (`mkfs.mxfs -D` with the module parameter
 > `dirshard_mkdir_enable=1`) is experimental, off by default and part of no
@@ -632,6 +680,8 @@ packages.
 > | Ubuntu 24.04 LTS | 6.8.0-101-generic (the GA kernel) |
 > | RHEL / AlmaLinux / Rocky 9.8 | 5.14.0-687.49.1.el9_8 |
 > | Debian 13 | 6.12.107+deb13-amd64 (Debian 13.7) |
+> | Debian 12 | 6.1.0-53-amd64 |
+> | Ubuntu 26.04 LTS | 7.0.0-38-generic (Ubuntu 26.04.1) |
 >
 > **Any other kernel is untested, even on the same distribution.** MeshXFS builds
 > against each kernel's own API, and a distribution's kernels differ: every
@@ -658,7 +708,7 @@ packages.
 > tools/defects.py 16/disk/caw/direct --release  # released; also 2/, 4/ and 8/
 > tools/defects.py 4/net/mesh/direct --release   # released; also 2/
 > tools/defects.py 2/net/mesh/drbd --release     # released
-> tools/defects.py 8/net/mesh/direct --release   # released in 0.90.51, not claimed now; also 16/ and every .../mpath
+> tools/defects.py 8/net/mesh/direct --release   # released; also 16/ and every .../mpath
 > tools/defects.py 32/disk/caw/mpath             # 32 nodes: not released yet
 > ```
 
@@ -971,9 +1021,9 @@ release (see the notice at the top).
 For `disk/caw`, see "Choosing the transport" below before the first mount.
 
 ```
-apt install ./mxfs_<version>_amd64.deb                  # Ubuntu 24.04, Proxmox VE 9
+apt install ./mxfs_<version>_amd64.deb                  # Ubuntu 24.04 and 26.04, Debian 12 and 13, Proxmox VE 9
 dnf install epel-release kernel-devel-$(uname -r)       # RHEL / AlmaLinux / Rocky 9.8: DKMS is in EPEL
-dnf install ./mxfs-<version>-1.el8.x86_64.rpm
+dnf install ./mxfs-<version>-1.el9.x86_64.rpm
 ```
 
 With firewalld on, open the DLM, discovery, lock-hint and heartbeat ports on
@@ -1072,9 +1122,8 @@ force-promote or mount `/dev/drbd0` by hand.
 
 ### Choosing the transport
 
-On `direct`, `disk/caw` is released for clusters of two, four, eight and
-sixteen nodes and `net/mesh` for two and four (eight and sixteen, and
-`mpath`, were verified in 0.90.51; see "Released in an earlier version").
+Both transports are released for clusters of two, four, eight and sixteen
+nodes, on `direct` and on `mpath`.
 Pick one per cluster, before its first mount:
 
 | | `net/mesh` | `disk/caw` |

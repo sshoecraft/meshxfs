@@ -43,7 +43,7 @@ PF_STOPS=$V
 OTHERS=$(for n in $NODES; do [ "$n" = "$V" ] || printf '%s ' "$n"; done)
 pf_start_gate
 pf_load_start
-trap 'timeout 30 $VIRSH resume "$V" >/dev/null 2>&1; stop_loads "$NODES"; links_all_up; kmsg_stop' EXIT
+trap 'timeout 30 $VIRSH resume "$V" >/dev/null 2>&1; stop_loads "$NODES"; links_all_up; kmsg_keep; kmsg_stop' EXIT
 
 # 2. one path down
 link "$V" a down

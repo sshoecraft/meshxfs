@@ -8,18 +8,18 @@
 # Builds into dist/<version>/:
 #   mxfs_<v>_amd64.deb              Debian / Ubuntu / Proxmox (DKMS + tools)
 #   pve-storage-mxfs_<v>_all.deb    Proxmox VE storage plugin
-#   mxfs-<v>-1.el8.x86_64.rpm       RHEL / AlmaLinux / Rocky (DKMS + tools)
+#   mxfs-<v>-1.el9.x86_64.rpm       RHEL / AlmaLinux / Rocky 9 (DKMS + tools)
 #   SHA256SUMS                      every published package
 #
-# Each package is built in a container running the OLDEST distribution it
-# targets, never on the host.  The userspace tools are linked against the
+# Each package is built on a lab VM of the OLDEST distribution it targets,
+# built here with mkosimage, never on the host and never in a container
+# (scripts/vm_package_build.sh).  The userspace tools are linked against the
 # build system's glibc and refuse to start on an older one: built on the
 # Ubuntu 24.04 host, mkfs.mxfs and chk_mxfs require GLIBC_2.38, which
-# Proxmox 8 / Debian 12 (2.36) and RHEL 9 (2.34) do not have.  Debian 12
-# covers Debian 12+, Ubuntu 24.04+ and Proxmox 8+; EL8 covers RHEL 8+.
-#
-# The containers use the host network: on clyde, docker's bridge network has
-# no outbound TCP, so apt/dnf inside a bridged container cannot reach a mirror.
+# Debian 12 (2.36) and RHEL 9 (2.34) do not have.  The .debs are built on
+# the debian12 node (Debian 12+, Ubuntu 24.04+, Proxmox VE 9), the .rpm on
+# the rhel9 node.  Until 0.90.130 they were built in docker containers from
+# downloaded images (debian:bookworm, almalinux:8).
 #
 # Before anything else, tools/release_text_check.py must pass: the README, the
 # manual pages, the module-options file and the module's parameter text are
@@ -46,8 +46,6 @@ set -e
 SRCDIR="$(cd "$(dirname "$0")/.." && pwd)"
 source "$SRCDIR/packaging/common.sh"
 
-DEB_IMAGE="debian:bookworm"
-RPM_IMAGE="almalinux:8"
 REPO="sshoecraft/meshxfs"
 
 publish=0
@@ -87,7 +85,6 @@ if [ -f "$OUT/SHA256SUMS" ]; then
 fi
 mkdir -p "$OUT"
 
-owner="$(id -u):$(id -g)"
 
 # The text a user reads must say what the release data says, before anything is
 # built from it and again before it is published: the README, the manual pages
@@ -112,21 +109,11 @@ if [ "$built" = 0 ]; then
         }
     done <<< "$checks"
 
-    echo "=== MeshXFS $VERSION — .deb packages in $DEB_IMAGE ==="
-    docker run --rm --network host -v "$SRCDIR:/src/mxfs:ro" -v "$OUT:/out" "$DEB_IMAGE" bash -ec "
-        apt-get update -qq
-        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gcc make rsync dpkg-dev >/dev/null
-        /src/mxfs/packaging/mkdeb.sh /out
-        /src/mxfs/packaging/mkdeb_pve.sh /out
-        chown $owner /out/*.deb
-    "
+    echo "=== MeshXFS $VERSION — .deb packages on the debian12 lab node ==="
+    "$SRCDIR/scripts/vm_package_build.sh" deb "$OUT" || { echo "ERROR: the .deb build failed; no release" >&2; exit 1; }
 
-    echo "=== MeshXFS $VERSION — .rpm package in $RPM_IMAGE ==="
-    docker run --rm --network host -v "$SRCDIR:/src/mxfs:ro" -v "$OUT:/out" "$RPM_IMAGE" bash -ec "
-        dnf install -y -q gcc make rsync rpm-build tar gzip >/dev/null
-        /src/mxfs/packaging/mkrpm.sh /out
-        chown $owner /out/*.rpm
-    "
+    echo "=== MeshXFS $VERSION — .rpm package on the rhel9 lab node ==="
+    "$SRCDIR/scripts/vm_package_build.sh" rpm "$OUT" || { echo "ERROR: the .rpm build failed; no release" >&2; exit 1; }
 
     (cd "$OUT" && sha256sum *.deb *.rpm > SHA256SUMS)
 

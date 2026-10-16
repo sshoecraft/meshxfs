@@ -54,7 +54,7 @@ PF_DEATH=1
 pf_start_gate
 pf_load_start
 pf_load_stop
-trap 'timeout 30 $VIRSH resume "$A" >/dev/null 2>&1; rs 15 "$A" "echo 0 > $P/dl_takeover_pause_ms" >/dev/null 2>&1; links_all_up; kmsg_stop' EXIT
+trap 'timeout 30 $VIRSH resume "$A" >/dev/null 2>&1; rs 15 "$A" "echo 0 > $P/dl_takeover_pause_ms" >/dev/null 2>&1; links_all_up; kmsg_keep; kmsg_stop' EXIT
 
 # 2. B leaves, then A, the last member
 for n in "$B" "$A"; do

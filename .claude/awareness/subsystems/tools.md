@@ -1677,7 +1677,8 @@ capturing the same state.
   `tests/lib/rig.sh`.
 - `scripts/release.sh` — builds `dist/<version>/` (the .deb and the
   pve-storage .deb in the oldest Debian container they target, the .rpm in
-  its container) after `scripts/pve_kbuild_check.sh` on the PVE kernels;
+  its container) after every released platform's `build_check`
+  (`scripts/vm_kbuild_check.sh <platform>`, on that platform's lab VM);
   refuses if `dist/<version>` already holds a build. `--publish [--version
   V]` creates the GitHub release with this version's CHANGELOG section as its
   notes, from a commit that must already be pushed. `tests/full_verify.sh`

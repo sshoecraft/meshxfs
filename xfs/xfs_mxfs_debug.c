@@ -1388,11 +1388,11 @@ mxfs_inode_authority_show(
 		(unsigned long long)atomic64_read(&mxfs_auth_unpub_n));
 	/* clean-release marker production (see xfs_relmark_item.c) */
 	{
-		uint64_t pub = 0, fail = 0, noid = 0;
+		uint64_t pub = 0, fail = 0, noid = 0, ijf = 0;
 		uint64_t im = 0, ifl = 0, am = 0, afl = 0, icl = 0;
 		uint64_t icm = 0, icf = 0, icr = 0;
 
-		mxfs_relmark_counters(&pub, &fail, &noid);
+		mxfs_relmark_counters(&pub, &fail, &noid, &ijf);
 		mxfs_relmark_site_counters(&im, &ifl, &am, &afl, &icl);
 		mxfs_relmark_iclus_counters(&icm, &icf, &icr);
 		seq_printf(m,
@@ -1400,6 +1400,7 @@ mxfs_inode_authority_show(
 "  published         %llu\n"
 "  publish_fail      %llu\n"
 "  skip_noident      %llu\n"
+"  on_frozen         %llu\n"
 "  ino_marked        %llu\n"
 "  ino_failed        %llu\n"
 "  ag_marked         %llu\n"
@@ -1417,7 +1418,8 @@ mxfs_inode_authority_show(
 "  evict_rearm       %llu\n"
 "  bast_rearm_owed   %llu\n",
 			(unsigned long long)pub, (unsigned long long)fail,
-			(unsigned long long)noid, (unsigned long long)im,
+			(unsigned long long)noid, (unsigned long long)ijf,
+			(unsigned long long)im,
 			(unsigned long long)ifl, (unsigned long long)am,
 			(unsigned long long)afl, (unsigned long long)icl,
 			(unsigned long long)icm, (unsigned long long)icf,

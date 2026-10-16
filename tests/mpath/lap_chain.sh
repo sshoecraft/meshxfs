@@ -56,8 +56,10 @@ laps)
     . tests/lib/runlock.sh
     vmhold_take "lap_chain $tag" $(tools/mxfs_lab.sh group "$group") \
         || { echo "lap_chain: could not hold the VMs of group $group"; exit 2; }
-    setsid tools/vm_pool.sh release --after $$ $(tools/mxfs_lab.sh group "$group") \
-        </dev/null >/dev/null 2>&1 &
+    # from a subshell that exits at once: never a child a bare `wait` here
+    # (or in a run.sh it starts) would wait on while it waits for us
+    ( setsid tools/vm_pool.sh release --after $$ $(tools/mxfs_lab.sh group "$group") \
+        </dev/null >/dev/null 2>&1 & )
     [ -n "$knobs" ] && export PF_KNOBS="$knobs"
     if [ "$prep" = 1 ]; then
         MXFS_FORCE_PREP=1 ./run.sh "$config" --group "$group" prep_cluster \

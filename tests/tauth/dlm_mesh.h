@@ -58,6 +58,8 @@ struct vnode {
                                          * with neither flag the node is a
                                          * mount that has no handler yet */
     volatile int     answered;
+    volatile int     drop_seals;        /* ignore this many inbound OWNER_SEALs:
+                                         * a member that never answers */
     volatile int     basts;
     struct mxfs_resource_id last_bast_res;
     int              msgs_rx;
@@ -192,6 +194,20 @@ static void vrx_fn(void *arg)
                 if (m->len >= sizeof(struct mxfs_dlm_release_ack))
                     mxfs_dlm_process_release_ack(me->dlm,
                                                  (const struct mxfs_dlm_release_ack *)m->buf);
+                break;
+            case MXFS_MSG_OWNER_SEAL:
+                if (me->drop_seals > 0) {
+                    me->drop_seals--;
+                    break;
+                }
+                if (m->len >= sizeof(struct mxfs_dlm_owner_seal))
+                    mxfs_dlm_process_owner_seal(me->dlm, hdr->sender,
+                                                (const struct mxfs_dlm_owner_seal *)m->buf);
+                break;
+            case MXFS_MSG_OWNER_SEAL_ACK:
+                if (m->len >= sizeof(struct mxfs_dlm_owner_seal))
+                    mxfs_dlm_process_owner_seal_ack(me->dlm, hdr->sender,
+                                                    (const struct mxfs_dlm_owner_seal *)m->buf);
                 break;
             case MXFS_MSG_PAGE_HANDOFF:
                 if (m->len >= sizeof(struct mxfs_dlm_page_handoff))

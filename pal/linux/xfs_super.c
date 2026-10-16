@@ -1430,6 +1430,23 @@ xfs_fs_unfreeze(
 {
 	struct xfs_mount	*mp = XFS_M(sb);
 
+	/*
+	 * The single-to-multi join holds this mount frozen from its cached-view
+	 * drop until the two-node view is installed (mxfs_dlm_join_prepare /
+	 * mxfs_dlm_join_commit, which clears m_mxfs_join_frozen before its own
+	 * thaw).  Before 6.6 a freeze has no holder, so a userspace FITHAW
+	 * (fsfreeze -u) reaches here inside that window: on Debian 12's 6.1 it
+	 * ended the join's freeze and a writer made 33 appends that no grant
+	 * covered (tests/join_freeze_userspace_thaw.sh).  Refused, the thaw
+	 * fails and the mount stays frozen until the join thaws it.  From 6.6
+	 * the kernel holder refuses that thaw before this is called.
+	 */
+	if (READ_ONCE(mp->m_mxfs_join_frozen)) {
+		xfs_warn_ratelimited(mp,
+	"mxfs: P-JOIN-THAW-REFUSED -- a thaw arrived while the single->multi join holds this mount frozen; refused, the join thaws it when its view is installed");
+		return -EBUSY;
+	}
+
 	xfs_restore_resvblks(mp);
 	xfs_log_work_queue(mp);
 

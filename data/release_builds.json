@@ -1,5 +1,10 @@
 {
   "_": "Each release's module build per kernel, as measured on a host running it: /sys/module/mxfs/version and /sys/module/mxfs/srcversion read together. A host that builds the module against its own kernel (DKMS, or make on Proxmox) has its own srcversion for the same source, so a run on such a host is tied to a release by this table (tools/release_status.py). Add a line only from a host that reported both values.",
+  "0.90.130": {
+    "6.8.0-101-generic": "1E9C0DE7364AD47BCDDE54A",
+    "6.17.2-1-pve": "C61BDB7C5424AA24E2EAA72",
+    "7.0.14-24-pve": "819E8893C17F0BF388CC9D7"
+  },
   "0.90.129": {
     "6.8.0-101-generic": "4FD56D0D02CBB2D2A7CB8B6",
     "6.17.2-1-pve": "3E4E73AF28599638B96BAE4",

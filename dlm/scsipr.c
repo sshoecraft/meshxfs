@@ -3934,9 +3934,10 @@ static const struct mxfs_lu_reset_audited_kernel mxfs_lu_reset_audited[] = {
  *
  * Measured with the script itself: /src/linux 7.1.0-rc7 (read) gives the value
  * below, and so do the headers of 6.8.0-101-generic, 6.17.2-1-pve and
- * 7.0.14-19-pve (scripts/pve_libiscsi_crosscheck.sh; 7.0.14-19-pve's three
- * iSCSI headers are byte-identical to the read tree, 6.17.2-1-pve's libiscsi.h
- * differs only in the return type of iscsi_queuecommand).
+ * 7.0.14-19-pve (compared header by header against the Proxmox kernels' own
+ * header packages; 7.0.14-19-pve's three iSCSI headers are byte-identical to
+ * the read tree, 6.17.2-1-pve's libiscsi.h differs only in the return type of
+ * iscsi_queuecommand).
  *
  * 0.90.1: measured the same way on the two other released platforms' build
  * headers, taken from the lab's own nodes — 5.14.0-687.49.1.el9_8.x86_64

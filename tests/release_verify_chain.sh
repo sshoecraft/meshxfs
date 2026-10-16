@@ -75,10 +75,27 @@ FULL="${FULL:-1}"
 POWER="${POWER:-0}"
 export POWER
 [[ "$CLAIM" =~ ^[0-9]+$ ]] && [ "$CLAIM" -ge 2 ] || { echo "CLAIM must be an integer >= 2 (got '$CLAIM')" | tee -a "$L"; exit 2; }
+# table_boards [N]: every configuration the release table grades by its board
+# (data/release_table.json, the rows tools/release_status.py reads), at node
+# count N or all.  The release matrix alone left out the TCP configurations
+# released earlier (8/16 net/mesh/direct, 2-16 net/mesh/mpath), whose rows the
+# table still turns red on a build they never ran on.
+table_boards() {
+    python3 -c 'import json, sys
+n = sys.argv[2] if len(sys.argv) > 2 else ""
+seen = []
+for row in json.load(open(sys.argv[1]))["rows"]:
+    if "boards" not in row:
+        continue
+    for c in row["configs"]:
+        if c not in seen and (not n or c.split("/")[0] == n):
+            seen.append(c)
+print("\n".join(seen))' data/release_table.json "$@"
+}
 if [ -z "${LOWER+set}" ]; then
-    # every node count the release matrix names below the claim, largest first
+    # every node count the release table's boards name below the claim, largest first
     LOWER=""
-    for n in $(python3 tools/configuration.py release-matrix | cut -d/ -f1 | sort -rnu); do
+    for n in $(table_boards | cut -d/ -f1 | sort -rnu); do
         [ "$n" -lt "$CLAIM" ] && LOWER="$LOWER $n"
     done
 fi
@@ -157,7 +174,9 @@ group_of() {
 # names.
 RIG_MAX=$(tools/mxfs_lab.sh groups | while read -r g; do tools/mxfs_lab.sh group "$g"; done | tr ' ' '\n' | sed -n 's/^test//p' | sort -n | tail -1)
 if [ "$POWER" = 1 ]; then
-    step "platform sets off" scripts/lab_power.sh down ubuntu2404 pve9 rhel9 debian13
+    # every set data/platforms.json releases, as tests/full_verify.sh reads it
+    # shellcheck disable=SC2046  # one argument per platform
+    step "platform sets off" scripts/lab_power.sh down $(python3 -c 'import json, sys; d = json.load(open(sys.argv[1]))["platforms"]; print(" ".join(k for k, v in d.items() if v["status"] == "released"))' data/platforms.json)
     step "rig off" scripts/lab_power.sh down "rig:${RIG_MAX:-$CLAIM}"
     [ -n "$LAPS" ] && step "rig up" scripts/lab_power.sh up "rig:$CLAIM"
 fi
@@ -182,7 +201,7 @@ boards=(); sets=(); cfgs=()
 for n in $counts; do
     [ "$n" = "$CLAIM" ] || laps_at "$n"
     i=0
-    for cfg in $(python3 tools/configuration.py release-matrix --nodes "$n"); do
+    for cfg in $(table_boards "$n"); do
         g=$(group_of "$n" "$i")
         [ "$(scripts/../tools/mxfs_lab.sh group "$g" 2>/dev/null | wc -w)" = "$n" ] \
             || { echo "$(date -u +%FT%TZ) chain defect: $cfg needs rig group $g of $n nodes in the lab file" | tee -a "$L"; exit 2; }
@@ -207,21 +226,32 @@ if [ "${#boards[@]}" -gt 0 ]; then
     # 2/net/mesh/direct never ran).  So the boards go in waves, in argument
     # order: a board joins the first wave none of whose groups shares a node
     # with its own, and the waves run one after another.
-    waves=(); wave_nodes=()
+    # A board also needs a pool LUN of its own for the whole wave: run.sh takes
+    # 20G up to 8 nodes and 80G above, and a board that finds none free fails
+    # at once with no row run (0.90.130: 16/disk/caw/mpath and 16/net/mesh/mpath
+    # each shared a wave with another 16-node board, and the pool has one 80G
+    # LUN).  So a wave holds no more boards above 8 nodes than the pool has
+    # LUNs of 80G or more.
+    big_luns=$(tools/lun_pool.sh status 2>/dev/null | awk '$1 ~ /^lun[0-9]+$/ { s = $2; sub(/G$/, "", s); if (s + 0 >= 80) n++ } END { print n + 0 }')
+    [ "$big_luns" -ge 1 ] || big_luns=1
+    waves=(); wave_nodes=(); wave_big=()
     for b in "${boards[@]}"; do
         nodes=$(tools/mxfs_lab.sh group "${b##*@}")
+        big=0; [ "$(echo "$nodes" | wc -w)" -gt 8 ] && big=1
         placed=0
         for w in "${!waves[@]}"; do
             clash=0
             for n in $nodes; do
                 case "${wave_nodes[$w]}" in *" $n "*) clash=1; break ;; esac
             done
+            [ "$big" = 1 ] && [ "${wave_big[$w]}" -ge "$big_luns" ] && clash=1
             if [ "$clash" = 0 ]; then
                 waves[w]="${waves[$w]} $b"; wave_nodes[w]="${wave_nodes[$w]} $nodes "
+                wave_big[w]=$(( ${wave_big[$w]} + big ))
                 placed=1; break
             fi
         done
-        [ "$placed" = 1 ] || { waves+=("$b"); wave_nodes+=(" $nodes "); }
+        [ "$placed" = 1 ] || { waves+=("$b"); wave_nodes+=(" $nodes "); wave_big+=("$big"); }
     done
     for w in "${!waves[@]}"; do
         # shellcheck disable=SC2086  # one argument per board

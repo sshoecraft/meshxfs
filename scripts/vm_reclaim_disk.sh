@@ -94,11 +94,15 @@ for d in "$@"; do
         [ "$was" = running ] && stop "$d"
     fi
     [ "$(state "$d")" = running ] || $VIRSH start "$d" >/dev/null || { say "$d: FAILED to start"; continue; }
-    a=$(lab_addr "$d"); t0=$(date +%s); up=0
+    a=""; t0=$(date +%s); up=0
     while [ $(( $(date +%s) - t0 )) -lt $BOOT_S ]; do
         # ssh answering is enough: fstrim needs the filesystems mounted, not
-        # boot finished, and some rig guests hold /run/nologin for minutes
-        on "$a" 10 "echo up" | grep -q up && { up=1; break; }
+        # boot finished, and some rig guests hold /run/nologin for minutes.
+        # The address is resolved on every attempt: a node fresh from
+        # mkosimage takes a new DHCP lease on its first libvirt boot
+        # (ubuntu2604-2: .127 under Packer, .172 under libvirt), and the
+        # resolver knows it only once that lease is taken
+        a=$(lab_addr "$d" 2>/dev/null) && on "$a" 10 "echo up" | grep -q up && { up=1; break; }
         sleep 3
     done
     if [ $up = 1 ]; then

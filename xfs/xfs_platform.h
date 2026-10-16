@@ -1114,8 +1114,22 @@ static inline struct iomap_ioend *iomap_init_ioend(struct inode *inode,
 #define mxfs_iomap_file_buffered_write(iocb, from, ops, wops, priv) \
 	iomap_file_buffered_write(iocb, from, ops, priv)
 #else
-#define mxfs_iomap_file_buffered_write(iocb, from, ops, wops, priv) \
-	iomap_file_buffered_write(iocb, from, ops)
+/* Until 6.5 iomap_file_buffered_write left iocb->ki_pos where it found it
+ * and its caller advanced it; from 6.5 iomap advances it and the fork's
+ * callers no longer do.  The signature did not change, and RHEL 9's 5.14
+ * carries the newer behaviour, so neither the version nor a build probe tells
+ * the two apart.  On Debian 12's 6.1 every buffered write() returned its full
+ * count with the file position unmoved, so each one overwrote the file from
+ * the same offset: an 8 MiB dd left a 1 MiB file.  Advance the position here
+ * only when iomap did not. */
+#define mxfs_iomap_file_buffered_write(iocb, from, ops, wops, priv) ({	\
+	struct kiocb *mxfs_bw_iocb = (iocb);				\
+	loff_t mxfs_bw_pos = mxfs_bw_iocb->ki_pos;			\
+	ssize_t mxfs_bw_ret = iomap_file_buffered_write(mxfs_bw_iocb, from, ops); \
+	if (mxfs_bw_ret > 0 && mxfs_bw_iocb->ki_pos == mxfs_bw_pos)	\
+		mxfs_bw_iocb->ki_pos += mxfs_bw_ret;			\
+	mxfs_bw_ret;							\
+})
 #endif
 
 /* iomap_page_mkwrite gained write_ops param in ~6.15 */

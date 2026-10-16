@@ -142,3 +142,13 @@ clean:
 	rm -rf $(OBJDIR) $(BIN) $(LBIN) $(DBIN) $(FBIN) $(CBIN) $(UBIN) $(RBIN) $(PBIN) $(VBIN) $(SBIN) $(GBIN)
 
 .PHONY: all clean
+
+XBIN := seal_barrier_test
+XOBJS := $(OBJDIR)/seal_barrier_test.o $(OBJDIR)/dlm.o $(OBJDIR)/dlm_shared.o \
+         $(OBJDIR)/tauth_ledger.o $(OBJDIR)/tauth_store.o $(OBJDIR)/pal_user.o
+
+$(OBJDIR)/seal_barrier_test.o: seal_barrier_test.c dlm_mesh.h tauth_testlib.h $(TOP)/dlm/dlm.h $(TOP)/dlm/tauth_ledger.h | $(OBJDIR)
+	$(CC) $(CPPFLAGS) -I$(TOP)/pal -O2 -g -std=gnu11 -Wall -c -o $@ $<
+
+$(XBIN): $(XOBJS)
+	$(CC) $(CFLAGS) -o $@ $(XOBJS) $(LDLIBS)

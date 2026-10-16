@@ -333,6 +333,21 @@ enum mxfs_dlm_msg_type {
 	 */
 	MXFS_MSG_LOCK_CANCEL,
 	MXFS_MSG_LOCK_CANCEL_ACK,
+	/*
+	 * Prover -> every live member, when a fenced victim's fence-time manifest
+	 * is taken on TCP: seal this owner (refuse its releases, drain the ones
+	 * still committing) and answer with OWNER_SEAL_ACK.  The prover collects
+	 * the victim's ledger records only after every member has answered, so a
+	 * release the victim sent to ANY master cannot retire a record after the
+	 * collect.  Before this only the prover sealed: a victim that had lost
+	 * its storage but not its network kept releasing through the other
+	 * masters for the ~35 s until its own lease ran out, one such release
+	 * landed after the collect, and the replay read it as a post-seal
+	 * mutation and quarantined the whole filesystem (2026-10-15, 4- and
+	 * 8-node net/mesh/mpath, path_all_lost).  Carried in an owner_seal.
+	 */
+	MXFS_MSG_OWNER_SEAL,
+	MXFS_MSG_OWNER_SEAL_ACK,
 
 	/*
 	 * ASYMMETRIC MDS (Phase 1, see ASYMMETRIC_MDS_PLAN.md).
@@ -519,6 +534,17 @@ struct mxfs_dlm_lock_cancel {
 	uint32_t                cancel_id;
 	uint8_t                 mode;
 	uint8_t                 pad[3];
+};
+
+/* OWNER_SEAL and OWNER_SEAL_ACK: the victim to seal and the barrier it
+ * belongs to; in the ack, rc is the member's mxfs_dlm_seal_owner result. */
+struct mxfs_dlm_owner_seal {
+	struct mxfs_dlm_msg_hdr hdr;
+	uint64_t                victim_inc;
+	mxfs_node_id_t          victim;
+	uint32_t                seal_id;
+	int32_t                 rc;
+	uint32_t                pad;
 };
 
 /* What the master found for a cancelled acquisition, in the ack. */

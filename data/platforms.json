@@ -12,14 +12,14 @@
         "mxfs_<v>_amd64.deb",
         "pve-storage-mxfs_<v>_all.deb"
       ],
-      "build_check": "scripts/pve_kbuild_check.sh 6.17.2-1-pve",
+      "build_check": "scripts/vm_kbuild_check.sh pve9 6.17.2-1-pve 7.0.14-19-pve",
       "verify_env": "two Proxmox VE 9 nodes built as lab/vms.md describes (pve9-1, pve9-2), sharing one iSCSI LUN that supports SCSI persistent reservations and COMPARE AND WRITE (clyde's SCST target since 2026-09-26), attached in-guest; which nodes and which LUN come from this site's lab file (tools/mxfs_lab.sh nodes pve9). Platform rounds run on two nodes, the node and a peer to fence: every fault a platform VM has caught (a kernel API, the fence on that kernel, packaging) shows at two, and scale is verified on the development rig (test1..testN for N nodes) by the release boards. Releases up to 0.90.41 were verified on N nodes of an eight-node set; from 0.90.42 the set is two nodes.",
       "verify_tests": "install both .debs from the built packages on every node of the set; DKMS builds on every installed PVE kernel; for EACH claimed kernel (pinned with proxmox-boot-tool, rebooted into) and EACH configuration of the release matrix: mount with no options on every node, transport announced by every mount; cross-node checksums (each node's data read on every other); create/remote-delete counts; chk_mxfs clean; peer= between two nodes and peers= across the set with multicast blocked; pvesm add/status/remove holds one mount; O_DIRECT read on a stable-writes device; every node rebooted on that kernel, module auto-loaded with the configured transport, remount, earlier data intact (CONFIG=<configuration> KERNEL=<krel> tests/packaged_round.sh pve9, once per claimed kernel per configuration); hung-node freeze on each configuration (CONFIG=<configuration> PREP=pve9 tests/tcp_peer_freeze_death.sh: the set's second node frozen, the first measured): death declared, fence certified, replay, survivor writing",
       "verified": {
         "amd64": {
-          "version": "0.90.129",
-          "date": "2026-10-15",
-          "evidence": "tests/evidence/full_verify_0.90.129_pve9.log tests/evidence/full_verify_0.90.129.log"
+          "version": "0.90.130",
+          "date": "2026-10-16",
+          "evidence": "tests/evidence/full_verify_0.90.130_pve9.log tests/evidence/full_verify_0.90.130.log"
         }
       },
       "priority": 1,
@@ -36,15 +36,15 @@
       "packages": [
         "mxfs_<v>_amd64.deb"
       ],
-      "build_check": "make modules -j16",
+      "build_check": "scripts/vm_kbuild_check.sh ubuntu2404",
       "verify_env": "two Ubuntu 24.04 nodes on the GA kernel built as lab/vms.md describes (ubuntu2404-1, ubuntu2404-2), sharing one iSCSI LUN that supports SCSI persistent reservations and COMPARE AND WRITE (clyde's SCST target since 2026-09-26), attached in-guest; which nodes and which LUN come from this site's lab file (tools/mxfs_lab.sh nodes ubuntu2404), for the packaged round (tests/packaged_round.sh ubuntu2404). Platform rounds run on two nodes, the node and a peer to fence: every fault a platform VM has caught (a kernel API, the fence on that kernel, packaging) shows at two, and scale is verified on the development rig (test1..testN for N nodes) by the release boards. Releases up to 0.90.41 were verified on N nodes of an eight-node set; from 0.90.42 the set is two nodes.",
       "verify_tests": "the rig suite of every configuration of the release matrix at every released node count (run.sh 8/net/mesh/direct, run.sh 8/disk/caw/direct, then 4 and 2 on the same module), every board row PASS (tools/criteria.py <configuration>); on each configuration: install the .deb from the built packages on every node of the set with a DKMS build and a module loaded from updates/dkms; mount with no options on every node, transport announced by every mount; cross-node checksums (each node's data read on every other); create/remote-delete counts; chk_mxfs clean; peer= between two nodes and peers= across the set with multicast blocked; every node rebooted, module auto-loaded with the configured transport, remount, earlier data intact (CONFIG=<configuration> tests/packaged_round.sh ubuntu2404); hung-node freeze on each configuration (CONFIG=<configuration> PREP=ubuntu2404 tests/tcp_peer_freeze_death.sh: the set's second node frozen, the first measured)",
       "notes": "The development rig's platform.",
       "verified": {
         "amd64": {
-          "version": "0.90.129",
-          "date": "2026-10-15",
-          "evidence": "tests/evidence/full_verify_0.90.129_ubuntu2404.log tests/evidence/full_verify_0.90.129.log"
+          "version": "0.90.130",
+          "date": "2026-10-16",
+          "evidence": "tests/evidence/full_verify_0.90.130_ubuntu2404.log tests/evidence/full_verify_0.90.130.log"
         }
       },
       "priority": 3,
@@ -59,18 +59,18 @@
         "5.14.0-687.49.1.el9_8 (9.8; earlier minors carry fewer backports and are not verified)"
       ],
       "packages": [
-        "mxfs-<v>-1.el8.x86_64.rpm (DKMS; EPEL dkms)"
+        "mxfs-<v>-1.el9.x86_64.rpm (DKMS; EPEL dkms)"
       ],
-      "build_check": "scripts/rhel_kbuild_check.sh -i almalinux:9 && scripts/rhel_kbuild_check.sh -i rockylinux:9",
+      "build_check": "scripts/vm_kbuild_check.sh rhel9",
       "verify_env": "two AlmaLinux 9.8 nodes built as lab/vms.md describes (alma9-1, alma9-2), on kernel 5.14.0-687.49.1.el9_8, firewalld active, SELinux enforcing, sharing one iSCSI LUN that supports SCSI persistent reservations and COMPARE AND WRITE (clyde's SCST target since 2026-09-26), attached in-guest; which nodes and which LUN come from this site's lab file (tools/mxfs_lab.sh nodes rhel9). Platform rounds run on two nodes, the node and a peer to fence: every fault a platform VM has caught (a kernel API, the fence on that kernel, packaging) shows at two, and scale is verified on the development rig (test1..testN for N nodes) by the release boards. Releases up to 0.90.41 were verified on N nodes of an eight-node set; from 0.90.42 the set is two nodes. AlmaLinux and Rocky rebuild Red Hat's kernel for each minor release; runtime runs on AlmaLinux, build checks on AlmaLinux and Rocky.",
       "verify_tests": "on each configuration of the release matrix: install the .rpm from the built packages on every node of the set with a DKMS build and the module loaded from /lib/modules/<krel>/extra; firewalld with only 7600/tcp 7601/udp 7602/udp 7603/udp opened; mount with no options on every node, transport announced by every mount; cross-node checksums (each node's data read on every other); create/remote-delete counts; chk_mxfs clean; peer= between two nodes and peers= across the set with multicast dropped; every node rebooted, module auto-loaded with the configured transport, remount, earlier data intact; SELinux enforcing: mount, cross-node writes, no AVC denials (CONFIG=<configuration> tests/packaged_round.sh rhel9); hung-node freeze on each configuration (CONFIG=<configuration> PREP=rhel9 tests/tcp_peer_freeze_death.sh: the set's second node frozen, the first measured): death declared, fence certified, replay, survivor writing; sVirt (tests/selinux_svirt_mxfs.sh)",
       "notes": "Ported in 0.89.82: kernel APIs are probed at build time (pal/linux/kcompat_probe.sh), since RHEL 9 reports 5.14 for every minor release while carrying backports, so each minor is a different build. The claim is 9.8 only. Runtime runs on AlmaLinux 9.8, which rebuilds Red Hat's kernel, so verifying it needs no Red Hat subscription; a claim for another minor needs a pair on that minor.",
       "priority": 2,
       "verified": {
         "amd64": {
-          "version": "0.90.129",
-          "date": "2026-10-15",
-          "evidence": "tests/evidence/full_verify_0.90.129_rhel9.log tests/evidence/full_verify_0.90.129.log"
+          "version": "0.90.130",
+          "date": "2026-10-16",
+          "evidence": "tests/evidence/full_verify_0.90.130_rhel9.log tests/evidence/full_verify_0.90.130.log"
         }
       },
       "arch": [
@@ -86,7 +86,7 @@
       "packages": [
         "rpm"
       ],
-      "notes": "RHEL 10 runs 6.12 plus Red Hat backports: nearer the tree than RHEL 9's 5.14, so it is expected to be cheaper than RHEL 9. Build with scripts/rhel_kbuild_check.sh -i almalinux:10; osimager has rhel-10.x and alma-10.x specs. AlmaLinux and Rocky rebuild the same kernel: runtime on RHEL, build checks on all three.",
+      "notes": "RHEL 10 runs 6.12 plus Red Hat backports: nearer the tree than RHEL 9's 5.14, so it is expected to be cheaper than RHEL 9. Build and verify on a pair built with mkosimage (osimager has rhel-10.x and alma-10.x specs; lab/vms.md alma-10-latest-x86_64) with scripts/vm_kbuild_check.sh rhel10. AlmaLinux and Rocky rebuild the same kernel; a rebuild is checked only on a set of its own.",
       "priority": 6,
       "arch": [
         "amd64"
@@ -123,19 +123,29 @@
       ]
     },
     "ubuntu2604": {
-      "name": "Ubuntu 26.04 LTS",
-      "status": "development",
+      "name": "Ubuntu 26.04 LTS (kernel 7.0)",
+      "status": "released",
       "priority": 5,
       "kernels": [
-        "7.0.x-generic"
+        "7.0.0-38-generic (Ubuntu 26.04.1)"
       ],
       "packages": [
         "mxfs_<v>_amd64.deb"
       ],
-      "notes": "The current Ubuntu LTS. Its kernel is close to the upstream tree MXFS forks, so the port should be a build check and a packaged round.",
+      "notes": "Released from 0.90.130 (owner, 2026-10-15). The current Ubuntu LTS; its 7.0 kernel is the line Proxmox VE 9's 7.0 kernel is built from. Build check and verification run on the ubuntu2604-1/ubuntu2604-2 pair (lab/vms.md), built here with mkosimage.",
       "arch": [
         "amd64"
-      ]
+      ],
+      "build_check": "scripts/vm_kbuild_check.sh ubuntu2604",
+      "verify_env": "two Ubuntu 26.04 nodes on the claimed kernel built as lab/vms.md describes (ubuntu2604-1, ubuntu2604-2), sharing one iSCSI LUN that supports SCSI persistent reservations and COMPARE AND WRITE (clyde's SCST target), attached in-guest; which nodes and which LUN come from this site's lab file (tools/mxfs_lab.sh nodes ubuntu2604), for the packaged round (tests/packaged_round.sh ubuntu2604). Platform rounds run on two nodes, the node and a peer to fence; scale is verified on the development rig by the release boards.",
+      "verify_tests": "on each configuration of the release matrix: install the .deb from the built packages on every node of the set with a DKMS build and a module loaded from updates/dkms; mount with no options on every node, transport announced by every mount; cross-node checksums (each node's data read on every other); create/remote-delete counts; chk_mxfs clean; peer= between two nodes and peers= across the set with multicast blocked; O_DIRECT read on a stable-writes device; every node rebooted, module auto-loaded with the configured transport, remount, earlier data intact (CONFIG=<configuration> tests/packaged_round.sh ubuntu2604); hung-node freeze on each configuration (CONFIG=<configuration> PREP=ubuntu2604 tests/tcp_peer_freeze_death.sh: the set's second node frozen, the first measured)",
+      "verified": {
+        "amd64": {
+          "version": "0.90.130",
+          "date": "2026-10-16",
+          "evidence": "tests/evidence/full_verify_0.90.130_ubuntu2604.log tests/evidence/full_verify_0.90.130.log"
+        }
+      }
     },
     "debian13": {
       "name": "Debian 13",
@@ -151,14 +161,14 @@
       "arch": [
         "amd64"
       ],
-      "build_check": "scripts/debian_kbuild_check.sh -i debian:13",
+      "build_check": "scripts/vm_kbuild_check.sh debian13",
       "verify_env": "two Debian 13 nodes on the claimed kernel built as lab/vms.md describes (debian13-1, debian13-2), sharing one iSCSI LUN that supports SCSI persistent reservations and COMPARE AND WRITE (clyde's SCST target since 2026-09-26), attached in-guest; which nodes and which LUN come from this site's lab file (tools/mxfs_lab.sh nodes debian13), for the packaged round (tests/packaged_round.sh debian13). Platform rounds run on two nodes, the node and a peer to fence: every fault a platform VM has caught (a kernel API, the fence on that kernel, packaging) shows at two, and scale is verified on the development rig (test1..testN for N nodes) by the release boards. Releases up to 0.90.41 were verified on N nodes of an eight-node set; from 0.90.42 the set is two nodes.",
       "verify_tests": "on each configuration of the release matrix: install the .deb from the built packages on every node of the set with a DKMS build and a module loaded from updates/dkms; mount with no options on every node, transport announced by every mount; cross-node checksums (each node's data read on every other); create/remote-delete counts; chk_mxfs clean; peer= between two nodes and peers= across the set with multicast blocked; O_DIRECT read on a stable-writes device; every node rebooted, module auto-loaded with the configured transport, remount, earlier data intact (CONFIG=<configuration> tests/packaged_round.sh debian13); hung-node freeze on each configuration (CONFIG=<configuration> PREP=debian13 tests/tcp_peer_freeze_death.sh: the set's second node frozen, the first measured)",
       "verified": {
         "amd64": {
-          "version": "0.90.129",
-          "date": "2026-10-15",
-          "evidence": "tests/evidence/full_verify_0.90.129_debian13.log tests/evidence/full_verify_0.90.129.log"
+          "version": "0.90.130",
+          "date": "2026-10-16",
+          "evidence": "tests/evidence/full_verify_0.90.130_debian13.log tests/evidence/full_verify_0.90.130.log"
         }
       }
     },
@@ -195,21 +205,28 @@
     },
     "debian12": {
       "name": "Debian 12",
-      "status": "development",
+      "status": "released",
       "kernels": [
         "6.1.0-53-amd64 (Debian 12)"
       ],
       "packages": [
         "mxfs_<v>_amd64.deb"
       ],
-      "notes": "Added to the release list 2026-10-13 by the owner, and taken off it 2026-10-14 by the owner: not part of the 0.90.129 release. The module builds clean against 6.1.0-53-amd64 (scripts/debian_kbuild_check.sh -i debian:12, 0 errors, 0 warnings, 0.90.127's 6.1 shims); it has never been loaded on a Debian 12 node. The debian12-1/debian12-2 pair in lab/vms.md is not built yet, and no lab-file entry exists. Until a verification is recorded, scripts/release.sh refuses to publish.",
+      "notes": "Released from 0.90.130 (owner, 2026-10-15). Its first verification found buffered writes not advancing the file position on 6.1 (fixed in 0.90.130); the full platform chain then passed on both nodes with the 0.90.130 packages (tests/evidence/full_verify_0.90.130_debian12.log). Build check and verification run on the debian12-1/debian12-2 pair (lab/vms.md), built here with mkosimage.",
       "priority": 7,
       "arch": [
         "amd64"
       ],
-      "build_check": "scripts/debian_kbuild_check.sh -i debian:12",
+      "build_check": "scripts/vm_kbuild_check.sh debian12",
       "verify_env": "two Debian 12 nodes on the claimed kernel built as lab/vms.md describes (debian12-1, debian12-2), sharing one iSCSI LUN that supports SCSI persistent reservations and COMPARE AND WRITE (clyde's SCST target), attached in-guest; which nodes and which LUN come from this site's lab file (tools/mxfs_lab.sh nodes debian12), for the packaged round (tests/packaged_round.sh debian12). Platform rounds run on two nodes, the node and a peer to fence; scale is verified on the development rig by the release boards.",
-      "verify_tests": "on each configuration of the release matrix: install the .deb from the built packages on every node of the set with a DKMS build and a module loaded from updates/dkms; mount with no options on every node, transport announced by every mount; cross-node checksums (each node's data read on every other); create/remote-delete counts; chk_mxfs clean; peer= between two nodes and peers= across the set with multicast blocked; O_DIRECT read on a stable-writes device; every node rebooted, module auto-loaded with the configured transport, remount, earlier data intact (CONFIG=<configuration> tests/packaged_round.sh debian12); hung-node freeze on each configuration (CONFIG=<configuration> PREP=debian12 tests/tcp_peer_freeze_death.sh: the set's second node frozen, the first measured)"
+      "verify_tests": "on each configuration of the release matrix: install the .deb from the built packages on every node of the set with a DKMS build and a module loaded from updates/dkms; mount with no options on every node, transport announced by every mount; cross-node checksums (each node's data read on every other); create/remote-delete counts; chk_mxfs clean; peer= between two nodes and peers= across the set with multicast blocked; O_DIRECT read on a stable-writes device; every node rebooted, module auto-loaded with the configured transport, remount, earlier data intact (CONFIG=<configuration> tests/packaged_round.sh debian12); hung-node freeze on each configuration (CONFIG=<configuration> PREP=debian12 tests/tcp_peer_freeze_death.sh: the set's second node frozen, the first measured)",
+      "verified": {
+        "amd64": {
+          "version": "0.90.130",
+          "date": "2026-10-16",
+          "evidence": "tests/evidence/full_verify_0.90.130_debian12.log tests/evidence/full_verify_0.90.130.log"
+        }
+      }
     },
     "debian11": {
       "name": "Debian 11",

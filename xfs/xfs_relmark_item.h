@@ -80,7 +80,7 @@ int mxfs_relmark_publish(struct xfs_mount *mp, uint16_t auth_class,
 			 uint64_t grant_epoch, const char *who);
 
 void mxfs_relmark_counters(uint64_t *published, uint64_t *failed,
-			   uint64_t *skipped_noid);
+			   uint64_t *skipped_noid, uint64_t *on_frozen);
 /* xfs_mxfs_dlm.c: per-release-site production counters */
 void mxfs_relmark_site_counters(uint64_t *ino_marked, uint64_t *ino_failed,
 				uint64_t *ag_marked, uint64_t *ag_failed,

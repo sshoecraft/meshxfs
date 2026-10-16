@@ -29,7 +29,7 @@
 #   3. the release packages (scripts/release.sh), unless dist/VERSION holds them
 #   4. every platform's packaged round on EACH configuration of the matrix
 #      (CONFIG=N/net/mesh/direct, N/disk/caw/direct): ubuntu2404, pve9 on both
-#      claimed kernels, rhel9, debian13
+#      claimed kernels, and every other platform data/platforms.json releases
 #   5. every platform's hung-node test on each configuration, and on the rhel9
 #      set the SELinux sVirt test, then STALL_LAPS laps of
 #      tests/svirt_stall_laps.sh (default 0)
@@ -43,8 +43,8 @@
 # tests/evidence/full_verify_<VERSION>_<platform>.log and are copied into the
 # main log when it finishes.
 #
-# PLATFORM_GROUPS (default "ubuntu2404,pve9,rhel9,debian13": one group, all
-# four at once) names the groups, commas inside a group and spaces between
+# PLATFORM_GROUPS (default: every released platform in one group, all
+# at once) names the groups, commas inside a group and spaces between
 # groups.  POWER=1 (default 0) powers the sets with scripts/lab_power.sh so
 # that only what a step needs is up: the rig alone for the suites, then each
 # group's sets alone for their steps, and the rig again at the end.  Both
@@ -75,8 +75,13 @@ LAPS="${2:-0}"
 NODES="${NODES:-2}"
 [[ "$NODES" =~ ^[0-9]+$ ]] && [ "$NODES" -ge 2 ] || { echo "NODES must be an integer >= 2 (got '$NODES')" >&2; exit 2; }
 POWER="${POWER:-0}"
-ALL_PLATFORMS="ubuntu2404 pve9 rhel9 debian13"
-# PLATFORMS (default all four) re-runs only the sets named, for a run whose
+# every platform data/platforms.json releases, never a list kept here: a
+# platform released there and left out of a fixed list here would ship
+# unverified (Debian 12, released in 0.90.130, had to be run by a copy of
+# this script until then)
+ALL_PLATFORMS=$(python3 -c 'import json, sys; d = json.load(open(sys.argv[1]))["platforms"]; print(" ".join(k for k, v in d.items() if v["status"] == "released"))' "$(dirname "$0")/../data/platforms.json")
+[ -n "$ALL_PLATFORMS" ] || { echo "no released platform in data/platforms.json" >&2; exit 2; }
+# PLATFORMS (default every released platform) re-runs only the sets named, for a run whose
 # other sets already passed on this version.  The verdict at the end still
 # reads every platform's log, so a set not re-run is graded on its own last
 # run of $V and a failed one cannot drop out of it.
@@ -105,7 +110,7 @@ echo "=== full_verify $V nodes=$NODES platform_nodes=$PLATFORM_NODES power=$POWE
 plat_set() {
     lab_nodes "$1" | tr ' ' '\n' | awk 'NF' | head -n "$PLATFORM_NODES" | tr '\n' ' '
 }
-for k in ubuntu2404 pve9 rhel9 debian13; do
+for k in $ALL_PLATFORMS; do
     n=$(lab_nodes "$k" 2>/dev/null | wc -w)
     [ "$n" -ge "$PLATFORM_NODES" ] || { echo "$k: its verification set has $n node(s), the rounds need $PLATFORM_NODES" | tee -a "$L"; exit 2; }
 done
@@ -121,7 +126,7 @@ run() {
 
 all_platform_nodes() {  # every node the platform rounds run on
     local k
-    for k in ubuntu2404 pve9 rhel9 debian13; do
+    for k in $ALL_PLATFORMS; do
         plat_set "$k" 2>/dev/null
     done | tr ' ' '\n' | awk 'NF && !seen[$0]++' | tr '\n' ' '
 }
@@ -288,6 +293,16 @@ steps_of() {  # <platform>: that platform's steps, in order
 }
 for g in $PLATFORM_GROUPS; do
     gs=${g//,/ }
+    # The sets are held in the VM pool while they verify, whichever way they
+    # are powered: a node nobody holds is idle to the pool, and the release
+    # helpers that scripts/release.sh's package builds and kernel build checks
+    # leave behind (vm_pool.sh release --after) shut the first node of the
+    # pve9, rhel9 and debian12 sets off part way through 0.90.130's first
+    # POWER=1 platform rounds.
+    . "$HERE/tests/lib/runlock.sh"
+    # shellcheck disable=SC2046  # one argument per node
+    vmhold_take "full_verify $V" $(for k in $gs; do plat_set "$k"; done) \
+        || { echo "could not hold the sets of [$gs]" | tee -a "$L"; exit 2; }
     if [ "$POWER" = 1 ]; then
         # only this group's sets hold the host's memory while they verify
         off=$(for g in $SUITE_GROUPS; do echo -n "group:$g "; done)
@@ -296,6 +311,13 @@ for g in $PLATFORM_GROUPS; do
         run scripts/lab_power.sh down $off
         # shellcheck disable=SC2086  # only the nodes the rounds run on
         run scripts/lab_power.sh up $(for k in $gs; do plat_set "$k"; done)
+    else
+        # and started if the pool had shut them off: a set that was off failed
+        # every step with "not answering" (0.90.130's first Debian 12 round)
+        # shellcheck disable=SC2046
+        run tools/vm_pool.sh up $(for k in $gs; do plat_set "$k"; done)
+        # shellcheck disable=SC2046
+        ( setsid tools/vm_pool.sh release --after $$ $(for k in $gs; do plat_set "$k"; done) </dev/null >/dev/null 2>&1 & )
     fi
     pids=()
     for k in $gs; do steps_of "$k" & pids+=($!); done

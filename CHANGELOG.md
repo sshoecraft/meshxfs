@@ -1,3 +1,317 @@
+## 2026-10-16 — 0.90.130 — Stronger Recovery, Broader Platform Support
+
+What changed for someone upgrading from 0.90.129:
+
+- **The network lock manager over multipath, at 2, 4, 8 and 16 nodes, and
+  over a single path at 8 and 16** (0.90.130).  A node that loses every
+  storage path is fenced and its journal replayed while the others keep
+  writing; every other node now refuses the fenced node's late lock
+  releases before recovery collects its locks, so none of them can land
+  afterwards and leave the filesystem refusing every write.
+- **Ubuntu 26.04 and Debian 12 are supported** (0.90.130): the .deb, on
+  Ubuntu 26.04's kernel 7.0 and Debian 12's 6.1.
+- **Fixes** (0.90.130): on kernels before 6.5 (Debian 12) every buffered
+  write now advances the file position (it rewrote the same offset); a
+  node frozen by a backup or snapshot tool (`fsfreeze`) answers another
+  node's lock request without a kernel warning, which on a host that sets
+  `panic_on_warn` was a crash; on kernels before 6.6 a userspace thaw no
+  longer ends the freeze a node holds while another node joins.
+
+**Released configurations and what 0.90.130 was validated on:**
+
+| configuration | nodes | storage | validated on 0.90.130 |
+|---|---|---|---|
+| `2/net/mesh/drbd` | 2 | each host's own disk, DRBD 8.4 dual-primary | `tests/drbd_release_verify.sh`; two physical Proxmox VE 9 hosts, a network cable pulled under load and plugged back in |
+| `2/net/mesh/direct` | 2 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+| `4/net/mesh/direct` | 4 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+| `8/net/mesh/direct` | 8 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig |
+| `16/net/mesh/direct` | 16 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig |
+| `2/net/mesh/mpath` | 2 | one shared iSCSI LUN over two paths, network lock manager | the 31-row suite plus eight path-fault rows on the test rig |
+| `4/net/mesh/mpath` | 4 | one shared iSCSI LUN over two paths, network lock manager | the 31-row suite plus eight path-fault rows on the test rig |
+| `8/net/mesh/mpath` | 8 | one shared iSCSI LUN over two paths, network lock manager | the 31-row suite plus eight path-fault rows on the test rig |
+| `16/net/mesh/mpath` | 16 | one shared iSCSI LUN over two paths, network lock manager | the 31-row suite plus eight path-fault rows on the test rig |
+| `2/disk/caw/direct` | 2 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `4/disk/caw/direct` | 4 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `8/disk/caw/direct` | 8 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `16/disk/caw/direct` | 16 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `2/disk/caw/mpath` | 2 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+| `4/disk/caw/mpath` | 4 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+| `8/disk/caw/mpath` | 8 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+| `16/disk/caw/mpath` | 16 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig; three Proxmox VE 9 hosts on two paths (path faults, live migration, datastore operations, HA power loss), kernels 6.17 and 7.0 |
+
+The test rig is Ubuntu 24.04 (kernel 6.8.0-101-generic).  "Installed
+packages" means the release packages on two nodes of each supported
+platform: Proxmox VE 9 (kernels 6.17 and 7.0), RHEL 9.8, Ubuntu 24.04,
+Ubuntu 26.04, Debian 12 and Debian 13.  Every host in a cluster needs the
+same MeshXFS version; hosts on different kernels are fine.
+
+### 0.90.130 in detail
+
+The work this version is for: the cluster-wide seal barrier that keeps a node
+which has lost every storage path from retiring a lock after recovery sealed
+it (D-NETMESH-MPATH-ALL-LOST-SURVIVORS-STALL-131S, which holds
+`4/net/mesh/mpath`, `8/net/mesh/mpath` and `16/net/mesh/mpath` out of the
+release), and every platform check and test running on a lab VM built here
+with `mkosimage` and held through the VM pool, never in a container or on a
+downloaded image.
+
+**A platform's kernel build check runs on that platform's own lab VM.**
+`scripts/vm_kbuild_check.sh <platform>` takes the first node of the
+platform's verification set, holds it in the VM pool for the length of the
+build (`tests/lib/runlock.sh` `vmhold_take`), starts it if it is off, copies
+the module source staged as the packages stage it (`packaging/common.sh`), and
+compiles it against the headers of the kernel the node runs (and, on
+Proxmox, of each claimed kernel the node carries).  It replaces
+`scripts/debian_kbuild_check.sh`, `scripts/rhel_kbuild_check.sh` and
+`scripts/pve_kbuild_check.sh`, which compiled in docker containers, the first
+two kept running between runs; five of those had sat on the build host for
+days.  Each released platform's `build_check` in `data/platforms.json` now
+names the new script, Ubuntu 24.04's included (it compiled on the build host
+itself before).  Rocky 9 had only a container check and has no lab set, so it
+has no check until one is built.  On debian13-1 the check compiled the module
+against 6.12.107+deb13-amd64 in 206 s with the node started by the pool.
+
+**Debian 12 is a released platform.**  Kernel 6.1.0-53-amd64, the .deb.  Its
+verification set (debian12-1, debian12-2) was built with mkosimage from
+`debian-12-latest-x86_64` and upgraded to the claimed kernel; its first
+round found the buffered-write position fault below, and with that fixed the
+whole platform chain passed on both nodes.  `tests/full_verify.sh` now reads
+the released platforms from `data/platforms.json` instead of a fixed list of
+four, and holds and starts each platform set through the VM pool when it is
+not powering the lab itself (`POWER=0`).  It now holds the sets when it powers
+them too (`POWER=1`): the first `POWER=1` platform run of 0.90.130 lost the
+first node of the pve9, rhel9 and debian12 sets part way through their rounds,
+shut off by the release helpers that `scripts/release.sh`'s package builds and
+kernel build checks leave behind for those nodes, which shut off any VM nobody
+holds once their grace has passed.
+
+**Ubuntu 26.04 is a released platform.**  Kernel 7.0.0-38-generic (26.04.1),
+the .deb.  Its verification set (ubuntu2604-1, ubuntu2604-2) was built with
+mkosimage from `ubuntu-26-latest-x86_64` and set up by the new
+`scripts/platform_node_setup.sh`: 4 vCPUs and 4 GiB like the 24.04 set, the
+upgrade, DKMS and headers, and three things the image itself gets wrong.  The
+live-server image ships open-iscsi with its initiator name already written, so
+both nodes had the same one: the target saw one initiator, each login dropped
+the other node's session, and SCSI PR refused the mount's reservation; a name
+older than the node's own install is regenerated.  mkosimage's libvirt domain
+has no ACPI, so every shutdown ran out its budget and killed the guest; the
+script adds it, and since that renames the guest's NIC and its DHCP address
+changes, the script and `scripts/vm_reclaim_disk.sh` resolve a node on every
+ssh attempt instead of once.  `scripts/vm_kbuild_check.sh ubuntu2604` compiled
+the module (5764D1266E74C48DB9A935D); `tests/buffered_write_pos_verify.sh
+ubuntu2604` passed; and both packaged rounds and both hung-node tests passed
+with the 0.90.130 .deb (`tests/evidence/platform_verify_0.90.130_ubuntu2604.log`:
+installs 238-244 s, the O_DIRECT stable-writes read, reboot and data intact;
+death declared at +66 s on the lock network and +39 s on CAW, survivor writing
+at +71 s and +46 s).
+
+Ubuntu 26.04's `dd` is uutils coreutils 0.10.0, and its `iflag=direct` fails
+every read, on ext4 as on MXFS ("IO error: Invalid input"): the first round's
+O_DIRECT check failed on it while a reader with an aligned buffer read the
+exact bytes with stable writes on and off (`tests/dio_bounce_eio_probe.sh`).
+`tests/dio_stable_writes_read.sh` now reads with such a reader, 1 MiB at a
+time.  Three more harness faults came out of the same set:
+`tests/buffered_write_pos_verify.sh` ran its checks on the root filesystem of
+a node with no package installed and printed PASS for each before failing,
+and left its own module loaded because it unloaded it with `modprobe -r`; it
+now refuses to run without the package or a mount, and unloads with `rmmod`.
+`tests/packaged_round.sh` unloads with `rmmod` when `modprobe -r` cannot find
+the module.  `tests/full_verify.sh` and `tests/release_verify_chain.sh` still
+named four platforms in three places, so Debian 12 was missing from the set
+check and the power-off; they read `data/platforms.json`.  One platform's
+steps run on their own with `scripts/platform_lab.sh <platform>` (its pool LUN
+and lab file) and `tests/platform_verify.sh <platform> <version>`, which run
+them as `full_verify.sh` does.
+
+**A userspace thaw cannot end the join's freeze on kernels before 6.6.**  The
+single-to-multi join freezes the incumbent's mount from its cached-view drop
+until the two-node view is installed.  Before 6.6 a freeze has no holder, so
+on Debian 12's 6.1 a `fsfreeze -u` inside that window ended it: with the
+window held 20 s (`dbg_join_flip_delay_ms`) a writer on the incumbent made 33
+appends inside it that no grant covered (`tests/join_freeze_userspace_thaw.sh
+debian12 thaw`).  `xfs_fs_unfreeze` now refuses a thaw with -EBUSY while the
+join holds the freeze (`P-JOIN-THAW-REFUSED`); the join clears its flag before
+its own thaw.  The same run with the fix: `fsfreeze -u` refused, nothing
+written inside the window, the join completed.  From 6.6 the kernel's freeze
+holder already refuses that thaw (Ubuntu 6.8: `Invalid argument`).  On the
+final tree the thaw was refused on CAW and on the lock network with nothing
+written inside the window; D-JOIN-FREEZE-THAWED-BY-USERSPACE-FITHAW-ON-6-1 is
+closed as fixed and verified.
+
+**A frozen node answers a peer's lock request without a kernel warning.**
+A node whose mount is frozen still releases a lock a peer asks for, and the
+release makes its clean-release marker durable before the unlock
+(`mxfs_relmark_publish`).  That marker is a transaction, and `xfs_trans_alloc`
+warns on any transaction once a freeze is complete: `WARNING ... at
+xfs/xfs_trans.c xfs_trans_alloc`, which taints the kernel and crashes a host
+that sets `panic_on_warn`.  Two ways reach it.  The single-to-multi join
+freezes the incumbent, and on CAW the newcomer's mount asks for the
+incumbent's AG 0 and root-inode tenures about two seconds into that freeze
+(on the lock network the newcomer is admitted only after the view is
+installed, so its requests arrive after the thaw).  And a userspace
+`fsfreeze -f`, as a backup or snapshot tool issues, on any transport: a peer
+creating a file in a directory the frozen node holds.  Both warned on
+0.90.129 and on 0.90.130 before this change, on Debian 12 (6.1) and Ubuntu
+24.04 (6.8).  The marker logs no metadata, never enters the AIL and goes to
+the node's own journal slice, and a frozen MXFS node already writes the
+shared LUN for the cluster (its heartbeat; on CAW the unlock itself), so the
+promise a freeze keeps here is that no data or metadata changes, which the
+marker does not break.  It is now marked `XFS_TRANS_MXFS_FROZEN_OK` and is the
+one transaction the frozen check lets through; every other transaction still
+warns.  Holding the release until the thaw instead would stall every peer
+that wants the lock for as long as the freeze lasts.  Each such marker logs
+`P-RELMARK-ON-FROZEN ... join=1|0` and counts in the debugfs `relmark` block
+(`on_frozen`).  `tests/join_freeze_userspace_thaw.sh` takes `TRANSPORT=caw|tcp`
+(the join case reproduces only on CAW; the earlier runs that showed it ran on
+the transport a CAW packaged round had left in `/etc/modprobe.d`), refuses to
+measure on a stale mount or a pair running two different modules, waits for
+the incumbent's whole window before measuring, and checks that its writer
+appends again after the thaw.  `tests/userfreeze_peer_demand.sh` is the
+userspace-freeze case.  Verified on the final tree (Debian 12
+ED3F0582816CF9633E86BD3, Ubuntu 24.04 1E9C0DE7364AD47BCDDE54A): the join on
+CAW, five runs over the whole 20 s window, published both markers inside it
+with no warning, nothing written inside it and the writer appending again
+0.3-1.7 s after the thaw; on the lock network the same runs reach no marker
+and warn nothing.  The userspace freeze on both kernels and both transports
+published two markers, warned nothing, and the peer's create and listing
+returned in 0.03-0.04 s.  D-JOIN-FREEZE-RELMARK-TRANS-ALLOC-WHILE-FROZEN and
+D-USERSPACE-FREEZE-PEER-REQUEST-RELMARK-WARN are closed as fixed and verified.
+
+**Release packages are built on the lab's own VMs.**  `scripts/release.sh`
+built every package since 0.89.77 in docker containers from downloaded
+images (`debian:bookworm`, `almalinux:8`); the module was never compiled
+there (the packages carry its source and DKMS builds it on the installing
+system, which every platform round did on its own VM), but the userspace
+tools and the archives were.  `scripts/vm_package_build.sh deb|rpm <dir>`
+builds the .debs on the debian12 node and the .rpm on the rhel9 node,
+mkosimage-built and held through the VM pool, and accepts each package only
+when its sha256 matches the node's; `release.sh` and
+`scripts/pve_pair_from_guide.sh` use it.  Both packages hold the same files
+as 0.90.129's; the .deb's tools need glibc 2.34 at most.  The .rpm built on
+AlmaLinux 9 is named `mxfs-<v>-1.el9.x86_64.rpm` (was `.el8`), and
+`tests/packaged_round.sh`, `tests/rpm_lifecycle.sh`, the README and
+`data/platforms.json` take the version's own file.  The two scripts that ran
+containers and nothing called, `scripts/pve_libiscsi_crosscheck.sh` and
+`tests/rpm_post_dkms_failure.sh`, are removed.
+
+**On kernels before 6.5 a buffered write advances the file position.**  The
+first Debian 12 (6.1.0-53-amd64) verification set found every buffered
+`write()` returning its full count with the file position unmoved, so each
+write overwrote the file from the same offset: an 8 MiB `dd bs=1M` left a
+1 MiB file holding its last chunk, and `cp` left 128 KiB.  Until 6.5
+`iomap_file_buffered_write` left `iocb->ki_pos` to its caller, and the fork's
+`xfs_file_buffered_write` relies on the iomap that advances it.  The signature
+is the same on both sides of that change and RHEL 9's 5.14 has the newer
+behaviour, so neither the version nor a build probe can tell them apart:
+`mxfs_iomap_file_buffered_write` (`xfs/xfs_platform.h`) now advances the
+position only when iomap did not.  Debian 12 was not a supported platform
+before this version; no earlier release ran on a kernel this old.  `tests/buffered_write_pos_verify.sh
+<platform>` builds the tree's module on the platform's node, loads it and
+checks positions, appends, `pwrite`, and 64 MiB written by `dd` and `cp`:
+PASS on debian12 (F92B221B4D9FF2256495374), ubuntu2404 6.8 and rhel9 5.14;
+the unfixed module failed the same checks
+(`tests/evidence/buffered_write_pos_verify/`).  Then the whole Debian 12
+platform chain passed on both nodes with the 0.90.130 packages built on the
+lab VMs (`tests/evidence/full_verify_0.90.130_debian12.log`): both packaged
+rounds to the end, the stable-writes O_DIRECT read, reboot and data intact
+included, and both hung-node tests.  D-DEBIAN12-61-DIO-READ-STABLE-WRITES-WRONG-DATA
+is closed as fixed and verified.
+
+**A fenced victim is sealed on every authority before its records are
+collected (TCP lock network).**  `mxfs_dlm_seal_barrier` seals the victim on
+the prover, sends `MXFS_MSG_OWNER_SEAL` to every other live member, and lets
+the fence-time manifest be collected only after each has answered that it has
+sealed it too (each member refuses the victim's releases from then on and
+drains those already committing); a member that does not answer within its
+drain bound plus a second fails the barrier and the snapshot is retried.
+Before it only the prover sealed.  On 0.90.129, 8/net/mesh/mpath
+`path_all_lost` (victim test14, both storage paths down, network up) ended in
+`P-RMAN-POSTSEAL-MUTATION type=1 id=356515841` and a TERMINAL whole-filesystem
+quarantine: 3.5-4.1 M EIOs per survivor and a victim that could not remount.
+From the replayer's and the victim's logs: the entry's ledger page (index
+123628, page 3988) was mastered by a survivor (node 3703056728), never by the
+victim, so no takeover of the victim's pages retired it; the departure purges
+of a slotted victim wait for recovery completion; and the victim was releasing
+until it poisoned its own session at the lease deadline, 1.3 s before the
+fence was seen, while a master checks the sender's seal only when it processes
+a release.  A release sent before the poison and committed at that master
+after the collect is the mechanism left; a sealed member logs
+`P-TAUTH-SEALED-RELEASE-REFUSED` for each such release, which the boards now
+keep.  Usermode: `tests/tauth/seal_barrier_test.c` (the old local cut lets a
+release retire the record at another master; the barrier refuses it; an
+unanswered member fails it at its bound).  Verified: three logged 8-node
+laps passed `path_all_lost` with members logging
+`P-TAUTH-SEALED-RELEASE-REFUSED` for the victim's late release of the same
+resource and no post-seal mutation on any node, and on the release build
+`path_all_lost` passed on the `net/mesh/mpath` boards at 2, 4, 8 and 16
+nodes, survivors stalling 36-73 s against the 120 s bound.
+D-NETMESH-MPATH-ALL-LOST-SURVIVORS-STALL-131S is closed as fixed and
+verified; the stall it was first filed for on 0.90.53, a survivor holding
+inode locks while it retries an allocation-group lock mastered by the dead
+node, is a different mechanism, not seen since, and is queued on its own.
+
+**The lock-network configurations an earlier release claimed are released
+again.**  `8/net/mesh/direct`, `16/net/mesh/direct` and `net/mesh/mpath` at
+2, 4, 8 and 16 nodes, verified in 0.90.51 and not claimed from 0.90.107, are
+in the release matrix again (`data/configurations.json`): each passed its
+whole board on the release build, and no open record that crosses the
+release bar reaches any of them.  The README's "Released in an earlier
+version" list is empty.
+
+**The Proxmox VE SAN suite runs on one kernel with one command.**
+`scripts/pve_suite_on_kernel.sh <kernel> <label>` holds the three nested hosts
+(pve9-5/6/7) in the VM pool, installs, pins and boots the kernel on any host
+not running it, exports the SAN LUN again and logs every host in on both paths
+(`scripts/pve_caw_lun.sh setup`, idempotent: the SCST target is runtime-only,
+and 0.90.130's first run found it gone and every mount failing "Can't lookup
+blockdev"), installs this tree (`scripts/pve_tree_install.sh`), mounts the
+existing LUN (`scripts/pve_mxfs_san_disk.sh join`) and runs
+`scripts/pve_full_suite.sh`; the 0.90.129 runs did those steps by hand.
+
+**A failed path row keeps its nodes' kernel logs whichever stage it fails
+at.**  The copy of each node's followed log ran only at the end of a row, so a
+row that failed at a stage (`path_all_lost` at `stage=rejoin`) left with
+nothing but the follower's start marker in its evidence: the logs of the
+0.90.129 failures above stayed in `/run` on nodes the VM pool then shut off.
+`tests/mpath/lib.sh` copies them from the row's EXIT trap (`kmsg_keep`) and
+names any node whose copy did not arrive.  Two rows set an EXIT trap of their
+own after the library's and left `kmsg_keep` out of it:
+`tests/mpath/path_fenced_return.sh` and `tests/mpath/fenced_takeover_stop.sh`.
+So the 0.90.130 release chain's `2/disk/caw/mpath` `path_fenced_return`
+failure (the healthy node returning EIO while the frozen victim kept its
+registrations) kept no kernel log, and both nodes' journals had rotated past
+the window by the time they were read.  Both traps now keep the logs.
+
+**Shipped open: D-CAWMPATH-FENCED-RETURN-SURVIVOR-EIO-VICTIM-UNFENCED.**  That
+`2/disk/caw/mpath` `path_fenced_return` failure is a healthy node losing its
+mount, which crosses the release bar, and its cause is not known.  It was
+seen once in 21 runs of the row; the 11 runs on the 0.90.130 build after it
+passed, as did the row on the 4-, 8- and 16-node `disk/caw/mpath` boards.
+It ships open by the owner's decision, named as an exception in the README,
+and stays in the queue until a recurrence's kept kernel logs show its cause.
+
+**`run.sh` no longer hangs at its first parallel step.**  The VM pool's
+release helper, started in the background to shut the group's VMs off after
+the run, waited for `run.sh` to exit while `run.sh`'s bare `wait` waited for
+it: every group run since the pool was wired in stopped there (two preps sat
+20 minutes in `do_wait`).  The helper is now started from a subshell that
+exits at once, in `run.sh`, `tests/mpath/lap_chain.sh`,
+`tests/drbd_release_verify.sh` and the two new scripts.
+`scripts/board_laps.sh` takes `--group <g>`.
+
+**The release chain boards every configuration the release table grades.**
+`tests/release_verify_chain.sh` took its boards from the release matrix
+(`tools/configuration.py release-matrix`), ten configurations, while
+`tools/release_status.py` grades sixteen by their boards
+(`data/release_table.json`): the lock-network configurations released earlier
+(`8/net/mesh/direct`, `16/net/mesh/direct` and `net/mesh/mpath` at 2, 4, 8 and
+16 nodes) were never run by the chain and stayed red on every new build.  The
+chain now reads the table's board rows.  Its waves also hold no more boards
+above 8 nodes than the pool has LUNs of 80G or more: the first 0.90.130 chain
+put each 16-node `mpath` board in a wave beside another 16-node board, the
+pool's one 80G LUN went to the other, and both `mpath` boards ended at their
+LUN allocation with no row run.
+
 ## 2026-10-13 — 0.90.129 — Shared Proxmox Storage, Faster DRBD Setup, Stronger Recovery
 
 What changed for someone upgrading from 0.90.124, the last published release

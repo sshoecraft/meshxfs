@@ -55,7 +55,7 @@ Assorted group (kind: assorted): owner corrections and traps from 2026-10-15, lo
 - Every tools/release_status.py row is in scope; red means work before release. Never relabel or hide a row because claim data excludes it. Answer "why can't we release X" with the blocking open defects and fix plan, never "X is not in this release". Narrowing release scope is the user's decision alone.
 
 ## Defect scope and full_verify reruns can turn the table red — `trap-defect-scope-and-full-verify-reruns-can-turn-a-validated-release-table-red`
-- After ~8 h of 0.90.129 validation, release_status.py showed every row red with no test failing: two install-build defects were filed with `defects.py add -N 1 -C '*/*/*' -P any` (2.3 GB Ubuntu guest OOM'd building the module at install). User was furious: the table is read as the validation result.
+- After ~8 h of 0.90.129 validation, release_status.py showed every row red with no test failing: two install-build defects were filed with `defects.py add -N 1 -C '*/*/*' -P any` (2.3 GB Ubuntu guest OOM'd building the module at install). The owner reads the table as the validation result, so an all-red table with no failed test is a wrong report.
 - Before `defects.py add`, run `tools/release_status.py` and predict which rows flip; tell the user in the same turn.
 - `-P` platform narrowing does not separate rig rows (no platform = every platform; rig runs Ubuntu 24.04 so `@ubuntu2404` still blocks all). Only fix plus removal clears.
 - tests/full_verify.sh skips package build when `dist/<VER>/SHA256SUMS` verifies; after a source change packages are stale and the rerun tests OLD code. Move `dist/<VER>` aside (`.backup`) first.

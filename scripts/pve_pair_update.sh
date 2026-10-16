@@ -33,6 +33,12 @@
 #                  the pair comes back on an empty filesystem.  For the test
 #                  pairs only: everything on the filesystem is destroyed
 #   FROM_TREE=1    install this working tree instead of pulling the pushed one
+#   DEBS="<deb> ..."  install these release packages (mxfs_<v>_amd64.deb,
+#                  pve-storage-mxfs_<v>_all.deb, built by scripts/release.sh or
+#                  scripts/vm_package_build.sh) with apt over the ones
+#                  installed, the way a user upgrades a pair set up from the
+#                  .deb (DKMS builds the module), instead of a source build; a
+#                  pair installed from the package refuses `make install`
 #   SKIP_INSTALL=1 no pull and build: swap to the module already installed
 #                  (with CHECK=1, a filesystem check of a running pair)
 #   INSTALL_BUDGET seconds for the pull and build on a host (default 900: a
@@ -133,7 +139,18 @@ $(printf '%s\n' "$out" | tail -8)"
 fi
 for h in "$P0" "$P1"; do
     [ "${SKIP_INSTALL:-0}" = 1 ] && break
-    if [ "${FROM_TREE:-0}" = 1 ]; then
+    if [ -n "${DEBS:-}" ]; then
+        on "$h" "rm -rf /root/mxfs-debs && mkdir /root/mxfs-debs && echo MKDIR_OK" 20 | grep -q MKDIR_OK || die "$h: could not make /root/mxfs-debs"
+        names=""
+        for d in $DEBS; do
+            [ -f "$d" ] || die "no such package: $d"
+            timeout 60 "$SSHP" "$h" SCP "$d" "/root/mxfs-debs/$(basename "$d")" </dev/null >/dev/null 2>&1 \
+                || die "$h: could not copy $(basename "$d")"
+            names="$names ./$(basename "$d")"
+        done
+        pre=""
+        build="cd /root/mxfs-debs && DEBIAN_FRONTEND=noninteractive apt-get install -y $names"
+    elif [ "${FROM_TREE:-0}" = 1 ]; then
         timeout 120 "$SSHP" "$h" SCP "$PACK/mxfs-tree.tar.gz" /root/mxfs-tree.tar.gz </dev/null >/dev/null 2>&1 \
             || die "$h: could not copy the tree's pack"
         pre=""

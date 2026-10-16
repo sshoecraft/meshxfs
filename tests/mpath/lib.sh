@@ -178,7 +178,7 @@ pf_start_gate() {
         fi
         i=$((i + 1))
     done
-    trap 'kmsg_stop' EXIT
+    trap 'kmsg_keep; kmsg_stop' EXIT
     # PF_KNOBS="name=value ...": test-only module parameters written on every
     # node once its log is being followed, so the row runs a path that its
     # natural faults reach only rarely.  Each node's read-back goes to
@@ -198,6 +198,24 @@ pf_start_gate() {
 PFMARK="PF-MARK-$ROW-$RUN"
 KFILE=/run/mxfs_pf_kmsg.$RUN.$ROW
 kmsg_stop() { local n; for n in $NODES; do ( rs 15 "$n" "kill \$(cat $KFILE.pid 2>/dev/null) 2>/dev/null; rm -f $KFILE.pid" >/dev/null 2>&1 ) & done; wait; }
+# kmsg_keep: a failed row's followed kernel logs into its evidence, once,
+# whichever exit the row takes.  Run by the EXIT trap as well as at the end:
+# a row that failed at a stage (`finish FAIL "stage=rejoin"; exit 1`) used to
+# leave without the copy, and the only kernel log of 4/ and 8/net/mesh/mpath
+# path_all_lost failing on 0.90.129 (a post-seal ledger mutation and a whole-
+# filesystem quarantine) stayed in /run on nodes the VM pool then shut off.
+# A node whose copy did not arrive is named, never passed over.
+kmsg_keep() {
+    local n
+    [ "${fails:-0}" != 0 ] || return 0
+    [ -z "${kmsg_kept:-}" ] || return 0
+    kmsg_kept=1
+    for n in $NODES; do ( rs 90 "$n" "gzip -c $KFILE > /src/mxfs/$OUT/kmsg_${n}_fromnode.gz" >/dev/null 2>&1 ) & done; wait
+    for n in $NODES; do
+        [ -s "$OUT/kmsg_${n}_fromnode.gz" ] || echo "  WARN the kernel log of $n was not copied into $OUT (it may still be on the node: $KFILE)"
+    done
+    echo "  INFO each node's kernel log of this row is in $OUT/kmsg_<node>_fromnode.gz and kept on the node: $KFILE"
+}
 
 # The load on every node (or on the nodes named), and a trap that stops it and
 # restores every link however the row ends.  pf_load_stop and pf_verify take
@@ -211,7 +229,7 @@ pf_load_start() {
         pids+=($!)
     done
     wait "${pids[@]}"
-    trap 'stop_loads "$NODES"; links_all_up; kmsg_stop' EXIT
+    trap 'stop_loads "$NODES"; links_all_up; kmsg_keep; kmsg_stop' EXIT
     pids=()
     for n in $on; do ( clock_measure "$n" ) & pids+=($!); done
     wait "${pids[@]}"
@@ -511,8 +529,7 @@ pf_done() {
     # 0.90.52 (a node's filesystem shut down in path_failover on
     # 4/net/mesh/mpath, a 72 s stall on 2/net/mesh/mpath) lost the only copy
     # to the reboot of the next row's victim before anyone read it.
-    for n in $NODES; do ( rs 90 "$n" "gzip -c $KFILE > /src/mxfs/$OUT/kmsg_${n}_fromnode.gz" >/dev/null 2>&1 ) & done; wait
-    echo "  INFO each node's kernel log of this row is in $OUT/kmsg_<node>_fromnode.gz and kept on the node: $KFILE"
+    kmsg_keep
     finish FAIL "$m"
     exit 1
 }

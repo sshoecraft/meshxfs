@@ -165,6 +165,14 @@ void	xfs_log_get_max_trans_res(struct xfs_mount *mp,
 #define XFS_TRANS_RTBITMAP_LOCKED	(1u << 9)
 
 /*
+ * MXFS: a log-only transaction (the clean-release marker) that may commit on
+ * a frozen filesystem -- frozen by the single-to-multi join or from
+ * userspace.  It logs no metadata and is never AIL-resident, so it cannot
+ * dirty what a freeze keeps clean.  Requires XFS_TRANS_NO_WRITECOUNT.
+ */
+#define XFS_TRANS_MXFS_FROZEN_OK	(1u << 10)
+
+/*
  * Field values for xfs_trans_mod_sb.
  */
 #define	XFS_TRANS_SB_ICOUNT		0x00000001

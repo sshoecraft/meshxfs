@@ -21,11 +21,11 @@ shows at two; a release's node count is verified on the development rig.
 
 | platform | osimager spec | nodes | after the build | role |
 |---|---|---|---|---|
-| `ubuntu2404` | `ubuntu-24.04-latest-x86_64` | 2 | boot the GA kernel `platforms.json` claims, not an HWE one | runtime |
+| `ubuntu2404` | `ubuntu-24-latest-x86_64` | 2 | boot the GA kernel `platforms.json` claims, not an HWE one | runtime |
 | `pve9` | `proxmox-ve-9-latest-x86_64` | 2 | install each kernel `platforms.json` claims by its exact version (`proxmox-default-kernel` for the newest), so every claimed kernel is present; `proxmox-headers-<krel>` for each | runtime, one round per claimed kernel |
 | `rhel9` | `alma-9-latest-x86_64` | 2 | boot the claimed kernel, installed by its exact version if the build brought a newer one; enable EPEL (DKMS comes from there); firewalld running, SELinux enforcing | runtime |
 | `debian13` | `debian-13-latest-x86_64` | 2 | replace the DVD-only `sources.list` with deb.debian.org `trixie`, `trixie-updates` and `trixie-security`; `apt full-upgrade` and boot the claimed kernel; install `linux-headers-amd64 dkms open-iscsi sg3-utils` | runtime |
-| `ubuntu2604` | `ubuntu-26.04-latest-x86_64` | 2 | | runtime |
+| `ubuntu2604` | `ubuntu-26-latest-x86_64` | 2 | `scripts/platform_node_setup.sh <node>`: 4 vCPUs and 4 GiB like `ubuntu2404` (osimager builds at 2 and 2), `apt full-upgrade`, `dkms linux-headers-generic open-iscsi sg3-utils`, an iSCSI initiator name of the node's own (the image ships one, so every node built from it shares it and the target sees one initiator), a reboot onto the upgraded kernel | runtime |
 | `rhel10` | `alma-10-latest-x86_64` | 2 | enable EPEL; firewalld running, SELinux enforcing | runtime |
 | `debian12` | `debian-12-latest-x86_64` | 2 | | runtime |
 | `rhel8` | `alma-8-latest-x86_64` | 2 | enable EPEL; firewalld running, SELinux enforcing | runtime |
@@ -35,9 +35,12 @@ shows at two; a release's node count is verified on the development rig.
 | `raspios11` | none — a Raspberry Pi | 2 | | runtime on real hardware |
 | `macos26` | none — a Mac | 2 | | runtime on real hardware |
 
-**Build checks need no VM.** Rocky 9 and the other rebuilds are compiled in a
-container by the platform's `build_check` (`scripts/rhel_kbuild_check.sh -i
-rockylinux:9`); only the runtime platform above gets a set of nodes.
+**Build checks run on the set's first node.** A platform's `build_check`
+(`scripts/vm_kbuild_check.sh <platform>`) compiles the module on that node,
+held through the VM pool, against the kernel it runs. Nothing is compiled or
+tested in a container or on a downloaded image: neither is the platform a
+user runs. A distribution with no set of its own here (Rocky 9, another
+RHEL rebuild) has no check until one is built with `mkosimage`.
 
 **A spec names an OS major line, never a point release.**
 `<dist>-<major>-latest-<arch>` builds the newest point release osimager has

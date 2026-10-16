@@ -97,14 +97,21 @@ verify)
     echo "acknowledged files: $nacked ($(for h in "${PAIR[@]}"; do printf '%s=%s ' "$h" "$(grep -c '^ACK ' "$E/acks_$h.log")"; done)); read-back bound ${vbudget}s per host"
     for h in "${PAIR[@]}"; do
         timeout 30 "$SSH" "$h" SCP "$E/acked.sha" /root/cablepull.sha </dev/null >/dev/null 2>&1
-        r=$(on "$h" "$vbudget" "echo 3 > /proc/sys/vm/drop_caches; findmnt -n -o FSTYPE $MNT; sha256sum -c --quiet /root/cablepull.sha 2>&1 | tail -5; echo SHA_RC=\${PIPESTATUS[0]}")
+        # the host's disk reads every 2 s for the read-back: a slow read-back
+        # with the disk idle is the filesystem waiting, one with the disk busy
+        # is I/O (2026-10-15: pve1 read 6.3 GB in more than 118 s right after
+        # a pull, where the same disk reads 134 MB/s through MXFS otherwise)
+        on "$h" 20 "nohup setsid bash -c 'while :; do echo \$(date +%s.%N) \$(awk \"\\\$3 ~ /^(sd[a-z]+|drbd0)\\\$/ {printf \\\"%s=%s \\\", \\\$3, \\\$6}\" /proc/diskstats); sleep 2; done' > /root/cablepull_diskstats.txt 2>&1 </dev/null & echo \$! > /root/cablepull_diskstats.pid" >/dev/null
+        r=$(on "$h" "$vbudget" "echo 3 > /proc/sys/vm/drop_caches; findmnt -n -o FSTYPE $MNT; t0=\$(date +%s.%N); sha256sum -c --quiet /root/cablepull.sha 2>&1 | tail -5; echo SHA_RC=\${PIPESTATUS[0]} read_s=\$(awk -v a=\$t0 -v b=\$(date +%s.%N) 'BEGIN{printf \"%.1f\", b-a}')")
+        on "$h" 20 "kill \$(cat /root/cablepull_diskstats.pid) 2>/dev/null; cat /root/cablepull_diskstats.txt" > "$E/diskstats_$h.txt"
         grep -q 'SHA_RC=' <<<"$r" || echo "$h: the read-back did not finish within ${vbudget}s"
         echo "$h: $(echo "$r" | tr '\n' ' ')"
         grep -q 'SHA_RC=0' <<<"$r" && grep -q '^mxfs' <<<"$r" || bad=1
         k=$(on "$h" 60 "journalctl _TRANSPORT=kernel --since @$(cat "$E/t0") --no-pager -o cat | grep -aE 'BUG:|WARNING:|Oops|blocked for more than|Filesystem has been shut down|shutting down filesystem' | head -5")
         if [ -n "$k" ]; then echo "$h kernel log:"; echo "$k" | sed 's/^/    /'; bad=1; fi
     done
-    on "${PAIR[0]}" "$vbudget" "rm -rf $MNT/cablepull" >/dev/null
+    # kept on a failure, so the set that read slowly or wrong can be read again
+    [ "$bad" = 0 ] && on "${PAIR[0]}" "$vbudget" "rm -rf $MNT/cablepull" >/dev/null
     # the verdict is kept with the run, naming the build both hosts ran, so the
     # release table (data/release_table.json) can read it
     ident=$(on "${PAIR[0]}" 20 "echo version=\$(modinfo -F version mxfs) build=\$(cat /sys/module/mxfs/srcversion)")

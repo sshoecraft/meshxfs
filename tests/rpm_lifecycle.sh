@@ -43,10 +43,14 @@ STATE="echo registered=\$(dkms status mxfs 2>/dev/null | sed -n 's|^mxfs[/, ]*\(
 state() { on 60 "$STATE" > "$EV/state_$1.log"; cat "$EV/state_$1.log" | sed "s/^/  $1: /"; }
 val() { sed -n "s/^$2=//p" "$EV/state_$1.log" | sed 's/ *$//'; }
 
+# a version's rpm by its own name: el8 up to 0.90.129 (built in an EL8
+# container), el9 from 0.90.130 (built on the rhel9 lab node)
+rpmname() { (cd "$HERE/dist/$1" 2>/dev/null && ls mxfs-"$1"-1.el*.x86_64.rpm 2>/dev/null | head -1); }
 for v in "$OLD" "$NEW"; do
-    [ -f "$HERE/dist/$v/mxfs-$v-1.el8.x86_64.rpm" ] || { say "no dist/$v rpm"; exit 2; }
-    on 60 "true" && "$SSH" "$NODE" SCP "$HERE/dist/$v/mxfs-$v-1.el8.x86_64.rpm" /root/ >/dev/null 2>&1 || { say "scp $v"; exit 2; }
+    [ -n "$(rpmname "$v")" ] || { say "no dist/$v rpm"; exit 2; }
+    on 60 "true" && "$SSH" "$NODE" SCP "$HERE/dist/$v/$(rpmname "$v")" /root/ >/dev/null 2>&1 || { say "scp $v"; exit 2; }
 done
+OLDRPM=$(rpmname "$OLD"); NEWRPM=$(rpmname "$NEW")
 say "node=$NODE old=$OLD new=$NEW evidence=$EV"
 on 20 "grep -q ' mxfs ' /proc/mounts" && { say "MXFS is mounted on $NODE; unmount it first"; exit 2; }
 
@@ -56,16 +60,16 @@ state erase0
 [ -z "$(val erase0 registered)" ] || fail "after the first erase DKMS still holds: $(val erase0 registered)"
 
 # 2. install OLD, upgrade to NEW
-on $INSTALL_S "dnf -y install /root/mxfs-$OLD-1.el8.x86_64.rpm; echo rc=\$?" > "$EV/install_old.log"
+on $INSTALL_S "dnf -y install /root/$OLDRPM; echo rc=\$?" > "$EV/install_old.log"
 grep -q "^rc=0" "$EV/install_old.log" || fail "installing $OLD (see install_old.log)"
-on $INSTALL_S "dnf -y install /root/mxfs-$NEW-1.el8.x86_64.rpm; echo rc=\$?" > "$EV/upgrade.log"
+on $INSTALL_S "dnf -y install /root/$NEWRPM; echo rc=\$?" > "$EV/upgrade.log"
 grep -q "^rc=0" "$EV/upgrade.log" || fail "upgrading to $NEW (see upgrade.log)"
 state upgrade
 [ "$(val upgrade registered)" = "$NEW" ] || fail "after the upgrade DKMS holds '$(val upgrade registered)', not only $NEW"
 [ "$(val upgrade loads)" = 0 ] && [ "$(val upgrade version)" = "$NEW" ] || fail "after the upgrade the module does not load as $NEW"
 
 # 3. reinstall NEW
-on $INSTALL_S "dnf -y reinstall /root/mxfs-$NEW-1.el8.x86_64.rpm; echo rc=\$?" > "$EV/reinstall.log"
+on $INSTALL_S "dnf -y reinstall /root/$NEWRPM; echo rc=\$?" > "$EV/reinstall.log"
 grep -q "^rc=0" "$EV/reinstall.log" || fail "reinstalling $NEW (see reinstall.log)"
 state reinstall
 [ "$(val reinstall registered)" = "$NEW" ] || fail "after the reinstall DKMS holds '$(val reinstall registered)', not $NEW"
