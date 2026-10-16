@@ -21,8 +21,10 @@ packages.
 > **A shared-LUN clustered filesystem written entirely by AI.**
 >
 > Every line of the clustering, coordination, distributed-lock, fencing, and
-> on-disk-envelope code in this repository was written by an autonomous AI agent
-> (Anthropic's Claude Code) — **not** by a human using an AI tool. MeshXFS starts
+> on-disk-envelope code in this repository was written by AI — **not** by a
+> human using an AI tool. Claude Opus, running as an autonomous coding agent in
+> Anthropic's Claude Code, wrote a large share of it, consulting Claude Fable,
+> GPT, Gemini and Astra on the hardest problems. MeshXFS starts
 > from the upstream Linux kernel **XFS** code, written by the XFS developers,
 > and the AI has since modified much of it heavily (see "How this was built").
 > Everything that turns XFS into a filesystem many machines can mount at once
@@ -788,10 +790,19 @@ equivalent to `xfs_db`. Tool names follow the standard Linux `mkfs.TYPE` /
 
 ## How this was built
 
-MeshXFS was written **entirely by AI** — specifically Anthropic's **Claude Code**,
-an autonomous AI coding agent — across many development sessions. No human wrote,
-hand-edited, or line-by-line reviewed the clustering code. The human/AI boundary
-is clean:
+MeshXFS was written **entirely by AI**, across many development sessions. No
+human wrote, hand-edited, or line-by-line reviewed the clustering code.
+
+- **The coding agent:** Claude Opus, running autonomously in Anthropic's
+  **Claude Code**, wrote a large share of the code.
+- **Consulted on the hardest problems:** Claude Fable, GPT, Gemini and Astra,
+  on lock-protocol design, recovery races and fencing correctness. Without
+  them the project would never have been completed.
+- **The human's part:** directing the work, setting the requirements and
+  running the testing, not writing the implementation.
+
+The project exists to find out whether AI could write a device driver this
+complex. The human/AI boundary is clean:
 
 - **Human-written:** the upstream Linux kernel **XFS** source MeshXFS forked,
   written by the XFS developers (their copyright notices are kept in every
