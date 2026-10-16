@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Proxmox forum thread for testers
+    url: https://forum.proxmox.com/threads/testers-wanted-meshxfs-clustered-filesystem-and-proxmox-ve-storage-plugin.187097/
+    about: Questions and setup help
