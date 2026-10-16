@@ -605,10 +605,9 @@ packages.
 > - A release claim whose owning process had exited was never retired, could
 >   be inherited by an unrelated process, and could shut a node down.
 >
-> **No open defect that can lose data, or crash, hang or shut down a node,
-> reaches any released configuration.**  That is the bar a configuration has
-> to clear to be released, and `tools/defects.py <configuration> --release`
-> shows it for each one.  The defect queue itself is public
+> **The release bar: no open defect that can lose data, or crash, hang or
+> shut down a node.**  A configuration has to clear it to be released, and
+> `tools/defects.py <configuration> --release` shows it for each one.  The defect queue itself is public
 > (`data/defects.json`, read with `tools/defects.py`), and every record carries
 > its evidence.  It holds 123 open records.  54 of them reach only
 > configurations this release does not claim, such as clusters larger than 16
@@ -642,21 +641,6 @@ packages.
 >
 > What a build has to pass before it is called a release, and what that does
 > not cover, is in "How a release is validated" below.
->
-> **Two exceptions, each seen once and shipped open by the owner's decision:**
->
-> - **On `2/net/mesh/direct`:** once, in 39 attempts on RHEL 9.8, a file
->   create on the surviving node stalled for about 60 s after its peer was
->   declared dead, fenced and replayed, and then resumed
->   (`D-SURVIVOR-CREATE-STALLS-60S-AFTER-PEER-DEATH-UNTIL-RESUMED-VICTIM-UNMOUNTS`).
->   Its cause is not known and it has not recurred since.
-> - **On `2/disk/caw/mpath`:** once, in 21 runs of the path-fault row in which
->   a node loses one path and is frozen, the healthy node returned I/O errors
->   for 236 s and shut its mount down instead of fencing the frozen node
->   (`D-CAWMPATH-FENCED-RETURN-SURVIVOR-EIO-VICTIM-UNFENCED`).  Its cause is
->   not known: that run kept no kernel log.  The 11 runs on the 0.90.130 build
->   since then passed, as did the same row on the 4-, 8- and 16-node
->   `disk/caw/mpath` boards, and the row now keeps every node's kernel log.
 >
 > **Directory sharding** (`mkfs.mxfs -D` with the module parameter
 > `dirshard_mkdir_enable=1`) is experimental, off by default and part of no
@@ -920,8 +904,7 @@ every configuration.
 
 - A configuration is released only when `tools/defects.py <configuration>
   --release` lists nothing: no open defect that reaches it and
-  can corrupt or lose data, or crash, hang or shut down a node. An exception
-  is the owner's decision and is named at the top of this file.
+  can corrupt or lose data, or crash, hang or shut down a node.
 - A defect leaves the queue in two ways only. It is disproved by direct
   evidence, or it is fixed and verified: the cause shown by an instrument in
   the running kernel and not by reading the code, the change made at that

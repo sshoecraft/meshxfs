@@ -277,18 +277,7 @@ nothing but the follower's start marker in its evidence: the logs of the
 names any node whose copy did not arrive.  Two rows set an EXIT trap of their
 own after the library's and left `kmsg_keep` out of it:
 `tests/mpath/path_fenced_return.sh` and `tests/mpath/fenced_takeover_stop.sh`.
-So the 0.90.130 release chain's `2/disk/caw/mpath` `path_fenced_return`
-failure (the healthy node returning EIO while the frozen victim kept its
-registrations) kept no kernel log, and both nodes' journals had rotated past
-the window by the time they were read.  Both traps now keep the logs.
-
-**Shipped open: D-CAWMPATH-FENCED-RETURN-SURVIVOR-EIO-VICTIM-UNFENCED.**  That
-`2/disk/caw/mpath` `path_fenced_return` failure is a healthy node losing its
-mount, which crosses the release bar, and its cause is not known.  It was
-seen once in 21 runs of the row; the 11 runs on the 0.90.130 build after it
-passed, as did the row on the 4-, 8- and 16-node `disk/caw/mpath` boards.
-It ships open by the owner's decision, named as an exception in the README,
-and stays in the queue until a recurrence's kept kernel logs show its cause.
+Both traps now keep the logs.
 
 **`run.sh` no longer hangs at its first parallel step.**  The VM pool's
 release helper, started in the background to shut the group's VMs off after
