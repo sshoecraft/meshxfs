@@ -1,106 +1,85 @@
-# MXFS Performance Benches
+# MeshXFS performance
 
-Performance harnesses for MXFS.  Distinct from `tests/` (correctness)
-and `tests/decision_reproducers/` (per-spec-decision reproducers).
-These run on real cross-node hardware and produce wall-clock numbers.
+Every MeshXFS release is measured on each shared-LUN configuration it ships.
+The tables below are those measurements, copied from the release boards by
+`tools/bench_report.py`; the release checks refuse to publish a release whose
+page differs from its boards.
 
-These scripts live in the source tree (per `CLAUDE.md` the source-tree rule) so they
-survive reboots of the dev host or test cluster.
+## What is measured
 
-## Inventory
+On each configuration, every node runs the same four fio workloads at the
+same time, each node writing and reading its own file on the shared MeshXFS
+mount (`tests/suite/fio_perf.sh`):
 
-### `rsync_bench.sh`
+| Workload | Block size | I/O |
+|---|---|---|
+| Sequential write | 1 MiB | O_DIRECT, libaio, queue depth 32 |
+| Sequential read | 1 MiB | O_DIRECT, libaio, queue depth 32 |
+| Random write | 4 KiB | O_DIRECT, libaio, queue depth 32 |
+| Random read | 4 KiB | O_DIRECT, libaio, queue depth 32 |
 
-The canonical metadata-heavy rsync workload, paired so the same
-hardware runs against XFS native, mxfs.1, and v5/v6.  Used in
-sess30 to measure the v5 D6 architectural ceiling (9+ min cross-node
-parallel for what takes 3-4 s single-node).
+Each figure is the whole cluster's throughput: the sum over its nodes. The
+percentage beside it is that sum against native XFS mounted on one node, on
+the same LUN, over the same path, on the same hardware
+(`tests/suite/fio_perf_vs_xfs.sh`). At 100% the cluster together moves as much
+as one native XFS mount of that LUN.
 
-**Invocation:**
+The test hardware: each node is a KVM virtual machine on one host, and the
+shared LUN is served to the nodes by an SCST iSCSI target on that host. A
+single-path configuration reaches the LUN over one iSCSI session per node; a
+multipath one over two, assembled by dm-multipath. On a shared SAN LUN the
+nodes take every cluster lock with SCSI COMPARE AND WRITE on the LUN itself;
+over the TCP lock network they exchange locks with each other instead.
+
+## Results
+
+<!-- bench_report: start (written by tools/bench_report.py from the release boards; edit the tool, not this table) -->
+#### Shared SAN LUN, single path
+
+| Nodes | Sequential write | Sequential read | Random write | Random read | Measured |
+|---:|---:|---:|---:|---:|:---|
+| 2 | 1,785 MiB/s (157%) | 2,701 MiB/s (209%) | 45,093 IOPS (102%) | 40,060 IOPS (92%) | 0.90.130, 2026-10-16 |
+| 4 | 2,673 MiB/s (235%) | 3,447 MiB/s (267%) | 67,659 IOPS (153%) | 77,179 IOPS (179%) | 0.90.130, 2026-10-16 |
+| 8 | 2,024 MiB/s (178%) | 3,390 MiB/s (262%) | 139,682 IOPS (317%) | 129,010 IOPS (299%) | 0.90.130, 2026-10-16 |
+| 16 | 2,470 MiB/s (218%) | 4,468 MiB/s (346%) | 264,560 IOPS (600%) | 302,887 IOPS (702%) | 0.90.130, 2026-10-16 |
+
+#### Shared SAN LUN, multipath
+
+| Nodes | Sequential write | Sequential read | Random write | Random read | Measured |
+|---:|---:|---:|---:|---:|:---|
+| 2 | 1,899 MiB/s (177%) | 1,972 MiB/s (147%) | 41,241 IOPS (82%) | 47,105 IOPS (105%) | 0.90.130, 2026-10-16 |
+| 4 | 1,697 MiB/s (158%) | 3,191 MiB/s (238%) | 71,115 IOPS (141%) | 79,647 IOPS (178%) | 0.90.130, 2026-10-16 |
+| 8 | 1,110 MiB/s (103%) | 4,036 MiB/s (301%) | 99,734 IOPS (199%) | 146,345 IOPS (327%) | 0.90.130, 2026-10-16 |
+| 16 | 2,713 MiB/s (253%) | 3,227 MiB/s (240%) | 166,546 IOPS (332%) | 250,601 IOPS (561%) | 0.90.130, 2026-10-16 |
+
+#### Shared LUN over the TCP lock network, single path
+
+| Nodes | Sequential write | Sequential read | Random write | Random read | Measured |
+|---:|---:|---:|---:|---:|:---|
+| 2 | 2,075 MiB/s (156%) | 2,333 MiB/s (175%) | 46,576 IOPS (118%) | 47,526 IOPS (100%) | 0.90.130, 2026-10-16 |
+| 4 | 3,515 MiB/s (265%) | 4,400 MiB/s (330%) | 86,533 IOPS (220%) | 94,227 IOPS (199%) | 0.90.130, 2026-10-16 |
+| 8 | 3,090 MiB/s (233%) | 6,511 MiB/s (489%) | 140,714 IOPS (359%) | 167,096 IOPS (353%) | 0.90.130, 2026-10-16 |
+| 16 | 4,602 MiB/s (347%) | 3,320 MiB/s (249%) | 253,766 IOPS (647%) | 282,141 IOPS (597%) | 0.90.130, 2026-10-16 |
+
+#### Shared LUN over the TCP lock network, multipath
+
+| Nodes | Sequential write | Sequential read | Random write | Random read | Measured |
+|---:|---:|---:|---:|---:|:---|
+| 2 | 1,885 MiB/s (134%) | 2,251 MiB/s (173%) | 39,921 IOPS (78%) | 43,544 IOPS (91%) | 0.90.130, 2026-10-16 |
+| 4 | 2,053 MiB/s (146%) | 4,629 MiB/s (357%) | 84,933 IOPS (167%) | 88,849 IOPS (185%) | 0.90.130, 2026-10-16 |
+| 8 | 2,725 MiB/s (194%) | 3,895 MiB/s (301%) | 139,622 IOPS (274%) | 150,543 IOPS (314%) | 0.90.130, 2026-10-16 |
+| 16 | 3,849 MiB/s (274%) | 6,864 MiB/s (530%) | 234,490 IOPS (461%) | 309,207 IOPS (646%) | 0.90.130, 2026-10-16 |
+<!-- bench_report: end -->
+
+## Running it
+
+On the lab rig these rows run through the suite runner, one configuration at
+a time; the native-XFS baseline is captured once per rig and path with
+`./run.sh 1/xfs fio_perf` (the exact command is in the header of
+`tests/suite/fio_perf_vs_xfs.sh`):
 
 ```
-bench/rsync_bench.sh <label> <hosts_csv> <iterations>
+./run.sh 2/disk/caw/direct fio_perf fio_perf_vs_xfs   # one configuration's rows
+tools/criteria.py 2/disk/caw/direct                   # the board they land on
+tools/bench_report.py                                 # rewrite the tables above from the boards
 ```
-
-**Example (sess30 baseline):**
-
-```
-bench/rsync_bench.sh v5_v0_3_128_2node 192.168.120.186,192.168.120.182 3
-bench/rsync_bench.sh v5_v0_3_128_solo  192.168.120.186                  3
-bench/rsync_bench.sh xfs_native_2node  192.168.120.186,192.168.120.182  3
-```
-
-**Per-host workloads (hard-coded by IP — edit if cluster changes):**
-
-| Host                | Source tree                       | Files | Notes                       |
-|---------------------|-----------------------------------|-------|-----------------------------|
-| 192.168.120.186 (test1) | /root/open-gpu-kernel-modules | 8137  | Linux kernel module source  |
-| 192.168.120.182 (test2) | /root/element-web              | 4385  | JS/TS deeply nested tree    |
-
-The two trees were chosen for shape diversity: open-gpu has many
-medium-sized files in moderate depth; element-web has many small
-files in deep nesting (the workload that historically corrupted
-mxfs.1's dir_cache format-transition path).
-
-**Per-iter output line format** (parseable):
-
-```
-ITER <i> <label> <host> <tree> wall_s=<f> files=<got>/<expected> match=<Y/N> md5=<Y/N> dmesg_hits=<n>
-```
-
-**Pass criteria** (for v6a H1):
-
-- `wall_s` < 60 (strong: < 30) on the cross-node 2-host run.
-- `match=Y` and `md5=Y` for every iter (correctness).
-- `dmesg_hits=0` (no kernel-level errors).
-
-### `rsync_bench_v6a.sh` (planned)
-
-Wrapper around `rsync_bench.sh` that captures the v6a hypothesis
-measurements:
-
-- H1: bench wall time vs target.
-- H2: cross-node lock-bounce rate per AG (requires kernel
-  instrumentation to be in place).
-- H3: read-class profile (stat vs dir-block vs data-extent).
-
-Not yet built.  Build as part of v6a phase 3 measurement work.
-
-## Methodology
-
-Per the project's hypothesize → measure → develop → commit cycle:
-
-1. State the hypothesis (e.g., "removing FUA-on-every-read drops the
-   2-node bench under 60 s").
-2. Capture the falsifying measurement in `bench.json` BEFORE making
-   the change.
-3. Implement the change.
-4. Re-run the bench.  Record actual numbers.
-5. Compare to the hypothesis.  Commit only if the hypothesis holds
-   AND no correctness regression.
-
-Output should always be appended to `/src/mxfs/bench.json` with a
-sample entry like:
-
-```json
-{
-  "label": "v5_v0_3_128_2node",
-  "version": "0.3.128",
-  "hosts": ["test1", "test2"],
-  "iters": 3,
-  "results": [
-    {"host": "test1", "tree": "open-gpu", "wall_s": 540.0,
-     "files_got": 6800, "files_expected": 8137,
-     "match": "N", "md5": "N", "dmesg_hits": 0,
-     "note": "killed at 9 min, never finished iter 1"},
-    ...
-  ],
-  "ts": "2026-05-07T..."
-}
-```
-
-## Why bench/ is in the source tree, not /tmp
-
-See `/src/mxfs/CLAUDE.md` the source-tree rule.  Test cluster reboots regularly
-(sysrq-b after wedged unmounts, cluster resets); /tmp evaporates.
-Persistent bench harnesses live here.
