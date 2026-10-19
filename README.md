@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/meshxfs-logo.jpeg" alt="MeshXFS logo" width="220">
+</p>
+
 # MeshXFS
 
 ### A POSIX clustered filesystem built on XFS
@@ -77,405 +81,8 @@ packages.
 > Ubuntu 26.04, Debian 12 and Debian 13.  Every host in a cluster needs the
 > same MeshXFS version; hosts on different kernels are fine.
 
-> ## 0.90.129: Shared Proxmox Storage, Faster DRBD Setup, Stronger Recovery
->
-> What changed for someone upgrading from 0.90.124, the last published release
-> (0.90.125 to 0.90.128 were never published; their work ships here):
->
-> - **Proxmox VE 9 hosts share one SAN LUN as their datastore, over
->   multipath** (0.90.129).  Three hosts on one iSCSI LUN over two storage
->   networks run guests on it: live migration with the guest writing
->   throughout, HA restart after a host loses power, snapshots and rollback,
->   backup and restore, disk moves, templates and linked clones, containers,
->   and a storage path lost and returned under load.  Verified on both
->   Proxmox VE 9 kernels: 6.17, which the 9.1 installer ships, and 7.0, which
->   `proxmox-default-kernel` now installs.
-> - **A DRBD pair is set up in minutes, on whole disks** (0.90.129).  The
->   guide gives DRBD the disk that will hold the VMs and skips DRBD's first
->   copy of it, which took about an hour per 250 GB: the device is formatted
->   next, so nothing on it before is ever read.  Two physical Proxmox VE 9
->   hosts set up this way wrote at the replication link's full speed and
->   passed live migration, datastore operations, a full disk, a host reset
->   under load, a host leaving and returning cleanly, and the 31-row suite,
->   on both kernels, and through a rolling kernel upgrade with one host on
->   each.
-> - **A DRBD pair whose first host dies recovers, given a QDevice** (0.90.128):
->   `authority=quorum` in `/etc/mxfs/drbd-fence.conf` lets corosync's vote
->   decide which host carries on.
-> - **Fixes to locking and recovery** (0.90.128, 0.90.129): a host that dies no
->   longer stalls the others for a minute; a new lock tenure is no longer
->   taken for one already released; a waiter registration that fails no
->   longer leaves its mark on the lock; a fenced host reports being fenced,
->   not corruption; a new file on a reused inode number no longer crashes its
->   creator; a shared `mmap` write no longer hangs on RHEL 9; a full DRBD
->   filesystem refuses a write at once instead of hanging the writer.
-> - **vSphere shared disks** (0.90.128): MeshXFS mounts a multi-writer VMDK
->   or a physical-mode RDM with `fence=vcenter`, `fence=manual` or
->   `fence=quorum`.  Not yet a released configuration.
-> - **The module's messages say MeshXFS** (0.90.128), not XFS, and the
->   product is named MeshXFS throughout (0.90.125).
-> - **Proxmox VM disk settings are documented** (0.90.129): give VM disks on
->   MeshXFS `cache=none`, the Proxmox default and the mode every Proxmox
->   validation ran with (see "Proxmox VE: VM disk settings" below).
->
-> **Released configurations and what 0.90.129 was validated on:**
->
-> | configuration | nodes | storage | validated on 0.90.129 |
-> |---|---|---|---|
-> | `2/net/mesh/drbd` | 2 | each host's own disk, DRBD 8.4 dual-primary | `tests/drbd_release_verify.sh`; two physical Proxmox VE 9 hosts set up from `docs/drbd-setup.md` (the 31-row suite, live migration, datastore operations, a full disk, a host reset and a clean departure, kernels 6.17 and 7.0) |
-> | `2/net/mesh/direct` | 2 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
-> | `4/net/mesh/direct` | 4 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
-> | `2/disk/caw/direct` | 2 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
-> | `4/disk/caw/direct` | 4 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
-> | `8/disk/caw/direct` | 8 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
-> | `16/disk/caw/direct` | 16 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
-> | `2/disk/caw/mpath` | 2 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
-> | `4/disk/caw/mpath` | 4 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
-> | `8/disk/caw/mpath` | 8 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
-> | `16/disk/caw/mpath` | 16 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig; three Proxmox VE 9 hosts on two paths (path faults, live migration, datastore operations, HA power loss), kernels 6.17 and 7.0 |
->
-> The test rig is Ubuntu 24.04 (kernel 6.8.0-101-generic).  "Installed
-> packages" means the release packages on two nodes of each released
-> platform: Proxmox VE 9 (kernels 6.17 and 7.0), RHEL 9.8, Ubuntu 24.04
-> and Debian 13.  Every host in a cluster needs the same MeshXFS
-> version; hosts on different kernels are fine.
-
-> ## 0.90.124: Multipath SAN Support, Stronger Recovery, Better Scalability
->
-> What changed for someone upgrading from 0.90.116, the last published
-> release:
->
-> - **dm-multipath is released again for SAN clusters on the on-disk lock
->   manager** (0.90.124): `2/disk/caw/mpath`, `4/disk/caw/mpath`,
->   `8/disk/caw/mpath` and `16/disk/caw/mpath`.  Every node reaches the shared
->   iSCSI LUN through a dm-multipath map over two paths, each on its own NIC
->   and storage network.  It was last claimed in 0.90.51, and later releases
->   dropped it when defects found since then reached it.
-> - **Fixed on the way there** (0.90.123, 0.90.124), each found by the
->   16-node path-fault runs: a node acquiring a directory could wait on a
->   child's lock that a peer held while that peer waited for the same
->   directory, stalling every node for eight minutes; a node that rejoined
->   after being fenced could fail to open a file, its `open()` retrying for
->   ever and impossible to kill; and an open that can never be granted now
->   fails with EIO, while a killed open always returns.
-> - **More than one MeshXFS filesystem can be mounted on a host** (0.90.120).
->   Before, two filesystems on the same hosts crossed each other's lock
->   traffic: connections were reset, one filesystem could miss its peer's
->   heartbeat, and fsyncs took 17 s instead of 0.6 s.  A new mount option,
->   `transport=tcp|caw`, picks each filesystem's lock manager, so one host can
->   keep a DRBD resource mounted beside a SAN LUN.
-> - **A DRBD pair with several MeshXFS resources recovers every one of them**
->   (0.90.121, 0.90.122).  When a host died, only one resource recovered and
->   the others stayed blocked; now each is fenced and recovered under its own
->   evidence.  When one replication link fails, the peer is cut off on every
->   resource the two hosts share, where before a mount could shut down or hang.
->   The module is now loaded before DRBD connects, because loading it with
->   links up could drop them.
-> - **Less wasted lock work under heavy VM load on a DRBD pair** (0.90.117,
->   0.90.118).  With seven AlmaLinux installs at once on two physical Proxmox
->   VE 9 hosts with 2011-era SATA SSDs, the lock answers a host wrote for
->   requests the other host had already abandoned fell from 84 to 17, and the
->   longest a request waited in the answering host's queue fell from 39 s to
->   13 s.  An allocation now stops asking a host that has stopped answering:
->   the longest allocation walk fell from 46 s to 8.5 s.
-> - **A misleading kernel warning is gone** (0.90.117): `P958-ACQ-IDLE-LOST`
->   read like a lock wait of up to 20 minutes, but every one was the leftover
->   record of a brief try that had already given up.
->
-> **Still open:** under heavy load on slow disks, a VM write that needs new
-> space can still wait about a second for a slow answer from the other host
-> of a DRBD pair (D-REMOTE-NOQUEUE-AG-TRYLOCK-WAITS-A-FULL-ATTEMPT-PER-AG-UNDER-ILOCK).
-> No write fails and no data is at risk.
->
-> **Released configurations and what 0.90.124 was validated on:**
->
-> | configuration | nodes | storage | validated on 0.90.124 |
-> |---|---|---|---|
-> | `2/net/mesh/drbd` | 2 | each host's own disk, DRBD 8.4 dual-primary | the DRBD test rig, including several resources on one pair through a host's death and a link cut; a nested Proxmox VE 9 pair with two resources through a host's death |
-> | `2/net/mesh/direct` | 2 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
-> | `4/net/mesh/direct` | 4 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
-> | `2/disk/caw/direct` | 2 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
-> | `4/disk/caw/direct` | 4 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
-> | `8/disk/caw/direct` | 8 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
-> | `16/disk/caw/direct` | 16 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
-> | `2/disk/caw/mpath` | 2 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
-> | `4/disk/caw/mpath` | 4 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
-> | `8/disk/caw/mpath` | 8 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
-> | `16/disk/caw/mpath` | 16 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
->
-> The test rig is Ubuntu 24.04 (kernel 6.8.0-101-generic): one iSCSI path per
-> node for `direct`, two for `mpath` (multipath-tools 0.9.4, the settings of
-> `tools/mpath_settings.sh`).  The path-fault rows
-> ([`docs/mpath-verification.md`](docs/mpath-verification.md)) run under load
-> on every node: one path lost and returned and then the other, a whole
-> storage network lost on every node at once, a flapping path, a mount and an
-> unmount on one path, a node killed while the survivors are on one path, a
-> fenced node whose dead path comes back, every path lost, a node that
-> withdraws, and a lock command the target applied whose answer never
-> arrived.  "Installed packages" means the release packages on two nodes of
-> each of Proxmox VE 9, RHEL 9.8, Ubuntu 24.04 and Debian 13; those rounds
-> attach on one path, so `mpath` is claimed on Ubuntu 24.04 only.  Not
-> covered for `mpath`: a second target or storage controller, Fibre Channel or
-> SAS, more than two paths, other multipath settings, and automatic failback
-> to a preferred path group.  Every host in a cluster needs the same version.
-
-> ## 0.90.116: two-host Proxmox VE on DRBD: VM disks no longer freeze on slow SSDs, and a host that leaves, fails or rejoins comes back cleanly
->
-> **For `2/net/mesh/drbd`, a VM's disk writes no longer freeze on slow
-> disks.**  With seven AlmaLinux installs at once on two physical Proxmox VE 9
-> hosts whose DRBD sat on 2011-era SATA SSDs, a guest write that needed new
-> space could hold its disk image locked for 30 s to a minute. Its lock
-> request had asked only to try, but it waited on the cluster's lock-ownership
-> records, which were being written to the slow disk.  Every other write to
-> that image waited behind it, and the host kernel reported hung tasks.  No
-> write failed and no data was lost.  0.90.116's try never touches the disk
-> and never waits: when its answer is not ready, it says so at once, the write
-> takes space elsewhere, and a background worker readies the answer for next
-> time.  On the same disks and load, none of the slow waits remained, no task
-> hung, and all seven installs finished (`CHANGELOG.md`, 0.90.115 and
-> 0.90.116).
->
-> **A host whose MeshXFS mount is shut down and then
-> rejoins no longer hangs or stalls.**  When a host's heartbeat writes stop
-> long enough, the other host declares its mount dead, recovers it, and the
-> host's guard unmounts and remounts it with no restart.  On two physical
-> Proxmox VE 9 hosts that rejoin had two faults when the rejoining host held
-> the lower heartbeat slot:
->
-> - its mount could wait minutes for an admission that never came (fixed in
->   0.90.113);
-> - its first reads could take 69 to 95 s, because its peer's requests for
->   the lock pages those reads needed were queued behind a stream of other
->   hand-offs (fixed in 0.90.114).
->
-> No data was lost in either.  Both were found by forcing the dropout on
-> purpose (`tests/pve_pair_failover.sh` `withdraw-p0`), as happened for real on
-> 2026-10-06 when a swapping host's heartbeat writes stalled.  Everyday use
-> did not reach either one.  `CHANGELOG.md` has what was measured, 0.90.108
-> to 0.90.114.
->
-> **What 0.90.116 was validated on:**
->
-> - **The six shared-LUN configurations under "Released" below**
->   (`2/net/mesh/direct`, `4/net/mesh/direct`, `2/disk/caw/direct`,
->   `4/disk/caw/direct`, `8/disk/caw/direct`, `16/disk/caw/direct`): the
->   31-row suite of each on the test rig (Ubuntu 24.04, iSCSI, one path per
->   node) at its node count, and the installed packages on two nodes of each
->   of Proxmox VE 9, RHEL 9.8, Ubuntu 24.04 and Debian 13.
-> - **`2/net/mesh/drbd`**: the DRBD rig (`tests/drbd_release_verify.sh`), the
->   nested Proxmox VE 9 pair through every step of
->   `tests/pve_pair_failover.sh` (crashes, power cuts, restarts, promotions, a
->   slow heartbeat and the withdrawals), and the two physical Proxmox VE 9.1
->   hosts: seven concurrent AlmaLinux 9.7 installs at a time on MeshXFS on DRBD,
->   on both the hosts' Samsung 850 EVO and their older Kingston SATA SSDs,
->   and repeated dropout-and-rejoin laps under load.
->
-> `8/net/mesh/direct`, `16/net/mesh/direct` and every `mpath` configuration
-> were not tested on this release and are not claimed.
-
-> ## 0.90.107: MeshXFS on DRBD dual-primary is released again, verified on two physical Proxmox VE 9 hosts
->
-> **`2/net/mesh/drbd` is released again**: two hosts, each with its own local
-> disk, replicated by DRBD dual-primary, with MeshXFS mounted read/write on both
-> and no shared storage at all.  It was withdrawn on 2026-10-06, after eight
-> concurrent VM installs on two physical Proxmox VE 9 hosts shut both hosts'
-> MeshXFS mounts down and gave the guests I/O errors.  What that load found was
-> fixed (`CHANGELOG.md`, 0.90.55 to 0.90.107), and this release was verified
-> on those same two hosts as well as on the test rig:
->
-> - **Two physical Proxmox VE 9.1 hosts** (HP Z400, SATA SSDs, gigabit;
->   kernel 6.17.2-1-pve, DRBD 8.4.11), installed with `make install` as
->   [`docs/drbd-setup.md`](docs/drbd-setup.md) describes: seven AlmaLinux 9.7
->   installs at once, three on one host and four on the other, every guest
->   disk on the shared filesystem, for 43 minutes.  No guest I/O error, hung
->   task, kernel warning, withdrawal or self-fence on either host.
-> - **A nested Proxmox VE 9 pair**, for the failures nobody should cause on
->   hardware: a crash of either host, both hosts' power cut at once, a clean
->   reboot, a host that dies while its peer is being repaired (four ways),
->   stale and racing promotions, a slow heartbeat, and four withdrawals, each
->   under a VM-like load on both hosts with every fsynced file checked on both
->   afterwards.  All 15 passed.
-> - **The test rig** (Ubuntu 24.04, DRBD 8.4.11, `tests/drbd_release_verify.sh`):
->   the cluster suite on `/dev/drbd0`, unmount and remount, a node crash, a cut
->   replication link, a split with no tie-break, a device stacked on DRBD, both
->   nodes' power cut, and a pair-outage recovery whose owner dies.  All passed.
->
-> **What it is not: fast under heavy writes on modest disks.**  Both disks
-> write everything and every write waits for both, so a pair has one disk's
-> write capacity.  On the physical pair one AlmaLinux install on MeshXFS takes
-> 1.4–1.9 times as long as on a local disk, and XFS on the same DRBD takes
-> about three quarters of MeshXFS's time.  Seven installs at once did not finish
-> in 43 minutes, and under that load one heartbeat write took 8.6 s (the lease
-> is 60 s).  A lone sequential writer gets about three quarters of what XFS
-> gets on the same DRBD: MeshXFS bounds its own writes in flight on DRBD so that
-> its coordination writes are never starved.  Size the VMs on a pair to its
-> disks.  Each of these is an open record in the defect queue.
->
-> Also fixed, for every configuration: unmounting a filesystem that had been
-> shut down could free the lock manager under a background log task and crash
-> the node.  The six `direct` configurations that no open defect blocks, and
-> all four platforms, were verified again on this build.  The eight `mpath`
-> configurations and `8/net/mesh/direct` and `16/net/mesh/direct` are not
-> claimed by this release, because defects found after 0.90.51 reach them; see
-> "Released in an earlier version" below.
-
-> ## 0.90.51: multipath, verified by taking paths away
->
-> **The `mpath` attachment is released at 2, 4, 8 and 16 nodes with both lock
-> managers:** `{2,4,8,16}/net/mesh/mpath` and `{2,4,8,16}/disk/caw/mpath`.
-> Every node reaches the shared LUN through a dm-multipath map over two iSCSI
-> paths, each path on its own NIC and its own storage network.  Each of the
-> eight configurations passed the 31-row suite the `direct` configurations
-> pass, and then the path-fault rows of
-> [`docs/mpath-verification.md`](docs/mpath-verification.md), all under load on
-> every node: one path lost and returned and then the other, a whole storage
-> network lost on every node at once, a flapping path, a mount and an unmount
-> on one path, a node killed while the survivors are on one path, a fenced
-> node whose dead path comes back, every path lost, a node that withdraws, and
-> on `disk/caw` a lock command the target applied whose answer never arrived.
-> A row passes only with no failed operation on any node, no node lost that
-> the row did not kill, every stall under the bound, and every acknowledged
-> file read back by checksum from another node.
->
-> Making those rows pass took changes to the filesystem, not only to the rig:
-> a node now registers its fencing key on each path itself and follows its
-> paths as they come and go, the lone survivor's fence works with one
-> registration per path, a `disk/caw` lock swap whose answer was lost is
-> recognised as landed, and several faults that are not specific to multipath
-> were found and fixed on the way (a lock wait that lost its registration, a
-> refused lock upgrade that starved behind its own node's readers, a healthy
-> node shutting down behind a stalled peer, a survivor opening a dead node's
-> files as directories, a lookup failing when its name was removed under it).
-> `CHANGELOG.md` has each with what was measured.
->
-> **What this covers:** iSCSI; two paths on separate networks to ONE target;
-> the multipath and initiator settings in `tools/mpath_settings.sh`, which are
-> the ones to use; the test rig's platform, Ubuntu 24.04 with kernel
-> 6.8.0-101-generic and multipath-tools 0.9.4.  **What it does not:** a second
-> target or storage controller, Fibre Channel or SAS, more than two paths,
-> other multipath settings, automatic failback to a preferred path group, and
-> the other three platforms, whose package rounds attach on one path.
->
-> The eight `direct` configurations and all four platforms were verified again
-> on this build.
-
-> ## 0.90.42: sixteen nodes
->
-> **`16/net/mesh/direct` and `16/disk/caw/direct` are released.**  Sixteen
-> nodes mounting one LUN, with either lock manager, passed the same 31-row
-> suite the smaller clusters pass — data integrity, coherency, crash and fence
-> recovery, pace against native XFS — on the build this release ships, and
-> the 2-, 4- and 8-node configurations and all four platforms were verified
-> again on it.
->
-> Two defect records stood between 8 nodes and 16.  One was disproved by
-> measurement.  The other was a real fault in the `disk/caw` lock manager's
-> clean-up after an abandoned lock wait, found by reading the code and never
-> seen on the rig: the clean-up could act on a lock slot that had since been
-> reused for a different lock.  The check that stops it from releasing that
-> other lock was already in the tree; this release adds a deterministic test
-> for it and fixes what the test then showed — when the slot had been reused,
-> the abandoned wait's own registration was left behind, which stalls every
-> other node's readers of that lock.  See `CHANGELOG.md`.
-
-> ## 0.90.41: MeshXFS on DRBD dual-primary — a clustered filesystem with no shared storage
->
-> **Two nodes, a local disk each, no SAN, no iSCSI target, no third server.**
-> DRBD replicates the two disks synchronously (protocol C) with both nodes
-> Primary at once, and MeshXFS mounts `/dev/drbd0` read/write on both.  The
-> configuration is **`2/net/mesh/drbd`**.  This is the smallest possible MeshXFS
-> cluster: two Proxmox hosts with local NVMe can share one filesystem for VM
-> images and live migration without buying storage.
->
-> DRBD has no SCSI underneath, so it has neither persistent reservations (how
-> MeshXFS fences a dead node) nor COMPARE AND WRITE (how it claims heartbeat and
-> recovery records).  MeshXFS supplies both from the attachment itself:
->
-> - **Fencing through an authority outside both nodes.**  DRBD's
->   `fencing resource-and-stonith` freezes I/O when a node loses its peer and
->   runs MeshXFS's handler, which has the site's fence authority (IPMI, a PDU, the
->   hypervisor) power the peer off and hold it off.  The authority grants one
->   winner per split.  The survivor proves the peer is off, disconnected and
->   Outdated (fence proof kind 25) before every irreversible recovery step.
-> - **Admission by a witness.**  A mount is refused unless DRBD is on protocol
->   C with two primaries, MeshXFS's fence handler, every split-brain policy set to
->   `disconnect`, no suspended I/O, and this node a working, UpToDate Primary.
-> - **A compare-and-swap on the replicated device**: a two-party one-bit lock
->   in reserved sectors, with swaps group-committed under one acquisition.
-> - **Recovery after both nodes lose power**: the first node back has the
->   authority hold its peer off, replays both journals, then lets the peer
->   rejoin.
->
-> **Measured on the rig** (two nodes, DRBD 8.4.11, Ubuntu 24.04, the 0.90.41
-> module built from the tree): the cluster suite's rows all passed, the
-> fault rows and `crash_audit` included; a power cut of both nodes recovered
-> with every file of both nodes intact, also when the recovery's completion
-> was refused partway and finished by a resume; a recovery whose owner died
-> was taken over and finished, by the owner's next boot and by the other
-> node, every file intact; a node crash with a writer running was fenced,
-> certified and recovered in 84 s with every fsynced file of both nodes
-> intact; a link cut settled in 11 s and a split had exactly one winner in
-> 11 s; unmount/remount cycles, a crash-cut retirement and a whole-cluster
-> restart left nothing stalled; a device stacked on DRBD, and a loop device,
-> were refused and left byte-identical.  Cold `chk_mxfs` clean after each.
->
-> **Status: withdrawn on 2026-10-06 and released again in 0.90.107** (see the
-> top of this file).  0.90.41 released it on Ubuntu 24.04 with DRBD 8.4.11,
-> the platform and DRBD version everything above was measured on.  Setup
-> is in "DRBD dual-primary" under Quick start, the design in
-> [`docs/attachment-methods.md`](docs/attachment-methods.md) ("DRBD
-> dual-primary"), and the design rulings in
-> [`docs/rulings/drbd-dual-primary-attachment.md`](docs/rulings/drbd-dual-primary-attachment.md).
->
-> 0.90.41 is the first published DRBD release.  The attachment was built in
-> 0.90.40, whose release validation found three ways a second fault during
-> pair-outage recovery could leave a volume unmountable; 0.90.40 was held
-> back, all three were fixed, and the tests that found them are part of what
-> passed above.  A pair outage on `2/net/mesh/direct` is also no longer left
-> REFUSED when the other host is still booting.
->
-> Also since 0.90.39, for every configuration: a stacked device is never resolved
-> to the disk underneath it for SCSI passthrough, a compare-and-swap never
-> falls back to a plain write, a node joining after a whole-cluster bootstrap
-> settles the adopted victim's lock records (reads of the inodes they covered
-> used to hang), and a departing node hands its lock pages off in parallel.
-> See `CHANGELOG.md`.
-
-> ## 0.90.39: `mkfs.mxfs` is no longer slow
->
-> **If you tried MeshXFS before and the format alone put you off, try it again.**
-> `mkfs.mxfs` used to take tens of seconds on a small LUN and minutes on a
-> large one, where `mkfs.xfs` takes a moment.  It now formats a 20 GB LUN in a
-> quarter of a second.
->
-> | LUN | before | 0.90.39 |
-> |---|---|---|
-> | 10 GB | 12.4 s | 0.13 s |
-> | 20 GB | 17.9–30.9 s | 0.24 s |
->
-> The cause was the lock authority ledger, which mkfs lays out on the LUN and
-> sizes with it.  mkfs wrote every empty page of it as its own synchronous
-> 4 KiB write, about 2.3 ms each: 10,571 of them for 20 GB, 67,650 for
-> 128 GiB, so the wait grew with the LUN.  It now writes
-> them in large batches, flushes once at the end instead of opening the device
-> `O_SYNC`, and computes CRC32C in hardware.
->
-> The formatted device is byte-for-byte identical: its sha256 matches the old
-> binary's output at 10 GB and 20 GB.  Every board of this release formatted
-> its LUN with it, and the 8-node boards' cold audit read clean on every node.
->
-> Also in 0.90.39:
->
-> - **Fixes for races that could crash or wedge a node**, all in the slots
->   that let a lock-release drain re-enter the inode lock.  A design review
->   found three; this version's own self-test found a fourth.  None was seen on
->   the rig before the fixes.  A release drain that cannot claim a slot is now
->   queued and retried instead of run without one.  0.90.37 has these races,
->   so upgrade from it.
-> - **The RPM builds again.**  The 0.90.38 source tarball was missing a header
->   the new mkfs needs.
-> - All six released configurations were verified on this version, and the
->   release boards now run side by side, each on its own fixed-size test LUN.
+> Earlier releases are described in [`CHANGELOG.md`](CHANGELOG.md) and on the
+> [Releases page](https://github.com/sshoecraft/meshxfs/releases).
 
 > ## Released: seventeen configurations, on the `direct`, `mpath` and `drbd` attachments
 >
@@ -538,8 +145,6 @@ packages.
 >
 > Every other node count from 3 to 64 (3, 5 to 7, 9 to 15, and 17 and up) is in
 > the same state on `net/mesh` and `disk/caw` with `direct`, `mpath` or `pass`.
-> From 17 nodes up, open defects in the queue include ones that can lose data
-> or hang a node.
 >
 > ### The four fields
 >
@@ -590,35 +195,11 @@ packages.
 > `peers=<this node>/<the other node>`, and proves a dead node's writes ended
 > by its boot having ended.
 >
-> **Running 0.90.37 or earlier?  Upgrade.**  0.90.36 and earlier have defects
-> that can lose data, and 0.90.37 has races that could crash or wedge a node
-> (the claim-slot ones described under 0.90.39 above).  The data-loss defects
-> were found after 0.90.36 shipped, measured on `8/net/mesh/direct`; the code
-> involved is not specific to that configuration. All are fixed and verified
-> since 0.90.37:
->
-> - A name created in a directory that another node had just removed was lost
->   (`mkdir`, `link`, `symlink`, `rename`), and a `symlink` into such a
->   directory could shut nodes down.
-> - An entry removed while other nodes were adding to its directory could
->   survive with its inode freed, and a shared directory's link count could
->   end up above its entries. A task whose lock-release claim had outlived its
->   release modified the directory with no lock grant.
-> - A release claim whose owning process had exited was never retired, could
->   be inherited by an unrelated process, and could shut a node down.
->
 > **The release bar: no open defect that can lose data, or crash, hang or
 > shut down a node.**  A configuration has to clear it to be released, and
 > `tools/defects.py <configuration> --release` shows it for each one.  The defect queue itself is public
 > (`data/defects.json`, read with `tools/defects.py`), and every record carries
-> its evidence.  It holds 123 open records.  54 of them reach only
-> configurations this release does not claim, such as clusters larger than 16
-> nodes.
-> The 69 that reach a released
-> configuration (between 11 and 45 each, depending on the configuration) are
-> each classified as not crossing that bar, most of them as
-> slowness in a particular operation: `tools/defects.py --at 2/net/mesh/drbd -d`
-> lists them for one configuration.
+> its evidence.
 >
 > **Verified attachments on shared storage: `direct` and `mpath`**, over
 > iSCSI.  With `direct` each node ran its own iSCSI initiator and reached the
@@ -637,23 +218,20 @@ packages.
 > replicated by DRBD dual-primary and fenced without SCSI reservations
 > (`2/net/mesh/drbd`, `docs/attachment-methods.md`), verified with DRBD 8.4.11
 > on Proxmox VE 9 and Ubuntu 24.04 (see the top of this file).  It is installed
-> from source on both hosts with `make install`
-> ([`docs/drbd-setup.md`](docs/drbd-setup.md)); the release packages carry the
-> same DRBD pieces, but their install has not been verified on DRBD.
+> from the release package on both hosts
+> ([`docs/drbd-setup.md`](docs/drbd-setup.md)).
 >
 > What a build has to pass before it is called a release, and what that does
 > not cover, is in "How a release is validated" below.
 >
 > **Directory sharding** (`mkfs.mxfs -D` with the module parameter
-> `dirshard_mkdir_enable=1`) is experimental, off by default and part of no
-> release. On `4/disk/caw/direct` a node's listing of a sharded directory that
-> another node had just re-created failed with "Structure needs cleaning" in 3
-> of 10 laps (`D-DIRSHARD-REUSE-PEER-READDIR-EUCLEAN-ON-CAW-AT-4-NODES`).
+> `dirshard_mkdir_enable=1`) is off by default and is not part of a release.
 >
 > **Performance:** every released configuration passes the suite's pace rows
 > against native XFS on the same storage (`fio_perf`, `fio_perf_vs_xfs`), and
 > every row of the suite runs under a time budget derived from native XFS.
-> Performance work continues; the open records are in the queue.
+> Each configuration's measured throughput is in
+> [`bench/README.md`](bench/README.md).
 >
 > **Released for exactly these kernels**, each installed from the release
 > packages on two x86-64 nodes of that platform sharing an iSCSI LUN and
@@ -681,7 +259,7 @@ packages.
 > **Storage:** the shared storage's write cache must survive a power loss
 > (battery- or flash-backed, as enterprise SAN and NAS arrays provide), or
 > losing the storage target's power must be outside what the cluster has to
-> survive. Crash-durable operation on unprotected caches is in development.
+> survive.
 >
 > The release packages and `make install` configure both for you:
 > `/etc/modprobe.d/mxfs.conf` sets `options mxfs force_transport=1`
@@ -707,7 +285,7 @@ read/write, with coherent caching and crash consistency — a shared-disk
 clustered filesystem built as a fork of XFS.
 
 - **One shared LUN, many nodes.** Every node opens the same device — reachable
-  over SCSI (iSCSI verified; see "Verified storage attachment" above) —
+  over SCSI (iSCSI verified; see "Verified attachments on shared storage" above) —
   read/write, concurrently. NVMe, NVMe-oF included, is not supported: the
   fencing and lock commands are SCSI's.
 - **Or two nodes and no shared storage at all.** Two hosts with a local disk
@@ -744,7 +322,7 @@ overlay.
     disk*, claimed with the SCSI **COMPARE AND WRITE** (opcode `0x89`) atomic
     primitive plus SCSI Persistent Reservations. No separate lock network is
     required, which is what lets it scale past the point where a network DLM
-    stops keeping up (more than 16 nodes is still in development).
+    stops keeping up.
 
   The module parameter `force_transport` picks the lock manager a new cluster
   forms on: `1` (the default) is `net/mesh`, `0` is `disk/caw`. The release
@@ -894,8 +472,9 @@ headers are the reference for what follows.
    version, the defect queue) and reads this file, the manual pages, the
    installed module-options file, the storage guides and the module's own
    parameter descriptions against it: the Released table, the current
-   version, the defect counts, the cluster sizes, and any wording that calls
-   a released thing experimental, unverified, unsupported or in development.
+   version, the cluster sizes, the measured numbers in `bench/README.md`, and
+   any wording that calls a released thing experimental, unverified,
+   unsupported or in development.
    `scripts/release.sh` runs it before it builds a package and again before
    it publishes, and stops on a failure.
 7. **The configurations with a rig of their own.** `2/net/mesh/drbd` is
@@ -1011,7 +590,7 @@ the release package from the
 loads the module with `force_transport=1 target_cache_protected=1`, i.e.
 `net/mesh`, and every node must run the same version. A source build of this
 tree (`make && make install`) installs the development code, which is not a
-release (see the notice at the top).
+release.
 For `disk/caw`, see "Choosing the transport" below before the first mount.
 
 ```
@@ -1185,9 +764,9 @@ format.
 | `tools/` | Userspace binaries: `mkfs` / `chk` / `resize` / `fua_verify` / `caw_verify`. |
 | `include/`, `compat/` | Shared headers and compatibility shims. |
 | `tests/` | Multi-node test harness + `tests/criteria/` ship-gate verifiers. |
-| `bench/` | Performance benchmarks (paired against native XFS). |
+| `bench/` | Measured throughput of every released shared-LUN configuration against native XFS. |
 | `scripts/` | Cluster orchestration and diagnostics. |
-| `packaging/` | Debian packaging. |
+| `packaging/` | Debian, Proxmox VE and RPM packaging. |
 | `docs/` | Architecture, operator, and man-page documentation. |
 
 ## License
