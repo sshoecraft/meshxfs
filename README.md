@@ -22,6 +22,34 @@ On a system, MeshXFS goes by its short name `mxfs`: the `mxfs.ko` module,
 `resize_mxfs` and `mxfs_admin`, and the `mxfs` and `pve-storage-mxfs`
 packages.
 
+> ## ⚠️ Advisory, 2026-10-19: two defects found while validating 0.90.131
+>
+> Testing of the next release found two defects in configurations that
+> 0.90.130 claims. Run MeshXFS on test data only, keep backups, and after a
+> test check the volume with `chk_mxfs -v <device>` while it is unmounted on
+> every node.
+>
+> 1. **Network lock manager (`net/mesh`: the package default,
+>    `force_transport=1`, and the DRBD dual-primary pair): a node can shut its
+>    filesystem down after a peer is fenced and rejoins.** On a two-node
+>    multipath cluster with about 40,000 files in use, a full page of the lock
+>    ledger reached the inode lock as an error instead of a wait. The surviving
+>    node, then the node that had rejoined, shut their filesystems down, and
+>    the cluster stopped serving until it was mounted again. The failed reads
+>    we inspected were I/O errors, not wrong data. 0.90.130 has the same code
+>    path. The cause is identified; the fix ships in 0.90.131 once it passes
+>    verification.
+> 2. **On-disk locks (`disk/caw`) on an eight-node multipath cluster: one
+>    file was left named by two directory entries while its link count is 1.**
+>    The filesystem check after the test suite found it; the rest of the
+>    volume checked clean. The cause is under investigation, and whether
+>    0.90.130 is affected is not yet determined.
+>
+> If you hit either, or `chk_mxfs` reports anything, please open an issue at
+> <https://github.com/sshoecraft/meshxfs/issues> with every node's kernel log
+> (`dmesg`) and the `chk_mxfs` output. This advisory is updated as the fixes
+> land.
+
 > **A shared-LUN clustered filesystem written entirely by AI.**
 >
 > Every line of the clustering, coordination, distributed-lock, fencing, and
