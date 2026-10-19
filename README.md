@@ -42,8 +42,12 @@ packages.
 > 2. **On-disk locks (`disk/caw`) on an eight-node multipath cluster: one
 >    file was left named by two directory entries while its link count is 1.**
 >    The filesystem check after the test suite found it; the rest of the
->    volume checked clean. The cause is under investigation, and whether
->    0.90.130 is affected is not yet determined.
+>    volume checked clean. During a test that repeatedly took one node's
+>    storage path away, another node wrote an out-of-date copy of a small
+>    directory over a newer one, which brought back an entry that had been
+>    removed; the inode number was later reused for a new file. 0.90.130 has
+>    the same code path. The fix is being worked on and ships in 0.90.131
+>    once it passes verification.
 >
 > If you hit either, or `chk_mxfs` reports anything, please open an issue at
 > <https://github.com/sshoecraft/meshxfs/issues> with every node's kernel log
