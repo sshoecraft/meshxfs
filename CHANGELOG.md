@@ -1224,7 +1224,10 @@ unwind freed the AG groups under them and waited for the worker forever (a
 fenced peer's rejoin on `2/net/mesh/mpath`).  The duties now run only on a
 mount the VFS has made active (`reap_active_gate`).  A/B with a mount held
 30 s and then refused: with the gate off the duties ran inside it, with it on
-they waited, and the node remounted (laps `riab`, `riac`).
+they waited, and the node remounted (laps `riab`, `riac`).  The board cells of
+run 20261020T142123Z-g2d it accounts for (test32 sync-wedged on the reap
+worker): alloc_witness BLOCKED 2026-10-20T14:56:03Z, chk_clean BLOCKED
+2026-10-20T14:56:26Z and tcp_dlm_scaling BLOCKED 2026-10-20T14:56:50Z.
 
 **Removed from the queue, fixed and verified:
 D-REAP-WORKER-QUEUES-UNINITIALISED-FOREIGN-REPLAY-WORK-INSIDE-SLOW-MOUNT.**
@@ -1240,7 +1243,11 @@ leave it, and nothing asked a holder to release one, so a page of cached
 grants stayed full and a fenced peer's rejoin hung behind the wait.  A
 refused request now asks the holders of the page's eight oldest records to
 release them (`dl_capacity_reclaim`); in the user-mode capacity test the
-request was granted in 130 ms where it had still been waiting after 1 s.
+request was granted in 130 ms where it had still been waiting after 1 s.  The 2/net/mesh/mpath board cells of run 20261020T142123Z-g2d it
+accounts for: path_fenced_return ABORTED 2026-10-20T14:55:38Z (the fenced
+peer's rejoin did not complete), path_all_lost FAIL 2026-10-20T14:55:39Z,
+path_peer_withdrawn FAIL 2026-10-20T14:55:39Z and crash_audit FAIL
+2026-10-20T14:56:51Z (each a pre-assert: mxfs not mounted on test32).
 
 **Removed from the queue, fixed and verified:
 D-TCP-NOQUEUE-TRY-ON-FULL-LEDGER-PAGE-SPENDS-RETRY-BUDGET-CREATES-CRAWL.**
