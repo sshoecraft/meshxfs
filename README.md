@@ -22,9 +22,9 @@ On a system, MeshXFS goes by its short name `mxfs`: the `mxfs.ko` module,
 `resize_mxfs` and `mxfs_admin`, and the `mxfs` and `pve-storage-mxfs`
 packages.
 
-> ## ⚠️ Advisory, 2026-10-19: two defects found while validating 0.90.131
+> ## ⚠️ Advisory, updated 2026-10-20: three defects found while validating 0.90.131
 >
-> Testing of the next release found two defects in configurations that
+> Testing of the next release found three defects in configurations that
 > 0.90.130 claims. Run MeshXFS on test data only, keep backups, and after a
 > test check the volume with `chk_mxfs -v <device>` while it is unmounted on
 > every node.
@@ -46,10 +46,23 @@ packages.
 >    storage path away, another node wrote an out-of-date copy of a small
 >    directory over a newer one, which brought back an entry that had been
 >    removed; the inode number was later reused for a new file. 0.90.130 has
->    the same code path. The fix is being worked on and ships in 0.90.131
->    once it passes verification.
+>    the same code path. The cause is identified: a node that held the
+>    directory only for reading wrote it back. The fix has passed a directed
+>    test and ships in 0.90.131 once it passes verification.
+> 3. **Network lock manager (`net/mesh`): a node can shut its filesystem down
+>    when its peer stops responding while it creates a file.** When a create
+>    reuses an inode number at the moment the other node asks for that inode,
+>    the create can wait about 6 seconds behind this node's own release of it
+>    while holding the allocation group it is creating in. On a healthy pair
+>    that pause is all that happens. On a two-node multipath cluster whose
+>    other node stopped responding during the pause (the test froze it), the
+>    surviving node shut its filesystem down about 16 seconds later instead of
+>    waiting for its peer to be declared dead, and the cluster stopped serving
+>    until it was mounted again. 0.90.130 has the same code path. The cause is
+>    identified and the fix has passed its first directed tests; it ships in
+>    0.90.131 once it passes verification.
 >
-> If you hit either, or `chk_mxfs` reports anything, please open an issue at
+> If you hit any of these, or `chk_mxfs` reports anything, please open an issue at
 > <https://github.com/sshoecraft/meshxfs/issues> with every node's kernel log
 > (`dmesg`) and the `chk_mxfs` output. This advisory is updated as the fixes
 > land.
