@@ -1197,11 +1197,29 @@
           "status": "PASS",
           "measured": "skipped (marker matched 2/net/mesh/mpath)",
           "reason": "",
-          "iso": "2026-10-20T23:17:06Z",
+          "iso": "2026-10-20T23:24:39Z",
           "recorded": "2026-10-20",
           "elapsed_s": 0,
           "build": "292B547486AE6E75317F308",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-20T23:24:30Z",
+              "measured": "elapsed=35s (fresh prep)",
+              "reason": ""
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-20T23:23:46Z",
+              "measured": "elapsed=36s (fresh prep)",
+              "reason": ""
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-20T23:17:06Z",
+              "measured": "skipped (marker matched 2/net/mesh/mpath)",
+              "reason": ""
+            },
             {
               "status": "PASS",
               "iso": "2026-10-20T23:16:57Z",
@@ -1242,24 +1260,6 @@
               "status": "PASS",
               "iso": "2026-10-20T23:02:10Z",
               "measured": "elapsed=34s (fresh prep)",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-20T23:01:26Z",
-              "measured": "elapsed=35s (fresh prep)",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-20T22:54:37Z",
-              "measured": "skipped (marker matched 2/net/mesh/mpath)",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-20T22:54:27Z",
-              "measured": "elapsed=35s (fresh prep)",
               "reason": ""
             }
           ]
@@ -36358,14 +36358,18 @@
       "detector": "tests/mpath/path_fenced_return.sh (host-coordinated; F6): under tests/mpath/pathload.py on every node, the last node's path a is taken down, the node is frozen (virsh suspend) until the others have fenced it (its registrations leave the target, bound 110 s), its path is restored and the node thawed. PASS only when for 40 s after the thaw the target held exactly the others' registrations at every sample, the victim's kernel log shows its authority closed or the filesystem shut down, a probe write on it failed and returned, its load ended when told, no fsynced write it started after being frozen was acknowledged, it unmounted and mounted again (rc 0, 0) and ran the load without error, the others' longest stall is under 120 s with zero errors, zero double grants, and every acknowledged file reads back by sha256 from another node.",
       "per_config": {
         "2/net/mesh/mpath": {
-          "status": "PASS",
-          "measured": "victim=test18 fenced_s=35 resumed_s=6 other_stall_ms=39769 acked=44630 elapsed=240s fails=0",
-          "reason": " (evidence tests/evidence/board_20261020T231657Z-g2e_path_fenced_return)",
-          "iso": "2026-10-20T23:21:15Z",
+          "status": "PENDING",
+          "measured": "",
+          "reason": "executing 20261020T232430Z-g2e",
+          "iso": "2026-10-20T23:24:44Z",
           "recorded": "2026-10-20",
-          "elapsed_s": 243,
-          "build": "292B547486AE6E75317F308",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-20T23:21:15Z",
+              "measured": "victim=test18 fenced_s=35 resumed_s=6 other_stall_ms=39769 acked=44630 elapsed=240s fails=0",
+              "reason": " (evidence tests/evidence/board_20261020T231657Z-g2e_path_fenced_return)"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-20T23:13:43Z",
@@ -36419,12 +36423,6 @@
               "iso": "2026-10-20T15:53:50Z",
               "measured": "victim=test32 fenced_s=38 resumed_s=4 other_stall_ms=41067 acked=17220 elapsed=200s fails=0",
               "reason": " (evidence tests/evidence/board_20261020T151838Z-g2d_path_fenced_return)"
-            },
-            {
-              "status": "ABORTED",
-              "iso": "2026-10-20T14:55:38Z",
-              "measured": "",
-              "reason": "the test ABORTed: it could not measure, a harness gap and not a verdict on the filesystem; ABORT: the remount of test32 (rejoin) did not complete: MXFS-RS-STATUS v=1 host=test32 rc=124 err=tests/evidence/board_20261020T142123Z-g2d_path_fenced_return/rs_stderr/test32_lHJmCS; stderr=[]; stdout=[] [label=path_fenced_return_20261020T142123Z-g2d stage=capture evidence=tests/evidence/board_20261020T1421"
             }
           ]
         },
@@ -38953,10 +38951,16 @@
         "2/net/mesh/mpath": {
           "status": "PENDING",
           "measured": "",
-          "reason": "executing 20261020T231657Z-g2e",
-          "iso": "2026-10-20T23:21:15Z",
+          "reason": "running 20261020T232430Z-g2e",
+          "iso": "2026-10-20T23:24:44Z",
           "recorded": "2026-10-20",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-20T23:22:39Z",
+              "measured": "nodes_pass=2/2 hostload=2.92 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261020T231657Z-g2e fsid=b50a6dc9-fb06-4162-8081-8093d88f26ed witness=tests/evidence/alloc_witness/20261020T231657Z-g2e/witness.txt",
+              "reason": ""
+            },
             {
               "status": "PASS",
               "iso": "2026-10-20T23:15:07Z",
@@ -39009,12 +39013,6 @@
               "status": "PASS",
               "iso": "2026-10-20T16:50:41Z",
               "measured": "nodes_pass=2/2 hostload=2.58 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261020T164738Z-g2d fsid=3d8cad41-9878-439a-a486-056a9d6ea78c witness=tests/evidence/alloc_witness/20261020T164738Z-g2d/witness.txt",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-20T16:46:35Z",
-              "measured": "nodes_pass=2/2 hostload=4.29 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261020T164136Z-g2d fsid=8272b18c-ac43-4721-a17c-16c1c4f1b49f witness=tests/evidence/alloc_witness/20261020T164136Z-g2d/witness.txt",
               "reason": ""
             }
           ]
@@ -40230,10 +40228,16 @@
         "2/net/mesh/mpath": {
           "status": "PENDING",
           "measured": "",
-          "reason": "running 20261020T231657Z-g2e",
-          "iso": "2026-10-20T23:17:11Z",
+          "reason": "running 20261020T232430Z-g2e",
+          "iso": "2026-10-20T23:24:44Z",
           "recorded": "2026-10-20",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-20T23:23:00Z",
+              "measured": "nodes_pass=2/2 hostload=3.09 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=58048 ledger_holders=0 umount_ms=4786 remount_ms=5118 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_2node_20261020T232249Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261020T231657Z-g2e/witness.txt",
+              "reason": ""
+            },
             {
               "status": "FAIL",
               "iso": "2026-10-20T23:15:24Z",
@@ -40286,12 +40290,6 @@
               "status": "PASS",
               "iso": "2026-10-20T16:51:01Z",
               "measured": "nodes_pass=2/2 hostload=3.03 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=11392 ledger_holders=327 umount_ms=2997 remount_ms=5132 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_2node_20261020T165049Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261020T164738Z-g2d/witness.txt",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-20T16:46:55Z",
-              "measured": "nodes_pass=2/2 hostload=3.85 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=11584 ledger_holders=0 umount_ms=3358 remount_ms=5169 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_2node_20261020T164643Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261020T164136Z-g2d/witness.txt",
               "reason": ""
             }
           ]

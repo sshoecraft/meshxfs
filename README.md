@@ -22,6 +22,24 @@ On a system, MeshXFS goes by its short name `mxfs`: the `mxfs.ko` module,
 `resize_mxfs` and `mxfs_admin`, and the `mxfs` and `pve-storage-mxfs`
 packages.
 
+> ## ⚠️ Advisory, 2026-10-20: a defect found in 0.90.131 after its release
+>
+> Testing of the published 0.90.131 build on a two-node multipath cluster
+> (network lock manager) found one on-disk metadata error. A node had been
+> fenced and then rejoined. After the run, `chk_mxfs` reported an unlinked-inode
+> list entry that points at an inode that is already free (`AG 0 unlinked
+> bucket 1: member … has a FREE core`). The inode belonged to a file that had
+> already been deleted, and the check found no other error. It showed up in 1
+> of the first 7 such runs. The code path is the cleanup a node runs while it
+> recovers after another node leaves or dies, so it is not specific to one
+> lock manager. Whether 0.90.130 is affected is not yet determined.
+>
+> Until the fix is released: run MeshXFS on test data only and keep backups.
+> After a test, unmount the filesystem on every node and check it with
+> `chk_mxfs -v <device>`. Please report any error it shows. The cause is
+> identified, and the fix ships in the next release once it passes
+> verification.
+
 > **A shared-LUN clustered filesystem written entirely by AI.**
 >
 > Every line of the clustering, coordination, distributed-lock, fencing, and
