@@ -9,9 +9,14 @@
 # previous incarnation and replay that slice, (c) be admitted with the data
 # both incarnations wrote, and neither host may fault or shut down.  Nothing
 # here forges platter state: the departing node is made unable to certify by
-# the existing test knob that refuses the sole-survivor exclusive-write gate
-# (fence_gate_inject_refuse), so its attempt keeps answering
-# KEY_ABSENT_UNPROVEN exactly as it would against a target error.
+# two test knobs on it alone.  pr_fence_inject_key_absent makes every attempt
+# classify the victim's registration ABSENT (KEY_ABSENT_UNPROVEN, submitting
+# nothing) — the shape a target that purges registrations with the session
+# produces; SCST and LIO retain a destroyed initiator's registration, so
+# without it the present-key PREEMPT AND ABORT proves exclusion on the first
+# attempt and nothing is stranded (laps sav1/sav2, 2026-10-19).  And
+# fence_gate_inject_refuse refuses the sole-survivor exclusive-write gate that
+# classification leads to, so the attempt keeps answering KEY_ABSENT_UNPROVEN.
 #
 # SHAPE
 #   prep both -> A and B each write a witness file and sync -> arm the gate
@@ -29,7 +34,11 @@
 # replays (bound 300); A's rejoin bound 300; captures 60 s.
 #
 # Usage: tests/d0356_stranded_prover_return.sh <label>
-# Env:   MXFS_NODE_LIST (default test1,test2), MXFS_DEV (default: the device
+# Env:   MXFS_GROUP=<g> runs on that rig group's two nodes and pool LUN,
+#        beside other groups' runs (run.sh locks each configuration for one
+#        group at a time, so pick MXFS_CONFIG no other group is running);
+#        MXFS_CONFIG (default 2/net/mesh/direct) is the configuration prepped;
+#        MXFS_NODE_LIST (default test1,test2), MXFS_DEV (default: the device
 #        of A's live mxfs mount after prep, via mxfs_dev_resolve; no rig's
 #        device path is assumed), MXFS_MODARGS, JOIN_BOUND (default 300),
 #        UMOUNT_BOUND (default 120), MXFS_FAULT_UMOUNT_SRC=<node>:<stage>
@@ -43,10 +52,22 @@
 set -u
 LABEL=${1:?label}
 cd "$(dirname "$0")/.." || exit 2
+GROUPARG=()
+if [ -n "${MXFS_GROUP:-}" ]; then
+    GROUPARG=(--group "$MXFS_GROUP")
+    MXFS_NODE_LIST=$(tools/mxfs_lab.sh group "$MXFS_GROUP" | tr -s ' \t' '\n' | grep . | head -2 | paste -sd,) \
+        || { echo "RESULT: ABORT label=$LABEL stage=group (no group $MXFS_GROUP)"; exit 2; }
+fi
 export MXFS_NODE_LIST=${MXFS_NODE_LIST:-test1,test2}
 export MXFS_CONFIG=${MXFS_CONFIG:-2/net/mesh/direct}
 A=${MXFS_NODE_LIST%%,*}          # the prover that cannot certify, then leaves
 B=${MXFS_NODE_LIST##*,}          # the victim, then the lone rescuer
+# run.sh holds the nodes only while it runs; the death, the lone return and the
+# rejoin below happen between its calls, invisible to tools/vm_pool.sh, whose
+# idle sweep would shut the nodes off
+. tests/lib/runlock.sh
+vmhold_take "d0356_stranded_prover_return $LABEL" "$A" "$B" \
+    || { echo "RESULT: ABORT label=$LABEL stage=vmhold (could not hold $A $B)"; exit 2; }
 SSH=tools/mxfs_sshpass.sh
 MNT=/mnt/shared
 KO=/root/mxfs.ko.prep
@@ -61,8 +82,8 @@ ck()   { if [ "$2" = "$3" ]; then echo "  PASS $1 ($2)"; else echo "  FAIL $1 go
 ckge() { if [ "${2:-0}" -ge "$3" ] 2>/dev/null; then echo "  PASS $1 ($2 >= $3)"; else echo "  FAIL $1 got=${2:-?} want>=$3"; fails=$((fails+1)); fi; }
 # rs/rsx/cnt/capture_require/ensure_src_or_abort/mxfs_dev_resolve (tests/lib/rig.sh)
 . "$(dirname "$0")/lib/rig.sh"
-fault_before() { # <stage>
 MODARGS=${MXFS_MODARGS:-$(mxfs_rig_modargs)}   # rig-derived: includes this rig's retirement contract
+fault_before() { # <stage>
     case ${MXFS_FAULT_UMOUNT_SRC:-} in
         *:"$1") echo "STAGE FAULT: unmounting /src on ${MXFS_FAULT_UMOUNT_SRC%%:*} before $1"; rs 30 "${MXFS_FAULT_UMOUNT_SRC%%:*}" "umount -l /src; mountpoint -q /src && echo STILL || echo GONE" | tail -1 ;;
     esac
@@ -79,7 +100,7 @@ keylist() { grep -oE '^  0x[0-9a-f]+' "$1" | tr -d ' ' | sort -u; }
 normkey() { printf '0x%016x' "$(( $1 ))" 2>/dev/null; }
 echo "=== d0356_stranded_prover_return label=$LABEL A(prover)=$A B(victim,rescuer)=$B sv=$SV $(date -u +%FT%TZ) ==="
 
-MXFS_FORCE_PREP=1 timeout 300 ./run.sh 2/net/mesh/direct prep_cluster > "$OUT/prep.log" 2>&1
+MXFS_FORCE_PREP=1 timeout 300 ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster > "$OUT/prep.log" 2>&1
 prc=$?
 echo "STAGE prep rc=$prc wall=$(el)s  $(grep -am1 'prep_cluster OK\|FAIL' "$OUT/prep.log" | cut -c1-120)"
 [ $prc = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=prep evidence=$OUT"; exit 2; }
@@ -106,9 +127,11 @@ ensure_src_or_abort "$A"
 hbdump "$A" > "$OUT/hb_before.txt"
 capture_require "$OUT/hb_before.txt" '^slot +[0-9]+ magic=' "the platter dump on $A before the death"
 
-# ---- arm: the sole-survivor gate is refused on A, so its attempt against a
-#      purged key can never certify (the target on this rig purges a dead
-#      nexus's registration, measured s578j/s53b).
+# ---- arm: every attempt on A classifies the victim's key absent, and the
+#      sole-survivor gate that follows is refused, so A's attempt can never
+#      certify (this rig's target retains a dead nexus's registration).
+value_now_into armabs "$A" 30 "$OUT/rv_armed_0.txt" '^-?[0-9]+$' "key-absent armed on $A" "echo 1 > $P/pr_fence_inject_key_absent; cat $P/pr_fence_inject_key_absent"
+ck "$A armed the key-absent classification" "$armabs" "1"
 value_now_into armed "$A" 30 "$OUT/rv_armed_1.txt" '^-?[0-9]+$' "armed on $A" "echo 1 > $P/fence_gate_inject_refuse; cat $P/fence_gate_inject_refuse"
 ck "$A armed the gate refusal" "$armed" "1"
 [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL could not arm evidence=$OUT"; exit 2; }
@@ -135,7 +158,7 @@ if [ "$refused" != 1 ] || [ -z "$ANODE" ]; then
     rsx 60 "$A" "journalctl -k --since @$AMARK --no-pager 2>/dev/null | cut -c1-600" > "$OUT/A_journal.txt"
     capture_require "$OUT/A_journal.txt" 'kernel: ' "the kernel journal on $A while waiting for the gate refusal"
     echo "  VACUOUS $A never reached a refused attempt — nothing is stranded"
-    rs 20 "$A" "echo 0 > $P/fence_gate_inject_refuse" >/dev/null 2>&1
+    rs 20 "$A" "echo 0 > $P/fence_gate_inject_refuse; echo 0 > $P/pr_fence_inject_key_absent" >/dev/null 2>&1
     $VIRSH start "$B" > /dev/null 2>&1     # never leave the victim powered off
     echo "RESULT: VACUOUS label=$LABEL wall=$(el)s evidence=$OUT"; exit 3
 fi
@@ -229,6 +252,22 @@ certA=$(grep -a 'P236-FENCE-CERTIFIED' "$OUT/B_journal.txt" | grep -ac "victim=$
 certAkind=$(grep -a 'P236-FENCE-CERTIFIED' "$OUT/B_journal.txt" | grep -a "victim=$ANODE " | grep -oE 'kind=[A-Z_]+' | head -1 | cut -d= -f2)
 recA=$(grep -a 'P163-RECOVERY-COMPLETE' "$OUT/B_journal.txt" | grep -ac "slot=${ASLOT:-99} ")
 recB=$(grep -a 'P163-RECOVERY-COMPLETE' "$OUT/B_journal.txt" | grep -ac "slot=$BSLOT ")
+# B returning alone finds a total outage and, as the bootstrap owner, adopts
+# one certified victim slot as its own record and replays that slice in full
+# as its own log (P-BOOT-ADOPT rc=0, then P-BOOT-ADOPTED-LOG); that recovery
+# prints no P163 line (laps sav4/sav5, 0.90.131: B's old slot in one, A's in
+# the other), so an adopted slot counts as recovered once the mount completed
+adopted() {
+    if grep -a "P-BOOT-ADOPT slot=$1 " "$OUT/B_journal.txt" | grep -q ' rc=0 ' &&
+       grep -aq "P-BOOT-ADOPTED-LOG slot=$1 " "$OUT/B_journal.txt"; then
+        cnt "$OUT/B_join.txt" '^MOUNTED'; true
+    else
+        echo 0
+    fi
+}
+adoptA=$(adopted "${ASLOT:-99}"); adoptB=$(adopted "$BSLOT")
+recA=$(( recA + adoptA )); recB=$(( recB + adoptB ))
+echo "  NOTE recovery by P163: A's slot ${ASLOT:-?} $((recA - adoptA)), B's old slot $BSLOT $((recB - adoptB)); by adoption as B's own log: A's $adoptA, B's old $adoptB"
 BNEW=$(grep -ao 'claimed heartbeat slot [0-9]* for node [0-9]*' "$OUT/B_journal.txt" | head -1 | grep -oE '[0-9]+$')
 # grep -c exits 1 on a zero count, so an `|| echo 0` fallback would print a
 # second 0 (s53d scored "0\n0" != 0); count with the exit status ignored.
@@ -259,8 +298,8 @@ if [ -n "$akey" ]; then
     ck "$A's key was retired by the fence" "$(keylist "$OUT/keys_after_B.txt" | grep -c "^$(normkey "$akey")$")" 0
 fi
 
-# ---- A REJOINS (knob cleared) and reads both witnesses.
-rs 20 "$A" "echo 0 > $P/fence_gate_inject_refuse" >/dev/null 2>&1
+# ---- A REJOINS (knobs cleared) and reads both witnesses.
+rs 20 "$A" "echo 0 > $P/fence_gate_inject_refuse; echo 0 > $P/pr_fence_inject_key_absent" >/dev/null 2>&1
 JMARK=$(date +%s)
 rsx $((JOIN_BOUND + 60)) "$A" "T0=\$(date +%s%N); timeout $JOIN_BOUND mount -t mxfs $MXFS_DEV $MNT; echo MOUNT_RC=\$?; echo WALL_MS=\$(( (\$(date +%s%N) - T0) / 1000000 )); mountpoint -q $MNT && echo MOUNTED || echo NOT_MOUNTED; cat $MNT/$WA 2>&1; cat $MNT/$WB 2>&1; true" > "$OUT/A_rejoin.txt"
 capture_require "$OUT/A_rejoin.txt" '^(MOUNTED|NOT_MOUNTED)$' "the rejoin of $A"

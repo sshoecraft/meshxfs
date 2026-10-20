@@ -1,0 +1,61 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, hypotheses
+# H-U6 and H-U4 on one build, run from ~/src/mxfs-c (build
+# 311877C431E1BB444562804: ifree_defer_drain, ifree_defer_reap and
+# unlprev_rele_defer, each a same-build knob defaulting to 1).
+#
+# H-U6 (the record, session 58, written before the patch): the H-U4 predecessor
+# hold and the H-U1 pin were released at the end of xfs_inactive_ifree with a
+# synchronous xfs_irele; when that was the predecessor's last reference and it
+# was unlinked, its whole inactivation ran nested inside the outer one after
+# the outer free had committed, so a local create that took the outer number
+# held the AGI and waited in xfs_iget for the outer inactivation while the
+# nested one waited for that AGI (hu4df1 deadlocked test29).  unlprev_rele_defer
+# 1 hands those references to the inode BAST workqueue; 0 releases them inline.
+# PREDICTION: control laps (unlprev_rele_defer=0) hang the way hu4df1 did;
+# fix laps complete with no P-BUFLOCK-STUCK, rele_deferred > 0 (the references
+# were handed off), and PASS.
+#
+# H-U4 (its delay A/B, tests/queues/peer_open_unlinked_hu4_delay_ab.queue):
+# that queue's fix arm could not be judged because its first fix lap was the
+# H-U6 deadlock; this queue reruns both its arms on the H-U6 build.  Its
+# prediction and its rules are that file's, unchanged.
+#
+# Arms, all with dbg_ifree_midlist_delay_ms=600 (H-U4's window),
+# freshsrc_iunl_overlay=1 (H-U3), b6_release_drain=1 (H-U5), unlprev_pin=1 (H-U1),
+# no close drops, 30 iterations, 2/net/mesh/direct g2c:
+#   F  (fix of both)       unlprev_tenure=1 unlprev_rele_defer=1   u6f1 u6f2 u6f3
+#   C4 (H-U4's control)    unlprev_tenure=0 unlprev_rele_defer=1   u4c1 u4c2 u4c3
+#   C6 (H-U6's control)    unlprev_tenure=1 unlprev_rele_defer=0   u6c1, LAST: a
+#                          hang leaves both nodes wedged, and no lap may follow it
+# F and C4 differ only in unlprev_tenure, F and C6 only in unlprev_rele_defer.
+#
+# VERDICT RULES (written before the first lap):
+#   H-U6 SUPPORTED AND FIXED  u6c1 REPRODUCED hung=1, its stacks showing a
+#             nested xfs_inactive below xfs_inactive_ifree waiting on an AGI
+#             (<node>_dstacks.txt); and u6f1-3 all PASS with hung=0,
+#             buflock_stuck=0 and rele_deferred > 0 over the three.
+#   H-U6 NOT FIXED  a fix lap that hangs, or REPRODUCES with a P-BUFLOCK-STUCK
+#             or P-CR3-NEEDINACT storm on a number whose inactivation is
+#             nested: attributed from its stacks.
+#   H-U6 WEAK  u6c1 does not hang: the same build did not reproduce the
+#             deadlock, and the fix laps' PASS is not a verdict on H-U6 alone
+#             (hu4df1 on build 41D2F9237EBB21CF21E9D57 is the only reproduction).
+#   H-U4      judged by tests/queues/peer_open_unlinked_hu4_delay_ab.queue's
+#             rules on u4c1-3 (controls) and u6f1-3 (fixes).
+#   VACUOUS   rele_deferred 0 over the three fix laps: no predecessor reference
+#             was handed off.
+# A lap that ABORTs, or audits STALE/NONE without a reproduction or a hang, has
+# no verdict and is rerun.  A reproduction's cold audit (after the remount
+# replays both journals) is recorded either way: CORRUPT there makes the record
+# an integrity defect.
+#
+# Bound per lap: the hu4d queue's 2357 s derivation plus the sixth PUC_KNOBS
+# knob, 2x20 = 2397 s.  A hung lap skips the unmount, remount, snapshot and
+# cold audit (more than the 2x60 s its stack capture adds).
+2397 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1 unlprev_rele_defer=1" tests/peer_open_unlinked_chain.sh u6f1 30 2/net/mesh/direct g2c
+2397 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=0 unlprev_rele_defer=1" tests/peer_open_unlinked_chain.sh u4c1 30 2/net/mesh/direct g2c
+2397 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1 unlprev_rele_defer=1" tests/peer_open_unlinked_chain.sh u6f2 30 2/net/mesh/direct g2c
+2397 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=0 unlprev_rele_defer=1" tests/peer_open_unlinked_chain.sh u4c2 30 2/net/mesh/direct g2c
+2397 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1 unlprev_rele_defer=1" tests/peer_open_unlinked_chain.sh u6f3 30 2/net/mesh/direct g2c
+2397 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=0 unlprev_rele_defer=1" tests/peer_open_unlinked_chain.sh u4c3 30 2/net/mesh/direct g2c
+2397 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1 unlprev_rele_defer=0" tests/peer_open_unlinked_chain.sh u6c1 30 2/net/mesh/direct g2c

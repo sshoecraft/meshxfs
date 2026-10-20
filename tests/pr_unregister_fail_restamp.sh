@@ -154,7 +154,7 @@ for i in $(seq 1 "$N"); do h="test$i"; [ "$h" = "$VICTIM" ] && continue; "$SSH" 
 sleep 5
 keys > "$OUT/keys_after_fence.txt"
 if [ -n "$KEY" ] && grep -qx "$KEY" "$OUT/keys_after_fence.txt"; then say "FAIL: key $KEY still registered after the peer fence"; FAILS=$((FAILS+1)); else say "key $KEY absent after fence"; fi
-faults=$(grep -ciE 'kernel BUG|BUG:|Oops|general protection|Call Trace' "$OUT"/peer_*.dmesg "$OUT/victim_umount.log" | awk -F: '{s+=$2} END{print s+0}')
+faults=$(grep -ciE 'kernel BUG|BUG:|\bOops\b|general protection|Call Trace' "$OUT"/peer_*.dmesg "$OUT/victim_umount.log" | awk -F: '{s+=$2} END{print s+0}')
 shut=$(grep -l 'Filesystem has been shut down\|forced shutdown' "$OUT"/peer_*.dmesg 2>/dev/null | wc -l)
 [ "$faults" -eq 0 ] || { say "FAIL: kernel faults=$faults"; FAILS=$((FAILS+1)); }
 [ "$shut" -eq 0 ] || { say "FAIL: $shut peers shut down"; FAILS=$((FAILS+1)); }

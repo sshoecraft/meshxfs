@@ -1,0 +1,67 @@
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY and
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT: the class of
+# the one grader line left on D-INACT's final queues.  Lap fucd2
+# (tests/queues/freed_inode_final_caw.queue, build F09C3FED, 2/disk/caw/direct
+# g2b) logged on test16 at 18502.780888 'P-LOG-MIRROR-PHANTOM ino=2097298
+# dlm_granted=0 ... unpub_clr=22:824 pub_inflight=0', a live file logged at a
+# cached EX while the DLM, asked, recorded none.  unpub_clr=22:824 is the
+# publish drain's take (xfs/xfs_mxfs_publish.c), which clears
+# i_dlm_unpublished and lists the claim before the claim is made; the inode's
+# own claim landed at 18502.780718 (P291-EXWIN path=claim mode=5 slot=1
+# waited_ms=0), 170 us before the print; the peer logged no lock activity on
+# the number from 18492.21 to 18551.39.  The line samples pub_inflight at the
+# print, after the DLM query, so a claim that returns while the query runs
+# reads pub_inflight=0.  All 22 phantom lines of the final queues (fum and fuc)
+# are this take site; 21 read pub_inflight=1.
+#
+# HYPOTHESIS H-PH1 (written before any lap): every P-LOG-MIRROR-PHANTOM at the
+# drain's take is a logger inside its own publish's take-to-claim window: the
+# DLM is asked while that claim is in flight.  The detector now snapshots, under
+# m_mxfs_unpub_lock and before the query, whether the inode is unpublished and
+# whether its claim is listed (q_inflight), times the query (q_us), and asks
+# the DLM again at the print (requery)
+# (xfs/libxfs/xfs_trans_inode.c; build ~/src/mxfs-b, srcversion printed by
+# each lap).  tests/freed_inode_final_grade.sh grades a line carrying
+# q_inflight by it: pi0 is q_inflight=0.
+#
+# PREDICTIONS: every phantom line with unpub_clr=22:824 reads q_inflight=1;
+# requery reads 5 (EX) on a line whose claim landed before the print; no
+# phantom line reads q_inflight=0.
+#
+# Laps: fucd2's line on the same group and configuration with one change of
+# setting, NG0_DRAIN_BOUND=0 (this build's H-F12 knob at the open scan, so the
+# drain behaves as F09C3FED's); laps pha1-pha3 as fucd2, lap pha4 also holds
+# every drain claim 20 ms (NG0_PUBCLAIM_DELAY_MS=20, with NG0_PUBCLAIM_GUARD=1,
+# the module default the knob needs set) so the window is reached many times.
+# The harness's own vacuity gate is H-F12's (an AG drain timeout) because
+# NG0_DRAIN_BOUND is set; it is not this queue's measure, and a VACUOUS or
+# FAIL verdict from it judges nothing below.
+#
+# MEASURE, per lap: every P-LOG-MIRROR-PHANTOM line after the lap's mark in
+# each node's <node>_hf7.txt (the harness's hf10 line counts them by
+# pub_inflight and by q_inflight), with unpub_clr, q_claim_age_us, q_us and
+# requery; the cold audit; node failures from each whole stream; the if_*
+# fields of the deferred-free fixes.
+#
+# VERDICT RULES (written before the first lap):
+#   A lap with a node failure or a CORRUPT cold audit is attributed before
+#   anything below is judged; an ABORT has no verdict and is rerun.
+#   SUPPORTED   at least one phantom line at unpub_clr=22:824 over the queue,
+#               every such line q_inflight=1, and no phantom line of any site
+#               q_inflight=0.  Then fucd2's line is that class read late (its
+#               own claim landed 170 us before its print), and it is not a
+#               corruption line of either record.
+#   REFUTED     a phantom line at unpub_clr=22:824 with q_inflight=0: a cached
+#               EX logged with no claim of it in flight and none recorded.  It
+#               is a finding of D-FREED's, attributed per inode (its stream,
+#               the peer's activity on the number) before any removal.
+#   OTHER SITE  a phantom line at another site with q_inflight=0 is a finding
+#               of D-FREED's too, and judges H-PH1 nothing.
+#   NOT REACHED no phantom line in all four laps: H-PH1 untested.
+# Run while no lap shares g2b; the H-F12 reach queue may run on g3 beside it.
+#
+# Bound: fucd2's, 1680 s per lap.
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_DRAIN_BOUND=0 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh pha1 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_DRAIN_BOUND=0 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh pha2 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_DRAIN_BOUND=0 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh pha3 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh pha4 1 300 2/disk/caw/direct g2b

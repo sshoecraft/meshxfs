@@ -982,6 +982,15 @@ int mxfs_pal_scsi_pr_unregister(mxfs_bdev_t *dev, uint64_t key);
 int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key, int *added);
 
 /*
+ * Watch `dev`'s SCSI paths for a reset another initiator issues (on: from the
+ * creation of its reservation context; off: at its release).  After such a
+ * reset, a request already in flight that the target leaves unanswered is
+ * walked down the transport's timeout ladder to an abort and retry instead
+ * of holding the device for three expiries of the command timeout.
+ */
+void mxfs_pal_scsi_reset_watch(mxfs_bdev_t *dev, bool on);
+
+/*
  * On a multipath map: how many paths prove, by a matching RESERVE that
  * changes nothing, that their nexus holds `key`; and reduce the key's
  * registrations to the single path that proves it.  Both return 1 when the
@@ -1648,10 +1657,13 @@ int mxfs_pal_bdev_compare_and_write_many(mxfs_bdev_t *dev, int n,
  * sector at `offset` with compare_buf and, on a match, write `write_len`
  * bytes (a multiple of 512, at most 4096) from write_buf starting at that
  * sector, with FUA, atomically with respect to every other swap on the
- * device.  Only where every swap is emulated: the DRBD attachment (a whole
- * page inside one acquisition of the pair's lock) and the usermode file.  A
- * SCSI COMPARE AND WRITE covers the compared sector alone, so a SCSI device
- * answers -EOPNOTSUPP and the caller keeps its multi-step protocol.  Results
+ * device.  Where every swap is emulated (the DRBD attachment: a whole page
+ * inside one acquisition of the pair's lock; the usermode file) the compare
+ * is that first sector.  A SCSI COMPARE AND WRITE compares exactly what it
+ * writes, so on a SCSI target compare_buf must hold write_len bytes, the
+ * whole range as the caller read it; a target whose Block Limits page does
+ * not allow that many blocks, or the caw_span knob at 0, answers -EOPNOTSUPP
+ * with nothing issued and the caller keeps its multi-step protocol.  Results
  * as mxfs_pal_bdev_compare_and_write; an error after the compare matched
  * leaves the range in doubt (written, partly written, or not).
  */
@@ -1659,6 +1671,15 @@ int mxfs_pal_bdev_compare_and_write_span(mxfs_bdev_t *dev, uint64_t offset,
                                          const void *compare_buf,
                                          const void *write_buf,
                                          uint32_t write_len);
+
+/*
+ * Would mxfs_pal_bdev_compare_and_write_span issue a swap of len bytes on this
+ * device now?  true where the swap is emulated (the emulation decides), and on
+ * a SCSI target only while caw_span is on and its Block Limits page allows
+ * len bytes in one COMPARE AND WRITE.  Asked per commit, so the knob takes
+ * effect without a remount.
+ */
+bool mxfs_pal_bdev_span_swap_ok(mxfs_bdev_t *dev, uint32_t len);
 
 /*
  * Drop the cached backing-path (scsi_device) references held for stacked

@@ -1,0 +1,63 @@
+# D-8TCP-TWO-VICTIM-SURVIVOR-LOAD-STALLS-UP-TO-186S on 8/net/mesh/direct g8
+# (test7..test14), tests/multi_victim_containment.sh with MXFS_GROUP=g8,
+# victims test9,test12 (places 3 and 6, the record's test3,test6), VICTIM_GAP=75
+# as in queues w35a/x36b.  Run from ~/src/mxfs-g (srcversion recorded on the
+# defect when the queue starts: the main tree's sources, every fix at its
+# default).
+#
+# WHAT THE RECORD MEASURED (x36c lap 2, 0.90.36): per victim about 64 s from
+# the kill to the death fence, then the elected replayer's claim refused
+# 'manifest is not sealed yet' while the prover was sealing it, re-armed with
+# a flat 30 s (P89-REAP-SCHED why=freplay-fence), so each victim cost ~60 s of
+# detection plus ~29 s of waiting on a seal that landed 1-2 s after the
+# refusal; load_longest_stall 184-185 s (x36b p1).
+#
+# WHAT THE TREE HAS NOW, read before this queue (not changed by it):
+#  (1) the replay re-arm after a refusal is mxfs_v5_dlm_recovery_wait_ms
+#      (dlm/v5_mount.c): 1000 ms while a live peer holds the fencing attempt
+#      at stage FENCING or SNAPSHOTTING and that wait is younger than 20 s,
+#      the 30 s idle interval otherwise (xfs/xfs_mxfs_recovery.c freplay-fence);
+#  (2) on a SCSI attachment the dead window is
+#      MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD = 17 checks of 2 s = 34 s
+#      (dlm/disklock.h), not the 62 s of the record's build.
+#
+# HYPOTHESIS H-2V1 (written before the first lap): the record's stall was those
+# two fixed waits; with (1) and (2) each victim costs the 34 s window plus its
+# observation start (at most one 2 s interval) plus fence, seal and replay
+# (seconds), and no fixed 30 s wait remains anywhere in a recovery.
+#
+# LAPS: P = production settings (no injected hold), H = PROVER_HOLD_MS=8000
+# (the record's injected 8 s between certificate and manifest on the last
+# victim's prover, which is what makes the replayer's claim meet SNAPSHOTTING).
+#
+# READING RULES (written before the first lap):
+#   Per victim, from the survivors' followed logs (klog_<node>.txt.gz) on the
+#   host clock of each line: kill (summary.txt KILL line) -> first
+#   'declaring dead' / P309-DEATH-FENCE-QUEUED on any survivor (DETECT),
+#   -> P236-FENCE-SEALED for that slot (FENCE), -> P163-RECOVERY-COMPLETE
+#   for that slot (REPLAY); every P89-REAP-SCHED why=freplay-fence line with
+#   its delay_ms, and every 'foreign replay slot=N: NOT replayed' refusal.
+#   REACH (the refusal exercised): an H lap with at least one refusal while
+#   the prover was live.  An H lap without one is VACUOUS for (1).
+#   H-2V1 SUPPORTED when every lap is VERDICT PASS, every victim's DETECT is
+#   at most 40 s (34 s window + 2 s observation start + 4 s monitor and
+#   clock slack), FENCE + REPLAY at most 15 s, at least one H lap reaches,
+#   and in every reached lap the freplay-fence re-arms read delay_ms=1000 and
+#   the slot's recovery completes within 5 s of its seal.
+#   H-2V1 REFUTED by any freplay-fence re-arm of 30000 ms while the attempt's
+#   holder was live and the wait younger than 20 s, by a recovery completing
+#   25 s or more after its seal, or by a DETECT over 40 s.
+#   Read on every lap and stated whatever the verdict: load_longest_stall per
+#   survivor against the sum of the victims' DETECT+FENCE+REPLAY segments that
+#   overlap it (a stall the segments do not account for is a new finding).
+#   Any load error, shutdown, quarantine or chk_mxfs error is its own finding,
+#   attributed from its own lines before anything else.
+#
+# Bound per lap (the harness's own steps): prep 150 + load confirm 30 +
+# probes 5 + kills (75 + 1) x 2 + window 300 + 25 + survivor reads 60 + load
+# stop 80 + unmount 140 + chk 200 + log packing 10 + victim starts 60 = 1212 s,
+# rounded to 1300.
+1300 MXFS_GROUP=g8 VICTIM_GAP=75 tests/multi_victim_containment.sh 8/net/mesh/direct test9,test12 tvp1
+1300 MXFS_GROUP=g8 VICTIM_GAP=75 PROVER_HOLD_MS=8000 tests/multi_victim_containment.sh 8/net/mesh/direct test9,test12 tvh1
+1300 MXFS_GROUP=g8 VICTIM_GAP=75 tests/multi_victim_containment.sh 8/net/mesh/direct test9,test12 tvp2
+1300 MXFS_GROUP=g8 VICTIM_GAP=75 PROVER_HOLD_MS=8000 tests/multi_victim_containment.sh 8/net/mesh/direct test9,test12 tvh2

@@ -80,15 +80,33 @@ export POWER
 # count N or all.  The release matrix alone left out the TCP configurations
 # released earlier (8/16 net/mesh/direct, 2-16 net/mesh/mpath), whose rows the
 # table still turns red on a build they never ran on.
+#
+# A configuration this version does not claim (data/configurations.json
+# released_earlier) is left out while a record that crosses the release bar
+# reaches it (tools/defects.py <configuration> --release): its row reads Not
+# ready on that record whatever its board says, so the board cannot change the
+# release.  0.90.131's B0D2 chain spent waves 3-5, about three hours, on the
+# 4/8/16 net/mesh boards the open D-TCP-4NODE-NOQUEUE-TRY-WAITS-9S-ON-FULL-
+# LEDGER-PAGE-CREATES-STALL already held back.  ALL_BOARDS=1 runs them anyway.
 table_boards() {
-    python3 -c 'import json, sys
+    ALL_BOARDS="${ALL_BOARDS:-0}" python3 -c 'import json, os, sys
+sys.path.insert(0, "tools")
+import defects
 n = sys.argv[2] if len(sys.argv) > 2 else ""
+earlier = json.load(open("data/configurations.json")).get("released_earlier", {})
+queue = defects.load()["defects"]
+def held_back(c):
+    if os.environ.get("ALL_BOARDS") == "1" or c not in earlier:
+        return False
+    nodes, selector, platform = defects.parse_at(c)
+    return any(str(e.get("impact", "")).lower() != "noblock" and defects.blocks(e, nodes, selector, platform)
+               for e in queue)
 seen = []
 for row in json.load(open(sys.argv[1]))["rows"]:
     if "boards" not in row:
         continue
     for c in row["configs"]:
-        if c not in seen and (not n or c.split("/")[0] == n):
+        if c not in seen and (not n or c.split("/")[0] == n) and not held_back(c):
             seen.append(c)
 print("\n".join(seen))' data/release_table.json "$@"
 }
@@ -195,6 +213,19 @@ if [ "$together" = 1 ]; then
 elif [ "$FULL" = 1 ]; then
     NODES=$CLAIM step "full_verify nodes=$CLAIM" tests/full_verify.sh "$V"
 fi
+# The laps and boards deploy the tree's mxfs.ko, not the clean copy the build
+# step made, so a tree whose module was not rebuilt after the last source edit
+# would have every step below verify a module that does not ship (0.90.131's
+# first chain did, on its first lap).  srcversion depends only on the source:
+# the tree's module must carry the clean build's.
+if [ "$FULL" = 1 ]; then
+    clean_sv=$(grep -a -o -E "clean_build_rc=0 version=$V srcversion=[0-9A-F]+" "$EV/full_verify_$V.log" 2>/dev/null | tail -n 1 | sed 's/.*srcversion=//')
+    tree_sv=$(modinfo -F srcversion mxfs.ko 2>/dev/null)
+    if [ -z "$clean_sv" ] || [ "$clean_sv" != "$tree_sv" ]; then
+        echo "$(date -u +%FT%TZ) chain defect: the tree's mxfs.ko is srcversion '$tree_sv', the clean build's is '$clean_sv'; run make modules in the tree, then this chain again; nothing more run" | tee -a "$L"
+        exit 2
+    fi
+fi
 counts="$LOWER"
 [ "$together" = 1 ] && counts="$CLAIM $LOWER"
 boards=(); sets=(); cfgs=()
@@ -262,6 +293,12 @@ if [ "${#boards[@]}" -gt 0 ]; then
         echo "=== board $cfg ===" >> "$L"
         python3 tools/criteria.py "$cfg" | grep -vE '\| PASS ' | cut -c1-160 >> "$L"
     done
+    # bench/README.md is written from the release boards (tools/bench_report.py)
+    # and scripts/release.sh refuses to build while the page disagrees with
+    # them, so the page is rewritten from the boards just run, before the
+    # packages step reads it: on 0.90.131 the boards changed the throughput
+    # numbers and the page still held the previous run's.
+    step "bench page" python3 tools/bench_report.py
 fi
 if [ "$together" = 1 ]; then
     # full_verify powers down only the claimed count's groups before a

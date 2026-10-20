@@ -70,7 +70,14 @@
 #       no allocation or release logs nodes in or out meanwhile (each login
 #       is ~20 host kernel log lines; a run's host preflight samples that
 #       log's rate).  Waits up to 300 s: five allocations of <= 60 s ahead.
+#   tools/lun_pool.sh fault <command...>        inject a fault (freeze a guest, cut
+#       or mute a storage path) while no SCST reconfiguration is in progress
+#       (scst_quiet_begin below says why); waits up to 90 s.  fault-lock
+#       prints the lock, for an injector that is a shell function
 #   tools/lun_pool.sh snapshot <id> <label>     copy a LUN's platter out of the pool
+#       (refused when it could leave the host below its free-space floor;
+#       MXFS_SNAPSHOT_DIR, or the lab file's `paths snapshots=`, puts it on
+#       another filesystem)
 #   tools/lun_pool.sh destroy <id>              remove a free LUN and its image
 #
 # --owner defaults to the caller (the parent of this script).  free refuses a
@@ -111,6 +118,64 @@ pool_lock() {  # serialise every decision about who holds what
 }
 pool_unlock() { exec {LOCKFD}>&-; }
 
+# A write to an SCST management file suspends the WHOLE target: SCST stops
+# admitting commands on every LUN it exports and waits, up to 90 s
+# (SCST_SUSPEND_TIMEOUT_USER), for every command already admitted to finish.
+# A command whose initiator cannot answer -- a guest that is frozen, or whose
+# storage path is cut or muted -- finishes only when its connection times out,
+# and for that long every LUN on the host stalls.  Measured 2026-10-19
+# 19:14:14Z: a bind of test29/test30 waited 49 s ('Waiting for 1 active
+# commands', the one a WRITE of test18, frozen by path_fenced_return 12 s
+# before), and every cluster on the host lost its storage for those 49 s and
+# self-fenced.
+#
+# So every reconfiguration runs inside scst_quiet_begin/scst_quiet_end: it
+# holds SCSTLOCK exclusive and starts only once the hypervisor shows no such
+# fault in effect (san_faults reads the guests' state, not anyone's record of
+# it, so an injector that does not know about this is still seen).  An
+# injector that goes through `fault` takes SCSTLOCK shared for the instant it
+# injects, so no fault begins between that check and the writes.
+#
+# The wait is bounded by the longest window a fault on the rig holds a
+# command: path_fenced_return keeps its victim frozen until the peers fence it,
+# measured 131 s (19:14:02-19:16:13Z the same day); the path rows cut one path
+# for 60 s at a time.  Two groups faulting back to back: 2 x 131 = 262 s.
+SCSTLOCK=$POOL/.scst.lock
+SCST_QUIET_WAIT_S=${MXFS_SCST_QUIET_WAIT_S:-262}
+VIRSH="virsh -c qemu:///system"
+SANNETS=$(for k in a b; do v=$(lab_get san "$k" 2>/dev/null) && echo "${v%%,*}"; done)
+
+san_faults() {  # every fault in effect that can keep a command on the target from finishing
+    local d m
+    $VIRSH list --state-paused --name 2>/dev/null | grep . | sed 's/^/paused /'
+    for d in $($VIRSH list --state-running --name 2>/dev/null); do
+        for m in $($VIRSH domiflist "$d" 2>/dev/null | awk -v nets=" $(echo $SANNETS) " 'index(nets, " " $3 " ") {print $5}'); do
+            [ "$($VIRSH domif-getlink "$d" "$m" 2>/dev/null | awk '{print $2}')" = down ] && echo "path-down $d $m"
+        done
+    done
+    tc qdisc show 2>/dev/null | awk '$2 == "netem" {print "muted " $5}'
+}
+
+scst_quiet_begin() {  # hold SCSTLOCK exclusive with no fault in effect, or fail
+    local t0=$SECONDS f=""
+    exec {SCSTFD}>>"$SCSTLOCK" || { echo "lun_pool: cannot open $SCSTLOCK" >&2; return 1; }
+    while :; do
+        if flock -x -w 90 "$SCSTFD"; then
+            f=$(san_faults)
+            [ -z "$f" ] && return 0
+            flock -u "$SCSTFD"
+        else
+            f="an injector held $SCSTLOCK 90 s"
+        fi
+        [ $((SECONDS - t0)) -lt "$SCST_QUIET_WAIT_S" ] || break
+        sleep 2
+    done
+    exec {SCSTFD}>&-
+    echo "lun_pool: no SCST reconfiguration: a fault stayed in effect ${SCST_QUIET_WAIT_S} s, and a reconfiguration would stall every LUN behind it: $(echo $f)" >&2
+    return 1
+}
+scst_quiet_end() { exec {SCSTFD}>&-; }
+
 starttime_of() {  # <pid> -> field 22 of /proc/<pid>/stat, or nothing
     local s
     s=$(cat "/proc/$1/stat" 2>/dev/null) || return 0
@@ -144,6 +209,15 @@ register() {  # <id>: the SCST device and target exist, target has no default LU
         ip -4 -o addr show | grep -q "inet $p/" \
             || { echo "lun_pool: multipath portal $p is not an address on this host (scripts/san_net.sh host)" >&2; return 1; }
     done
+    # scst_setup.sh writes the target's management files on every call
+    scst_quiet_begin || return 1
+    register_writes "$id"; local rc=$?
+    scst_quiet_end
+    return $rc
+}
+register_writes() {  # <id>: register's writes, under scst_quiet_begin
+    local id=$1 tgt dev img g
+    tgt=$(tgt_of "$id"); dev=$(scstdev_of "$id"); img=$(img_of "$id")
     MXFS_SCST_IMG=$img MXFS_SCST_DEV=$dev MXFS_SCST_TGT=$tgt MXFS_SCST_PORTAL_IP="$PORTAL${MPLIST:+ $MPLIST}" \
         timeout 60 "$HERE/scripts/scst_setup.sh" setup | grep -E 'SCST_SETUP|FAIL' >/dev/null || return 1
     # scst_setup.sh reuses a device of the same name whatever file it holds.
@@ -159,15 +233,22 @@ register() {  # <id>: the SCST device and target exist, target has no default LU
 }
 
 set_initiators() {  # <id> <iqn>...: the alloc group holds exactly these
-    local id=$1 g ini; shift
+    local id=$1 g ini ops=() op rc=0; shift
     g=$T/$(tgt_of "$id")/ini_groups/alloc/initiators
     [ -d "$g" ] || return 1
     for ini in "$@"; do
-        [ -e "$g/$ini" ] || echo "add $ini" | sudo tee "$g/mgmt" >/dev/null || return 1
+        [ -e "$g/$ini" ] || ops+=("add $ini")
     done
     for ini in $(ls "$g" | grep -v '^mgmt$'); do
-        case " $* " in *" $ini "*) ;; *) echo "del $ini" | sudo tee "$g/mgmt" >/dev/null || return 1 ;; esac
+        case " $* " in *" $ini "*) ;; *) ops+=("del $ini") ;; esac
     done
+    [ "${#ops[@]}" = 0 ] && return 0
+    scst_quiet_begin || return 1
+    for op in "${ops[@]}"; do
+        echo "$op" | sudo tee "$g/mgmt" >/dev/null || { rc=1; break; }
+    done
+    scst_quiet_end
+    return $rc
 }
 
 initiator_of() {  # <node> -> its InitiatorName, or nothing
@@ -263,7 +344,14 @@ NODE_LOGIN_MP=$NODE_UNMOUNT'
     def=$(ip -4 route show default | sed -n "s/.* dev \([^ ]*\).*/\1/p" | head -1)
     nics=""
     for p in MPLIST; do
-        d=$(ip -4 route get $p 2>/dev/null | sed -n "s/.* dev \([^ ]*\).*/\1/p" | head -1)
+        # A node just booted may not have its storage NICs addressed yet
+        # (DHCP lands seconds after sshd answers), and until then the portal
+        # routes through the default NIC: wait for it, 30 s at most.
+        for w in $(seq 30); do
+            d=$(ip -4 route get $p 2>/dev/null | sed -n "s/.* dev \([^ ]*\).*/\1/p" | head -1)
+            [ -n "$d" ] && [ "$d" != "$def" ] && break
+            sleep 1
+        done
         [ -n "$d" ] && [ "$d" != "$def" ] || { echo "LOGIN_FAIL portal $p is reached through ${d:-nothing}, the default route NIC is $def: no storage NIC for this path"; exit 0; }
         case " $nics " in *" $d "*) echo "LOGIN_FAIL portals share NIC $d: one path, not two"; exit 0 ;; esac
         nics="$nics $d"
@@ -467,7 +555,8 @@ cmd_alloc() {
         for n in "${nodes[@]}"; do
             case "$held" in *",$n,"*)
                 echo "lun_pool: lun$id: its finished allocation holds $n; releasing it" >&2
-                release "$id"; break ;;
+                release "$id" || die "lun$id: its finished allocation of $n was not released"
+                break ;;
             esac
         done
     done
@@ -487,7 +576,7 @@ cmd_alloc() {
         for id in $(for i in $(ids); do [ -s "$(owner_of "$i")" ] && ! owner_live "$i" && echo "$(owner_field "$i" 4) $i"; done | sort | awk '{print $2}'); do
             [ "$(lun_size "$id")" -ge "$min" ] || continue
             echo "lun_pool: lun$id: no free LUN; releasing the finished allocation $(cut -d' ' -f3- "$(owner_of "$id")")" >&2
-            release "$id"
+            release "$id" || die "lun$id: the finished allocation was not released"
             break
         done
         pick_free
@@ -556,13 +645,32 @@ cmd_lookup() {
 # the LUN, so evidence of a corrupt filesystem has to leave it first.  Sparse,
 # so a 20 GiB LUN costs what the filesystem had written.  Copy only while no
 # node writes to it (the caller's cluster unmounted, or audited cold).
+#
+# The copy lands in MXFS_SNAPSHOT_DIR, else the lab file's `paths snapshots=`,
+# else <pool dir>/../snapshots, and is refused if it could leave that
+# filesystem with less free space than the host preflight demands before every
+# run (MXFS_PREFLIGHT_MIN_FREE_GB, 10 G).  On clyde the last of those shares the
+# filesystem that carries the pool, the guest images and the journal: on
+# 2026-10-17, 22 kept images left it 6 G free and the preflight refused every
+# lap after them; and a copy there fills that filesystem's page cache with
+# gigabytes of unwritten data, which stalled the target's writes to every LUN
+# for most of a minute (two copies of 12-15 G held one release write of each
+# node of a two-node cluster 57 s).  So the lab file names a directory on
+# another disk.  The bound is the image's allocated size, since the pool's LUNs
+# are allocated in full.
 cmd_snapshot() {
-    local id label dir snap
+    local id label dir snap need free floor
     id=$(printf %02d "$((10#${1:?usage: snapshot <id> <label>}))")
     label=${2:?usage: snapshot <id> <label>}
     [ -e "$(img_of "$id")" ] || die "no lun$id in $POOL"
-    dir=$(dirname "$POOL")/snapshots
+    dir=${MXFS_SNAPSHOT_DIR:-$(lab_get paths snapshots 2>/dev/null)}
+    dir=${dir:-$(dirname "$POOL")/snapshots}
     mkdir -p "$dir" || die "cannot create $dir"
+    floor=$(( ${MXFS_PREFLIGHT_MIN_FREE_GB:-10} * 1073741824 ))
+    need=$(( $(stat -c '%b * %B' "$(img_of "$id")") ))
+    free=$(df -PB1 "$dir" | awk 'NR==2{print $4}')
+    [ -n "$free" ] && [ "$((free - need))" -ge "$floor" ] \
+        || die "snapshot of lun$id refused: $dir has $((${free:-0} / 1073741824))G free, the copy can take $((need / 1073741824))G, and the host preflight needs ${MXFS_PREFLIGHT_MIN_FREE_GB:-10}G left (set MXFS_SNAPSHOT_DIR to a filesystem with room)"
     snap=$dir/lun$id-$label-$(date -u +%Y%m%dT%H%M%SZ).img
     cp --sparse=always "$(img_of "$id")" "$snap" || die "copy to $snap failed"
     echo "$snap"
@@ -589,7 +697,7 @@ cmd_free() {
     if owner_live "$id" && [ "$force" = 0 ] && [ "$(owner_field "$id" 1)" != "${owner:-$PPID}" ]; then
         die "lun$id is held by live owner: $(cat "$(owner_of "$id")") (--force to take it back)"
     fi
-    release "$id"
+    release "$id" || die "lun$id not freed"
     pool_unlock
     echo "freed lun$id"
 }
@@ -624,6 +732,7 @@ cmd_destroy() {
     [ -e "$(img_of "$id")" ] || die "no lun$id in $POOL"
     [ -s "$(owner_of "$id")" ] && die "lun$id is allocated: $(cat "$(owner_of "$id")")"
     tgt=$(tgt_of "$id"); dev=$(scstdev_of "$id")
+    scst_quiet_begin || die "lun$id not destroyed"
     if [ -d "$T/$tgt" ]; then
         [ "$(sudo ls "$T/$tgt/sessions" 2>/dev/null | grep -vc '^mgmt$')" = 0 ] \
             || die "lun$id: $tgt still has sessions; free it from its nodes first"
@@ -633,6 +742,7 @@ cmd_destroy() {
     if [ -d "/sys/kernel/scst_tgt/devices/$dev" ]; then
         echo "del_device $dev" | sudo tee "$H/mgmt" >/dev/null || die "del_device $dev failed"
     fi
+    scst_quiet_end
     unlink "$(img_of "$id")" || die "could not remove $(img_of "$id")"
     unlink "$(owner_of "$id")" 2>/dev/null
     unlink "$POOL/lun$id.wwid" 2>/dev/null
@@ -650,6 +760,14 @@ case "${1:-}" in
     status)  cmd_status ;;
     quiet)   # run a command while no allocation or release is in progress
              shift; pool_lock 300; "$@"; rc=$?; pool_unlock; exit $rc ;;
+    fault)   # inject a fault (freeze a guest, cut or mute a storage path)
+             # while no SCST reconfiguration is in progress; 90 s covers one
+             # (a register is bounded at 60 s, the fault check about 3 s)
+             shift; exec {SCSTFD}>>"$SCSTLOCK" || die "cannot open $SCSTLOCK"
+             flock -s -w 90 "$SCSTFD" || die "an SCST reconfiguration held $SCSTLOCK 90 s; fault not injected: $*"
+             "$@"; exit $? ;;
+    fault-lock) echo "$SCSTLOCK" ;;  # for an injector that cannot run as a command (a shell function)
+    faults)  san_faults ;;  # what would hold a reconfiguration back now
     snapshot) shift; cmd_snapshot "$@" ;;
     destroy) shift; cmd_destroy "$@" ;;
     *) echo "usage: $0 create <count> [<size>] | up | alloc [--owner <pid>] [--what <text>] [--size <min>] <node>... | lookup --owner <pid> | lookup --nodes <a,b,..> | free <id>|--owner <pid> [--force] | status | snapshot <id> <label> | destroy <id>" >&2; exit 2 ;;

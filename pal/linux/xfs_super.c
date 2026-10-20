@@ -797,6 +797,16 @@ xfs_init_mount_workqueues(
 	if (!mp->m_mxfs_inode_bast_wq)
 		goto out_destroy_ag_bast;
 
+	/* D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349: reserve-ahead
+	 * requests (see m_mxfs_resv_ahead_wq in xfs_mount.h).  Not
+	 * WQ_MEM_RECLAIM: nothing in reclaim waits on a reserve-ahead. */
+	mp->m_mxfs_resv_ahead_wq = alloc_workqueue("mxfs-resv-ahead/%s",
+			WQ_UNBOUND, MXFS_RESV_AHEAD_MAX, mp->m_super->s_id);
+	if (!mp->m_mxfs_resv_ahead_wq)
+		goto out_destroy_inode_bast;
+	atomic_set(&mp->m_mxfs_resv_ahead_inflight, 0);
+	mp->m_mxfs_resv_ahead_off = false;
+
 	/* v0.10.38: dir-EX-BAST idle-PR sweep (runs on the inode-bast wq). */
 	INIT_WORK(&mp->m_mxfs_pr_sweep_work, mxfs_dlm_pr_sweep_work_fn);
 	mp->m_mxfs_pr_sweep_last = 0;
@@ -804,6 +814,8 @@ xfs_init_mount_workqueues(
 	/* bast-arm gate (D-DWORK-TEARDOWN-LASTREF-LEAK class fix). */
 	spin_lock_init(&mp->m_mxfs_arm_lock);
 	mp->m_mxfs_arms_off = false;
+	mp->m_mxfs_dshrink_off = false;
+	atomic_set(&mp->m_mxfs_dshrink_inflight, 0);
 
 	/* release-side device-flush coalescing state. */
 	atomic64_set(&mp->m_mxfs_flush_req, 0);
@@ -822,6 +834,8 @@ xfs_init_mount_workqueues(
 	INIT_LIST_HEAD(&mp->m_mxfs_unpub_list);
 	atomic_set(&mp->m_mxfs_pubdrain_active, 0);
 	spin_lock_init(&mp->m_mxfs_unpub_lock);
+	INIT_LIST_HEAD(&mp->m_mxfs_pubclaim_list);
+	init_waitqueue_head(&mp->m_mxfs_pubclaim_wq);
 
 	/* (D-513): victim-domain quarantine map.  The map fields are
 	 * kzalloc-zero (= nothing quarantined) which the lockless readers
@@ -859,6 +873,10 @@ xfs_init_mount_workqueues(
 
 	return 0;
 
+out_destroy_inode_bast:
+	destroy_workqueue(mp->m_mxfs_inode_bast_wq);
+	/* xfs_kill_sb's shrink gate flushes it when set */
+	mp->m_mxfs_inode_bast_wq = NULL;
 out_destroy_ag_bast:
 	destroy_workqueue(mp->m_mxfs_ag_bast_wq);
 out_destroy_sync:
@@ -895,8 +913,14 @@ xfs_destroy_mount_workqueues(
 			mxfs_probe("mxfs: P-PUBDRAIN-TEARDOWN-TIMEOUT active=%d after 30s -- proceeding\n",
 				atomic_read(&mp->m_mxfs_pubdrain_active));
 	}
-	if (mp->m_mxfs_inode_bast_wq)
+	if (mp->m_mxfs_resv_ahead_wq)
+		destroy_workqueue(mp->m_mxfs_resv_ahead_wq);
+	if (mp->m_mxfs_inode_bast_wq) {
 		destroy_workqueue(mp->m_mxfs_inode_bast_wq);
+		/* a failed mount reaches xfs_kill_sb after this, and its
+		 * shrink gate flushes the queue when it is set */
+		mp->m_mxfs_inode_bast_wq = NULL;
+	}
 	if (mp->m_mxfs_ag_bast_wq)
 		destroy_workqueue(mp->m_mxfs_ag_bast_wq);
 	destroy_workqueue(mp->m_sync_workqueue);
@@ -1084,6 +1108,14 @@ xfs_fs_evict_inode(
 	truncate_inode_pages_final(&inode->i_data);
 	clear_inode(inode);
 
+	/*
+	 * TEST ONLY (dbg_evict_stale_delay_ms, H-CG1's A/B): hold a stale
+	 * linked copy here, I_FREEING set, so a create that takes its number
+	 * meets the teardown at its igrab.  Nothing happens with the knob at 0.
+	 */
+	if (unlikely(READ_ONCE(mxfs_dbg_evict_stale_delay_ms) > 0))
+		mxfs_dbg_evict_stale_delay(XFS_I(inode));
+
 	if (IS_ENABLED(CONFIG_XFS_RT) &&
 	    S_ISREG(inode->i_mode) && inode->i_private) {
 		xfs_open_zone_put(inode->i_private);
@@ -1125,6 +1157,15 @@ xfs_mount_free(
 	 */
 	mxfs_authority_put(mp->m_mxfs_auth);
 	mp->m_mxfs_auth = NULL;
+	/*
+	 * D-FAILED-MOUNT-LEAVES-DESTAGE-AND-ALLOCLIST-RETRY-WORK-QUEUED-PAST-FREE:
+	 * name a delayed work that would outlive the mount.
+	 */
+	if (work_busy(&mp->m_mxfs_destage_kick.work) ||
+	    work_busy(&mp->m_mxfs_alloclist_retry.work))
+		pr_warn("mxfs: P-MOUNT-FREE-WORK-PENDING destage=0x%x alloclist=0x%x -- the mount is freed with its delayed work still queued or running\n",
+			work_busy(&mp->m_mxfs_destage_kick.work),
+			work_busy(&mp->m_mxfs_alloclist_retry.work));
 	kfree(mp);
 }
 
@@ -2193,10 +2234,17 @@ mxfs_depart_dbg_crash_cut(
  * mount-unwind twin of dbg_unmount_tail_delay_ms and it exists for the same
  * reason: the tail is ~1 s, the lease is 30 s, and no workload produces that
  * ordering on demand.  One-shot.
+ *
+ * dbg_admission_delay_ms holds the mount this long before its admission
+ * commit, after xfs_mountfs: a mount still inactive when the reap worker's
+ * mount-settle timer (20 s) fires, which a mount waiting on its peers does in
+ * production (see reap_active_gate).  With dbg_admission_refuse the held mount
+ * then takes the unwind.  One-shot.
  */
 int mxfs_dbg_auth_tail_blind;
 int mxfs_dbg_unmount_tail_delay_ms;
 int mxfs_dbg_admission_refuse;
+int mxfs_dbg_admission_delay_ms;
 int mxfs_dbg_mount_unwind_park_ms;
 atomic64_t mxfs_auth_tail_blind_n = ATOMIC64_INIT(0);
 
@@ -2429,6 +2477,14 @@ xfs_fs_put_super(
 	 * after the flush below would otherwise re-open the
 	 * window.
 	 */
+	/* reserve-ahead items are DLM lock requests: refuse new ones and let
+	 * the queued ones finish while the DLM is up (an item that runs after
+	 * the flag drops its request) */
+	if (mp->m_mxfs_resv_ahead_wq) {
+		WRITE_ONCE(mp->m_mxfs_resv_ahead_off, true);
+		flush_workqueue(mp->m_mxfs_resv_ahead_wq);
+	}
+
 	/* late-dirty arm pre-warm — must precede the gate closure */
 	mxfs_sb_late_dirty_prearm(mp);
 
@@ -5378,6 +5434,7 @@ xfs_fs_fill_super(
 			goto out_filestream_unmount;
 		}
 		mp->m_mxfs_clustered = true;
+		int refuse_rc = 0;
 		struct mxfs_v5_dlm_opts dlm_opts = {
 			.authority = mp->m_mxfs_auth,
 			.transport = mp->m_mxfs_transport == MXFS_MOUNT_TRANSPORT_TCP ?
@@ -5418,6 +5475,7 @@ xfs_fs_fill_super(
 			 * one rather than the one sampled at mount. */
 			.single_node_exclusive_live = &mxfs_single_node_exclusive,
 			.fence_capability_override = mxfs_fence_capability_override != 0,
+			.refuse_rc = &refuse_rc,
 		};
 		memcpy(dlm_opts.volume_uuid, &mp->m_sb.sb_uuid, 16);
 		/* flush epoch starts at 1 so a buffer stamp
@@ -5464,9 +5522,9 @@ xfs_fs_fill_super(
 			xfs_alert(mp, "MXFS DLM init failed -- aborting mount of cluster (envelope) volume");
 			if (why && why[0]) {
 				errorfc(fc, "%s", strncmp(why, "mxfs: ", 6) ? why : why + 6);
-				error = -EPERM;
+				error = refuse_rc ? refuse_rc : -EPERM;
 			} else {
-				error = -ENOTCONN;
+				error = refuse_rc ? refuse_rc : -ENOTCONN;
 			}
 			kfree(why);
 			goto out_filestream_unmount;
@@ -5650,6 +5708,15 @@ xfs_fs_fill_super(
 		 * Must follow cache_init: the settle needs the slice-replay
 		 * hook it registers. */
 		mxfs_dlm_mount_recovery_settle(mp);
+		if (unlikely(mxfs_dbg_admission_delay_ms > 0)) {
+			int hold = mxfs_dbg_admission_delay_ms;
+
+			mxfs_dbg_admission_delay_ms = 0;	/* one shot */
+			xfs_alert(mp,
+	"MXFS: P-DBG-ADMISSION-DELAY ms=%d -- TEST: the mount waits before its admission commit, as a mount that takes this long would",
+				  hold);
+			msleep(hold);
+		}
 		/*
 		 * the recovery barrier's FSWIDE gates ran inside
 		 * xfs_mountfs, BEFORE the registration-time outcome scan and
@@ -6188,7 +6255,7 @@ mxfs_report_residual_inodes(
 				held++;
 				if (held > 16)
 					continue;
-				mxfs_probe("mxfs: P199-UNMOUNT-RESIDUAL-INODE ino=%llu icount=%d mode=0%o nlink=%u dlm_mode=%u dlm_state=%u ex_h=%u pr_h=%u pin=%u bast_pending=%d unpublished=%d iflags=0x%lx pincount=%d in_ail=%d -- still in the ICI radix tree at unmount; generic_shutdown_super will report it busy\n",
+				mxfs_probe("mxfs: P199-UNMOUNT-RESIDUAL-INODE ino=%llu icount=%d mode=0%o nlink=%u dlm_mode=%u dlm_state=%u ex_h=%u pr_h=%u pin=%u bast_pending=%d unpublished=%d iflags=0x%lx pincount=%d in_ail=%d dshrink=%u -- still in the ICI radix tree at unmount; generic_shutdown_super will report it busy\n",
 					(unsigned long long)ip->i_ino,
 					atomic_read(&vip->i_count),
 					vip->i_mode, vip->i_nlink,
@@ -6201,7 +6268,8 @@ mxfs_report_residual_inodes(
 					ip->i_flags,
 					atomic_read(&ip->i_pincount),
 					(ip->i_itemp && test_bit(XFS_LI_IN_AIL,
-						&ip->i_itemp->ili_item.li_flags)) ? 1 : 0);
+						&ip->i_itemp->ili_item.li_flags)) ? 1 : 0,
+					work_busy(&ip->i_mxfs_dshrink_work));
 			}
 			rcu_read_unlock();
 		} while (nr_found == 32);
@@ -6211,10 +6279,79 @@ mxfs_report_residual_inodes(
 			total, held);
 }
 
+/*
+ * D-UMOUNT-ROOT-DENTRY-STILL-IN-USE-DEFERRED-DIR-DCACHE-SHRINK-RACE: a
+ * directory's deferred dcache shrink (mxfs_dir_dshrink_queue) holds a
+ * reference on the directory's dentry while it runs, and the only gate on it
+ * closes in put_super, after generic_shutdown_super has walked the dentry
+ * tree.  A shrink queued by the reload umount's own stat of the mount point
+ * caused was still running at that walk: 'BUG: Dentry {i=80,n=/} still in use
+ * (2)' and the root inode at icount 3 (jwc3).  Count the shrinks queued or
+ * running now, then close their gate, wait for the queue calls already past
+ * it, and flush the queue they run on, before kill_block_super.
+ */
+static void
+mxfs_close_dshrink_for_umount(
+	struct xfs_mount		*mp)
+{
+	struct xfs_perag		*pag = NULL;
+	int				busy = 0;
+	int				spins = 0;
+	bool				gate;
+
+	if (!mp || !mp->m_mxfs_inode_bast_wq)
+		return;
+	while ((pag = xfs_perag_next(mp, pag))) {
+		struct xfs_inode	*batch[32];
+		uint32_t		first_index = 0;
+		int			nr_found, i;
+
+		do {
+			rcu_read_lock();
+			nr_found = radix_tree_gang_lookup(&pag->pag_ici_root,
+					(void **)batch, first_index, 32);
+			for (i = 0; i < nr_found; i++) {
+				struct xfs_inode *ip = batch[i];
+
+				if (!ip)
+					continue;
+				first_index = XFS_INO_TO_AGINO(mp, ip->i_ino) + 1;
+				if (work_busy(&ip->i_mxfs_dshrink_work))
+					busy++;
+			}
+			rcu_read_unlock();
+		} while (nr_found == 32);
+	}
+	gate = READ_ONCE(mxfs_dshrink_umount_gate);
+	if (busy) {
+		atomic_add(busy, &mxfs_dshrink_at_umount);
+		pr_warn("mxfs: P-DSHRINK-AT-UMOUNT busy=%d gate=%d -- deferred directory dcache shrinks queued or running as the unmount begins\n",
+			busy, gate ? 1 : 0);
+	}
+	if (!gate)
+		return;
+	spin_lock(&mp->m_mxfs_arm_lock);
+	mp->m_mxfs_dshrink_off = true;
+	spin_unlock(&mp->m_mxfs_arm_lock);
+	smp_mb();
+	/* a queue call holds the count across a dentry lookup and a
+	 * queue_work, microseconds */
+	while (atomic_read(&mp->m_mxfs_dshrink_inflight) > 0) {
+		if (++spins > 20000) {
+			pr_warn("mxfs: P-DSHRINK-GATE-STUCK inflight=%d -- a shrink queue call did not leave the unmount gate\n",
+				atomic_read(&mp->m_mxfs_dshrink_inflight));
+			break;
+		}
+		usleep_range(50, 100);
+	}
+	flush_workqueue(mp->m_mxfs_inode_bast_wq);
+}
+
 static void
 xfs_kill_sb(
 	struct super_block		*sb)
 {
+	mxfs_close_dshrink_for_umount(XFS_M(sb));
 	mxfs_report_residual_inodes(XFS_M(sb));
 	kill_block_super(sb);
 	xfs_mount_free(XFS_M(sb));
@@ -6633,6 +6770,10 @@ MODULE_PARM_DESC(dbg_admit_park_ms,
 module_param_named(dbg_admission_refuse, mxfs_dbg_admission_refuse, int, 0644);
 MODULE_PARM_DESC(dbg_admission_refuse,
 	"DEBUG: discard a successful mount admission commit so the mount takes the unwind that calls xfs_unmountfs with the DLM already detached (one-shot, 0=off)");
+
+module_param_named(dbg_admission_delay_ms, mxfs_dbg_admission_delay_ms, int, 0644);
+MODULE_PARM_DESC(dbg_admission_delay_ms,
+	"DEBUG: hold the mount this long before its admission commit, so it is still inactive when the reap worker's mount-settle timer fires (one-shot, 0=off)");
 
 module_param_named(dbg_mount_unwind_park_ms, mxfs_dbg_mount_unwind_park_ms, int, 0644);
 MODULE_PARM_DESC(dbg_mount_unwind_park_ms,

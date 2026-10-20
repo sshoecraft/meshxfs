@@ -1831,6 +1831,7 @@ static void check_tauth(int fd, const struct mxfs_ondisk_super *s)
     uint32_t hdr_ok = 0, two = 0, one = 0, none = 0, p;
     uint32_t npages = 0;
     uint64_t hash_seed = 0;
+    uint16_t hash_version = 0;
     uint64_t maxseq = 0;
     unsigned c;
 
@@ -1849,12 +1850,14 @@ static void check_tauth(int fd, const struct mxfs_ondisk_super *s)
             continue;
         if (mxfs_tauth_region_valid(rh, fs_gen, crc32c) &&
             memcmp(rh->fs_uuid, s->fs_uuid, 16) == 0) {
-            if (hdr_ok && (rh->npages != npages || rh->hash_seed != hash_seed))
-                err("authority ledger: header copies disagree on geometry (%u/%016llx vs %u/%016llx)",
-                    rh->npages, (unsigned long long)rh->hash_seed,
-                    npages, (unsigned long long)hash_seed);
+            if (hdr_ok && (rh->npages != npages || rh->hash_seed != hash_seed ||
+                           rh->hash_version != hash_version))
+                err("authority ledger: header copies disagree on geometry (%u/%016llx/v%u vs %u/%016llx/v%u)",
+                    rh->npages, (unsigned long long)rh->hash_seed, rh->hash_version,
+                    npages, (unsigned long long)hash_seed, hash_version);
             npages = rh->npages;
             hash_seed = rh->hash_seed;
+            hash_version = rh->hash_version;
             hdr_ok++;
         }
     }
@@ -1893,10 +1896,10 @@ static void check_tauth(int fd, const struct mxfs_ondisk_super *s)
                 err("authority ledger page %u: NO valid copy — every resource on it is UNKNOWN", p);
         }
     }
-    printf("TCP authority ledger .... %s  (hdr_copies=%u pages=%u records=%llu seed=%016llx two=%u one=%u none=%u maxseq=%llu)\n",
+    printf("TCP authority ledger .... %s  (hdr_copies=%u pages=%u records=%llu seed=%016llx hash_version=%u two=%u one=%u none=%u maxseq=%llu)\n",
            (hdr_ok && none == 0) ? "OK" : "ERRORS", hdr_ok, npages,
            (unsigned long long)npages * MXFS_TAUTH_ENTRIES_PER_PAGE,
-           (unsigned long long)hash_seed, two, one, none,
+           (unsigned long long)hash_seed, hash_version, two, one, none,
            (unsigned long long)maxseq);
     check_tauth_ctrl(fd, s, fs_gen);
     free(rh); free(pa); free(pb);
@@ -5402,6 +5405,7 @@ static struct ds_ino *ds_find(struct ds_list *l, uint64_t ino)
 #define DS_DI_FORMAT    0x05
 #define DS_DI_NLINK     0x10
 #define DS_DI_SIZE      0x38
+#define DS_DI_NBLOCKS   0x40
 #define DS_DI_NEXTENTS  0x4c
 #define DS_DI_FORKOFF   0x52
 #define DS_DI_AFORMAT   0x53
@@ -6023,6 +6027,7 @@ struct de_stats {
     uint64_t nlink_bad, nameless;
     uint32_t *refs;     /* entries naming each allocated inode, by set index */
     bool root_seen;
+    bool unlinked_dir;  /* the directory being walked has nlink 0 */
 };
 
 static void de_ext_push(struct de_extlist *l, uint64_t startoff,
@@ -6239,6 +6244,37 @@ static void de_report(struct de_stats *st, const char *fmt, ...)
     st->errors_shown++;
 }
 
+/*
+ * MXFS_CHK_NAMES_OF=<ino>[,<ino>...]: print every directory entry naming one
+ * of these inodes.  A link-count error says how many names an inode has, not
+ * which, and the names are what say which operation wrote the extra one.
+ */
+#define DE_NAMES_OF_MAX 16
+static uint64_t de_names_of[DE_NAMES_OF_MAX];
+static int de_names_of_n = -1;
+
+static bool de_names_of_wanted(uint64_t ino)
+{
+    if (de_names_of_n < 0) {
+        const char *s = getenv("MXFS_CHK_NAMES_OF");
+
+        de_names_of_n = 0;
+        while (s && *s && de_names_of_n < DE_NAMES_OF_MAX) {
+            char *end;
+            unsigned long long v = strtoull(s, &end, 0);
+
+            if (end == s)
+                break;
+            de_names_of[de_names_of_n++] = v;
+            s = *end ? end + 1 : end;
+        }
+    }
+    for (int i = 0; i < de_names_of_n; i++)
+        if (de_names_of[i] == ino)
+            return true;
+    return false;
+}
+
 /* resolve one entry: the allocated set, then the dinode it names */
 static void de_check_entry(int fd, const struct xfs_geo *geo,
                            const struct de_u64list *set, uint64_t dirino,
@@ -6251,6 +6287,10 @@ static void de_check_entry(int fd, const struct xfs_geo *geo,
     bool dotdot = namelen == 2 && name[0] == '.' && name[1] == '.';
 
     st->entries++;
+    if (de_names_of_wanted(ino))
+        printf("  NAMES-OF: directory %llu entry '%.*s' names inode %llu "
+               "(ftype %d)\n", (unsigned long long)dirino, (int)namelen, name,
+               (unsigned long long)ino, ftype);
     if (dot && ino != dirino) {
         st->dot_bad++;
         de_report(st, "directory %llu: '.' names %llu",
@@ -6267,8 +6307,13 @@ static void de_check_entry(int fd, const struct xfs_geo *geo,
         return;
     }
     /* '.' and '..' count too: a directory's nlink is its name, its own '.'
-     * and each subdirectory's '..' */
-    if (st->refs)
+     * and each subdirectory's '..'.  Not a removed directory's (nlink 0,
+     * waiting on its AGI unlinked bucket to be freed): the rmdir dropped its
+     * '.' link and its parent's link for it, and repointed its '..' at the
+     * root (xfs_dir_remove_child), so counting them makes the directory and
+     * the root each read one link more than they have (crl8m1: one empty
+     * directory on its bucket read as two nlink errors). */
+    if (st->refs && !(st->unlinked_dir && (dot || dotdot)))
         st->refs[at]++;
     if (ds_read_dinode(fd, geo, ino, dip) < 0) {
         st->dangling++;
@@ -6777,13 +6822,16 @@ static void check_dirents(int fd, const struct xfs_geo *geo)
         st.dirs++;
         if (dirino == geo->rootino)
             st.root_seen = true;
+        st.unlinked_dir = get_be32(dip + DS_DI_NLINK) == 0;
         {
             uint64_t e0 = st.entries, b0 = st.blocks, d0 = st.dangling +
                           st.mode0, x0 = st.blocks_bad;
 
             if (dip[DS_DI_FORMAT] == DS_FMT_LOCAL) {
-                /* a shortform directory stores no '.', but it counts */
-                st.refs[de_index(&set, dirino)]++;
+                /* a shortform directory stores no '.', but it counts,
+                 * unless the directory was removed (de_check_entry) */
+                if (!st.unlinked_dir)
+                    st.refs[de_index(&set, dirino)]++;
                 de_walk_shortform(fd, geo, &set, dirino, dip, &st, tdip);
             } else
                 de_walk_blocks(fd, geo, &set, dirino, dip, &st, tdip);
@@ -6879,7 +6927,7 @@ out:
  */
 struct fo_stats {
     uint64_t inodes, extents, blocks;
-    uint64_t in_free, in_chunk, twice, bad_ptr, bad_bmbt;
+    uint64_t in_free, in_chunk, twice, bad_ptr, bad_bmbt, nblocks_bad;
     uint64_t shown;
     bool reflink;
     uint32_t *ag_in_free;   /* per AG: fork blocks the BNO btree calls free */
@@ -7067,6 +7115,9 @@ static void fo_inode(int fd, const struct xfs_geo *geo, uint64_t ino,
                                      : get_be32(dip + DS_DI_NEXTENTS);
     uint64_t aext = geo->has_nrext64 ? get_be32(dip + DS_DI_NEXTENTS)
                                      : get_be16(dip + DS_DI_NEXTENTS + 4);
+    uint64_t nblocks = get_be64(dip + DS_DI_NBLOCKS);
+    uint64_t named0 = st->blocks;
+    int errors0 = errors;
 
     st->inodes++;
     if (dbytes > lit)
@@ -7077,6 +7128,24 @@ static void fo_inode(int fd, const struct xfs_geo *geo, uint64_t ino,
         fo_fork(fd, geo, ino, "attr", dip[DS_DI_AFORMAT],
                 dip + DS_DI_LITERAL + (size_t)forkoff * 8,
                 lit - (size_t)forkoff * 8, aext, st);
+    /*
+     * The core's block count is the blocks its forks name, extents and bmbt
+     * blocks together: bmap and bunmapi change both in one transaction, so on
+     * a cold device they agree.  A count above the forks is a dead life's
+     * count carried into a new one
+     * (D-CREATE-ON-ZOMBIE-SHELL-INHERITS-DEAD-LIFE-NBLOCKS); the kernel's
+     * dinode verifier rejects only the case with no extents at all, so a
+     * file with extents carried it silently.  Compared only when the walk
+     * above read the whole map (no finding of its own on this inode).
+     */
+    if (errors == errors0 && st->blocks - named0 != nblocks) {
+        st->nblocks_bad++;
+        fo_report(st, "inode %llu di_nblocks %llu but its forks name %llu "
+                  "blocks (data %llu extents, attr %llu) -- P-NBLOCKS-MISMATCH",
+                  (unsigned long long)ino, (unsigned long long)nblocks,
+                  (unsigned long long)(st->blocks - named0),
+                  (unsigned long long)dext, (unsigned long long)aext);
+    }
 }
 
 static void fo_walk_inobt(int fd, const struct xfs_geo *geo, uint32_t agno,
@@ -7342,13 +7411,15 @@ static void check_fork_owners(int fd, const struct xfs_geo *geo,
         }
     }
     printf("Inode fork ownership .... %s  (inodes=%llu extents=%llu "
-           "blocks=%llu in_free=%llu in_chunk=%llu twice=%llu%s bad=%llu)\n",
+           "blocks=%llu in_free=%llu in_chunk=%llu twice=%llu%s bad=%llu "
+           "nblocks_bad=%llu)\n",
            errors == pre_errors ? "OK" : "ERRORS",
            (unsigned long long)st.inodes, (unsigned long long)st.extents,
            (unsigned long long)st.blocks, (unsigned long long)st.in_free,
            (unsigned long long)st.in_chunk, (unsigned long long)st.twice,
            st.reflink ? " (reflink: shared extents allowed)" : "",
-           (unsigned long long)(st.bad_ptr + st.bad_bmbt));
+           (unsigned long long)(st.bad_ptr + st.bad_bmbt),
+           (unsigned long long)st.nblocks_bad);
     free(st.ag_in_free);
     free(st.ag_other);
 }

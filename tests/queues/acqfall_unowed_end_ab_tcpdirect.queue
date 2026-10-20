@@ -1,0 +1,74 @@
+# D-ABANDONED-ACQUIRE-UNPAIRED-DLM-END-AT-OPEN-AND-UNFLAGGED-SITES: hypothesis
+# H-NE-1's change, same-build A/B.  An abandoned inode acquire (unreceipted
+# -110, the recovery-blocked cutoff, a killed task, a stalled transition)
+# returns from the begin hook with no holder counted, but the open path's
+# ride, the page fault's begin and the multi-inode helpers still unlock the
+# components it took with an end: sav6 (tests/tcp_lockreq_blackhole.sh, main
+# tree 65863B92) printed 'P71-UNDERFLOW ino=8388737 mode=PR state=0 dlm_mode=0
+# comm=md5sum un=mxfs_dlm_open_protect' after md5sum's PR acquire gave up.
+# The change (main tree, build 28AD29D0280957262F97F85): every give-up counts
+# one end not owed on the task's registration for that inode, per mode
+# (mxfs_acqfall_give_up_rc now takes the begin's mode), and mxfs_dlm_ilock_end
+# consumes one instead of decrementing a holder (P-ACQFALL-END-NOT-OWED,
+# counter acqfall_unowed_skip_n); an unconsumed count is dropped when the
+# registration exits.  Knob acqfall_unowed_skip: 1 = the change (default),
+# 0 = the control (counted, never skipped: today's behaviour).
+#
+# Shape: sav6's, 2/net/mesh/direct g2c, W=test30 opens (md5sum) an inode
+# mastered at H=test29 with W's LOCK_REQ for it dropped (FAULT=drop_req, the
+# default), ARMED_S=180, WORKLOAD=open (the default).  Each arm on a fresh
+# prep; the knob written on both nodes after the prep (a module reload resets
+# it) and read back, without writing, after the lap (chk_clean unmounts and
+# remounts but reloads nothing, so the value stands through the audit).
+# Then run.sh chk_clean: every node unmounts, one audits, all remount.  A
+# holder an end failed to drop, or one a skipped end should have dropped,
+# keeps the inode referenced, and the unmount shows it.  Order c1 f1 f2 c2.
+#
+# RULES (written before the first lap), per lap, both nodes' kernel captures
+# in the lap's evidence directory:
+#   VALID: the readbacks show the arm's value on test29 and test30 before the
+#     lap and after it, with one srcversion; the harness printed its verdict.
+#   GIVE-UP REACHED: W logs P912-OPEN-UNRECEIPTED (the open refused after its
+#     acquire gave up).  A lap without it is VACUOUS: no give-up, nothing owed.
+#   CONTROL (0): REACH = P71-UNDERFLOW on W naming un=mxfs_dlm_open_protect.
+#   FIX (1): zero P71-UNDERFLOW from any site on either node, and W logs
+#     P-ACQFALL-END-NOT-OWED for the refused inode (the skip ran where the
+#     control underflows).
+#   SUPPORTED: REACH in at least one control lap and every valid fix lap FIX.
+#   REFUTED: a fix lap with any P71-UNDERFLOW (a give-up's end not consumed,
+#     or a site this does not cover), or a fix lap whose P71 is absent only
+#     because no end ran at all (no P-ACQFALL-END-NOT-OWED with the give-up
+#     reached): then a new hypothesis.
+#   HOLDER CHECK (every arm): chk_clean PASS (verdict=CLEAN release=CLEAN
+#     errors=0, every node unmounted and remounted inside its bound), and the
+#     harness's own checks (H served, W's read recovered with the right bytes
+#     after the disarm).  A fix lap that fails here while its control passes
+#     means a skip took an owed end: the change is wrong.
+#   INTEGRITY (any lap): a shutdown, BUG, Oops, hung-task, P-TAUTH-VERIFY-FAIL
+#     or P-TAUTH-DOUBLE-GRANT line stops the work and is attributed first.
+#
+# Bounds: prep 300 (run.sh prep_cluster, measured 38-99 s on g2c); knobs 60
+# (tests/fleet_set_params.sh: one 40 s ssh per node, in parallel); blackhole
+# 370 (its header: setup 8 x 13 + ARMED_S 180 + recovery 60 + captures 20);
+# audit 315 (run.sh alloc_witness 120 + chk_clean 180 + preflight and marker
+# check; measured 100-118 s on g2c).
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "acqfall_unowed_skip=0" test29,test30 tests/evidence/acqne_c1_before.txt
+370 ARMED_S=180 tests/tcp_lockreq_blackhole.sh acqnec1 test30 test29
+60 tests/fleet_set_params.sh "acqfall_unowed_skip acqfall_unowed_skip_n" test29,test30 tests/evidence/acqne_c1_after.txt
+315 ./run.sh 2/net/mesh/direct --group g2c chk_clean
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "acqfall_unowed_skip=1" test29,test30 tests/evidence/acqne_f1_before.txt
+370 ARMED_S=180 tests/tcp_lockreq_blackhole.sh acqnef1 test30 test29
+60 tests/fleet_set_params.sh "acqfall_unowed_skip acqfall_unowed_skip_n" test29,test30 tests/evidence/acqne_f1_after.txt
+315 ./run.sh 2/net/mesh/direct --group g2c chk_clean
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "acqfall_unowed_skip=1" test29,test30 tests/evidence/acqne_f2_before.txt
+370 ARMED_S=180 tests/tcp_lockreq_blackhole.sh acqnef2 test30 test29
+60 tests/fleet_set_params.sh "acqfall_unowed_skip acqfall_unowed_skip_n" test29,test30 tests/evidence/acqne_f2_after.txt
+315 ./run.sh 2/net/mesh/direct --group g2c chk_clean
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "acqfall_unowed_skip=0" test29,test30 tests/evidence/acqne_c2_before.txt
+370 ARMED_S=180 tests/tcp_lockreq_blackhole.sh acqnec2 test30 test29
+60 tests/fleet_set_params.sh "acqfall_unowed_skip acqfall_unowed_skip_n" test29,test30 tests/evidence/acqne_c2_after.txt
+315 ./run.sh 2/net/mesh/direct --group g2c chk_clean

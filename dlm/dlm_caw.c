@@ -98,6 +98,37 @@ MODULE_PARM_DESC(caw_answer_lost_resolve,
                  "swap's image; 0 = log only.");
 
 /*
+ * A LONG WAIT'S HINT CADENCE (see the re-send in caw_wait_for_grant).
+ *
+ * caw_bast_resend_backoff: 1 (default) = a wait still blocked
+ * MXFS_CAW_BAST_RESEND_BACKOFF_AFTER_MS after it began doubles the interval
+ * of its UDP BAST re-send at each send, up to MXFS_CAW_BAST_RESEND_MAX_MS;
+ * 0 = every re-send at MXFS_CAW_BAST_RESEND_MS for the whole wait, the
+ * control arm.  Waits shorter than the threshold, nearly all of them, are
+ * unchanged.
+ */
+static int mxfs_caw_bast_resend_backoff = 1;
+module_param_named(caw_bast_resend_backoff, mxfs_caw_bast_resend_backoff, int, 0644);
+MODULE_PARM_DESC(caw_bast_resend_backoff,
+                 "A lock wait blocked past 3 s: 1 (default) = back its UDP BAST "
+                 "re-send off to 1 s; 0 = re-send every 100 ms for the whole wait.");
+
+/*
+ * THE HOLDER'S OWN POLL DURING A LONG CONFLICT (see bast_poll_fn).
+ *
+ * caw_poll_resubmit_backoff: 1 (default) = a conflict the disk poll has seen
+ * on one slot generation for MXFS_CAW_POLL_RESUBMIT_AFTER_MS is submitted at
+ * most once per MXFS_CAW_POLL_RESUBMIT_MS; 0 = submitted on every pass that
+ * sees it (every 100 ms under contention), the control arm.  Conflicts
+ * younger than the threshold are unchanged.
+ */
+static int mxfs_caw_poll_resubmit_backoff = 1;
+module_param_named(caw_poll_resubmit_backoff, mxfs_caw_poll_resubmit_backoff, int, 0644);
+MODULE_PARM_DESC(caw_poll_resubmit_backoff,
+                 "A conflict the BAST disk poll has seen past 3 s: 1 (default) = "
+                 "submit its BAST at most once every 4 s; 0 = on every poll pass.");
+
+/*
  * A WAIT THAT HAS LOST ITS REGISTRATION (see P-WAIT-REG-LOST in
  * caw_wait_for_grant).
  *
@@ -7008,6 +7039,7 @@ static int caw_wait_for_grant(struct mxfs_dlm_caw_ctx *ctx,
 	 * idle disk poll can be relaxed (MXFS_CAW_BAST_POLL_RELAX_MS)
 	 * without widening the lost-packet recovery window. */
 	uint64_t last_bast_ms = mxfs_pal_time_ms();
+	uint32_t bast_resend_ms = MXFS_CAW_BAST_RESEND_MS;
 	int bast_resends = 0;
 	int rc;
 	uint32_t prev_magic = 0;
@@ -7303,7 +7335,7 @@ static int caw_wait_for_grant(struct mxfs_dlm_caw_ctx *ctx,
 
 				last_stuck_dump_ms = mxfs_pal_time_ms();
 				pr_warn_ratelimited(
-				    "mxfs: P-ACQ-STUCK ino=%llu slot=%u myslot=%d want=%u el_ms=%llu magic=%x gen=%llu gm=%u hex=%llx hpw=%llx hpr=%llx w=%llx wex=%llx yt=%llx ysm=%llu streak=%u read_ms=%llu read_max_ms=%llu cand=%llx scrubs=%d laps=%d\n",
+				    "mxfs: P-ACQ-STUCK ino=%llu slot=%u myslot=%d want=%u el_ms=%llu magic=%x gen=%llu gm=%u hex=%llx hpw=%llx hpr=%llx w=%llx wex=%llx yt=%llx ysm=%llu streak=%u read_ms=%llu read_max_ms=%llu cand=%llx scrubs=%d laps=%d hints=%d hint_ms=%u\n",
 				    (unsigned long long)resource->ino, slot_idx,
 				    sod_myslot,
 				    mode, (unsigned long long)el, cur_slot->magic,
@@ -7320,7 +7352,8 @@ static int caw_wait_for_grant(struct mxfs_dlm_caw_ctx *ctx,
 				    (unsigned long long)acq_read_ms,
 				    (unsigned long long)acq_read_max_ms,
 				    (unsigned long long)ctx->closure_cand_mask,
-				    scrub_hits, slot_reads);
+				    scrub_hits, slot_reads,
+				    bast_resends, bast_resend_ms);
 				/* SELF-ORPHAN detector: the sole wire
 				 * holder is THIS NODE while this waiter is
 				 * still pre-CAS — a grant with no in-core
@@ -7351,10 +7384,21 @@ static int caw_wait_for_grant(struct mxfs_dlm_caw_ctx *ctx,
 		 * whole cluster's hint volume, and the hint flood shares the
 		 * recv socket + recv thread with the GRANT nudges — drowning
 		 * the very wakeups the handoff depends on. */
-		if (mxfs_pal_time_ms() - last_bast_ms >= MXFS_CAW_BAST_RESEND_MS) {
+		if (mxfs_pal_time_ms() - last_bast_ms >= bast_resend_ms) {
 			caw_send_bast_mcast(ctx, resource, mode);
 			bast_resends++;
 			last_bast_ms = mxfs_pal_time_ms();
+			/* A wait this old is a drain its holder has already been
+			 * told about: each further hint only costs the holder a
+			 * notification.  Lengthen the gap rather than keep
+			 * notifying it ~10 times a second until the drain ends. */
+			if (mxfs_caw_bast_resend_backoff &&
+			    last_bast_ms - start >= MXFS_CAW_BAST_RESEND_BACKOFF_AFTER_MS &&
+			    bast_resend_ms < MXFS_CAW_BAST_RESEND_MAX_MS) {
+				bast_resend_ms *= 2;
+				if (bast_resend_ms > MXFS_CAW_BAST_RESEND_MAX_MS)
+					bast_resend_ms = MXFS_CAW_BAST_RESEND_MAX_MS;
+			}
 		}
 
 		if (resource->type == MXFS_LTYPE_INODE && caw_instr_on() &&
@@ -15429,8 +15473,9 @@ static void caw_bast_submit(struct mxfs_dlm_caw_ctx *ctx,
 	if (!e) {
 		/*
 		 * Pool exhausted.  Dropping is survivable — the waiter keeps
-		 * re-sending its hint every MXFS_CAW_BAST_RESEND_MS for as
-		 * long as it is blocked, and the disk poll independently
+		 * re-sending its hint every MXFS_CAW_BAST_RESEND_MS (backed off
+		 * to at most MXFS_CAW_BAST_RESEND_MAX_MS once the wait is old) for
+		 * as long as it is blocked, and the disk poll independently
 		 * rediscovers the conflict from the slot's waiter bits — but
 		 * it is NOT free: both recovery channels are slower than the
 		 * hint.  Pin the poll to its FAST cadence so the backstop
@@ -15586,7 +15631,7 @@ static void caw_bastq_report(struct mxfs_dlm_caw_ctx *ctx, const char *when)
 	if (!ctx->bq.pool && !ctx->bq.inline_cb)
 		return;
 
-	pr_info("mxfs: P265-BASTQ-STATS node=%u at=%s submitted=%llu dispatched=%llu merged=%llu rearmed=%llu overflow=%llu inline=%llu depth=%u hiwater=%u running=%u\n",
+	pr_info("mxfs: P265-BASTQ-STATS node=%u at=%s submitted=%llu dispatched=%llu merged=%llu rearmed=%llu overflow=%llu inline=%llu depth=%u hiwater=%u running=%u poll_submitted=%llu poll_held_back=%llu\n",
 		ctx->local_node, when,
 		(unsigned long long)ctx->bq.submitted,
 		(unsigned long long)ctx->bq.dispatched,
@@ -15594,15 +15639,69 @@ static void caw_bastq_report(struct mxfs_dlm_caw_ctx *ctx, const char *when)
 		(unsigned long long)ctx->bq.rearmed,
 		(unsigned long long)ctx->bq.overflow,
 		(unsigned long long)ctx->bq.inline_cb,
-		ctx->bq.depth, ctx->bq.hiwater, ctx->bq.running_n);
+		ctx->bq.depth, ctx->bq.hiwater, ctx->bq.running_n,
+		(unsigned long long)ctx->bq.poll_submitted,
+		(unsigned long long)ctx->bq.poll_held_back);
 }
 
 /* ─── BAST poll thread ─── */
+
+/* A conflict the disk poll submitted a BAST for: the slot, its generation and
+ * waiter mode then, when the poll first and last submitted for it, and when it
+ * last saw it. */
+struct caw_poll_resub {
+	uint32_t slot;
+	uint8_t  mode;
+	uint64_t gen;
+	uint64_t first_ms;
+	uint64_t last_ms;
+	uint64_t seen_ms;
+};
+
+/*
+ * Whether the disk poll submits a BAST for a conflict it sees on this pass.
+ * Every pass, as before, for the first MXFS_CAW_POLL_RESUBMIT_AFTER_MS of a
+ * conflict on one slot generation and waiter mode; after that at most once
+ * per MXFS_CAW_POLL_RESUBMIT_MS.  A new generation, a new waiter mode, a
+ * collision in the table, or a conflict not seen for
+ * MXFS_CAW_POLL_RESUBMIT_GAP_MS starts the conflict over and submits at once.
+ * No table (its allocation failed) or the knob at 0 submits on every pass.
+ */
+static bool caw_poll_resubmit_due(struct caw_poll_resub *tab, uint32_t slot_idx,
+				  const struct mxfs_caw_lock_slot *slot)
+{
+	struct caw_poll_resub *e;
+	uint64_t now;
+
+	if (!tab || !mxfs_caw_poll_resubmit_backoff)
+		return true;
+	now = mxfs_pal_time_ms();
+	e = &tab[slot_idx % MXFS_CAW_POLL_RESUBMIT_SLOTS];
+	if (!e->first_ms || e->slot != slot_idx ||
+	    e->gen != slot->generation || e->mode != slot->waiter_mode ||
+	    now - e->seen_ms >= MXFS_CAW_POLL_RESUBMIT_GAP_MS) {
+		e->slot = slot_idx;
+		e->gen = slot->generation;
+		e->mode = slot->waiter_mode;
+		e->first_ms = now;
+		e->last_ms = now;
+		e->seen_ms = now;
+		return true;
+	}
+	e->seen_ms = now;
+	if (now - e->first_ms < MXFS_CAW_POLL_RESUBMIT_AFTER_MS ||
+	    now - e->last_ms >= MXFS_CAW_POLL_RESUBMIT_MS) {
+		e->last_ms = now;
+		return true;
+	}
+	return false;
+}
 
 static void bast_poll_fn(void *data)
 {
 	struct mxfs_dlm_caw_ctx *ctx = data;
 	uint32_t *batch;
+	struct caw_poll_resub *resub;
 	uint32_t poll_interval = MXFS_CAW_BAST_POLL_MS;
 	uint32_t rot = 0;	/* v0.5.3 rotating scan start (coverage >256 held) */
 	uint64_t bq_report_ms = mxfs_pal_time_ms();
@@ -15620,6 +15719,12 @@ static void bast_poll_fn(void *data)
 			     "dlm_caw: BAST poll alloc failed, thread exiting");
 		return;
 	}
+	/* The conflicts this poll has submitted for (caw_poll_resubmit_due).
+	 * Without it every conflict is submitted on every pass, as before. */
+	resub = mxfs_pal_alloc(MXFS_CAW_POLL_RESUBMIT_SLOTS * sizeof(*resub));
+	if (!resub)
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "dlm_caw: BAST poll resubmit table alloc failed; every conflict is re-submitted on every pass");
 
 	while (ctx->running) {
 		bool saw_contention = false;
@@ -15821,7 +15926,20 @@ static void bast_poll_fn(void *data)
 				 * slow release stall the rest of the rotation,
 				 * so the "lossless backstop" was itself
 				 * head-of-line blocked.
+				 *
+				 * A conflict that has outlived its first
+				 * seconds is a drain the holder already knows
+				 * about: past MXFS_CAW_POLL_RESUBMIT_AFTER_MS
+				 * it is re-submitted once per
+				 * MXFS_CAW_POLL_RESUBMIT_MS rather than on
+				 * every 100 ms pass.
 				 */
+				if (!caw_poll_resubmit_due(resub, batch[i],
+							   &slot)) {
+					ctx->bq.poll_held_back++;
+					continue;
+				}
+				ctx->bq.poll_submitted++;
 				caw_bast_submit(ctx, &slot.resource,
 						slot.waiter_mode);
 			}
@@ -15863,6 +15981,7 @@ static void bast_poll_fn(void *data)
 				 MXFS_CAW_BAST_POLL_MS);
 	}
 
+	mxfs_pal_free(resub);
 	mxfs_pal_free(batch);
 	mxfs_pal_log(MXFS_LOG_DEBUG, "dlm_caw: BAST poll thread exiting");
 }

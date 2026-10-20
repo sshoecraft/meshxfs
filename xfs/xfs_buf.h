@@ -398,6 +398,17 @@ struct xfs_buf {
 	 * stale buffer is reused.
 	 */
 	u64			b_mxfs_recov_slots;
+	/*
+	 * Inode-cluster buffers only: this buffer's current streak of
+	 * empty-case write refusals (iwr_refuse_empty), refusals no more than a
+	 * second apart -- how many, when the first and the last were
+	 * (ktime_get_ns).  Read and written under the buffer lock by the
+	 * P-IWR-REFUSED instrument in mxfs_submit_partial_inode_write; zero
+	 * when no streak is open.  Detection only.
+	 */
+	u32			b_mxfs_refuse_n;
+	u64			b_mxfs_refuse_start;
+	u64			b_mxfs_refuse_last;
 
 	/*
 	 * async write failure retry count. Initialised to zero on the first
@@ -487,9 +498,11 @@ xfs_buf_incore(
 	return xfs_buf_get_map(target, &map, 1, XBF_INCORE | flags, bpp);
 }
 
-/* a cached buffer a trylock could not take: its state and its holder */
+/* a cached buffer a trylock could not take: its state and its holder;
+ * stacks prints the holder's stack even with the stall_stacks switch off */
 void mxfs_buf_report_locked(struct xfs_buftarg *btp, xfs_daddr_t blkno,
-		size_t numblks, const char *why, unsigned long long ino);
+		size_t numblks, const char *why, unsigned long long ino,
+		bool stacks);
 
 static inline int
 xfs_buf_get(

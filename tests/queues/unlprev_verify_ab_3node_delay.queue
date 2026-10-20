@@ -1,0 +1,50 @@
+# H-IU1 A/B for D-IUNLINK-PREV-OF-PEER-FREED-INODE-STALE-PRECOMMIT-SHUTDOWN on
+# 3/disk/caw/direct g3 (test1 test2 test3), the configuration of fn32, where
+# the record's shutdown was seen.  Same build for both arms: ~/src/mxfs-g
+# srcversion 534C42EF75B3E5A4996006D, the main tree's sources with every fix at
+# its default (H-IU1 in: mxfs_ifree_prev_tenure checks, under the predecessor's
+# hold, that the predecessor is live, unlinked and still points at the inode
+# being freed, P-UNLPREV-MOVED in both arms, and with unlprev_held_verify=1
+# starts the free over, P-UNLPREV-REBUILD).  Run from ~/src/mxfs-g.  Every
+# other setting is exactly tests/queues/freed_nodelay_3node.queue's
+# (production settings: both test delays off); NG0_UNLPREV_VERIFY alternates
+# 0 (control) and 1 (fix), and NG0_UNLPREV_DELAY_MS=1000 sets the test knob
+# dbg_unlprev_wait_delay_ms for the workload in both arms (a free that waits
+# for its predecessor's hold sleeps that long first, holding nothing).
+#
+# WHY (written before the first lap).  The directed queue lapq_iud was vacuous
+# by construction (its peer never frees the predecessor: B4 skips that
+# inactivation), and the iub laps' 300 ms windows on 2/disk/caw/mpath met no
+# move in 110 waits.  The race needs fn32's actors: a node that took a peer
+# zombie's EX through a lookup (stat, touch) frees it mid-list while the owner
+# frees the zombie ahead of it.  Lap ifd2 (production settings, no delay) met
+# that twice on test31 with the fix on (P-UNLPREV-MOVED prev_mode=00, rebuilt).
+# The noino_gen0 workload runs those lookups (lookup_a/lookup_b) beside the
+# churn; the delay widens each predecessor wait from tens of ms to a second.
+#
+# READING RULES (written before the first lap):
+#   URESULT grades each lap (tests/noino_gen0_ab.sh, the H-IU1 grade).  A lap
+#   with unlprev_held_moved 0 on every node is UVACUOUS and counts for neither
+#   arm.
+#   H-IU1 IS CONFIRMED AS THE CAUSE when a control lap is UCONTROL-SHOWS-CAUSE:
+#   a P53-IUNLINK-MISMATCH on an inode that a P-UNLPREV-MOVED line of the same
+#   node named as the held predecessor (fn32's shutdown).
+#   THE FIX IS VERIFIED when at least three fix laps are UPASS with moved > 0:
+#   no P53-IUNLINK-MISMATCH, no node failure, cold audit CLEAN.
+#   H-IU1 IS REFUTED by a fix lap with a P53 mismatch on a remove whose
+#   predecessor passed the check under its hold, or if control laps with
+#   moved > 0 keep removing without a P53 mismatch (then a moved predecessor
+#   does not reach the precommit and fn32 had another cause).
+#   Any other node failure, CORRUPT shape, stall or ABORT is attributed from
+#   its own lines to its own record (ERESULT and ARESULT are not set here).
+#
+# Bound: the freed_nodelay laps' 1680 s per lap (they ran 472-597 s; the delay
+# adds one second per predecessor wait, 10-66 waits a lap on 2 nodes).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UNLPREV_VERIFY=0 NG0_UNLPREV_DELAY_MS=1000 tests/noino_gen0_ab.sh iu31 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UNLPREV_VERIFY=1 NG0_UNLPREV_DELAY_MS=1000 tests/noino_gen0_ab.sh iu32 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UNLPREV_VERIFY=0 NG0_UNLPREV_DELAY_MS=1000 tests/noino_gen0_ab.sh iu33 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UNLPREV_VERIFY=1 NG0_UNLPREV_DELAY_MS=1000 tests/noino_gen0_ab.sh iu34 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UNLPREV_VERIFY=0 NG0_UNLPREV_DELAY_MS=1000 tests/noino_gen0_ab.sh iu35 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UNLPREV_VERIFY=1 NG0_UNLPREV_DELAY_MS=1000 tests/noino_gen0_ab.sh iu36 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UNLPREV_VERIFY=0 NG0_UNLPREV_DELAY_MS=1000 tests/noino_gen0_ab.sh iu37 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UNLPREV_VERIFY=1 NG0_UNLPREV_DELAY_MS=1000 tests/noino_gen0_ab.sh iu38 1 300 3/disk/caw/direct g3

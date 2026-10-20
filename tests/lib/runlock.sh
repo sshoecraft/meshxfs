@@ -27,11 +27,14 @@ runlock_holder() {  # <file> -> the holder line it records, or "unknown"
     echo "${h:-unknown}"
 }
 
-runlock_take() {  # <file> <shared|exclusive> <what> -> 0 if taken; the fd stays open
-    local file=$1 mode=$2 what=$3 fd flag=-x
+runlock_take() {  # <file> <shared|exclusive> <what> [wait_s] -> 0 if taken; the fd stays open
+    local file=$1 mode=$2 what=$3 wait_s=${4:-0} fd flag=-x wflag=-n
     [ "$mode" = shared ] && flag=-s
+    case $wait_s in ''|*[!0-9]*) wait_s=0 ;; esac
+    [ "$wait_s" -gt 0 ] && wflag="-w $wait_s"
     exec {fd}>>"$file" || return 1
-    if ! flock -n $flag "$fd"; then
+    # shellcheck disable=SC2086  # wflag is "-n" or "-w <s>" by design
+    if ! flock $wflag $flag "$fd"; then
         exec {fd}>&-
         return 1
     fi
@@ -76,8 +79,14 @@ vmhold_take() {  # <what> <vm>... -> holds every VM in use (tools/vm_pool.sh) wh
     return 0
 }
 
+# MXFS_CONFIG_LOCK_WAIT_S=<s> makes a run wait up to <s> seconds for the
+# configuration's lock instead of refusing at once.  Two rig groups can run the
+# same configuration (g2c and g2d are both 2/net/mesh/direct); their run.sh
+# calls then take turns on the board column instead of one of them failing
+# mid-queue with "held by another run" and costing the lap it belonged to.
+# Unset or 0: refuse at once, as before.
 runlock_config() {  # <slug> <what> -> 0 iff the configuration's lock is taken
-    runlock_take "/tmp/mxfs_config.$1.lock" exclusive "$2" || {
+    runlock_take "/tmp/mxfs_config.$1.lock" exclusive "$2" "${MXFS_CONFIG_LOCK_WAIT_S:-0}" || {
         echo "ERROR: configuration $1 is held by another run: $(runlock_holder "/tmp/mxfs_config.$1.lock")"
         return 1
     }

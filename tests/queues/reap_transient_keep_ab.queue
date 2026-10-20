@@ -1,0 +1,70 @@
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY, H-3: the
+# reap worker retired an entry whenever its lookup failed.  In fwcm3 its own
+# unlinked-list walk reloaded six zombies and released them, its lookup of each
+# then failed -ENOENT while the in-core inode was queued for inactivation
+# (xfs_iget_cache_hit: unlinked inodes cannot be re-grabbed), and it retired
+# their entries as freed; the queued inactivation ran without the entry's
+# authority and was skipped, and all six were still on AG 1 bucket 1 after the
+# clean unmount.
+#
+# Same-build A/B, one knob between the arms: reap_transient_keep (1 keeps such
+# an entry for the worker's next pass, 0 retires it as before), set and read
+# back by tests/noino_gen0_ab.sh's NG0_REAP_KEEP.  Build: ~/src/mxfs-c,
+# srcversion B62F12AFFE4EFBB3DCEB982 (main-tree source of 0.90.131 with the H-3
+# instrument and knob, P88-REAP-IGET-FAIL, counters reap_iget_transient and
+# reap_iget_retired); run from ~/src/mxfs-c, whose harness prints each lap's
+# build and refuses a node running anything else.  Settings: lap fwcm3's
+# (tests/queues/freed_inode_final_caw.queue, 2/disk/caw/mpath, every guard
+# at its module default, NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1), the
+# configuration with the highest reach on build 311877C4 (iget_rc=-2
+# retirements: fwcm1 6, fwcm3 31; lower bounds, the line is rate-limited).
+# Run on g2 (test1 test2): g2b shares test15 and test16 with fw3's g3b.  Control
+# and fix laps alternate.
+#
+# MEASURES, per lap, from tools/ifree_defer_attribution.py (both nodes' whole
+# kernel logs after the lap's mark, through the cold audit's unmount):
+#   if_transient   P88-REAP-IGET-FAIL transient=1 lines: a failed lookup that
+#                  met the entry's zombie still in core in its inactivation
+#                  (mode set, nlink 0, the entry's generation) -- the REACH
+#   if_kept / if_retired_transient   those kept (fix) / retired (control)
+#   if_zombies     bucket members of the cold audit after the clean unmount
+#   if_zombie_retired_transient      zombies whose entry a transient failure
+#                  retired
+# plus rk_transient / rk_retired (the counters, read after the workload).
+#
+# VERDICT RULES (written before the first lap):
+#   A lap with a node failure or a CORRUPT cold audit is attributed before
+#   anything below is judged.  A lap whose audit is STALE/NONE has no verdict
+#   and is rerun.  A lap with if_transient 0 did not reach and judges nothing.
+#   CONTROL (reap_transient_keep 0), reached: SHOWS THE CAUSE if if_zombies > 0
+#     and if_zombie_retired_transient == if_zombies (every zombie's entry was
+#     retired by a transient failure); CLEAN-REACHED if if_zombies == 0 (the
+#     retired zombies were freed later as some other free's predecessor, as in
+#     most of build 311877C4's laps).
+#   FIX (reap_transient_keep 1), reached: PASS if the harness passes (if_ok=1:
+#     if_zombies 0, if_fork_errors 0, no unlanded drain, if_retired_transient
+#     0), the cold audit is CLEAN errors=0 and node_failures 0.
+#   H-3 SUPPORTED AND FIXED: at least one control lap SHOWS THE CAUSE and at
+#     least two reached fix laps PASS, with no reached fix lap failing.
+#   H-3 REFUTED: a control lap's zombie whose entry no transient failure retired
+#     (some other path left it), or a reached fix lap with if_zombies > 0 --
+#     a new hypothesis, not a patch on this one.
+#   WEAK: the controls reach but none SHOWS THE CAUSE: this queue does not
+#     decide H-3; more control laps on the same build, or a window knob.
+#
+# Bound: the CAW final queue's noino lap derivation, 1680 s per lap (fwcm3's
+# wall was 491 s).
+#
+# THE FIRST RUN (label rk, g2, 07:10:32Z) REACHED LITTLE ON g2: lap rkc1
+# (control) read if_reach 9, if_reaps 9, if_igetfail 0, if_transient 0 --
+# unreached, judges nothing; lap rkf1 (fix) read if_reach 24, if_transient 2,
+# if_kept 2, if_retired_transient 0, if_zombies 0, if_ok 1, audit CLEAN -- a
+# reached fix PASS.  fwcm3 read if_reach 111 on g2b.  The run was stopped at
+# lap 3's prep (07:27:10Z) and the laps below moved to g2b (test15 test16,
+# free since fw3 finished) with new labels; rules unchanged, rkf1 counts.
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_REAP_KEEP=0 tests/noino_gen0_ab.sh rbc1 1 300 2/disk/caw/mpath g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_REAP_KEEP=1 tests/noino_gen0_ab.sh rbf1 1 300 2/disk/caw/mpath g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_REAP_KEEP=0 tests/noino_gen0_ab.sh rbc2 1 300 2/disk/caw/mpath g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_REAP_KEEP=1 tests/noino_gen0_ab.sh rbf2 1 300 2/disk/caw/mpath g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_REAP_KEEP=0 tests/noino_gen0_ab.sh rbc3 1 300 2/disk/caw/mpath g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_REAP_KEEP=1 tests/noino_gen0_ab.sh rbf3 1 300 2/disk/caw/mpath g2b

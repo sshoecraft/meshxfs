@@ -1,0 +1,34 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F8: the
+# protective reload's P5F arm (xfs/xfs_mxfs_reload.c) keeps a CLEAN shell's
+# cached image over the platter's FREE image on the reload's own fresh grant,
+# and the shell's next change writes the dead life back over the free.
+# Same-build A/B of module knob freshsrc_keep_guard: NG0_FRESHSRC_GUARD=0 is
+# the control (the old rule), =1 the fix.  2/net/mesh/mpath on test1/test2,
+# production knobs otherwise (NG0_DELAY_MS=0, noino_gen0_guard=1), the H-F7b
+# recycle guard off in both arms (that hypothesis is refuted; its fix comes
+# out), dbg_log_mirror_check on for the write-side detector.
+#
+# VERDICT RULES (written before the first lap):
+#   PROVEN    control laps count fk_clean > 0 and at least one audits CORRUPT
+#             with the lookup node's P5F clean_held=1 keep of the audited
+#             generation in <node>_p5f.txt, AND every fix lap reads
+#             fk_clean=0, audit CLEAN, no node failure, with fk_refused > 0
+#             in aggregate
+#   REFUTED   any fix lap audits CORRUPT: trace that inode, H-F8 is not the
+#             whole cause
+#   OPEN      no control lap reproduces: run more laps before judging
+# A lap whose audit is STALE/NONE has no verdict and is rerun.
+#
+# Bound per lap, the sum of the harness's own step bounds: prep_cluster 300 +
+# workload SECS+60 = 360 + counters 2x40 + knob sets/resets 2x(20+20+20+20) +
+# chk_clean with alloc_witness 150 + stream capture 2x120 + snapshot 60 = 1350 s.
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kmc1 1 300 2/net/mesh/mpath g2
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kmf1 1 300 2/net/mesh/mpath g2
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kmc2 1 300 2/net/mesh/mpath g2
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kmf2 1 300 2/net/mesh/mpath g2
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kmc3 1 300 2/net/mesh/mpath g2
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kmf3 1 300 2/net/mesh/mpath g2
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kmc4 1 300 2/net/mesh/mpath g2
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kmf4 1 300 2/net/mesh/mpath g2
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kmc5 1 300 2/net/mesh/mpath g2
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kmf5 1 300 2/net/mesh/mpath g2

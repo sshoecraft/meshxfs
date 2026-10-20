@@ -1,0 +1,25 @@
+# D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY shape (c), hypothesis H-UB1:
+# same-build A/B of unstaged_logged_skip on the directed reproducer
+# tests/unstaged_slot_ab.sh, 2/disk/caw/direct on g2b (test15 test16), the
+# configuration of the one production instance (rk5).  Twin of
+# tests/queues/ub1_directed_ab_cawmpath.queue (2/disk/caw/mpath, g2d); the two
+# are graded as one campaign by the VERDICT RULES in that queue's header,
+# written before the first lap of either, and repeated here:
+#   SUPPORTED   across both queues, at least one control lap (skip 0) reads
+#               CONTROL-SHOWS-CAUSE, at least three fix laps (skip 1) read
+#               PASS with X's unstaged_logged_prevented > 0, and no fix lap
+#               reads FAIL.
+#   FIX FAILS   any fix lap FAIL is attributed from its own lines first; it
+#               REFUTES H-UB1 if the regressed slot's latest P-UB1-UNSTAGED-SKIP
+#               line reads masked=1, or if the audit names an inode a masked=1
+#               line named.
+#   WEAK        neither: more laps.  VACUOUS laps are rerun; a PASS with
+#               prevented=0 does not count toward the three.
+# Same build: the main tree, srcversion 022F8BF6763B609A9ECC7D1.  8 iterations
+# a lap.  Bound per lap 1870 s, derived in the twin's header.
+1870 tests/unstaged_slot_ab.sh usb1 0 8 2/disk/caw/direct g2b
+1870 tests/unstaged_slot_ab.sh usb2 1 8 2/disk/caw/direct g2b
+1870 tests/unstaged_slot_ab.sh usb3 1 8 2/disk/caw/direct g2b
+1870 tests/unstaged_slot_ab.sh usb4 0 8 2/disk/caw/direct g2b
+1870 tests/unstaged_slot_ab.sh usb5 1 8 2/disk/caw/direct g2b
+1870 tests/unstaged_slot_ab.sh usb6 1 8 2/disk/caw/direct g2b

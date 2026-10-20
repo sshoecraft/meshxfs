@@ -1,0 +1,103 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F13,
+# with the peer-unlink reach repaired.
+#
+# WHY THIS QUEUE REPLACES tests/queues/ialloc_fence_ab.queue (ifg) and its
+# disk-locking copy (icg): neither reached.  Their control laps ifc1 and icc1
+# read agbast_a 3 and 1 against the REACH line of 50, and the queues were
+# stopped after their first fix laps.  The cause is the harness, measured from
+# ifc1's kernel streams: the churner allocates a file in its parent's AG when it
+# owns that AG, so the 300 files it created in a directory of their own landed
+# in AG 6 (the peer's unlinked-list adds of them, P82-ADD agno=6, one a second)
+# while its churn allocated in AG 12 (297 of its 300 adds), and the peer's
+# removes never asked for the AG the churn was creating in.
+# The first repair (create them in the churn directory before the mark and move
+# them to their own) did not reach either, and its queue (ixg, with iyg on disk
+# locking) was stopped in its first control laps: in ixc1 the 300 files landed
+# in AGs 12 and 8 (the peer's 15 and 13 unlinked-list adds of them) while the
+# churn then allocated in AG 6 (all 300 of the churner's adds), and the churner
+# had received 4 AG BASTs halfway through the workload.  The node's allocator
+# moves between its AGs, so a file made before the mark says nothing about the
+# AG the churn will use.  tests/noino_gen0_ab.sh now runs the feed live: the
+# churner creates the 300 files over the workload, one a second, beside its
+# churn, in a directory of their own the churn never locks, and the peer
+# removes each as it appears.  A file created while the churn runs is
+# allocated in the AG the churn is creating in, and each remove's unlinked-list
+# insert takes that AG's lock while the churn goes on creating there.
+#
+# HYPOTHESIS H-F13 (written before any patch, recorded on the defect): with
+# ag_ialloc_fence on -- no inode allocation in an AG while a peer's BAST is
+# pending on it, no release COMMIT while an unpublished inode of it is listed
+# or claiming (within MXFS_PUB_DRAIN_TIMEOUT_MS of the BAST, then
+# P-AG-FENCE-ESCAPE), and an AG release's scope limited to its own AG's
+# parent-unknown inodes -- every ag-bast unlock reads listed=0 inflight=0 and
+# no AG drain times out, under the claim hold that made fds3 and fw3f2 time
+# out, with clean audits and no node failure.
+#
+# Same-build A/B, one knob between the arms: ag_ialloc_fence, set and read back
+# on every node by NG0_IALLOC_FENCE (0 control, 1 fix).  Build ~/src/mxfs-b,
+# srcversion 53A7F8EBBCEC0C4B6A705D2 (printed by each lap), whose harness
+# refuses a node running anything else.  Both arms: NG0_DRAIN_BOUND=0 (H-F12
+# off: production's open scan), each drain claim held 200 ms and each create
+# held 5 ms with its parent unknown, and NG0_PEER_UNLINK=300 (the repaired
+# reach: one remove a second).  Control and fix alternate, control first, on
+# 3/net/mesh/direct g3 (test1 test2 test3).
+#
+# MEASURES, per lap (RESULT line; each node's whole kernel log after the mark):
+#   punl_created, punl_removed, agbast_a   the reach: the feed's creates and
+#                the peer's removes done, AG BASTs the churner got
+#   ux_unlocks, ux_listed, ux_unlinked, ux_inflight   ag-bast unlocks with an
+#                unpublished inode of the AG listed or claiming, and their sums
+#   dt_ag, stuck_chase, stuck_held, pc_rel_ag   AG drain timeouts, their STUCK
+#                lines by shape, AG releases that went with a claim in flight
+#   dt_dir, pc_rel_dir   the same for directory releases
+#   fn_refused, fn_held, fn_escaped, fn_escape_lines   the fence's counters
+#   the churner's churn rounds (<A>_churn.out), audit, node_failures, and every
+#   other gate the harness applies
+#
+# VERDICT RULES (the rules of ialloc_fence_ab.queue, unchanged, written before
+# the first lap of this queue):
+#   A lap with a node failure or a CORRUPT cold audit is attributed before
+#   anything below is judged.  A lap whose audit is STALE/NONE, or an ABORT, has
+#   no verdict and is rerun.  The harness's own VACUOUS verdict is H-F12's gate
+#   (control dt_ag 0) and is not this queue's measure.
+#   REACH: punl_removed >= 100 and agbast_a >= 50.  A lap below either did not
+#   reach and judges nothing.
+#   CONTROL (fence 0), reached: SHOWS THE CAUSE if ux_unlocks > 0, or dt_ag > 0
+#     with stuck_chase > 0 and stuck_held 0.
+#   FIX (fence 1), reached: PASS if ux_unlocks 0, dt_ag 0, pc_rel_ag 0,
+#     fn_escape_lines 0, fn_refused > 0, audit CLEAN errors=0, node_failures 0
+#     and every other harness gate holds.
+#   REFUTED: a reached fix lap with ux_unlocks > 0 or dt_ag > 0.
+#   ESCAPE: a fix lap with fn_escape_lines > 0 is attributed (which inode stayed
+#     unpublished, and why the worker could not publish it) before any verdict.
+#   SUPPORTED AND FIXED: at least one control SHOWS THE CAUSE and at least two
+#     reached fix laps PASS, with no reached fix lap failing.  WEAK: the
+#     controls do not reach or do not show the cause: more control laps.
+#   COST (recorded, not a verdict on H-F13): a fix lap whose churner completes
+#     fewer than half the control laps' mean churn rounds, or whose punl_removed
+#     falls below half theirs, is a performance finding of the fence.
+#   A failure only through the directory scope (dt_dir, pc_rel_dir) is its own
+#   finding.
+#
+# Bound: fw3's, 1680 s per lap (ifg's laps about 480 s).
+#
+# RERUN WITH THE CREATE-REUSE FIX IN BOTH ARMS (labels jzc1..jzf3).  The live
+# feed's izg laps were cut short by another defect: izf1 (fence 1) and izc2
+# (fence 0) shut a node down when a create reused a number the peer had just
+# freed while the node held a linked evicted copy of its old life
+# (D-CREATE-REUSE-OVER-PEER-FREED-LINKED-CORPSE-SHUTS-NODE-DOWN), so each lap
+# measured that shutdown and not H-F13.  That defect's change (knob
+# cr63_linked_defer) is in the build these laps run, ~/src/mxfs-b srcversion
+# A97F45838280C5F3B4C352C (H-F13's build plus that change), and
+# NG0_CR63_DEFER=1 sets and reads it back on every node in BOTH arms, so the
+# only knob between the arms is still ag_ialloc_fence.  izc1 (control, reached,
+# SHOWS THE CAUSE) stands as recorded.  The verdict rules above are unchanged.
+# Every lap here is also an H-L1 fix lap for the create-reuse defect: its
+# CRESULT line is graded by tests/queues/cr63_linked_defer_ab.queue's rules
+# (CPASS, CVACUOUS, CFAIL attributed first), in either arm of this queue,
+# because cr63_linked_defer is 1 in both (declared before the first lap).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=0 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh jzc1 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh jzf1 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=0 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh jzc2 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh jzf2 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh jzf3 1 300 3/net/mesh/direct g3

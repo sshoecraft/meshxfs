@@ -1,0 +1,78 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F7c: a
+# create that reuses a number whose no-inode release is in flight builds its
+# new life on the grant that release anchored at its BAST.  The allocator's
+# probe (xfs/libxfs/xfs_ialloc.c mxfs_dialloc_try_reserve ->
+# mxfs_v5_dlm_inode_reserve_try -> a no-queue EX request) is answered by the
+# DLM's already-granted shortcut (dlm/dlm.c), which mints no generation, so
+# the release's unlock at the anchored generation still matches: the number
+# goes to the peer while the new life is live at a cached EX the DLM no longer
+# records, with its logged changes not on the platter.  Traced on the H-F7 fix
+# arm (recycle guard 1, postfence 300 ms, ~/src/mxfs-c FAB8FDFC): pmf1 ino
+# 8388759, pdf1 ino 8388766, pmf3 ino 8388753 (start_lifecycle=ABSENT: the old
+# life's inactivation freed it at 7390.48, P82-REM, and the release unlocked
+# a new life at cc 2164 at 7390.84 with no recycle line between).
+#
+# Same-build A/B of module knob noino_resv_guard (0 = control, 1 = fix: the
+# allocator skips a number whose no-inode release is in flight, at the phase-1
+# probe and the phase-2 take).  Both arms hold the window open with
+# NG0_POSTFENCE_MS=300 and run every other guard on: noino_recycle_guard 1
+# (H-F7), freshsrc_keep_guard 1 (H-F8), selfclobber_keep_guard 1 (H-F8b),
+# noino_gen0_guard 1, mirror check on, so only the allocator's rule differs
+# between arms.  Runs from the main tree (its mxfs.ko, srcversion
+# 3AEA31FDF4AD31EFBBA6A90 at launch, which carries the free-release instrument
+# P-FREE-RELEASE, the NOGRANT probe's cgen field, the H-F9 guard
+# noino_shell_guard at its default 1 in both arms, so a zombie shell's BAST is
+# served in core and no longer prints the LEFT-GRANT lifecycle=LIVE line these
+# rules count, and the H-F10 guard pub_claim_release_guard at its default 1 in
+# both arms, with pub_inflight= on the phantom and no-grant lines; the harness
+# prints each lap's build and refuses a node running anything else).  The
+# first launch on 08BD0ED2 measured nothing: every lap ABORTed at the host
+# preflight (root filesystem full); the rules below were amended for the
+# pub_inflight= split before any lap measured anything.  Kept images go to
+# /mxfs/snapshots.
+#
+# VERDICT RULES (written before the first lap):
+#   REACHED      every control lap counts rv_under > 0 (the harness's vacuity
+#                gate): the allocator takes numbers under an in-flight release
+#                on this build.
+#   ATTRIBUTED   in the control laps, each P-NOINO-UNLOCK-UNDRAINED and each
+#                P-NOINO-UNLOCK-LEFT-GRANT lifecycle=LIVE cached_mode=5 names a
+#                number with a P-DIALLOC-RESV-UNDER-NOINO line on the same node
+#                inside that release (its unlock time less queue_ms + fence_ms
+#                + tail_ms, up to the unlock).  An instance with no such line is
+#                another path and is traced before the fix is judged.
+#   FIX VERIFIED (H-F7c)  REACHED and ATTRIBUTED, and every non-vacuous fix lap
+#                (rv_skipped > 0) reads hf7_undrained=0, hf7_keep=0, no
+#                phantom or no-grant line with pub_inflight=0 (the harness's
+#                'hf10 lines' count per node: phantom_noinflight=0,
+#                nogrant_noinflight=0), no LEFT-GRANT lifecycle=LIVE
+#                cached_mode=5 line on either node, audit CLEAN and
+#                node_failures=0.  A phantom or no-grant line with
+#                pub_inflight=1 was logged or written while a publish claim
+#                on the inode was in flight: that is H-F10's window, not this
+#                path, and it judges nothing here (a no-grant one is its own
+#                finding under the OTHER rule).
+#   REFUTED      any fix lap with hf7_undrained > 0, a LEFT-GRANT
+#                lifecycle=LIVE cached_mode=5 line, or a CORRUPT audit: the
+#                guard does not close the whole remaining path; trace the
+#                instance.
+#   OTHER        a fix-lap LEFT-GRANT lifecycle=LIVE cached_mode=3 (a PR
+#                tenure, not a create's), an hf7_nogrant line whose inode has
+#                no LEFT-GRANT or undrained line, or any line with
+#                pub_inflight=1 on a no-grant write: its own finding, traced; it
+#                does not judge this guard but blocks the record's closure.
+# A lap whose audit is STALE/NONE has no verdict and is rerun; a VACUOUS lap
+# has no verdict.
+#
+# Bound per lap, the sum of the harness's own step bounds, every ssh step
+# counted: prep_cluster 300 + srcversion reads 2x20 + knob sets 2x(7x20: gen0
+# guard+delay, recycle, freshsrc, selfclobber, resv, mirror, postfence) +
+# mkdir 30 + workload SECS+60 = 360 + counter reads 2x40 + knob resets
+# 2x(3x20: delay, mirror, postfence) + chk_clean with alloc_witness 150 +
+# stream capture 2x120 + snapshot 60 = 1660 s.
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_RESV_GUARD=0 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh udc1 1 300 2/net/mesh/direct g2c
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_RESV_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh udf1 1 300 2/net/mesh/direct g2c
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_RESV_GUARD=0 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh udc2 1 300 2/net/mesh/direct g2c
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_RESV_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh udf2 1 300 2/net/mesh/direct g2c
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_RESV_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh udf3 1 300 2/net/mesh/direct g2c
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_RESV_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh udf4 1 300 2/net/mesh/direct g2c

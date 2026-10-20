@@ -1,0 +1,39 @@
+# D-UMOUNT-ROOT-DENTRY-STILL-IN-USE-DEFERRED-DIR-DCACHE-SHRINK-RACE, H-DS1: the
+# TCP half of the same-build A/B of dshrink_umount_gate, build
+# 37897D38118AD5E2FAAC4FC (main tree ~/src/mxfs, 0.90.131),
+# tests/umount_dshrink_race_ab.sh, 2/net/mesh/direct on g2d (test31 test32).
+# The CAW half is tests/queues/umount_dshrink_race_ab.queue (2/disk/caw/mpath,
+# labels dsr*); every completed directory reload queues the deferred shrink on
+# either transport, and this half shows the gate on the other one.  Chained
+# behind queue fvd, which holds run.sh's 2/net/mesh/direct lock on g2c.  Each
+# lap: 3 rounds, the test hold dbg_dshrink_hold_ms=1500 set on node A in both
+# arms, the gate 0 (control) or 1 (fix) on node A.
+#
+# VERDICT RULES (written before the first lap; the CAW half's, unchanged):
+#   per lap   the harness's RESULT line: a round REACHES when it shows
+#             P-DBG-DSHRINK-HOLD and P-DSHRINK-AT-UMOUNT; control
+#             CONTROL-SHOWS-CAUSE when a reached round has 'BUG: Dentry';
+#             fix PASS when a round reached and no round has 'BUG: Dentry',
+#             'Busy inodes' or another WARNING/BUG/Oops line, every umount
+#             and mount returned 0 inside its bound and the cold audit is
+#             CLEAN; VACUOUS with no reach; FAIL otherwise.  A FAIL is
+#             attributed from the round's captured kernel log before it is
+#             counted against the fix.
+#   SUPPORTED AND FIXED on this configuration: at least one control lap
+#             CONTROL-SHOWS-CAUSE, at least two fix laps PASS, no fix lap
+#             FAIL on this mechanism.
+#   REFUTED   a reached fix round with 'BUG: Dentry' (the gate closed and the
+#             flush done, the reference still there), or a control lap whose
+#             BUG names the root while A's P199 line for ino 128 in that round
+#             reads dshrink=0 (no shrink busy at the BUG).
+#   WEAK      every reached control round without the BUG: the hold does not
+#             reproduce the race and the fix laps judge nothing.
+#
+# Bound per lap, the CAW half's derivation: prep 300 + srcversion reads 2x20
+# + findmnt 15 + knob set and readback 20 + 3 rounds x 116 + counters 20 +
+# chk_clean with alloc_witness 150 = 893 s.
+893 tests/umount_dshrink_race_ab.sh dstc1 0 3 1500 2/net/mesh/direct g2d
+893 tests/umount_dshrink_race_ab.sh dstf1 1 3 1500 2/net/mesh/direct g2d
+893 tests/umount_dshrink_race_ab.sh dstc2 0 3 1500 2/net/mesh/direct g2d
+893 tests/umount_dshrink_race_ab.sh dstf2 1 3 1500 2/net/mesh/direct g2d
+893 tests/umount_dshrink_race_ab.sh dstf3 1 3 1500 2/net/mesh/direct g2d

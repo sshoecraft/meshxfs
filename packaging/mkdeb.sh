@@ -48,7 +48,7 @@ Package: mxfs
 Version: ${VERSION}
 Architecture: ${ARCH}
 Maintainer: MXFS Project
-Depends: dkms, python3, proxmox-default-headers | linux-headers-generic | linux-headers-amd64 | linux-headers
+Depends: dkms, python3, iproute2, proxmox-default-headers | linux-headers-generic | linux-headers-amd64 | linux-headers
 Recommends: open-iscsi
 Section: kernel
 Priority: optional
@@ -121,6 +121,7 @@ set -e
 echo "Removing MXFS ${VERSION} from DKMS ..."
 dkms remove -m mxfs -v ${VERSION} --all 2>/dev/null || true
 rm -f /etc/udev/rules.d/60-mxfs-blkid.rules
+rm -f /etc/udev/rules.d/61-mxfs-stranded-path.rules
 [ "\$1" = remove ] && { systemctl disable mxfs-vcenter-tag.service 2>/dev/null || true; }
 [ "\$1" = remove ] && { systemctl disable mxfs-quorumd.service 2>/dev/null || true; }
 udevadm control --reload-rules 2>/dev/null || true

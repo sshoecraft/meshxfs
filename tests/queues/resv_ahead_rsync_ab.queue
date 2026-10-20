@@ -1,0 +1,23 @@
+# D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349: reserve-ahead A/B on
+# 2/net/mesh/direct g2c (test29 copies, test30 stays mounted), one build
+# with resv_ahead and tauth_group_commit set per arm by
+# tests/resv_ahead_rsync_ab.sh.  Run from the checkout whose build carries
+# resv_ahead (the sibling ~/src/mxfs-b while the main tree's build is frozen
+# under other laps).
+# Every arm follows a fresh prep, so each starts on a fresh ledger (the first
+# touch of each ledger page costs an activation; a warm ledger measured 36 s
+# against 48-55 s fresh on 0.90.131, and arms must not differ by that).
+# The native line comes first: LRB_NATIVE=1 formats the LUN with mkfs.xfs and
+# stores the copy wall the arms are graded against (2x line).
+# Bounds: prep_cluster 300 (tests/suite/manifest); lone_rsync_bench 120 (its
+# header); each arm 180 (tests/resv_ahead_rsync_ab.sh header).
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+120 LRB_NATIVE=1 MXFS_NODE_LIST=test29,test30 tests/lone_rsync_bench.sh nat29 test29 2
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+180 tests/resv_ahead_rsync_ab.sh ra0a 0 0 test29 test30
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+180 tests/resv_ahead_rsync_ab.sh ra32a 32 0 test29 test30
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+180 tests/resv_ahead_rsync_ab.sh ra32g 32 1 test29 test30
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+180 tests/resv_ahead_rsync_ab.sh ra0g 0 1 test29 test30

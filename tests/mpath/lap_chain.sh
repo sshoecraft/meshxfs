@@ -11,7 +11,16 @@
 #       --delay <s>       wait <s> seconds before starting (stagger groups)
 #       --knobs "<k=v> …" test-only module parameters every path row sets
 #                         (PF_KNOBS)
-#       --rows <csv>      rows of a lap (default: every path row, then
+#       --node-knobs "<node>:<k=v> …" the same, written only on the node each
+#                         entry names, after --knobs (PF_NODE_KNOBS)
+#       --freeze-knobs "<k=v> …" test-only module parameters written on the
+#                         victim just before path_fenced_return freezes it
+#                         (PF_FREEZE_KNOBS; a self-consuming one-shot such as
+#                         dbg_admit_park_ms goes BEFORE the knob that arms it)
+#       --freeze-writer <depth>  path_fenced_return's victim keeps <depth>
+#                         1 MiB O_DIRECT writes in flight across the freeze
+#                         and the fence (PF_FREEZE_WRITER)
+#       --rows <csv>     rows of a lap (default: every path row, then
 #                         alloc_witness and chk_clean)
 #       --sampler <node>  run tests/mpath/load_sampler.sh on <node> beside
 #                         each lap (starts 60 s in, 2100 s long)
@@ -44,6 +53,9 @@ laps)
         --prep) prep=1; shift ;;
         --delay) delay=$2; shift 2 ;;
         --knobs) knobs=$2; shift 2 ;;
+        --node-knobs) export PF_NODE_KNOBS="$2"; shift 2 ;;
+        --freeze-knobs) export PF_FREEZE_KNOBS="$2"; shift 2 ;;
+        --freeze-writer) export PF_FREEZE_WRITER="$2"; shift 2 ;;
         --rows) rows=$2; shift 2 ;;
         --sampler) sampler=$2; shift 2 ;;
         *) echo "unknown option $1"; exit 2 ;;

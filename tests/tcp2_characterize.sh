@@ -26,7 +26,7 @@ for i in $(seq 1 "$ITERS"); do
     echo "$out" | grep -E '  (PASS|FAIL) ' | tee -a "$LOG"
     # capture shutdown/oops/corruption markers
     for n in test1 test2; do
-        hits=$(timeout 8 "$SSH" "$n" "$PF" "dmesg 2>/dev/null | grep -iE 'shutdown|corruption|EFSBADCRC|EFSCORRUPTED|BUG:|Oops|call trace|DLM AG lock failed|trans_cancel' | tail -20")
+        hits=$(timeout 8 "$SSH" "$n" "$PF" "dmesg 2>/dev/null | grep -iE 'shutdown|corruption|EFSBADCRC|EFSCORRUPTED|BUG:|\bOops\b|call trace|DLM AG lock failed|trans_cancel' | tail -20")
         if [ -n "$hits" ]; then
             echo "  >>> $n dmesg:" | tee -a "$LOG"
             echo "$hits" | sed 's/^/      /' | tee -a "$LOG"

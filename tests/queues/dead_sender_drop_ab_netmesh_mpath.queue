@@ -1,0 +1,79 @@
+# D-MASTER-OWN-EX-RELEASE-GOES-STALE-RECORD-OUTLIVES-IT-PEER-GRANTS-REFUSED:
+# hypothesis H-MO1 (the record, session 118).  Lap ors3 of
+# tests/queues/own_release_stale_netmesh_mpath.queue named the stale field
+# (authority epoch and seq of the fenced test18 incarnation) and its writer: the
+# thawed victim's OLD incarnation reconnected (P164-DEAD-REJECT connect), and
+# 12 ms later its LOCK_GRANT re-affirming the old grant id was processed by the
+# survivor (P74-GRANT matched=0 have_mirror=1 naming the fenced authority),
+# overwriting the id the survivor's takeover re-grant had minted.  The change:
+# the TCP dispatcher drops every message but NODE_LEAVE whose sender is a
+# retired identity (dl_dead_sender_drop, 1 default; 0 = processed, the control),
+# logging P164-DEAD-MSG-DROP, or at 0 P164-DEAD-MSG-PASS (one counter for
+# both, 32 lines per load, then every 1024th).
+#
+# Build: ~/src/mxfs-e synced from the main tree (tools/sibling_sync.sh, marker
+# P-DG-DESTROY-RELEASED; the module also names dl_dead_sender_n).  It also carries D-DG-SHADOW's dl_dg_destroy_releases
+# (the double-grant shadow's entries end with their DLM context), left at its
+# default 1 in both arms; every other knob at its default.  Run from
+# ~/src/mxfs-e; grade each lap with tools/dead_sender_ab_grade.py <row dir>.
+# 2/net/mesh/mpath g2e (test17 test18); path_fenced_return freezes and fences
+# test18, thaws it, it unmounts and mounts again and reads test17's files; then
+# chk_clean.  Arms alternate C (dl_dead_sender_drop=0) and F (=1), every lap on
+# a fresh prep, so each lap's module load resets the capped probes (P74-GRANT
+# 8000, P-TAUTH-OWN-REL-STALE 64, P164-DEAD-MSG-DROP 32) and an absent line is
+# not a spent cap.
+#
+# READING RULES (written before the first lap), per lap, from the row's kept
+# captures (kmsg_<node>_fromnode.gz in the row's evidence directory) and the
+# knobs read back in the row's knobs.txt (a lap whose knob did not take on both
+# nodes judges nothing):
+#   On the survivor (the node that logs P-DEAD-INC for the victim): FENCED_INC =
+#   that line's inc=, T_DEATH = its P164-DEAD-NOTE timestamp; count
+#     DEAD_TRAFFIC  P164-DEAD-REJECT connect lines after T_DEATH (the thawed
+#                   old incarnation reconnected),
+#     ZGRANT        P74-GRANT lines after T_DEATH whose grant_id names
+#                   FENCED_INC as authority (a retired identity's grant was
+#                   processed),
+#     STALE_OWN     P-TAUTH-OWN-REL-STALE lines whose rel_auth=FENCED_INC, and
+#                   P-TAUTH-REL-EX-STALE-HOLDER lines whose op auth=FENCED_INC,
+#     DROPS         P164-DEAD-MSG-DROP lines (and their types),
+#     PASSES        P164-DEAD-MSG-PASS lines (and their types),
+#     DOUBLE        P-TAUTH-DOUBLE-GRANT on either node, classified by the
+#                   record's ex= (survivor itself, FENCED_INC, other).
+#   P74-GRANT stops at 8000 lines per module load and a lap prints about that
+#   many, so ZGRANT = 0 is evidence only when the lap's in-scope P74 count is
+#   well under the cap; PASSES and DROPS are the graded counts.
+#   CONTROL REACH: a C lap with PASSES > 0 (a retired identity's lock message
+#     was processed after its death note).
+#   FIX: every F lap with DEAD_TRAFFIC > 0 has DROPS > 0, PASSES = 0,
+#     ZGRANT = 0 and STALE_OWN = 0.
+#   SUPPORTED: FIX in every F lap, CONTROL REACH in at least one C lap, and at
+#     least 3 F laps with DEAD_TRAFFIC > 0 (otherwise the fix arm did not meet
+#     the cause: VACUOUS, raise the lap count).
+#   REFUTED: any F lap with PASSES > 0, ZGRANT > 0 or STALE_OWN > 0: a new
+#     hypothesis before any patch.
+#   HOLDER CHECK (each lap): path_fenced_return PASS and chk_clean CLEAN
+#     (verdict=CLEAN release=CLEAN errors=0).  An F lap failing where the C laps
+#     pass means the drop took a message something needed: the change is wrong.
+#   Recorded, not graded: STALE_OWN in a C lap (the record's full shape); the
+#     peer's refusals ('lock request failed after', DOUBLE naming the survivor);
+#     DOUBLE naming FENCED_INC belongs to
+#     D-SOLE-SURVIVOR-CREATES-FAIL-EBUSY-FROM-DIALLOC-AFTER-PEER-FENCE and is
+#     counted per arm for that record.  Any shutdown, BUG, Oops, hung task or
+#     chk_clean not CLEAN is attributed from its own lines first.
+#
+# Bounds: tests/queues/own_release_stale_netmesh_mpath.queue's lap
+# (path_fenced_return 400 s + chk_clean 180 s + the chain's overhead outside the
+# rows, measured 130-160 s = 730 s) plus prep_cluster 300 s on every lap = 1030 s.
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dsdc1 1 --prep --knobs "dl_dead_sender_drop=0" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dsdf1 1 --prep --knobs "dl_dead_sender_drop=1" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dsdc2 1 --prep --knobs "dl_dead_sender_drop=0" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dsdf2 1 --prep --knobs "dl_dead_sender_drop=1" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dsdc3 1 --prep --knobs "dl_dead_sender_drop=0" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dsdf3 1 --prep --knobs "dl_dead_sender_drop=1" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dsdc4 1 --prep --knobs "dl_dead_sender_drop=0" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dsdf4 1 --prep --knobs "dl_dead_sender_drop=1" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dsdc5 1 --prep --knobs "dl_dead_sender_drop=0" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dsdf5 1 --prep --knobs "dl_dead_sender_drop=1" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dsdc6 1 --prep --knobs "dl_dead_sender_drop=0" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dsdf6 1 --prep --knobs "dl_dead_sender_drop=1" --rows path_fenced_return,chk_clean

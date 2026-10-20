@@ -1,0 +1,32 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT with the
+# test delays off, three nodes on disk locking: 3/disk/caw/direct g3 (test1 test2 test3), build
+# ~/src/mxfs srcversion 4C46C2DE6232F3C1F9C96CB (the build of
+# tests/queues/livefeed_main_caw.queue).  Every setting of that queue's laps
+# except the two test delays, i.e. exactly tests/queues/livefeed_main_nodelay.queue's
+# settings: NG0_PUBCLAIM_DELAY_MS (dbg_pub_claim_delay_ms, 200 there) and
+# NG0_CREATE_PARENT_DELAY_MS (5 there) are unset and stay at their default 0.
+#
+# WHY (written before the first lap).  lfn1 (livefeed_main_nodelay.queue lap 1,
+# 2/net/mesh/direct g2c) is this record's shape on the main build with every
+# fix in it: its cold audit found AG 0 inobt-FREE agino 136 with a LIVE core
+# (P-FREE-LIVE-CORE), while every live-feed lap WITH the delays (lfb1-3 here,
+# lf31-2 on 3/disk/caw/direct, which this queue repeats with the delays off, lft1-2 on 2/net/mesh/mpath) audited CLEAN.  These
+# laps measure whether the delays-off reproduction reaches three nodes on disk locking and how
+# often, and each CORRUPT lap is a second source for the attribution.
+#
+# READING RULES (written before the first lap):
+#   A CORRUPT cold audit naming P-FREE-LIVE-CORE is a reproduction of this
+#   record; its inode's last life is read from the lap's own streams after the
+#   mark (create, unlink/inactivation, inobt free P150-FREE-IBT, the FREE
+#   obligation and how it ended -- P55C*, P-FREEPUB*, P-FREEOB* -- every write
+#   of its cluster) before anything else.  Any other CORRUPT shape, a node
+#   failure, a stall or an ABORT is attributed from its own lines to its own
+#   record.  A CLEAN lap is counted, not a disposition.
+#   Also read on every lap: the D-FREED F fields (punl_removed, agbast_a,
+#   ux_unlocks, dt_ag, pc_rel_ag, fn_escape_lines, fn_refused, fh_*), the
+#   harness's WRESULT, and tests/iwr_refuse_streaks.sh (H-WW1-R2: no streak of
+#   200 ms or more, none open at unmount).
+#
+# Bound: the kw and wr laps' 1680 s per lap (they ran 472-597 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fn31 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fn32 1 300 3/disk/caw/direct g3

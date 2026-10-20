@@ -1,0 +1,72 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F12 with
+# reach.  tests/queues/pub_drain_bound_ab.queue (pb) ran H-F12's same-build A/B
+# on lap fds3's settings with NG0_PUBCLAIM_DELAY_MS=200; its laps were VACUOUS
+# because node A (test1, the churner) received 0 or 1 AG release request after
+# each lap's mark (fds1-fds4 the same: one per lap).  In multi-node every file
+# and directory is allocated in its creating node's own AG
+# (xfs/libxfs/xfs_ialloc.c xfs_dialloc_pick_ag), so a peer asks for A's churn AG
+# essentially only when it frees one of A's inodes as their last closer, and the
+# stat/touch lookup loop makes the peer the last closer rarely.  The claim delay
+# makes every request that meets A's churn a chase, but makes no requests.
+#
+# REACH KNOB: NG0_LOOKUP_HOLD_MS=50 makes the lookup loop also hold each file
+# open for 50 ms (tests/noino_gen0_ab.sh): when A removes a file B is holding,
+# B becomes its last closer, frees it, and asks A for A's churn AG while A is
+# creating in it, which is H-F12's case.  Everything else is pb's line.
+#
+# Same-build A/B, one knob between the arms: pub_drain_bound (1 bounds an AG
+# release's drain to the entries listed when it began; 0 is the open scan),
+# set and read back on every node by NG0_DRAIN_BOUND.  Build: ~/src/mxfs-b, the
+# H-F12 change plus a read-only instrument at every AG unlock, both arms
+# (xfs/xfs_mxfs_publish.c mxfs_pub_unlock_exposure, line P-PUB-UNPUB-AT-UNLOCK,
+# counters pub_unlock_exposed and pub_unlock_listed), and the phantom detector's
+# snapshot of the inode's unpublished state and in-flight claim taken before it
+# asks the DLM (xfs/libxfs/xfs_trans_inode.c: q_inflight, q_us, requery; read
+# only); its srcversion is printed by each lap.  Run from ~/src/mxfs-b, whose harness refuses a node running
+# anything else.  Control and fix laps alternate, control first, on
+# 3/net/mesh/direct g3 (test1 test2 test3).
+#
+# MEASURES, per lap (RESULT line; each node's whole kernel log after the mark):
+#   dt_ag, dt_dir, stuck_chase, stuck_held, pc_rel_ag, pc_rel_dir, db_left:
+#     as in pb's queue
+#   ux_unlocks   AG unlocks (site=ag-bast) with an unpublished inode of that AG
+#                still listed or its claim in flight (P-PUB-UNPUB-AT-UNLOCK)
+#   ux_listed / ux_unlinked / ux_inflight   summed over those lines: listed
+#                inodes of the AG, of them already unlinked, claims in flight
+#   audit, node_failures, and every other gate the harness applies
+#
+# VERDICT RULES (written before the first lap):
+#   A lap with a node failure or a CORRUPT cold audit is attributed before
+#   anything below is judged.  A lap whose audit is STALE/NONE, or an ABORT, has
+#   no verdict and is rerun.  The harness's VACUOUS (control: dt_ag 0; fix:
+#   db_left 0 and dt_ag 0) did not reach and judges nothing.
+#   H-F12, unchanged from pb's rules:
+#     CONTROL (bound 0), reached: SHOWS THE CAUSE if its AG drain timeouts'
+#       STUCK lines are chase-shaped (stuck_chase > 0, stuck_held 0); only held
+#       STUCK lines REFUTE H-F12 for them.
+#     FIX (bound 1), reached: PASS if dt_ag 0, pc_rel_ag 0, cold audit CLEAN
+#       errors=0, node_failures 0 and every other harness gate holds.  A reached
+#       fix lap with an AG drain timeout REFUTES H-F12.
+#     A failure only through the directory scope is its own finding.
+#     SUPPORTED AND FIXED: at least one control SHOWS THE CAUSE and at least
+#       two reached fix laps PASS, with no reached fix lap failing on the AG
+#       scope.  WEAK: the controls do not reach: more control laps.
+#   THE HANDOFF EXPOSURE (the consult's question; it judges H-F12's
+#   completeness, not its verdict above):
+#     EXPOSED   any reached fix lap with ux_listed > 0: a bounded AG release
+#               handed the AG off with unpublished inodes of that AG listed.
+#               With ux_unlinked > 0 among them, the inodes a peer's
+#               unlinked-list remove can take as predecessor were among them.
+#               H-F12 is then not the complete fix, and the AG handoff needs an
+#               enrollment fence (the next hypothesis) whatever H-F12's verdict.
+#     The control arm's ux fields are read the same way: they say what the
+#     open scan leaves at a handoff today.
+#     NOT SEEN  every reached lap of both arms ux_unlocks 0.
+#
+# Bound: fw3's, 1680 s per lap (pb's laps 494-519 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_LOOKUP_HOLD_MS=50 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh brc1 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_LOOKUP_HOLD_MS=50 NG0_DRAIN_BOUND=1 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh brf1 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_LOOKUP_HOLD_MS=50 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh brc2 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_LOOKUP_HOLD_MS=50 NG0_DRAIN_BOUND=1 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh brf2 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_LOOKUP_HOLD_MS=50 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh brc3 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_LOOKUP_HOLD_MS=50 NG0_DRAIN_BOUND=1 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh brf3 1 300 3/net/mesh/direct g3

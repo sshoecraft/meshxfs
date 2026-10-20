@@ -1,0 +1,72 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F10, the
+# reach A/B.  The first H-F10 A/B (tests/queues/hf10_pubclaim_guard_ab*.queue,
+# claim delay 20 ms alone) left its control laps wmc1 and wdc1 VACUOUS
+# (pub_claim_inflight_rel 0 on all four nodes, no phantom line): the claim
+# delay lengthens a claim only after a drain has taken the inode, and a drain
+# takes an inode of a create in progress only inside the window in which the
+# inode is listed unpublished with no parent recorded (from the allocation's
+# local grant to the parent store after xfs_dir_create_child,
+# xfs/xfs_inode.c xfs_create).  That window is microseconds wide; on the H-F9
+# fix laps a drain met it about once in four laps (zmf1, zmf4).
+#
+# Test knob dbg_create_parent_delay_ms (NG0_CREATE_PARENT_DELAY_MS) holds a
+# regular-file create in that window, its parent directory locked, so the BAST
+# drain of the peer's directory (which this node holds at PR for its lookups)
+# can take the churner's new file, and the churner's own directory release
+# (its ilock_end demote when the peer's lookup has BASTed it) then meets the
+# claim in flight.  The claim delay (20 ms) is kept so that release meets the
+# claim before it lands.  No setattr delay: the lookup loop runs at full rate,
+# so the peer's directory is BASTed as often as the workload allows.
+#
+# Same-build A/B of pub_claim_release_guard (0 = control, 1 = fix), every other
+# guard at 1 (noino_gen0_guard by the harness's guard argument,
+# noino_recycle_guard, freshsrc_keep_guard, selfclobber_keep_guard set;
+# noino_resv_guard and noino_shell_guard at their module default 1), mirror
+# check on.  Runs from the sibling checkout ~/src/mxfs-e (main-tree source
+# plus the knob, srcversion 533873C78054A9285602B33 at launch, printed by each lap; the harness refuses a node
+# running anything else) on 3/net/mesh/direct g3b (test15 test16 test17; the
+# workload runs on the first two, the third is mounted and idle), because
+# both 2-node TCP configurations carry the main tree's chains.  Kept images go
+# to /mxfs/snapshots.
+#
+# VERDICT RULES (written before the first lap; the first H-F10 A/B's rules,
+# with this queue's reach):
+#   REACHED      a control lap counts pc_inflight_rel > 0 (the harness's
+#                vacuity gate); a VACUOUS control lap has no verdict.  If no
+#                control lap is reached, the reach knob does not open the
+#                window and the design is redone before anything is judged.
+#   PROVEN       a reached control lap audits CORRUPT and an audited inode
+#                has, on one node, claim_at_release > 0 or a phantom or
+#                no-grant line with pub_inflight=1 (the harness's attribution
+#                line).
+#   HAZARD ONLY  REACHED, and no control lap audits CORRUPT with that
+#                attribution: the release going with the child neither
+#                unpublished nor granted is measured, but no corruption is
+#                attributed to it on these laps.
+#   FIX VERIFIED (H-F10)  REACHED, and every non-vacuous fix lap
+#                (pc_rel_waited > 0) reads pc_ok=1 (pc_inflight_rel == 0,
+#                including a release that waited out the 5 s bound), audits
+#                CLEAN with node_failures=0, and logs no P-LOGWR-DLM-NOGRANT
+#                line with pub_inflight=1.
+#   REFUTED      a non-vacuous fix lap reads pc_inflight_rel > 0 or audits
+#                CORRUPT with H-F10 attribution: trace the instance.
+#   OTHER        on a fix lap: a CORRUPT audit without H-F10 attribution, a
+#                phantom or no-grant line with pub_inflight=0, hf7_undrained >
+#                0, a left_live line, or a P-NOINO-LIVE-SHELL routed=0 line.
+#                Each is its own finding; none judges this guard.  Phantom
+#                lines with pub_inflight=1 on a fix lap judge nothing.
+# A lap whose audit is STALE/NONE has no verdict and is rerun.
+#
+# Bound per lap, the sum of the harness's own step bounds, every ssh step
+# counted: prep_cluster 300 + srcversion reads 2x20 + knob sets 2x(9x20: gen0
+# guard+delay, recycle, freshsrc, selfclobber, pubclaim guard, pubclaim
+# delay, create-parent delay, mirror) + mkdir 30 + workload SECS+60 = 360 +
+# counter reads 2x40 + knob resets 2x(4x20: delay, mirror, pubclaim delay,
+# create-parent delay) + chk_clean with alloc_witness 150 + stream capture
+# 2x120 + snapshot 60 = 1660 s.
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=0 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh xtc1 1 300 3/net/mesh/direct g3b
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh xtf1 1 300 3/net/mesh/direct g3b
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=0 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh xtc2 1 300 3/net/mesh/direct g3b
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh xtf2 1 300 3/net/mesh/direct g3b
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh xtf3 1 300 3/net/mesh/direct g3b
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh xtf4 1 300 3/net/mesh/direct g3b

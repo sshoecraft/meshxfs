@@ -297,6 +297,12 @@ static bool format_dirshard;
  * every mount must then pass -o cluster=NAME.  NULL = unnamed. */
 static const char *format_cluster_name;
 
+/* TEST ONLY (-H): the authority ledger's routing version written into the
+ * region header.  A module reads it at attach and routes by it, so one module
+ * can be measured on both: version 1 hashes every resource to its own page,
+ * version 2 groups eight consecutive inode numbers per page. */
+static uint16_t format_tauth_hash_version = MXFS_TAUTH_HASH_VERSION;
+
 /*
  * Write a buffer to fd at the given offset.
  * Uses pwrite with O_DIRECT alignment via posix_memalign.
@@ -798,6 +804,10 @@ static int format_tauth_region(int fd, uint64_t tauth_offset, uint64_t tauth_siz
         return -1;
     }
     mxfs_tauth_region_init(rh, fs_gen, uuid, npages, hash_seed, stamp, crc32c);
+    if (rh->hash_version != format_tauth_hash_version) {
+        rh->hash_version = format_tauth_hash_version;
+        rh->crc32c = mxfs_tauth_region_crc(rh, crc32c);
+    }
     if (write_sectors(fd, tauth_offset + mxfs_tauth_hdr_off(0), rh,
                       sizeof(*rh)) < 0)
         goto fail;
@@ -1861,7 +1871,7 @@ static const char *existing_signature(const char *device, char *buf, size_t bufl
 static void usage(const char *prog)
 {
     fprintf(stderr,
-            "Usage: %s [-f] [-c name] [-D] [-n count] [-d size] [-t entries] [-v] [-V] [-Z] DEVICE\n"
+            "Usage: %s [-f] [-c name] [-D] [-n count] [-d size] [-t entries] [-H version] [-v] [-V] [-Z] DEVICE\n"
             "\n"
             "Format a block device for MXFS (Multinode XFS).\n"
             "\n"
@@ -1879,6 +1889,8 @@ static void usage(const char *prog)
             "              default: the whole device).  Like mkfs.xfs -d size=;\n"
             "              used to reproduce a smaller-device geometry (agcount)\n"
             "              on a larger LUN.\n"
+            "  -H VERSION  TEST ONLY: write authority-ledger routing VERSION\n"
+            "              (1 or 2; default 2), to measure one module on both\n"
             "  -v          Verbose output\n"
             "  -V          Print version and exit\n"
             "  -Z          TEST ONLY: do not zero the XFS log region (keeps a\n"
@@ -1917,10 +1929,20 @@ int main(int argc, char *argv[])
     uint32_t tauth_npages = 0;          /* -t: authority-ledger records, 0 = derive */
     uint64_t tauth_seed = 0;            /* per-format routing-hash seed */
 
-    while ((opt = getopt(argc, argv, "fc:Dn:d:t:vVZ")) != -1) {
+    while ((opt = getopt(argc, argv, "fc:Dn:d:t:H:vVZ")) != -1) {
         switch (opt) {
         case 'f':
             force = true;
+            break;
+        case 'H':
+            if (strcmp(optarg, "1") == 0) {
+                format_tauth_hash_version = MXFS_TAUTH_HASH_V1;
+            } else if (strcmp(optarg, "2") == 0) {
+                format_tauth_hash_version = MXFS_TAUTH_HASH_V2;
+            } else {
+                pr_err("mkfs.mxfs: -H VERSION must be 1 or 2\n");
+                return 1;
+            }
             break;
         case 'c':
             if (!mxfs_cluster_name_valid(optarg)) {

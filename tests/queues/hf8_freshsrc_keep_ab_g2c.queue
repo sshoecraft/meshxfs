@@ -1,0 +1,17 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F8: the
+# same same-build A/B as tests/queues/hf8_freshsrc_keep_ab.queue (its header
+# states the hypothesis and the verdict rules), on 2/net/mesh/direct with
+# test29/test30 beside that queue's 2/net/mesh/mpath laps on test1/test2.
+# NG0_FRESHSRC_GUARD=0 is the control, =1 the fix.
+#
+# Bound per lap: 1350 s, derived in that queue's header.
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kdc1 1 300 2/net/mesh/direct g2c
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kdf1 1 300 2/net/mesh/direct g2c
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kdc2 1 300 2/net/mesh/direct g2c
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kdf2 1 300 2/net/mesh/direct g2c
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kdc3 1 300 2/net/mesh/direct g2c
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kdf3 1 300 2/net/mesh/direct g2c
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kdc4 1 300 2/net/mesh/direct g2c
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kdf4 1 300 2/net/mesh/direct g2c
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kdc5 1 300 2/net/mesh/direct g2c
+1350 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kdf5 1 300 2/net/mesh/direct g2c

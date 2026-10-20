@@ -54,6 +54,7 @@
 #include <string.h>
 #endif
 #include "mxfs_common.h"     /* mxfs_uuid_to_volume_id */
+#include "mxfs_dlm.h"        /* MXFS_LTYPE_INODE: the routing shards it */
 
 #define MXFS_TAUTH_REGION_MAGIC     0x48545541u  /* "AUTH" LE */
 #define MXFS_TAUTH_PAGE_MAGIC       0x47504154u  /* "TAPG" LE */
@@ -110,7 +111,25 @@
 									 MXFS_TAUTH_ENTRIES_PER_PAGE)     /* 2115 = minimum */
 #define MXFS_TAUTH_NPAGES_MIN       MXFS_TAUTH_NPAGES
 #define MXFS_TAUTH_NPAGES_MAX       (1u << 20)                        /* 8 GiB dual */
-#define MXFS_TAUTH_HASH_VERSION     1u   /* fnv1a-32 over the resource id, seeded */
+/*
+ * Routing versions, recorded in the region header at format time; every
+ * member routes by the region's, so a module that knows only version 1
+ * refuses a version 2 region at open (region_valid) instead of misrouting.
+ *   1  every resource hashes alone: fnv1a-32 over the resource id, seeded
+ *   2  (D-0349) an INODE resource hashes with the low MXFS_TAUTH_INO_SHARD_BITS
+ *      bits of its number cleared, so the consecutive numbers an inode chunk
+ *      hands out in order share one home page, and so one master and one
+ *      page write, instead of each paying a page of its own (on a fresh
+ *      filesystem nearly every new number's page had never been used, and its
+ *      first touch cost a bootstrap prepare and an activation on top of the
+ *      grant's own commit).  Its home index on the page is offset by those
+ *      bits.  Every other resource type routes as in version 1.
+ */
+#define MXFS_TAUTH_HASH_V1          1u
+#define MXFS_TAUTH_HASH_V2          2u
+#define MXFS_TAUTH_HASH_VERSION     MXFS_TAUTH_HASH_V2   /* what mkfs writes */
+#define MXFS_TAUTH_INO_SHARD_BITS   3u
+#define MXFS_TAUTH_INO_SHARD        (1u << MXFS_TAUTH_INO_SHARD_BITS)
 #define MXFS_TAUTH_HDR_COPIES       2u
 #define MXFS_TAUTH_PAGE_COPIES      2u
 /* Region size for a page count (the header copies + both page copy arrays). */
@@ -467,6 +486,41 @@ static inline uint32_t mxfs_tauth_home_index(uint32_t hash, uint32_t npages)
 	return (npages ? hash / npages : hash) % MXFS_TAUTH_ENTRIES_PER_PAGE;
 }
 
+/* a resource whose routing version 2 shards by inode number */
+static inline int mxfs_tauth_ino_sharded(const struct mxfs_resource_id *res,
+					 uint16_t hash_version)
+{
+	return hash_version >= MXFS_TAUTH_HASH_V2 && res->type == MXFS_LTYPE_INODE;
+}
+
+/* The routing hash of a resource under a region's routing version: the one
+ * every page and master decision is made from (module, tools and tests). */
+static inline uint32_t mxfs_tauth_route_hash(const struct mxfs_resource_id *res,
+					     uint64_t seed, uint16_t hash_version)
+{
+	struct mxfs_resource_id r;
+
+	if (!mxfs_tauth_ino_sharded(res, hash_version))
+		return mxfs_tauth_res_hash(res, sizeof(*res), seed);
+	r = *res;
+	r.ino &= ~(uint64_t)(MXFS_TAUTH_INO_SHARD - 1);
+	return mxfs_tauth_res_hash(&r, sizeof(r), seed);
+}
+
+/* The preferred entry on the home page for a routing hash from
+ * mxfs_tauth_route_hash: a sharded inode's numbers take consecutive entries. */
+static inline uint32_t mxfs_tauth_route_index(const struct mxfs_resource_id *res,
+					      uint32_t hash, uint32_t npages,
+					      uint16_t hash_version)
+{
+	uint32_t idx = mxfs_tauth_home_index(hash, npages);
+
+	if (mxfs_tauth_ino_sharded(res, hash_version))
+		idx = (idx + (uint32_t)(res->ino & (MXFS_TAUTH_INO_SHARD - 1))) %
+		      MXFS_TAUTH_ENTRIES_PER_PAGE;
+	return idx;
+}
+
 /*
  * Pure validation.  `crc` is the caller's crc32c(seed ~0, data, len) —
  * mxfs_pal_crc32c in the module, the local table in the tools — so this
@@ -545,7 +599,8 @@ static inline int mxfs_tauth_region_valid(const struct mxfs_tauth_region_hdr *rh
 	    rh->npages > MXFS_TAUTH_NPAGES_MAX ||
 	    rh->entry_bytes != MXFS_TAUTH_ENTRY_BYTES ||
 	    rh->page_bytes != MXFS_TAUTH_PAGE_BYTES ||
-	    rh->hash_version != MXFS_TAUTH_HASH_VERSION ||
+	    rh->hash_version < MXFS_TAUTH_HASH_V1 ||
+	    rh->hash_version > MXFS_TAUTH_HASH_V2 ||
 	    rh->fs_gen != fs_gen ||
 	    rh->seq == 0)
 		return 0;

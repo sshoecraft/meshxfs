@@ -225,7 +225,7 @@ if [ "$MODE" = "defer" ]; then
             p282=$(grep -c "P282-RELGATE-FAULT stage=$stage " "$LOG")
             defers=$(grep 'P280-RELEASE-CERT ' "$LOG" | grep -c 'cas=0 .*defer=[1-4]:')
             wedges=$(grep -c 'P-ICLUS-WEDGE' "$LOG")
-            faults=$(grep -ciE 'kernel BUG|BUG:|Oops|general protection|Call Trace' "$LOG")
+            faults=$(grep -ciE 'kernel BUG|BUG:|\bOops\b|general protection|Call Trace' "$LOG")
             echo "--- stage $stage cycle $cycle: P282=$p282 defer_certs=$defers wedges=$wedges faults=$faults ---"
             total_defer_certs=$(( total_defer_certs + defers ))
             if [ "$wedges" -gt 0 ]; then echo "=== FAIL: unexpected wedge at stage $stage (defer bounds should not expire in a ${WIN}s window) ==="; fail=1; fi
@@ -351,7 +351,7 @@ if [ "$MODE" = "inode" ]; then
             fi
             wedges=$(grep -c 'P-INODE-WEDGE' "$LOG")
             nocause=$(grep -c 'P-INODE-DEFER-NOCAUSE' "$LOG")
-            faults=$(grep -ciE 'kernel BUG|BUG:|Oops|general protection|Call Trace' "$LOG")
+            faults=$(grep -ciE 'kernel BUG|BUG:|\bOops\b|general protection|Call Trace' "$LOG")
             echo "--- inode stage $stage cycle $cycle: P282=$p282 defer_certs=$defers P228=$p228 wedges=$wedges nocause=$nocause faults=$faults ---"
             total_defer_certs=$(( total_defer_certs + defers ))
             if [ "$wedges" -gt 0 ]; then echo "=== FAIL: unexpected INODE wedge at stage $stage (a one-shot forced defer must resolve, not expire the bounds) ==="; fail=1; fi

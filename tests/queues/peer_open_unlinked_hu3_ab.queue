@@ -1,0 +1,53 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, hypothesis
+# H-U3 (the record, session 51): the protective reload's fresh-source adopt at
+# an inode-lock acquire copies the platter's di_next_unlinked over this node's
+# own committed, buffer-logged unlinked-list edit of that slot before its home
+# write lands, so the next remove stitches the bucket or the predecessor to an
+# inode already removed and freed.  The fix grafts the iunlink store's
+# committed values onto the fresh image before the adopt
+# (xfs/xfs_mxfs_reload.c); the module parameter freshsrc_iunl_overlay=0 turns
+# it off on the same build.  Both arms print P-FRESHSRC-IUNL-STALE (not
+# ratelimited) when the image a reload adopts carries an older next pointer for
+# the reloaded inode than this node committed, with grafted=1 when the graft
+# corrected it.  Run from ~/src/mxfs on the tree build that carries it; the
+# harness refuses a node running anything else, and reads each knob back.
+#
+# The laps: control and fix alternating, three of each, the reproducer's
+# workload (tests/clmerge_window_node.sh, 30 iterations) on 2/net/mesh/direct
+# g2c, where build C06A6D4A9AB7A357503DF51 reproduced in 3 of 3 laps (puca1,
+# puca2, puci1).
+#
+# VERDICT RULES (written before the first lap):
+#   SUPPORTED AND FIXED  at least 2 of the 3 control laps REPRODUCED, each with
+#             sig_pre > 0 on a node that failed (a P53-IUNLINK-MISMATCH of an
+#             inode that an ungrafted P-FRESHSRC-IUNL-STALE named earlier,
+#             before that node's first 'xfs_ifree returned error'); and all 3
+#             fix laps PASS: no 'xfs_ifree returned error', no
+#             P53-IUNLINK-MISMATCH, stale_ungrafted 0, no node failure line in
+#             either node's whole kernel log, cold audit CLEAN errors=0, and
+#             stale_grafted > 0 over the fix laps (the graft reached).
+#   NOT SUPPORTED  a control lap that reproduces with sig_pre 0 on every node
+#             that failed: another mechanism, attributed before anything else.
+#   NOT FIXED  a fix lap that REPRODUCES, logs P53-IUNLINK-MISMATCH, or counts
+#             stale_ungrafted > 0 (a graft refused): attributed from its kept
+#             logs and image.
+#   WEAK      fewer than 2 control laps reproduce: the arms cannot be told
+#             apart at this rate; more laps, not a verdict.
+# A lap that ABORTs, or audits STALE/NONE without a reproduction, has no verdict
+# and is rerun.  A reproduction's cold audit (after the remount replays both
+# journals) is recorded either way: CORRUPT there makes the record an integrity
+# defect.  Nothing here disposes of H-U1 (NOPREV) or H-U2 (BACKREF): a NOPREV or
+# BACKREF line in any lap is attributed and recorded.
+#
+# Bound per lap (tests/peer_open_unlinked_chain.sh's derivation): prep 300 +
+# srcversion 2x20 + the instr knob 2x20 + one PUC_KNOBS knob 2x20 + the mount's
+# device 2x20 + mkdir 30 + workload 30 x (3 + 5 + ceil(3 x 0.3) + 2) + 60 = 390,
+# +10 for the peer + the done file on both nodes 2x20 + instr reset 2x20 +
+# stream copy 2x120 + on a failure: unmount 2x(70 + 20) + snapshot 60 + image
+# check 10 + remount 2x(110 + 20), + the cold audit 150 = 1870 s.
+1870 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS=freshsrc_iunl_overlay=0 tests/peer_open_unlinked_chain.sh hu3c1 30 2/net/mesh/direct g2c
+1870 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS=freshsrc_iunl_overlay=1 tests/peer_open_unlinked_chain.sh hu3f1 30 2/net/mesh/direct g2c
+1870 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS=freshsrc_iunl_overlay=0 tests/peer_open_unlinked_chain.sh hu3c2 30 2/net/mesh/direct g2c
+1870 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS=freshsrc_iunl_overlay=1 tests/peer_open_unlinked_chain.sh hu3f2 30 2/net/mesh/direct g2c
+1870 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS=freshsrc_iunl_overlay=0 tests/peer_open_unlinked_chain.sh hu3c3 30 2/net/mesh/direct g2c
+1870 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS=freshsrc_iunl_overlay=1 tests/peer_open_unlinked_chain.sh hu3f3 30 2/net/mesh/direct g2c

@@ -1,0 +1,53 @@
+# D-LOCAL-UNLINK-INACT-AFTER-GRANT-LOSS-WRITES-STALE-CORE-OVER-PEER-CHANGE,
+# hypothesis H-LU1: fix laps on a corrected instrument, after
+# tests/queues/peer_changed_life_ab_caw.queue (lapq_pca, pca1-6).
+#
+# WHAT THE FIRST QUEUE GAVE, by its rules: controls pca1, pca3, pca5 all
+# CONTROL-SHOWS-CAUSE (peerchanged 12, 9, 11 with dblfree_skips 24, 18, 22 on
+# the unlinker: the peer-changed lives truncated on their unrefreshed maps,
+# freeing blocks the peer had already freed); fix lap pca2 PASS; fix laps pca4 and
+# pca6 FAIL on reap_last_entries=1 alone, every other fix criterion met
+# (cc_deferred = peerchanged = 12, no stale truncate, no double free, no
+# regress, no node failure, audit CLEAN errors=0).  Attributed from the
+# unlinker's reaper lines: the last P89-REAP-DUTY exit line counted an entry
+# whose inactivation that pass had just started, and that entry's
+# P89-REAP-DONE follows the exit line (pca4 test1 ino 8388739, pca6 test1 ino
+# 8388748), with no reap add after it.  mxfs_reap_worker requeues an entry
+# before its xfs_irele and mxfs_defer_reap_done retires it when the free
+# commits, so the exit count includes it; the reaper's next pass, 30 s later,
+# fell after the harness's stream copy.  The same reading made pct2, pct4 and
+# pct6 FAIL in the TCP queue.  The instrument, not the property, was wrong:
+# tests/peer_changed_life_ab.sh now waits, after the settle, for an exit line
+# after the lap's mark that reads entries=0 (at most PCL_REAP_WAIT_S=70 s of
+# wall, two re-runs and 10 s), then grades exactly as before.  The criterion
+# is unchanged: the unlinker's reaper ends with no entry left.
+#
+# Same build as the first queue: run from the main tree, srcversion
+# 022F8BF6763B609A9ECC7D1 (equal to ~/src/mxfs-e's, where the first queue
+# and the final verification run).  2/disk/caw/direct on g2b (test15 test16)
+# because g2 (test1 test2) carries the final verification lap fw3c.  Same
+# harness settings as the first queue: 12 iterations, peer wait 500 ms, live
+# unlink delay 3000 ms, last-reference hold 4500 ms.
+#
+# VERDICT RULES (written before the first lap of this queue):
+#   SUPPORTED   the three fix laps (guard 1) PASS by the harness's grade and
+#               the control lap (guard 0) reads CONTROL-SHOWS-CAUSE; with the
+#               first queue's three controls that is four of four.
+#   FIX FAILS   any fix lap FAIL: its lines are attributed before anything
+#               else, starting with the unlinker's verdict and reaper lines
+#               for the lives it names.
+#   WEAK        neither: more laps, not a verdict.
+#   A VACUOUS lap (peerchanged 0) measured nothing and is rerun; an ABORT or
+#   an overrun is read from its own lines.  The first queue's pca2 PASS and
+#   the attributed pca4/pca6 FAILs do not count toward the three.
+# The record closes only when this A/B is SUPPORTED and the final
+# verification campaign passes on the same build.
+#
+# Bound per lap: the first queue's 1278 s (prep 300, srcversion and knob
+# steps 2 x 60, mkdir 30, workload 288 + 10, done marker 20, settle 40,
+# counters 40, knob resets 40, stream copy 240, chk_clean 150) plus the
+# reaper report wait, 70 s of wall and the last poll's 20 s: 1368 s.
+1368 tests/peer_changed_life_ab.sh pcf1 1 12 2/disk/caw/direct g2b
+1368 tests/peer_changed_life_ab.sh pcf2 0 12 2/disk/caw/direct g2b
+1368 tests/peer_changed_life_ab.sh pcf3 1 12 2/disk/caw/direct g2b
+1368 tests/peer_changed_life_ab.sh pcf4 1 12 2/disk/caw/direct g2b

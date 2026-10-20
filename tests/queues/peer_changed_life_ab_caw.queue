@@ -1,0 +1,58 @@
+# D-LOCAL-UNLINK-INACT-AFTER-GRANT-LOSS-WRITES-STALE-CORE-OVER-PEER-CHANGE,
+# hypothesis H-LU1 (the record, session 92), A/B on 2/disk/caw/direct g2
+# (test1 test2), the configuration whose control lap pclc3 showed the cause.
+# Same build in both arms: ~/src/mxfs-e synced by tools/sibling_sync.sh to the
+# main tree at srcversion 022F8BF6763B609A9ECC7D1 (marker inact_local_cc_guard).
+# Run from ~/src/mxfs-e.  The harness refuses a node running another build and
+# reads every knob back.  Only inact_local_cc_guard differs between the arms;
+# the test delays (live unlink 3000 ms, BAST last-reference hold 4500 ms, the
+# peer's 500 ms wait past the minimum hold) are the same in both.
+#
+# THE CAUSE, as lap pclc3 (control, 12 of 12 iterations) showed it: the
+# unlinker's inactivation of f<k>, run on its BAST worker after its grant was
+# lost since the unlink, read the platter's same life at a higher changecount
+# (P-INACT-LOCAL-EPOCH verdict=peer-changed, e.g. ino 8388739 disk_cc=26
+# mem_cc=20 disk_size=0 mem_size=65536 disk_nblocks=0 mem_nblocks=16) and
+# truncated its unrefreshed extent map: P3-SKIP-DBLFREE agno=4 bno=24 len=10
+# and bno=10 len=6, blocks the peer's own truncate had already freed (24 such
+# skips in the lap).  Only the redundant-free safety net kept that from
+# freeing blocks another file could own by then.
+#
+# PREDICTION IF H-LU1's FIX WORKS: fix laps reach (peerchanged > 0) and defer
+# every such free to the reaper (cc_deferred == peerchanged); the unlinker
+# logs no P3-SKIP-DBLFREE and no stale truncate of a peer-changed life, no
+# node logs a P-DINO-CLOBBER regress, the reaper finishes every entry, the
+# cold audit reads CLEAN errors=0, and no node logs a failure line.
+#
+# VERDICT RULES (written before the first lap of this queue and of
+# peer_changed_life_ab_tcpmpath.queue):
+#   SUPPORTED   at least 2 of the 3 control laps CONTROL-SHOWS-CAUSE, and all
+#               3 fix laps PASS by the harness's grade (cc_deferred ==
+#               peerchanged > 0, stale_truncates 0, dblfree_skips 0 on the
+#               unlinker, regress_lines 0 on both nodes, node_failures 0,
+#               reap_last_entries 0, cold audit CLEAN errors=0).
+#   REFUTED     every control lap that reached reads CONTROL-NO-STALE-TRUNCATE
+#               (the peer-changed inactivation does not truncate a stale map).
+#   FIX FAILS   a fix lap FAIL: its lines are attributed before anything else,
+#               starting with the unlinker's verdict and reaper lines for the
+#               lives it names.
+#   WEAK        neither of the above: more laps, not a verdict.
+#   A VACUOUS lap (peerchanged 0) measured nothing and is rerun; an ABORT or
+#   overrun is read from its own lines (a rig cause is recorded as that and
+#   the lap rerun; anything else is a finding).  Any node failure line in a
+#   control lap is attributed and recorded whatever the grade.
+# The record closes only when this A/B is SUPPORTED and the final
+# verification campaign passes on the same build.
+#
+# Bound per lap, the sum of the harness's own step bounds, every ssh step
+# counted: prep_cluster 300 + per node srcversion 20, knob set 20, counter
+# read-back 20 (x2) + mkdir 30 + workload 12 x (15 + 3 + 1) + 60 = 288 and B's
+# 10 s margin + the done marker 20 + settle 40 + counters 2x20 + knob resets
+# 2x20 + stream capture 2x120 + chk_clean 150 = 1278 s.  Lap pclc3 measured
+# 7.2 s an iteration.
+1278 tests/peer_changed_life_ab.sh pca1 0 12 2/disk/caw/direct g2
+1278 tests/peer_changed_life_ab.sh pca2 1 12 2/disk/caw/direct g2
+1278 tests/peer_changed_life_ab.sh pca3 0 12 2/disk/caw/direct g2
+1278 tests/peer_changed_life_ab.sh pca4 1 12 2/disk/caw/direct g2
+1278 tests/peer_changed_life_ab.sh pca5 0 12 2/disk/caw/direct g2
+1278 tests/peer_changed_life_ab.sh pca6 1 12 2/disk/caw/direct g2

@@ -11,6 +11,20 @@ MODULE_PARM_DESC(creator_baseline_stamp,
 
 /* ─── deferred-publish ─── */
 
+/* the order inodes join m_mxfs_unpub_list: an AG release's drain takes only
+ * the entries listed before it began (pub_drain_bound, xfs_mxfs_dlm.c) */
+static atomic64_t	mxfs_unpub_seq_next = ATOMIC64_INIT(0);
+
+/* Called under m_mxfs_unpub_lock. */
+static void
+mxfs_unpub_list_add(
+	struct xfs_mount	*mp,
+	struct xfs_inode	*ip)
+{
+	ip->i_mxfs_unpub_seq = atomic64_inc_return(&mxfs_unpub_seq_next);
+	list_add_tail(&ip->i_dlm_unpub_link, &mp->m_mxfs_unpub_list);
+}
+
 /*
  * Grant a brand-new inode (XFS_IGET_CREATE) its DLM lock locally, with no
  * on-disk CAW.  The creator owns the inode exclusively (it is invisible to
@@ -129,7 +143,7 @@ mxfs_dlm_grant_local_new(
 		/* v0.5.6: parent unknown until xfs_create/xfs_symlink records
 		 * it post-dirent; 0 = matched by every scoped BAST drain. */
 		ip->i_mxfs_unpub_parent = 0;
-		list_add_tail(&ip->i_dlm_unpub_link, &mp->m_mxfs_unpub_list);
+		mxfs_unpub_list_add(mp, ip);
 	}
 	spin_unlock(&mp->m_mxfs_unpub_lock);
 
@@ -216,7 +230,7 @@ mxfs_dlm_rearm_unpublished(
 		/* v0.5.6: parent unknown until xfs_create/xfs_symlink records
 		 * it post-dirent; 0 = matched by every scoped BAST drain. */
 		ip->i_mxfs_unpub_parent = 0;
-		list_add_tail(&ip->i_dlm_unpub_link, &mp->m_mxfs_unpub_list);
+		mxfs_unpub_list_add(mp, ip);
 		rearmed = true;
 	}
 	spin_unlock(&mp->m_mxfs_unpub_lock);
@@ -285,14 +299,242 @@ mxfs_dlm_unpub_in_scope(
 	xfs_ino_t		parent_ino,
 	xfs_agnumber_t		agno)
 {
-	if (ip->i_mxfs_unpub_parent == 0)
+	if (ip->i_mxfs_unpub_parent == 0) {
+		/*
+		 * H-F13: an AG release's scope is what the AG's own structures
+		 * can surface, and a parent-unknown inode of another AG is not
+		 * among it -- every directory's drain still matches it.  With
+		 * ag_ialloc_fence on, the creates the fence sends to the
+		 * node's other AGs no longer feed this AG's drain.
+		 */
+		if (parent_ino == 0 && agno != NULLAGNUMBER &&
+		    READ_ONCE(mxfs_ag_ialloc_fence))
+			return XFS_INO_TO_AGNO(mp, ip->i_ino) == agno;
 		return true;
+	}
 	if (parent_ino != 0 && ip->i_mxfs_unpub_parent == parent_ino)
 		return true;
 	if (agno != NULLAGNUMBER &&
 	    XFS_INO_TO_AGNO(mp, ip->i_ino) == agno)
 		return true;
 	return false;
+}
+
+/*
+ * D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F10.  A
+ * publish that takes an inode off the unpublished list before claiming it
+ * leaves the inode neither unpublished nor granted until the claim returns.
+ * The BAST-side drain below may do that only because the peer whose BAST it
+ * serves waits for the whole drain, which shields the inodes that peer can
+ * reach through the released lock and no others.  An inode whose parent is
+ * not yet recorded is in every drain's scope, so the drain of an unrelated
+ * lock can take it, and its real parent's release then finds nothing listed
+ * to publish.  Measured on the H-F9 fix lap zmf1 (test2, ino 10485895): the
+ * BAST drain of the peer's directory took the new file while its creator was
+ * still inside the create; the creator ended its own directory's tenure 0.8
+ * ms before that claim landed, and the file logged four changes at no grant
+ * (P-LOG-MIRROR-PHANTOM unpub_clr=22:583).  Every take-then-claim publish
+ * keeps the inode on m_mxfs_pubclaim_list while its claim is in flight, so a
+ * directory or AG release can see the claims in its scope.
+ */
+static atomic64_t	mxfs_pubclaim_next = ATOMIC64_INIT(0);
+
+/* Under m_mxfs_unpub_lock, at the take.  Returns the claim's token, 0 if the
+ * inode is being reclaimed (i_ino 0) or is already tracked. */
+static u64
+mxfs_pubclaim_begin_locked(
+	struct xfs_mount	*mp,
+	struct xfs_inode	*ip)
+{
+	if (ip->i_ino == 0 || !list_empty(&ip->i_mxfs_pubclaim_link))
+		return 0;
+	ip->i_mxfs_pubclaim_seq = atomic64_inc_return(&mxfs_pubclaim_next);
+	ip->i_mxfs_pubclaim_ns = ktime_get_ns();
+	list_add_tail(&ip->i_mxfs_pubclaim_link, &mp->m_mxfs_pubclaim_list);
+	return ip->i_mxfs_pubclaim_seq;
+}
+
+/* The claim carrying `seq` returned (or was not made): it leaves the list.
+ * Found by token, never by pointer: reclaim may have freed the inode and
+ * removed it first. */
+void
+mxfs_pubclaim_end(
+	struct xfs_mount	*mp,
+	u64			seq)
+{
+	struct xfs_inode	*ip;
+	bool			found = false;
+
+	if (!seq)
+		return;
+	spin_lock(&mp->m_mxfs_unpub_lock);
+	list_for_each_entry(ip, &mp->m_mxfs_pubclaim_list,
+			    i_mxfs_pubclaim_link) {
+		if (ip->i_mxfs_pubclaim_seq == seq) {
+			list_del_init(&ip->i_mxfs_pubclaim_link);
+			found = true;
+			break;
+		}
+	}
+	spin_unlock(&mp->m_mxfs_unpub_lock);
+	if (found)
+		wake_up_all(&mp->m_mxfs_pubclaim_wq);
+}
+
+/* The inode is about to be freed (reclaim, or a failed create's teardown): a
+ * claim still tracked on it leaves now, whatever its claimant does later. */
+void
+mxfs_pubclaim_drop(
+	struct xfs_inode	*ip)
+{
+	struct xfs_mount	*mp = ip->i_mount;
+	bool			was;
+
+	spin_lock(&mp->m_mxfs_unpub_lock);
+	was = !list_empty(&ip->i_mxfs_pubclaim_link);
+	if (was)
+		list_del_init(&ip->i_mxfs_pubclaim_link);
+	spin_unlock(&mp->m_mxfs_unpub_lock);
+	if (was)
+		wake_up_all(&mp->m_mxfs_pubclaim_wq);
+}
+
+/*
+ * The ilock backstop's take (xfs/xfs_mxfs_ilock.c): mxfs_dlm_unpublish_drop
+ * plus the claim's tracking, in one critical section.  The token is kept on
+ * the inode (i_mxfs_pubclaim_bseq) for the acquiring thread, which holds a
+ * reference, to end once its acquire returns.  Returns whether the inode was
+ * unpublished.
+ */
+bool
+mxfs_dlm_unpublish_take(
+	struct xfs_inode	*ip)
+{
+	struct xfs_mount	*mp = ip->i_mount;
+	bool			was;
+
+	if (!mp->m_mxfs_dlm)
+		return false;
+
+	spin_lock(&mp->m_mxfs_unpub_lock);
+	was = ip->i_dlm_unpublished;
+	if (was) {
+		list_del_init(&ip->i_dlm_unpub_link);
+		ip->i_dlm_unpublished = false;
+		WRITE_ONCE(ip->i_mxfs_unpub_clr_line, MXFS_SITE);
+		ip->i_mxfs_pubclaim_bseq = mxfs_pubclaim_begin_locked(mp, ip);
+	}
+	spin_unlock(&mp->m_mxfs_unpub_lock);
+	return was;
+}
+
+/* Under m_mxfs_unpub_lock: the first claim in flight in this release's scope. */
+static struct xfs_inode *
+mxfs_pubclaim_inscope_locked(
+	struct xfs_mount	*mp,
+	xfs_ino_t		parent_ino,
+	xfs_agnumber_t		agno)
+{
+	struct xfs_inode	*ip;
+
+	list_for_each_entry(ip, &mp->m_mxfs_pubclaim_list,
+			    i_mxfs_pubclaim_link)
+		if (mxfs_dlm_unpub_in_scope(mp, ip, parent_ino, agno))
+			return ip;
+	return NULL;
+}
+
+static bool
+mxfs_pubclaim_inscope(
+	struct xfs_mount	*mp,
+	xfs_ino_t		parent_ino,
+	xfs_agnumber_t		agno)
+{
+	bool			any;
+
+	spin_lock(&mp->m_mxfs_unpub_lock);
+	any = mxfs_pubclaim_inscope_locked(mp, parent_ino, agno) != NULL;
+	spin_unlock(&mp->m_mxfs_unpub_lock);
+	return any;
+}
+
+/*
+ * A directory or AG release is about to go to a peer.  With a claim in its
+ * scope in flight, pub_claim_release_guard 1 waits for it within the drain's
+ * own window; 0 (the same-build control) lets the release go.  A release
+ * whose own drain timed out goes as it did before (that timeout breaks a
+ * cross-node BAST cycle) and is counted.  A release of a regular file exposes
+ * no child and is not checked.
+ */
+static void
+mxfs_pubclaim_release_check(
+	struct xfs_mount	*mp,
+	xfs_ino_t		parent_ino,
+	xfs_agnumber_t		agno,
+	bool			drain_timed_out)
+{
+	extern int		mxfs_pub_claim_release_guard;
+	extern atomic_t		mxfs_pub_claim_inflight_rel;
+	extern atomic_t		mxfs_pub_claim_rel_waited;
+	static atomic_t		p_pcir_n = ATOMIC_INIT(0);
+	struct xfs_inode	*ip, *cip;
+	xfs_ino_t		cino = 0, cparent = 0, oino = 0;
+	s64			age_us = 0, oage_us = 0, a;
+	u64			t0 = 0, now;
+	unsigned int		ninscope = 0;
+	int			guard = READ_ONCE(mxfs_pub_claim_release_guard);
+	const char		*outcome;
+
+	if (parent_ino == 0 && agno == NULLAGNUMBER)
+		return;
+	spin_lock(&mp->m_mxfs_unpub_lock);
+	ip = mxfs_pubclaim_inscope_locked(mp, parent_ino, agno);
+	if (ip) {
+		cino = ip->i_ino;
+		cparent = ip->i_mxfs_unpub_parent;
+		now = ktime_get_ns();
+		age_us = (s64)(now - ip->i_mxfs_pubclaim_ns) / 1000;
+		/* every in-scope claim, and the oldest: a drain-timeout
+		 * release names whether its own stuck claim is among them */
+		list_for_each_entry(cip, &mp->m_mxfs_pubclaim_list,
+				    i_mxfs_pubclaim_link) {
+			if (!mxfs_dlm_unpub_in_scope(mp, cip, parent_ino,
+						     agno))
+				continue;
+			ninscope++;
+			a = (s64)(now - cip->i_mxfs_pubclaim_ns) / 1000;
+			if (a > oage_us) {
+				oage_us = a;
+				oino = cip->i_ino;
+			}
+		}
+	}
+	spin_unlock(&mp->m_mxfs_unpub_lock);
+	if (!ip)
+		return;
+
+	if (guard && !drain_timed_out) {
+		t0 = ktime_get_ns();
+		wait_event_timeout(mp->m_mxfs_pubclaim_wq,
+				   !mxfs_pubclaim_inscope(mp, parent_ino, agno),
+				   msecs_to_jiffies(MXFS_PUB_DRAIN_TIMEOUT_MS));
+	}
+	if (t0 && !mxfs_pubclaim_inscope(mp, parent_ino, agno)) {
+		atomic_inc(&mxfs_pub_claim_rel_waited);
+		outcome = "waited";
+	} else {
+		atomic_inc(&mxfs_pub_claim_inflight_rel);
+		outcome = drain_timed_out ? "drain-timeout" :
+			  guard ? "escaped" : "proceeded";
+	}
+	if (atomic_inc_return(&p_pcir_n) <= 2000)
+		pr_warn("mxfs: P-PUB-CLAIM-INFLIGHT-AT-RELEASE parent=%llu agno=%d child=%llu child_parent=%llu age_us=%lld wait_us=%lld guard=%d outcome=%s inscope=%u oldest=%llu oldest_age_us=%lld comm=%s -- a release in whose scope a publish claim was in flight: that inode is neither unpublished nor granted until the claim returns\n",
+			(unsigned long long)parent_ino,
+			agno == NULLAGNUMBER ? -1 : (int)agno,
+			(unsigned long long)cino, (unsigned long long)cparent,
+			age_us, t0 ? (s64)(ktime_get_ns() - t0) / 1000 : 0,
+			guard, outcome, ninscope,
+			(unsigned long long)oino, oage_us, current->comm);
 }
 
 /*
@@ -532,13 +774,77 @@ mxfs_dlm_creator_baseline_query(
 	mxfs_dlm_creator_baseline_apply(ip, bep, bgg, site);
 }
 
+/*
+ * The step a drain worker is in for its current child, recorded for the
+ * drain's timeout report: a drain that runs out its window names the child
+ * each unfinished worker is on and what it waits in (P-PUB-DRAIN-STUCK).
+ */
+#define MXFS_PUB_STEP_SETTLE	1	/* FS-layer EX gone: durability settle */
+#define MXFS_PUB_STEP_DEMOTE	2	/* routed: the child's own demote pipeline */
+#define MXFS_PUB_STEP_ICLUS	3	/* routed, live holder: cluster EX claim */
+#define MXFS_PUB_STEP_EVICTED	4	/* routed, evicted: durability settle */
+#define MXFS_PUB_STEP_CLAIM	5	/* the on-disk EX claim */
+
+static inline void
+mxfs_pub_drain_step(
+	struct mxfs_pub_drain_worker	*w,
+	xfs_ino_t			ino,
+	int				step)
+{
+	WRITE_ONCE(w->cur_phase, step);
+	WRITE_ONCE(w->cur_ns, ktime_get_ns());
+	WRITE_ONCE(w->cur_ino, ino);
+}
+
+/*
+ * D-SURVIVOR-DEFERRED-PUBLISH-EX-CLAIM-FAILS-AFTER-60-REMASTER-RETRIES-AT-REJOIN.
+ * The non-routed arm's on-disk EX claim can fail after the pop has cleared
+ * i_dlm_unpublished: on 2/net/mesh/mpath, after a fenced peer rejoined, a
+ * full ledger page answered every one of the claim's 60 retries
+ * (why[capacity=60]) and the claim returned -EAGAIN.  The arm only logged it,
+ * so the child kept its local-only EX with no grant behind it and sat on no
+ * list: a peer that sees its name can be granted it cleanly and read the
+ * platter before the child is written, while this node goes on writing it
+ * under an EX nobody else knows of.
+ *
+ * The claim cannot be given up and the child cannot be demoted instead: its
+ * live core may not go home without a grant (pub_claim_write_guard masks it
+ * while the claim is in flight, because a peer may still hold the number's
+ * previous life).  So 1 (default): a claim answered -EAGAIN (its retry budget
+ * spent on RETRY answers) stays in flight and is asked again, with backoff,
+ * until it is granted, the filesystem shuts down or unmounts, or it fails
+ * otherwise -- as the inode lock parks and asks again instead of failing.
+ * While it waits on a full page the master keeps its place in the child's
+ * queue (dl_capacity_park), so a peer that asks for the child after the
+ * drain window ends queues behind the claim instead of being granted first.
+ * 0 = the same-build control: the failure is only logged.
+ * dbg_pub_claim_fail_ino (TEST ONLY): the first claim attempt of that inode
+ * fails with -EAGAIN without asking the lock layer, the state a claim that
+ * ran out its retries is in; the switch clears itself when it fires.
+ */
+int mxfs_pub_claim_retry = 1;
+static atomic_t mxfs_pub_claim_retry_n = ATOMIC_INIT(0);
+static unsigned long long mxfs_dbg_pub_claim_fail_ino;
+module_param_named(pub_claim_retry, mxfs_pub_claim_retry, int, 0644);
+MODULE_PARM_DESC(pub_claim_retry,
+	"a deferred-publish EX claim answered -EAGAIN stays in flight and is asked again until granted (1, default); 0 = the failure is only logged (test control)");
+module_param_named(pub_claim_retry_n, mxfs_pub_claim_retry_n.counter, int,
+		   0444);
+MODULE_PARM_DESC(pub_claim_retry_n,
+	"deferred-publish claims asked again after an -EAGAIN since load");
+module_param_named(dbg_pub_claim_fail_ino, mxfs_dbg_pub_claim_fail_ino,
+		   ullong, 0644);
+MODULE_PARM_DESC(dbg_pub_claim_fail_ino,
+	"TEST ONLY: the first deferred-publish EX claim attempt of this inode fails with -EAGAIN without asking the lock layer; cleared when it fires (0 = off)");
+
 static unsigned int
 mxfs_dlm_publish_drain_loop(
 	struct xfs_mount	*mp,
 	xfs_ino_t		parent_ino,
 	xfs_agnumber_t		agno,
-	xfs_ino_t		*seen_defer)	/* MXFS_PUB_SEEN_DEFER_MAX */
+	struct mxfs_pub_drain_worker *w)
 {
+	xfs_ino_t		*seen_defer = w->seen_defer;	/* MXFS_PUB_SEEN_DEFER_MAX */
 	struct mxfs_v5_dlm	*dlm = mp->m_mxfs_dlm;
 	struct xfs_inode	*ip, *match;
 	uint64_t		ino;
@@ -557,6 +863,7 @@ mxfs_dlm_publish_drain_loop(
 		uint8_t		pre_mode = MXFS_LOCK_EX;
 		uint8_t		pre_state = MXFS_DLM_ISTATE_CACHED;
 		bool		pub_routed = false;
+		u64		claim_seq = 0;	/* H-F10: this take's tracking */
 
 		ino = 0;
 		match = NULL;
@@ -566,6 +873,9 @@ mxfs_dlm_publish_drain_loop(
 			bool deferred = false;
 
 			if (!mxfs_dlm_unpub_in_scope(mp, ip, parent_ino, agno))
+				continue;
+			/* H-F12: listed after this drain began */
+			if (ip->i_mxfs_unpub_seq > w->seq_limit)
 				continue;
 			for (di = 0; di < n_defer; di++)
 				if (seen_defer[di] == ip->i_ino) {
@@ -582,6 +892,7 @@ mxfs_dlm_publish_drain_loop(
 			match->i_dlm_unpublished = false;
 			WRITE_ONCE(match->i_mxfs_unpub_clr_line, MXFS_SITE);
 			ino = match->i_ino;
+			claim_seq = mxfs_pubclaim_begin_locked(mp, match);
 			/* P78: snapshot FS-layer lock state while the
 			 * entry is provably alive (on-list under the lock).
 			 * ICLUSTER: routability snapshotted here too — match
@@ -641,7 +952,12 @@ mxfs_dlm_publish_drain_loop(
 			 * the BAST'd dir until then.  Bounded; fires only when
 			 * the cluster is provably not yet durable.
 			 */
+			mxfs_pub_drain_step(w, ino, MXFS_PUB_STEP_SETTLE);
 			mxfs_dlm_unpub_child_settle(mp, ino);
+			/* H-F10: a release of this child's real parent waits
+			 * for the settle as it would for a claim */
+			mxfs_pubclaim_end(mp, claim_seq);
+			mxfs_pub_drain_step(w, 0, 0);
 			continue;
 		}
 
@@ -678,6 +994,7 @@ mxfs_dlm_publish_drain_loop(
 			struct xfs_inode *dip = NULL;
 			bool run_bp = false;
 
+			mxfs_pub_drain_step(w, ino, MXFS_PUB_STEP_DEMOTE);
 			if (xfs_iget(mp, NULL, ino, XFS_IGET_INCORE, 0,
 				     &dip) == 0 && dip) {
 				spin_lock(&dip->i_dlm_lock);
@@ -741,6 +1058,8 @@ mxfs_dlm_publish_drain_loop(
 							dip->i_mxfs_auth_gen;
 						spin_unlock(&dip->i_dlm_lock);
 					}
+					mxfs_pub_drain_step(w, ino,
+							    MXFS_PUB_STEP_ICLUS);
 					crc = mxfs_pub_defer_claim ?
 						mxfs_iclus_lock(mp, ino,
 							MXFS_LOCK_EX,
@@ -754,15 +1073,17 @@ mxfs_dlm_publish_drain_loop(
 						spin_unlock(&dip->i_dlm_lock);
 					}
 					if (crc) {
+						/* H-F10: off the in-flight list
+						 * before it is listed again */
+						mxfs_pubclaim_end(mp, claim_seq);
+						claim_seq = 0;
 						spin_lock(&mp->m_mxfs_unpub_lock);
 						if (!dip->i_dlm_unpublished &&
 						    dip->i_ino == ino) {
 							dip->i_dlm_unpublished = true;
 							dip->i_mxfs_unpub_parent =
 								parent_ino;
-							list_add_tail(
-							    &dip->i_dlm_unpub_link,
-							    &mp->m_mxfs_unpub_list);
+							mxfs_unpub_list_add(mp, dip);
 						}
 						spin_unlock(&mp->m_mxfs_unpub_lock);
 						if (n_defer <
@@ -781,6 +1102,8 @@ mxfs_dlm_publish_drain_loop(
 						 * drain; the next publish
 						 * retries the rest */
 						xfs_irele(dip);
+						mxfs_pubclaim_end(mp, claim_seq);
+						mxfs_pub_drain_step(w, 0, 0);
 						break;
 					}
 				} else {
@@ -790,8 +1113,12 @@ mxfs_dlm_publish_drain_loop(
 			} else {
 				/* evicted between pop and here: its updates
 				 * are log-only — settle the platter image */
+				mxfs_pub_drain_step(w, ino,
+						    MXFS_PUB_STEP_EVICTED);
 				mxfs_dlm_unpub_child_settle(mp, ino);
 			}
+			mxfs_pubclaim_end(mp, claim_seq);
+			mxfs_pub_drain_step(w, 0, 0);
 			n++;
 			continue;
 		}
@@ -843,13 +1170,55 @@ mxfs_dlm_publish_drain_loop(
 				spin_unlock(&bip->i_dlm_lock);
 			}
 
-			rc = mxfs_v5_dlm_inode_lock(dlm, ino, MXFS_LOCK_EX,
-						    bip ? &dir_gres : NULL);
-			if (rc)
+			mxfs_pub_drain_step(w, ino, MXFS_PUB_STEP_CLAIM);
+			/* TEST ONLY (H-F10 A/B): hold the claim in flight */
+			{
+				extern unsigned int mxfs_dbg_pub_claim_delay_ms;
+				unsigned int d = READ_ONCE(mxfs_dbg_pub_claim_delay_ms);
+
+				if (d)
+					msleep(d);
+			}
+
+			if (unlikely(READ_ONCE(mxfs_dbg_pub_claim_fail_ino) == ino)) {
+				WRITE_ONCE(mxfs_dbg_pub_claim_fail_ino, 0);
+				rc = -EAGAIN;
+			} else
+				rc = mxfs_v5_dlm_inode_lock(dlm, ino, MXFS_LOCK_EX,
+							    bip ? &dir_gres : NULL);
+			{
+				int	laps = 0;
+
+				while (rc == -EAGAIN &&
+				       READ_ONCE(mxfs_pub_claim_retry) &&
+				       !xfs_is_shutdown(mp) &&
+				       !xfs_is_unmounting(mp)) {
+					int	k = atomic_inc_return(
+						&mxfs_pub_claim_retry_n);
+
+					laps++;
+					if (k <= 2000)
+						pr_warn("mxfs: P-PUB-CLAIM-RETRY ino=%llu laps=%d total=%d -- deferred-publish EX claim answered -EAGAIN; it stays in flight and is asked again\n",
+							(unsigned long long)ino,
+							laps, k);
+					/* the lock layer already waited out its
+					 * budget; ask again well inside the time a
+					 * request parked for capacity keeps its
+					 * place (MXFS_CAP_PARK_TTL_MS) */
+					msleep(50);
+					rc = mxfs_v5_dlm_inode_lock(dlm, ino,
+							MXFS_LOCK_EX,
+							bip ? &dir_gres : NULL);
+				}
+				if (laps && !rc)
+					pr_warn("mxfs: P-PUB-CLAIM-RETRY-GRANTED ino=%llu laps=%d\n",
+						(unsigned long long)ino, laps);
+			}
+			if (rc) {
 				mxfs_pal_log(MXFS_LOG_WARN,
 					"mxfs: deferred-publish CAW EX failed ino=%llu rc=%d",
 					(unsigned long long)ino, rc);
-			else if (bip) {
+			} else if (bip) {
 				spin_lock(&bip->i_dlm_lock);
 				mxfs_dlm_authority_install(bip, &dir_gres,
 							   dir_gen_snap, false,
@@ -861,6 +1230,8 @@ mxfs_dlm_publish_drain_loop(
 			}
 			if (bip)
 				xfs_irele(bip);
+			mxfs_pubclaim_end(mp, claim_seq);
+			mxfs_pub_drain_step(w, 0, 0);
 		}
 		n++;
 	}
@@ -889,8 +1260,9 @@ mxfs_dlm_publish_drain_work(
 	struct mxfs_pub_drain_batch *b = w->batch;
 	struct xfs_mount	*mp = w->mp;
 
+	WRITE_ONCE(w->cur_pid, current->pid);
 	w->published = mxfs_dlm_publish_drain_loop(mp, w->parent_ino,
-						   w->agno, w->seen_defer);
+						   w->agno, w);
 	if (atomic_dec_and_test(&b->pending))
 		complete(&b->done);
 	if (atomic_dec_and_test(&b->refs))
@@ -898,8 +1270,173 @@ mxfs_dlm_publish_drain_work(
 	atomic_dec(&mp->m_mxfs_pubdrain_active);
 }
 
+/*
+ * H-F12: a bounded AG release drain that finished.  Count the in-scope entries
+ * listed after it began and still listed: the release goes with them
+ * unpublished, as with a child created after an open drain emptied its scope.
+ * The walk stops at 1024.
+ */
+static void
+mxfs_pub_drain_bound_report(
+	struct xfs_mount	*mp,
+	xfs_agnumber_t		agno,
+	unsigned int		backlog,
+	unsigned int		published,
+	u64			seq_limit)
+{
+	static atomic_t		pbnd_n = ATOMIC_INIT(0);
+	struct xfs_inode	*ip;
+	unsigned int		left = 0;
+
+	spin_lock(&mp->m_mxfs_unpub_lock);
+	list_for_each_entry(ip, &mp->m_mxfs_unpub_list, i_dlm_unpub_link) {
+		if (ip->i_mxfs_unpub_seq <= seq_limit ||
+		    !mxfs_dlm_unpub_in_scope(mp, ip, 0, agno))
+			continue;
+		if (++left >= 1024)
+			break;
+	}
+	spin_unlock(&mp->m_mxfs_unpub_lock);
+	if (!left)
+		return;
+	atomic_add(left, &mxfs_pub_drain_bound_left);
+	if (atomic_inc_return(&pbnd_n) <= 200)
+		mxfs_probe("mxfs: P-PUB-DRAIN-BOUND agno=%u backlog=%u published=%u left=%u -- a bounded AG release drain finished and left the children listed after it began\n",
+			agno, backlog, published, left);
+}
+
+/*
+ * Just before an AG release's unlock: the unpublished inodes of this AG still
+ * listed (of them, the ones already unlinked, which a peer's unlinked-list
+ * remove can take as its predecessor), the parent-unknown entries of other AGs
+ * the AG scope also matches, and the claims of this AG's inodes still in
+ * flight.  Read only; each walk stops at 1024.
+ */
 void
-mxfs_dlm_publish_unpublished(
+mxfs_pub_unlock_exposure(
+	struct xfs_mount	*mp,
+	xfs_agnumber_t		agno,
+	const char		*site)
+{
+	static atomic_t		pexp_n = ATOMIC_INIT(0);
+	struct xfs_inode	*ip;
+	unsigned int		listed = 0, unl = 0, p0 = 0, infl = 0, n = 0;
+	xfs_ino_t		first = 0;
+
+	if (!mp->m_mxfs_dlm)
+		return;
+	spin_lock(&mp->m_mxfs_unpub_lock);
+	list_for_each_entry(ip, &mp->m_mxfs_unpub_list, i_dlm_unpub_link) {
+		if (++n > 1024)
+			break;
+		if (XFS_INO_TO_AGNO(mp, ip->i_ino) == agno) {
+			if (!listed++)
+				first = ip->i_ino;
+			if (VFS_I(ip)->i_nlink == 0)
+				unl++;
+		} else if (ip->i_mxfs_unpub_parent == 0) {
+			p0++;
+		}
+	}
+	n = 0;
+	list_for_each_entry(ip, &mp->m_mxfs_pubclaim_list,
+			    i_mxfs_pubclaim_link) {
+		if (++n > 1024)
+			break;
+		if (XFS_INO_TO_AGNO(mp, ip->i_ino) == agno)
+			infl++;
+	}
+	spin_unlock(&mp->m_mxfs_unpub_lock);
+	if (!listed && !infl)
+		return;
+	atomic_inc(&mxfs_pub_unlock_exposed);
+	atomic_add(listed, &mxfs_pub_unlock_listed);
+	if (atomic_inc_return(&pexp_n) <= 2000)
+		mxfs_probe("mxfs: P-PUB-UNPUB-AT-UNLOCK agno=%u site=%s listed=%u unlinked=%u first=%llu p0_other=%u inflight=%u comm=%s -- an AG unlock with unpublished inodes of this AG still listed or one's claim in flight\n",
+			agno, site, listed, unl, (unsigned long long)first,
+			p0, infl, current->comm);
+}
+
+/*
+ * H-F13: whether an unpublished inode of this AG is listed or one's claim is
+ * in flight -- what a peer granted the AG could reach through its AGI or inode
+ * btree with no grant of ours to meet.  Parent-unknown entries of other AGs
+ * are not counted: the AG's own structures cannot surface them, and their
+ * directories' releases publish them.  Callable under pag_dlm_lock, a mutex
+ * always taken before m_mxfs_unpub_lock.
+ */
+bool
+mxfs_pub_ag_exposed(
+	struct xfs_mount	*mp,
+	xfs_agnumber_t		agno)
+{
+	struct xfs_inode	*ip;
+	bool			found = false;
+
+	spin_lock(&mp->m_mxfs_unpub_lock);
+	list_for_each_entry(ip, &mp->m_mxfs_unpub_list, i_dlm_unpub_link) {
+		if (XFS_INO_TO_AGNO(mp, ip->i_ino) == agno) {
+			found = true;
+			break;
+		}
+	}
+	if (!found) {
+		list_for_each_entry(ip, &mp->m_mxfs_pubclaim_list,
+				    i_mxfs_pubclaim_link) {
+			if (XFS_INO_TO_AGNO(mp, ip->i_ino) == agno) {
+				found = true;
+				break;
+			}
+		}
+	}
+	spin_unlock(&mp->m_mxfs_unpub_lock);
+	return found;
+}
+
+/*
+ * A drain whose window ran out: name the child each unfinished worker is on,
+ * the step it waits in and for how long, and dump that worker's stack.  The
+ * batch holds the waiter's reference, so the worker slots stay valid; the
+ * fields are read racily and the worker may finish meanwhile.
+ */
+static void
+mxfs_pub_drain_stuck_report(
+	struct mxfs_pub_drain_worker	*w,
+	unsigned int			i,
+	xfs_ino_t			parent_ino,
+	xfs_agnumber_t			agno)
+{
+	static atomic_t		pstk_n = ATOMIC_INIT(0);
+	xfs_ino_t		ino = READ_ONCE(w->cur_ino);
+	int			step = READ_ONCE(w->cur_phase);
+	u64			t0 = READ_ONCE(w->cur_ns);
+	pid_t			pid = READ_ONCE(w->cur_pid);
+	struct pid		*wpid;
+	struct task_struct	*task;
+
+	if (!ino)
+		return;
+	pr_warn("mxfs: P-PUB-DRAIN-STUCK parent=%llu agno=%d worker=%u ino=%llu step=%d age_ms=%llu pid=%d -- an unfinished drain worker at the publish window's end (step 1 settle, 2 demote, 3 cluster claim, 4 evicted settle, 5 claim)\n",
+		(unsigned long long)parent_ino,
+		agno == NULLAGNUMBER ? -1 : (int)agno, i,
+		(unsigned long long)ino, step,
+		(unsigned long long)((ktime_get_ns() - t0) / NSEC_PER_MSEC),
+		pid);
+	if (!pid || atomic_inc_return(&pstk_n) > 20)
+		return;
+	wpid = find_get_pid(pid);
+	task = wpid ? get_pid_task(wpid, PIDTYPE_PID) : NULL;
+	if (task) {
+		sched_show_task(task);
+		put_task_struct(task);
+	}
+	put_pid(wpid);
+}
+
+/* The drain of mxfs_dlm_publish_unpublished; returns whether its bounded
+ * wait ran out with claims of its own still in flight. */
+static bool
+mxfs_dlm_publish_unpublished_drain(
 	struct xfs_mount	*mp,
 	xfs_ino_t		parent_ino,
 	xfs_agnumber_t		agno)
@@ -908,14 +1445,28 @@ mxfs_dlm_publish_unpublished(
 	struct xfs_inode	*ip;
 	unsigned int		n = 0, backlog = 0;
 	u64			t0;
+	u64			seq_limit = U64_MAX;
+	bool			timed_out = false;
 
 	if (!dlm)
-		return;
+		return false;
 
 	/* Fast bail without taking the lock in the common (empty) case. */
 	if (list_empty(&mp->m_mxfs_unpub_list))
-		return;
+		return false;
 
+	/*
+	 * H-F12: an AG release drains in its prepass with local admission to
+	 * the AG open, so the creates this node keeps making there list new
+	 * children in scope for as long as the drain runs; taking those too, a
+	 * drain whose workers claim slower than this node creates never empties
+	 * its scope and runs out its window.  Bound it to what is listed now.
+	 * A directory's release keeps the open scan: a peer reaches a new child
+	 * of the directory by its name once the directory is released.
+	 */
+	if (READ_ONCE(mxfs_pub_drain_bound) && parent_ino == 0 &&
+	    agno != NULLAGNUMBER)
+		seq_limit = atomic64_read(&mxfs_unpub_seq_next);
 
 	/*
 	 * v0.5.5: the drain used to claim slots
@@ -934,13 +1485,15 @@ mxfs_dlm_publish_unpublished(
 	list_for_each_entry(ip, &mp->m_mxfs_unpub_list, i_dlm_unpub_link) {
 		if (!mxfs_dlm_unpub_in_scope(mp, ip, parent_ino, agno))
 			continue;
+		if (ip->i_mxfs_unpub_seq > seq_limit)
+			continue;
 		if (++backlog > MXFS_PUB_DRAIN_INLINE)
 			break;
 	}
 	spin_unlock(&mp->m_mxfs_unpub_lock);
 
 	if (!backlog)
-		return;
+		return false;
 
 	/*
 	 * WAVE A (instrumented, P138-measured): the per-child eager-demote
@@ -968,6 +1521,8 @@ mxfs_dlm_publish_unpublished(
 					    i_dlm_unpub_link) {
 				if (!mxfs_dlm_unpub_in_scope(mp, ip,
 							     parent_ino, agno))
+					continue;
+				if (ip->i_mxfs_unpub_seq > seq_limit)
 					continue;
 				if (!mxfs_iclus_routed(ip))
 					continue;
@@ -1029,6 +1584,7 @@ mxfs_dlm_publish_unpublished(
 			b->w[i].mp = mp;
 			b->w[i].parent_ino = parent_ino;
 			b->w[i].agno = agno;
+			b->w[i].seq_limit = seq_limit;
 			b->w[i].batch = b;
 			INIT_WORK(&b->w[i].work, mxfs_dlm_publish_drain_work);
 			queue_work(system_unbound_wq, &b->w[i].work);
@@ -1037,15 +1593,24 @@ mxfs_dlm_publish_unpublished(
 				msecs_to_jiffies(MXFS_PUB_DRAIN_TIMEOUT_MS))) {
 			for (i = 0; i < nw; i++)
 				n += b->w[i].published;
+			if (seq_limit != U64_MAX)
+				mxfs_pub_drain_bound_report(mp, agno, backlog,
+							    n, seq_limit);
 		} else {
 			static atomic_t ptmo_n = ATOMIC_INIT(0);
 
-			if (atomic_inc_return(&ptmo_n) <= 200)
+			timed_out = true;
+			if (atomic_inc_return(&ptmo_n) <= 200) {
 				pr_warn("mxfs: P-PUB-DRAIN-TIMEOUT parent=%llu agno=%d backlog=%u -- %ums publish window expired; handoff proceeds, claims land async (cross-node bast cycle broken)\n",
 					(unsigned long long)parent_ino,
 					agno == NULLAGNUMBER ? -1 : (int)agno,
 					backlog,
 					MXFS_PUB_DRAIN_TIMEOUT_MS);
+				for (i = 0; i < nw; i++)
+					mxfs_pub_drain_stuck_report(&b->w[i], i,
+								    parent_ino,
+								    agno);
+			}
 		}
 		if (atomic_dec_and_test(&b->refs))
 			kfree(b);
@@ -1065,6 +1630,28 @@ report:
 					(unsigned long long)parent_ino,
 					agno == NULLAGNUMBER ? -1 : (int)agno);
 	}
+	return timed_out;
+}
+
+/*
+ * Publish what a peer could reach through the lock this node is releasing,
+ * then make sure no claim another publish took in this release's scope is
+ * still in flight (H-F10, mxfs_pubclaim_release_check).  The check runs on
+ * every path, including the ones where nothing was listed to publish: the
+ * zmf1 release had nothing listed because the other drain had already taken
+ * the child.
+ */
+void
+mxfs_dlm_publish_unpublished(
+	struct xfs_mount	*mp,
+	xfs_ino_t		parent_ino,
+	xfs_agnumber_t		agno)
+{
+	bool			timed_out;
+
+	timed_out = mxfs_dlm_publish_unpublished_drain(mp, parent_ino, agno);
+	if (mp->m_mxfs_dlm)
+		mxfs_pubclaim_release_check(mp, parent_ino, agno, timed_out);
 }
 
 /*
@@ -1338,6 +1925,7 @@ mxfs_dlm_publish_inode(
 	bool			was_unpub;
 	int			rc;
 	uint64_t		pub_gen_snap;
+	u64			claim_seq = 0;	/* H-F10: this take's tracking */
 
 	if (!mp)
 		return;
@@ -1390,6 +1978,7 @@ mxfs_dlm_publish_inode(
 		list_del_init(&ip->i_dlm_unpub_link);
 		ip->i_dlm_unpublished = false;
 		WRITE_ONCE(ip->i_mxfs_unpub_clr_line, MXFS_SITE);
+		claim_seq = mxfs_pubclaim_begin_locked(mp, ip);
 	}
 	spin_unlock(&mp->m_mxfs_unpub_lock);
 
@@ -1400,6 +1989,7 @@ mxfs_dlm_publish_inode(
 	/* a release of this node that moved the generation under this
 	 * request leaves the published EX uncertified: ask again */
 	rc = mxfs_ilock_redrive_stalegen(ip, MXFS_LOCK_EX, pub_gen_snap, rc);
+	mxfs_pubclaim_end(mp, claim_seq);	/* H-F10 */
 	if (rc) {
 		mxfs_probe_ratelimited(
 		    "mxfs: P109-PUBLISH-FAIL ino=%llu rc=%d (falling back to lazy backstop)\n",

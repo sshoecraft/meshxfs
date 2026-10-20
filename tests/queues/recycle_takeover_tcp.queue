@@ -1,0 +1,35 @@
+# D-RECYCLE-RESET-UNDER-NOINO-STRANDS-COMMITTED-DIR-CHANGE-WEDGE-SHUTDOWN, the
+# TCP half of the build that carries both halves of the fix: srcversion
+# C06A6D4A9AB7A357503DF51 (noino_recycle_dirty_wait, noino_recycle_takeover,
+# the live-check skip's re-drive of a taken release, and the TEST ONLY
+# dbg_recycle_nowait).  2/net/mesh/mpath g2, the configuration of
+# ndrc3/ndrf3; every harness refuses a node not running the tree build.
+#
+# Laps 1-2, H-W2 (tests/noino_dirty_recycle_ab.sh header, NDR_ARM=takeover):
+# the lookup reproducer with its recycle sent on as a caller that cannot wait,
+# noino_recycle_takeover 0 then 1.  Laps 3-4, H-W1 again on this build: the
+# same reproducer with the recycle allowed to wait, noino_recycle_dirty_wait
+# 0 then 1 (the lookup fix measured on the build that ships).
+#
+# VERDICT RULES (written before the first lap):
+#   FIXED      lap 2 PASS (every iteration ran, no listing held the renamed
+#              name, recycle_dirty_takeover > 0, no reset of a dirty corpse,
+#              cold audit CLEAN, no node failure in either whole kernel log)
+#              and lap 4 PASS, with each control showing it reached the case
+#              (lap 1 recycle_reset_dirty > 0, lap 3 hazard + reset_dirty > 0).
+#              A control that reached the case and still read CONTROL-FRESH
+#              is recorded as such: the fix arm's PASS then says the fix does
+#              no harm, not that it closed anything, and the hypothesis is
+#              re-examined.
+#   NOT FIXED  any fix-arm FAIL: diagnose from its kept logs before anything
+#              else.
+#   NO VERDICT an ABORT, or a VACUOUS fix arm: rerun that lap.
+#
+# Bound per lap, from the harness header's derivation: prep 300 + srcversion
+# and knob reads 2x20 + 2x20 + mkdir 30 + ten iterations x (10 + 10 +
+# (PREFENCE 2.5 + 10) x 2) = 450 + counters 2x40 + knob resets 2x20 + chk_clean
+# 150 + stream copy 2x120 = 1370 s.
+1370 NDR_ARM=takeover tests/noino_dirty_recycle_ab.sh ntc1 0 10 2/net/mesh/mpath g2
+1370 NDR_ARM=takeover tests/noino_dirty_recycle_ab.sh ntf1 1 10 2/net/mesh/mpath g2
+1370 tests/noino_dirty_recycle_ab.sh ndrc4 0 10 2/net/mesh/mpath g2
+1370 tests/noino_dirty_recycle_ab.sh ndrf4 1 10 2/net/mesh/mpath g2

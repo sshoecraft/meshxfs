@@ -1,0 +1,17 @@
+# D-CHK-COUNTS-UNLINKED-DIR-DOT-AND-DOTDOT-AS-LINKS-FALSE-NLINK-ERRORS, H-CK1:
+# one lap of tests/chk_unlinked_dir_residue.sh on 4/net/mesh/direct g4, the
+# tree's tools/chk_mxfs (OLD, built before the patch) against the patched
+# tools/chk_mxfs.c compiled to the session scratchpad (NEW).  The hypothesis,
+# the prediction and the verdict rules are the harness header's, written
+# before the lap.  Bound: the header's derivation, 800 s.
+#
+# Lap cud1 (05:17Z, log tests/evidence/lapq_cud.log) graded NOT-FIXED on the
+# first rules, which predicted an nlink error naming p1: the rmdir repoints a
+# removed directory's '..' at the root, so the old binary named the root
+# instead ('nlink 3 but 6') and each removed directory ('nlink 0 but 1'); the
+# patched binary reported no error on the frozen image and both binaries were
+# clean after the unmount.  The patch's early return for a removed
+# directory's '..' (written for a dangling '..' that cannot occur) was taken
+# out and its comments corrected; the harness's rules were corrected before
+# lap cud2, which runs that rebuilt binary.
+800 tests/chk_unlinked_dir_residue.sh cud2 /tmp/claude-1000/-home-steve-src-mxfs/64331231-a998-4e3a-9856-9dc8e90b3e93/scratchpad/chk_mxfs_hck1 4/net/mesh/direct g4

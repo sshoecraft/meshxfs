@@ -1,0 +1,9 @@
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY, H-1 A/B on
+# 2/net/mesh/mpath g2 (where fzmp1 and fzmd1 found it), run from ~/src/mxfs-c:
+# ifree_defer_drain 1 (fix) vs 0 (control), ifree_defer_reap 0 in both arms,
+# every other knob as the fzm final-verification laps.  Arms alternate.  The
+# natural reach here was 1-3 deferrals a lap; a lap with none is VACUOUS.
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_REAP=0 NG0_IFREE_DRAIN=1 tests/noino_gen0_ab.sh idmf1 1 300 2/net/mesh/mpath g2
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_REAP=0 NG0_IFREE_DRAIN=0 tests/noino_gen0_ab.sh idmc1 1 300 2/net/mesh/mpath g2
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_REAP=0 NG0_IFREE_DRAIN=1 tests/noino_gen0_ab.sh idmf2 1 300 2/net/mesh/mpath g2
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_REAP=0 NG0_IFREE_DRAIN=0 tests/noino_gen0_ab.sh idmc2 1 300 2/net/mesh/mpath g2

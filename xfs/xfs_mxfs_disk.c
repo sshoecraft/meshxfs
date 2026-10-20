@@ -482,9 +482,16 @@ mxfs_p949_compare_fua(struct xfs_mount *mp, struct block_device *bdev,
 	kfree(fua);
 }
 
+/*
+ * The same read, also handing back the home's whole dinode (sb_inodesize bytes
+ * into *dinode_out, when the home holds one) for a caller that must put the
+ * platter's own bytes back into a cached cluster slot: the P55C classification
+ * in xfs_iflush (H-F11).  rc and *magicp as mxfs_dbg_disk_di_read_coherent().
+ */
 int
-mxfs_dbg_disk_di_read_coherent(struct xfs_mount *mp, xfs_ino_t ino,
-			       uint16_t *modep, uint32_t *genp, bool *magicp)
+mxfs_disk_dinode_read_coherent(struct xfs_mount *mp, xfs_ino_t ino,
+			       uint16_t *modep, uint32_t *genp, bool *magicp,
+			       void *dinode_out)
 {
 	struct xfs_buftarg	*tp;
 	xfs_agnumber_t		agno;
@@ -509,7 +516,8 @@ mxfs_dbg_disk_di_read_coherent(struct xfs_mount *mp, xfs_ino_t ino,
 	isize = mp->m_sb.sb_inodesize;
 	blen = mp->m_sb.sb_blocksize;
 	if (isize < 256 || blen == 0 || (blen & 511) ||
-	    off * isize + 0x60 > blen)
+	    off * isize + 0x60 > blen ||
+	    (dinode_out && off * isize + isize > blen))
 		return -EINVAL;
 	lba = (uint64_t)XFS_AGB_TO_DADDR(mp, agno, agbno) + tp->bt_sector_offset;
 	tmp = kmalloc(blen, GFP_NOFS);
@@ -526,6 +534,8 @@ mxfs_dbg_disk_di_read_coherent(struct xfs_mount *mp, xfs_ino_t ino,
 				*modep = be16_to_cpup((const __be16 *)(dk + 2));
 			if (genp)
 				*genp = be32_to_cpup((const __be32 *)(dk + 0x5c));
+			if (dinode_out)
+				memcpy(dinode_out, dk, isize);
 		} else if (READ_ONCE(mxfs_p949_plain_vs_fua)) {
 			mxfs_p949_compare_fua(mp, tp->bt_bdev, lba, blen, off,
 					      isize, ino, tmp);
@@ -535,6 +545,15 @@ mxfs_dbg_disk_di_read_coherent(struct xfs_mount *mp, xfs_ino_t ino,
 	}
 	kfree(tmp);
 	return rc;
+}
+EXPORT_SYMBOL(mxfs_disk_dinode_read_coherent);
+
+int
+mxfs_dbg_disk_di_read_coherent(struct xfs_mount *mp, xfs_ino_t ino,
+			       uint16_t *modep, uint32_t *genp, bool *magicp)
+{
+	return mxfs_disk_dinode_read_coherent(mp, ino, modep, genp, magicp,
+					      NULL);
 }
 EXPORT_SYMBOL(mxfs_dbg_disk_di_read_coherent);
 

@@ -1,0 +1,75 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, hypothesis
+# H-U4 (the record, session 53): a mid-list unlinked remove rewrites the
+# PREDECESSOR's di_next_unlinked, a field of another inode's slot, under the AG
+# DLM alone, and a peer holding, or next acquiring, that predecessor's inode EX
+# publishes the whole slot from its own cluster buffer, whose copy of the field
+# predates the edit: the platter reverts to a removed inode, the editor's store
+# retires its record once its own write completed, and the chain closes into a
+# cycle.  The fix, module parameter unlprev_tenure (1 = on, 0 = the same-build
+# control): (a) xfs_inactive_ifree takes the predecessor's inode EX as a counted
+# hold before the edit, never while holding the AG DLM; (b) a release of an
+# inode's lock, through a BAST or through reclaim, lands any committed,
+# unlanded di_next_unlinked of its slot first; (c) a reload that keeps its
+# cached cluster buffer refreshes that buffer's slot from the fresh,
+# store-grafted image.  freshsrc_iunl_overlay=1 (the H-U3 graft) in both arms.
+# Both arms count and print, unratelimited: P-UNLPREV-NOTENURE (a predecessor
+# edited without this node's EX hold on it), P-NEXTWR-STALE (a slot this node
+# flushes carries a next pointer other than the platter's, with no store record
+# of this node committing it), P-IUNL-OWED-AT-RELEASE (a release that still
+# owed such an edit; landed=1 in the fix arm, landed=0 in the control),
+# P-KEPT-NEXT-STALE (a kept buffer's slot with a next pointer other than the
+# platter's; refreshed=1 in the fix arm); the fix arm alone prints P-UNLPREV-WAIT
+# (a free that backed off to take the hold), P-UNLPREV-DEFER and
+# P-IUNL-LAND-FAIL.  The module counters (unlprev_notenure, unlprev_waits,
+# nextwr_stale, iunl_owed_release, kept_next_stale) are zeroed after the prep
+# and read after the workload settles, so a probe line the log drops still
+# counts.  Run from ~/src/mxfs on the tree build that carries the change; the
+# harness refuses a node running anything else and reads each knob back.
+#
+# The laps: control and fix alternating, three of each, the reproducer's
+# workload (tests/clmerge_window_node.sh, 30 iterations) on 2/net/mesh/direct
+# g2c, where build 1D27C5C01E79324C9A70D0F reproduced in 3 of 3 H-U3 control
+# laps and in 1 of 3 H-U3 fix laps (hu3f1, the H-U4 trace).
+#
+# VERDICT RULES (written before the first lap):
+#   SUPPORTED AND FIXED  at least 2 of the 3 control laps REPRODUCED, each with
+#             unlprev_notenure > 0 and nextwr_stale > 0 (both halves of the
+#             hazard reached on that lap); and all 3 fix laps PASS: no
+#             'xfs_ifree returned error' and no node failure line in either
+#             node's kernel log through the post-audit capture, the workload
+#             complete, cold audit CLEAN errors=0, unlprev_notenure 0,
+#             nextwr_stale 0, no P-IUNL-LAND-FAIL; and unlprev_waits > 0 over
+#             the fix laps (the hold was taken).
+#   NOT SUPPORTED  a control lap that reproduces with unlprev_notenure 0 or
+#             nextwr_stale 0: another mechanism, attributed before anything
+#             else.
+#   NOT FIXED  a fix lap that REPRODUCES, or counts unlprev_notenure > 0,
+#             nextwr_stale > 0 or a P-IUNL-LAND-FAIL line: attributed from its
+#             kept logs and image.  A P-UNLPREV-NOTENURE line names its caller
+#             (comm): one from a remove other than xfs_inactive_ifree's (tmpfile
+#             link, rename whiteout, dirshard) is the gap the record names, and
+#             is recorded as such.
+#   WEAK      fewer than 2 control laps reproduce: the arms cannot be told apart
+#             at this rate; more laps, not a verdict.
+#   VACUOUS   unlprev_waits 0 over all three fix laps: the hold was never taken
+#             there, so the fix arm measured nothing.
+# A lap that ABORTs, or audits STALE/NONE without a reproduction, has no verdict
+# and is rerun.  A reproduction's cold audit (after the remount replays both
+# journals) is recorded either way: CORRUPT there makes the record an integrity
+# defect.  Nothing here disposes of H-U1 (NOPREV) or H-U2 (BACKREF): a NOPREV or
+# BACKREF line in any lap is attributed and recorded.
+#
+# Bound per lap (tests/peer_open_unlinked_chain.sh's derivation): prep 300 +
+# srcversion 2x20 + the instr knob 2x20 + two PUC_KNOBS knobs 2x2x20 + the
+# counter reset 2x20 + the mount's device 2x20 + mkdir 30 + workload
+# 30 x (3 + 5 + ceil(3 x 0.3) + 2) + 60 = 390, +10 for the peer + the done file
+# on both nodes 2x20 + instr reset 2x20 + the settle 7 + the counters 2x20 +
+# stream copy 2x120 + on a failure: unmount 2x(70 + 20) + snapshot 60 + image
+# check 10 + remount 2x(110 + 20), + the cold audit 150 + the post-audit stream
+# copy 2x120 = 2237 s.
+2237 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=0" tests/peer_open_unlinked_chain.sh hu4c1 30 2/net/mesh/direct g2c
+2237 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1" tests/peer_open_unlinked_chain.sh hu4f1 30 2/net/mesh/direct g2c
+2237 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=0" tests/peer_open_unlinked_chain.sh hu4c2 30 2/net/mesh/direct g2c
+2237 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1" tests/peer_open_unlinked_chain.sh hu4f2 30 2/net/mesh/direct g2c
+2237 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=0" tests/peer_open_unlinked_chain.sh hu4c3 30 2/net/mesh/direct g2c
+2237 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1" tests/peer_open_unlinked_chain.sh hu4f3 30 2/net/mesh/direct g2c

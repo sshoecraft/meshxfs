@@ -1,0 +1,71 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F12: an AG
+# release publishes its scope's unpublished inodes in its prepass, while local
+# admission to the AG is still open, and its drain took any in-scope entry on
+# every pass.  The creates its own node kept making in that AG fed it new
+# children faster than its workers claimed them, so the scope never emptied, the
+# drain ran out its 5000 ms window (the peer waiting for the AG that long) and the
+# release went with a claim in flight (fw3f2, test16 AG 1).  Evidence before this
+# queue, build F09C3FED2DB371E0D9A8BC5 (tests/queues/freed_drain_stuck_3node.queue,
+# lap fds3, test1): P-PUB-DRAIN-TIMEOUT parent=0 agno=6 backlog=1, its one
+# P-PUB-DRAIN-STUCK worker in step 5 (claim) on ino 12583041 with age_ms=17, the
+# worker's stack in msleep of the 20 ms claim hold, and test1 creating and
+# freeing that same number about every 300 ms through the window (a new
+# generation each time, 573 P82-REM agno=6 in the 6 s around it): a chase, not a
+# wait.
+#
+# Same-build A/B, one knob between the arms: pub_drain_bound (1 bounds an AG
+# release's drain to the entries listed when it began; 0 is the open scan), set
+# and read back on every node by tests/noino_gen0_ab.sh's NG0_DRAIN_BOUND.
+# Build: ~/src/mxfs-b srcversion 5E041AA6C084D8481A72987 (the main tree's
+# F09C3FED source plus the H-F12 change: i_mxfs_unpub_seq stamped at every add to
+# the unpublished list, the bound applied to the backlog count, the Wave A pass
+# and each drain worker, P-PUB-DRAIN-BOUND and counter pub_drain_bound_left);
+# run from ~/src/mxfs-b, whose harness prints each lap's build and refuses a node
+# running anything else.
+#
+# Settings: lap fds3's line (fw3f2's settings, 3/net/mesh/direct, g3 test1 test2
+# test3) with NG0_PUBCLAIM_DELAY_MS raised from 20 to 200, in both arms, so a
+# drain's claim is held 200 ms: one worker then claims about 5 children a second,
+# far below the rate a churning node creates in one AG, and the control's open
+# scan reaches the chase on most AG releases that meet a create.  Control and fix
+# laps alternate, control first.
+#
+# MEASURES, per lap (the harness RESULT line; each node's whole kernel log after
+# the lap's mark, <node>_drain.txt):
+#   dt_ag / dt_dir   P-PUB-DRAIN-TIMEOUT of AG releases / of directory releases
+#   stuck_chase      P-PUB-DRAIN-STUCK of AG drains, worker on its child < 1000 ms
+#   stuck_held       the same, >= 2500 ms (a wait on one child, not a chase)
+#   pc_rel_ag / pc_rel_dir   P-PUB-CLAIM-INFLIGHT-AT-RELEASE not 'waited': a
+#                    release that went with a claim in flight, by scope
+#   db_left          pub_drain_bound_left: newer in-scope children a bounded AG
+#                    drain left listed (fix arm's reach)
+#   audit, node_failures, and every other gate the harness applies (if_ok, pc_ok)
+#
+# VERDICT RULES (written before the first lap):
+#   A lap with a node failure or a CORRUPT cold audit is attributed before
+#   anything below is judged.  A lap whose audit is STALE/NONE, or an ABORT, has
+#   no verdict and is rerun.  The harness's VACUOUS (control: dt_ag 0; fix:
+#   db_left 0 and dt_ag 0) did not reach and judges nothing.
+#   CONTROL (pub_drain_bound 0), reached: SHOWS THE CAUSE if every AG drain
+#     timeout's STUCK lines are chase-shaped (stuck_chase > 0, stuck_held 0).  A
+#     control whose AG timeouts show only held STUCK lines REFUTES H-F12 for
+#     them (a wait: a new hypothesis).
+#   FIX (pub_drain_bound 1), reached: PASS if dt_ag 0, pc_rel_ag 0, the cold
+#     audit CLEAN errors=0, node_failures 0 and every other harness gate holds.
+#     A reached fix lap with any AG drain timeout REFUTES H-F12.
+#   A lap of either arm that fails only through the directory scope (dt_dir > 0
+#     or pc_rel_dir > 0, with dt_ag 0 and pc_rel_ag 0 in a fix lap) is a
+#     directory-scope finding, recorded and traced on its own; it neither
+#     supports nor refutes H-F12, which bounds AG releases only.
+#   H-F12 SUPPORTED AND FIXED: at least one control SHOWS THE CAUSE and at least
+#     two reached fix laps PASS, with no reached fix lap failing on the AG scope.
+#   WEAK: the controls do not reach, or reach without any STUCK line: more
+#     control laps on the same build.
+#
+# Bound: fw3's, 1680 s per lap (fds1-3 walls 508-558 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh pbc1 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_DRAIN_BOUND=1 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh pbf1 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh pbc2 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_DRAIN_BOUND=1 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh pbf2 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh pbc3 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_DRAIN_BOUND=1 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh pbf3 1 300 3/net/mesh/direct g3

@@ -2180,6 +2180,261 @@ mxfs_dialloc_try_reserve(
 }
 
 /*
+ * D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349 (ruling
+ * docs/rulings/d0349-batched-reserve-ahead.md): reserve-ahead.
+ *
+ * Measured on 2/net/mesh/direct with the peer mounted (0.90.131): an 8714-file
+ * rsync spent 39.1 of its 49.3 s of xfs_create in the probe above, 3.67 ms a
+ * call, because every grant is a durable ledger commit at the number's master
+ * and a single creator makes them one after another; alone it takes none and
+ * runs at native pace.  After a create reserves a number, the next free
+ * numbers of the same inobt record are requested here, each with the same
+ * no-queue EX request the probe makes and never DEMAND (a number another node
+ * holds is skipped, not taken from it), from a worker that holds no XFS lock,
+ * up to MXFS_RESV_AHEAD_MAX at once, so the commits overlap at the masters and
+ * the creates that follow find their grant already held (the DLM's
+ * already-granted shortcut answers their probe).
+ *
+ * Nothing here changes what a grant is.  A number requested ahead is held
+ * exactly as a probed number is between its probe and its create: an EX grant
+ * on a free number, an exclusion claim only.  The allocator still probes it,
+ * validates its home on the platter and takes it under the AG lock.  One taken
+ * ahead and never used stays a cached grant until a peer's probe BASTs it or
+ * the unmount releases it, as a probed number whose create failed does.
+ */
+extern int		mxfs_resv_ahead;
+extern atomic_t		mxfs_resv_ahead_queued;
+extern atomic_t		mxfs_resv_ahead_granted;
+extern atomic_t		mxfs_resv_ahead_denied;
+extern atomic_t		mxfs_resv_ahead_err;
+extern atomic_t		mxfs_resv_ahead_consumed;
+extern atomic_t		mxfs_resv_ahead_capped;
+
+struct mxfs_resv_ahead_work {
+	struct work_struct	work;
+	struct xfs_mount	*mp;
+	xfs_ino_t		ino;
+};
+
+static void
+mxfs_resv_ahead_fn(
+	struct work_struct	*work)
+{
+	struct mxfs_resv_ahead_work *w =
+		container_of(work, struct mxfs_resv_ahead_work, work);
+	struct xfs_mount	*mp = w->mp;
+	int			rc = -ESHUTDOWN;
+
+	if (!READ_ONCE(mp->m_mxfs_resv_ahead_off) && !xfs_is_shutdown(mp) &&
+	    mp->m_mxfs_dlm && !mxfs_v5_dlm_is_single_node(mp->m_mxfs_dlm))
+		rc = mxfs_v5_dlm_inode_reserve_try(mp->m_mxfs_dlm, w->ino, 0,
+						   NULL);
+	if (rc == 0)
+		atomic_inc(&mxfs_resv_ahead_granted);
+	else if (rc == -EAGAIN || rc == -EWOULDBLOCK)
+		atomic_inc(&mxfs_resv_ahead_denied);
+	else
+		atomic_inc(&mxfs_resv_ahead_err);
+	atomic_dec(&mp->m_mxfs_resv_ahead_inflight);
+	kfree(w);
+}
+
+/*
+ * The probe above has just reserved offset `off` of `rec`.  `wfree` is the
+ * walk's remaining candidate mask: holes removed, and `off` and every offset
+ * the walk passed over (cooling, quarantined, refused) already cleared.  Ask
+ * for the lowest of the rest until mxfs_resv_ahead of them are outstanding.
+ */
+static void
+mxfs_resv_ahead_queue(
+	struct xfs_perag	*pag,
+	struct xfs_inobt_rec_incore *rec,
+	int			off,
+	uint64_t		wfree)
+{
+	struct xfs_mount	*mp = pag_mount(pag);
+	int			depth = READ_ONCE(mxfs_resv_ahead);
+	uint64_t		ahead = 0;
+	int			want;
+
+	if (depth <= 0 || !mp->m_mxfs_resv_ahead_wq ||
+	    READ_ONCE(mp->m_mxfs_resv_ahead_off))
+		return;
+	depth = min(depth, MXFS_RESV_AHEAD_MAX);
+
+	spin_lock(&pag->pag_resv_lock);
+	if (pag->pag_resv_ahead_rec != rec->ir_startino) {
+		pag->pag_resv_ahead_rec = rec->ir_startino;
+		pag->pag_resv_ahead_mask = 0;
+	} else if (pag->pag_resv_ahead_mask & XFS_INOBT_MASK(off)) {
+		atomic_inc(&mxfs_resv_ahead_consumed);
+	}
+	pag->pag_resv_ahead_mask |= XFS_INOBT_MASK(off);
+	/* asked for earlier and still free: what we are already ahead by */
+	want = depth - (int)hweight64(wfree & pag->pag_resv_ahead_mask);
+	while (want-- > 0) {
+		uint64_t	c = wfree & ~pag->pag_resv_ahead_mask & ~ahead;
+
+		if (!c)
+			break;
+		ahead |= XFS_INOBT_MASK(xfs_lowbit64(c));
+	}
+	pag->pag_resv_ahead_mask |= ahead;
+	spin_unlock(&pag->pag_resv_lock);
+
+	while (ahead) {
+		int			b = xfs_lowbit64(ahead);
+		xfs_agino_t		agino = rec->ir_startino + b;
+		struct mxfs_resv_ahead_work *w = NULL;
+
+		ahead &= ~XFS_INOBT_MASK(b);
+		/* the walk would skip these too; leave them to its probe */
+		if (mxfs_disklive_q_has(pag, agino) ||
+		    mxfs_resv_cool_hot(pag, agino, NULL))
+			continue;
+		if (atomic_inc_return(&mp->m_mxfs_resv_ahead_inflight) <=
+		    MXFS_RESV_AHEAD_MAX)
+			w = kmalloc(sizeof(*w), GFP_NOFS | __GFP_NOWARN);
+		if (!w) {
+			/* not asked after all: a later create may ask again */
+			atomic_dec(&mp->m_mxfs_resv_ahead_inflight);
+			atomic_inc(&mxfs_resv_ahead_capped);
+			spin_lock(&pag->pag_resv_lock);
+			if (pag->pag_resv_ahead_rec == rec->ir_startino)
+				pag->pag_resv_ahead_mask &=
+					~(XFS_INOBT_MASK(b) | ahead);
+			spin_unlock(&pag->pag_resv_lock);
+			break;
+		}
+		INIT_WORK(&w->work, mxfs_resv_ahead_fn);
+		w->mp = mp;
+		w->ino = xfs_agino_to_ino(pag, agino);
+		atomic_inc(&mxfs_resv_ahead_queued);
+		queue_work(mp->m_mxfs_resv_ahead_wq, &w->work);
+	}
+}
+
+/*
+ * D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F7c: is a
+ * no-inode release of this candidate in flight on this node?  That release
+ * anchored, at its BAST, the grant this node still holds on the number, and
+ * unlocks it after its live check.  The probe below is answered from that same
+ * grant by the DLM's already-granted shortcut, which mints no generation, so a
+ * create that took the number would build its new life on a grant the release
+ * then hands to the peer with the life's changes undrained -- measured on the
+ * H-F7 fix arm with the window held open: pmf1 (ino 8388759) and pdf1 (ino
+ * 8388766), each released at the generation it anchored while a new life of
+ * the number, created after the release began, was live at cached EX with
+ * logged changes not on the platter.  With nothing tracked
+ * (noino_bast_dedup=0) there is nothing to consult.
+ */
+static bool
+mxfs_dialloc_noino_inflight(
+	struct xfs_mount	*mp,
+	xfs_ino_t		ino)
+{
+	extern int		mxfs_noino_bast_dedup;
+	extern atomic_t		mxfs_noino_untracked_inflight;
+	extern bool		mxfs_noino_inflight_contains(struct xfs_mount *,
+							     uint64_t);
+
+	if (!READ_ONCE(mxfs_noino_bast_dedup))
+		return false;
+	return atomic_read(&mxfs_noino_untracked_inflight) > 0 ||
+	       mxfs_noino_inflight_contains(mp, ino);
+}
+
+/*
+ * The candidate's verdict under noino_resv_guard: true = skip it.  With the
+ * guard off (the same-build control) the number is taken as before and the
+ * hazard is counted where the reservation or the take happens.
+ */
+static bool
+mxfs_dialloc_noino_skip(
+	struct xfs_perag	*pag,
+	xfs_ino_t		ino,
+	int			phase)
+{
+	extern int		mxfs_noino_resv_guard;
+	extern atomic_t		mxfs_dialloc_resv_noino_skipped;
+	static atomic_t		p_dnsk_n = ATOMIC_INIT(0);
+
+	if (!READ_ONCE(mxfs_noino_resv_guard) ||
+	    !mxfs_dialloc_noino_inflight(pag_mount(pag), ino))
+		return false;
+	atomic_inc(&mxfs_dialloc_resv_noino_skipped);
+	if (atomic_inc_return(&p_dnsk_n) <= 2000)
+		pr_warn("mxfs: P-DIALLOC-NOINO-SKIP ino=%llu agno=%u phase=%d comm=%s -- a no-inode release of this number is in flight; skipped as peer-held, the release would unlock the grant a create here builds on\n",
+			(unsigned long long)ino, pag_agno(pag), phase,
+			current->comm);
+	return true;
+}
+
+static void
+mxfs_dialloc_noino_hazard(
+	struct xfs_perag	*pag,
+	xfs_ino_t		ino,
+	int			phase)
+{
+	extern atomic_t		mxfs_dialloc_resv_under_noino;
+	static atomic_t		p_drun_n = ATOMIC_INIT(0);
+
+	if (!mxfs_dialloc_noino_inflight(pag_mount(pag), ino))
+		return;
+	atomic_inc(&mxfs_dialloc_resv_under_noino);
+	if (atomic_inc_return(&p_drun_n) <= 2000)
+		pr_warn("mxfs: P-DIALLOC-RESV-UNDER-NOINO ino=%llu agno=%u phase=%d comm=%s -- candidate %s while a no-inode release of the number is in flight; the create builds on the grant that release will unlock\n",
+			(unsigned long long)ino, pag_agno(pag), phase,
+			current->comm, phase == 1 ? "reserved" : "taken");
+}
+
+/*
+ * D-LOCAL-CREATE-RESETS-HELD-STALE-COPY-IN-PLACE-REMOVED-NAME-ACTS-ON-NEW-FILE:
+ * is this node's cached copy of a free candidate referenced?  A free number's
+ * copy is a dead life of it, and P-CR63 resets it in place for the create that
+ * takes the number (xfs/xfs_icache.c): whatever references it -- a task
+ * mid-operation through a name a peer removed, or that name's cached dentry --
+ * then acts on the new file.  A copy being set up or torn down is no holder's
+ * (P-CR63 resets neither).  The same field reads the cache hit makes, under rcu
+ * and i_flags_lock; nothing is pinned.  dialloc_held_skip 0 is the same-build
+ * control: the number is taken and the reset counted at P-CR63-HELD.
+ */
+static bool
+mxfs_dialloc_held_skip_cand(
+	struct xfs_perag	*pag,
+	xfs_ino_t		ino,
+	int			phase)
+{
+	extern int		mxfs_dialloc_held_skip;
+	extern atomic_t		mxfs_dialloc_held_skipped;
+	static atomic_t		p_dhsk_n = ATOMIC_INIT(0);
+	xfs_agino_t		agino = XFS_INO_TO_AGINO(pag_mount(pag), ino);
+	struct xfs_inode	*ip;
+	int			cnt = 0;
+
+	if (!READ_ONCE(mxfs_dialloc_held_skip))
+		return false;
+	rcu_read_lock();
+	ip = radix_tree_lookup(&pag->pag_ici_root, agino);
+	if (ip) {
+		spin_lock(&ip->i_flags_lock);
+		if (ip->i_ino == ino &&
+		    !(ip->i_flags & (XFS_INEW | XFS_IRECLAIM | XFS_IRECLAIMABLE)))
+			cnt = atomic_read(&VFS_I(ip)->i_count);
+		spin_unlock(&ip->i_flags_lock);
+	}
+	rcu_read_unlock();
+	if (cnt <= 0)
+		return false;
+	atomic_inc(&mxfs_dialloc_held_skipped);
+	if (atomic_inc_return(&p_dhsk_n) <= 2000)
+		pr_warn("mxfs: P-DIALLOC-HELD-SKIP ino=%llu agno=%u phase=%d i_count=%d comm=%s -- this node's cached copy of the free number is referenced; skipped as held, a create would reset it under its holder\n",
+			(unsigned long long)ino, pag_agno(pag), phase, cnt,
+			current->comm);
+	return true;
+}
+
+/*
  * Pick a reservable free inode out of one inobt/finobt record.  Works on a
  * private copy of ir_free; the on-tree record is untouched until the caller
  * commits the one inode it was handed.  Returns 0 with *offp; -EAGAIN when
@@ -2264,6 +2519,11 @@ mxfs_dialloc_pick_in_rec(
 				return error;
 		}
 		if (!clustered) {
+			/* a held copy is a dead life whatever the membership:
+			 * a sole survivor still holds names its departed peer
+			 * removed */
+			if (mxfs_dialloc_held_skip_cand(pag, ino, 0))
+				continue;
 			*offp = off;
 			return 0;
 		}
@@ -2271,6 +2531,22 @@ mxfs_dialloc_pick_in_rec(
 		 * reservation is already held; no probe, no cooldown check) */
 		if (rs->validated != NULLFSINO) {
 			if (ino == rs->validated) {
+				/* H-F7c: a no-inode release of the number may
+				 * have begun since phase 1 reserved it; giving
+				 * the candidate up re-picks (VALIDATED-LOST) */
+				if (mxfs_dialloc_noino_skip(pag, ino, 2)) {
+					rs->contended++;
+					return -EAGAIN;
+				}
+				/* the validation dropped the AGI: a holder may
+				 * have taken the copy since phase 1 */
+				if (mxfs_dialloc_held_skip_cand(pag, ino, 2)) {
+					rs->contended++;
+					mxfs_resv_cool_add_kind(pag, agino,
+								MXFS_RESV_COOL_HELD);
+					return -EAGAIN;
+				}
+				mxfs_dialloc_noino_hazard(pag, ino, 2);
 				*offp = off;
 				return 0;
 			}
@@ -2299,6 +2575,22 @@ mxfs_dialloc_pick_in_rec(
 				continue;
 			}
 		}
+		/* before the probe: a referenced copy is skipped as held, on the
+		 * peer-held cooldown, and counted as contention like the skip
+		 * below */
+		if (mxfs_dialloc_held_skip_cand(pag, ino, 1)) {
+			rs->contended++;
+			mxfs_resv_cool_add_kind(pag, agino, MXFS_RESV_COOL_HELD);
+			continue;
+		}
+		/* H-F7c: counted as contention, so a sweep that finds nothing
+		 * else backs off and re-sweeps rather than failing the create */
+		if (mxfs_dialloc_noino_skip(pag, ino, 1)) {
+			rs->contended++;
+			mxfs_resv_cool_add_kind(pag, agino,
+						MXFS_RESV_COOL_DEMANDED);
+			continue;
+		}
 		if (rs->probes >= MXFS_RESV_PROBES_MAX ||
 		    (s64)(ktime_get_ns() - rs->visit_t0) > MXFS_RESV_VISIT_NS) {
 			rs->budget_exhausted = 1;
@@ -2306,6 +2598,8 @@ mxfs_dialloc_pick_in_rec(
 		}
 		error = mxfs_dialloc_try_reserve(pag, ino, rs);
 		if (error == 0) {
+			mxfs_dialloc_noino_hazard(pag, ino, 1);
+			mxfs_resv_ahead_queue(pag, rec, off, wfree);
 			*offp = off;
 			return 0;
 		}
@@ -3525,6 +3819,35 @@ mxfs_dialloc_carve_gate(
 	return true;
 }
 
+/*
+ * D-SOLE-SURVIVOR-CREATES-FAIL-EBUSY-FROM-DIALLOC-AFTER-PEER-FENCE: the step of
+ * xfs_dialloc_try_ag that returned an error other than -EAGAIN.  xfs_dialloc
+ * ends its whole sweep on such an error and fails the create with it; a sole
+ * survivor's creates failed -EBUSY there after a peer's fence, and none of the
+ * allocator's own refusal probes printed, so the step and its errno are what
+ * name the source.  Error paths only; warn level so a lap sees it without
+ * dynamic debug.
+ */
+static void
+mxfs_dialloc_tryag_err(
+	struct xfs_perag	*pag,
+	const char		*step,
+	int			flags,
+	int			error)
+{
+#ifdef __KERNEL__
+	struct xfs_mount	*mp = pag_mount(pag);
+
+	if (!error || error == -EAGAIN)
+		return;
+	pr_warn_ratelimited("mxfs: P-DIALLOC-TRYAG-ERR agno=%u step=%s err=%d trylock=%d single=%d comm=%s pid=%d -- this AG visit failed with an error that ends the create's whole AG sweep\n",
+		pag_agno(pag), step, error,
+		(flags & XFS_ALLOC_FLAG_TRYLOCK) ? 1 : 0,
+		mp->m_mxfs_dlm ? mxfs_v5_dlm_is_single_node(mp->m_mxfs_dlm) : -1,
+		current->comm, current->pid);
+#endif
+}
+
 static int
 xfs_dialloc_try_ag(
 	struct xfs_perag	*pag,
@@ -3538,6 +3861,7 @@ xfs_dialloc_try_ag(
 	struct xfs_mount	*mp = (*tpp)->t_mountp;
 	struct xfs_buf		*agbp;
 	xfs_ino_t		ino;
+	const char		*step = "ag-lock";
 	int			error;
 
 	/*
@@ -3548,17 +3872,34 @@ xfs_dialloc_try_ag(
 	 * (the proven create-path hold-and-wait deadlock).  The blocking
 	 * second pass (flags==0) waits as before.
 	 */
+#ifdef __KERNEL__
+	/*
+	 * D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT,
+	 * H-F13: a peer's BAST is pending on this AG.  An inode allocated in
+	 * it now is one its release has to chase or hand over unpublished, so
+	 * pass the AG by as a peer-held one, on both passes: the sweep takes
+	 * another owned AG or backs off and re-sweeps, and never relaxes the
+	 * partition for it.
+	 */
+	if (mxfs_ag_ialloc_fenced_now(mp, pag)) {
+		rs->contended++;
+		return -EAGAIN;
+	}
+#endif
 	if (flags & XFS_ALLOC_FLAG_TRYLOCK)
 		error = mxfs_ag_dlm_trylock(mp, pag);
 	else
 		error = mxfs_ag_dlm_lock(mp, pag);
-	if (error)
+	if (error) {
+		mxfs_dialloc_tryag_err(pag, step, flags, error);
 		return error;
+	}
 
 	/*
 	 * Then read in the AGI buffer and recheck with the AGI buffer
 	 * lock held.
 	 */
+	step = "read-agi";
 	error = xfs_ialloc_read_agi(pag, *tpp, 0, &agbp);
 	if (error)
 		goto out_dlm;
@@ -3574,6 +3915,7 @@ xfs_dialloc_try_ag(
 			error = -EAGAIN;
 			goto out_release;
 		}
+		step = "ag-alloc";
 		error = xfs_ialloc_ag_alloc(pag, *tpp, agbp);
 		if (error < 0)
 			goto out_release;
@@ -3585,6 +3927,7 @@ xfs_dialloc_try_ag(
 		 * new inodes.
 		 */
 		ASSERT(pag->pagi_freecount > 0);
+		step = "roll";
 		error = xfs_dialloc_roll(tpp, agbp);
 		if (error)
 			goto out_release;
@@ -3603,6 +3946,7 @@ xfs_dialloc_try_ag(
 	 * first AG's evidence.
 	 */
 	rs->swept = 0;
+	step = "two-phase";
 	error = mxfs_dialloc_two_phase(pag, tpp, &agbp, parent, &ino, rs);
 	if (!agbp)
 		goto out_dlm;		/* AGI re-read failed: nothing held */
@@ -3621,10 +3965,12 @@ xfs_dialloc_try_ag(
 	if (error == -EAGAIN && rs->swept && ok_alloc && !xfs_is_shutdown(mp) &&
 	    mxfs_dialloc_carve_gate(pag, *tpp, rs, "swept")) {
 		rs->swept = 0;
+		step = "grow-alloc";
 		error = xfs_ialloc_ag_alloc(pag, *tpp, agbp);
 		if (error < 0)
 			goto out_release;
 		rs->grows++;
+		step = "grow-roll";
 		error = xfs_dialloc_roll(tpp, agbp);
 		if (error)
 			goto out_release;
@@ -3635,6 +3981,7 @@ xfs_dialloc_try_ag(
 		rs->budget_exhausted = 0;
 		rs->visit_t0 = ktime_get_ns();
 		/* the pick may still land on an old record: validate again */
+		step = "grow-two-phase";
 		error = mxfs_dialloc_two_phase(pag, tpp, &agbp, parent, &ino, rs);
 		if (!agbp)
 			goto out_dlm;
@@ -3697,12 +4044,14 @@ xfs_dialloc_try_ag(
 	 * in xfs_alloc.c:3704).
 	 */
 	mxfs_ag_dlm_unlock_deferred(*tpp, pag);
+	mxfs_dialloc_tryag_err(pag, step, flags, error);
 	return error;
 
 out_release:
 	xfs_trans_brelse(*tpp, agbp);
 out_dlm:
 	mxfs_ag_dlm_unlock(mp, pag);
+	mxfs_dialloc_tryag_err(pag, step, flags, error);
 	return error;
 }
 

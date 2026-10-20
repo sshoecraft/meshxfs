@@ -1,0 +1,23 @@
+# Flake-window laps for 2/net/mesh/direct on g2c (test29 test30), run from the
+# main tree on the module the release chain will build (the chain's clean build
+# must report the srcversion these laps ran, or they count for nothing).
+#
+# alloc_witness FAILed at window index 0 (2026-10-20T15:57Z, run
+# 20261020T153125Z-g2c, D-TCP-PRIVATE-DIR-CREATE-RATE-34-PER-SECOND), so the
+# cell reads PASS again only after 11 more runs of the row; these 10 laps and
+# the chain's board are those runs.  chk_clean rides with it: its release
+# verdict needs the witness of the same run id.
+#
+# Bound per lap: prep_cluster 300 s + alloc_witness 120 s + chk_clean 180 s
+# (tests/suite/manifest) + the chain's overhead outside the rows, measured
+# about 60 s = 660 s.
+660 tests/board_4node_chain.sh wd1_r131 2/net/mesh/direct:alloc_witness,chk_clean@g2c
+660 tests/board_4node_chain.sh wd2_r131 2/net/mesh/direct:alloc_witness,chk_clean@g2c
+660 tests/board_4node_chain.sh wd3_r131 2/net/mesh/direct:alloc_witness,chk_clean@g2c
+660 tests/board_4node_chain.sh wd4_r131 2/net/mesh/direct:alloc_witness,chk_clean@g2c
+660 tests/board_4node_chain.sh wd5_r131 2/net/mesh/direct:alloc_witness,chk_clean@g2c
+660 tests/board_4node_chain.sh wd6_r131 2/net/mesh/direct:alloc_witness,chk_clean@g2c
+660 tests/board_4node_chain.sh wd7_r131 2/net/mesh/direct:alloc_witness,chk_clean@g2c
+660 tests/board_4node_chain.sh wd8_r131 2/net/mesh/direct:alloc_witness,chk_clean@g2c
+660 tests/board_4node_chain.sh wd9_r131 2/net/mesh/direct:alloc_witness,chk_clean@g2c
+660 tests/board_4node_chain.sh wd10_r131 2/net/mesh/direct:alloc_witness,chk_clean@g2c

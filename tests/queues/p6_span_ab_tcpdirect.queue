@@ -1,0 +1,84 @@
+# D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349, hypothesis H-P6 (written in
+# the record before any patch, session 104): on a SCSI attachment every
+# single-page ledger commit runs the ticket protocol -- read both copies, a
+# COMPARE AND WRITE of the spare's sector 0 to a ticket, flush, the 7 body
+# sectors with FUA, flush, a COMPARE AND WRITE of sector 0 to the final header,
+# flush, read back: 8 serial device operations, 3 of them cache flushes --
+# because the store took a whole-page swap only on emulated devices.  The rig's
+# SCST target allows 255 blocks per COMPARE AND WRITE (Block Limits VPD), so one
+# swap that compares the whole spare copy as read and writes the new image,
+# then the store's one flush and read-back, is the same exclusion in 5
+# operations with 1 flush.
+#
+# Same-build A/B of the caw_span module knob (0 = the ticket protocol, the
+# control; 1 = the whole-page swap where the target allows it, the default),
+# written and read back on both nodes before each copy, with the per-node count
+# of whole-page swaps (caw_span_n) zeroed then and read after.  Build: the
+# main tree, srcversion 65863B924040AF5213F2A76, run from the main tree.  The
+# first build named here, ~/src/mxfs-e E9B83D5632B58D3C14FDF5A, merged the
+# swap's two payload pages into one bvec when they were adjacent and panicked
+# its first node in 4 of 5 preps (run p6, no arm graded); this build adds them
+# as two bvecs and differs from it in that and an off-by-default test knob
+# (D-WHOLE-PAGE-CAW-PAYLOAD-PANICS-NODE-IN-SCSI-ALLOC-SGTABLES, removed fixed
+# and verified).  The prediction and rules below are unchanged.
+# 2/net/mesh/direct on g2c (test29 test30), the main
+# tree's defaults otherwise (resv_ahead 0, tauth_group_commit 0), the
+# both-mounted 8714-file rsync of tests/lone_rsync_bench.sh run by
+# tests/resv_ahead_rsync_ab.sh (A = test29 copies, B = test30 stays mounted),
+# every arm on a freshly prepped cluster.  Native baseline first, on this node
+# and LUN (LRB_NATIVE=1), then re-prepped.
+#
+# PREDICTION (the record's, unchanged):
+#   (1) reach: caw_span_n > 0 on both nodes in every fix arm (p6f1 p6f2 p6f3
+#       p6pf) and 0 on both in every control (p6c1 p6c2 p6c3 p6pc);
+#   (2) the mean per-call time of mxfs_tauth_page_write in the profiled fix
+#       pass (p6pf, tests/tcp_rsync_profile.sh) is at least 35% below the
+#       profiled control's (p6pc), on each node;
+#   (3) each fix arm's copy wall (rsync + sync) is below its pair's: pairs
+#       (p6c1, p6f1), (p6f2, p6c2), (p6c3, p6f3), run in that alternating order;
+#   with every arm landing every file, bad=0, mount/rsync/umount rc 0, no
+#   shutdown, BUG or Oops, and every cold audit CLEAN errors=0.
+#
+# VERDICT RULES (written before the first lap):
+#   SUPPORTED   (1) holds in every arm, (2) is at least 35% on both nodes, (3)
+#               holds in all three pairs, and every safety condition holds.
+#   REFUTED     (2) falls by less than 15% on either node, or a fix arm's copy
+#               wall is not below its pair's.  Between 15% and 35% on (2) is
+#               recorded as partial, not SUPPORTED.
+#   FIX FAILS   a fix arm or an audit shows a lost or corrupt file, a
+#               shutdown, BUG or Oops, or a P-TAUTH-VERIFY-FAIL,
+#               P-TAUTH-PUBLISH-FAIL, P-TAUTH-TICKET-STOLEN or P-CAW-SPAN-REFUSED
+#               line in either node's kernel log (kmsg_<node>.gz): attributed
+#               from its own lines before anything else; the record stays open.
+#   An ABORT or VACUOUS arm measured nothing: read from its own lines and
+#   rerun.  Each arm's lone_rsync_bench PASS or FAIL against 2x native is
+#   recorded, but it is not this hypothesis's verdict: H-P6 is one term of the
+#   create's cost and is not expected to meet 2x native alone.
+#
+# Bounds, from each harness's own header: prep 300 (as in
+# tests/queues/resv_ahead_rsync_ab.queue), the native copy 120
+# (tests/lone_rsync_bench.sh), an A/B arm 210 (tests/resv_ahead_rsync_ab.sh
+# with CAW_SPAN), a profiled pass 785 (tests/tcp_rsync_profile.sh with
+# CAW_SPAN), a cold audit 150 (as in tests/queues/sntr_ab_cawdirect.queue).
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+120 LRB_NATIVE=1 MXFS_NODE_LIST=test29,test30 tests/lone_rsync_bench.sh p6nat test29 2
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+210 CAW_SPAN=0 tests/resv_ahead_rsync_ab.sh p6c1 0 0 test29 test30
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+210 CAW_SPAN=1 tests/resv_ahead_rsync_ab.sh p6f1 0 0 test29 test30
+150 ./run.sh 2/net/mesh/direct --group g2c chk_clean
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+210 CAW_SPAN=1 tests/resv_ahead_rsync_ab.sh p6f2 0 0 test29 test30
+150 ./run.sh 2/net/mesh/direct --group g2c chk_clean
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+210 CAW_SPAN=0 tests/resv_ahead_rsync_ab.sh p6c2 0 0 test29 test30
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+210 CAW_SPAN=0 tests/resv_ahead_rsync_ab.sh p6c3 0 0 test29 test30
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+210 CAW_SPAN=1 tests/resv_ahead_rsync_ab.sh p6f3 0 0 test29 test30
+150 ./run.sh 2/net/mesh/direct --group g2c chk_clean
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+785 CAW_SPAN=0 tests/tcp_rsync_profile.sh p6pc test29 test30
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+785 CAW_SPAN=1 tests/tcp_rsync_profile.sh p6pf test29 test30
+150 ./run.sh 2/net/mesh/direct --group g2c chk_clean

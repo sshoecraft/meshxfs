@@ -1,0 +1,14 @@
+# The live-feed laps on the main-tree build, TCP half, 2/net/mesh/mpath g2e (test17 test18), where wtf2 refused 14155
+# (the sibling A/B's fix laps on this configuration).
+# Build, settings, hypothesis H-WW1-R with its prediction, and the verdict
+# rules are those of tests/queues/livefeed_main_caw.queue, written before
+# its first lap and unchanged here; every lap is the fix arm of
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT (graded by
+# ialloc_fence_hint_caw_ab.queue's F rules) and of
+# D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-NUMBER-REUSE (graded by
+# iwr_refuse_empty_ab.queue's F rules), and every node's stream is read for
+# H-WW1-R.  Two laps.
+#
+# Bound: the wr laps' 1680 s per lap (they ran 492-546 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh lft1 1 300 2/net/mesh/mpath g2e
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh lft2 1 300 2/net/mesh/mpath g2e

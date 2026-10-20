@@ -1,0 +1,48 @@
+# D-STAT-ABORTED-BY-THE-RECOVERY-BLOCKED-CUTOFF-ENDS-ITS-INODE-DLM-HOLD-UNPAIRED:
+# the verification its record wrote when the patch went in (0.87.22, s59), on
+# the main tree's build (65863B924040AF5213F2A76, which carries
+# XFS_ILOCK_MXFS_NOEND, xfs/xfs_inode.h, used by xfs/xfs_mxfs_fallible.c, and
+# the -EHOSTDOWN arm's mxfs_acqfall_give_up_rc, xfs/xfs_mxfs_ilock.c), on the
+# 2-node TCP pair g2c (2/net/mesh/direct).
+#
+# RULES (the record's, unchanged): each tests/d0356_stranded_prover_return.sh
+# lap must print P958-GETATTR-REFUSED rc=-5 after P240-RBLK-EIO-ABORT
+# comm=umount, and ZERO 'P71-UNDERFLOW.*un=mxfs_getattr_dlm_unlock' and ZERO
+# 'un=mxfs_ilock_fallible' in any node's kernel log over the lap; the
+# tests/tcp_lockreq_blackhole.sh lap (ARMED_S=180, on a freshly prepped mount,
+# both nodes mounted) must print ZERO 'un=mxfs_ilock_fallible' where s586h
+# printed them.  A d0356 lap with no P240-RBLK-EIO-ABORT comm=umount did not
+# reach the abort and judges nothing; any P71-UNDERFLOW from either end site is
+# NOT FIXED, attributed from its own lines.  Every lap's own harness verdict
+# (PASS, both witnesses readable, platter clean) must also hold.
+#
+# STAGING (changed after laps sav1/sav2, both VACUOUS): this rig's SCST target
+# retains a destroyed initiator's registration, so A's present-key PREEMPT AND
+# ABORT proved exclusion on the first attempt and the gate refusal was never
+# reached.  The harness now also arms pr_fence_inject_key_absent on A (every
+# attempt classifies KEY_ABSENT_UNPROVEN, submitting nothing).  The blackhole
+# lap is preceded by its own prep: a VACUOUS or failed d0356 lap leaves B
+# rebooted without the module (lap sav3 ABORTed on that).
+#
+# Bounds: d0356 1420 s (its header: prep 300 + witnesses 10 + death 180 +
+# umount 120 + boot 150 + lone mount 300 + rejoin 300 + captures 60); prep 300
+# (run.sh prep_cluster, measured 88-99 s on g2c); blackhole 370 s (its header:
+# setup 8 x 13 + ARMED_S 180 + recovery 60 + captures 20).
+#
+# Run sva (06:51-07:09Z): sav4 and sav5 met the record's markers (P240 comm=umount
+# then P958 rc=-5; zero P71-UNDERFLOW and zero un=mxfs_ilock_fallible in every
+# journal) but their harness verdicts FAILed one check each: the returning node,
+# bootstrap owner after a total outage, adopted a certified victim slot as its
+# own log (P-BOOT-ADOPT rc=0, P-BOOT-ADOPTED-LOG; B's old slot in sav4, A's in
+# sav5), which prints no P163-RECOVERY-COMPLETE.  The harness now counts such an
+# adoption as that slot's recovery once the mount completed; the two d0356 laps
+# are rerun for the harness's own verdict.  sav6 (blackhole): harness fails=0,
+# zero un=mxfs_ilock_fallible; one P71-UNDERFLOW at a third site
+# (un=mxfs_dlm_open_protect), outside this record's two sites, filed as
+# D-ABANDONED-ACQUIRE-UNPAIRED-DLM-END-AT-OPEN-AND-UNFLAGGED-SITES.
+#1420 MXFS_GROUP=g2c MXFS_CONFIG=2/net/mesh/direct tests/d0356_stranded_prover_return.sh sav4
+#1420 MXFS_GROUP=g2c MXFS_CONFIG=2/net/mesh/direct tests/d0356_stranded_prover_return.sh sav5
+#300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+#370 ARMED_S=180 tests/tcp_lockreq_blackhole.sh sav6 test30 test29
+1420 MXFS_GROUP=g2c MXFS_CONFIG=2/net/mesh/direct tests/d0356_stranded_prover_return.sh sav7
+1420 MXFS_GROUP=g2c MXFS_CONFIG=2/net/mesh/direct tests/d0356_stranded_prover_return.sh sav8

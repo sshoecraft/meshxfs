@@ -1,0 +1,127 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT: the TCP half
+# of the final verification, 2/net/mesh/direct g2c, on the build of the final
+# source: srcversion 311877C431E1BB444562804 (main tree ~/src/mxfs, 0.90.131:
+# the H-F11 fix, both halves of the fix for
+# D-RECYCLE-RESET-UNDER-NOINO-STRANDS-COMMITTED-DIR-CHANGE-WEDGE-SHUTDOWN
+# (noino_recycle_dirty_wait and noino_recycle_takeover), the unlinked-list
+# fixes of D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES
+# (freshsrc_iunl_overlay, unlprev_tenure, b6_release_drain, unlprev_pin,
+# unlprev_rele_defer) and the deferred-free fixes of
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY
+# (ifree_defer_drain, ifree_defer_reap), all at their defaults 1; run from
+# ~/src/mxfs, the harness prints each lap's build and refuses a node running
+# anything else).  Every guard runs at its module
+# default 1 in every lap: noino_gen0_guard, inact_local_epoch_guard (H-F6),
+# noino_recycle_guard (H-F7), freshsrc_keep_guard (H-F8),
+# selfclobber_keep_guard (H-F8b), noino_resv_guard (H-F7c), noino_shell_guard
+# (H-F9), pub_claim_release_guard and pub_claim_write_guard (H-F10),
+# deadshell_sanitize_guard, p55c_home_restore (H-F11), noino_recycle_dirty_wait,
+# noino_recycle_takeover and the four unlinked-list fixes.  An NG0_*_GUARD=1
+# setting writes that default and
+# makes the harness read the guard's counters; a guard not named on a line is
+# still at its default.  NG0_P55C_RESTORE and NG0_DIRTY_WAIT are deliberately
+# NOT set: each makes its own reach the lap's only vacuity gate
+# (tests/noino_gen0_ab.sh), which would hide the H-F7c and H-F9 window laps'
+# own gates; the harness keeps H-F11's lines and chain (p55_home_platter,
+# p55_restored_lof, disklive, hf11_chain; its PASS requires hf11_chain 0) and
+# the dirty-corpse lines (<node>_dirtywait.txt) on every lap anyway.
+#
+# Node failures are counted from each node's whole kernel log after the lap's
+# mark in both harnesses (tests/noino_gen0_ab.sh, tests/peer_last_closer_ab.sh),
+# not only from the ring read after the workload, which missed fxdp2's
+# shutdown.
+#
+# The previous run of this half (build 737E182A809291DAA0B4785, labels
+# fxdp1/fxdd1/fxdr1/fxds1/fxdl1/fxdp2): fxdp1, fxdr1, fxds1, fxdl1 PASS, fxdd1
+# VACUOUS, fxdp2 FAIL with audit STALE: test30 shut its filesystem down
+# mid-lap (P-INODE-WEDGE), the stability defect recorded as
+# D-RECYCLE-RESET-UNDER-NOINO-STRANDS-COMMITTED-DIR-CHANGE-WEDGE-SHUTDOWN, whose
+# fix this build carries.  The run on build C06A6D4A9AB7A357503DF51 (labels
+# fydp1..fydp2) was 6 of 6 PASS; it ran before the unlinked-list fixes, which
+# change the inactivation and unlinked-list paths every lap here exercises, so
+# it does not speak for this build.  The run on build 41D2F9237EBB21CF21E9D57
+# (labels fzdp1..fzdp2) never started: its chain died with the session that
+# launched it.  The CAW and 2/net/mesh/mpath halves on that build audited
+# CORRUPT on D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY's
+# shape (every audited inode a free deferred at the unlinked-list preflight),
+# whose two fixes this build carries.
+#
+# THE DEFERRED-FREE GRADING (added for build 311877C4, before its first lap).
+# A free deferred at the unlinked-list preflight leaves its inode on its AGI
+# bucket, and tools/chk_mxfs grades a bucket member as legal crash residue, not
+# an error, so a CLEAN audit alone cannot show that the deferred inodes were
+# freed.  The two production laps therefore also set NG0_IFREE_DRAIN=1
+# NG0_IFREE_REAP=1 (the module defaults, written and read back): the harness
+# then attributes every bucket member and fork-ownership error to the
+# deferrals that name it (tools/ifree_defer_attribution.py) and passes the lap
+# only with no fork-ownership error, no unlanded drain and no bucket member
+# left (if_ok=1).  For those two laps the deferrals' reach is the vacuity gate
+# in place of the generation-0 release's.
+#
+# The run on build 311877C431E1BB444562804 (labels fwdp1..fwdp2, log
+# tests/evidence/lapq_fwd.log) was 6 of 6 PASS.  This run (labels fvd*, written
+# before its first lap) is on build 37897D38118AD5E2FAAC4FC (main tree
+# ~/src/mxfs, 0.90.131): that source plus every change made since, each at its
+# module default.  Behaviour: H-3 of
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY
+# (reap_transient_keep), H-U7 of
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES
+# (reload_next_refresh), H-F13's inode-allocation fence with its revision
+# H-F13b (ag_ialloc_fence 1, ag_fence_hint_exempt 1), H-F12's bounded drain
+# built but off (pub_drain_bound 0, the open scan every earlier run had), and
+# the fixes of D-CREATE-REUSE-OVER-PEER-FREED-LINKED-CORPSE-SHUTS-NODE-DOWN
+# (cr63_linked_defer), D-UMOUNT-ROOT-DENTRY-STILL-IN-USE-DEFERRED-DIR-DCACHE-SHRINK-RACE
+# (dshrink_umount_gate), D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-NUMBER-REUSE
+# (sf_kept_ahead_base) and D-FORMATION-RAMP-LOCK-REQUEST-EXHAUSTS-RETRIES-EAGAIN
+# (ilock_retry_exhaust_park, dl_retry_view_unspent).  Instruments only: the
+# handoff exposure census (P-PUB-UNPUB-AT-UNLOCK), the phantom detector's
+# in-flight sample and the next-write detector's own-free exception.  The
+# rules below are unchanged.
+#
+# The laps: two production laps (no window held open), one with the original
+# incident's generation-0 release delay (NG0_DELAY_MS=200), the fix-arm
+# settings of the H-F7c queue (post-fence hold 300 ms: H-F7 and H-F7c reach),
+# the fix-arm settings of the H-F9 queue (setattr delay 500 ms: H-F8b and H-F9
+# reach), and one peer-last-closer lap (H-F6 reach, zombie-shell counters
+# read).  H-F10's reach needs three nodes and is run on g3b after the CAW work.
+#
+# VERDICT RULES (written before the first lap):
+#   CLEAN      every lap's cold audit CLEAN errors=0 with node_failures=0 and
+#              hf11_chain=0, each production lap if_ok=1 with if_zombies=0
+#              and if_fork_errors=0, and each window lap passes its own harness's
+#              fix-arm condition (the noino harness's PASS: refuse_ok, hf7_ok,
+#              fk_ok, sc_ok, hs_ok, pc_ok, pw_ok, p55_ok all 1; the
+#              peer-last-closer harness's PASS and ZRESULT not ZFAIL).  A lap
+#              graded VACUOUS by a harness gate keeps its audit and hf11_chain
+#              as its verdict and is reported as unreached for that gate.
+#   REACH      reported per guard from the laps' counters: rv_skipped (H-F7c),
+#              recycle redrive/reset lines (H-F7), fk_refused (H-F8),
+#              sc_refused (H-F8b), shell_routed (H-F9), inact_peerfreed (H-F6),
+#              noino_gen0_refused (gen-0), deadshell_stale_sanitized,
+#              p55_restored_lof (H-F11: a live staged slot over a free platter
+#              put back to the platter's bytes), and the dirty-corpse lines
+#              (P-RECYCLE-DIRTY-WAIT/KEEP/TAKEOVER, P-NOINO-TAKEN-OVER).  A
+#              guard with reach 0 over this half and the CAW half rests on its
+#              own A/B verdict, and the record says so.
+#   CORRUPT    any CORRUPT audit, any hf11_chain > 0, any dinode verify
+#              failure, any P-NOINO-UNLOCK-UNDRAINED, P-NOINO-UNLOCK-LEFT-GRANT
+#              lifecycle=LIVE cached_mode=5, P-RECYCLE-RESET-UNDER-NOINO with
+#              owes=1, or phantom/no-grant line with pub_inflight=0, on any lap:
+#              blocks the record; attribute the audited inode or the line to a
+#              known shape or a new one.
+#   UNSTABLE   any node failure line in a lap's whole kernel log: blocks both
+#              records until attributed.
+# A lap whose audit is STALE/NONE has no verdict and is rerun.
+#
+# Bounds: noino laps 1680 s, the H-F7c/H-F9 queues' derivation (prep 300 +
+# srcversion 2x20 + seven knob sets 2x7x20 + mkdir 30 + workload SECS+60 = 360
+# + counters 2x40 + three knob resets 2x3x20 + chk_clean with alloc_witness 150
+# + stream capture 2x120 + snapshot 60 = 1660) plus the harness's P55C stream
+# pass (2x10); the peer-last-closer lap 1130 s (the H-F6 queue's 1090 + 2x20
+# for the sanitize knob set/readback).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fvdp1 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh fvdd1 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_RESV_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh fvdr1 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_SHELL_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh fvds1 1 300 2/net/mesh/direct g2c
+1130 PLC_SANITIZE_GUARD=1 tests/peer_last_closer_ab.sh fvdl1 1 40 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fvdp2 1 300 2/net/mesh/direct g2c

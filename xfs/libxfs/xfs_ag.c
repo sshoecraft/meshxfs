@@ -313,6 +313,8 @@ xfs_perag_alloc(
 	mutex_init(&pag->pag_dlm_acquire_lock);
 	spin_lock_init(&pag->pag_resv_lock);	/* 0.23.0 */
 	pag->pag_resv_cursor = NULLAGINO;
+	pag->pag_resv_ahead_rec = NULLAGINO;	/* D-0349 reserve-ahead */
+	pag->pag_resv_ahead_mask = 0;
 	xa_init(&pag->pag_disklive_q);		/* D-0351 containment */
 	pag->pag_disklive_n = 0;
 	pag->pag_dlm_cached = false;

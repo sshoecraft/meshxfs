@@ -56,8 +56,48 @@ done
 ck "multipathd failed $V's path a (within 40 s)" "$one" 1
 
 # 3. frozen
+# PF_FREEZE_KNOBS="name=value ...": test-only module parameters written on the
+# victim only, immediately before it is frozen, so a one-shot injection (e.g. a
+# parked log write, dbg_admit_park_site=log dbg_admit_park_ms=<ms>) is in
+# flight across the freeze and the fence.  Read back into knobs_freeze.txt; a
+# parameter that did not take fails the row, which would have measured
+# something else.
+if [ -n "${PF_FREEZE_KNOBS:-}" ]; then
+    for kv in $PF_FREEZE_KNOBS; do
+        echo "$V ${kv%%=*} want=${kv#*=} got=$(rs 15 "$V" "echo ${kv#*=} > /sys/module/mxfs/parameters/${kv%%=*} && cat /sys/module/mxfs/parameters/${kv%%=*}" 2>/dev/null | tr -d '\r\n')" >> "$OUT/knobs_freeze.txt"
+    done
+    ck "$V took PF_FREEZE_KNOBS ($PF_FREEZE_KNOBS)" "$(awk '{w=$3; g=$4; sub(/^want=/,"",w); sub(/^got=/,"",g); if (w != g) bad++} END {print bad+0}' "$OUT/knobs_freeze.txt")" 0
+fi
+# PF_FREEZE_WRITER=<depth>: the victim keeps <depth> 1 MiB O_DIRECT writes in
+# flight to a preallocated file on the mount from 3 s before the freeze, so
+# commands are queued at the target when the fence's PREEMPT AND ABORT aborts
+# them.  A target that aborts them without answering (SCST's iSCSI driver
+# does, whatever the Control mode page's TAS bit says) leaves them outstanding
+# on the victim, and its unmount at the rejoin
+# waits on them.  The writer runs 20 s of guest time (the guest clock stands
+# still while it is frozen): ~5 s before the freeze and ~15 s after the thaw,
+# well before the rejoin, so whatever it still holds at the rejoin the layer
+# below held.
+if [ -n "${PF_FREEZE_WRITER:-}" ]; then
+    # recorded for the evidence: TAS (Control mode page byte 5, 0x40) as this
+    # node's paths read it, page bytes after an 8-byte header (DBD)
+    rs 20 "$V" "for p in \$(ls /sys/block/\$(basename \$(readlink -f /dev/mapper/mpatha))/slaves); do echo \"\$p \$(timeout 5 sg_modes -d --page=0x0a -r /dev/\$p 2>/dev/null | od -An -tx1 -v | tr -s ' \n' ' ')\"; done" > "$OUT/freeze_tas.txt" 2>&1
+    tasl=""
+    while read -r p pl; do
+        read -r -a pb <<<"$pl"
+        if [ "${#pb[@]}" -ge 14 ]; then tasl+="$p tas=$(( (0x${pb[13]} & 0x40) ? 1 : 0 )); "; else tasl+="$p tas=?; "; fi
+    done < "$OUT/freeze_tas.txt"
+    echo "  INFO the target's TAS as $V's paths read it before the freeze: $tasl"
+    # the writer alone goes to the background: `a && b &` would background the
+    # list in a subshell holding the ssh channel until fio exits
+    rs 30 "$V" "f=/mnt/shared/pf_freeze_writer_$V; fallocate -l 1G \$f && { nohup setsid fio --name=pfw --filename=\$f --rw=randwrite --bs=1M --iodepth=$PF_FREEZE_WRITER --ioengine=libaio --direct=1 --size=1G --time_based --runtime=20 --continue_on_error=all --output=/run/pf_freeze_writer.txt < /dev/null > /run/pf_freeze_writer.out 2>&1 & echo started; }" > "$OUT/freeze_writer.txt" 2>&1
+    ck "$V started the freeze writer (depth $PF_FREEZE_WRITER)" "$(grep -c '^started' "$OUT/freeze_writer.txt")" 1
+    sleep 2
+    rs 15 "$V" "for p in \$(ls /sys/block/\$(basename \$(readlink -f /dev/mapper/mpatha))/slaves); do echo \$p \$(cat /sys/block/\$p/inflight); done; ps -o pid= -C fio | wc -l" > "$OUT/freeze_writer_inflight.txt" 2>&1
+    echo "  INFO $V just before the freeze, per path 'reads writes' in flight, then fio processes: $(tr '\n' ';' < "$OUT/freeze_writer_inflight.txt")"
+fi
 T0=$(now_ms)
-timeout 30 $VIRSH suspend "$V" >/dev/null 2>&1
+tools/lun_pool.sh fault timeout 30 $VIRSH suspend "$V" >/dev/null 2>&1
 ck "$V is frozen" "$($VIRSH domstate "$V" 2>/dev/null | head -1)" paused
 echo "  INFO $V frozen at $(date -u +%T) with its path a down"
 

@@ -1,8 +1,9 @@
 # MeshXFS on two hosts with DRBD dual-primary
 
-`2/net/mesh/drbd` is a released configuration (see the top of the README):
-verified on two physical Proxmox VE 9 hosts with DRBD 8.4.11, installed exactly
-as below.
+`2/net/mesh/drbd` is released; the README names the version that last verified
+it. Each release verifies it with DRBD 8.4.11 on its own two-node test rig
+(Ubuntu 24.04), and the installation below was carried out exactly as written
+on two physical Proxmox VE 9 hosts (0.90.130).
 
 Two hosts, each with a local disk, and no shared storage: DRBD keeps the two
 disks identical and MeshXFS runs on top of both at once. This is the `2/net/mesh/drbd`

@@ -1,0 +1,49 @@
+# D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349: where the copy's NON-create
+# time goes.  ra32off (tests/queues/d0349_offcpu_ra32_tcpdirect.queue, ~/src/mxfs-g
+# 9165D999BCB65B8FC36F493, resv_ahead=32 dl_reserve_held_local=1) measured
+# xfs_create at 8.63 s of wall (6.52 s off-CPU) in pass 2's 17.08 s copy, but
+# its per-VFS-op timers (@fn_us, one probe pair keyed by `func` over six
+# functions) printed nothing in either pass, so ~8.4 s of the copy was never
+# attributed.  tests/tcp_rsync_offcpu.sh now times rename, setattr, lookup,
+# write, release, getattr and mkdir with one probe pair each.  This queue
+# measures; it grades no change.
+#
+# Build: ~/src/mxfs-g (9165D999BCB65B8FC36F493, the ra32off build) with the main
+# tree's tests/tcp_rsync_offcpu.sh copied in; run from ~/src/mxfs-g.
+# 2/net/mesh/direct g2c, A=test29 copies, B=test30 mounted, each pass on a
+# fresh prep.  Passes 1-2 at resv_ahead=32 dl_reserve_held_local=1 (ra32off's
+# settings, read back before and after); pass 3 at the module defaults.
+#
+# READING RULES (written before the first pass), per pass from offcpu.txt and
+# bench.txt:
+#   VALID: bench RESULT line present with files=8137 bad=0 rsync_rc=0, and at
+#     least one @fn_us entry printed (else the instrument is still blind:
+#     fix it before reading anything).
+#   RECEIVER SUM = @create_us + every @fn_us entry; COVERAGE = RECEIVER SUM /
+#     rsync_wall.  Below 0.7 the receiver is not where the copy waits (the
+#     generator/sender side or the pipe hand-off is): the next instrument is
+#     a per-process on-CPU/off-CPU split of all three rsync processes.
+#   DECISION for the next 0349 piece (both 32-ahead passes must agree; else
+#     a third pass before deciding): the largest of {create, rename, setattr,
+#     write, release, lookup, getattr, mkdir} by wall is the next target.  If
+#     create, the ruling's step 2 (candidate-home check off the create path)
+#     stands as planned; if another op exceeds create, that op's wall is
+#     profiled by stack before any step-2 code is written.
+#   INTEGRITY: any shutdown, BUG, Oops, hung-task, P-TAUTH-VERIFY-FAIL or
+#     P-TAUTH-DOUBLE-GRANT line in either node's kernel log stops the reading.
+#
+# Bounds: prep_cluster 300 s + the config lock wait 150 s (g2d's queue shares
+# 2/net/mesh/direct's run.sh lock); knobs 60 s (one 40 s ssh per node in
+# parallel); the profile 180 s (its header: attach 30 + bench 120 + read-back
+# 30).
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "resv_ahead=32 dl_reserve_held_local=1" test29,test30 tests/evidence/vop1_knobs_before.txt
+180 tests/tcp_rsync_offcpu.sh vop1 test29 test30
+60 tests/fleet_set_params.sh "resv_ahead dl_reserve_held_local dl_reserve_held_local_n resv_ahead_granted resv_ahead_consumed" test29,test30 tests/evidence/vop1_knobs_after.txt
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "resv_ahead=32 dl_reserve_held_local=1" test29,test30 tests/evidence/vop2_knobs_before.txt
+180 tests/tcp_rsync_offcpu.sh vop2 test29 test30
+60 tests/fleet_set_params.sh "resv_ahead dl_reserve_held_local dl_reserve_held_local_n resv_ahead_granted resv_ahead_consumed" test29,test30 tests/evidence/vop2_knobs_after.txt
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "resv_ahead dl_reserve_held_local" test29,test30 tests/evidence/vop3_knobs_before.txt
+180 tests/tcp_rsync_offcpu.sh vop3 test29 test30

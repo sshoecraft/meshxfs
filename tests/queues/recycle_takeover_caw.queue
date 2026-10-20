@@ -1,0 +1,23 @@
+# D-RECYCLE-RESET-UNDER-NOINO-STRANDS-COMMITTED-DIR-CHANGE-WEDGE-SHUTDOWN, the
+# CAW half of the build that carries both halves of the fix: srcversion
+# C06A6D4A9AB7A357503DF51.  2/disk/caw/mpath g2b (tdr1's transport and
+# attachment); the TCP half is tests/queues/recycle_takeover_tcp.queue, and
+# its header has the hypotheses and the arms.  On CAW the waiting peer's UDP
+# BAST hint is re-sent every 100 ms instead of TCP's request re-send, and the
+# recycle's grant measurement is a sampled slot read; neither changes what an
+# arm is graded on.
+#
+# VERDICT RULES (written before the first lap): as the TCP half's, per lap:
+#   FIXED      lap 2 PASS and lap 4 PASS, each control having reached the
+#              case (lap 1 recycle_reset_dirty > 0, lap 3 hazard + reset_dirty
+#              > 0); a reached control that read CONTROL-FRESH is recorded as
+#              such and the hypothesis re-examined.
+#   NOT FIXED  any fix-arm FAIL: diagnose from its kept logs first.
+#   NO VERDICT an ABORT, or a VACUOUS fix arm: rerun that lap.
+#
+# Bound per lap: 1370 s, the TCP half's derivation (the harness's steps do not
+# depend on the transport).
+1370 NDR_ARM=takeover tests/noino_dirty_recycle_ab.sh ntc2 0 10 2/disk/caw/mpath g2b
+1370 NDR_ARM=takeover tests/noino_dirty_recycle_ab.sh ntf2 1 10 2/disk/caw/mpath g2b
+1370 tests/noino_dirty_recycle_ab.sh ndrc5 0 10 2/disk/caw/mpath g2b
+1370 tests/noino_dirty_recycle_ab.sh ndrf5 1 10 2/disk/caw/mpath g2b

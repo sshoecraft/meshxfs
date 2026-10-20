@@ -18,12 +18,11 @@ nodes and you will get silent corruption. **Read this before formatting a LUN.**
 MeshXFS coordinates nodes with a distributed lock manager (DLM) that runs over one
 of two transports.  With each node reaching the LUN over its own iSCSI login on
 one path (the `direct` attachment), CAW is released for 2-, 4-, 8- and 16-node
-clusters, TCP for 2 and 4.  With two paths per node through dm-multipath
+clusters.  With two paths per node through dm-multipath
 (`mpath`, with the settings of `tools/mpath_settings.sh`), CAW is released for
-2-, 4-, 8- and 16-node clusters on Ubuntu 24.04.  TCP at 8 and 16 nodes, and
-TCP on `mpath`, were verified in 0.90.51 and are not claimed by the current
-release (README, "Released in an earlier version"); hypervisor passthrough is
-not verified. A
+2-, 4-, 8- and 16-node clusters on Ubuntu 24.04.  TCP was last verified in
+0.90.130, at the same sizes on both attachments (README, "Released in an
+earlier version"); hypervisor passthrough is not verified. A
 configuration names
 the transport by class and method: TCP is `net/mesh`, CAW is `disk/caw`.
 
@@ -193,6 +192,22 @@ ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="sd*", \
 This does **not** mask a slow filesystem — a genuinely slow workload still fails
 its own time budget. It only stops a transient transport stall from turning into
 an unrecoverable wedge.
+
+The long timeout has a cost that MeshXFS pays down itself. A LOGICAL UNIT RESET
+that any initiator issues aborts every other initiator's commands at the target,
+and a target may drop them without a response (SAM allows it with the Control
+mode page's TAS bit clear; iscsi-scst does it whatever TAS says). The Linux
+initiator learns of the reset only from the unit attention its next command
+draws, blocks the device on it, and then dispatches nothing while the dropped
+command is outstanding, which is three expiries of this timeout (540 s). That
+would starve the node's storage heartbeat and fence it. So the module watches
+every shared device's SCSI paths for that unit attention and walks the commands
+sent before it, still unanswered after `stranded_abort_ms`, through the
+initiator's own timeout ladder to an abort and retry. The kernel reports the
+unit attention to user space only, so the package installs
+`/etc/udev/rules.d/61-mxfs-stranded-path.rules` to pass it to the module. No
+connection is dropped: a reinstated iSCSI session can be briefly unregistered on
+SCST, and a write refused in that window would end the mount.
 
 ### 5.2 Unique node identity
 Each node must have a unique cluster slot (disklock slot 0..63). Two live nodes

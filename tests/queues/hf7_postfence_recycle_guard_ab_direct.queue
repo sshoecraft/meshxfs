@@ -1,0 +1,51 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F7: a
+# no-inode release unlocks a grant that the lookup node's recycled corpse kept
+# and wrote through after the release's drain fence; the change rides the
+# unlock undrained and is written home over the peer's free.  kdf2 (H-F8 A/B,
+# 2/net/mesh/direct, production knobs, recycle guard off) traced it end to
+# end: 88 touches through the kept grant during a 5.3 s fence, the unlock with
+# cc 194 undrained (P-NOINO-UNLOCK-UNDRAINED cc=194 start_cc=106), the peer's
+# grant and free, and the lookup node's write of the live cc-194 core 46 ms
+# later (P-LOGWR-DLM-NOGRANT) -- the audited core byte for byte.
+#
+# Same-build A/B of module knob noino_recycle_guard (0 = control, 1 = fix),
+# with the window held open by dbg_noino_postfence_delay_ms (NG0_POSTFENCE_MS):
+# every no-inode release waits that long after its fence, just before it
+# unlocks.  Both arms: freshsrc_keep_guard 1 and selfclobber_keep_guard 1 (the
+# H-F8 and H-F8b fixes, so neither reload keep confounds), noino_gen0_guard 1,
+# no generation-0 delay, mirror check on.  Runs from the sibling checkout
+# carrying the fixes and the knob (its mxfs.ko, srcversion
+# FAB8FDFCBFD75AFF34154F6 at launch; the harness prints each lap's build).
+#
+# VERDICT RULES (written before the first lap):
+#   REACHED   control laps count hf7_undrained > 0 in aggregate: the held
+#             window does open the hazard on this build.  If no control lap
+#             does, the forcing is wrong -- redesign it before judging the fix.
+#   FIX VERIFIED (H-F7)  REACHED, and every non-vacuous fix lap reads
+#             hf7_keep=0, hf7_undrained=0, hf7_reset>0, audit CLEAN,
+#             node_failures=0 and hf7_nogrant=0.  A nonzero hf7_nogrant in a
+#             fix lap suspends the verdict until its lines are traced: a writer
+#             shape other than H-F7 is its own finding and blocks the record.
+#   REFUTED   any fix lap with hf7_undrained > 0, or a CORRUPT fix lap whose
+#             audited inode has an undrained attribution on either node.
+#   OTHER     a CORRUPT fix lap with no undrained attribution: trace that inode
+#             (another mechanism); it does not judge this fix but blocks the
+#             record's closure.
+# A lap whose audit is STALE/NONE has no verdict and is rerun; a VACUOUS lap
+# (control kept no grant / fix reset none) has no verdict.
+#
+# Bound per lap, the sum of the harness's own step bounds, every ssh step
+# counted: prep_cluster 300 + srcversion reads 2x20 + knob sets 2x(6x20: gen0
+# guard+delay, recycle, freshsrc, mirror, postfence, selfclobber) + mkdir 30 +
+# workload SECS+60 = 360 + counter reads 2x40 + knob resets 2x(3x20: delay,
+# mirror, postfence) + chk_clean with alloc_witness 150 + stream capture 2x120
+# + snapshot 60 = 1620 s.  (The H-F8 queue's 1350 counted four knob calls per
+# node where its laps make six, and no srcversion reads or mkdir.)
+1620 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh pdc1 1 300 2/net/mesh/direct g2c
+1620 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh pdf1 1 300 2/net/mesh/direct g2c
+1620 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh pdc2 1 300 2/net/mesh/direct g2c
+1620 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh pdf2 1 300 2/net/mesh/direct g2c
+1620 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh pdc3 1 300 2/net/mesh/direct g2c
+1620 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh pdf3 1 300 2/net/mesh/direct g2c
+1620 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh pdc4 1 300 2/net/mesh/direct g2c
+1620 NG0_SELFCLOBBER_GUARD=1 NG0_POSTFENCE_MS=300 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh pdf4 1 300 2/net/mesh/direct g2c

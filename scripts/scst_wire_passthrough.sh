@@ -102,7 +102,8 @@ del_target() {                                   # $1 = target IQN
 }
 
 attach_one() {                                   # $1 = node number
-    local k="$1" vm="test$k" tgt="${TGT_BASE}${k}" dev state note=""
+    local k="$1"
+    local vm="test$k" tgt="${TGT_BASE}${k}" dev state note=""
     $VIRSH dominfo "$vm" >/dev/null 2>&1 || { say "$vm: NOT DEFINED — skipped"; return 1; }
 
     ensure_target "$tgt"
@@ -132,7 +133,8 @@ EOF
 }
 
 detach_one() {                                   # $1 = node number
-    local k="$1" vm="test$k" tgt="${TGT_BASE}${k}"
+    local k="$1"
+    local vm="test$k" tgt="${TGT_BASE}${k}"
     $VIRSH dominfo "$vm" >/dev/null 2>&1 && \
         $VIRSH detach-disk "$vm" "$GUEST_TGT" --config >/dev/null 2>&1 && say "$vm: detached $GUEST_TGT"
     host_logout "$tgt"
@@ -141,7 +143,8 @@ detach_one() {                                   # $1 = node number
 }
 
 status_one() {                                   # $1 = node number
-    local k="$1" vm="test$k" tgt="${TGT_BASE}${k}" src en="-"
+    local k="$1"
+    local vm="test$k" tgt="${TGT_BASE}${k}" src en="-"
     $VIRSH dominfo "$vm" >/dev/null 2>&1 || return 0
     src=$($VIRSH dumpxml "$vm" --inactive 2>/dev/null | grep -A4 "device='lun'" | grep -oP "source dev='\K[^']+")
     [ -d "$TROOT/$tgt" ] && en=$($SUDO cat "$TROOT/$tgt/enabled" 2>/dev/null)

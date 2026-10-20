@@ -1,0 +1,44 @@
+# D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349: where a both-mounted create
+# waits now that routing version 2 is the format (mkfs's default since session
+# 112; its A/B and cold audit: tests/queues/route_v2_main_ab_tcpdirect.queue,
+# tests/queues/route_v2_cold_audit_tcpdirect.queue, 5.0-5.8x native against
+# 8.6-9.8x for version 1).  The last off-CPU profile (hp7a,
+# tests/evidence/tcp_rsync_offcpu/20261019T061523Z-hp7a) was taken on a
+# version-1 volume, where nearly every create met a ledger page its incarnation
+# had never used; the design ruling's ranked steps
+# (docs/rulings/d0349-pregrant-pool-and-chunk-delegation.md: 1. batched
+# pre-grants consumed locally, 2. the candidate-home check moved into the
+# refill, 3. chunk delegation) are ordered by gains measured on that shape.
+# This measures the shape the next step will act on.  Main tree build, the
+# module's defaults, 2/net/mesh/direct g2c, A=test29 copies, B=test30 mounted;
+# two passes, each on a fresh prep.  tests/tcp_rsync_offcpu.sh grades nothing;
+# bpftrace inflates absolute times (hp7a: ~4x), so the split is the evidence.
+#
+# HYPOTHESIS H-P8 (written before the first lap).  Version 2 removed most
+# first-touch page hand-offs (prepares and activations per grant 5.6-5.8x
+# fewer), so in xfs_create's off-CPU time by stack: (a) the reserve's retry
+# sleeps (msleep <- dlm_lock_retries_impl <- mxfs_v5_dlm_inode_reserve_try),
+# which wait out REMASTER parks during a hand-off, fall to under a quarter of
+# their hp7a share (hp7a: 10.3 s of 62.6 s off-CPU, 16%); (b) the reserve's
+# DLM reply wait (pending_wait <- dlm_lock_impl <- the reserve), the durable
+# grant commit and the remote round trip, becomes the largest single term;
+# (c) the synchronous platter reads under the AG grant (the candidate-home
+# check mxfs_dbg_disk_di_read_coherent, the leaf rebuild's data-block reads,
+# xfs_dir2_data_log_entry's read) keep about their hp7a size in absolute
+# terms (~8.6 s), so their share rises.  READING: per pass, the off-CPU sums
+# inside xfs_create grouped by those three stack families, the AGI buffer lock
+# and everything else, each as a share of create off-CPU time, plus creates
+# and the reserve's call count and time.  If (c) is now larger than (b), the
+# ruling's step 2 comes before step 1; if (b) dominates, step 1 stands as
+# first.  REFUTED (a new hypothesis before any patch) if (a) is still above a
+# quarter of its hp7a share.
+#
+# Bounds: prep 300 (run.sh prep_cluster, measured 38-99 s on g2c) + 150 for
+# 2/net/mesh/direct's run.sh lock, which g2d's queue shares
+# (MXFS_CONFIG_LOCK_WAIT_S: that queue's longest run.sh call, chk_clean,
+# measured 100-130 s); profile 180 (its header: bpftrace attach 30 + the
+# bench's caller bound 120 + stop and read-back 30).
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+180 tests/tcp_rsync_offcpu.sh v2off1 test29 test30
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+180 tests/tcp_rsync_offcpu.sh v2off2 test29 test30

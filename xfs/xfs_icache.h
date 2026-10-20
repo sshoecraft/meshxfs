@@ -112,7 +112,31 @@ enum xfs_ino_lifecycle {
 enum xfs_ino_lifecycle xfs_icache_ino_lifecycle(struct xfs_mount *mp,
 		xfs_ino_t ino, unsigned long *iflags_out, unsigned int *nlink_out,
 		unsigned long *istate_out);
+enum xfs_ino_lifecycle xfs_icache_ino_lifecycle_grant(struct xfs_mount *mp,
+		xfs_ino_t ino, unsigned long *iflags_out, unsigned int *nlink_out,
+		unsigned long *istate_out, uint8_t *dlm_mode_out);
+enum xfs_ino_lifecycle xfs_icache_ino_lifecycle_life(struct xfs_mount *mp,
+		xfs_ino_t ino, unsigned long *iflags_out, unsigned int *nlink_out,
+		unsigned long *istate_out, uint8_t *dlm_mode_out, umode_t *mode_out,
+		uint32_t *gen_out);
 const char *xfs_ino_lifecycle_name(enum xfs_ino_lifecycle lc);
+bool xfs_icache_ino_mark_released(struct xfs_mount *mp, xfs_ino_t ino);
+
+/* what the in-core inode of a number still owes the platter (probe only) */
+struct xfs_ino_drain_state {
+	unsigned long	iflags;
+	uint64_t	cc;		/* VFS i_version: the dinode's changecount */
+	xfs_lsn_t	li_lsn;
+	unsigned int	fields;		/* logged, not yet flushed to its buffer */
+	unsigned int	last_fields;	/* flushed, cluster write not complete */
+	int		pin;		/* changes in the CIL, not checkpointed */
+	bool		in_ail;
+	uint8_t		dlm_mode;
+};
+enum xfs_ino_lifecycle xfs_icache_ino_drain_state(struct xfs_mount *mp,
+		xfs_ino_t ino, struct xfs_ino_drain_state *ds);
+int xfs_icache_grab_live_shell(struct xfs_mount *mp, xfs_ino_t ino,
+		struct xfs_inode **ipp);
 int xfs_inodegc_flush(struct xfs_mount *mp);
 void xfs_inodegc_stop(struct xfs_mount *mp);
 void xfs_inodegc_start(struct xfs_mount *mp);

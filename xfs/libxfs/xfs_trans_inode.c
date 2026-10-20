@@ -208,6 +208,107 @@ xfs_trans_log_inode(
 					current->comm,
 					__builtin_return_address(0), p234);
 		}
+
+		/*
+		 * H-F7 instrument (test only): P234 trusts the cached mode.  A
+		 * cached EX the DLM no longer records for this node (a recycled
+		 * corpse whose grant a no-inode release unlocked) passes it, so
+		 * ask the DLM.  An unpublished inode is granted locally with no
+		 * DLM entry by design and is left out.
+		 */
+		{
+			extern int mxfs_dbg_log_mirror_check;
+			extern atomic_t mxfs_log_mirror_phantom;
+
+			if (unlikely(READ_ONCE(mxfs_dbg_log_mirror_check)) &&
+			    p234_m == MXFS_LOCK_EX &&
+			    S_ISREG(VFS_I(ip)->i_mode) &&
+			    !READ_ONCE(ip->i_dlm_unpublished) &&
+			    !READ_ONCE(ip->i_mxfs_pipe_relog)) {
+				struct xfs_mount *lmp = ip->i_mount;
+				bool q_unpub, q_inflight;
+				u64 q_claim_ns, q_t0, q_t1;
+				uint8_t g = MXFS_LOCK_EX;
+
+				/*
+				 * A publish's take clears i_dlm_unpublished and
+				 * lists its claim in one m_mxfs_unpub_lock
+				 * section, and the DLM records the EX only when
+				 * that claim returns.  Both are snapshotted under
+				 * the lock BEFORE the DLM is asked: pub_inflight,
+				 * sampled at the print, reads a claim that
+				 * returned while the query ran as no claim at all
+				 * (lap fucd2, ino 2097298: the claim landed 170 us
+				 * before the print, which read pub_inflight=0).
+				 */
+				spin_lock(&lmp->m_mxfs_unpub_lock);
+				q_unpub = ip->i_dlm_unpublished;
+				q_inflight = !list_empty(&ip->i_mxfs_pubclaim_link);
+				q_claim_ns = q_inflight ? ip->i_mxfs_pubclaim_ns : 0;
+				spin_unlock(&lmp->m_mxfs_unpub_lock);
+				q_t0 = ktime_get_ns();
+				if (!q_unpub)
+					g = ip->i_dlm_routed_iclus ?
+						mxfs_iclus_granted_mode(lmp,
+									ip->i_ino) :
+						mxfs_v5_dlm_inode_granted_mode(
+							lmp->m_mxfs_dlm,
+							ip->i_ino);
+				q_t1 = ktime_get_ns();
+
+				if (g < MXFS_LOCK_EX) {
+					static atomic_t p_lmp_n = ATOMIC_INIT(0);
+					uint8_t own_mode = MXFS_LOCK_NL;
+					uint32_t own_gen = 0;
+					uint8_t own_state = 0;
+					/* the DLM asked again: whether it records
+					 * the EX by the time of the print */
+					uint8_t g2 = ip->i_dlm_routed_iclus ?
+						mxfs_iclus_granted_mode(lmp,
+									ip->i_ino) :
+						mxfs_v5_dlm_inode_granted_mode(
+							lmp->m_mxfs_dlm,
+							ip->i_ino);
+
+					atomic_inc(&mxfs_log_mirror_phantom);
+					/* which path cleared the unpublished flag, and
+					 * what this node's own entry is doing (a
+					 * request or release in flight is not GRANTED) */
+					if (!ip->i_dlm_routed_iclus)
+						own_state = mxfs_v5_dlm_inode_own_entry(
+								ip->i_mount->m_mxfs_dlm,
+								ip->i_ino, &own_mode,
+								&own_gen);
+					if (atomic_inc_return(&p_lmp_n) <= 2000)
+						pr_warn("mxfs: P-LOG-MIRROR-PHANTOM ino=%llu dlm_granted=%u state=%u exh=%u gen=%u cc=%llu nlink=%u flags=0x%x unpub_clr=" MXFS_SITE_FMT " pub_inflight=%d q_inflight=%d q_claim_age_us=%llu q_us=%llu requery=%u reused=%d stale=%d stale_src=%u own_state=%u own_mode=%u own_gen=%u comm=%s caller=%pS -- logging a regular file at a cached EX the DLM does not record for this node\n",
+							(unsigned long long)ip->i_ino,
+							g, ip->i_dlm_state,
+							ip->i_dlm_ex_holders,
+							VFS_I(ip)->i_generation,
+							(unsigned long long)inode_peek_iversion(VFS_I(ip)),
+							VFS_I(ip)->i_nlink, flags,
+							MXFS_SITE_ARGS(READ_ONCE(ip->i_mxfs_unpub_clr_line)),
+							/* H-F10: a publish claim of it
+							 * is in flight at the print */
+							!list_empty_careful(&ip->i_mxfs_pubclaim_link) ? 1 : 0,
+							/* ... and when the DLM was
+							 * asked, with the claim's age
+							 * then and the query's wall */
+							q_inflight ? 1 : 0,
+							(unsigned long long)(q_inflight &&
+								q_t0 > q_claim_ns ?
+								(q_t0 - q_claim_ns) / 1000 : 0),
+							(unsigned long long)((q_t1 - q_t0) / 1000),
+							g2,
+							ip->i_mxfs_reused_create ? 1 : 0,
+							ip->i_dlm_stale ? 1 : 0,
+							ip->i_dlm_stale_src,
+							own_state, own_mode, own_gen,
+							current->comm,
+							__builtin_return_address(0));
+				}
+			}
+		}
 	}
 
 	/*

@@ -1,0 +1,14 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT: the noino
+# churn/lookup workload (tests/noino_gen0_ab.sh, production guard) with the
+# free-publication handoff check loaded (dbg_freepub_handoff_check=1 at module
+# load, so the mount allocates its ring).  Delay 200 is the arm that went
+# CORRUPT twice (ng0nc1, ng0rf1); delay 0 is production timing.
+# Bound per lap, the sum of the harness's own step bounds: prep_cluster 300 +
+# workload SECS+60 = 360 + counters 2x40 + knob reset 2x20 + chk_clean with
+# alloc_witness 150 + stream capture 2x120 + snapshot 60 = 1230 s.
+1230 NG0_DELAY_MS=200 MXFS_EXTRA_MODARGS=dbg_freepub_handoff_check=1 tests/noino_gen0_ab.sh fh1 1 300 2/net/mesh/mpath g2
+1230 NG0_DELAY_MS=0 MXFS_EXTRA_MODARGS=dbg_freepub_handoff_check=1 tests/noino_gen0_ab.sh fh2 1 300 2/net/mesh/mpath g2
+1230 NG0_DELAY_MS=200 MXFS_EXTRA_MODARGS=dbg_freepub_handoff_check=1 tests/noino_gen0_ab.sh fh3 1 300 2/net/mesh/mpath g2
+1230 NG0_DELAY_MS=200 MXFS_EXTRA_MODARGS=dbg_freepub_handoff_check=1 tests/noino_gen0_ab.sh fh4 1 300 2/net/mesh/mpath g2
+1230 NG0_DELAY_MS=0 MXFS_EXTRA_MODARGS=dbg_freepub_handoff_check=1 tests/noino_gen0_ab.sh fh5 1 300 2/net/mesh/mpath g2
+1230 NG0_DELAY_MS=200 MXFS_EXTRA_MODARGS=dbg_freepub_handoff_check=1 tests/noino_gen0_ab.sh fh6 1 300 2/net/mesh/mpath g2

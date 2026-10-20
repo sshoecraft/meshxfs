@@ -68,6 +68,14 @@ static inline int param_get_ullong(char *buffer, const struct kernel_param *kp)
 {
     return sprintf(buffer, "%llu", *(unsigned long long *)kp->arg);
 }
+static inline int param_set_int(const char *val, const struct kernel_param *kp)
+{
+    return sscanf(val, "%d", (int *)kp->arg) == 1 ? 0 : -1;
+}
+static inline int param_get_int(char *buffer, const struct kernel_param *kp)
+{
+    return sprintf(buffer, "%d", *(int *)kp->arg);
+}
 #define module_param_named(name, var, type, perm)
 #define module_param_cb(name, ops, arg, perm) \
     static const struct kernel_param_ops *const mxfs_param_ref_##name \

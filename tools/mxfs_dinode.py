@@ -135,9 +135,10 @@ def main():
                 continue
             mode = be16(dip, 0x02); fmt = dip[0x05]
             bigtime = sb_bigtime and (be64(dip, 0x78) & DI_FLAGS2_BIGTIME) != 0
-            line = ("ino=%d mode=0%o fmt=%d nlink=%d gen=%d cc=%d size=%d crtime=%s"
+            nrec = be64(dip, 0x18) if be64(dip, 0x78) & DI_FLAGS2_NREXT64 else be32(dip, 0x4C)
+            line = ("ino=%d mode=0%o fmt=%d nlink=%d gen=%d cc=%d size=%d nextents=%d nblocks=%d crtime=%s"
                     % (ino, mode, fmt, be32(dip, 0x10), be32(dip, 0x5c), be64(dip, 0x68),
-                       be64(dip, 0x38), fmt_ns(crtime(dip, bigtime))))
+                       be64(dip, 0x38), nrec, be64(dip, 0x40), fmt_ns(crtime(dip, bigtime))))
             isdir = (mode & 0o170000) == 0o040000
             if isdir and fmt == 1:
                 sf = dip[0xb0:]
@@ -153,7 +154,6 @@ def main():
             if fmt != 2:
                 print("  (format %d: entries not listed)" % fmt)
                 continue
-            nrec = be64(dip, 0x18) if be64(dip, 0x78) & DI_FLAGS2_NREXT64 else be32(dip, 0x4C)
             for i in range(nrec):
                 l0, l1 = be64(dip, 0xb0 + 16 * i), be64(dip, 0xb8 + 16 * i)
                 startoff = (l0 >> 9) & ((1 << 54) - 1)

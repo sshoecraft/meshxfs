@@ -29,6 +29,9 @@
 #define NNODES 3
 #include "dlm_mesh.h"
 
+/* dlm/dlm.c's knob; user mode has no /sys to set it through */
+extern int mxfs_dl_local_wait_keeps_decided;
+
 struct unlock_job {
     struct vnode *n;
     struct mxfs_resource_id res;
@@ -280,13 +283,21 @@ int main(int argc, char **argv)
      * the orphan the same way or the master itself becomes a durable EX
      * holder nobody can ever unlock.  Expect: M's request fails (budget),
      * afterwards B takes EX within budget and the record is clean.
+     *
+     * dl_local_wait_keeps_decided (default 1) keeps a local wait whose grant
+     * is decided and committing, so with it on M is granted from the delayed
+     * commit and nothing is orphaned.  The abandoned-while-committing shape
+     * is what a wait that outlasts the kept rounds, or a killed task, still
+     * leaves behind; it is reached here with the knob at 0.
      */
     if (!tl_fails) {
         uint8_t g = 0;
         uint64_t t0;
+        int keeps = mxfs_dl_local_wait_keeps_decided;
 
         struct lock_job *jm;
 
+        mxfs_dl_local_wait_keeps_decided = 0;
         settle(M);
         /* A (remote) holds EX; M queues EX behind it (WAITING, 1 attempt =
          * 1000 ms); A's release — whose transition carries M's grant — is
@@ -333,6 +344,7 @@ int main(int argc, char **argv)
                   "s5 platter record clean: rc=%d holders=%#llx ex=%u",
                   rc, (unsigned long long)e.holders, e.ex_node);
         }
+        mxfs_dl_local_wait_keeps_decided = keeps;
     }
     printf("  INFO busy_denies=%llu ledger_denies=%llu ghosts=%llu release_acks=%llu\n",
            (unsigned long long)M->ledger.busy_denies,

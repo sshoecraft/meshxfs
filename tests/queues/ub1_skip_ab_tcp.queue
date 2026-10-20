@@ -1,0 +1,50 @@
+# H-UB1 A/B for D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY, shape (c), on
+# 2/net/mesh/direct g2c (test29 test30).  Same build for both arms: ~/src/mxfs-c
+# srcversion 03857C0C22451BFB43D2B3F, the main tree's sources (every fix at its
+# default) with H-CG1 and H-UB1: with module knob unstaged_logged_skip=1 a
+# partial cluster write masks a logged slot this node never copied in (stage
+# epoch 0, not flushing, no buffer-logged bytes, not staled); 0 writes it with
+# the buffer's last read of it, as before (rk5: a peer's landed free of ino
+# 131 put back to its older unlinked image).  Run from ~/src/mxfs-c.  Every
+# other setting is exactly tests/queues/cr63_igrab_retry_ab_mpath.queue's
+# without its H-CG1 knobs (production settings: every test delay off, the
+# clobber check on).  NG0_UB1_SKIP alternates 0 (control) and 1 (fix).  The
+# shape is rare: one landed regression of it in the 16 H-RS1 laps (rk5), none
+# in session 84's sweep of 133 laps.  This queue and
+# tests/queues/ub1_skip_ab_tcpmpath.queue (g2e) run side by side and are graded as one
+# campaign.
+#
+# READING RULES (written before the first lap):
+#   BRESULT grades each lap (tests/noino_gen0_ab.sh, THE H-UB1 FIX).  A lap
+#   whose unstaged_logged_found is 0 on every node is BVACUOUS and counts for
+#   neither arm.
+#   THE CONTROL SHOWS THE CAUSE when a control lap is BCONTROL-SHOWS-CAUSE:
+#   unstaged_logged_regressed > 0, the clobber check finding a slot this
+#   node never copied in written while the platter held a newer image
+#   (P-DINO-CLOBBER path=partial regress=1 on a slot a P-UB1-UNSTAGED-SKIP
+#   masked=0 line named).
+#   THE FIX IS SUPPORTED when, across the campaign, the control shows the
+#   cause at least once, at least three fix laps are BPASS, at least one fix
+#   lap has unstaged_logged_prevented > 0 (the mask stopped a write that would
+#   have regressed), and no fix lap regresses such a slot.
+#   H-UB1 IS REFUTED by a fix lap with unstaged_logged_regressed > 0, by a
+#   partial-path regression of a slot whose latest P-UB1 line reads masked=1,
+#   or by a lost write: an audit error on an inode a masked=1 line named.
+#   Partial-path regressions of other shapes (H-RS1's, the free-adopt shape:
+#   the P-DINO-CLOBBER lines in <node>_ub1.txt) are attributed to their own
+#   shapes from their own lines.  Any node failure, CORRUPT shape, stall or
+#   ABORT is attributed from its own lines to its own record.
+#
+# Bound: the freed_nodelay laps' 1680 s per lap (they ran 404-597 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UB1_SKIP=0 tests/noino_gen0_ab.sh ubt1 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UB1_SKIP=1 tests/noino_gen0_ab.sh ubt2 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UB1_SKIP=0 tests/noino_gen0_ab.sh ubt3 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UB1_SKIP=1 tests/noino_gen0_ab.sh ubt4 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UB1_SKIP=1 tests/noino_gen0_ab.sh ubt5 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UB1_SKIP=0 tests/noino_gen0_ab.sh ubt6 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UB1_SKIP=1 tests/noino_gen0_ab.sh ubt7 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UB1_SKIP=0 tests/noino_gen0_ab.sh ubt8 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UB1_SKIP=0 tests/noino_gen0_ab.sh ubt9 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UB1_SKIP=1 tests/noino_gen0_ab.sh ubt10 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UB1_SKIP=1 tests/noino_gen0_ab.sh ubt11 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_UB1_SKIP=0 tests/noino_gen0_ab.sh ubt12 1 300 2/net/mesh/direct g2c

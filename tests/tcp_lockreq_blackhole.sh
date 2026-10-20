@@ -262,7 +262,19 @@ probe() { rsx "$2" "$1" "$6" > "$3"; capture_require "$3" "$4" "$5"; }
 disarm() {
     timeout 20 $SSH "$W" "echo 0 > $P/dl_drop_lockreq_ino; echo 0 > $P/dl_no_cancel; echo 0 > $P/readdir_leaf_pause_ms 2>/dev/null; echo 0 > $P/watch_ino" >/dev/null 2>&1
     timeout 20 $SSH "$H" "echo 0 > $P/dl_drop_grant_ino" >/dev/null 2>&1
+    [ -n "$CR_SAVED" ] && cr_restore
 }
+# held_fd_dio_unaligned holds W's close_release at 0 across its re-cache
+# (below); CR_SAVED is the value it found, put back by the first of the
+# write's release, disarm, or the exit trap
+CR_SAVED=""
+cr_restore() {
+    local v=$CR_SAVED
+    CR_SAVED=""
+    timeout 20 $SSH "$W" "echo $v > $P/close_release" </dev/null >/dev/null 2>&1
+    echo "  INFO close_release on $W put back to $v (reads $(timeout 15 $SSH "$W" "cat $P/close_release" </dev/null 2>/dev/null | filt | tr -dc '0-9')) at +$(el)s"
+}
+trap '[ -n "$CR_SAVED" ] && cr_restore' EXIT
 # The digest a node reports for the target: the file's bytes, or the sorted
 # names of the directory.  Both sides of every comparison use this.
 dig() { if [ "$ISDIR" = "1" ]; then echo "ls -1A '$1' | sort | md5sum | cut -d' ' -f1"; else echo "md5sum '$1' | cut -d' ' -f1"; fi; }
@@ -281,6 +293,14 @@ t0=$(date +%s)
 el() { echo $(( $(date +%s) - t0 )); }
 
 echo "=== tcp_lockreq_blackhole label=$LABEL W=$W H=$H armed_s=$ARMED_S out=$OUT $(date -u +%FT%TZ) ==="
+# Both nodes are held for the lap's lifetime (tools/vm_pool.sh).  run.sh's
+# release helper shuts a pool VM off once nothing has held it for 600 s, and
+# this lap runs outside run.sh: a queue of these laps after one prep lost W and
+# H 600 s after each run.sh call (acqcv, 2026-10-19: test31 and test32 powered
+# off at 09:14:47 and 09:26:08, each mid-lap, the next sample's ssh reset).
+. "$(dirname "$0")/lib/runlock.sh"
+vmhold_take "tcp_lockreq_blackhole $LABEL" "$W" "$H" \
+    || { echo "RESULT: ABORT label=$LABEL stage=hold -- could not hold $W $H"; exit 2; }
 TREESV=$(modinfo mxfs.ko 2>/dev/null | sed -n 's/^srcversion: *//p')
 for n in "$W" "$H"; do
     info=$(timeout 20 $SSH "$n" "echo sv=\$(cat /sys/module/mxfs/srcversion) ft=\$(cat $P/force_transport) m=\$(grep -c ' mxfs ' /proc/mounts) k=\$(test -w $P/dl_drop_lockreq_ino && echo 1 || echo 0) c=\$(test -r $P/dl_drop_lockreq_n && echo 1 || echo 0)" 2>/dev/null | filt | tr -d '\r')
@@ -311,6 +331,15 @@ DM="dmesg | awk '/$MARK/{f=1} f'"
 # 1. H writes eight candidate files.  Which node masters a resource is a hash of
 #    the resource id, so the one inode this measurement needs — remotely
 #    mastered FROM W — is found by asking, not by assuming.
+#    Each file candidate is followed by seven empty spacer files, so successive
+#    candidates are eight inode numbers apart.  Under ledger routing version 2
+#    (mkfs's default) an inode routes with the low three bits of its number
+#    cleared, so eight consecutive numbers share one master: written back to
+#    back, all eight candidates were mastered by one node, and on a 2-node
+#    group half the laps ABORTed with every candidate local to W (acqnef2,
+#    2026-10-19).  Spaced, each candidate is its own routing group, as every
+#    candidate was under version 1.
+SPACERS="1 2 3 4 5 6 7"
 if [ "$ISDIR" = "1" ]; then
     # Eight leaf-format directories.  Bound: 8 x DIR_ENTRIES creates at a
     # measured ~14 ms each (3200 creates = 45 s) plus the sync.
@@ -333,6 +362,7 @@ timeout 40 $SSH "$H" "
         rm -f \"\$f\"; fallocate -l 65536 \"\$f\" || exit 1
         dd if=/dev/urandom of=\"\$f\" bs=4096 count=1 conv=notrunc status=none || exit 1
         echo \$i \$(stat -c %i \"\$f\") \$(md5sum \"\$f\" | cut -d' ' -f1)
+        for s in $SPACERS; do : > \"\$f.sp\$s\" || exit 1; done
     done
     sync
   " 2>"$OUT/h_setup.err" | filt > "$OUT/h_setup.txt"
@@ -342,6 +372,7 @@ timeout 40 $SSH "$H" "
         f='$MNT/.lockreqbh_${LABEL}_'\$i
         dd if=/dev/urandom of=\"\$f\" bs=4096 count=4 status=none || exit 1
         echo \$i \$(stat -c %i \"\$f\") \$(md5sum \"\$f\" | cut -d' ' -f1)
+        for s in $SPACERS; do : > \"\$f.sp\$s\" || exit 1; done
     done
     sync
   " 2>"$OUT/h_setup.err" | filt > "$OUT/h_setup.txt"
@@ -527,6 +558,19 @@ if [ "$WORKLOAD" != "open" ]; then
         # the write fault the read also refills W's page cache, so the
         # fault's read half is served locally and page_mkwrite's acquires
         # are the first request.
+        if [ "$WORKLOAD" = "held_fd_dio_unaligned" ]; then
+            # close_release demotes a cached PR 2 ms after any close
+            # (mxfs_dlm_close_release, close_release=1 by default), so the
+            # re-cache read's own close handed the PR back and the armed
+            # write's first ride sent the request (acqcv2: stage=first in
+            # both arms, the timestamp update never reached).  Held at 0 on W
+            # from before the re-cache until the write is released, and put
+            # back at the release, on disarm and on any exit.
+            cr=$(timeout 20 $SSH "$W" "echo was=\$(cat $P/close_release); echo 0 > $P/close_release; echo now=\$(cat $P/close_release)" </dev/null 2>/dev/null | filt | tr '\n' ' ')
+            CR_SAVED=$(printf '%s\n' "$cr" | grep -aoE 'was=[0-9]+' | cut -d= -f2)
+            echo "  INFO $WORKLOAD: close_release on W held at 0 for the re-cache [$cr] at +$(el)s"
+            [ -n "$CR_SAVED" ] && [[ "$cr" == *"now=0"* ]] || { echo "ABORT: could not hold close_release at 0 on $W ($cr)"; disarm; exit 2; }
+        fi
         recache=$(timeout 30 $SSH "$W" "md5sum '$F' | cut -d' ' -f1" 2>/dev/null | filt | grep -aoE '^[0-9a-f]{32}' | head -1)
         echo "  INFO $WORKLOAD: W re-cached the file's PR (md5=${recache:-none}) at +$(el)s"
         [ "$recache" = "$MD5_H" ] || { echo "ABORT: W's re-cache read does not match H's rewrite"; disarm; exit 2; }
@@ -560,6 +604,9 @@ if [ "$WORKLOAD" != "open" ]; then
         RPID=$cpid
     fi
     echo "  INFO W held-fd read released pid=$RPID armed at +$(el)s"
+    # the released write's first ride has found the cached PR by now; no
+    # close happens on W until it returns
+    [ -n "$CR_SAVED" ] && cr_restore
     if [ "$WORKLOAD" = "leaf_midlist" ]; then
         # W is inside its first between-block pause (LEAF_PAUSE_MS, started
         # ~3 s ago).  H's create now takes EX on the dir and revokes W's
@@ -1234,7 +1281,7 @@ if [ "$ISDIR" = "1" ]; then
     # Bound: 8 x DIR_ENTRIES unlinks at ~14 ms each, plus the rmdirs.
     timeout $(( 8 * DIR_ENTRIES / 50 + 40 )) $SSH "$H" "rm -f '$MNT/.lockreqbh_${LABEL}_probe'; rm -rf '$MNT'/.lockreqbh_${LABEL}_1 '$MNT'/.lockreqbh_${LABEL}_2 '$MNT'/.lockreqbh_${LABEL}_3 '$MNT'/.lockreqbh_${LABEL}_4 '$MNT'/.lockreqbh_${LABEL}_5 '$MNT'/.lockreqbh_${LABEL}_6 '$MNT'/.lockreqbh_${LABEL}_7 '$MNT'/.lockreqbh_${LABEL}_8" >/dev/null 2>&1
 else
-timeout 15 $SSH "$H" "rm -f '$F' '$MNT/.lockreqbh_${LABEL}_probe' '$MNT'/.lockreqbh_${LABEL}_1 '$MNT'/.lockreqbh_${LABEL}_2 '$MNT'/.lockreqbh_${LABEL}_3 '$MNT'/.lockreqbh_${LABEL}_4 '$MNT'/.lockreqbh_${LABEL}_5 '$MNT'/.lockreqbh_${LABEL}_6 '$MNT'/.lockreqbh_${LABEL}_7 '$MNT'/.lockreqbh_${LABEL}_8" >/dev/null 2>&1
+timeout 15 $SSH "$H" "rm -f '$F' '$MNT/.lockreqbh_${LABEL}_probe' '$MNT'/.lockreqbh_${LABEL}_1 '$MNT'/.lockreqbh_${LABEL}_2 '$MNT'/.lockreqbh_${LABEL}_3 '$MNT'/.lockreqbh_${LABEL}_4 '$MNT'/.lockreqbh_${LABEL}_5 '$MNT'/.lockreqbh_${LABEL}_6 '$MNT'/.lockreqbh_${LABEL}_7 '$MNT'/.lockreqbh_${LABEL}_8 '$MNT'/.lockreqbh_${LABEL}_[1-8].sp[1-7]" >/dev/null 2>&1
 fi
 echo "=== tcp_lockreq_blackhole $LABEL: fails=$fails wall=$(el)s out=$OUT $(date -u +%FT%TZ) ==="
 [ "$fails" -eq 0 ]

@@ -1,0 +1,25 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F7: in
+# egc2 the audited live core (cc 1417, nlink 1, di_lsn = the lookup node's own
+# checkpoint) was the lookup node's touch, logged ~80 ms after the churner had
+# freed the life and while the churner still held EX.  Hypothesis: the touch
+# ran at a cached EX the DLM had already released -- the lookup node's evicted
+# corpse was recycled between a no-inode release's live check and its unlock,
+# the recycle kept the cached grant because the DLM still recorded it, and the
+# unlock then handed the inode to the peer.  These laps carry the instrument
+# (NG0_MIRROR_CHECK=1): if H-F7 holds, a corrupt lap's writer logs
+# P-RECYCLE-KEEP-UNDER-NOINO / P-NOINO-UNLOCK-LEFT-GRANT lifecycle=LIVE /
+# P-LOG-MIRROR-PHANTOM for the audited inode; if none of the three fires for
+# it, H-F7 is refuted.  Production guards, the noino workload, the spare pair.
+# The first six hold the gen-0 release window open (NG0_DELAY_MS=200, the arm
+# all three corrupt laps ran), the last two run production timing.
+# Bound per lap, the sum of the harness's own step bounds: prep_cluster 300 +
+# workload SECS+60 = 360 + counters 2x40 + knob reset 2x(20+20) + chk_clean with
+# alloc_witness 150 + stream capture 2x120 + snapshot 60 = 1270 s.
+1270 NG0_MIRROR_CHECK=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hf7a1 1 300 2/net/mesh/direct g2c
+1270 NG0_MIRROR_CHECK=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hf7a2 1 300 2/net/mesh/direct g2c
+1270 NG0_MIRROR_CHECK=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hf7a3 1 300 2/net/mesh/direct g2c
+1270 NG0_MIRROR_CHECK=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hf7a4 1 300 2/net/mesh/direct g2c
+1270 NG0_MIRROR_CHECK=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hf7a5 1 300 2/net/mesh/direct g2c
+1270 NG0_MIRROR_CHECK=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hf7a6 1 300 2/net/mesh/direct g2c
+1270 NG0_MIRROR_CHECK=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh hf7p1 1 300 2/net/mesh/direct g2c
+1270 NG0_MIRROR_CHECK=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh hf7p2 1 300 2/net/mesh/direct g2c

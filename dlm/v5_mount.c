@@ -38,7 +38,19 @@
  * auth_withdraw_threads below exposes it (see there for why). */
 static int mxfs_auth_withdraw_threads;
 
+/* The TCP membership-settle gate's answer when it times out on a peer whose
+ * heartbeat slot is live but whom discovery and the lease never reached
+ * (multicast blocked or unrouted): 1 refuses the mount there, naming the
+ * cause and the fix; 0 is the same-build control, which proceeds into the
+ * root inode's lock retries, shuts the filesystem down and leaves mount(8)
+ * reporting "can't read superblock" about 40 s later. */
+static int mxfs_memb_unreached_refuse = 1;
+
 #ifdef __KERNEL__
+module_param_named(memb_unreached_refuse, mxfs_memb_unreached_refuse, int, 0644);
+MODULE_PARM_DESC(memb_unreached_refuse,
+		 "TCP mount whose membership settle times out on a live peer slot discovery never reached: 1=refuse the mount naming multicast and peer= (default), 0=proceed into the lock retries (control)");
+
 static int mxfs_force_transport = 1;
 module_param_named(force_transport, mxfs_force_transport, int, 0644);
 MODULE_PARM_DESC(force_transport,
@@ -207,6 +219,22 @@ module_param_named(tcp_death_grace_ms, mxfs_tcp_death_grace_ms, int, 0644);
  */
 int mxfs_fence_blocked_after_ms = 120000;
 module_param_named(fence_blocked_after_ms, mxfs_fence_blocked_after_ms, int, 0644);
+/*
+ * 0.90.131 TEST ONLY: the PR worker holds each handed-over death this many ms
+ * before its fence runs.  That widens the window between a peer's death
+ * declaration and its recovery-pending marker until a survivor's acquire
+ * budget is sure to run out inside it (path_fenced_return with PF_KNOBS).
+ * 0 in production.
+ */
+int mxfs_dbg_death_fence_delay_ms;
+module_param_named(dbg_death_fence_delay_ms, mxfs_dbg_death_fence_delay_ms, int, 0644);
+/*
+ * 0.90.131 TEST ONLY, the same-build control for death_inflight_n: 0 stops the
+ * acquire classifier counting a declared death whose fence is still running,
+ * which restores the shutdown it otherwise parks.  1 in production.
+ */
+int mxfs_death_inflight_park = 1;
+module_param_named(death_inflight_park, mxfs_death_inflight_park, int, 0644);
 /*
  * 0.74.0 TEST ONLY: refuse the sole-survivor exclusive-write gate as if the
  * membership or nexus condition failed, so the absent-key shape stays
@@ -1076,6 +1104,7 @@ struct mxfs_v5_dlm {
 	unsigned int                bast_parked_n;
 	uint64_t                    bast_park_total;     /* every arrival, repeats too */
 	uint64_t                    bast_park_replayed;
+	uint64_t                    bast_park_replayed_ag;	/* of them, AG locks */
 	uint64_t                    bast_park_overflow;
 	/*
 	 * (chain 90 harvest, D-SAMENODE-WAITER-CANCEL-COLLISION closure
@@ -1428,6 +1457,18 @@ struct mxfs_v5_dlm {
 	mxfs_atomic32_t                 death_fence_pending[MXFS_DISKLOCK_HB_SLOTS];
 	mxfs_node_id_t                  death_fence_victim[MXFS_DISKLOCK_HB_SLOTS];
 	mxfs_epoch_t                    death_fence_epoch[MXFS_DISKLOCK_HB_SLOTS];
+	/*
+	 * Deaths declared whose fence-and-recover body has not returned: one
+	 * count per handoff (v5_death_fence_handoff), dropped when
+	 * v5_node_death_fence_and_recover returns.  The recovery-pending marker
+	 * is set only at the END of that body, after the fence is proved and
+	 * sealed, so from the declaration until then a waiter on the dead
+	 * node's grant saw neither a live holder nor a pending recovery, and
+	 * the acquire classifier shut its filesystem down
+	 * (D-CAWMPATH-FENCED-RETURN-SURVIVOR-EIO-VICTIM-UNFENCED: 487 ms
+	 * between the declaration and the marker on test15).
+	 */
+	mxfs_atomic32_t                 death_inflight_n;
 	/*
 	 * (D-PR-RESERVATION-HEALTH-UNMONITORED-AFTER-MOUNT-381): the PR
 	 * worker's second job.  The admission gate proves the exclusion invariant
@@ -2004,6 +2045,8 @@ static void v5_bast_replay(struct mxfs_v5_dlm *ctx, uint32_t type,
 	}
 	ctx->bast_parked_n = kept;
 	ctx->bast_park_replayed += n;
+	if (type == MXFS_LTYPE_AG)
+		ctx->bast_park_replayed_ag += n;
 	mxfs_pal_mutex_unlock(ctx->bast_park_lock);
 
 	for (i = 0; i < n; i++) {
@@ -2642,6 +2685,44 @@ static void v5_peer_msg_cb_tcp(void *data, mxfs_node_id_t sender,
 	}
 }
 
+/*
+ * A retired identity never speaks again, and that includes its lock traffic.
+ * v5_peer_connect_cb_tcp ignores a retired identity's reconnect, but the peer
+ * layer keeps the connection and its receive thread, so every lock message it
+ * then sent was processed here.  Measured on 2/net/mesh/mpath
+ * (path_fenced_return, the fenced victim thawed): 12 ms after its old
+ * incarnation reconnected it re-affirmed an exclusive grant on a page the
+ * survivor had taken over; the survivor's grant receive overwrote the grant id
+ * its takeover re-grant had minted, its release then named the old id, the
+ * ledger applied that release as stale and the record stayed on the page
+ * naming the survivor, so every later grant of the inode to the rejoined node
+ * was refused as a double grant.  Its NODE_LEAVE keeps its own handler, which
+ * already ignores a retired sender.  0 = a retired identity's lock traffic is
+ * processed (test control).  dl_dead_sender_n counts a retired identity's
+ * messages in either setting (P164-DEAD-MSG-DROP or, at 0, -PASS); writing the
+ * knob resets it.
+ */
+int mxfs_dl_dead_sender_drop = 1;
+atomic_t mxfs_dl_dead_sender_n = ATOMIC_INIT(0);
+static int dl_dead_sender_drop_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_dead_sender_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_dead_sender_drop_ops = {
+	.set = dl_dead_sender_drop_set,
+	.get = param_get_int,
+};
+module_param_cb(dl_dead_sender_drop, &dl_dead_sender_drop_ops, &mxfs_dl_dead_sender_drop, 0644);
+MODULE_PARM_DESC(dl_dead_sender_drop,
+		 "lock messages from a retired (dead, fenced) identity are dropped at receive (default 1); 0 = they are processed (test control); writing it resets dl_dead_sender_n");
+module_param_named(dl_dead_sender_n, mxfs_dl_dead_sender_n.counter, int, 0444);
+MODULE_PARM_DESC(dl_dead_sender_n,
+		 "lock messages received from a retired identity (dropped unless dl_dead_sender_drop is 0), since dl_dead_sender_drop was last written");
+
 static void v5_peer_msg_cb_tcp_dispatch(struct mxfs_v5_dlm *ctx, mxfs_node_id_t sender,
 			       void *msg, size_t len)
 {
@@ -2655,6 +2736,20 @@ static void v5_peer_msg_cb_tcp_dispatch(struct mxfs_v5_dlm *ctx, mxfs_node_id_t 
 	hdr = (const struct mxfs_dlm_msg_hdr *)msg;
 	if (hdr->magic != MXFS_DLM_MAGIC)
 		return;
+
+	if (hdr->type != MXFS_MSG_NODE_LEAVE && v5_node_is_dead(ctx, sender)) {
+		bool drop = READ_ONCE(mxfs_dl_dead_sender_drop) != 0;
+		int n = atomic_inc_return(&mxfs_dl_dead_sender_n);
+
+		if (n <= 32 || (n % 1024) == 0)
+			mxfs_pal_log(MXFS_LOG_WARN,
+				     "mxfs: P164-DEAD-MSG-%s n=%d type=%u from node %u -- a "
+				     "retired identity's lock message is %s",
+				     drop ? "DROP" : "PASS", n, hdr->type, sender,
+				     drop ? "not processed" : "processed (dl_dead_sender_drop=0)");
+		if (drop)
+			return;
+	}
 
 	/*
 	 * D2: a withdrawn node must not serve MASTER
@@ -4450,11 +4545,29 @@ static void v5_settled_flush(struct mxfs_v5_dlm *ctx)
 	}
 }
 
+/*
+ * A sweep that is queued and has not started yet answers every later request
+ * for one: the worker takes requests in order, so it starts after the request
+ * and after whatever the requester did before asking.  The mount queues one
+ * behind the settled departures it has just queued, and each of those asked for
+ * another as it ended, so a mount with one settled departure swept the whole
+ * ledger twice in a row (2/net/mesh/direct: the mount's sweep queued_ms=23983
+ * behind its predecessor's 24 s takeover, then the departure's queued_ms=5313;
+ * 14.7 s each on a 1 TB LUN).  A sweep already running is not joined: it may
+ * have passed a page the requester has changed since.
+ * orphan_sweep_coalesce=0 queues every request, as before (test control).
+ */
+static int mxfs_orphan_sweep_coalesce = 1;
+module_param_named(orphan_sweep_coalesce, mxfs_orphan_sweep_coalesce, int, 0644);
+MODULE_PARM_DESC(orphan_sweep_coalesce,
+    "a requested orphan sweep joins one already queued and not yet started (1, default); 0 = queue every request (test control)");
+
 /* 0.75.69 (D-...-0927): queue the orphan sweep on the departure worker
  * (inline when the worker is not running). */
 static void v5_orphan_sweep_queue(struct mxfs_v5_dlm *ctx)
 {
 	struct v5_depart_req r;
+	int i;
 
 	if (!ctx->dlm || !ctx->tauth_open)
 		return;
@@ -4469,6 +4582,22 @@ static void v5_orphan_sweep_queue(struct mxfs_v5_dlm *ctx)
 		return;
 	}
 	mxfs_pal_mutex_lock(ctx->depart_lock);
+	if (mxfs_orphan_sweep_coalesce) {
+		for (i = 0; i < ctx->depart_qn; i++) {
+			int qn = ctx->depart_qn;
+			uint64_t age = r.queued_ms - ctx->depart_q[i].queued_ms;
+
+			if (!ctx->depart_q[i].orphan_sweep)
+				continue;
+			mxfs_pal_mutex_unlock(ctx->depart_lock);
+			mxfs_pal_log(MXFS_LOG_DEBUG,
+				     "mxfs: P-ORPHAN-SWEEP-COALESCED pos=%d of %d "
+				     "queued_ms=%llu -- a sweep queued and not "
+				     "started yet answers this request",
+				     i, qn, (unsigned long long)age);
+			return;
+		}
+	}
 	if (ctx->depart_qn >= MXFS_MAX_NODES) {
 		mxfs_pal_mutex_unlock(ctx->depart_lock);
 		v5_depart_run(ctx, &r);
@@ -10246,6 +10375,14 @@ int mxfs_v5_dlm_any_recovery_pending(struct mxfs_v5_dlm *ctx)
 	return mxfs_disklock_recovery_pending_iter(ctx->disklock, -1, &node) >= 0;
 }
 
+/* Is a peer's death declared whose fence has not finished and so has not yet
+ * been marked recovery-pending?  See death_inflight_n. */
+int mxfs_v5_dlm_any_death_inflight(struct mxfs_v5_dlm *ctx)
+{
+	return ctx && mxfs_death_inflight_park &&
+	       mxfs_atomic32_get(&ctx->death_inflight_n) > 0;
+}
+
 /* Slots other than this node's that its heartbeat monitor still counts (live,
  * or dead with the recovery still owed): the sysfs other_slots_held a DRBD
  * node reads from its peer before it promotes. */
@@ -15737,6 +15874,10 @@ static void v5_death_fence_handoff(struct mxfs_v5_dlm *ctx,
 	if (!ctx->fence_retry_thread && !ctx->fence_retry_stop)
 		v5_pr_worker_start(ctx);
 
+	/* dropped where the fence-and-recover run for this handoff returns:
+	 * below for the inline arm, in v5_death_fence_drain for the queued one */
+	mxfs_atomic32_inc(&ctx->death_inflight_n);
+
 	if (!ctx->fence_retry_thread)
 		why = "this mount has no PR worker (it failed to start)";
 	else if (mxfs_atomic32_get(&ctx->death_fence_pending[dead_slot]))
@@ -15752,6 +15893,7 @@ static void v5_death_fence_handoff(struct mxfs_v5_dlm *ctx,
 			     dead_slot, dead_node, (unsigned long long)dead_epoch,
 			     why);
 		v5_node_death_fence_and_recover(ctx, dead_node, dead_slot, dead_epoch);
+		mxfs_atomic32_dec(&ctx->death_inflight_n);
 		return;
 	}
 
@@ -15794,7 +15936,10 @@ static void v5_death_fence_drain(struct mxfs_v5_dlm *ctx)
 			     "mxfs: P309-DEATH-FENCE-RUN slot=%d victim=%u epoch=%llu "
 			     "-- taking the handed-over death on the PR worker",
 			     slot, victim, (unsigned long long)epoch);
+		if (mxfs_dbg_death_fence_delay_ms > 0)
+			mxfs_pal_sleep_ms(mxfs_dbg_death_fence_delay_ms);
 		v5_node_death_fence_and_recover(ctx, victim, slot, epoch);
+		mxfs_atomic32_dec(&ctx->death_inflight_n);
 	}
 }
 
@@ -19886,6 +20031,51 @@ out:
 	return rc;
 }
 
+/*
+ * The TCP settle gate timed out: the lease sees @have nodes (this one
+ * included) while the slot table showed the foreign slots in @fmask ACTIVE
+ * when the gate began.  Count the slots of @fmask that are still ACTIVE and
+ * whose heartbeat advances across a liveness pass: live nodes, each in the
+ * table for the whole gate, so past its own bounded join gate (12 s) and
+ * with its discovery and lease started.  A live node the lease does not see
+ * is one this node cannot reach, and a mount that proceeds without it only
+ * spends its root inode's lock retries and shuts the filesystem down (the
+ * record's 40 s and "can't read superblock").  Frozen slots are crash
+ * leftovers the heartbeat monitor evicts, a slot claimed after the gate
+ * began was never waited on, and a table that cannot be read refuses
+ * nothing: each of those proceeds as before.  Returns how many live nodes
+ * the lease does not account for, and logs the refusal when there are any.
+ */
+static int v5_memb_unreached_live(struct mxfs_v5_dlm *ctx, uint64_t fmask,
+				  int have, int waited)
+{
+	uint64_t before = 0, stale = 0, after = 0, live, m;
+	int nlive = 0, unreached;
+
+	if (mxfs_disklock_get_stale_slot_mask(ctx->disklock, 0, ctx->node_slot,
+					      &before) ||
+	    !(before & fmask) ||
+	    mxfs_disklock_get_stale_slot_mask(ctx->disklock, 5000, ctx->node_slot,
+					      &stale) ||
+	    mxfs_disklock_get_stale_slot_mask(ctx->disklock, 0, ctx->node_slot,
+					      &after))
+		return 0;
+	live = fmask & before & ~stale & after;
+	for (m = live; m; m &= (m - 1))
+		nlive++;
+	unreached = nlive - (have - 1);
+	if (unreached <= 0)
+		return 0;
+	mxfs_pal_log(MXFS_LOG_WARN,
+		     "mxfs: P-MEMB-UNREACHED-REFUSE live=0x%llx stale=0x%llx lease=%d after %dms -- %d live peer slot(s) the lease never reached; refusing the mount",
+		     (unsigned long long)live, (unsigned long long)stale, have,
+		     waited, unreached);
+	mxfs_pal_log(MXFS_LOG_ERR,
+		     "mxfs: %d live peer(s) share this LUN but cluster discovery never reached them: allow UDP multicast %s and the discovery and lease ports between the nodes, or mount with -o peer=<address>",
+		     unreached, MXFS_DISCOVERY_MCAST);
+	return unreached;
+}
+
 struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 {
 	struct mxfs_v5_dlm *ctx;
@@ -20827,11 +21017,15 @@ tcp_bootstrap_again:
 						 * and its empty flush is local: the commit
 						 * needs no flush (tauth_store.h) */
 						ctx->tauth.store.fua_durable = ctx->drbd_minor >= 0;
-						/* and one swap there writes a whole page, as on
-						 * the shared attachment, whose every swap is the
-						 * same emulation (its FUA and flush are the
-						 * hypervisor's, so the flush stays) */
-						ctx->tauth.store.span_commit = v5_noscsi(ctx);
+						/* and one swap writes a whole page wherever the
+						 * device can: there, and on the shared
+						 * attachment, whose every swap is the same
+						 * emulation (its FUA and flush are the
+						 * hypervisor's, so the flush stays), and on a
+						 * SCSI target whose Block Limits page allows a
+						 * page in one COMPARE AND WRITE; the PAL answers
+						 * per commit (mxfs_pal_bdev_span_swap_ok) */
+						ctx->tauth.store.span_commit = true;
 						ctx->dlm->slot_node_cb = v5_slot_node_cb;
 						ctx->dlm->bootstrap_cb = v5_bootstrap_cb;
 						ctx->dlm->bootstrap_node_cb = v5_bootstrap_node_cb;
@@ -21078,14 +21272,29 @@ tcp_bootstrap_again:
 					mxfs_pal_sleep_ms(250);
 					waited += 250;
 				}
-				if (have >= want)
+				if (have >= want) {
 					mxfs_pal_log(MXFS_LOG_INFO,
 						     "mxfs: membership settled at mount: %d active slot(s) on LUN, lease sees %d node(s) after %dms",
 						     foreign, have, waited);
-				else
+				} else if (mxfs_memb_unreached_refuse &&
+					   v5_memb_unreached_live(ctx, fmask, have,
+								   waited) > 0) {
+					/* nothing of this mount has taken a lock
+					 * or written the filesystem yet: the
+					 * ordinary teardown releases the slot and
+					 * the key, and frees the context.  The
+					 * errno is the cause's own, so even a
+					 * mount(8) that never reads the reason
+					 * says "No route to host". */
+					if (opts->refuse_rc)
+						*opts->refuse_rc = -EHOSTUNREACH;
+					mxfs_v5_dlm_shutdown(ctx);
+					return NULL;
+				} else {
 					mxfs_pal_log(MXFS_LOG_WARN,
 						     "mxfs: P-MEMB-SETTLE-TIMEOUT %d active foreign slot(s) on LUN but lease sees only %d node(s) after %dms -- proceeding (slots may be dead; monitor will evict)",
 						     foreign, have, waited);
+				}
 			}
 		}
 		v5_auth_withdraw_thread_start(ctx);
@@ -22314,12 +22523,17 @@ void mxfs_v5_dlm_shutdown_defer_release(struct mxfs_v5_dlm *ctx,
 		v5_depart_race_inject(ctx, 4);
 	}
 	/* 0.90.20: what the mount phase parked and what the installation of
-	 * the handlers replayed; `left` is a type whose handler never came */
-	mxfs_pal_log(MXFS_LOG_DEBUG,
+	 * the handlers replayed; `left` is a type whose handler never came.
+	 * One line per unmount, at info: it is the only record of whether a
+	 * blocking notification reached this mount before its handlers did,
+	 * and the per-arrival lines share the debug site with every other
+	 * debug line of the module */
+	mxfs_pal_log(MXFS_LOG_INFO,
 		     "mxfs: P-BAST-PARK-STATS node=%u arrivals=%llu replayed=%llu "
-		     "overflow=%llu left=%u",
+		     "replayed_ag=%llu overflow=%llu left=%u",
 		     ctx->node_id, (unsigned long long)ctx->bast_park_total,
 		     (unsigned long long)ctx->bast_park_replayed,
+		     (unsigned long long)ctx->bast_park_replayed_ag,
 		     (unsigned long long)ctx->bast_park_overflow,
 		     ctx->bast_parked_n);
 
@@ -23225,6 +23439,27 @@ int mxfs_v5_dlm_inode_unlock_gen(struct mxfs_v5_dlm *ctx, uint64_t ino,
 				 uint32_t expected_gen)
 {
 	return mxfs_v5_dlm_inode_unlock_open(ctx, ino, expected_gen, 0);
+}
+
+/* A release whose caller's capture found no tenure of ours (gen 0).  The TCP
+ * mirror's generations are exact, so a grant carrying one now was minted
+ * after the capture by a fresh acquire and is refused under the table lock.
+ * CAW keeps the unconditional release: its grant_meta generation is lossy (0
+ * with a live tenure), so the anchor cannot be told apart there. */
+int mxfs_v5_dlm_inode_unlock_unanchored(struct mxfs_v5_dlm *ctx, uint64_t ino)
+{
+	struct mxfs_resource_id res;
+	int grc;
+
+	if (!ctx)
+		return 0;
+	if (!ctx->dlm)
+		return mxfs_v5_dlm_inode_unlock_gen(ctx, ino, 0);
+	grc = v5_tcp_release_gate(ctx, "ino-unanchored", (unsigned long long)ino);
+	if (grc)
+		return grc;
+	make_inode_resource(&res, ctx->volume_id, ino);
+	return mxfs_dlm_unlock_unanchored(ctx->dlm, &res);
 }
 
 /* (design review audit C1): release with an atomic open-holder bit change —
@@ -24497,6 +24732,19 @@ uint8_t mxfs_v5_dlm_inode_granted_mode(struct mxfs_v5_dlm *ctx, uint64_t ino)
 	return MXFS_LOCK_NL;
 }
 
+uint8_t mxfs_v5_dlm_inode_own_entry(struct mxfs_v5_dlm *ctx, uint64_t ino,
+				    uint8_t *mode_out, uint32_t *gen_out)
+{
+	struct mxfs_resource_id res;
+
+	*mode_out = MXFS_LOCK_NL;
+	*gen_out = 0;
+	if (!ctx || !ctx->dlm)
+		return MXFS_LSTATE_UNLOCKED;
+	make_inode_resource(&res, ctx->volume_id, ino);
+	return mxfs_dlm_own_entry(ctx->dlm, &res, mode_out, gen_out);
+}
+
 /* open tracking (D-CROSSNODE-OPEN-UNLINK): peer protected-activity
  * bitmap for an inode.  Valid only while the caller holds a grant on the
  * inode (see mxfs_dlm_caw_open_holders contract).
@@ -24740,13 +24988,15 @@ int mxfs_v5_dlm_lu_reset_admit_probe(struct mxfs_v5_dlm *ctx,
  * ISSUED AFTER THE RESET TO LAND.  That single fact carries both things this
  * step owes:
  *
- *   - CONVERGENCE of this node's own coordination I/O.  The heartbeat sector
- *     is written through a single-outstanding synchronous compare-and-write
- *     under the disklock mutex, so a fresh beat CANNOT land until the beat the
- *     reset stranded has been resolved by the error handler.  Observing the
- *     new one is observing the old one finish — without draining anything,
- *     without blocking the reset, an abort, an EH retry or transport recovery,
- *     and without a generation filter that would have to reject a completion.
+ *   - CONVERGENCE of this node's own coordination I/O.  A beat the reset
+ *     stranded is resolved only by the error handler.  The heartbeat no longer
+ *     waits for it before beating again (disklock.c, HEARTBEAT I/O THAT A
+ *     TARGET NEVER ANSWERS), so a fresh beat landing is not by itself the old
+ *     one finishing; the wait also requires that no beat the heartbeat gave up
+ *     on is still in flight (mxfs_disklock_beats_unresolved).  Together they
+ *     are the old one finishing — without draining anything, without blocking
+ *     the reset, an abort, an EH retry or transport recovery, and without a
+ *     generation filter that would have to reject a completion.
  *   - AUTHORITY.  A beat that lands renews the lease from an anchor taken
  *     before it was issued, so the deadline it produces is one peers cannot
  *     have aged past.
@@ -24829,7 +25079,8 @@ int mxfs_v5_dlm_lu_reset_barrier(struct mxfs_v5_dlm *ctx,
 	for (;;) {
 		beat_ms = boot_arm ? ctx->bootstrap->last_ok_ms
 				   : dl->auth->last_ok_ms;
-		if (beat_ms > reset_issued_ms) {
+		if (beat_ms > reset_issued_ms &&
+		    (boot_arm || !mxfs_disklock_beats_unresolved(dl))) {
 			beat_landed = true;
 			break;
 		}
@@ -25782,8 +26033,12 @@ int mxfs_v5_dlm_inode_reserve_try(struct mxfs_v5_dlm *ctx, uint64_t ino,
 	 * this caller just never asked for it.
 	 */
 	if (ctx->dlm) {
+		/* MXFS_LKF_RESERVE only for a caller that takes no grant result:
+		 * the mirror's answer names the generation it already had, and a
+		 * filled result promises a generation minted for this request. */
 		int ret = mxfs_dlm_lock(ctx->dlm, &res, MXFS_LOCK_EX,
 					MXFS_LKF_NOQUEUE |
+					(gres ? 0 : MXFS_LKF_RESERVE) |
 					(demand ? MXFS_LKF_DEMAND : 0),
 					&granted);
 
@@ -26635,6 +26890,18 @@ int mxfs_v5_dlm_inode_held_nb(struct mxfs_v5_dlm *ctx, uint64_t ino)
 		return mode != MXFS_LOCK_NL ? 1 : 0;
 	}
 	return -EWOULDBLOCK;    /* CAW: the on-disk slot is the only authority */
+}
+
+int mxfs_v5_dlm_inode_held_mode_nb(struct mxfs_v5_dlm *ctx, uint64_t ino,
+				   uint8_t *mode)
+{
+	struct mxfs_resource_id res;
+
+	if (!ctx || !ctx->dlm || !mode)
+		return -EWOULDBLOCK;
+	make_inode_resource(&res, ctx->volume_id, ino);
+	return mxfs_dlm_held_mode_nb(ctx->dlm, &res, mode) < 0 ?
+		-EWOULDBLOCK : 0;
 }
 
 int mxfs_v5_dlm_ag_held(struct mxfs_v5_dlm *ctx, uint32_t agno)

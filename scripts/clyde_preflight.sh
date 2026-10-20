@@ -105,6 +105,19 @@ else
     ok "no halt flag"
 fi
 
+# The halt flag is only as good as the guard that sets it.  The guard runs its
+# script from /src, so a boot that comes up without /src mounted leaves it in a
+# restart loop (203/EXEC) while every check above still reads clean: on
+# 2026-10-16 it was down 47 min after a host reset and nothing here said so.
+echo "-- kernel-log guard"
+gstate=$(systemctl is-active mxfs-clyde-guard.service 2>/dev/null)
+if [ "$gstate" = active ]; then
+    ok "mxfs-clyde-guard.service is active"
+else
+    bad "mxfs-clyde-guard.service is '${gstate:-unknown}', not active — nothing would halt the rig on a flood or a precursor"
+    bad "  systemctl status mxfs-clyde-guard.service (is /src mounted?)"
+fi
+
 # ---------------------------------------------------------------------------
 # 1. Is the host kernel already damaged?
 #

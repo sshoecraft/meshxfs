@@ -1,0 +1,63 @@
+# D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-NUMBER-REUSE, the
+# net/mesh arm of the 0.90.54 hypothesis: a FUA read that fails inside
+# mxfs_dir_sf_refresh_if_disk_differs (the mandatory adopt of a shortform
+# directory's platter image once its in-core fork is proven stale) returns and
+# lets the caller go on with the stale fork.  Path faults made such reads fail
+# thousands of times on the 8/net/mesh/mpath incident's rig.  The injected arm
+# (tests/mpath/sf_refresh_read_fail.sh, PF_KNOBS dbg_sf_refresh_read_fail=2000)
+# ran once, on 2/disk/caw/mpath (sfinj1: >= 800 failed refresh reads, loads
+# err=0, audit CLEAN); the transport the record was observed on never ran it.
+# On this build every path row's load also checks each churn file against the
+# inode its create was handed before unlinking it (PATHLOAD_VERIFY=1 in
+# tests/mpath/lib.sh pf_load_start, verify_fail checked in pf_load_stop), so a
+# churn name left naming another inode fails the row itself, not only the
+# cold audit.  The release drain's own reconcile (dir_release_premerge) is off
+# by default, so it is not a backstop for the stale fork in either arm.
+#
+# THE FIRST RUN (labels sfn0/sfn1, 2026-10-17 23:26-23:32Z, tests/evidence/
+# lapq_sfn.log) IS VOID AND JUDGES NOTHING: the D-FREED final queue fzm was
+# driving the same group g2 at the same time (its laps fzml1 23:20-23:25Z and
+# fzmp2 23:25-23:33Z), so sfn's prep found the fleet "already prepped" and its
+# control row ran beside fzm's load; its cold audit was killed at a 90 s bound
+# that left out the alloc_witness run.sh runs before chk_clean; the next prep
+# was refused (rc=3) and the knob row found no reservation keys.  This rerun
+# uses new labels so that evidence stays as it was.
+#
+# 2/net/mesh/mpath g2 (test1 test2), main tree build 311877C431E1BB444562804,
+# chained behind ~/src/mxfs-c's idrmc3 (which holds the same configuration and
+# group), so no other queue drives g2 while it runs.
+#
+# VERDICT RULES (written before the first lap, unchanged for the rerun):
+#   REPRODUCED  the knob lap fails with VERIFY_FAIL / a CORRUPT cold audit
+#               naming a churn file, and the control lap does not: the stale
+#               fork after a failed refresh read is a mechanism of this record
+#               on net/mesh; diagnose from the kept logs and fix there.
+#   NOT THIS    both laps clean (row PASS with the injection reached on at
+#               least one node, cold audit CLEAN): the failed refresh read does
+#               not produce the shape on net/mesh either; the hypothesis is
+#               closed for both transports and is not a disposition of the
+#               record.
+#   OTHER       any failure in the control lap, or a knob-lap failure of
+#               another shape: its own finding.  A lap whose injection was not
+#               reached is VACUOUS and is rerun.
+#
+# Bounds: prep_cluster 300 (tests/suite/manifest); each row 310 (its header's
+# --budget 300, which tests/mpath/lap_chain.sh enforces on the row, plus the
+# chain's marker read and log setup); each cold audit 210: run.sh's chk_clean
+# runs alloc_witness first under the same run id (run.sh, "asking for
+# chk_clean asks for alloc_witness"), so the bound is alloc_witness at 2 nodes
+# 120 s plus chk_clean at 2 nodes 60 s (tests/criteria/TIMEOUT_BUDGETS.md),
+# plus 30 s for run.sh's lock, marker and board write.
+#
+# The knob is given as a PF_KNOBS= prefix, not lap_chain.sh's --knobs: the
+# row reads PF_KNOBS either way (lap_chain.sh exports it only when --knobs is
+# given; tests/mpath/lib.sh pf_load_start writes and reads back whatever it
+# holds), and tests/lap_queue_chain.sh's queue check skips every leading word
+# while an '=' appears anywhere later in the line, so a --knobs k=v tail made
+# it take "2/net/mesh/mpath" for the script and refuse the queue.
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/mpath --group g2 prep_cluster
+310 PF_KNOBS=dbg_sf_refresh_read_fail=0 tests/mpath/lap_chain.sh row 2/net/mesh/mpath g2 sfr0 tests/mpath/sf_refresh_read_fail.sh --budget 300
+210 ./run.sh 2/net/mesh/mpath --group g2 chk_clean
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/mpath --group g2 prep_cluster
+310 PF_KNOBS=dbg_sf_refresh_read_fail=2000 tests/mpath/lap_chain.sh row 2/net/mesh/mpath g2 sfr1 tests/mpath/sf_refresh_read_fail.sh --budget 300
+210 ./run.sh 2/net/mesh/mpath --group g2 chk_clean

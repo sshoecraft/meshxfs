@@ -80,7 +80,7 @@ echo "  INFO $A's takeover activations before the freeze: ${act0:-unread}"
 ck "$A's takeover pass is in flight before the freeze (activations logged)" "$([ "${act0:-0}" -gt 0 ] && echo yes || echo no)" yes
 
 # 5. A frozen, fenced by B
-timeout 30 $VIRSH suspend "$A" >/dev/null 2>&1
+tools/lun_pool.sh fault timeout 30 $VIRSH suspend "$A" >/dev/null 2>&1
 ck "$A is frozen" "$($VIRSH domstate "$A" 2>/dev/null | head -1)" paused
 echo "  INFO $A frozen at $(date -u +%T)"
 tf=$(pf_wait_keys 2 110 fenced "$B")

@@ -311,7 +311,7 @@ value_now_into rv1 "$B" 20 "$OUT/rv_rv1_1.txt" '^[0-9]+$' "rv1 on $B" "grep -c '
 ck "$B never lost its mount" "$rv1" "1"
 rs 30 "$B" "dmesg | sed -n '/$MK/,\$p' | grep -av '$NOISE'" > "$OUT/dmesg_$B.txt"
 ck "$B stayed healthy while A was shut down and away" \
-   "$(grep -aic 'corruption\|BUG:\|Oops\|Internal error\|shutting down' "$OUT/dmesg_$B.txt")" "0"
+   "$(grep -aic 'corruption\|BUG:\|\bOops\b\|Internal error\|shutting down' "$OUT/dmesg_$B.txt")" "0"
 # THE CLOSING FREE IS EVIDENCE, NOT CLEANUP.
 # This rm frees the churn file, and the NEXT lap recycles that inode number --
 # so whether this free's dinode reaches home is exactly what D-0946 turns on.

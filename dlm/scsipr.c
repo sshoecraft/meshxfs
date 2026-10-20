@@ -57,6 +57,9 @@ static void scsipr_free_now(struct mxfs_scsipr_ctx *ctx)
  * the thread may still dereference it, so nothing is freed. */
 static void scsipr_free(struct mxfs_scsipr_ctx *ctx)
 {
+	/* before the quarantine return: a quarantined context's device may be
+	 * closed while the context stays allocated */
+	mxfs_pal_scsi_reset_watch(ctx->dev, false);
 	if (mxfs_scsipr_probe_stop(ctx) == -ETIMEDOUT)
 		return;                     /* quarantined by probe_stop */
 	if (ctx->quarantined)
@@ -366,6 +369,10 @@ struct mxfs_scsipr_ctx *mxfs_scsipr_create(mxfs_bdev_t *dev,
 		snprintf(ctx->dev_name, sizeof(ctx->dev_name), "%s", dev_name);
 	else
 		snprintf(ctx->dev_name, sizeof(ctx->dev_name), "(unknown)");
+
+	/* a reset another initiator issues must not hold this device's I/O
+	 * for the transport's whole timeout ladder (pal/linux/kern.c) */
+	mxfs_pal_scsi_reset_watch(dev, true);
 
 	mxfs_pal_log(MXFS_LOG_DEBUG,
 		     "scsipr: initialized for '%s' key=0x%llx",
@@ -2395,6 +2402,7 @@ int mxfs_scsipr_fence_node(struct mxfs_scsipr_ctx *ctx,
  * Returns 0 when the exclusion still holds.  On refusal, *out (optional)
  * carries the kind that explains why, using the same vocabulary as the fence.
  */
+
 int mxfs_scsipr_validate_admission(struct mxfs_scsipr_ctx *ctx)
 {
 	struct mxfs_pal_pr_caps caps;

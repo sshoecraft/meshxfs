@@ -48,6 +48,7 @@
 #include <linux/fs.h>
 #include <linux/kthread.h>
 #include <linux/completion.h>
+#include <linux/kmod.h>
 #include <linux/mutex.h>
 #include <linux/rwsem.h>
 #include <linux/wait.h>
@@ -97,6 +98,10 @@ struct mxfs_bdev {
 	uint64_t base_offset;
 	bool is_clone;
 	bool drbd_cas;		/* attached the DRBD swap emulator (drbd.c); detached at close */
+	/* the SCSI target's MAXIMUM COMPARE AND WRITE LENGTH in blocks (Block
+	 * Limits VPD page, byte 5), read at the first whole-page swap: 0 not read
+	 * yet, -1 none or unreadable */
+	int caw_max_blocks;
 	char path[4096];
 
 	/* I/O stats for performance analysis */
@@ -693,6 +698,9 @@ int mxfs_pal_bdev_read(mxfs_bdev_t *dev, uint64_t offset,
  */
 int mxfs_pal_scsi_read_fua_bdev(struct block_device *bdev, uint64_t lba_512,
 				 void *buf, uint32_t len);
+void mxfs_pal_scsi_fenced_path_reset_bdev(struct block_device *bdev);
+/* fenced-path resets queued and not yet finished: the unload waits for them */
+static atomic_t mxfs_fpr_pending = ATOMIC_INIT(0);
 
 /*
  * sess-tcp (PROVEN BY INSTRUMENT): the LIO/tcm_loop test backstore REJECTS the
@@ -784,6 +792,7 @@ static DEFINE_SPINLOCK(mxfs_sdev_cache_lock);
  * reservation key (defined with the per-path reservation commands). */
 static bool mxfs_pr_path_refused(dev_t devt, struct scsi_device *sdev);
 static void mxfs_pr_maps_release(void);
+static void mxfs_sra_release(void);
 
 /* Read one 512B block at absolute LBA `lba` through a candidate path via
  * READ(16) passthrough.  Bounded UNIT-ATTENTION retry: the first command
@@ -1116,6 +1125,7 @@ void mxfs_pal_sdev_cache_release(void)
 	while (n--)
 		scsi_device_put(drop[n]);
 	mxfs_pr_maps_release();
+	mxfs_sra_release();
 }
 EXPORT_SYMBOL_GPL(mxfs_pal_sdev_cache_release);
 
@@ -1208,6 +1218,7 @@ void mxfs_pal_sdev_probe_init(void)
 
 void mxfs_pal_sdev_probe_exit(void)
 {
+	wait_var_event(&mxfs_fpr_pending, !atomic_read(&mxfs_fpr_pending));
 	if (mxfs_sdev_probe_pde) {
 		proc_remove(mxfs_sdev_probe_pde);
 		mxfs_sdev_probe_pde = NULL;
@@ -5123,6 +5134,580 @@ static void mxfs_pr_paths_get(struct block_device *bdev, struct mxfs_pr_paths *t
 	kfree(ident);
 }
 
+/*
+ * RELEASE THE WRITES A FENCED NODE'S OWN PATHS ARE HOLDING.
+ *
+ * The fence is a PREEMPT AND ABORT, and it aborts this node's commands still
+ * queued at the target.  A target may release an aborted command without
+ * sending any response (iscsi-scst does, whatever the Control mode page's TAS
+ * bit says), and the initiator then holds it for three expiries of its
+ * command timeout before its error handler aborts and retries it: 540 s at
+ * the 180 s MeshXFS asks for.  The fenced filesystem's shutdown and unmount
+ * wait on those writes, so the node can neither leave nor rejoin for that
+ * long.  Measured on 2/disk/caw/mpath (tests/mpath/pia_factor.sh): dropping
+ * the node's own iSCSI connections returned every held write with
+ * RESERVATION CONFLICT within 60 ms, sent no task-management function to the
+ * target, and so touched no other node's commands.
+ *
+ * Dropping a connection is the transport's business, so it is done by a
+ * user-mode helper (fenced_path_reset_helper) given the disk names of every
+ * SCSI path of the device: a multipath map's paths, or the disk itself.  A
+ * resent write can only land before the preempt (as it would have had the
+ * target answered) or bounce after it; it never lands later than it would
+ * have without the reset.  UMH_WAIT_EXEC: the caller is a shutdown and must
+ * not wait on a helper that may itself wait on the stack.  An empty helper
+ * path turns this off (the same-build control).
+ */
+static char *mxfs_fenced_path_reset_helper = "/usr/sbin/mxfs_fenced_path_reset.sh";
+module_param_named(fenced_path_reset_helper, mxfs_fenced_path_reset_helper,
+		   charp, 0644);
+MODULE_PARM_DESC(fenced_path_reset_helper,
+	"program run when the cluster fences this node, given the disk names of the shared device's SCSI paths, to drop their transport connections so the writes the target aborted without a response return at once (empty = do not run one)");
+
+#define MXFS_FPR_ARGS	(MXFS_PR_MAX_PATHS + 2)
+
+struct mxfs_fpr_work {
+	struct work_struct	work;
+	struct block_device	*bdev;	/* the disk's part0 or a partition */
+	struct gendisk		*disk;	/* referenced: keeps bdev alive */
+};
+
+static void mxfs_fpr_work_fn(struct work_struct *work)
+{
+	static char *envp[] = { "HOME=/", "PATH=/usr/sbin:/usr/bin:/sbin:/bin", NULL };
+	struct mxfs_fpr_work *w = container_of(work, struct mxfs_fpr_work, work);
+	struct block_device *bdev = w->bdev;
+	struct mxfs_pr_paths t;
+	char helper[256], line[256];
+	char (*names)[32] = NULL;
+	char *argv[MXFS_FPR_ARGS];
+	const char *hp = mxfs_fenced_path_reset_helper ? mxfs_fenced_path_reset_helper : "";
+	size_t hn, ll = 0;
+	int i, n = 0, rc;
+
+	/* `echo /path > .../fenced_path_reset_helper` stores the newline too */
+	while (*hp == ' ' || *hp == '\t' || *hp == '\n' || *hp == '\r')
+		hp++;
+	hn = strlen(hp);
+	while (hn && (hp[hn - 1] == ' ' || hp[hn - 1] == '\t' ||
+		      hp[hn - 1] == '\n' || hp[hn - 1] == '\r'))
+		hn--;
+	if (!hn) {
+		pr_notice("mxfs: P-FENCED-PATH-RESET dev=%s helper=off -- held writes return only when the initiator's timeout ladder ends\n",
+			  bdev->bd_disk->disk_name);
+		goto out;
+	}
+	if (hn >= sizeof(helper) || hp[0] != '/') {
+		pr_err("mxfs: P-FENCED-PATH-RESET dev=%s helper path unusable -- not run\n",
+		       bdev->bd_disk->disk_name);
+		goto out;
+	}
+	memcpy(helper, hp, hn);
+	helper[hn] = '\0';
+
+	names = kcalloc(MXFS_PR_MAX_PATHS, sizeof(*names), GFP_KERNEL);
+	if (!names) {
+		pr_err("mxfs: P-FENCED-PATH-RESET dev=%s no memory -- not run\n",
+		       bdev->bd_disk->disk_name);
+		goto out;
+	}
+	mxfs_pr_paths_get(bdev, &t);
+	for (i = 0; i < t.n; i++) {
+		device_for_each_child(&t.p[i]->sdev_gendev, names[n],
+				      mxfs_sdev_disk_child);
+		if (names[n][0])
+			n++;
+	}
+	mxfs_pr_paths_put(&t);
+	if (!n && !bdev_is_partition(bdev) &&
+	    !strncmp(bdev->bd_disk->disk_name, "sd", 2)) {
+		strscpy(names[0], bdev->bd_disk->disk_name, sizeof(names[0]));
+		n = 1;
+	}
+	if (!n) {
+		pr_notice("mxfs: P-FENCED-PATH-RESET dev=%s no SCSI path -- nothing to reset\n",
+			  bdev->bd_disk->disk_name);
+		goto out;
+	}
+
+	argv[0] = helper;
+	for (i = 0; i < n; i++) {
+		argv[i + 1] = names[i];
+		ll += scnprintf(line + ll, sizeof(line) - ll, "%s%s",
+				i ? " " : "", names[i]);
+	}
+	argv[n + 1] = NULL;
+	rc = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_EXEC);
+	pr_notice("mxfs: P-FENCED-PATH-RESET dev=%s paths=%d [%s] helper=%s exec_rc=%d\n",
+		  bdev->bd_disk->disk_name, n, line, helper, rc);
+out:
+	kfree(names);
+	put_device(disk_to_dev(w->disk));
+	kfree(w);
+	if (atomic_dec_and_test(&mxfs_fpr_pending))
+		wake_up_var(&mxfs_fpr_pending);
+}
+
+/* Queued, never run here: the caller is a filesystem shutdown, which may be
+ * in a context that must not sleep, and must never wait on a helper that may
+ * itself wait on the stack it is releasing. */
+void mxfs_pal_scsi_fenced_path_reset_bdev(struct block_device *bdev)
+{
+	struct mxfs_fpr_work *w;
+
+	if (!bdev)
+		return;
+	w = kzalloc(sizeof(*w), GFP_ATOMIC);
+	if (!w) {
+		pr_err("mxfs: P-FENCED-PATH-RESET dev=%s no memory -- not run\n",
+		       bdev->bd_disk->disk_name);
+		return;
+	}
+	w->bdev = bdev;
+	w->disk = bdev->bd_disk;
+	get_device(disk_to_dev(w->disk));
+	INIT_WORK(&w->work, mxfs_fpr_work_fn);
+	atomic_inc(&mxfs_fpr_pending);
+	queue_work(system_unbound_wq, &w->work);
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_scsi_fenced_path_reset_bdev);
+
+/*
+ * RELEASE THE COMMANDS ANOTHER INITIATOR'S RESET LEFT UNANSWERED.
+ *
+ * A LOGICAL UNIT RESET any initiator issues aborts every other initiator's
+ * commands still at the target, and a target may release them without any
+ * response: SAM allows it with the Control mode page's TAS bit at 0, and
+ * iscsi-scst does it whatever TAS says.  This node hears of the reset only
+ * through the unit attention (ASC 29h) its next command draws.  The midlayer
+ * retries that command with the device blocked (device_blocked set to
+ * max_device_blocked, drivers/scsi/scsi_lib.c), and a blocked device
+ * dispatches nothing while another command is outstanding -- so the commands
+ * the reset aborted hold the whole device until libiscsi's timeout ladder
+ * ends: three expiries of the 180 s request timeout, 540 s.  The heartbeat
+ * cannot reach the disk for that long, the node's storage lease expires and
+ * it fences itself (measured on 2/net/mesh/direct,
+ * tests/lu_reset_bystander_eh.sh).
+ *
+ * The ladder (iscsi_eh_cmd_timed_out) re-arms the timer once because the
+ * command moved data since the last expiry, once more after sending a
+ * NOP-Out, and then lets the error handler abort the command (ABORT TASK,
+ * which the target answers FUNCTION COMPLETE for a task it already aborted)
+ * and retry it.  After a reset no command that reached the target before it
+ * will ever be answered, so nothing is gained by waiting the ladder out:
+ * blk_abort_request expires a request's timer now, and each call is one rung.
+ * No connection is dropped, so the session and its reservation registration
+ * are untouched (a reinstated iSCSI session can be unregistered on SCST for
+ * tens of milliseconds, and a log write refused then shuts the filesystem
+ * down).  A command that was in fact still running at the target (one sent
+ * after the reset and slow) is aborted and retried: lost time, not data.
+ *
+ * The kernel reports the unit attention as a uevent (SDEV_UA=
+ * POWER_ON_RESET_OCCURRED), and 61-mxfs-stranded-path.rules writes the
+ * path's H:C:T:L to scsi_reset_seen.  When the path carries a watched device
+ * (one with a reservation context, mxfs_pal_scsi_reset_watch), the walk takes
+ * in, stranded_abort_ms after the notice, every request on the path still in
+ * flight whose timer was armed before the notice, and walks each down the
+ * ladder, one rung per tick, until it is answered.
+ *
+ * A request is walked only as the command it was taken in as.  The error
+ * handler's retry of a command the walk aborted counts one more retry, and a
+ * request reused for a new command has a new allocation time; neither is
+ * walked again.  A retry keeps its first allocation time, so a walk that went
+ * by that time alone would abort it again whenever a slow target held it past
+ * a tick, until its retries ran out and the write failed.
+ *
+ * stranded_abort_ms=0 walks nothing (the same-build control): the notice is
+ * looked at once, MXFS_SRA_LOOK after it, and what a walk would have taken in
+ * is counted.
+ */
+static int mxfs_stranded_abort_ms = 3000;
+module_param_named(stranded_abort_ms, mxfs_stranded_abort_ms, int, 0644);
+MODULE_PARM_DESC(stranded_abort_ms,
+	"after another initiator's reset is reported on a path of a mounted device (scsi_reset_seen), how long a request already in flight there may stay unanswered before it is walked down the transport's timeout ladder to an abort and retry (0 = never: it waits the ladder out)");
+
+#define MXFS_SRA_WATCH		8		/* watched devices */
+#define MXFS_SRA_NOTICES	16		/* paths with a reset notice open */
+#define MXFS_SRA_HELD		64		/* requests one notice walks */
+#define MXFS_SRA_TICK		(HZ / 4)
+#define MXFS_SRA_GIVE_UP	(30 * HZ)	/* past the newest notice's hold */
+#define MXFS_SRA_LOOK		(3 * HZ)	/* the control's hold */
+
+struct mxfs_sra_watch {
+	struct block_device	*bdev;		/* NULL: free slot */
+	int			count;		/* reservation contexts on it */
+};
+
+/* a request the walk took in, as the command it was then */
+struct mxfs_sra_held {
+	struct request		*rq;
+	unsigned long		alloc;		/* the command's jiffies_at_alloc */
+	int			retries;	/* its retries when taken in */
+	bool			live;		/* in flight as that command this tick */
+};
+
+struct mxfs_sra_notice {
+	struct scsi_device	*sdev;		/* referenced; NULL: free slot */
+	unsigned long		seen;		/* jiffies of the newest notice */
+	bool			taken;		/* the newest notice's requests are in */
+	bool			walking;	/* P-STRANDED-ABORT printed */
+	unsigned int		nheld;
+	unsigned int		missed;		/* armed before a notice, no room */
+	unsigned int		found;		/* held, on the last tick with any */
+	unsigned int		kicks;		/* rungs requested */
+	unsigned int		oldest_ms;
+	u8			op;		/* the oldest request's opcode */
+	struct mxfs_sra_held	held[MXFS_SRA_HELD];
+};
+
+static struct mxfs_sra_watch mxfs_sra_watched[MXFS_SRA_WATCH];
+static struct mxfs_sra_notice mxfs_sra_notices[MXFS_SRA_NOTICES];
+static DEFINE_MUTEX(mxfs_sra_lock);
+/* module exit has begun: the parameter stays writable until the module's
+ * sysfs is torn down, after exit, and must queue nothing then */
+static bool mxfs_sra_closing;
+static void mxfs_sra_work_fn(struct work_struct *work);
+static DECLARE_DELAYED_WORK(mxfs_sra_work, mxfs_sra_work_fn);
+
+static void mxfs_sra_disk_name(struct scsi_device *sdev, char *name)
+{
+	name[0] = '\0';
+	device_for_each_child(&sdev->sdev_gendev, name, mxfs_sdev_disk_child);
+	if (!name[0])
+		strscpy(name, "?", 32);
+}
+
+/* Is `sdev` a path of a watched device: the disk itself, or a slave of the
+ * multipath map?  Caller holds mxfs_sra_lock. */
+static bool mxfs_sra_watched_path(struct scsi_device *sdev)
+{
+	char name[32];
+	int i;
+
+	for (i = 0; i < MXFS_SRA_WATCH; i++) {
+		struct block_device *b = mxfs_sra_watched[i].bdev;
+
+		if (!b)
+			continue;
+		if (disk_to_dev(b->bd_disk)->parent == &sdev->sdev_gendev ||
+		    mxfs_sdev_is_slave_of(b->bd_disk, sdev, name))
+			return true;
+	}
+	return false;
+}
+
+/* Every device with a reservation context is watched for the life of that
+ * context (dlm/scsipr.c). */
+void mxfs_pal_scsi_reset_watch(mxfs_bdev_t *dev, bool on)
+{
+	struct block_device *bdev = dev ? dev->bdev : NULL;
+	struct gendisk *put = NULL;
+	int i, slot = -1;
+
+	if (!bdev)
+		return;
+	mutex_lock(&mxfs_sra_lock);
+	for (i = 0; i < MXFS_SRA_WATCH; i++) {
+		if (mxfs_sra_watched[i].bdev == bdev) {
+			slot = i;
+			break;
+		}
+		if (!mxfs_sra_watched[i].bdev && slot < 0)
+			slot = i;
+	}
+	if (on && slot >= 0) {
+		/* the entry keeps the disk, so a notice never reads a freed one */
+		if (!mxfs_sra_watched[slot].bdev)
+			get_device(disk_to_dev(bdev->bd_disk));
+		mxfs_sra_watched[slot].bdev = bdev;
+		mxfs_sra_watched[slot].count++;
+	} else if (!on && slot >= 0 && mxfs_sra_watched[slot].bdev == bdev &&
+		   --mxfs_sra_watched[slot].count <= 0) {
+		put = bdev->bd_disk;
+		mxfs_sra_watched[slot].bdev = NULL;
+		mxfs_sra_watched[slot].count = 0;
+	}
+	mutex_unlock(&mxfs_sra_lock);
+	if (put)
+		put_device(disk_to_dev(put));
+	if (on && slot < 0)
+		pr_warn("mxfs: P-STRANDED-WATCH dev=%s not watched -- %d devices already are; a reset another initiator issues leaves its unanswered commands to the timeout ladder\n",
+			bdev->bd_disk->disk_name, MXFS_SRA_WATCH);
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_scsi_reset_watch);
+
+struct mxfs_sra_scan {
+	struct mxfs_sra_notice	*n;
+	struct request_queue	*q;
+	bool			take;		/* take in what the newest notice left */
+	bool			kick;		/* false: count only (the control) */
+	unsigned int		found;
+	unsigned int		kicked;
+	unsigned int		oldest_ms;
+	u8			op;
+};
+
+static bool mxfs_sra_scan_one(struct request *rq, struct mxfs_sra_scan *s)
+{
+	struct mxfs_sra_notice *n = s->n;
+	struct mxfs_sra_held *h = NULL;
+	struct scsi_cmnd *cmd;
+	unsigned long deadline;
+	unsigned int age_ms, i;
+
+	if (rq->q != s->q)
+		return true;			/* another device on this host */
+	cmd = blk_mq_rq_to_pdu(rq);
+	deadline = READ_ONCE(rq->deadline);
+	for (i = 0; i < n->nheld; i++) {
+		if (n->held[i].rq == rq) {
+			h = &n->held[i];
+			break;
+		}
+	}
+	if (h && h->alloc == cmd->jiffies_at_alloc &&
+	    h->retries == cmd->retries)
+		goto walk;
+	/* Not held, or held as a command since answered.  What the newest
+	 * notice takes in is what was armed -- dispatched, or re-armed by a
+	 * rung -- before it. */
+	if (!s->take || !time_before(deadline - rq->timeout, n->seen))
+		return true;
+	if (!h) {
+		if (n->nheld >= MXFS_SRA_HELD) {
+			n->missed++;
+			return true;
+		}
+		h = &n->held[n->nheld++];
+		h->rq = rq;
+	}
+	h->alloc = cmd->jiffies_at_alloc;
+	h->retries = cmd->retries;
+walk:
+	h->live = true;
+	s->found++;
+	age_ms = jiffies_to_msecs(jiffies - cmd->jiffies_at_alloc);
+	if (age_ms >= s->oldest_ms) {
+		s->oldest_ms = age_ms;
+		s->op = cmd->cmnd[0];
+	}
+	/* One rung per call: a deadline already in the past is a rung asked
+	 * for and not yet run, or the abort the last rung started. */
+	if (s->kick && time_after(deadline, jiffies)) {
+		blk_abort_request(rq);
+		s->kicked++;
+	}
+	return true;
+}
+
+#if MXFS_EFFECTIVE_VERSION >= KERNEL_VERSION(6, 0, 0)
+static bool mxfs_sra_scan_rq(struct request *rq, void *data)
+{
+	return mxfs_sra_scan_one(rq, data);
+}
+#else
+static bool mxfs_sra_scan_rq(struct request *rq, void *data, bool reserved)
+{
+	return mxfs_sra_scan_one(rq, data);
+}
+#endif
+
+/* what was not in flight as the command it was taken in as has been answered */
+static void mxfs_sra_compact(struct mxfs_sra_notice *n)
+{
+	unsigned int i, k = 0;
+
+	for (i = 0; i < n->nheld; i++) {
+		if (!n->held[i].live)
+			continue;
+		n->held[k] = n->held[i];
+		n->held[k++].live = false;
+	}
+	n->nheld = k;
+}
+
+static void mxfs_sra_work_fn(struct work_struct *work)
+{
+	int abort_ms = READ_ONCE(mxfs_stranded_abort_ms);
+	unsigned long hold = abort_ms > 0 ? msecs_to_jiffies(abort_ms) : MXFS_SRA_LOOK;
+	unsigned long now = jiffies, next = 0;
+	struct scsi_device *drop[MXFS_SRA_NOTICES];
+	bool due = false;		/* `next` is set: a notice wants a tick */
+	int i, ndrop = 0;
+
+	mutex_lock(&mxfs_sra_lock);
+	for (i = 0; i < MXFS_SRA_NOTICES; i++) {
+		struct mxfs_sra_notice *n = &mxfs_sra_notices[i];
+		struct mxfs_sra_scan s = { .n = n, .kick = abort_ms > 0 };
+		unsigned int since_ms;
+		char name[32];
+
+		if (!n->sdev)
+			continue;
+		if (!n->taken && time_before(now, n->seen + hold)) {
+			/* the newest notice's hold: come back for its take, and
+			 * meanwhile walk what an earlier notice took in */
+			if (!due || time_before(n->seen + hold, next))
+				next = n->seen + hold;
+			due = true;
+			if (!n->nheld)
+				continue;
+		} else if (!n->taken) {
+			s.take = true;
+		}
+		s.q = n->sdev->request_queue;
+		blk_mq_tagset_busy_iter(&n->sdev->host->tag_set, mxfs_sra_scan_rq, &s);
+		mxfs_sra_compact(n);
+		if (s.take)
+			n->taken = true;
+		n->kicks += s.kicked;
+		if (s.found) {
+			n->found = s.found;
+			n->oldest_ms = s.oldest_ms;
+			n->op = s.op;
+		}
+		since_ms = jiffies_to_msecs(now - n->seen);
+		mxfs_sra_disk_name(n->sdev, name);
+		if (!s.kick) {
+			pr_info("mxfs: P-STRANDED-OFF path=%s in_flight=%u oldest_ms=%u op=0x%02x missed=%u since_reset_ms=%u -- stranded_abort_ms=0: what the reset left unanswered waits out the timeout ladder\n",
+				name, s.found, s.oldest_ms, s.op, n->missed,
+				since_ms);
+			goto close_notice;
+		}
+		if (n->nheld) {
+			if (time_before(now, n->seen + hold + MXFS_SRA_GIVE_UP)) {
+				if (!n->walking) {
+					n->walking = true;
+					pr_warn("mxfs: P-STRANDED-ABORT path=%s sdev=%u:%u:%u:%llu in_flight=%u oldest_ms=%u op=0x%02x missed=%u since_reset_ms=%u -- requests sent before another initiator's reset are still unanswered; walking them down the timeout ladder\n",
+						name, n->sdev->host->host_no,
+						n->sdev->channel, n->sdev->id,
+						(unsigned long long)n->sdev->lun,
+						s.found, s.oldest_ms, s.op,
+						n->missed, since_ms);
+				}
+				if (!due || time_before(now + MXFS_SRA_TICK, next))
+					next = now + MXFS_SRA_TICK;
+				due = true;
+				continue;
+			}
+			pr_err("mxfs: P-STRANDED-GIVE-UP path=%s in_flight=%u oldest_ms=%u op=0x%02x rungs=%u missed=%u since_reset_ms=%u -- still unanswered; left to the timeout ladder\n",
+			       name, s.found, s.oldest_ms, s.op, n->kicks,
+			       n->missed, since_ms);
+			goto close_notice;
+		}
+		if (!n->taken)
+			continue;	/* drained in a newer notice's hold */
+		if (n->walking)
+			pr_warn("mxfs: P-STRANDED-RELEASED path=%s rungs=%u since_reset_ms=%u last_in_flight=%u oldest_ms=%u op=0x%02x missed=%u\n",
+				name, n->kicks, since_ms, n->found,
+				n->oldest_ms, n->op, n->missed);
+		else
+			pr_info("mxfs: P-STRANDED-NONE path=%s missed=%u since_reset_ms=%u -- nothing sent before the reset was left unanswered\n",
+				name, n->missed, since_ms);
+close_notice:
+		drop[ndrop++] = n->sdev;
+		memset(n, 0, sizeof(*n));
+	}
+	if (due && !mxfs_sra_closing)
+		mod_delayed_work(system_unbound_wq, &mxfs_sra_work,
+				 time_after(next, now) ? next - now : 1);
+	mutex_unlock(&mxfs_sra_lock);
+	while (ndrop--)
+		scsi_device_put(drop[ndrop]);
+}
+
+/* udev's notice of a reset unit attention: "H:C:T:L" of the path. */
+static int mxfs_sra_notice_set(const char *val, const struct kernel_param *kp)
+{
+	unsigned int host, channel, id;
+	unsigned long long lun;
+	struct Scsi_Host *shost;
+	struct scsi_device *sdev, *put = NULL;
+	char name[32];
+	int i, slot = -1;
+
+	if (sscanf(val, "%u:%u:%u:%llu", &host, &channel, &id, &lun) != 4)
+		return -EINVAL;
+	shost = scsi_host_lookup(host);
+	if (!shost)
+		return 0;
+	sdev = scsi_device_lookup(shost, channel, id, lun);
+	scsi_host_put(shost);
+	if (!sdev)
+		return 0;
+
+	mutex_lock(&mxfs_sra_lock);
+	if (mxfs_sra_closing || !mxfs_sra_watched_path(sdev)) {
+		put = sdev;
+		goto out;
+	}
+	for (i = 0; i < MXFS_SRA_NOTICES; i++) {
+		if (mxfs_sra_notices[i].sdev == sdev) {
+			slot = i;
+			put = sdev;		/* the open notice holds one */
+			break;
+		}
+		if (!mxfs_sra_notices[i].sdev && slot < 0)
+			slot = i;
+	}
+	mxfs_sra_disk_name(sdev, name);
+	if (slot < 0) {
+		pr_err("mxfs: P-STRANDED-NOTICE path=%s dropped -- %d resets already open; its unanswered commands are left to the timeout ladder\n",
+		       name, MXFS_SRA_NOTICES);
+		put = sdev;
+		goto out;
+	}
+	/* A later reset on a path already walking opens a new take, after its
+	 * own hold, of what was armed before it; what the walk holds goes on
+	 * being walked meanwhile. */
+	mxfs_sra_notices[slot].sdev = sdev;
+	mxfs_sra_notices[slot].seen = jiffies;
+	mxfs_sra_notices[slot].taken = false;
+	pr_warn("mxfs: P-STRANDED-NOTICE path=%s sdev=%u:%u:%u:%llu abort_ms=%d -- another initiator reset this logical unit\n",
+		name, host, channel, id, lun, READ_ONCE(mxfs_stranded_abort_ms));
+	/* now: the work sets its own next tick, and a delay here would push
+	 * back the tick of every other notice already open */
+	mod_delayed_work(system_unbound_wq, &mxfs_sra_work, 0);
+out:
+	mutex_unlock(&mxfs_sra_lock);
+	if (put)
+		scsi_device_put(put);
+	return 0;
+}
+
+static const struct kernel_param_ops mxfs_sra_notice_ops = {
+	.set = mxfs_sra_notice_set,
+};
+module_param_cb(scsi_reset_seen, &mxfs_sra_notice_ops, NULL, 0200);
+MODULE_PARM_DESC(scsi_reset_seen,
+	"write a SCSI device's H:C:T:L when it reports the unit attention a reset leaves (61-mxfs-stranded-path.rules does)");
+
+/* module exit: no notice outlives the module */
+static void mxfs_sra_release(void)
+{
+	int i;
+
+	mutex_lock(&mxfs_sra_lock);
+	mxfs_sra_closing = true;
+	mutex_unlock(&mxfs_sra_lock);
+	cancel_delayed_work_sync(&mxfs_sra_work);
+	mutex_lock(&mxfs_sra_lock);
+	for (i = 0; i < MXFS_SRA_NOTICES; i++) {
+		if (mxfs_sra_notices[i].sdev)
+			scsi_device_put(mxfs_sra_notices[i].sdev);
+		memset(&mxfs_sra_notices[i], 0, sizeof(mxfs_sra_notices[i]));
+	}
+	/* every reservation context un-watches before it frees or is
+	 * quarantined (dlm/scsipr.c scsipr_free); an entry left here is a
+	 * context the module never freed, and it still holds a disk reference */
+	for (i = 0; i < MXFS_SRA_WATCH; i++) {
+		if (mxfs_sra_watched[i].bdev)
+			put_device(disk_to_dev(mxfs_sra_watched[i].bdev->bd_disk));
+		memset(&mxfs_sra_watched[i], 0, sizeof(mxfs_sra_watched[i]));
+	}
+	mutex_unlock(&mxfs_sra_lock);
+}
+
 int mxfs_pal_bdev_lu_ident(mxfs_bdev_t *dev, uint8_t *out, int max)
 {
 	struct scsi_device *sdev;
@@ -7519,8 +8104,8 @@ out:
 
 /*
  * COMPARE AND WRITE has one submission path: caw_manual_bio, the request
- * built the way drivers/scsi/sg.c builds an SG_IO one (a private page holding
- * a copy of the data, bio_add_page, blk_execute_rq).  The scsi_execute_cmd
+ * built the way drivers/scsi/sg.c builds an SG_IO one (private pages holding
+ * a copy of the data, one bvec each, blk_execute_rq).  The scsi_execute_cmd
  * path it replaced (the caw_path=0 knob, removed in 0.90.129) had two faults:
  * bio_map_kern mapped the caller's buffer and returned CAS success without
  * the write persisting under cross-node stress (P49), and it asked the
@@ -7591,7 +8176,7 @@ static atomic64_t mxfs_caw_verify_mismatch;
  * that drivers/scsi/sg.c uses for SG_IO.  Specifically:
  *   - allocate a fresh page for the 1024-byte data payload (compare+write)
  *   - copy caller's compare/write buffers into the fresh page
- *   - bio_alloc + bio_add_page (single bvec, our private page)
+ *   - bio_alloc + __bio_add_page (one bvec per private page, never merged)
  *   - blk_rq_append_bio onto a scsi_alloc_request'd request
  *   - scmd->cmnd / cmd_len / allowed=0 (SG_DEFAULT_RETRIES) per sg.c
  *   - blk_execute_rq(req, true) synchronous, at_head matches sg
@@ -7607,7 +8192,24 @@ static atomic64_t mxfs_caw_verify_mismatch;
  *     lost answer stays an error the callers treat as outcome unknown.
  *   - no RQF_QUIET on the request (sg doesn't set it; informational)
  */
-static int caw_manual_bio(struct scsi_device *sdev, u64 lba,
+/*
+ * nsect 512-byte sectors are compared and, on a match, written: the payload is
+ * the compare image then the write image, nsect * 512 bytes each.  Every
+ * caller but the whole-page ledger swap passes 1.  At most CAW_MAX_SECT, so
+ * the payload is at most two private pages (one bvec each).
+ */
+#define CAW_MAX_SECT	8
+
+/*
+ * DEBUG (D-WHOLE-PAGE-CAW-PAYLOAD-PANICS-NODE-IN-SCSI-ALLOC-SGTABLES):
+ * dbg_caw_span_adjacent=N builds the next N two-page payloads on two order-0
+ * pages split from one order-1 block, so the pages are physically adjacent on
+ * every command instead of by chance.  The count left reads back, so a lap
+ * knows how many commands it reached.  Never enable in production.
+ */
+static atomic_t mxfs_dbg_caw_span_adjacent = ATOMIC_INIT(0);
+
+static int caw_manual_bio(struct scsi_device *sdev, u64 lba, unsigned int nsect,
                           const void *compare_buf, const void *write_buf,
                           struct scsi_sense_hdr *sshdr_out,
                           int *resid_out)
@@ -7615,10 +8217,15 @@ static int caw_manual_bio(struct scsi_device *sdev, u64 lba,
 	struct request *req;
 	struct scsi_cmnd *scmd;
 	struct bio *bio;
-	struct page *page;
-	void *page_addr;
+	struct page *pages[2] = { NULL, NULL };
+	unsigned int len = nsect * 512, total = 2 * len, npages, i;
 	unsigned char cdb[16];
+	bool adjacent = false;
 	int ret;
+
+	if (nsect < 1 || nsect > CAW_MAX_SECT)
+		return -EINVAL;
+	npages = DIV_ROUND_UP(total, PAGE_SIZE);
 
 	/* Build COMPARE AND WRITE CDB (16 bytes) — same shape as legacy path */
 	memset(cdb, 0, sizeof(cdb));
@@ -7632,24 +8239,44 @@ static int caw_manual_bio(struct scsi_device *sdev, u64 lba,
 	cdb[7]  = (u8)(lba >> 16);
 	cdb[8]  = (u8)(lba >> 8);
 	cdb[9]  = (u8)(lba);
-	cdb[13] = 0x01;
+	cdb[13] = (u8)nsect;
 
-	/* Fresh page — bio's private payload (NOT shared with caller_buf).
+	/* Fresh pages — bio's private payload (NOT shared with caller_buf).
 	 * GFP_KERNEL is fine: caw_slot is called from kthread/syscall context,
 	 * never from atomic context per the existing scsi_execute_cmd path. */
-	page = alloc_page(GFP_KERNEL);
-	if (!page)
-		return -ENOMEM;
-
-	page_addr = page_address(page);
-	memcpy(page_addr, compare_buf, 512);
-	memcpy(page_addr + 512, write_buf, 512);
+	if (npages == 2 &&
+	    atomic_dec_if_positive(&mxfs_dbg_caw_span_adjacent) >= 0) {
+		pages[0] = alloc_pages(GFP_KERNEL, 1);
+		if (!pages[0]) {
+			ret = -ENOMEM;
+			goto out_pages;
+		}
+		split_page(pages[0], 1);
+		pages[1] = pages[0] + 1;
+		adjacent = true;
+	} else {
+		for (i = 0; i < npages; i++) {
+			pages[i] = alloc_page(GFP_KERNEL);
+			if (!pages[i]) {
+				ret = -ENOMEM;
+				goto out_pages;
+			}
+		}
+	}
+	if (npages == 1) {
+		memcpy(page_address(pages[0]), compare_buf, len);
+		memcpy(page_address(pages[0]) + len, write_buf, len);
+	} else {
+		/* two pages, one image each (len bytes, one bvec per page): the
+		 * payload still reads compare image, then write image */
+		memcpy(page_address(pages[0]), compare_buf, len);
+		memcpy(page_address(pages[1]), write_buf, len);
+	}
 
 	req = scsi_alloc_request(sdev->request_queue, REQ_OP_DRV_OUT, 0);
 	if (IS_ERR(req)) {
 		ret = PTR_ERR(req);
-		__free_page(page);
-		return ret;
+		goto out_pages;
 	}
 
 	{
@@ -7660,20 +8287,33 @@ static int caw_manual_bio(struct scsi_device *sdev, u64 lba,
 	 * (rq->q->disk->part0).  passthrough requests technically don't
 	 * require bi_bdev to be set, but accounting paths and tracepoints
 	 * dereference it. */
-	bio = bio_alloc(bdev_for_bio, 1, REQ_OP_DRV_OUT, GFP_KERNEL);
+	bio = bio_alloc(bdev_for_bio, npages, REQ_OP_DRV_OUT, GFP_KERNEL);
 	}
 	if (!bio) {
 		blk_mq_free_request(req);
-		__free_page(page);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out_pages;
 	}
 
-	if (bio_add_page(bio, page, 1024, 0) != 1024) {
-		bio_put(bio);
-		blk_mq_free_request(req);
-		__free_page(page);
-		return -EIO;
-	}
+	/*
+	 * One bvec per page, never merged.  bio_add_page folds a page that is
+	 * physically adjacent to the one before it into the same bvec, and where
+	 * blk_rq_append_bio counts a request's segments as its bvecs (6.8, RHEL
+	 * 9) the merged 8 KiB bvec is counted as one segment while
+	 * __blk_rq_map_sg splits it at the host's segment boundary (iscsi_tcp:
+	 * dma_boundary PAGE_SIZE - 1) into two: BUG_ON(count > nents) in
+	 * scsi_alloc_sgtables, a node panic whenever the allocator handed out two
+	 * adjacent pages.  Two bvecs are counted and mapped as two segments on
+	 * every kernel.  bio_alloc above sized the bio for npages.
+	 */
+	for (i = 0; i < npages; i++)
+		__bio_add_page(bio, pages[i], npages == 1 ? total : len, 0);
+	if (adjacent)
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs-pal: P-DBG-CAW-SPAN-ADJACENT pfn=%lx,%lx nsect=%u vcnt=%u (%d left, comm=%s)",
+			     page_to_pfn(pages[0]), page_to_pfn(pages[1]), nsect,
+			     bio->bi_vcnt, atomic_read(&mxfs_dbg_caw_span_adjacent),
+			     current->comm);
 
 	ret = blk_rq_append_bio(req, bio);
 	if (ret) {
@@ -7683,8 +8323,7 @@ static int caw_manual_bio(struct scsi_device *sdev, u64 lba,
 		if (req->bio == NULL)
 			bio_put(bio);
 		blk_mq_free_request(req);
-		__free_page(page);
-		return ret;
+		goto out_pages;
 	}
 
 	scmd = blk_mq_rq_to_pdu(req);
@@ -7732,7 +8371,10 @@ static int caw_manual_bio(struct scsi_device *sdev, u64 lba,
 #endif
 
 	blk_mq_free_request(req);
-	__free_page(page);
+out_pages:
+	for (i = 0; i < npages; i++)
+		if (pages[i])
+			__free_page(pages[i]);
 
 	return ret;
 }
@@ -7776,7 +8418,7 @@ int mxfs_pal_bdev_compare_and_write(mxfs_bdev_t *dev, uint64_t offset,
 	 */
 caw_submit:
 	memset(&sshdr, 0, sizeof(sshdr));
-	ret = caw_manual_bio(sdev, lba, compare_buf, write_buf,
+	ret = caw_manual_bio(sdev, lba, 1, compare_buf, write_buf,
 			     &sshdr, &caw_resid);
 
 	/*
@@ -7961,23 +8603,179 @@ int mxfs_pal_bdev_compare_and_write_many(mxfs_bdev_t *dev, int n,
 	return 0;
 }
 
+/*
+ * D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349, H-P6: a ledger page in ONE
+ * SCSI COMPARE AND WRITE.  SBC lets one command compare and write up to the
+ * target's MAXIMUM COMPARE AND WRITE LENGTH (Block Limits VPD page, byte 5);
+ * LIO's default is one block, which is where "a SCSI COMPARE AND WRITE covers
+ * one sector" came from, but the rig's SCST target allows 255.  Where the
+ * target allows the whole page, the ledger store commits a page in one swap
+ * (compare the spare copy exactly as read, write the new image) instead of the
+ * ticket protocol's two sector swaps, separate body write and three flushes.
+ * 1 = on where the target allows it (default); 0 = every SCSI page commit
+ * keeps the ticket protocol, the same-build control.  Read at each commit.
+ */
+static int mxfs_caw_span = 1;
+module_param_named(caw_span, mxfs_caw_span, int, 0644);
+MODULE_PARM_DESC(caw_span,
+		 "commit a ledger page in one SCSI COMPARE AND WRITE where the target allows a page: 1=on (default), 0=ticket protocol (control)");
+
+static int
+mxfs_pal_atomic_param_set(const char *val, const struct kernel_param *kp)
+{
+	int	v;
+	int	rc = kstrtoint(val, 0, &v);
+
+	if (rc)
+		return rc;
+	atomic_set((atomic_t *)kp->arg, v);
+	return 0;
+}
+
+static int
+mxfs_pal_atomic_param_get(char *buf, const struct kernel_param *kp)
+{
+	return sysfs_emit(buf, "%d\n", atomic_read((atomic_t *)kp->arg));
+}
+
+/* a resettable exact counter: a harness writes 0 and reads at the end */
+static const struct kernel_param_ops mxfs_pal_atomic_param_ops = {
+	.set = mxfs_pal_atomic_param_set,
+	.get = mxfs_pal_atomic_param_get,
+};
+
+static atomic_t mxfs_caw_span_n = ATOMIC_INIT(0);
+module_param_cb(caw_span_n, &mxfs_pal_atomic_param_ops, &mxfs_caw_span_n, 0644);
+MODULE_PARM_DESC(caw_span_n,
+		 "count of whole-page SCSI COMPARE AND WRITE commands a target answered (write resets)");
+
+module_param_cb(dbg_caw_span_adjacent, &mxfs_pal_atomic_param_ops,
+		&mxfs_dbg_caw_span_adjacent, 0644);
+MODULE_PARM_DESC(dbg_caw_span_adjacent,
+		 "DEBUG: build the next N whole-page COMPARE AND WRITE payloads on two physically adjacent pages (reads back the count left). Never enable in production.");
+
+/* the target's MAXIMUM COMPARE AND WRITE LENGTH in blocks, -1 when none */
+static int caw_max_blocks(struct mxfs_bdev *dev, struct scsi_device *sdev)
+{
+	unsigned char *vpd;
+	int v = READ_ONCE(dev->caw_max_blocks);
+
+	if (v)
+		return v;
+	vpd = kzalloc(64, GFP_KERNEL);
+	if (!vpd)
+		return -1;		/* not cached: the next commit asks again */
+	v = -1;
+	if (scsi_get_vpd_page(sdev, 0xb0, vpd, 64) == 0 && vpd[1] == 0xb0 && vpd[5])
+		v = vpd[5];
+	kfree(vpd);
+	WRITE_ONCE(dev->caw_max_blocks, v);
+	return v;
+}
+
+/* may a page of len bytes be committed in one swap on this device now? */
+static bool caw_span_allowed(struct mxfs_bdev *dev, struct scsi_device *sdev,
+			     uint64_t offset, uint32_t len)
+{
+	return READ_ONCE(mxfs_caw_span) && len && !(len & 511) &&
+	       len / 512 <= CAW_MAX_SECT &&
+	       !((offset + dev->base_offset) & 511) &&
+	       bdev_logical_block_size(dev->bdev) == 512 &&
+	       caw_max_blocks(dev, sdev) >= (int)(len / 512);
+}
+
+bool mxfs_pal_bdev_span_swap_ok(mxfs_bdev_t *dev, uint32_t len)
+{
+	struct scsi_device *sdev;
+	bool ok;
+
+	if (!dev || !dev->bdev)
+		return false;
+	/* no SCSI swap underneath: the emulated span swap decides */
+	if (mxfs_pal_shared_cas_on(dev))
+		return true;
+	sdev = mxfs_bdev_to_sdev(dev->bdev);
+	if (!sdev)
+		return true;
+	ok = caw_span_allowed(dev, sdev, 0, len);
+	scsi_device_put(sdev);
+	return ok;
+}
+
+/*
+ * One whole-page COMPARE AND WRITE, answered as the sector swap is: 0 written,
+ * -EAGAIN MISCOMPARE (nothing written), -EBADE reservation conflict, -EIO any
+ * other outcome (the write may or may not have landed), -EOPNOTSUPP nothing
+ * issued (or the target refused the command before executing it).
+ */
+static int caw_span_scsi(struct mxfs_bdev *dev, struct scsi_device *sdev,
+			 uint64_t offset, const void *compare_buf,
+			 const void *write_buf, uint32_t write_len)
+{
+	struct scsi_sense_hdr sshdr;
+	unsigned int nsect = write_len / 512;
+	u64 lba = (offset + dev->base_offset) / 512;
+	int resid = 0, ua_try = 0, ret;
+
+	if (!caw_span_allowed(dev, sdev, offset, write_len))
+		return -EOPNOTSUPP;
+again:
+	memset(&sshdr, 0, sizeof(sshdr));
+	ret = caw_manual_bio(sdev, lba, nsect, compare_buf, write_buf, &sshdr,
+			     &resid);
+	/* as the sector swap: a UNIT ATTENTION is reported instead of executing */
+	if (ret > 0 && scsi_sense_valid(&sshdr) &&
+	    sshdr.sense_key == UNIT_ATTENTION && ua_try < 5) {
+		ua_try++;
+		msleep(2 << ua_try);
+		goto again;
+	}
+	if (ret < 0)
+		return ret;
+	atomic_inc(&mxfs_caw_span_n);
+	if (scsi_sense_valid(&sshdr) && sshdr.sense_key == MISCOMPARE)
+		return -EAGAIN;
+	if (ret > 0) {
+		if ((ret & 0xff) == SAM_STAT_RESERVATION_CONFLICT)
+			return -EBADE;
+		/* refused before execution (a length the Block Limits page
+		 * offered and the command then rejected, or the FUA bit): nothing
+		 * written; the store goes back to the ticket protocol, whose own
+		 * sector swap reports a FUA refusal */
+		if (scsi_sense_valid(&sshdr) &&
+		    sshdr.sense_key == ILLEGAL_REQUEST) {
+			WRITE_ONCE(dev->caw_max_blocks, -1);
+			pr_warn_once("mxfs: P-CAW-SPAN-REFUSED nsect=%u asc=0x%x ascq=0x%x -- the target refused a whole-page COMPARE AND WRITE its Block Limits page allows; ledger commits use the ticket protocol on this device\n",
+				     nsect, sshdr.asc, sshdr.ascq);
+			return -EOPNOTSUPP;
+		}
+		return -EIO;
+	}
+	return 0;
+}
+
 int mxfs_pal_bdev_compare_and_write_span(mxfs_bdev_t *dev, uint64_t offset,
 					 const void *compare_buf,
 					 const void *write_buf,
 					 uint32_t write_len)
 {
 	struct scsi_device *sdev;
+	int ret;
 
 	if (!dev || !dev->bdev || !compare_buf || !write_buf)
 		return -EINVAL;
 	if (mxfs_pal_shared_cas_on(dev))
 		return mxfs_pal_drbd_cas_emulate_span(dev, offset, compare_buf,
 						      write_buf, write_len);
-	/* a SCSI COMPARE AND WRITE covers the compared sector alone */
+	/* a SCSI COMPARE AND WRITE compares exactly what it writes: compare_buf
+	 * holds write_len bytes here, where the emulated swap compares its
+	 * first sector alone */
 	sdev = mxfs_bdev_to_sdev(dev->bdev);
 	if (sdev) {
+		ret = caw_span_scsi(dev, sdev, offset, compare_buf, write_buf,
+				    write_len);
 		scsi_device_put(sdev);
-		return -EOPNOTSUPP;
+		return ret;
 	}
 	return mxfs_pal_drbd_cas_emulate_span(dev, offset, compare_buf, write_buf,
 					      write_len);

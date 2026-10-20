@@ -1,0 +1,55 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F11 A/B,
+# TCP half: 2/net/mesh/direct on g2c, from ~/src/mxfs-e, build
+# 737E182A809291DAA0B4785 (main's source plus p55c_home_restore; the harness
+# prints each lap's build and refuses a node running anything else).
+#
+# H-F11: a free's flush whose cluster slot still holds this node's unlanded
+# live image of the previous life (masked by the H-F10 write guard) classifies
+# on the platter, finds an older free there and discharges without touching
+# the slot; the slot is still logged by the attached item, so the next write of
+# the cluster puts the dead life's live core home over the free.  Measured on
+# TCP in laps ftmp1/ftdp1 (14 of 14 P-FREE-LIVE-CORE).  The fix puts the slot
+# back to the platter's bytes before P55C classifies on them.
+#
+# Every lap runs ftmp1's production settings (noino_gen0_guard 1, no delay,
+# every other guard at its default, mirror check on so the H-F7/H-F10
+# counters read) and differs only in NG0_P55C_RESTORE: 0 = control (staged
+# bytes left in the slot), 1 = fix.  Control and fix laps alternate so host
+# load falls on both arms.
+#
+# VERDICT RULES (written before the first lap):
+#   CONTROL (NG0_P55C_RESTORE=0)
+#     REPRODUCED  cold audit CORRUPT with P-FREE-LIVE-CORE, and hf11_chain
+#                 equals the number of audited P-FREE-LIVE-CORE inodes (each
+#                 audited inode was quarantined at the generation a P55C
+#                 platter classification named as its slot's staged image).
+#     NOT REACHED VACUOUS by the harness gate (p55_live_over_free 0): H-F11's
+#                 state did not arise; the audit stays the lap's verdict.
+#     REFUTES     an audited P-FREE-LIVE-CORE inode with no chain (another
+#                 producer), in any lap, control or fix.
+#     Reported per control lap: hf11_chain / p55_live_over_free (H-F11
+#     predicts 1: nothing else writes the slot before the next cluster write).
+#   FIX (NG0_P55C_RESTORE=1)
+#     PASS        the harness's PASS (audit CLEAN errors=0, node_failures=0,
+#                 every guard's ok flag 1, p55_ok=1 i.e. hf11_chain 0) with
+#                 p55_restored_lof > 0 (a live staged slot over a free platter
+#                 was restored).  VACUOUS by the gate if none was restored.
+#     FAIL        any CORRUPT audit or hf11_chain > 0: blocks; attribute each
+#                 audited inode.
+#   The TCP direct half verifies H-F11 on 2/net/mesh/direct only if at least one
+#   control lap is REPRODUCED and every non-vacuous fix lap PASSes.  If no
+#   control lap reaches H-F11, this configuration is reported unreached and
+#   H-F11 is not verified on it.
+#   A lap whose audit is STALE/NONE has no verdict and is rerun.
+#
+# Bound: the final-verification queue's noino derivation (1660 s: prep 300 +
+# srcversion 2x20 + seven knob sets 2x7x20 + mkdir 30 + workload SECS+60 = 360
+# + counters 2x40 + three knob resets 2x3x20 + chk_clean with alloc_witness 150
+# + stream capture 2x120 + snapshot 60) + the p55c_home_restore set/readback
+# 2x20 + the p55c stream pass 2x10 = 1720 s.
+1720 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_P55C_RESTORE=0 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh xdc1 1 300 2/net/mesh/direct g2c
+1720 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_P55C_RESTORE=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh xdf1 1 300 2/net/mesh/direct g2c
+1720 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_P55C_RESTORE=0 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh xdc2 1 300 2/net/mesh/direct g2c
+1720 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_P55C_RESTORE=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh xdf2 1 300 2/net/mesh/direct g2c
+1720 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_P55C_RESTORE=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh xdf3 1 300 2/net/mesh/direct g2c
+1720 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_P55C_RESTORE=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh xdf4 1 300 2/net/mesh/direct g2c

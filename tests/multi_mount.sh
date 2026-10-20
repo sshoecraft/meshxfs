@@ -14,10 +14,11 @@
 # What it measures, besides the integrity checks:
 #   - each mount's wall time, against the mount budget below;
 #   - the lock manager's connection setup: every filesystem on a host listens
-#     on the same TCP port, and a connection that reaches the other
-#     filesystem's listener is closed before its reply, which the connecting
-#     side logs as "peer: handshake reply from node N failed".  Any such line
-#     is a FAIL: each connection must reach its own filesystem the first time.
+#     on the same TCP port, which routes each connection to the mount whose
+#     volume its NODE_JOIN names.  A connection for a volume no mount there
+#     listens for (yet) is closed unread and resets at the connector ("reset
+#     the handshake", counted and reported); any other handshake failure
+#     ("peer: handshake reply from node N failed") is a FAIL.
 #   - that every filesystem heard every peer's heartbeat: one lease per peer
 #     per filesystem goes ACTIVE;
 #   - every error, warning or BUG line the module printed during the run.
@@ -38,6 +39,9 @@
 #                    a death in one filesystem must not reach another.  The
 #                    victim then boots, mounts its filesystems again and reads
 #                    the survivors' new files.
+#        MM_SIMUL_B=<cycles>  after the first mounts, unmount B on every member
+#                    and mount it on all of them at the same instant, <cycles>
+#                    times (the simultaneous-start race; see the loop)
 #        MM_OPT_A, MM_OPT_B  more mount options for A or for B, e.g.
 #                    MM_OPT_A=transport=tcp MM_OPT_B=transport=caw: one
 #                    filesystem on each lock transport on the same hosts
@@ -153,12 +157,18 @@ opt_of() {  # <A|B>: the filesystem's mount options
 # copy checked against this host's md5, the rig's module arguments and
 # retirement contract), and mount nothing.
 KO_MD5=$(md5sum mxfs.ko | awk '{print $1}')
+# This checkout as the nodes see it (this host's ~/src is their /src).  The
+# node-side prep, format and check run from it, so a sibling checkout's run
+# loads its own mxfs.ko: without MXFS_REPO prep_node.sh loads /src/mxfs's
+# module, whose md5 is not this checkout's, and every load from a sibling
+# aborted ('mxfs.ko content never matched expected md5').
+NODE_REPO=/src/$(basename "$REPO")
 # /src (the tree, over NFS) is not mounted on a node that just booted
 SRC_UP='mkdir -p /src; mountpoint -q /src || mount -t nfs -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp 192.168.120.1:/src /src'
 load_node() {  # <node>
     local n=$1 r sv d
     d=$DEVA; member "$n" A || d=$DEVB
-    r=$(on "$n" 120 "echo $TAG-load > /dev/kmsg; $SRC_UP; mkdir -p /mnt/mmA /mnt/mmB; MXFS_NO_MOUNT=1 MXFS_DEV='$d' MXFS_KO_MD5='$KO_MD5' bash /src/mxfs/tests/setup/prep_node.sh $TRANSPORT 2>&1 | grep -aE 'NODE_PREP_(OK|FAIL)'")
+    r=$(on "$n" 120 "echo $TAG-load > /dev/kmsg; $SRC_UP; mkdir -p /mnt/mmA /mnt/mmB; MXFS_NO_MOUNT=1 MXFS_REPO='$NODE_REPO' MXFS_DEV='$d' MXFS_KO_MD5='$KO_MD5' bash $NODE_REPO/tests/setup/prep_node.sh $TRANSPORT 2>&1 | grep -aE 'NODE_PREP_(OK|FAIL)'")
     sv=$(sed -n 's/.*srcversion=\([^ ]*\).*/\1/p' <<<"$r" | tr -d '\r ')
     [ "$sv" = "$WANT_SV" ] || { echo "$n prep: $r (want srcversion $WANT_SV)"; return 1; }
 }
@@ -172,7 +182,7 @@ echo "module $WANT_SV transport=$TRANSPORT on ${NODES[*]}"
 # then mkfs_mxfs).
 for w in A B; do
     f=$(members $w); f=${f%% *}
-    r=$(on "$f" 60 "MXFS_DEV='$(dev_of $w)' MXFS_MOUNT=/mnt/mm_none bash /src/mxfs/tests/setup/prep_fs.sh 2>&1 | tail -4; echo MKFS_RC=\${PIPESTATUS[0]}")
+    r=$(on "$f" 60 "MXFS_REPO='$NODE_REPO' MXFS_DEV='$(dev_of $w)' MXFS_MOUNT=/mnt/mm_none bash $NODE_REPO/tests/setup/prep_fs.sh 2>&1 | tail -4; echo MKFS_RC=\${PIPESTATUS[0]}")
     grep -q 'MKFS_RC=0' <<<"$r" || { echo "ABORT: format $w on $f: $r"; exit 2; }
 done
 echo "formatted A $DEVA (lun$IDA) and B $DEVB (lun$IDB)"
@@ -191,6 +201,32 @@ for w in $([ "$ORDER" = ab ] && echo A B || echo B A); do
     for n in $(members $w); do mount_one "$n" $w; done
 done
 [ "$FAILS" = 0 ] || { echo "RESULT: FAIL stage=mount fails=$FAILS evidence=$OUT"; exit 1; }
+
+# MM_SIMUL_B=<cycles> (D-JOIN-OUTBOUND-HANDSHAKE-ECONNRESET-LOGGED-AS-ERROR-ON-A-
+# JOIN-THAT-SUCCEEDS): with A mounted, unmount B on every member, then mount it
+# on all of them at the same instant, <cycles> times.  A host routes each
+# connection on its shared port by the volume its NODE_JOIN names, so a
+# connect for B that beats the peer's own B mount to its listener is closed
+# unread there ('a connection for no filesystem mounted here; closed') and
+# reset at the connector.  The scan below counts both ends of that race.
+SIMUL=${MM_SIMUL_B:-0}
+case "$SIMUL" in *[!0-9]*) echo "MM_SIMUL_B is a cycle count"; exit 2 ;; esac
+for c in $(seq 1 "$SIMUL"); do
+    for n in $(members B); do
+        r=$(on "$n" $((UMOUNT_BOUND_S + 5)) "timeout $UMOUNT_BOUND_S umount $(mnt_of B) 2>&1; echo UMOUNT_RC=\$?")
+        grep -q 'UMOUNT_RC=0' <<<"$r" || { fail "simul cycle $c: unmount B on $n: $r"; break 2; }
+    done
+    sd=$(mktemp -d)
+    spids=()
+    for n in $(members B); do
+        mount_one "$n" B > "$sd/$n" 2>&1 & spids+=($!)
+    done
+    src=0; for p in "${spids[@]}"; do wait "$p" || src=1; done
+    echo "simul cycle $c: $(cat "$sd"/* | grep -o 'mount B on [a-z0-9]*: MOUNT_RC=[0-9]* [0-9?]* ms' | paste -sd' ')"
+    rm -r "$sd"
+    [ "$src" = 0 ] || { fail "simul cycle $c: a simultaneous mount of B failed"; break; }
+done
+[ "$FAILS" = 0 ] || { echo "RESULT: FAIL stage=simul fails=$FAILS evidence=$OUT"; exit 1; }
 
 # Every member writes 2 x 8 MiB, fsynced, on each filesystem it mounts, all at
 # once.  Each line SUM <A|B> <md5> <file>.
@@ -309,7 +345,7 @@ done
 
 for w in A B; do
     f=$(members $w); f=${f%% *}
-    r=$(on "$f" $CHK_BOUND_S "/src/mxfs/tools/chk_mxfs -n $(dev_of $w) 2>&1 | tail -3; echo CHK_RC=\${PIPESTATUS[0]}")
+    r=$(on "$f" $CHK_BOUND_S "$NODE_REPO/tools/chk_mxfs -n $(dev_of $w) 2>&1 | tail -3; echo CHK_RC=\${PIPESTATUS[0]}")
     echo "chk_mxfs $w on $f: $(grep -o 'CHK_RC=[0-9]*' <<<"$r")"
     grep -q 'CHK_RC=0' <<<"$r" || fail "chk_mxfs -n $w: $r"
 done
@@ -318,6 +354,8 @@ done
 for n in "${NODES[@]}"; do
     on "$n" 30 "dmesg | sed -n '/$TAG-load/,\$p'" > "$OUT/dmesg.$n"
     hs=$(grep -ac 'handshake reply from node' "$OUT/dmesg.$n")
+    hsr=$(grep -ac 'reset the handshake' "$OUT/dmesg.$n")
+    rtc=$(grep -ac 'a connection for no filesystem mounted here; closed' "$OUT/dmesg.$n")
     bad=$(grep -aE 'mxfs|MXFS|XFS' "$OUT/dmesg.$n" | grep -aE 'BUG:|Oops|WARNING:|[Cc]orrupt[^=]|[Cc]orruption|EUCLEAN|Busy inodes|Shutting down|shut down|REFUSED' | head -5)
     # Every filesystem on this node must have heard every peer's heartbeat:
     # one lease per peer per filesystem goes ACTIVE.
@@ -326,9 +364,12 @@ for n in "${NODES[@]}"; do
     for w in A B; do
         member "$n" $w && want_act=$((want_act + $(members $w | wc -w) - 1))
     done
-    echo "$n: handshake-reply failures=$hs, leases ACTIVE $act of $want_act"
+    echo "$n: handshake-reply failures=$hs, handshake resets=$hsr, connections closed here unrouted=$rtc, leases ACTIVE $act of $want_act"
     [ "$act" -ge "$want_act" ] || fail "$n: only $act of $want_act peer leases went ACTIVE: a filesystem here never heard a peer's heartbeat"
-    [ "$hs" = 0 ] || fail "$n: $hs connection(s) reached the other filesystem's listener: $(grep -a 'handshake reply from node' "$OUT/dmesg.$n" | head -2)"
+    # A reset is the peer's host refusing a connect that beat its mount's
+    # listener (counted above, reported); any other handshake failure is not
+    # explained by that race and fails the run.
+    [ "$hs" = 0 ] || fail "$n: $hs handshake(s) failed: $(grep -a 'handshake reply from node' "$OUT/dmesg.$n" | head -2)"
     [ -z "$bad" ] || fail "$n kernel: $bad"
 done
 

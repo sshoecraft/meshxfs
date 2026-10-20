@@ -1,0 +1,65 @@
+# D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED: hypotheses H-ES2 and H-ES2b
+# (the record, sessions 121-122).  A cached directory holding no grant, which a
+# peer removed and remade under the same inode number, is returned by
+# xfs_lookup as the dead incarnation; `mkdir -p` chdir's into it and its create
+# fails ESTALE.  H-ES2: xfs_lookup takes such a directory's read grant before
+# returning it and retires a shell the acquire's reload poisoned (knob
+# lookup_dir_incarn_verify).  H-ES2b: the reload's poison branch queues the
+# directory's deferred dcache shrink, so the dead incarnation's cached children
+# stop pinning the old name and the retire can prune it (knob
+# poison_dir_dshrink).
+#
+# Build: ~/src/mxfs-b (tools/sibling_sync.sh from the main tree, marker
+# poison_dir_dshrink), srcversion as the readbacks print it; run from
+# ~/src/mxfs-b.  2/net/mesh/direct g2b, A=test15 removes and remakes,
+# B=test16 caches and runs mkdir -p.  Three arms, each on one fresh prep, the
+# knobs written on both nodes after the prep and read back without writing
+# after the laps; then run.sh chk_clean audits the arm's mount.
+#   C  lookup_dir_incarn_verify=0 poison_dir_dshrink=0   (today)
+#   F1 lookup_dir_incarn_verify=1 poison_dir_dshrink=0   (H-ES2 alone)
+#   F2 lookup_dir_incarn_verify=1 poison_dir_dshrink=1   (H-ES2 + H-ES2b)
+#
+# RULES (written before the first lap).  Per lap, the lap's RESULT line and
+# B's kernel log since the lap's start marker:
+#   VALID ARM: the readbacks show the arm's values on test15 and test16 before
+#     and after, with one srcversion across all three arms; every lap printed
+#     its RESULT line.  A lap with reused=0 is VACUOUS.
+#   CONTROL REACH (per mode): estale >= 1 in arm C's lap.
+#   H-ES2b PREMISE (mkdirp_new): arm F1 shows P34H-POISON-UNRETIRED on B with
+#     P34H-POISON-ALIAS children=1 for the same number, and estale >= 1.
+#   FIX (per mode, arm F2): estale = 0, other_err = 0, lost = 0, and
+#     b_lkup_dead >= 1 wherever arm C's lap reached.
+#   SUPPORTED: H-ES2 + H-ES2b fix mkdirp_new when C REACHES and F2 FIXES; the
+#     premise reading of F1 decides whether H-ES2b is needed or only harmless.
+#   REFUTED: an ESTALE in F2's mkdirp_new lap, or P34H-POISON-UNRETIRED with
+#     children=1 in F2: a new hypothesis before any patch.
+#   mkdirp_same is graded the same way and decides a separate question: whether
+#     the cached-dentry route (mxfs_drevalidate) also serves a dead shell.  If C
+#     REACHES there and F2 still fails, these changes do not cover that route
+#     and the record stays open for it.
+#   HOLDER CHECK (each arm): chk_clean PASS.  An F1 or F2 audit failing where
+#     C's passes means a change broke something.
+#   INTEGRITY (any lap): a shutdown, BUG, Oops, hung-task, P-TAUTH-VERIFY-FAIL
+#     or P-TAUTH-DOUBLE-GRANT line stops the work and is attributed first.
+#
+# Bounds: prep 300 + the config lock wait 150; knobs 60; each reproducer lap
+# 25 cycles x 12 s + 60 s = 360 (tests/dir_reuse_stale_shell.sh header);
+# audit 315 + 150.
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2b prep_cluster
+60 tests/fleet_set_params.sh "lookup_dir_incarn_verify=0 poison_dir_dshrink=0" test15,test16 tests/evidence/dinc_c_before.txt
+360 tests/dir_reuse_stale_shell.sh test15 test16 25 mkdirp_new
+360 tests/dir_reuse_stale_shell.sh test15 test16 25 mkdirp_same
+60 tests/fleet_set_params.sh "lookup_dir_incarn_verify poison_dir_dshrink lookup_dir_incarn_n lookup_dir_incarn_dead_n poison_dir_dshrink_n" test15,test16 tests/evidence/dinc_c_after.txt
+465 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2b chk_clean
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2b prep_cluster
+60 tests/fleet_set_params.sh "lookup_dir_incarn_verify=1 poison_dir_dshrink=0" test15,test16 tests/evidence/dinc_f1_before.txt
+360 tests/dir_reuse_stale_shell.sh test15 test16 25 mkdirp_new
+360 tests/dir_reuse_stale_shell.sh test15 test16 25 mkdirp_same
+60 tests/fleet_set_params.sh "lookup_dir_incarn_verify poison_dir_dshrink lookup_dir_incarn_n lookup_dir_incarn_dead_n poison_dir_dshrink_n" test15,test16 tests/evidence/dinc_f1_after.txt
+465 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2b chk_clean
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2b prep_cluster
+60 tests/fleet_set_params.sh "lookup_dir_incarn_verify=1 poison_dir_dshrink=1" test15,test16 tests/evidence/dinc_f2_before.txt
+360 tests/dir_reuse_stale_shell.sh test15 test16 25 mkdirp_new
+360 tests/dir_reuse_stale_shell.sh test15 test16 25 mkdirp_same
+60 tests/fleet_set_params.sh "lookup_dir_incarn_verify poison_dir_dshrink lookup_dir_incarn_n lookup_dir_incarn_dead_n poison_dir_dshrink_n" test15,test16 tests/evidence/dinc_f2_after.txt
+465 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2b chk_clean

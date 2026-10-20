@@ -1,0 +1,50 @@
+# D-STAT-ABORTED-BY-THE-RECOVERY-BLOCKED-CUTOFF-ENDS-ITS-INODE-DLM-HOLD-UNPAIRED:
+# verification of the fix in the tree since 0.87.22 (the -EHOSTDOWN arm of
+# mxfs_dlm_ilock_begin gives the fallible acquire up with -EIO,
+# xfs/xfs_mxfs_ilock.c mxfs_acqfall_give_up_rc; XFS_ILOCK_MXFS_NOEND,
+# xfs/xfs_inode.h, tells xfs_iunlock that no DLM end is owed when
+# mxfs_ilock_fallible releases its components on the give-up path,
+# xfs/xfs_mxfs_fallible.c).
+#
+# WHAT THE DEFECT LEFT (0.87.14, both laps s53d and s53e of
+# tests/d0356_stranded_prover_return.sh): during the unmount of the node whose
+# fencing attempt the gate-refusal knob keeps unprovable,
+# 'P240-RBLK-EIO-ABORT ino=128 mode=3 comm=umount' followed by
+# 'P71-UNDERFLOW ino=128 mode=PR state=0 dlm_mode=0 comm=umount
+# un=mxfs_getattr_dlm_unlock' and no P958-GETATTR-REFUSED; and every fallible
+# give-up of the blackhole laps (s586d/s586h/s589a/s595a/s606h, md5sum and
+# python3 readers) left 'P71-UNDERFLOW mode=PR state=0 dlm_mode=0
+# un=mxfs_ilock_fallible'.
+#
+# Build: the main tree, srcversion 022F8BF6763B609A9ECC7D1.  Configuration
+# 2/net/mesh/direct (the record's), group g2c (test29 test30), started once
+# the final verification's fw2t queue on g2c has ended.
+#
+# VERDICT RULES (written before the first lap):
+#   VERIFIED    both d0356 laps (sav1, sav2) reach the abort (a
+#               P240-RBLK-EIO-ABORT ... comm=umount line on A) and each such
+#               abort is followed on A by P958-GETATTR-REFUSED rc=-5, with ZERO
+#               'P71-UNDERFLOW.*un=mxfs_getattr_dlm_unlock' and ZERO
+#               'un=mxfs_ilock_fallible' on either node; and both blackhole
+#               laps (sav3 held_fd = the md5sum reader, sav4 held_fd_read = the
+#               python3 reader) show the drop firing and the reader's acquire
+#               given up (or the lap's own evidence of the fallible path), with
+#               ZERO 'un=mxfs_ilock_fallible' on either node, no node shutdown,
+#               and the read recovering on disarm.
+#   NOT FIXED   any 'un=mxfs_getattr_dlm_unlock' or 'un=mxfs_ilock_fallible'
+#               P71-UNDERFLOW line in any lap, or an abort with no
+#               P958-GETATTR-REFUSED after it: attributed from its own lines.
+#   VACUOUS     a d0356 lap with no P240-RBLK-EIO-ABORT comm=umount, or a
+#               blackhole lap whose drop never fired, measured nothing and is
+#               rerun.  A lap ending ABORT/INFRA is read from its own lines.
+#   Each lap's own verdict (its RESULT line) must also be PASS: a FAIL there
+#   is read before anything else.
+#
+# Bounds, each from its harness header: d0356 prep 300 + witnesses 10 + death
+# detection 180 + A's unmount 120 + B's boot 150 + B's lone mount 300 + A's
+# rejoin 300 + captures 60 = 1420 s; blackhole setup 8 x 13 + ARMED_S 180 +
+# recovery 60 + captures 20 = 364 s.
+1420 MXFS_GROUP=g2c MXFS_CONFIG=2/net/mesh/direct MXFS_NODE_LIST=test29,test30 tests/d0356_stranded_prover_return.sh sav1
+1420 MXFS_GROUP=g2c MXFS_CONFIG=2/net/mesh/direct MXFS_NODE_LIST=test29,test30 tests/d0356_stranded_prover_return.sh sav2
+364 ARMED_S=180 WORKLOAD=held_fd tests/tcp_lockreq_blackhole.sh sav3 test30 test29
+364 ARMED_S=180 WORKLOAD=held_fd_read tests/tcp_lockreq_blackhole.sh sav4 test30 test29

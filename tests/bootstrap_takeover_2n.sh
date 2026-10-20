@@ -352,7 +352,7 @@ fi
 
 # ---- 4. the cut, and the record re-read before anything can touch it
 if [ "$CUT" = freeze ]; then
-    $VIRSH suspend "$A" > /dev/null 2>&1
+    tools/lun_pool.sh fault $VIRSH suspend "$A" > /dev/null 2>&1
     echo "STAGE froze $A at +$(el)s (session and key kept; the QNAP purges a frozen key ~40 s later)"
 else
     $VIRSH destroy "$A" > /dev/null 2>&1

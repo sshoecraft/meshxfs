@@ -1,0 +1,65 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F9: a
+# BAST for a number whose in-core inode is a LIVE shell holding a freed image
+# (mode 0: its reload adopted a peer's free, P116-ZOMBIE-ADOPT) is refused by
+# xfs_iget(XFS_IGET_INCORE) (-ENOENT from xfs_iget_check_free_state), is
+# classified LIVE by xfs_icache_ino_lifecycle, and is served by the no-inode
+# release, which unlocks the grant the shell still caches.  A lookup of the
+# number's next life then resurrects the shell with that cached mode, and a
+# change logged under it reaches the platter with no grant behind it.  Traced
+# on the H-F8b A/B (~/src/mxfs-c FAB8FDFC, NG0_SETATTR_DELAY_MS=500), lap smc1,
+# both audited inodes (18874522, 18874524): P116-ZOMBIE-ADOPT, then
+# P-NOINO-UNLOCK-LEFT-GRANT lifecycle=LIVE cached_mode=5, then
+# P-RELOAD-IOPS-REWIRE, then P-LOG-MIRROR-PHANTOM comm=touch and
+# P-LOGWR-DLM-NOGRANT at the audited changecount.
+#
+# Same-build A/B of module knob noino_shell_guard (0 = control: the no-inode
+# release as before; 1 = fix: the BAST is served by the in-core release,
+# xfs/xfs_mxfs_bast.c __mxfs_dlm_bast_notify via xfs_icache_grab_live_shell).
+# Both arms hold the window open with NG0_SETATTR_DELAY_MS=500 (the H-F8b
+# window, in which 5 of 6 laps audited CORRUPT) and run every other guard on:
+# noino_gen0_guard 1, noino_recycle_guard 1 (H-F7), freshsrc_keep_guard 1
+# (H-F8), selfclobber_keep_guard 1 (H-F8b), noino_resv_guard at its default 1
+# (H-F7c), mirror check on, so only the shell rule differs between arms.  Runs
+# from the main tree (srcversion F061F8BD9F7D35E7B143462 at launch; the
+# harness prints each lap's build and refuses a node running anything else).
+# Kept images go to /mxfs/snapshots, off the filesystem that carries the pool,
+# the guest images and the journal.
+#
+# VERDICT RULES (written before the first lap):
+#   REACHED      every control lap counts live_shell > 0 (the harness's
+#                vacuity gate).
+#   PROVEN       a reached control lap audits CORRUPT and an audited inode
+#                has, on one node, a P116-ZOMBIE-ADOPT, a P-NOINO-LIVE-SHELL
+#                and a P-NOINO-UNLOCK-LEFT-GRANT lifecycle=LIVE line (the
+#                harness's attribution line prints zombie_adopt, live_shell
+#                and left_live for each audited inode).
+#   FIX VERIFIED (H-F9)  PROVEN, and every non-vacuous fix lap
+#                (shell_routed > 0) reads hs_ok=1 (live_shell == shell_routed),
+#                audits CLEAN with node_failures=0, and logs no
+#                P-NOINO-UNLOCK-LEFT-GRANT lifecycle=LIVE line for a number
+#                with a P116-ZOMBIE-ADOPT before it on the same node.
+#   REFUTED      a non-vacuous fix lap audits CORRUPT on an inode with the
+#                zombie chain, or logs a LEFT-GRANT lifecycle=LIVE line for a
+#                zombie-adopted number: the guard does not close H-F9; trace
+#                the instance.
+#   OTHER        on a fix lap: a CORRUPT audit whose inodes lack the zombie
+#                chain, a LEFT-GRANT lifecycle=LIVE for a number never
+#                zombie-adopted, a PHANTOM or NOGRANT line, hf7_undrained > 0,
+#                or a P-NOINO-LIVE-SHELL routed=0 line.  Each is its own
+#                finding, traced before the record moves; none judges this
+#                guard.
+# A lap whose audit is STALE/NONE has no verdict and is rerun; a VACUOUS lap
+# has no verdict.
+#
+# Bound per lap, the sum of the harness's own step bounds, every ssh step
+# counted: prep_cluster 300 + srcversion reads 2x20 + knob sets 2x(7x20: gen0
+# guard+delay, recycle, freshsrc, selfclobber, shell, mirror, setattr) +
+# mkdir 30 + workload SECS+60 = 360 + counter reads 2x40 + knob resets
+# 2x(3x20: delay, mirror, setattr) + chk_clean with alloc_witness 150 +
+# stream capture 2x120 + snapshot 60 = 1660 s.
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_SHELL_GUARD=0 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh zdc1 1 300 2/net/mesh/direct g2c
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_SHELL_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh zdf1 1 300 2/net/mesh/direct g2c
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_SHELL_GUARD=0 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh zdc2 1 300 2/net/mesh/direct g2c
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_SHELL_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh zdf2 1 300 2/net/mesh/direct g2c
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_SHELL_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh zdf3 1 300 2/net/mesh/direct g2c
+1660 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_SHELL_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh zdf4 1 300 2/net/mesh/direct g2c

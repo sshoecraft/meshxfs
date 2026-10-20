@@ -115,6 +115,16 @@ struct mxfs_lock {
 	 * delivery it might never receive cannot be relied on to bounce it.
 	 */
 	bool                 cancelled;
+	/*
+	 * A fresh request whose grant the ledger refused for capacity (its home
+	 * page full) stays queued as a WAITING waiter instead of being freed, so
+	 * a later request for the resource queues behind it rather than taking
+	 * the next free entry first (dl_capacity_park).  cap_parked_ms = when it
+	 * was last refused or re-asked; one not re-asked for MXFS_CAP_PARK_TTL_MS
+	 * is dropped by the next request for the resource.
+	 */
+	bool                 cap_parked;
+	uint64_t             cap_parked_ms;
 	struct mxfs_lock     *next;      /* hash chain link */
 	struct mxfs_lock     *work_next; /* deferred BAST/grant work list */
 	void                 *pend_waiter; /* the mxfs_dlm_pending a
@@ -404,6 +414,7 @@ struct mxfs_dlm_ctx {
 	 * transport / pre-attach).  Every member must route identically. */
 	uint32_t                page_count;
 	uint64_t                hash_seed;
+	uint16_t                hash_version;   /* routing version; 0 = version 1 */
 	bool                    ledger_required;
 	volatile bool           ledger_failed;
 	uint64_t                local_inc;
@@ -498,6 +509,11 @@ struct mxfs_dlm_ctx {
 	 * message prints the tally so 'failed after 10 retries' names its
 	 * cause. */
 	uint32_t                retry_why[11];  /* [10] = ledger capacity wait */
+	/* instrumentation: which exit of dlm_ledger_prepare and the page
+	 * functions under it parked a retry_why[4] ('prepare') answer (index =
+	 * DLM_PREP_*, see dlm_prep_site() in dlm.c; [0] = a park that named no
+	 * exit, which should stay 0) */
+	uint32_t                prep_site[12];
 	/* un-ACKed releases (holder side) */
 	struct mxfs_dlm_pending_release *rel_pending;
 	mxfs_mutex_t            *rel_lock;
@@ -595,6 +611,11 @@ struct mxfs_dlm_ctx {
 							 * page; a local release committed against one was
 							 * dropped as "remastered" and stayed on the platter) */
 							ledger_stale_image_retries;
+	/* dl_capacity_reclaim: the full page last asked to make room and when
+	 * (one page asked at most once per MXFS_DL_CAP_RECLAIM_MS; a lost update
+	 * between two refusals only asks again) */
+	uint32_t                cap_reclaim_page;
+	uint64_t                cap_reclaim_ms;
 
 	/*
 	 * (tcp-authority-ledger step 4): ordered page handoff.  A page
@@ -955,6 +976,12 @@ struct mxfs_dlm_ctx {
 	mxfs_node_id_t          relall_unreachable[8];
 	uint64_t                relall_unreachable_skips;
 	uint64_t                relall_send_fail;   /* release sends that failed after retries */
+	/* the volume of the resources this context grants EX on, learned at its
+	 * first dg_grant_ex: the double-grant shadow is one table for every
+	 * mount on the host, and a dead owner's entries are released in it for
+	 * this mount's volume only */
+	mxfs_volume_id_t        dg_volume;
+	bool                    dg_volume_set;
 };
 
 /* page_state */
@@ -1110,6 +1137,12 @@ int mxfs_dlm_open_holders(struct mxfs_dlm_ctx *ctx,
  * (an imported ledger record nobody adopted); -ENOENT if there is none. */
 int mxfs_dlm_unlock_genless(struct mxfs_dlm_ctx *ctx,
 			    const struct mxfs_resource_id *resource);
+/* a release whose caller found no tenure of ours to anchor it to: releases a
+ * generation-less grant or an abandoned request of ours, never a grant that
+ * carries a generation (-ESTALE: a fresh acquire minted it after the caller
+ * looked). */
+int mxfs_dlm_unlock_unanchored(struct mxfs_dlm_ctx *ctx,
+			       const struct mxfs_resource_id *resource);
 
 int mxfs_dlm_lock_convert(struct mxfs_dlm_ctx *ctx,
 			  const struct mxfs_resource_id *resource,
@@ -1183,6 +1216,13 @@ int mxfs_dlm_settled_grant_nb(struct mxfs_dlm_ctx *ctx,
  * lock-changed-hands signal for the dir-EX fast-path staleness check. */
 uint8_t mxfs_dlm_granted_mode(struct mxfs_dlm_ctx *ctx,
 			      const struct mxfs_resource_id *resource);
+/* diagnostic: the state of THIS node's most advanced entry for `resource`
+ * in any state (GRANTED, CONVERTING, PENDING_DURABLE, PENDING_RELEASE,
+ * WAITING, BLOCKED, in that order), with its mode and generation;
+ * MXFS_LSTATE_UNLOCKED when it has none. */
+uint8_t mxfs_dlm_own_entry(struct mxfs_dlm_ctx *ctx,
+			   const struct mxfs_resource_id *resource,
+			   uint8_t *mode_out, uint32_t *gen_out);
 uint32_t mxfs_dlm_grant_gen(struct mxfs_dlm_ctx *ctx,
 			    const struct mxfs_resource_id *resource);
 /* durable grant id + lineage of our held grant (false = none). */
@@ -1251,7 +1291,7 @@ int mxfs_dlm_process_release_ack(struct mxfs_dlm_ctx *ctx,
  * ledger_required set, grants are refused until this runs. */
 /* routing geometry without (or before) an attached ledger. */
 void mxfs_dlm_set_ledger_geometry(struct mxfs_dlm_ctx *ctx, uint32_t npages,
-				  uint64_t hash_seed);
+				  uint64_t hash_seed, uint16_t hash_version);
 void mxfs_dlm_attach_ledger(struct mxfs_dlm_ctx *ctx,
 			    struct mxfs_tauth_ledger *ledger,
 			    uint64_t local_inc, uint16_t local_slot);

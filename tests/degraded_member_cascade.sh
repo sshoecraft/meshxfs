@@ -103,7 +103,7 @@ fi
 # ── degraded ───────────────────────────────────────────────────────────────
 say "=== degraded ($MODE): $VICTIM degraded a few seconds into the run ==="
 if [ "$MODE" = freeze ]; then
-  ( sleep 12; $VIRSH suspend "$VICTIM" >/dev/null 2>&1 && echo "[$(date +%H:%M:%S)] $VICTIM SUSPENDED" ) &
+  ( sleep 12; "$(dirname "$0")/../tools/lun_pool.sh" fault $VIRSH suspend "$VICTIM" >/dev/null 2>&1 && echo "[$(date +%H:%M:%S)] $VICTIM SUSPENDED" ) &
 else
   # Lazy-unmount: the node stays up and keeps answering MQTT barriers, but
   # every subsequent FS operation on the shared mount fails.  run.sh's

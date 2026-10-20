@@ -21,6 +21,8 @@ lands, and only a verdict if what was acknowledged can be checked afterwards
           compares checksums.
   stall   reads an ops log and prints the longest gap between completed
           operations inside a time window, with the operations either side.
+  leftovers  checks the churn names a node's runs should have left in the
+          shared directory against what is there (see leftovers()).
 
 The log and manifest live OUTSIDE the filesystem under test (a local
 directory on the node): a record of what was acknowledged that is stored on
@@ -30,6 +32,8 @@ Usage:
   pathload.py run <node> <mountpoint> <outdir> <stopfile> [<size_bytes>]
   pathload.py verify <manifest>
   pathload.py stall <opslog> <from_ms> <to_ms>
+  pathload.py leftovers <node> <shared_dir> <run_outdir>...
+Env (run): PATHLOAD_VERIFY=1  check each churn file before unlinking it
 """
 import errno
 import hashlib
@@ -66,7 +70,26 @@ def run(node, mnt, outdir, stopfile, size):
     # free on disk) can then be read against what the creator was handed,
     # instead of against kernel logs that a passing row deletes.
     inos = open(os.path.join(outdir, "inos.log"), "a", buffering=1)
-    counts = {"ok": 0, "err": 0, "mutex_held": 0, "mutex_busy": 0, "double_grant": 0}
+    counts = {"ok": 0, "err": 0, "mutex_held": 0, "mutex_busy": 0, "double_grant": 0,
+              "verify_fail": 0}
+
+    # The log and the manifest are read by the harness WHILE this runs, from
+    # the other end of an NFS mount.  A buffered write stays in this node's
+    # page cache until writeback gets to it, tens of seconds: the harness saw
+    # an empty log 20 s into a load that had completed 2000 operations.  So
+    # all three are pushed to the server twice a second, after an operation,
+    # never only between laps: on 8/disk/caw/mpath a first lap took 20 s (a
+    # 6.5 s mutex, then an 11.5 s listing of the shared directory), and its
+    # three completed operations reached the server 4 s after the harness had
+    # read the log empty and failed the row's "load is running" check.
+    last_sync = [now_ms()]
+
+    def push():
+        if now_ms() - last_sync[0] >= 500:
+            for f in (ops, man, inos):
+                f.flush()
+                os.fsync(f.fileno())
+            last_sync[0] = now_ms()
 
     def op(name, fn):
         t0 = now_ms()
@@ -79,6 +102,8 @@ def run(node, mnt, outdir, stopfile, size):
             ops.write(f"{t0} {now_ms()} {name} ERR {errno.errorcode.get(e.errno, e.errno)}\n")
             counts["err"] += 1
             return None
+        finally:
+            push()
 
     def write_private(lap):
         p = os.path.join(priv, f"f{lap:07d}")
@@ -92,15 +117,51 @@ def run(node, mnt, outdir, stopfile, size):
             os.close(fd)
         return p, hashlib.sha256(data).hexdigest()
 
+    # PATHLOAD_VERIFY=1: before the churn unlinks the previous lap's file, it
+    # checks that the name still resolves to the inode that lap's create was
+    # handed, with one link.  Without it, an unlink whose lookup finds the name
+    # already dead (its inode freed under it) is swallowed as FileNotFoundError
+    # and the dead name stays in the directory unseen: the one case of a name
+    # naming a free inode was found only because a row's LAST churn file is
+    # never unlinked.  A failed check is logged (ops.log 'verify ERR', and
+    # verify.log) and the name is left in place for the cold audit.
+    check_prev = os.environ.get("PATHLOAD_VERIFY") == "1"
+    churn_ino = {}
+    verify_log = open(os.path.join(outdir, "verify.log"), "a", buffering=1) if check_prev else None
+
+    def verify_prev(lap):
+        p = os.path.join(shared, f"{node}.{lap - 1}.r")
+        want = churn_ino.pop(lap - 1, None)
+        if want is None:
+            return True
+        try:
+            st = os.lstat(p)
+        except OSError as e:
+            why = f"err={errno.errorcode.get(e.errno, e.errno)}"
+        else:
+            if st.st_ino == want and st.st_nlink == 1:
+                return True
+            why = f"ino={st.st_ino} nlink={st.st_nlink}"
+        t = now_ms()
+        verify_log.write(f"{t} VERIFY_FAIL {p} want_ino={want} {why}\n")
+        ops.write(f"{t} {t} verify ERR {p} want_ino={want} {why}\n")
+        counts["verify_fail"] += 1
+        return False
+
     def churn(lap):
         a = os.path.join(shared, f"{node}.{lap}")
         fd = os.open(a, os.O_CREAT | os.O_WRONLY, 0o644)
         try:
-            inos.write(f"{now_ms()} {a} {os.fstat(fd).st_ino}\n")
+            ino = os.fstat(fd).st_ino
+            inos.write(f"{now_ms()} {a} {ino}\n")
         finally:
             os.close(fd)
         os.rename(a, a + ".r")
+        if check_prev:
+            churn_ino[lap] = ino
         if lap > 0:
+            if check_prev and not verify_prev(lap):
+                return
             try:
                 os.unlink(os.path.join(shared, f"{node}.{lap - 1}.r"))
             except FileNotFoundError:
@@ -128,19 +189,8 @@ def run(node, mnt, outdir, stopfile, size):
                 pass
             os.rmdir(lockdir)
 
-    # The log and the manifest are read by the harness WHILE this runs, from
-    # the other end of an NFS mount.  A buffered write stays in this node's
-    # page cache until writeback gets to it, tens of seconds: the harness saw
-    # an empty log 20 s into a load that had completed 2000 operations.  So
-    # both are pushed to the server twice a second.
     lap = 0
-    last_sync = now_ms()
     while not os.path.exists(stopfile):
-        if now_ms() - last_sync >= 500:
-            for f in (ops, man, inos):
-                f.flush()
-                os.fsync(f.fileno())
-            last_sync = now_ms()
         r = op("write", lambda: write_private(lap))
         if r:
             man.write(f"{r[1]} {r[0]}\n")
@@ -152,9 +202,12 @@ def run(node, mnt, outdir, stopfile, size):
     ops.close()
     man.close()
     inos.close()
+    if verify_log:
+        verify_log.close()
     print(f"PATHLOAD node={node} laps={lap} ok={counts['ok']} err={counts['err']} "
           f"mutex_held={counts['mutex_held']} mutex_busy={counts['mutex_busy']} "
-          f"double_grant={counts['double_grant']}")
+          f"double_grant={counts['double_grant']}"
+          + (f" verify_fail={counts['verify_fail']}" if check_prev else ""))
 
 
 def verify(manifest, workers=16):
@@ -238,6 +291,67 @@ def stall(opslog, lo, hi):
           f"completed_in_window={inwin} errors_in_window={errs}")
 
 
+def leftovers(node, shared, outdirs):
+    """The churn names a node's runs should have left in the shared directory,
+    checked against what is there.  outdirs are that node's run directories in
+    the order the runs ran on ONE mount; each run's laps restart at 0, so a
+    later run replaces and then unlinks an earlier run's leftover of the same
+    lap number, as the churn does.  Lap k created <node>.<k>, renamed it to
+    <node>.<k>.r and unlinked <node>.<k-1>.r unless its check of that name
+    failed (verify.log), so replaying inos.log gives every name that should
+    remain and the inode its create was handed.  Run it on a node that did
+    not create them, after dropping its caches, and the lookups go to disk
+    through the lock manager."""
+    expect = {}
+    for d in outdirs:
+        failed = set()
+        try:
+            with open(os.path.join(d, "verify.log")) as f:
+                for line in f:
+                    p = line.split()
+                    if len(p) >= 3 and p[1] == "VERIFY_FAIL":
+                        failed.add(os.path.basename(p[2]))
+        except FileNotFoundError:
+            pass
+        with open(os.path.join(d, "inos.log")) as f:
+            for line in f:
+                p = line.replace("\x00", "").split()
+                if len(p) != 3 or os.path.dirname(p[1]) != shared:
+                    continue
+                base = os.path.basename(p[1])
+                head, _, k = base.rpartition(".")
+                if head != node or not k.isdigit():
+                    continue
+                k = int(k)
+                expect[f"{node}.{k}.r"] = int(p[2])
+                prev = f"{node}.{k - 1}.r"
+                if k > 0 and prev not in failed:
+                    expect.pop(prev, None)
+    have = sorted(n for n in os.listdir(shared) if n.startswith(node + "."))
+    ok = bad = 0
+    for name, want in sorted(expect.items()):
+        try:
+            st = os.lstat(os.path.join(shared, name))
+        except OSError as e:
+            print(f"LEFTOVER BAD {name} want_ino={want} err={errno.errorcode.get(e.errno, e.errno)}")
+            bad += 1
+            continue
+        if st.st_ino == want and st.st_nlink == 1:
+            ok += 1
+        else:
+            print(f"LEFTOVER BAD {name} want_ino={want} ino={st.st_ino} nlink={st.st_nlink}")
+            bad += 1
+    unexpected = [n for n in have if n not in expect]
+    for name in unexpected:
+        try:
+            st = os.lstat(os.path.join(shared, name))
+            what = f"ino={st.st_ino} nlink={st.st_nlink}"
+        except OSError as e:
+            what = f"err={errno.errorcode.get(e.errno, e.errno)}"
+        print(f"LEFTOVER UNEXPECTED {name} {what}")
+    print(f"LEFTOVERS node={node} expected={len(expect)} ok={ok} bad={bad} unexpected={len(unexpected)}")
+
+
 def main():
     a = sys.argv[1:]
     if len(a) >= 5 and a[0] == "run":
@@ -246,6 +360,8 @@ def main():
         verify(a[1])
     elif len(a) == 4 and a[0] == "stall":
         stall(a[1], int(a[2]), int(a[3]))
+    elif len(a) >= 4 and a[0] == "leftovers":
+        leftovers(a[1], a[2], a[3:])
     else:
         sys.stderr.write(__doc__)
         sys.exit(2)

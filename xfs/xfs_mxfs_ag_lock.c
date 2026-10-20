@@ -1566,6 +1566,73 @@ mxfs_alloclist_retry_kick(
 }
 
 /*
+ * A mount that fails inside xfs_mountfs after inode inactivation has run
+ * (log recovery's unlinked-inode processing, the unwind's own inodegc flush)
+ * can leave this retry and the destage kick queued on system_unbound_wq, and
+ * only put_super cancels them, which a failed fill_super never reaches: the
+ * log, the AIL and the AG groups are freed by the unwind and the mount itself
+ * by xfs_mount_free while a queued run still dereferences them
+ * (D-FAILED-MOUNT-LEAVES-DESTAGE-AND-ALLOCLIST-RETRY-WORK-QUEUED-PAST-FREE).
+ * xfs_mountfs's unwind calls this after its last inactivation
+ * (xfs_unmount_flush_inodes) and before the log and the AG groups go: new
+ * retry arms are closed as put_super closes them, and both works are
+ * cancelled synchronously.  mountfs_unwind_quiesce=0 leaves them queued (the
+ * same-build control).
+ */
+static int mxfs_mountfs_unwind_quiesce_on = 1;
+module_param_named(mountfs_unwind_quiesce, mxfs_mountfs_unwind_quiesce_on, int, 0644);
+MODULE_PARM_DESC(mountfs_unwind_quiesce,
+	"a failed mount's unwind cancels the destage kick and the alloc-list retry before the log and the AG groups are freed (1, default); 0 = leaves them queued (test control)");
+
+void
+mxfs_mountfs_unwind_quiesce(
+	struct xfs_mount	*mp)
+{
+	unsigned int		destage, alloclist;
+
+	if (!READ_ONCE(mxfs_mountfs_unwind_quiesce_on))
+		return;
+	WRITE_ONCE(mp->m_mxfs_arms_off, true);
+	destage = work_busy(&mp->m_mxfs_destage_kick.work);
+	alloclist = work_busy(&mp->m_mxfs_alloclist_retry.work);
+	cancel_delayed_work_sync(&mp->m_mxfs_destage_kick);
+	cancel_delayed_work_sync(&mp->m_mxfs_alloclist_retry);
+	xfs_warn(mp,
+	"MXFS P-MOUNTFS-UNWIND-QUIESCE destage=0x%x alloclist=0x%x -- the failed mount's destage kick and alloc-list retry are cancelled before the log and the AG groups are freed",
+		 destage, alloclist);
+}
+
+/*
+ * TEST ONLY, one-shot, self-clears: at the end of xfs_mountfs, arm the
+ * destage kick and the alloc-list retry with this delay, as inactivation
+ * during the mount would, and fail the mount (-EIO) down its ordinary unwind
+ * (tests/reap_inactive_mount_ab.sh MODE=failkick).  0 = off.
+ */
+static int mxfs_dbg_mountfs_fail_kick_ms;
+module_param_named(dbg_mountfs_fail_kick_ms, mxfs_dbg_mountfs_fail_kick_ms, int, 0644);
+MODULE_PARM_DESC(dbg_mountfs_fail_kick_ms,
+	"TEST: one-shot: at the end of xfs_mountfs, arm the destage kick and the alloc-list retry with this delay (ms) and fail the mount; self-clears");
+
+int
+mxfs_dbg_mountfs_fail_kick(
+	struct xfs_mount	*mp)
+{
+	int			delay = READ_ONCE(mxfs_dbg_mountfs_fail_kick_ms);
+
+	if (likely(delay <= 0))
+		return 0;
+	mxfs_dbg_mountfs_fail_kick_ms = 0;
+	queue_delayed_work(system_unbound_wq, &mp->m_mxfs_destage_kick,
+			   msecs_to_jiffies(delay));
+	queue_delayed_work(system_unbound_wq, &mp->m_mxfs_alloclist_retry,
+			   msecs_to_jiffies(delay));
+	xfs_alert(mp,
+	"MXFS: P-DBG-MOUNTFS-FAIL-KICK delay_ms=%d -- TEST: the destage kick and the alloc-list retry are armed and the mount fails at the end of xfs_mountfs",
+		  delay);
+	return -EIO;
+}
+
+/*
  * Drain every AG's alloc buflist, synchronously.  Returns how many AGs had
  * one to drain.
  *
@@ -2491,7 +2558,7 @@ obligations:
 				 * alloc gen + free ++ : a never-written short-lived
 				 * incarnation leaves the OLDER free image at home) */
 				if (omode == 0) {
-					mxfs_pubob_drop_ino(mp, oino[k]);
+					mxfs_pubob_drop_ino(mp, oino[k], "audit-home-free");
 					if (oip) {
 						WRITE_ONCE(oip->i_mxfs_freeob, 0);
 						xfs_iflags_clear(oip, MXFS_IF_PUBOB |
@@ -2514,7 +2581,7 @@ obligations:
 						ogenv[k], ogen, omode, ochain[k],
 						(unsigned long long)oepochv[k],
 						(unsigned long long)rel_ep, live ? 1 : 0);
-					mxfs_pubob_drop_ino(mp, oino[k]);
+					mxfs_pubob_drop_ino(mp, oino[k], "audit-foreign");
 					if (oip) {
 						/* never write-poison a LIVE inode
 						 * (s433: one P32D-DEADINCARN-SKIP on
@@ -2543,7 +2610,7 @@ obligations:
 							      &ogen, &omode) == 0 &&
 				    omode == 0 && ogen == ogenv[k]) {
 					repaired++;
-					mxfs_pubob_drop_ino(mp, oino[k]);
+					mxfs_pubob_drop_ino(mp, oino[k], "audit-published");
 					WRITE_ONCE(oip->i_mxfs_freeob, 0);
 					xfs_iflags_clear(oip, MXFS_IF_PUBOB |
 							 MXFS_IF_PUBOB_FLUSHED);
@@ -2564,7 +2631,7 @@ obligations:
 				continue;
 			if (onl == 0) {
 				/* Conversion is home: discharge lazily. */
-				mxfs_pubob_drop_ino(mp, oino[k]);
+				mxfs_pubob_drop_ino(mp, oino[k], "audit-unlink-home");
 				rcu_read_lock();
 				oip = radix_tree_lookup(&pag->pag_ici_root,
 							oag[k]);
@@ -2592,7 +2659,7 @@ obligations:
 						      &omode) == 0 &&
 			    onl == 0) {
 				repaired++;
-				mxfs_pubob_drop_ino(mp, oino[k]);
+				mxfs_pubob_drop_ino(mp, oino[k], "audit-unlink-repaired");
 				mxfs_probe_ratelimited("mxfs: P88-PUBOB-REPAIRED ag=%u agino=0x%x ino=%llu -- mid-chain conversion written before unlock\n",
 					pag_agno(pag), oag[k],
 					(unsigned long long)oino[k]);

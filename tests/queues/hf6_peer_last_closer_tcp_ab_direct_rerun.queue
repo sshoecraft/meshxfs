@@ -1,0 +1,8 @@
+# Rerun of lap 1 of tests/queues/hf6_peer_last_closer_tcp_ab_direct.queue (q6dc1),
+# whose cold audit was NONE (test30 could not unmount: its toucher polled a
+# corrupt done with -e until its bound; that corruption is
+# D-CREATE-ON-ZOMBIE-SHELL-INHERITS-DEAD-LIFE-NBLOCKS).  Same build as the
+# queue (main tree 3AEA31FDF4AD31EFBBA6A90) and the same rules; the harness
+# now ends the toucher on the name read from the directory, which changes
+# nothing it measures.  Bound as in the queue.
+1090 tests/peer_last_closer_ab.sh q6dc1r 0 40 2/net/mesh/direct g2c

@@ -1,0 +1,65 @@
+# D-MASTER-OWN-EX-RELEASE-GOES-STALE-RECORD-OUTLIVES-IT-PEER-GRANTS-REFUSED:
+# does the current build still strand a master's own exclusive record after a
+# release the ledger applied as stale, and which identity field differs?
+# Found in lap ebn5 of tests/queues/ebusy_default_control.queue (~/src/mxfs-g
+# 65863B92, dl_import_retire_first=0): test17, the survivor and master, took EX
+# on an inode while test18 was fenced or before, test18 rejoined, and test17's
+# own BAST release of that inode logged the first of 1537 P-TAUTH-DOUBLE-GRANT
+# refusals of test18's PR against a record naming test17 itself; test18's reads
+# failed rc=-11 and its unmount stuck.  1 of 8 laps.
+#
+# Build: ~/src/mxfs-c synced from the main tree (tools/sibling_sync.sh, marker
+# P-TAUTH-OWN-REL-STALE): the main tree's sources, routing version 2 the mkfs
+# default, every knob at its default (no --knobs), plus two capped log lines on
+# the path the record names, no behaviour change:
+#   P-TAUTH-OWN-REL-STALE (dlm/dlm.c dlm_txn_finalize): a master-local release
+#     of its own grant whose ledger op came back -ESTALE; the entry's identity
+#     (inc, rel_auth, rel_seq, gen), imported=, held_ms=.
+#   P-TAUTH-REL-EX-STALE-HOLDER (dlm/tauth_ledger.c apply_op): an exclusive
+#     release naming the record's holder whose inc/auth/seq differ from the
+#     record's; both identities.
+# Both print at WARN with no dynamic-debug switch, 64 per boot each, every line
+# numbered n=.  Run from ~/src/mxfs-c.  2/net/mesh/mpath g2e (test17 test18);
+# path_fenced_return fences test18, which unmounts, mounts again and runs its
+# load and the read-back of test17's files; then chk_clean.
+#
+# READING RULES (written before the first lap), per lap, lines attributed by
+# the row window (the row's own kmsg captures; when the row ABORTs before its
+# capture, the chk_clean run's kernlog_<node>.gz for the same window):
+#   P-TAUTH-DOUBLE-GRANT per node, each classified by its record's ex= against
+#     the logging node's own id (OWN), the fenced test18 incarnation (FENCED),
+#     or another (OTHER), with the ino and count per class.
+#   P-TAUTH-OWN-REL-STALE and P-TAUTH-REL-EX-STALE-HOLDER lines verbatim; for
+#     each REL-EX-STALE-HOLDER, which of inc / auth / seq differ.
+#   test18: 'lock request failed after', 'DLM inode lock failed'; the row's
+#     RESULT and its read-back line; chk_clean's verdict and umount line.
+#   REPRODUCED: a lap with an OWN P-TAUTH-DOUBLE-GRANT, or a P-TAUTH-OWN-REL-
+#     STALE whose resource the peer is then refused on (ledger-busy or a
+#     DOUBLE-GRANT for that ino).
+#   NAMED: a REPRODUCED lap whose REL-EX-STALE-HOLDER for that resource says
+#     which field differs: that field's writers are the next hypothesis, before
+#     any patch.
+#   UNNAMED: REPRODUCED with no REL-EX-STALE-HOLDER for that resource (the
+#     record was not the holder's, or the release never reached the ledger):
+#     a new hypothesis about the path, not about the identity.
+#   NOT REPRODUCED in all 8: no disposition (a clean run is not one); the next
+#     queue repeats the ebn knobs (dl_import_retire_first=0) on this build and
+#     raises the lap count.
+#   Recorded, not graded: P-TAUTH-OWN-REL-STALE lines whose resource is never
+#     refused afterwards (the record had already been retired); FENCED double
+#     grants belong to D-SOLE-SURVIVOR-CREATES-FAIL-EBUSY-FROM-DIALLOC-AFTER-
+#     PEER-FENCE; the typeflip ESTALE shape to D-CAW-MKDIR-LOOKUP-ESTALE-
+#     TYPEFLIP-UNRESOLVED.  Any shutdown, BUG, Oops, hung task or chk_clean not
+#     CLEAN is attributed from its own lines first.
+#
+# Bounds: as tests/queues/ebusy_default_control.queue (same rows, same group):
+# path_fenced_return 400 s + chk_clean 180 s + the chain's measured overhead
+# outside the rows (130-160 s) = 730 s; the first lap adds prep_cluster 300 s.
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ors1 1 --prep --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ors2 1 --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ors3 1 --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ors4 1 --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ors5 1 --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ors6 1 --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ors7 1 --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ors8 1 --rows path_fenced_return,chk_clean

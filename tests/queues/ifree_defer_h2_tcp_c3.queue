@@ -1,0 +1,11 @@
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY, H-2 A/B on
+# 2/net/mesh/mpath g2, one more control lap.  tests/queues/ifree_defer_h2_tcp.queue
+# (label idrm, ~/src/mxfs-c/tests/evidence/lapq_idrm.log) ran its four laps:
+# idrmf1 and idrmf2 (reap=1) reached 16 and 25 deferrals and left no zombie;
+# idrmc2 (reap=0) reached 1 and left it on its bucket; idrmc1 (reap=0) made no
+# deferral, VACUOUS, and judges nothing.  That file's rules (those of
+# tests/queues/ifree_defer_h2_caw.queue) need both control laps reached, so
+# this lap stands in for idrmc1, unchanged, from ~/src/mxfs-c on the same build
+# 311877C431E1BB444562804.  A lap with no deferral is again VACUOUS.
+# Bound: that file's 1680 s.
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=0 tests/noino_gen0_ab.sh idrmc3 1 300 2/net/mesh/mpath g2

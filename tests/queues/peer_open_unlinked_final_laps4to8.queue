@@ -1,0 +1,18 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, the final
+# verification, laps 4-8.  tests/queues/peer_open_unlinked_final.queue (label
+# pof, tests/evidence/lapq_pof.log) ran laps 1-3 (pfd1, pfw1, pfd2: all PASS)
+# and was stopped by hand during lap 4 (pfc1) before its audit, because its
+# 2/net/mesh/direct laps shared run.sh's configuration lock with other groups
+# and refused them.  Lap 4 has no verdict and is rerun here with laps 5-8,
+# each line unchanged, on the same main-tree build 311877C431E1BB444562804.
+# The verdict rules are that file's and are applied over all eight laps.
+# Started only after the CAW final queue (fwc) is done.  The three CAW laps
+# run first and the two 2/net/mesh/direct laps last, so those start after the
+# H-U6 control lap (tests/queues/peer_open_unlinked_hu6_c6.queue, chained
+# behind fwd on that configuration) has released its lock even at its full
+# bound.  Order carries no weight in the rules.  Bounds: that file's.
+2157 MXFS_SNAPSHOT_DIR=/mxfs/snapshots tests/peer_open_unlinked_chain.sh pfc1 30 2/disk/caw/direct g2d
+2257 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600" tests/peer_open_unlinked_chain.sh pfcw1 30 2/disk/caw/direct g2d
+2157 MXFS_SNAPSHOT_DIR=/mxfs/snapshots tests/peer_open_unlinked_chain.sh pfc2 30 2/disk/caw/direct g2d
+2257 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600" tests/peer_open_unlinked_chain.sh pfw2 30 2/net/mesh/direct g2d
+2157 MXFS_SNAPSHOT_DIR=/mxfs/snapshots tests/peer_open_unlinked_chain.sh pfd3 30 2/net/mesh/direct g2d

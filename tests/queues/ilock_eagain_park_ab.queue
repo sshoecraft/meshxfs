@@ -1,0 +1,39 @@
+# D-FORMATION-RAMP-LOCK-REQUEST-EXHAUSTS-RETRIES-EAGAIN, H-F2: the inode
+# lock's timeout classifier parks an acquire whose retry budget ran out on RETRY
+# answers (-EAGAIN) instead of reaching the "lock unrecoverable" shutdown.
+#
+# HYPOTHESIS H-F2 (written before the change, recorded on the defect, session
+# 69): an -EAGAIN at the end of the engine's budget is the cluster
+# reorganising its lock authority, not a coordination failure; parking with
+# backoff and asking again (arm (2c), P-LKRETRY-PARK) completes the operation
+# with nothing shut down.  PREDICTION: the control (ilock_retry_exhaust_park=0)
+# logs "DLM inode lock unrecoverable" for the injected number and shuts the
+# node down; the fix (1) logs one P-LKRETRY-PARK per injection, the read
+# returns its payload, nothing shuts down, the cold audit is CLEAN.  REFUTED by
+# a reached fix lap that shuts down or fails a read, or a reached control
+# that does not shut down (another arm already takes -EAGAIN: no harm to fix).
+#
+# Same-build A/B, one knob between the arms: ilock_retry_exhaust_park, set and
+# read back on both nodes by tests/ilock_eagain_park_ab.sh, which injects the
+# engine's spent-budget answer with dbg_ilock_force_eagain_ino.  Build: the main
+# tree, srcversion 90C41489237AC8D0BA136E8 (the harness refuses a node running
+# anything else).  2/net/mesh/direct g2c (test29 reads, test30 creates), three
+# rounds per lap; control and fix alternate, control first, one more fix lap
+# at the end.
+#
+# VERDICT RULES (written before the first lap):
+#   VACUOUS, ABORT judge nothing; such a lap is rerun.
+#   CONTROL: CONTROL-SHOWS-HARM confirms the harm; CONTROL-NO-HARM refutes the
+#     premise and ends the judgement.
+#   FIX: PASS as graded (every injection fired, parked once, its read returned
+#     its payload, no unrecoverable line, no node failure, audit CLEAN).
+#   SUPPORTED AND FIXED (kernel half): at least one CONTROL-SHOWS-HARM and at
+#     least two PASS, with no fix lap FAIL.  The user-mode half (what spends the
+#     engine's budget, H-F1 and its successor) is judged by its own A/B.
+#
+# Bound: the harness's caller bound at its defaults, 878 s (header).
+880 tests/ilock_eagain_park_ab.sh iepc1 0 3 2/net/mesh/direct g2c
+880 tests/ilock_eagain_park_ab.sh iepf1 1 3 2/net/mesh/direct g2c
+880 tests/ilock_eagain_park_ab.sh iepc2 0 3 2/net/mesh/direct g2c
+880 tests/ilock_eagain_park_ab.sh iepf2 1 3 2/net/mesh/direct g2c
+880 tests/ilock_eagain_park_ab.sh iepf3 1 3 2/net/mesh/direct g2c

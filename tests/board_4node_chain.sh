@@ -100,13 +100,19 @@ yardstick() {
     return 1
 }
 
+# board_log <cfg> <rows> <group>: the log board() writes
+board_log() {
+    local cfg=$1 row=$2 group=$3
+    echo "$EV/board_${cfg//\//-}${row:+_${row//,/_}}${group:+_$group}_$LABEL.log"
+}
+
 # board <cfg> <rows> <group>: one board (or the rows named), its log, its
 # read-back.  0 iff the read-back says the bar is met.
 board() {
     local cfg=$1 row=$2 group=$3 rows L g rrc
     rows="${row//,/ }"
     g=${group:+--group $group}
-    L="$EV/board_${cfg//\//-}${row:+_${row//,/_}}${group:+_$group}_$LABEL.log"
+    L=$(board_log "$cfg" "$row" "$group")
     echo "$(date -u +%FT%TZ) $cfg: ./run.sh $cfg $g $rows (log $L)"
     {
         if [ -n "$row" ]; then
@@ -163,9 +169,28 @@ for dlm in $(for c in "${CFGS[@]}"; do python3 tools/configuration.py get "$c" s
 done
 # one lane per group: the groups run side by side, and the boards that name
 # the same group (a matrix with more configurations at a node count than the
-# rig has groups) run in that lane one after another, in argument order
+# rig has groups) run in that lane one after another, in argument order.
+#
+# A lane starts only once the lane before it has finished its prep row.  Each
+# run.sh checks the host before it starts (scripts/clyde_preflight.sh), and a
+# prep logs every node of its group in to a pool LUN, which puts ~90 kernel
+# lines/s on clyde for a few seconds (SCST session threads), over the
+# preflight's 40/s gate.  Started together, the lanes measured each other's
+# logins: 0.90.131's 8/disk/caw/mpath board was refused at its preflight 16 s
+# after four other boards of its wave started, and never ran.  The prep row's
+# own budget (tests/suite/manifest, 300 s) bounds the wait; a prep that ends
+# any other way (run.sh refused, rc line) ends it too.  '--- prep ' is the
+# prep's own verdict line (prep OK / its failure), '=== run @' the board's start
+# after it.
+PREP_SETTLE_S=360
 pids=()
 for g in $(printf '%s\n' "${BGROUPS[@]}" | awk '!seen[$0]++'); do
+    first=""
+    for i in "${!CFGS[@]}"; do
+        [ "${BGROUPS[$i]}" = "$g" ] && { first=$i; break; }
+    done
+    FL=$(board_log "${CFGS[$first]}" "${ROWS[$first]}" "$g")
+    : > "$FL"    # a log from an earlier run under this label must not read as this prep
     (
         rc=0
         for i in "${!CFGS[@]}"; do
@@ -175,6 +200,10 @@ for g in $(printf '%s\n' "${BGROUPS[@]}" | awk '!seen[$0]++'); do
         exit $rc
     ) &
     pids+=($!)
+    for ((t = 0; t < PREP_SETTLE_S; t += 5)); do
+        grep -aqE '^=== run @ |^--- prep |^=== run\.sh ABORTED|^=== rc=' "$FL" 2>/dev/null && break
+        sleep 5
+    done
 done
 for p in "${pids[@]}"; do wait "$p" || rc_all=1; done
 exit $rc_all

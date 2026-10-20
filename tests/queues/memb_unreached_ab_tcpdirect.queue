@@ -1,0 +1,69 @@
+# D-A-MOUNT-THAT-CANNOT-DISCOVER-ITS-LIVE-PEER-FAILS-AS-CANT-READ-SUPERBLOCK:
+# the same-build A/B of memb_unreached_refuse (dlm/v5_mount.c: the TCP
+# membership-settle gate refuses a mount whose live peer slot the lease never
+# reached, naming multicast and peer=, with errno EHOSTUNREACH; 0 = the
+# control, which proceeds).  Run from the sibling checkout carrying the change
+# (~/src/mxfs-f, built by tools/sibling_sync.sh with the marker
+# P-MEMB-UNREACHED-REFUSE), on 2/net/mesh/direct g2d (A=test31 stays mounted
+# and writes, B=test32 drops multicast and mounts with no peer=).
+# tests/memb_unreached_ab.sh grades nothing; these rules do.
+#
+# VALID ARM: the knob read back on B; B's multicast drop answered 'blocked';
+# B's kernel-log capture holds the mount marker; A's loop wrote (a_writes > 0).
+# An arm that is not VALID judges nothing and is rerun.
+# FIXED, every VALID fix arm (knob 1): mount_rc != 0, refuse_line = 1,
+# err_errno = 1 (mount(8)'s stderr names the cause by its errno), err_msg_fc = 1
+# (the mount context carries the reason naming multicast and peer=), withdraw
+# = 0, shutdown = 0, lockfail = 0, mount_ms <= 25000 (the 15 s gate, a liveness
+# pass of at most 5 s, the teardown), remount_rc = 0 once multicast is
+# restored, a_errors = 0; and the cold audit after the fix arms CLEAN errors=0.
+# NOT FIXED: a VALID fix arm with withdraw, shutdown or lockfail > 0, err_errno
+# = 0, err_msg_fc = 0, remount_rc != 0 or a_errors > 0, attributed from its own
+# lines.
+# REACH (the control, knob 0): mount_rc != 0 with settle_timeout >= 1 and
+# lockfail >= 1 at mount_ms >= 30000 — the mount went past the settle gate into
+# the root inode's lock retries — ended by withdraw >= 1, shutdown >= 1 or
+# superblock_msg = 1 (the 0.89.84 shape) or still retrying at the 70 s
+# observation limit with park >= 1 (P-LKRETRY-PARK: this build parks and asks
+# again instead of shutting down).  A control that mounts, or fails another way,
+# is read from its own lines and the series judges nothing until the shape is
+# reached.
+#
+# RULE CHANGES, made before any lap of the build they judge (A219BC41 was
+# superseded by the errno change; its arms judge nothing): (1) err_msg (mount
+# (8)'s stderr carrying the reason) is recorded but judges nothing, because
+# this rig's mount(8) is util-linux 2.39.3, which mounts through
+# fsopen/fsconfig and never reads the mount context, so no kernel text can
+# reach it (measured: arms muf1/muf2 printed 'permission denied.'); its two
+# replacements err_errno and err_msg_fc are stricter.  (2) REACH also admits the
+# control's measured shape on 0.90.131 (lap muc1: settle timeout, 3 exhausted
+# rounds of 60 root-inode retries, P-LKRETRY-PARK, still retrying when
+# timeout 70 killed the mount), since the record's 0.89.84 shape ended in a
+# shutdown this build no longer takes.  (3) lockfail = 0 joins FIXED.
+#
+# CONTROL RERUN (run mua4, 8EEED26B): its control muc2 ABORTed, 'B's mount
+# produced no result line': the mount ignored timeout's TERM, outlived the 75 s
+# ssh bound and completed once the harness's exit trap restored multicast (test32
+# found mounted, no mount process).  Not VALID, so it judges nothing and is
+# rerun: the harness now sends KILL 30 s after the TERM, bounds the ssh at
+# 110 s, records a mount that answers neither as mount_rc=hung, and after the
+# restore waits up to 60 s for it and records late_mount.  REACH also admits
+# mount_rc=hung with settle_timeout >= 1 and lockfail >= 1 (still retrying at
+# the observation limit).  Control rerun muc3 from ~/src/mxfs-f by hand, bound
+# 430 s (the harness's control bound 415 s).
+#
+# ORDER: the fix arms first (each should leave B remounted), then the cold audit
+# of the volume they ran on (run.sh chk_clean audits it unmounted and remounts
+# both nodes), then the control on that same mount, last because it may leave B
+# in retries.  Only two run.sh calls, because g2c runs the same configuration
+# from the main tree and run.sh's configuration lock does not wait: a run.sh lap
+# that meets the other group's ABORTs at once and is rerun.
+#
+# Bounds: prep 300 (run.sh prep_cluster, measured 37-52 s); an arm 300
+# (tests/memb_unreached_ab.sh's header); the audit 315 (run.sh's alloc_witness
+# 120 + chk_clean 180 + the preflight and marker check).
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2d prep_cluster
+300 tests/memb_unreached_ab.sh muf3 1 test31 test32
+300 tests/memb_unreached_ab.sh muf4 1 test31 test32
+315 ./run.sh 2/net/mesh/direct --group g2d chk_clean
+300 tests/memb_unreached_ab.sh muc2 0 test31 test32

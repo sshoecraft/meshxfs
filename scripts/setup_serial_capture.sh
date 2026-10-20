@@ -35,7 +35,8 @@ fix_guest() {  # <node> — returns 0 if grub was already right (no reboot neede
 }
 
 fix_host_xml() {  # <node> — returns HOST_OK / HOST_PATCHED / HOST_FAIL
-    local n="$1" x="$TMP/$n.xml"
+    local n="$1"
+    local x="$TMP/$n.xml"
     virsh -c qemu:///system dumpxml "$n" > "$x" 2>/dev/null || { echo HOST_FAIL; return; }
     python3 - "$x" "$n" <<'PY'
 import re, sys

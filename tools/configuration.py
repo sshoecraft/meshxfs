@@ -401,7 +401,7 @@ def selftest() -> int:
     expect("shape xfs", parse("1/xfs").shape, "xfs")
     expect("release matrix", len(release_matrix()), 10)
     expect("release at 2", [c.key for c in release_matrix(2)],
-           ["2/net/mesh/direct", "2/disk/caw/direct", "2/disk/caw/mpath"])
+           ["2/disk/caw/direct", "2/disk/caw/mpath", "2/net/mesh/direct", "2/net/mesh/mpath"])
     expect("release at 16", [c.key for c in release_matrix(16)],
            ["16/disk/caw/direct", "16/disk/caw/mpath"])
     expect("released earlier, not in the matrix",

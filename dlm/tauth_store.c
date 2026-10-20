@@ -80,6 +80,13 @@ int mxfs_tauth_store_open(struct mxfs_tauth_store *s, mxfs_bdev_t *dev,
 			}
 			s->npages = rh->npages;
 			s->hash_seed = rh->hash_seed;
+			s->hash_version = rh->hash_version;
+			/* which routing every grant of this mount follows; an
+			 * A/B of the two versions reads its arm from here */
+			mxfs_pal_log(MXFS_LOG_INFO,
+				     "tauth: P-TAUTH-OPEN npages=%u hash_version=%u -- "
+				     "ledger region opened",
+				     rh->npages, (unsigned)rh->hash_version);
 			rc = 0;
 			break;
 		}
@@ -468,22 +475,33 @@ int mxfs_tauth_page_write(struct mxfs_tauth_store *s, struct mxfs_tauth_page *pg
 	rc = tauth_write_prepare(s, pg, ca, cb, ws);
 	if (rc)
 		goto out;
-	/* 3-5 as one swap where one swap can write the page (span_commit); a
-	 * torn-write test commit keeps the ticket protocol it models */
-	if (s->span_commit && !torn_after_bytes) {
+	/* 3-5 as one swap where one swap can write the page (span_commit, and the
+	 * device answers that it can now); a torn-write test commit keeps the
+	 * ticket protocol it models */
+	if (s->span_commit && !torn_after_bytes &&
+	    mxfs_pal_bdev_span_swap_ok(s->dev, MXFS_TAUTH_PAGE_BYTES)) {
 		s->writes++;
 		tauth_write_stamp(s, pg, ws->next, authority_epoch, config_epoch);
 		t0 = mxfs_pal_time_ms();
-		rc = mxfs_pal_bdev_compare_and_write_span(s->dev, ws->off, ws->spare0, pg,
+		/* the spare copy exactly as step 1 read it: a SCSI swap compares
+		 * all of it, an emulated one its sector 0 (ws->spare0) */
+		rc = mxfs_pal_bdev_compare_and_write_span(s->dev, ws->off,
+							   ws->target ? cb : ca, pg,
 							   MXFS_TAUTH_PAGE_BYTES);
 		ph_add(&s->ph_publish_ms, &s->ph_publish_max, t0);
 		if (rc == -EOPNOTSUPP) {
-			/* nothing issued: this device's swaps cover one sector */
-			s->span_commit = false;
-			mxfs_pal_log(MXFS_LOG_WARN,
-				     "tauth: P-TAUTH-SPAN-UNSUPPORTED page=%u -- the device "
-				     "cannot write a page in one swap; ticket commits from here",
-				     page_id);
+			/* nothing issued.  A device that still answers that it can
+			 * (an emulator that is not attached) never will: ticket
+			 * commits from here.  One that no longer can (the caw_span
+			 * knob, a target that refused the length) is asked again at
+			 * the next commit. */
+			if (mxfs_pal_bdev_span_swap_ok(s->dev, MXFS_TAUTH_PAGE_BYTES)) {
+				s->span_commit = false;
+				mxfs_pal_log(MXFS_LOG_WARN,
+					     "tauth: P-TAUTH-SPAN-UNSUPPORTED page=%u -- the device "
+					     "cannot write a page in one swap; ticket commits from here",
+					     page_id);
+			}
 		} else {
 			if (rc == -EAGAIN) {
 				/* nothing written: another writer changed the spare first */

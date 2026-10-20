@@ -276,6 +276,17 @@ NODE_DRBD_UP='modprobe drbd || echo "DRBD_UP_FAIL modprobe drbd"
     done
     [ -b "$ll" ] || echo "DRBD_UP_FAIL backing disk ${ll:-unnamed} absent after '"$LOGIN_BUDGET"' login attempts"
     drbdadm up '"$RES"' 2>&1 | tail -1'
+# The promotion both nodes of a pair run at once after a pair outage.  Each one
+# waits for the resync to finish, so both ask in the same few milliseconds, and
+# DRBD 8.4 aborts one of two concurrent state changes ("Concurrent state changes
+# detected and aborted (-19)", drbdsetup exit 11; outage test 2026-10-20 01:44Z,
+# 2 ms apart).  The node it refused asks again once the other's change has
+# landed, as the packages' boot program does after a refused promotion.
+NODE_PROMOTE='for t in 1 2 3 4 5; do
+        drbdadm primary '"$RES"' 2>&1 | tail -1
+        case "$(drbdadm role '"$RES"' 2>/dev/null)" in Primary/*) break ;; esac
+        sleep 1
+    done'
 
 stop_nodes() {
     both stop "$NODE_STOP" 120
@@ -2678,8 +2689,8 @@ step_outage_test() {
     done
     both drbdup "$NODE_DRBD_UP
         for i in \$(seq 1 $REJOIN_BUDGET); do [ \"\$(drbdadm cstate $RES) \$(drbdadm dstate $RES)\" = 'Connected UpToDate/UpToDate' ] && break; sleep 1; done
-        drbdadm primary $RES 2>&1 | tail -1
-        mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }" $((REJOIN_BUDGET + 40))
+        $NODE_PROMOTE
+        mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }" $((REJOIN_BUDGET + 45))
     # roles read only after both promotions: each node's view of its peer lags its own
     need_dual_primary
     say "  both booted; DRBD Primary/Primary UpToDate/UpToDate Connected"
@@ -2804,8 +2815,8 @@ step_takeover_test() {
     done
     both drbdup "$NODE_DRBD_UP
         for i in \$(seq 1 $REJOIN_BUDGET); do [ \"\$(drbdadm cstate $RES) \$(drbdadm dstate $RES)\" = 'Connected UpToDate/UpToDate' ] && break; sleep 1; done
-        drbdadm primary $RES 2>&1 | tail -1
-        mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }" $((REJOIN_BUDGET + 40))
+        $NODE_PROMOTE
+        mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }" $((REJOIN_BUDGET + 45))
     need_dual_primary
     local KO_MD5; KO_MD5=$(md5sum "$REPO/mxfs.ko" | awk '{print $1}')
     local PREP="MXFS_KEEP_LOADED=1 MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp"

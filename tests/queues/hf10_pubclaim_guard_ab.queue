@@ -1,0 +1,72 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F10: a
+# publish that takes an inode off the unpublished list before claiming it
+# leaves the inode neither unpublished nor granted until the claim returns.  A
+# file whose parent is not yet recorded is in every drain's scope, so the BAST
+# drain of an unrelated directory can take it, and its real parent's release
+# (or its AG's) then finds nothing listed and goes to the peer with the file's
+# name in it while the file holds no grant.  Seen on the H-F9 fix laps: zmf1
+# (test2, ino 10485895, four P-LOG-MIRROR-PHANTOM lines between dir 8388736's
+# P146 and P147, unpub_clr=22:583) and zmf4 (test1, ino 154, two lines between
+# dir 132's P146 and P147, P4L-ALLOC state=5 of the claim just before them).
+#
+# Same-build A/B of module knob pub_claim_release_guard (0 = control: a
+# directory or AG release goes whatever claims are in flight in its scope; 1 =
+# fix: it waits for them within the drain's 5 s bound,
+# xfs/xfs_mxfs_publish.c mxfs_pubclaim_release_check).  Both arms hold the
+# claim window open with NG0_PUBCLAIM_DELAY_MS=20 (dbg_pub_claim_delay_ms: the
+# drain sleeps between the take and the claim; a claim measured 2.3 ms in
+# zmf4) and run on the H-F9 fix arm's settings, where both sightings were
+# made: NG0_SETATTR_DELAY_MS=500, noino_shell_guard 1, noino_gen0_guard 1,
+# noino_recycle_guard 1, freshsrc_keep_guard 1, selfclobber_keep_guard 1,
+# noino_resv_guard at its default 1, mirror check on, so only the release
+# guard differs between arms.  Runs from the main tree (srcversion
+# 3AEA31FDF4AD31EFBBA6A90 at launch; the harness prints each lap's build and
+# refuses a node running anything else).  Kept images go to /mxfs/snapshots.
+#
+# VERDICT RULES (written before the first lap):
+#   REACHED      every control lap counts pc_inflight_rel > 0 (the harness's
+#                vacuity gate: a release went with a claim in flight in its
+#                scope).
+#   PROVEN       a reached control lap audits CORRUPT and an audited inode
+#                has, on one node, claim_at_release > 0 (it was the child of a
+#                P-PUB-CLAIM-INFLIGHT-AT-RELEASE outcome=proceeded line), or
+#                a phantom or no-grant line with pub_inflight=1 (the
+#                harness's attribution line prints claim_at_release,
+#                phantom_inflight and nogrant_inflight for each audited
+#                inode).
+#   HAZARD ONLY  REACHED, and no control lap audits CORRUPT with that
+#                attribution: the release going with the child neither
+#                unpublished nor granted is measured (the invariant the
+#                drain's own comment states, broken by direct observation),
+#                but no corruption is attributed to it on these laps.
+#   FIX VERIFIED (H-F10)  REACHED, and every non-vacuous fix lap
+#                (pc_rel_waited > 0) reads pc_ok=1 (pc_inflight_rel == 0: no
+#                release went with a claim in flight, including one that
+#                waited out the 5 s bound), audits CLEAN with node_failures=0,
+#                and logs no P-LOGWR-DLM-NOGRANT line with pub_inflight=1.
+#   REFUTED      a non-vacuous fix lap reads pc_inflight_rel > 0 or audits
+#                CORRUPT with H-F10 attribution: the guard does not hold H-F10;
+#                trace the instance.
+#   OTHER        on a fix lap: a CORRUPT audit without H-F10 attribution, a
+#                PHANTOM or NOGRANT line with pub_inflight=0, hf7_undrained >
+#                0, a left_live line, or a P-NOINO-LIVE-SHELL routed=0 line.
+#                Each is its own finding, traced before the record moves; none
+#                judges this guard.  PHANTOM lines with pub_inflight=1 on a fix
+#                lap are the creator logging on its own local tenure while no
+#                release can expose the file, and judge nothing.
+# A lap whose audit is STALE/NONE has no verdict and is rerun; a VACUOUS lap
+# has no verdict.
+#
+# Bound per lap, the sum of the harness's own step bounds, every ssh step
+# counted: prep_cluster 300 + srcversion reads 2x20 + knob sets 2x(9x20: gen0
+# guard+delay, recycle, freshsrc, selfclobber, shell, pubclaim guard, pubclaim
+# delay, mirror, setattr) + mkdir 30 + workload SECS+60 = 360 + counter reads
+# 2x40 + knob resets 2x(4x20: delay, mirror, setattr, pubclaim delay) +
+# chk_clean with alloc_witness 150 + stream capture 2x120 + snapshot 60 =
+# 1780 s.
+1780 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=0 NG0_PUBCLAIM_DELAY_MS=20 NG0_SHELL_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh wmc1 1 300 2/net/mesh/mpath g2
+1780 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_SHELL_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh wmf1 1 300 2/net/mesh/mpath g2
+1780 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=0 NG0_PUBCLAIM_DELAY_MS=20 NG0_SHELL_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh wmc2 1 300 2/net/mesh/mpath g2
+1780 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_SHELL_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh wmf2 1 300 2/net/mesh/mpath g2
+1780 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_SHELL_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh wmf3 1 300 2/net/mesh/mpath g2
+1780 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_SHELL_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh wmf4 1 300 2/net/mesh/mpath g2

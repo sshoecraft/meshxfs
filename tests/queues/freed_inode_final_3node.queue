@@ -1,0 +1,89 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT: the
+# three-node part of the final verification, 3/net/mesh/direct g3b (test15
+# test16 test17), on the build of the final source: srcversion
+# 311877C431E1BB444562804 (main tree ~/src/mxfs, 0.90.131: the H-F11 fix, both
+# halves of the fix for
+# D-RECYCLE-RESET-UNDER-NOINO-STRANDS-COMMITTED-DIR-CHANGE-WEDGE-SHUTDOWN, the
+# unlinked-list fixes of
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES
+# (freshsrc_iunl_overlay, unlprev_tenure, b6_release_drain, unlprev_pin,
+# unlprev_rele_defer) and the deferred-free fixes of
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY
+# (ifree_defer_drain, ifree_defer_reap), all at their defaults; run from
+# ~/src/mxfs).  g3b shares test15 and test16 with g2b,
+# so this queue runs after the CAW half.  H-F10's release side needs a third
+# node to reach (a release whose scope holds a publish claim in flight,
+# hf10_reach_ab.queue); these laps run its reach knobs
+# (NG0_PUBCLAIM_DELAY_MS=20, NG0_CREATE_PARENT_DELAY_MS=5) with every guard at
+# its module default 1, pub_claim_release_guard, pub_claim_write_guard,
+# p55c_home_restore, noino_recycle_dirty_wait and noino_recycle_takeover
+# included (NG0_PUBCLAIM_GUARD=1 writes the default and reads its counters;
+# NG0_P55C_RESTORE and NG0_DIRTY_WAIT are not set, as in the two-node halves).
+# Node failures are counted from each node's whole kernel log after the lap's
+# mark.
+#
+# The previous run of this part (build 737E182A809291DAA0B4785, labels
+# fx3f1..fx3f4) ran before the recycle fix, so it does not speak for this
+# build.  The run on build C06A6D4A9AB7A357503DF51 (labels fy3f1..fy3f4) was 4
+# of 4 PASS; it ran before the unlinked-list fixes, which change the
+# inactivation and unlinked-list paths every lap here exercises, so it does not
+# speak for this build either.  The run on build 41D2F9237EBB21CF21E9D57
+# (labels fz3f1..fz3f4) aborted at prep in every lap: its chain started it
+# while the next queue held test15 (run.sh's node lock refused each lap).
+#
+# THE DEFERRED-FREE GRADING (added for build 311877C4, before its first lap).
+# tools/chk_mxfs grades a bucket member as legal crash residue, not an error, so
+# a CLEAN audit alone cannot show that frees deferred at the unlinked-list
+# preflight were finished.  Laps 2 and 4 also set NG0_IFREE_DRAIN=1
+# NG0_IFREE_REAP=1 (the module defaults, written and read back): the harness
+# attributes every bucket member and fork-ownership error to the deferrals that
+# name it and passes the lap only with no fork-ownership error, no unlanded
+# drain and no bucket member left (if_ok=1).  For those two laps the deferrals'
+# reach is the vacuity gate in place of H-F10's; laps 1 and 3 keep H-F10's.
+#
+# The run on build 311877C431E1BB444562804 (labels fw3f1..fw3f4, log
+# tests/evidence/lapq_fw3.log) was 3 of 4 PASS: fw3f2 FAILED on pc_ok=0, an AG
+# release's publish drain running out its window with a claim in flight, the
+# chase H-F12 and H-F13 of this record address (the instrument run fds on
+# F09C3FED2DB371E0D9A8BC5 caught it again in fds3).  This run (labels fv3f*,
+# written before its first lap) is on build 37897D38118AD5E2FAAC4FC (main tree
+# ~/src/mxfs, 0.90.131): that source plus every change made since, each at its
+# module default.  Behaviour: H-3 of
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY
+# (reap_transient_keep), H-U7 of
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES
+# (reload_next_refresh), H-F13's inode-allocation fence with its revision
+# H-F13b (ag_ialloc_fence 1, ag_fence_hint_exempt 1), H-F12's bounded drain
+# built but off (pub_drain_bound 0, the open scan every earlier run had), and
+# the fixes of D-CREATE-REUSE-OVER-PEER-FREED-LINKED-CORPSE-SHUTS-NODE-DOWN
+# (cr63_linked_defer), D-UMOUNT-ROOT-DENTRY-STILL-IN-USE-DEFERRED-DIR-DCACHE-SHRINK-RACE
+# (dshrink_umount_gate), D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-NUMBER-REUSE
+# (sf_kept_ahead_base) and D-FORMATION-RAMP-LOCK-REQUEST-EXHAUSTS-RETRIES-EAGAIN
+# (ilock_retry_exhaust_park, dl_retry_view_unspent).  Instruments only: the
+# handoff exposure census (P-PUB-UNPUB-AT-UNLOCK), the phantom detector's
+# in-flight sample and the next-write detector's own-free exception.  It runs
+# on g3 (test1 test2 test3), which shares no node with the two-node halves
+# running beside it.  The rules below are unchanged.
+#
+# VERDICT RULES (written before the first lap):
+#   CLEAN     every lap's cold audit CLEAN errors=0 with node_failures=0 and
+#             hf11_chain=0, laps 2 and 4 if_ok=1 with if_zombies=0 and
+#             if_fork_errors=0, and every non-vacuous lap passes the harness
+#             (pc_ok=1, pw_ok=1, p55_ok=1 and the other ok flags); a lap
+#             VACUOUS by a gate keeps its audit and hf11_chain as its verdict
+#             and is reported as unreached.
+#   REACH     pc_rel_waited (H-F10 release side), pw_masked (write side),
+#             p55_restored_lof (H-F11) per lap, and the dirty-corpse lines.
+#   CORRUPT   any CORRUPT audit, hf11_chain > 0, P-RECYCLE-RESET-UNDER-NOINO
+#             with owes=1, or P-LOGWR-DLM-NOGRANT with pub_inflight=1: blocks
+#             the record; attribute each audited inode or line.
+#   UNSTABLE  any node failure line in a lap's whole kernel log: blocks both
+#             records until attributed.
+# A lap whose audit is STALE/NONE has no verdict and is rerun.
+#
+# Bound: the H-F10 reach queue's 1660 s per lap plus the harness's P55C stream
+# pass (2x10) = 1680 s.
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh fv3f1 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fv3f2 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh fv3f3 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fv3f4 1 300 3/net/mesh/direct g3

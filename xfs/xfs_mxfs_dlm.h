@@ -45,6 +45,20 @@ extern int mxfs_dirwr_enabled;
 /*  eager per-ifree durability chain (default 0). */
 extern int mxfs_ifree_eager_durable;
 extern int mxfs_inact_defer_unlock;
+/* xfs_inactive's local-unlink fast path requires an unbroken grant since the
+ * unlink (i_mxfs_unlink_epoch); 0 is the same-build control.  The counters
+ * are reset by a write. */
+extern int mxfs_inact_local_epoch_guard;
+extern atomic_t mxfs_inact_local_epoch_moved;
+extern atomic_t mxfs_inact_local_peerfreed;
+/* the same arm, judged on the platter: a same-incarnation platter image with a
+ * higher changecount than the in-core one defers the free; 0 is the same-build
+ * control.  The counters are reset by a write. */
+extern int mxfs_inact_local_cc_guard;
+extern atomic_t mxfs_inact_local_peerchanged;
+extern atomic_t mxfs_inact_local_cc_deferred;
+extern int mxfs_dbg_unlink_live_delay_ms;
+extern int mxfs_dbg_setattr_time_delay_ms;
 /*  coalesced background destage kick. */
 void mxfs_destage_kick(struct xfs_mount *mp);
 /* max -EAGAIN requeue cycles for a deferred extent-free
@@ -119,13 +133,33 @@ void mxfs_dlm_ilock_begin(struct xfs_inode *ip, uint8_t mode);
 
 /* D-0532 item (c): measurement at xfs_iget_recycle of a corpse's cached
  * grant against the DLM's own held record (P-RECYCLE-PHANTOM). */
-void mxfs_dlm_recycle_grant_check(struct xfs_inode *ip);
+void mxfs_dlm_recycle_grant_check(struct xfs_inode *ip, bool noino_at_start);
+/* xfs_iget_cache_hit, under i_flags_lock: true when the reclaimable corpse
+ * must not be recycled yet (xfs/xfs_mxfs_noino.c) */
+bool mxfs_noino_recycle_must_wait(struct xfs_inode *ip, struct xfs_trans *tp,
+				  int flags, bool *registered);
+bool mxfs_noino_corpse_owes_platter(struct xfs_inode *ip);
+extern int mxfs_noino_recycle_dirty_wait;
 /* D-0532 item (c), in-core half: the recycle found a delivered BAST on the
  * corpse (pending flag or state BAST).  outcome 2 = kept (grant live,
  * P-RECYCLE-BAST-KEEP), 1 = dropped (grant live, recycle_bast_keep=0,
  * P-RECYCLE-BAST-DROP), 0 = stale (grant NL, P-RECYCLE-BAST-STALE). */
 extern int mxfs_recycle_bast_keep;
 extern int mxfs_recycle_adopt_fail_refuse;
+/* xfs_iget_recycle: a stale recycle of a P91-protected cluster buffer judges
+ * the platter's dinode, not the kept buffer's (P-RECYCLE-SIDEREAD) */
+extern int mxfs_recycle_stale_sideread;
+extern atomic_t mxfs_recycle_sideread_disagree;
+/* xfs_iget_cache_hit: a create's linked reclaimable copy of a number the
+ * allocator holds free (D-CREATE-REUSE-OVER-PEER-FREED-LINKED-CORPSE) */
+extern int mxfs_cr63_linked_defer;
+extern atomic_t mxfs_cr63_linked_deferred;
+extern atomic_t mxfs_cr63_linked_refused;
+extern int mxfs_cr63_igrab_retry;
+extern atomic_t mxfs_cr63_igrab_fail;
+extern atomic_t mxfs_cr63_igrab_retried;
+extern int mxfs_dbg_evict_stale_delay_ms;
+void mxfs_dbg_evict_stale_delay(struct xfs_inode *ip);
 void mxfs_dlm_recycle_bast_note(struct xfs_inode *ip, uint8_t prev_state,
 				uint8_t prev_mode, int outcome);
 
@@ -243,6 +277,10 @@ void mxfs_dlm_publish_unpublished(struct xfs_mount *mp, xfs_ino_t parent_ino,
 				  xfs_agnumber_t agno);
 void mxfs_dlm_publish_dirs_work(struct work_struct *work);
 bool mxfs_dlm_unpublish_drop(struct xfs_inode *ip);
+/* H-F10: publish claims in flight (xfs/xfs_mxfs_publish.c) */
+bool mxfs_dlm_unpublish_take(struct xfs_inode *ip);
+void mxfs_pubclaim_end(struct xfs_mount *mp, u64 seq);
+void mxfs_pubclaim_drop(struct xfs_inode *ip);
 /*  THE dir-epoch staleness predicate.  Both consumers
  * (the P32E flush fence in xfs_inode.c and the P194/P195 operation gate in
  * libxfs/xfs_dir2.c) must go through this — a raw `cur_ep > i_dlm_dir_valid_epoch`
@@ -446,6 +484,9 @@ unsigned int mxfs_dlm_ag_drain_all_alloc_buflists(struct xfs_mount *mp);
 /* the alloc buflist leftover retry (xfs_ag.h pag_mxfs_alloc_retry) */
 void mxfs_alloclist_retry_fn(struct work_struct *work);
 void mxfs_alloclist_retry_kick(struct xfs_mount *mp);
+/* a failed mount's unwind cancels the retry and the destage kick */
+void mxfs_mountfs_unwind_quiesce(struct xfs_mount *mp);
+int mxfs_dbg_mountfs_fail_kick(struct xfs_mount *mp);
 /* the freeze's superblock reference is dropped from a work item on a queue of
  * its own: made at module init, destroyed (drops flushed) at module exit */
 int mxfs_join_sbref_init(void);
@@ -490,6 +531,14 @@ void mxfs_dlm_inode_final_release(struct xfs_inode *ip);
  * deferred revocation worker (PTE zap + page-cache discard + DONTCACHE).
  * Callable from any process context, including with ip's own locks held. */
 void mxfs_incarn_poison(struct xfs_inode *ip);
+/* xfs_lookup's verification of a cached grant-less directory before it is
+ * returned (knob lookup_dir_incarn_verify, xfs/xfs_mxfs_ag_unlock.c). */
+extern int mxfs_lookup_dir_incarn_verify;
+extern atomic_t mxfs_lookup_dir_incarn_n;
+extern atomic_t mxfs_lookup_dir_incarn_dead_n;
+/* ... including a directory this node never held a grant on (knob
+ * lookup_dir_incarn_ungranted, xfs/xfs_mxfs_ag_unlock.c). */
+extern int mxfs_lookup_dir_incarn_ungranted;
 /* Work function of a directory's deferred dcache shrink (i_mxfs_dshrink_work):
  * drops cached children with no lock held, so their synchronous inactivation
  * never runs inside the directory's own acquire.  See mxfs_dlm_reload_inode. */
@@ -502,6 +551,9 @@ extern int mxfs_dbg_poison_nth;
  * 0 = pre-fix no-wait behaviour, kept so the control is a measurement on this
  * same build rather than an argument about a build that no longer exists. */
 extern int mxfs_poison_retire_wait;
+/* a lookup whose poisoned shell could not be retired reads the parent again
+ * (knob poison_unretired_relookup, xfs/xfs_mxfs_ag_unlock.c) */
+extern int mxfs_poison_unretired_relookup;
 /* D-512 race-injection window (defined in pal/linux/xfs_file.c with its
  * dbg_incarn_race_ino/dbg_incarn_racewin_ms knobs; no-op when unarmed). */
 void mxfs_dbg_incarn_racewin(struct xfs_inode *ip, const char *site);
@@ -844,6 +896,16 @@ void mxfs_pubob_flush_owed(struct xfs_mount *mp);
 int mxfs_dbg_disk_di_read_coherent(struct xfs_mount *mp, uint64_t ino,
 				   uint16_t *modep, uint32_t *genp,
 				   bool *magicp);
+/* H-F11: the same read, also copying the home's whole dinode (sb_inodesize
+ * bytes) into *dinode_out when the home holds one. */
+int mxfs_disk_dinode_read_coherent(struct xfs_mount *mp, uint64_t ino,
+				   uint16_t *modep, uint32_t *genp,
+				   bool *magicp, void *dinode_out);
+/* H-F11: P55C puts a cluster slot that is this node's unlanded staged image
+ * back to the platter's bytes before classifying on them (1=default; 0=leaves
+ * the staged bytes in the slot, the same-build control). */
+extern int mxfs_p55c_home_restore;
+extern atomic_t mxfs_p55c_home_restored;
 /* D-0946, test only: read the platter dinode at EVERY create-path recycle
  * (xfs_iget_recycle) and fail a LIVE one; the counters say the check ran. */
 extern int mxfs_dbg_recycle_platter_assert;
@@ -913,6 +975,9 @@ int  mxfs_ag_dlm_trylock_alloc(struct xfs_mount *mp, struct xfs_perag *pag,
 			       uint32_t *mute_master);
 int  mxfs_ag_dlm_lock_bounded(struct xfs_mount *mp, struct xfs_perag *pag);
 void mxfs_ag_dlm_unlock(struct xfs_mount *mp, struct xfs_perag *pag);
+/* H-F13: a peer's BAST is pending on a tenure of this AG held here, so no
+ * inode is allocated in it */
+bool mxfs_ag_ialloc_fenced_now(struct xfs_mount *mp, struct xfs_perag *pag);
 
 /*
  * Private in-kernel restart code for the clean-txn AG allocation restart
@@ -1460,6 +1525,20 @@ void mxfs_ag_meta_reclaim(struct xfs_buf *bp, const char *why);
 extern int mxfs_dbg_dialloc_shutdown;	/* DEBUG one-shot AGI umount-wedge test */
 extern int mxfs_reload_oblig_keep;	/* never adopt over an unlanded committed change */
 extern int mxfs_reload_oblig_merge;	/* obligation-aware reload merge */
+extern int mxfs_sf_kept_ahead_base;	/* a kept-ahead reload leaves the shortform merge base alone */
+extern atomic_t mxfs_sf_kept_ahead_reloads;	/* kept-ahead reloads of a shortform dir */
+extern atomic_t mxfs_sf_kept_ahead_replaced;	/* ... whose differing kept fork replaced the base */
+extern atomic_t mxfs_sf_kept_ahead_kept;	/* ... whose differing kept fork left the base */
+extern int mxfs_dshrink_umount_gate;	/* unmount waits out the deferred dir dcache shrinks */
+extern atomic_t mxfs_dshrink_at_umount;	/* shrinks queued or running at xfs_kill_sb */
+extern atomic_t mxfs_dshrink_gate_refused;	/* shrinks the closed unmount gate refused */
+extern int mxfs_dbg_dshrink_hold_ms;	/* TEST ONLY: a shrink holds its dentry this long */
+extern atomic_t mxfs_iwr_whole_early;	/* cluster writes sent whole: buffer not split */
+extern atomic_t mxfs_iwr_whole_noskip;	/* ... no slot skipped */
+extern atomic_t mxfs_iwr_whole_empty;	/* ... every sector skipped, no passenger skip */
+extern atomic_t mxfs_iwr_whole_declined;	/* ... every sector skipped, refusal declined */
+extern int mxfs_iwr_refuse_empty;	/* refuse an all-skipped cluster write (H-WW1) */
+extern atomic_t mxfs_iwr_empty_refused;	/* ... the refusals */
 extern int mxfs_nlink_ledger;		/* directory link-count ledger (P180-NLB/NLR/NLW) */
 void mxfs_note_fork_tear(struct xfs_inode *ip, const char *site);	/* torn-LOCAL-fork tripwire (P181) */
 void mxfs_sfconv_disk_check(struct xfs_inode *ip);	/* sf->block conversion audit (P185) */
@@ -1765,12 +1844,49 @@ bool mxfs_iunl_store_fossil_match(struct xfs_mount *mp, uint64_t ino,
 				  uint16_t boffset, uint32_t expect);
 int mxfs_iunl_store_overlay(struct xfs_mount *mp, xfs_daddr_t daddr,
 			    int bblen, void *base, unsigned int len);
+int mxfs_iunl_store_stale(struct xfs_mount *mp, uint64_t ino,
+			  xfs_daddr_t daddr, int bblen, const void *base,
+			  unsigned int len, uint32_t *imgp, uint32_t *committedp);
 void mxfs_iunl_store_query_print(struct xfs_mount *mp, uint64_t ino);
 void mxfs_iunl_store_record(struct xfs_mount *mp, uint64_t ino, uint32_t gen,
 			    uint32_t next_agino, xfs_daddr_t daddr,
 			    uint16_t boffset);
 void mxfs_iunl_store_retire_range(struct xfs_mount *mp, xfs_daddr_t daddr,
 				  int bblen, void *base, unsigned int len);
+bool mxfs_iunl_store_live(struct xfs_mount *mp, uint64_t ino, uint32_t gen);
+int mxfs_iunl_store_land(struct xfs_mount *mp, struct xfs_inode *ip,
+			 bool land, const char *site);
+extern int mxfs_unlprev_tenure;
+extern int mxfs_unlprev_pin;
+extern atomic_t mxfs_unlprev_absent;
+extern atomic_t mxfs_unlprev_pinned;
+extern int mxfs_unlprev_held_verify;
+extern atomic_t mxfs_unlprev_held_moved;
+extern atomic_t mxfs_unlprev_rebuilds;
+extern int mxfs_dbg_unlprev_wait_delay_ms;
+extern int mxfs_dbg_ifree_midlist_delay_ms;
+extern int mxfs_dbg_inact_relflush_hold_ms;
+extern atomic_t mxfs_inact_relflush_holds;
+extern int mxfs_ifree_defer_drain;
+extern atomic_t mxfs_ifree_defer_dirty;
+extern atomic_t mxfs_ifree_defer_drained;
+extern atomic_t mxfs_ifree_defer_unlanded;
+extern int mxfs_ifree_defer_extend;
+extern atomic_t mxfs_ifree_defer_extended;
+extern int mxfs_dbg_ifree_defer_bound_ms;
+extern int mxfs_ifree_defer_reap;
+extern atomic_t mxfs_ifree_defer_reaps;
+extern int mxfs_reap_transient_keep;
+extern atomic_t mxfs_reap_iget_transient;
+extern atomic_t mxfs_reap_iget_retired;
+extern int mxfs_ilock_retry_exhaust_park;
+extern atomic_t mxfs_ilock_retry_exhaust_parks;
+extern unsigned long long mxfs_dbg_ilock_force_eagain_ino;
+extern int mxfs_unlprev_rele_defer;
+extern atomic_t mxfs_unlprev_rele_deferred;
+extern int mxfs_dbg_unlprev_rele_hold_ms;
+extern atomic_t mxfs_unlprev_rele_inline_last;
+extern atomic_t mxfs_unlprev_rele_deferred_last;
 void
 mxfs_p98_getattr_check(struct xfs_inode *ip);
 void mxfs_pubob_arm(struct xfs_mount *mp, struct xfs_inode *ip);

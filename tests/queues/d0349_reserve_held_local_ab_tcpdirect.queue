@@ -1,0 +1,68 @@
+# D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349, ruling step 1
+# (docs/rulings/d0349-pregrant-pool-and-chunk-delegation.md), its first piece:
+# local consumption.  A number granted ahead of its create (resv_ahead) whose
+# master is the peer was still asked of the master at the create's probe, which
+# answers with the re-affirm of the same durable grant (fresh generation, no
+# page write): a round trip per create for a grant the node already holds.
+# The change: an inode-number reserve (MXFS_LKF_RESERVE, set only by
+# mxfs_v5_dlm_inode_reserve_try for callers taking no grant result) of a
+# number this node holds EX is answered from the GRANTED mirror
+# (dl_reserve_held_local, 1 default; 0 = asks the master, the control);
+# dl_reserve_held_local_n counts those answers.
+#
+# HYPOTHESIS H-1a (written before the first lap): with resv_ahead=32 the
+# copier's reserves of pre-granted peer-mastered numbers are its remaining
+# reply waits, so answering them locally makes the both-mounted copy faster.
+# PREDICTIONS: in every C/F pair (same volume shape, fresh prep each, the copy
+# on test29 with test30 mounted, routing version 2, module defaults otherwise)
+# F's copy_wall < C's; F's dl_reserve_held_local_n on test29 > 0 and at least
+# half of its resv_ahead_granted; C's dl_reserve_held_local_n = 0.
+# REFUTED: F not faster than C in 2 of 3 pairs, or F's count 0 (VACUOUS if
+# resv_ahead_granted is 0 in either arm).  The B arm (resv_ahead=0, today's
+# default) is the baseline both are read against, not graded.
+# INTEGRITY (any lap): files=8137 bad=0 in every arm, no shutdown/BUG/Oops/
+# hung task/P-TAUTH-VERIFY-FAIL/P-TAUTH-DOUBLE-GRANT line; the F arm of pair 1
+# cold-audited (remount, run.sh chk_clean verdict=CLEAN release=CLEAN
+# errors=0).  The knob readback after each prep must show the arm's value on
+# both nodes (prep reloads the module, so each arm writes it after its prep).
+#
+# Build: ~/src/mxfs-g synced from the main tree (tools/sibling_sync.sh, marker
+# dl_reserve_held_local_n); it also carries dl_dead_sender_drop and
+# dl_dg_destroy_releases at their defaults.  Run from ~/src/mxfs-g.
+# 2/net/mesh/direct g2c (test29 copies, test30 mounted).
+#
+# Bounds: g2c and g2d share 2/net/mesh/direct's run.sh lock, so run.sh laps
+# wait up to 150 s for it on top of their own bounds: prep 300 + 150; native
+# 120 (lone_rsync_bench's own); knobs 60 (tests/fleet_set_params.sh, one 40 s
+# ssh per node in parallel); arm 240 (tests/resv_ahead_rsync_ab.sh's derived
+# bound with RA_HASH_VERSION); remount 85; audit 315 + 150.
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+120 LRB_NATIVE=1 MXFS_NODE_LIST=test29,test30 tests/lone_rsync_bench.sh rhlnat test29 2
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+240 RA_HASH_VERSION=2 tests/resv_ahead_rsync_ab.sh rhlb1 0 0 test29 test30
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "dl_reserve_held_local=0" test29,test30 tests/evidence/rhl_c1_before.txt
+240 RA_HASH_VERSION=2 tests/resv_ahead_rsync_ab.sh rhlc1 32 0 test29 test30
+60 tests/fleet_set_params.sh "dl_reserve_held_local dl_reserve_held_local_n resv_ahead_granted resv_ahead_consumed" test29,test30 tests/evidence/rhl_c1_after.txt
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "dl_reserve_held_local=1" test29,test30 tests/evidence/rhl_f1_before.txt
+240 RA_HASH_VERSION=2 tests/resv_ahead_rsync_ab.sh rhlf1 32 0 test29 test30
+60 tests/fleet_set_params.sh "dl_reserve_held_local dl_reserve_held_local_n resv_ahead_granted resv_ahead_consumed" test29,test30 tests/evidence/rhl_f1_after.txt
+85 MXFS_DEV=/dev/sda MXFS_NODE_LIST=test29,test30 tests/remount_node.sh rhlf1 test29
+465 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c chk_clean
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "dl_reserve_held_local=1" test29,test30 tests/evidence/rhl_f2_before.txt
+240 RA_HASH_VERSION=2 tests/resv_ahead_rsync_ab.sh rhlf2 32 0 test29 test30
+60 tests/fleet_set_params.sh "dl_reserve_held_local dl_reserve_held_local_n resv_ahead_granted resv_ahead_consumed" test29,test30 tests/evidence/rhl_f2_after.txt
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "dl_reserve_held_local=0" test29,test30 tests/evidence/rhl_c2_before.txt
+240 RA_HASH_VERSION=2 tests/resv_ahead_rsync_ab.sh rhlc2 32 0 test29 test30
+60 tests/fleet_set_params.sh "dl_reserve_held_local dl_reserve_held_local_n resv_ahead_granted resv_ahead_consumed" test29,test30 tests/evidence/rhl_c2_after.txt
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "dl_reserve_held_local=0" test29,test30 tests/evidence/rhl_c3_before.txt
+240 RA_HASH_VERSION=2 tests/resv_ahead_rsync_ab.sh rhlc3 32 0 test29 test30
+60 tests/fleet_set_params.sh "dl_reserve_held_local dl_reserve_held_local_n resv_ahead_granted resv_ahead_consumed" test29,test30 tests/evidence/rhl_c3_after.txt
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "dl_reserve_held_local=1" test29,test30 tests/evidence/rhl_f3_before.txt
+240 RA_HASH_VERSION=2 tests/resv_ahead_rsync_ab.sh rhlf3 32 0 test29 test30
+60 tests/fleet_set_params.sh "dl_reserve_held_local dl_reserve_held_local_n resv_ahead_granted resv_ahead_consumed" test29,test30 tests/evidence/rhl_f3_after.txt

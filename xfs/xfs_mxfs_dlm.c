@@ -1690,6 +1690,253 @@ module_param_cb(noino_bast_reclaimable, &mxfs_dbg_atomic_param_ops,
 		&mxfs_noino_bast_reclaimable, 0644);
 MODULE_PARM_DESC(noino_bast_reclaimable,
 		 "count of peer BASTs served by the no-inode release for an in-core RECLAIMABLE inode (write resets)");
+module_param_cb(noino_gen0_releases, &mxfs_dbg_atomic_param_ops,
+		&mxfs_noino_gen0_releases, 0644);
+MODULE_PARM_DESC(noino_gen0_releases,
+		 "count of no-inode releases whose BAST found no tenure of this node (rel_gen 0) (write resets)");
+module_param_cb(noino_gen0_live, &mxfs_dbg_atomic_param_ops,
+		&mxfs_noino_gen0_live, 0644);
+MODULE_PARM_DESC(noino_gen0_live,
+		 "count of those that met a tenure granted after the BAST when the release ran (P-NOINO-GEN0-LIVE) (write resets)");
+module_param_cb(noino_gen0_refused, &mxfs_dbg_atomic_param_ops,
+		&mxfs_noino_gen0_refused, 0644);
+MODULE_PARM_DESC(noino_gen0_refused,
+		 "count of those the guarded release refused because a generation-bearing grant was held (write resets)");
+module_param_cb(sf_kept_ahead_reloads, &mxfs_dbg_atomic_param_ops,
+		&mxfs_sf_kept_ahead_reloads, 0644);
+MODULE_PARM_DESC(sf_kept_ahead_reloads,
+		 "count of reloads that kept a shortform directory's in-core fork as ahead of the platter (write resets)");
+module_param_cb(sf_kept_ahead_replaced, &mxfs_dbg_atomic_param_ops,
+		&mxfs_sf_kept_ahead_replaced, 0644);
+MODULE_PARM_DESC(sf_kept_ahead_replaced,
+		 "count of those whose kept fork differed from the platter and replaced the merge base (sf_kept_ahead_base=0) (write resets)");
+module_param_cb(sf_kept_ahead_kept, &mxfs_dbg_atomic_param_ops,
+		&mxfs_sf_kept_ahead_kept, 0644);
+MODULE_PARM_DESC(sf_kept_ahead_kept,
+		 "count of those whose kept fork differed from the platter and left the merge base (sf_kept_ahead_base=1) (write resets)");
+/*
+ * D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT: the node
+ * that unlinked a file skipped the platter read at its inactivation whenever
+ * it held a fresh EX, trusting its in-core image of the life.  A peer that had
+ * the file open is its last closer and can free the life first; the unlinker's
+ * EX then arrives after that free, and destructive inactivation of the dead
+ * incarnation staged and published its live image over the peer's free.  The
+ * fast path now needs the grant unbroken since the unlink (i_dlm_epoch equal
+ * to i_mxfs_unlink_epoch).  inact_local_epoch_guard=0 is the same-build
+ * control: the fast path as before, the platter read made only to report.
+ */
+int mxfs_inact_local_epoch_guard = 1;
+module_param_named(inact_local_epoch_guard, mxfs_inact_local_epoch_guard, int, 0644);
+MODULE_PARM_DESC(inact_local_epoch_guard,
+		 "a local-unlink inactivation trusts its in-core image without a platter read only if the inode grant was never lost since the unlink (1=default; 0=always trust it, the same-build control)");
+atomic_t mxfs_inact_local_epoch_moved = ATOMIC_INIT(0);
+module_param_cb(inact_local_epoch_moved, &mxfs_dbg_atomic_param_ops,
+		&mxfs_inact_local_epoch_moved, 0644);
+MODULE_PARM_DESC(inact_local_epoch_moved,
+		 "count of local-unlink inactivations under a fresh EX whose grant was lost since the unlink (write resets)");
+atomic_t mxfs_inact_local_peerfreed = ATOMIC_INIT(0);
+module_param_cb(inact_local_peerfreed, &mxfs_dbg_atomic_param_ops,
+		&mxfs_inact_local_peerfreed, 0644);
+MODULE_PARM_DESC(inact_local_peerfreed,
+		 "count of those whose platter read found the life already freed or the number reused by a peer (P-INACT-LOCAL-EPOCH) (write resets)");
+/*
+ * D-LOCAL-UNLINK-INACT-AFTER-GRANT-LOSS-WRITES-STALE-CORE-OVER-PEER-CHANGE: the
+ * guard above sends the inactivation to the platter, but it compared only the
+ * mode and the generation there, so a peer's change of the same life (a
+ * timestamp update or an append through a descriptor it held across the unlink)
+ * read as 'ours'.  The truncate then logged the in-core core the peer had
+ * superseded, and the inactivation's flush sanction put it home over the peer's
+ * newer image (lap fv3c4: changecount 2563 written over 2564).  The inactivation
+ * cannot reload an I_FREEING inode in place, so a same-incarnation platter image
+ * with a higher changecount defers the free: nothing is dirtied, the grant is
+ * released plainly, and the reaper's iget and ILOCK ride reload the core before
+ * the free is tried again.  inact_local_cc_guard=0 is the same-build control:
+ * the verdict is printed and the inactivation proceeds on the in-core image.
+ */
+int mxfs_inact_local_cc_guard = 1;
+module_param_named(inact_local_cc_guard, mxfs_inact_local_cc_guard, int, 0644);
+MODULE_PARM_DESC(inact_local_cc_guard,
+		 "a local-unlink inactivation judged on the platter defers the free when the platter holds a newer changecount of the same life (1=default; 0=proceed on the in-core image, the same-build control)");
+atomic_t mxfs_inact_local_peerchanged = ATOMIC_INIT(0);
+module_param_cb(inact_local_peerchanged, &mxfs_dbg_atomic_param_ops,
+		&mxfs_inact_local_peerchanged, 0644);
+MODULE_PARM_DESC(inact_local_peerchanged,
+		 "count of those whose platter held the same life with a higher changecount than the in-core inode (P-INACT-LOCAL-EPOCH verdict=peer-changed) (write resets)");
+atomic_t mxfs_inact_local_cc_deferred = ATOMIC_INIT(0);
+module_param_cb(inact_local_cc_deferred, &mxfs_dbg_atomic_param_ops,
+		&mxfs_inact_local_cc_deferred, 0644);
+MODULE_PARM_DESC(inact_local_cc_deferred,
+		 "count of those whose free was deferred to the reaper for it (inact_local_cc_guard=1) (write resets)");
+/*
+ * TEST ONLY: the window inact_local_epoch_guard closes.  A peer's touch of the
+ * file by name holds a reference across the unlink without an open mark; its
+ * setattr then reads nlink 0, its iput frees the life, and the unlinker's
+ * inactivation comes after.  On the rig the unlinker's inodegc runs within a
+ * jiffy of its unlink and the peer's lookup-to-ILOCK gap is microseconds, so
+ * the guard's A/B never reached its branch (inact_local_peerfreed 0 in every
+ * lap).  The grant can be lost only while the unlinked inode is still live:
+ * once it is NEED_INACTIVE or INACTIVATING, a peer's BAST is parked until the
+ * inactivation ends (noino_lifecycle_requeue), so a delay inside the
+ * inactivation opens nothing (hf6c, 4 laps: every touched inode's EX BAST on
+ * the unlinker logged P-NOINO-LIFECYCLE class=NEED_INACTIVE, then
+ * P-NOINO-LIFECYCLE-DONE).  ng0rf1 lost it between the unlink's commit and the
+ * VFS's final iput, serving the peer's queued EX in core.
+ * dbg_unlink_live_delay_ms holds that window: a regular-file unlink that
+ * dropped the last link waits that long after its transaction commits, with
+ * no XFS lock held and the inode still referenced by the unlinking task.
+ * dbg_setattr_time_delay_ms holds a timestamp-only setattr of a regular file
+ * that long before it takes any lock.  0 = off.
+ */
+int mxfs_dbg_unlink_live_delay_ms;
+module_param_named(dbg_unlink_live_delay_ms, mxfs_dbg_unlink_live_delay_ms, int, 0644);
+MODULE_PARM_DESC(dbg_unlink_live_delay_ms,
+		 "TEST ONLY: ms a regular-file unlink that dropped the last link waits after its commit, before the final iput (0=off)");
+int mxfs_dbg_setattr_time_delay_ms;
+module_param_named(dbg_setattr_time_delay_ms, mxfs_dbg_setattr_time_delay_ms, int, 0644);
+MODULE_PARM_DESC(dbg_setattr_time_delay_ms,
+		 "TEST ONLY: ms a timestamp-only setattr of a regular file waits before taking any lock (0=off)");
+/*
+ * TEST ONLY, D-STALE-NAME-SETATTR's other operations: the reload's poison is
+ * refused after the lock by each operation's own gate -- xfs_setattr_size for
+ * a truncate, the namespace gate for a chmod or chown, the open path's P95 for
+ * an open -- and the timestamp delay above holds only a touch.
+ * dbg_setattr_delay_any 1 makes dbg_setattr_time_delay_ms hold every
+ * regular-file setattr (size, mode, owner, times) at entry instead, before any
+ * lock; dbg_open_delay_ms holds a multi-node regular-file open that long
+ * between the VFS's lookup and the open's protecting acquire.  0 = off.
+ */
+int mxfs_dbg_setattr_delay_any;
+module_param_named(dbg_setattr_delay_any, mxfs_dbg_setattr_delay_any, int, 0644);
+MODULE_PARM_DESC(dbg_setattr_delay_any,
+		 "TEST ONLY: dbg_setattr_time_delay_ms holds every regular-file setattr at entry, not only a timestamp-only one (0=off)");
+int mxfs_dbg_open_delay_ms;
+module_param_named(dbg_open_delay_ms, mxfs_dbg_open_delay_ms, int, 0644);
+MODULE_PARM_DESC(dbg_open_delay_ms,
+		 "TEST ONLY: ms a multi-node regular-file open waits between the lookup and its protecting acquire (0=off)");
+/*
+ * TEST ONLY: the context ng0rf1's inactivation ran in.  The two delays above
+ * make the peer the last closer, but the unlinker's last reference is still
+ * its own unlink's, so every lap inactivated as comm=rm, where the truncate's
+ * ILOCK reloads the stale inode and adopts the peer's free (P116) before any
+ * truncate.  ng0rf1's ran on the BAST worker: the worker serving the peer's EX
+ * held its reference past the unlink's final iput, its trailing xfs_irele
+ * (xfs_mxfs_bast.c mxfs_dlm_bast_work_fn) dropped the last one, and the
+ * synchronous inactivation ran under its demoter claim, which the ILOCK hook
+ * admits with no reload (H-F6a).  dbg_bast_lastref_wait_ms holds that
+ * trailing irele, for an unlinked regular file this node removed, until the
+ * work's reference is the only one or that many ms passed, so the work drops
+ * the last reference on demand.  0 = off.
+ */
+int mxfs_dbg_bast_lastref_wait_ms;
+module_param_named(dbg_bast_lastref_wait_ms, mxfs_dbg_bast_lastref_wait_ms, int, 0644);
+MODULE_PARM_DESC(dbg_bast_lastref_wait_ms,
+		 "TEST ONLY: ms the BAST work holds its trailing irele of a locally unlinked regular file until its reference is the last (0=off)");
+atomic_t mxfs_bast_lastref_waits = ATOMIC_INIT(0);
+module_param_cb(bast_lastref_waits, &mxfs_dbg_atomic_param_ops,
+		&mxfs_bast_lastref_waits, 0644);
+MODULE_PARM_DESC(bast_lastref_waits,
+		 "count of BAST works that held their trailing irele for dbg_bast_lastref_wait_ms (write resets)");
+atomic_t mxfs_bast_lastref_reached = ATOMIC_INIT(0);
+module_param_cb(bast_lastref_reached, &mxfs_dbg_atomic_param_ops,
+		&mxfs_bast_lastref_reached, 0644);
+MODULE_PARM_DESC(bast_lastref_reached,
+		 "count of those whose reference was the last when the hold ended (P-BAST-LASTREF-WAIT reached=1) (write resets)");
+/*
+ * TEST ONLY: the second half of ng0rf1's window.  The no-reload truncate logs
+ * the dead life's core, but on its own it puts nothing home: the inactivation's
+ * raw EX leaves i_dlm_mode at NL, so a flush after MXFS_IF_DLM_RELFLUSH clears
+ * is refused (P119) and a staging from a dead tenure is masked (P222), and
+ * that is how the first BAST-order lap (lrc1, 19 peer-freed truncates on the
+ * BAST worker) audited CLEAN.  ng0rf1's xfsaild copied the core into its
+ * cluster buffer while the token was still set (P240-COPYIN-ID, 6 ms after the
+ * grant, the truncate waiting at the AG seam) and the write followed.
+ * dbg_inact_relflush_hold_ms makes that happen on demand: after a local-unlink
+ * inactivation's truncate, with the token still set, the log is forced and
+ * this inode's item drained through the AIL (bounded by the knob's ms).
+ * 0 = off.
+ */
+int mxfs_dbg_inact_relflush_hold_ms;
+module_param_named(dbg_inact_relflush_hold_ms, mxfs_dbg_inact_relflush_hold_ms, int, 0644);
+MODULE_PARM_DESC(dbg_inact_relflush_hold_ms,
+		 "TEST ONLY: after a local-unlink inactivation's truncate, with MXFS_IF_DLM_RELFLUSH set, force the log and drain the inode through the AIL for at most this many ms (0=off)");
+atomic_t mxfs_inact_relflush_holds = ATOMIC_INIT(0);
+module_param_cb(inact_relflush_holds, &mxfs_dbg_atomic_param_ops,
+		&mxfs_inact_relflush_holds, 0644);
+MODULE_PARM_DESC(inact_relflush_holds,
+		 "count of inactivations drained under the token by dbg_inact_relflush_hold_ms (P-INACT-RELFLUSH-HOLD) (write resets)");
+
+void
+mxfs_dbg_bast_lastref_wait(
+	struct xfs_inode	*ip)
+{
+	static atomic_t		pblw_n = ATOMIC_INIT(0);
+	int			budget = READ_ONCE(mxfs_dbg_bast_lastref_wait_ms);
+	int			waited = 0;
+	int			cnt;
+
+	if (budget <= 0 || !S_ISREG(VFS_I(ip)->i_mode) ||
+	    VFS_I(ip)->i_nlink != 0 ||
+	    !xfs_iflags_test(ip, MXFS_IF_LOCAL_UNLINK))
+		return;
+	atomic_inc(&mxfs_bast_lastref_waits);
+	while ((cnt = atomic_read(&VFS_I(ip)->i_count)) > 1 &&
+	       waited < budget) {
+		msleep(10);
+		waited += 10;
+	}
+	if (cnt == 1)
+		atomic_inc(&mxfs_bast_lastref_reached);
+	if (atomic_inc_return(&pblw_n) <= 2000)
+		pr_warn("mxfs: P-BAST-LASTREF-WAIT ino=%llu gen=%u waited_ms=%d i_count=%d reached=%d comm=%s -- TEST ONLY: the BAST work held its trailing irele until its reference was the last\n",
+			(unsigned long long)ip->i_ino,
+			VFS_I(ip)->i_generation, waited, cnt,
+			cnt == 1 ? 1 : 0, current->comm);
+}
+/*
+ * D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349 (ruling
+ * docs/rulings/d0349-batched-reserve-ahead.md): on the TCP transport with a
+ * peer mounted, the allocator's reserve of each new inode number is a durable
+ * ledger grant at the number's master, and a single creator pays one commit
+ * per file, one after another.  resv_ahead=N requests the next N free numbers
+ * of the inobt record a create just reserved in, concurrently and outside
+ * every XFS lock (xfs_ialloc.c mxfs_resv_ahead_queue), so the commits overlap
+ * and the creates that follow find their grant already held.  0 is off, the
+ * same-build control.
+ */
+int mxfs_resv_ahead;
+module_param_named(resv_ahead, mxfs_resv_ahead, int, 0644);
+MODULE_PARM_DESC(resv_ahead,
+		 "free inode numbers of the allocator's current inobt record to reserve ahead of the creates (0=off, the same-build control; at most 64)");
+atomic_t mxfs_resv_ahead_queued = ATOMIC_INIT(0);
+module_param_cb(resv_ahead_queued, &mxfs_dbg_atomic_param_ops,
+		&mxfs_resv_ahead_queued, 0644);
+MODULE_PARM_DESC(resv_ahead_queued,
+		 "count of reserve-ahead requests queued (write resets)");
+atomic_t mxfs_resv_ahead_granted = ATOMIC_INIT(0);
+module_param_cb(resv_ahead_granted, &mxfs_dbg_atomic_param_ops,
+		&mxfs_resv_ahead_granted, 0644);
+MODULE_PARM_DESC(resv_ahead_granted,
+		 "count of reserve-ahead requests granted (write resets)");
+atomic_t mxfs_resv_ahead_denied = ATOMIC_INIT(0);
+module_param_cb(resv_ahead_denied, &mxfs_dbg_atomic_param_ops,
+		&mxfs_resv_ahead_denied, 0644);
+MODULE_PARM_DESC(resv_ahead_denied,
+		 "count of reserve-ahead requests refused because another node holds the number (write resets)");
+atomic_t mxfs_resv_ahead_err = ATOMIC_INIT(0);
+module_param_cb(resv_ahead_err, &mxfs_dbg_atomic_param_ops,
+		&mxfs_resv_ahead_err, 0644);
+MODULE_PARM_DESC(resv_ahead_err,
+		 "count of reserve-ahead requests that failed for any other reason, or were dropped at unmount (write resets)");
+atomic_t mxfs_resv_ahead_consumed = ATOMIC_INIT(0);
+module_param_cb(resv_ahead_consumed, &mxfs_dbg_atomic_param_ops,
+		&mxfs_resv_ahead_consumed, 0644);
+MODULE_PARM_DESC(resv_ahead_consumed,
+		 "count of creates whose number had been requested ahead (write resets)");
+atomic_t mxfs_resv_ahead_capped = ATOMIC_INIT(0);
+module_param_cb(resv_ahead_capped, &mxfs_dbg_atomic_param_ops,
+		&mxfs_resv_ahead_capped, 0644);
+MODULE_PARM_DESC(resv_ahead_capped,
+		 "count of reserve-ahead requests not queued because the mount already had its limit in flight (write resets)");
 module_param_cb(recycle_grant_cached, &mxfs_dbg_atomic_param_ops,
 		&mxfs_recycle_grant_cached, 0644);
 MODULE_PARM_DESC(recycle_grant_cached,
@@ -1698,6 +1945,1116 @@ module_param_cb(recycle_grant_phantom, &mxfs_dbg_atomic_param_ops,
 		&mxfs_recycle_grant_phantom, 0644);
 MODULE_PARM_DESC(recycle_grant_phantom,
 		 "count of those recycles where the DLM mirror no longer held the cached mode (P-RECYCLE-PHANTOM) (write resets)");
+/*
+ * D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F7: the
+ * no-inode release decides its unlock from a live check that cannot see a
+ * reclaimable corpse (xfs_iget INCORE refuses one), and the recycle that puts
+ * the corpse back into service decides from the DLM's record while that
+ * release may still be in flight.  If the recycle keeps the cached grant and
+ * the release then unlocks it, the live inode goes on writing at an EX the
+ * DLM has handed to a peer.  These count both sides of that window and the
+ * logging it would leave behind.
+ */
+atomic_t mxfs_recycle_keep_noino = ATOMIC_INIT(0);
+module_param_cb(recycle_keep_noino, &mxfs_dbg_atomic_param_ops,
+		&mxfs_recycle_keep_noino, 0644);
+MODULE_PARM_DESC(recycle_keep_noino,
+		 "count of recycles that kept a cached grant while a no-inode release of the same inode was in flight (P-RECYCLE-KEEP-UNDER-NOINO) (write resets)");
+atomic_t mxfs_noino_unlock_left_grant = ATOMIC_INIT(0);
+module_param_cb(noino_unlock_left_grant, &mxfs_dbg_atomic_param_ops,
+		&mxfs_noino_unlock_left_grant, 0644);
+MODULE_PARM_DESC(noino_unlock_left_grant,
+		 "count of no-inode releases that unlocked while an in-core inode of the number carried a cached grant (P-NOINO-UNLOCK-LEFT-GRANT) (write resets)");
+int mxfs_dbg_log_mirror_check;
+module_param_named(dbg_log_mirror_check, mxfs_dbg_log_mirror_check, int, 0644);
+MODULE_PARM_DESC(dbg_log_mirror_check,
+		 "TEST ONLY: at every logging of a regular file at a cached EX, ask the DLM whether it still records that grant for this node (P-LOG-MIRROR-PHANTOM) (0=off)");
+atomic_t mxfs_log_mirror_phantom = ATOMIC_INIT(0);
+module_param_cb(log_mirror_phantom, &mxfs_dbg_atomic_param_ops,
+		&mxfs_log_mirror_phantom, 0644);
+MODULE_PARM_DESC(log_mirror_phantom,
+		 "count of regular-file loggings at a cached EX that the DLM no longer records for this node (write resets)");
+/*
+ * The write side of the same question, under the same knob: a logged slot
+ * carrying a live core goes to its home while the DLM records no EX of this
+ * node for the inode -- the shape of both corrupting writes traced so far
+ * (pal/linux/xfs_buf.c, P-LOGWR-DLM-NOGRANT; TCP only).
+ */
+atomic_t mxfs_logwr_dlm_nogrant = ATOMIC_INIT(0);
+module_param_cb(logwr_dlm_nogrant, &mxfs_dbg_atomic_param_ops,
+		&mxfs_logwr_dlm_nogrant, 0644);
+MODULE_PARM_DESC(logwr_dlm_nogrant,
+		 "count of logged live inode images written home while the DLM recorded no EX of this node (P-LOGWR-DLM-NOGRANT, dbg_log_mirror_check) (write resets)");
+
+/*
+ * Under the same knob, the other end of such a write: a free release
+ * (mxfs_v5_dlm_inode_unlock_free) names no tenure and retires whatever grant
+ * of ours it meets.  The H-F7 fix arm logged a published live life written
+ * home at a cached EX 3.5 ms after this node's own free release of the number
+ * (pmf4, ino 2097292), with no no-inode release anywhere near it.  Each free
+ * release says which life it is for and which generation the DLM holds for the
+ * number as it goes; a P-LOGWR-DLM-NOGRANT whose cgen equals that generation
+ * names the life that was riding the retired grant.  Detection only, TCP only
+ * (the generation is exact there).
+ */
+void
+mxfs_free_release_probe(
+	struct xfs_inode	*ip,
+	const char		*site)
+{
+	static atomic_t		p_frel_n = ATOMIC_INIT(0);
+	struct xfs_mount	*mp = ip->i_mount;
+
+	if (likely(!READ_ONCE(mxfs_dbg_log_mirror_check)) || !mp->m_mxfs_dlm ||
+	    !mxfs_v5_dlm_is_tcp(mp->m_mxfs_dlm))
+		return;
+	if (atomic_inc_return(&p_frel_n) > 20000)
+		return;
+	pr_warn("mxfs: P-FREE-RELEASE site=%s ino=%llu gen=%u cgen=%u dlm_gen=%u mode=%u state=%u iflags=0x%lx nlink=%u reused=%d comm=%s -- a free release, generation 0, of this life's grant\n",
+		site, (unsigned long long)ip->i_ino, VFS_I(ip)->i_generation,
+		ip->i_dlm_cached_grant_gen,
+		mxfs_v5_dlm_inode_grant_gen(mp->m_mxfs_dlm, ip->i_ino),
+		ip->i_dlm_mode, ip->i_dlm_state, ip->i_flags,
+		VFS_I(ip)->i_nlink, ip->i_mxfs_reused_create ? 1 : 0,
+		current->comm);
+}
+/*
+ * The same hypothesis, the decisive half: the release's drain fence covers what
+ * this node committed before the fence's last log force, so a change committed
+ * through a recycled corpse after it is still in core when the unlock hands the
+ * inode to the peer.  Counted at the unlock itself, from the inode log item.
+ */
+atomic_t mxfs_noino_unlock_undrained = ATOMIC_INIT(0);
+module_param_cb(noino_unlock_undrained, &mxfs_dbg_atomic_param_ops,
+		&mxfs_noino_unlock_undrained, 0644);
+MODULE_PARM_DESC(noino_unlock_undrained,
+		 "count of no-inode releases that unlocked while the in-core inode of the number still held committed changes not yet on the platter (P-NOINO-UNLOCK-UNDRAINED) (write resets)");
+/*
+ * D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F8: the
+ * protective reload's P5F arm (xfs/xfs_mxfs_reload.c) kept a clean shell's
+ * cached image over the platter's FREE image because the reload's own fresh
+ * grant was held.  freshsrc_keep_guard 1 (default) keeps it only for a shell
+ * with committed changes not yet on the platter; 0 is the old rule, the
+ * same-build control.  keep_clean counts the hazard (a clean shell kept on the
+ * grant alone), clean_refused the guard's reach.
+ */
+int mxfs_freshsrc_keep_guard = 1;
+module_param_named(freshsrc_keep_guard, mxfs_freshsrc_keep_guard, int, 0644);
+MODULE_PARM_DESC(freshsrc_keep_guard,
+		 "a protective reload keeps a cached image over the platter's FREE image only when the in-core inode has committed changes not yet on the platter (1=default; 0=a held grant also keeps it, the same-build control)");
+atomic_t mxfs_freshsrc_keep_clean = ATOMIC_INIT(0);
+module_param_cb(freshsrc_keep_clean, &mxfs_dbg_atomic_param_ops,
+		&mxfs_freshsrc_keep_clean, 0644);
+MODULE_PARM_DESC(freshsrc_keep_clean,
+		 "count of protective reloads that kept a CLEAN shell's cached image over the platter's FREE image on the held grant alone (P5F clean_held=1) (write resets)");
+atomic_t mxfs_freshsrc_clean_refused = ATOMIC_INIT(0);
+module_param_cb(freshsrc_clean_refused, &mxfs_dbg_atomic_param_ops,
+		&mxfs_freshsrc_clean_refused, 0644);
+MODULE_PARM_DESC(freshsrc_clean_refused,
+		 "count of protective reloads where freshsrc_keep_guard refused that keep (P5F-FRESHSRC-CLEAN-REFUSED) (write resets)");
+/*
+ * D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, H-U3: the
+ * protective reload's fresh-source arm (xfs/xfs_mxfs_reload.c) adopts a slot's
+ * whole dinode from a private read of the platter, di_next_unlinked included,
+ * while this node's own committed edit of that pointer is still only in the
+ * kept buffer and the iunlink store.  It reverted a predecessor's next pointer
+ * to the inode just removed, and the predecessor's own remove then pointed the
+ * bucket at a free inode.  freshsrc_iunl_overlay 1 (default) grafts the store's
+ * committed values onto the fresh image before it is adopted, as the buffer
+ * read, write and cluster-merge paths do; 0 adopts the platter's bytes, the
+ * same-build control.  freshsrc_iunl_stale counts the reloads whose image
+ * carried a stale next pointer for the reloaded inode, in either arm (the
+ * hazard's reach); freshsrc_iunl_overlaid those the graft corrected.
+ */
+int mxfs_freshsrc_iunl_overlay = 1;
+module_param_named(freshsrc_iunl_overlay, mxfs_freshsrc_iunl_overlay, int, 0644);
+MODULE_PARM_DESC(freshsrc_iunl_overlay,
+		 "a protective reload grafts this node's committed, not yet landed di_next_unlinked values onto the platter image it adopts (1=default; 0=adopts the platter's bytes, the same-build control)");
+atomic_t mxfs_freshsrc_iunl_stale = ATOMIC_INIT(0);
+module_param_cb(freshsrc_iunl_stale, &mxfs_dbg_atomic_param_ops,
+		&mxfs_freshsrc_iunl_stale, 0644);
+MODULE_PARM_DESC(freshsrc_iunl_stale,
+		 "count of protective reloads whose platter image carried a di_next_unlinked for the reloaded inode older than this node's committed value (P-FRESHSRC-IUNL-STALE), with or without the graft (write resets)");
+atomic_t mxfs_freshsrc_iunl_overlaid = ATOMIC_INIT(0);
+module_param_cb(freshsrc_iunl_overlaid, &mxfs_dbg_atomic_param_ops,
+		&mxfs_freshsrc_iunl_overlaid, 0644);
+MODULE_PARM_DESC(freshsrc_iunl_overlaid,
+		 "count of those reloads where the graft put the committed di_next_unlinked into the image before the adopt (P-FRESHSRC-IUNL-STALE grafted=1) (write resets)");
+/*
+ * The same defect, H-U4: a mid-list unlinked remove rewrites the PREDECESSOR's
+ * di_next_unlinked, a field of another inode's slot, under the AG DLM alone,
+ * and a peer holding that predecessor's inode EX publishes the whole slot from
+ * its own cluster buffer, whose copy of the field predates the edit: the
+ * platter reverts to a removed inode.  unlprev_tenure 1 (default) makes the
+ * edit under the predecessor's own EX (xfs_inactive_ifree takes it as a counted
+ * hold, never while holding the AG DLM), lands it before that inode's lock
+ * leaves the node (mxfs_iunl_store_land), and refreshes a kept cluster
+ * buffer's copy of the field from the platter at the next acquire
+ * (xfs/xfs_mxfs_reload.c); 0 is the same-build control.  The counters count in
+ * both arms: unlprev_notenure, edits of a predecessor this node held no EX hold
+ * on (P-UNLPREV-NOTENURE); nextwr_stale, flushed slots whose next pointer
+ * differed from the platter's with no store record behind it (P-NEXTWR-STALE);
+ * iunl_owed_release, inode releases that still owed such an edit
+ * (P-IUNL-OWED-AT-RELEASE, landed=0 in the control); kept_next_stale, kept
+ * buffers whose copy of the field was older than the platter's
+ * (P-KEPT-NEXT-STALE); unlprev_waits, frees that backed off to take the hold.
+ */
+int mxfs_unlprev_tenure = 1;
+module_param_named(unlprev_tenure, mxfs_unlprev_tenure, int, 0644);
+MODULE_PARM_DESC(unlprev_tenure,
+		 "a mid-list unlinked remove edits its predecessor's di_next_unlinked only under that predecessor's inode EX, lands the edit before the lock leaves, and a kept cluster buffer's copy is refreshed at the next acquire (1=default; 0=the same-build control)");
+atomic_t mxfs_unlprev_notenure = ATOMIC_INIT(0);
+module_param_cb(unlprev_notenure, &mxfs_dbg_atomic_param_ops,
+		&mxfs_unlprev_notenure, 0644);
+MODULE_PARM_DESC(unlprev_notenure,
+		 "count of mid-list unlinked removes that edited a predecessor this node held no EX hold on (P-UNLPREV-NOTENURE) (write resets)");
+atomic_t mxfs_unlprev_waits = ATOMIC_INIT(0);
+module_param_cb(unlprev_waits, &mxfs_dbg_atomic_param_ops,
+		&mxfs_unlprev_waits, 0644);
+MODULE_PARM_DESC(unlprev_waits,
+		 "count of inode frees that backed off the AG DLM to take their predecessor's EX hold (P-UNLPREV-WAIT) (write resets)");
+atomic_t mxfs_nextwr_stale = ATOMIC_INIT(0);
+module_param_cb(nextwr_stale, &mxfs_dbg_atomic_param_ops,
+		&mxfs_nextwr_stale, 0644);
+MODULE_PARM_DESC(nextwr_stale,
+		 "count of flushed inode slots whose di_next_unlinked differed from the platter's with no iunlink store record behind it (P-NEXTWR-STALE) (write resets)");
+atomic_t mxfs_iunl_owed_release = ATOMIC_INIT(0);
+module_param_cb(iunl_owed_release, &mxfs_dbg_atomic_param_ops,
+		&mxfs_iunl_owed_release, 0644);
+MODULE_PARM_DESC(iunl_owed_release,
+		 "count of inode lock releases that still owed a committed di_next_unlinked of their slot (P-IUNL-OWED-AT-RELEASE) (write resets)");
+atomic_t mxfs_kept_next_stale = ATOMIC_INIT(0);
+module_param_cb(kept_next_stale, &mxfs_dbg_atomic_param_ops,
+		&mxfs_kept_next_stale, 0644);
+MODULE_PARM_DESC(kept_next_stale,
+		 "count of protective reloads whose kept cluster buffer carried an older di_next_unlinked for the reloaded inode than the platter (P-KEPT-NEXT-STALE) (write resets)");
+/*
+ * The same defect, H-U1: a mid-list unlinked remove looks its predecessor up in
+ * core (xfs_iunlink_remove_inode) and fails -EFSCORRUPTED, with the transaction
+ * already dirty, when it is gone (P-UNLREM-NOPREV), so the node shuts down.  A
+ * bucket's owner holds no reference to a member a peer holds open: its copy
+ * goes reclaimable when the owner's inactivation defers for the open holder,
+ * and a cache drop reclaims it.  The preflight that loads and pins the
+ * predecessor ran only when the freed inode's own chain state was incomplete.
+ * unlprev_pin 1 (default) pins a live in-core predecessor of a mid-list free
+ * for the length of the free and runs the preflight when it is absent, a
+ * reclaimable shell or mid-evict; 0 is the same-build control.  The counters
+ * count in both arms: unlprev_absent, mid-list frees whose recorded predecessor
+ * was absent, reclaimable or mid-evict at that check (P-UNLPREV-ABSENT);
+ * unlprev_pinned, those the preflight then loaded and pinned.
+ * dbg_ifree_midlist_delay_ms (TEST ONLY) holds a mid-list free that long
+ * before it starts, with no AG lock held, so a cache drop can reclaim the
+ * predecessor first; 0 = off.
+ */
+int mxfs_unlprev_pin = 1;
+module_param_named(unlprev_pin, mxfs_unlprev_pin, int, 0644);
+MODULE_PARM_DESC(unlprev_pin,
+		 "a mid-list inode free pins its predecessor before the remove, loading it through the preflight when it is not live in core (1=default; 0=the same-build control)");
+atomic_t mxfs_unlprev_absent = ATOMIC_INIT(0);
+module_param_cb(unlprev_absent, &mxfs_dbg_atomic_param_ops,
+		&mxfs_unlprev_absent, 0644);
+MODULE_PARM_DESC(unlprev_absent,
+		 "count of mid-list inode frees whose predecessor was absent, reclaimable or mid-evict in core (P-UNLPREV-ABSENT) (write resets)");
+atomic_t mxfs_unlprev_pinned = ATOMIC_INIT(0);
+module_param_cb(unlprev_pinned, &mxfs_dbg_atomic_param_ops,
+		&mxfs_unlprev_pinned, 0644);
+MODULE_PARM_DESC(unlprev_pinned,
+		 "count of those whose preflight then loaded and pinned the predecessor (write resets)");
+int mxfs_dbg_ifree_midlist_delay_ms;
+module_param_named(dbg_ifree_midlist_delay_ms, mxfs_dbg_ifree_midlist_delay_ms, int, 0644);
+MODULE_PARM_DESC(dbg_ifree_midlist_delay_ms,
+		 "TEST ONLY: ms a mid-list inode free waits before it starts, holding no AG lock (0=off)");
+/*
+ * D-IUNLINK-PREV-OF-PEER-FREED-INODE-STALE-PRECOMMIT-SHUTDOWN, H-IU1: H-U4's
+ * free drops the AG DLM to take its predecessor's EX hold, and the
+ * predecessor's owner can take it off the list and free it in that gap; the
+ * retry then edited a free inode's next pointer, the precommit found NULLAGINO
+ * where it expected the freed inode, and the node shut down.  Under the hold
+ * the predecessor's core is current, so unlprev_held_verify 1 (default)
+ * requires it to be live, unlinked and pointing at the freed inode, and on a
+ * miss clears the freed inode's prev pointer and starts the free over so the
+ * preflight rebuilds the chain from the platter; 0 is the same-build control.
+ * The counters count in both arms: unlprev_held_moved, held predecessors that
+ * failed the check (P-UNLPREV-MOVED); unlprev_rebuilds, frees started over for
+ * it.  dbg_unlprev_wait_delay_ms (TEST ONLY) sleeps after the free has dropped
+ * the AG DLM, ILOCK and transaction and before it asks for the hold; 0 = off.
+ */
+int mxfs_unlprev_held_verify = 1;
+module_param_named(unlprev_held_verify, mxfs_unlprev_held_verify, int, 0644);
+MODULE_PARM_DESC(unlprev_held_verify,
+		 "a mid-list inode free re-checks, under the predecessor's EX hold, that the predecessor is still live, unlinked and pointing at it, and rebuilds the chain when it is not (1=default; 0=the same-build control)");
+atomic_t mxfs_unlprev_held_moved = ATOMIC_INIT(0);
+module_param_cb(unlprev_held_moved, &mxfs_dbg_atomic_param_ops,
+		&mxfs_unlprev_held_moved, 0644);
+MODULE_PARM_DESC(unlprev_held_moved,
+		 "count of held predecessors no longer live, unlinked and pointing at the freed inode (P-UNLPREV-MOVED) (write resets)");
+atomic_t mxfs_unlprev_rebuilds = ATOMIC_INIT(0);
+module_param_cb(unlprev_rebuilds, &mxfs_dbg_atomic_param_ops,
+		&mxfs_unlprev_rebuilds, 0644);
+MODULE_PARM_DESC(unlprev_rebuilds,
+		 "count of inode frees started over to rebuild a stale unlinked chain view (P-UNLPREV-REBUILD) (write resets)");
+int mxfs_dbg_unlprev_wait_delay_ms;
+module_param_named(dbg_unlprev_wait_delay_ms, mxfs_dbg_unlprev_wait_delay_ms, int, 0644);
+MODULE_PARM_DESC(dbg_unlprev_wait_delay_ms,
+		 "TEST ONLY: ms an inode free waits, holding nothing, between dropping the AG DLM and asking for its predecessor's EX hold (0=off)");
+/*
+ * The same defect, H-U5: xfs_inactive's open-holder deferral (B6) releases its
+ * EX grant raw so that the reaper's retry takes a fresh one, and the unlink it
+ * follows is usually not at home yet; the next EX tenure on this node then
+ * meets that state as a P17B ghost and the AIL freezes behind it.
+ * b6_release_drain 1 (default) lands the inode's committed state before the
+ * release (log force, the bounded per-inode AIL drain, buftarg wait, device
+ * flush) and keeps the grant cached when the bound runs out; 0 is the
+ * same-build control, which releases raw.  The counters count in both arms:
+ * b6_release_dirty, B6 releases that found the inode pinned, logging fields or
+ * in the AIL (P-B6-RELEASE-DIRTY); b6_release_drained, those the drain landed;
+ * b6_release_kept, those whose grant stayed cached.
+ */
+int mxfs_b6_release_drain = 1;
+module_param_named(b6_release_drain, mxfs_b6_release_drain, int, 0644);
+MODULE_PARM_DESC(b6_release_drain,
+		 "an inactivation deferred for a peer's open holder lands the inode's committed state before it releases its grant, or keeps the grant cached (1=default; 0=releases raw, the same-build control)");
+atomic_t mxfs_b6_release_dirty = ATOMIC_INIT(0);
+module_param_cb(b6_release_dirty, &mxfs_dbg_atomic_param_ops,
+		&mxfs_b6_release_dirty, 0644);
+MODULE_PARM_DESC(b6_release_dirty,
+		 "count of open-holder-deferred inactivations whose grant release found the inode's committed state not at home (P-B6-RELEASE-DIRTY) (write resets)");
+atomic_t mxfs_b6_release_drained = ATOMIC_INIT(0);
+module_param_cb(b6_release_drained, &mxfs_dbg_atomic_param_ops,
+		&mxfs_b6_release_drained, 0644);
+MODULE_PARM_DESC(b6_release_drained,
+		 "count of those releases the drain landed first (P-B6-RELEASE-DIRTY drained=1) (write resets)");
+atomic_t mxfs_b6_release_kept = ATOMIC_INIT(0);
+module_param_cb(b6_release_kept, &mxfs_dbg_atomic_param_ops,
+		&mxfs_b6_release_kept, 0644);
+MODULE_PARM_DESC(b6_release_kept,
+		 "count of those whose bounded drain could not land the state, so the grant stayed cached (P-B6-RELEASE-DIRTY kept=1) (write resets)");
+/*
+ * D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY, H-1: a free
+ * that xfs_inactive_ifree defers (the unlinked-list preflight, P-UNLPRE-SKIP,
+ * or the predecessor's hold, P-UNLPREV-DEFER) leaves the truncate this
+ * inactivation committed before it not at home.  The raw EX the inactivation
+ * runs under never sets i_dlm_mode, so when the cached mode is not EX the
+ * truncate's only flush sanction is MXFS_IF_DLM_RELFLUSH, which the exit
+ * clears; every later flush is refused (P119) and retired unwritten, and the
+ * peer reads the pre-truncate core, naming the blocks the truncate freed.
+ * ifree_defer_drain 1 (default) lands the inode's committed state with the B6
+ * drain's bounded chain while the sanction still holds, and fails closed
+ * (shutdown) when the bound runs out with the cached mode not EX, since no
+ * later flush could write the change; 0 is the same-build control, which only
+ * counts.  The counters count in both arms: ifree_defer_dirty, deferred frees
+ * leaving with committed state not at home (P-IFREE-DEFER-DIRTY);
+ * ifree_defer_drained, those the drain landed; ifree_defer_unlanded, those
+ * that failed closed.
+ */
+int mxfs_ifree_defer_drain = 1;
+module_param_named(ifree_defer_drain, mxfs_ifree_defer_drain, int, 0644);
+MODULE_PARM_DESC(ifree_defer_drain,
+		 "an inactivation whose free is deferred lands the state it committed before releasing its grant, failing closed when it cannot (1=default; 0=the same-build control)");
+atomic_t mxfs_ifree_defer_dirty = ATOMIC_INIT(0);
+module_param_cb(ifree_defer_dirty, &mxfs_dbg_atomic_param_ops,
+		&mxfs_ifree_defer_dirty, 0644);
+MODULE_PARM_DESC(ifree_defer_dirty,
+		 "count of deferred inode frees whose inactivation left committed state not at home (P-IFREE-DEFER-DIRTY) (write resets)");
+atomic_t mxfs_ifree_defer_drained = ATOMIC_INIT(0);
+module_param_cb(ifree_defer_drained, &mxfs_dbg_atomic_param_ops,
+		&mxfs_ifree_defer_drained, 0644);
+MODULE_PARM_DESC(ifree_defer_drained,
+		 "count of those the drain landed before the grant release (P-IFREE-DEFER-DIRTY drained=1) (write resets)");
+atomic_t mxfs_ifree_defer_unlanded = ATOMIC_INIT(0);
+module_param_cb(ifree_defer_unlanded, &mxfs_dbg_atomic_param_ops,
+		&mxfs_ifree_defer_unlanded, 0644);
+MODULE_PARM_DESC(ifree_defer_unlanded,
+		 "count of those whose bounded drain could not land the state with the cached mode not EX, so the node failed closed (P-IFREE-DEFER-UNLANDED-FATAL) (write resets)");
+/*
+ * D-IFREE-DEFER-UNLANDED-FATAL-SHUTDOWN-BEHIND-LOCKED-CLUSTER-BUFFER, H-IFD1:
+ * the drain above takes its 200 ms bound (ifree_drain_ms) from the
+ * inactivation that holds the AG DLM across its drain, where a peer's AG BAST
+ * waits on it.  The deferred free holds neither the AG DLM nor the ILOCK, and
+ * its bound ran out in lap ifd2 while xfsaild was writing the cluster buffer
+ * that carried the state (copied in 152 ms into the drain, the buffer locked
+ * for the write 1 ms before the bound), so the node failed closed over a write
+ * in flight.  1 keeps draining without a bound when the bound runs out with
+ * the cached mode not EX (the forward-progress contract the BAST release
+ * path's drains wait under) and fails closed only if the state still owes home
+ * once the item has landed; 0 is the same-build control, which fails closed at
+ * the bound.  ifree_defer_extended counts the drains whose bound ran out with
+ * the cached mode not EX, in both settings (P-IFREE-DEFER-EXTENDED).
+ */
+int mxfs_ifree_defer_extend = 1;
+module_param_named(ifree_defer_extend, mxfs_ifree_defer_extend, int, 0644);
+MODULE_PARM_DESC(ifree_defer_extend,
+		 "a deferred free whose bounded drain runs out with the cached mode not EX keeps draining until the state lands instead of failing closed (1=default; 0=the same-build control)");
+atomic_t mxfs_ifree_defer_extended = ATOMIC_INIT(0);
+module_param_cb(ifree_defer_extended, &mxfs_dbg_atomic_param_ops,
+		&mxfs_ifree_defer_extended, 0644);
+MODULE_PARM_DESC(ifree_defer_extended,
+		 "count of deferred-free drains whose bound ran out with the cached mode not EX (P-IFREE-DEFER-EXTENDED), extended or not (write resets)");
+/*
+ * TEST ONLY, for the H-IFD1 A/B: a bound in ms for the deferred free's drain
+ * in place of ifree_drain_ms (0, the default, keeps ifree_drain_ms).  Under
+ * the lap's load about one deferred-free drain in six takes 50 ms or more and
+ * about one in ninety more than 200 ms, so a short bound meets the arm the
+ * A/B grades in most laps instead of one in four.
+ */
+int mxfs_dbg_ifree_defer_bound_ms;
+module_param_named(dbg_ifree_defer_bound_ms, mxfs_dbg_ifree_defer_bound_ms, int, 0644);
+MODULE_PARM_DESC(dbg_ifree_defer_bound_ms,
+		 "TEST ONLY: the deferred free's drain bound in ms in place of ifree_drain_ms (0=ifree_drain_ms)");
+/*
+ * The same defect, H-2: the P-UNLPRE-SKIP deferral recorded no reap entry, so
+ * the zombie's freer kept no authority past the inactivation: every later
+ * inactivation of it, on any node, is refused by B4 (no local unlink, no EX),
+ * and after a clean unmount it is still on its bucket.  ifree_defer_reap 1
+ * (default) records the entry the P-UNLPREV-DEFER deferrals record, so the
+ * reaper's retry restores the authority and frees it; 0 is the same-build
+ * control.  ifree_defer_reaps counts the entries recorded.
+ */
+int mxfs_ifree_defer_reap = 1;
+module_param_named(ifree_defer_reap, mxfs_ifree_defer_reap, int, 0644);
+MODULE_PARM_DESC(ifree_defer_reap,
+		 "a free deferred at the unlinked-list preflight records a reap entry carrying the freer's authority (1=default; 0=the same-build control)");
+atomic_t mxfs_ifree_defer_reaps = ATOMIC_INIT(0);
+module_param_cb(ifree_defer_reaps, &mxfs_dbg_atomic_param_ops,
+		&mxfs_ifree_defer_reaps, 0644);
+MODULE_PARM_DESC(ifree_defer_reaps,
+		 "count of reap entries recorded for frees deferred at the unlinked-list preflight (write resets)");
+/*
+ * The same defect, H-3: the reaper retired an entry whenever its lookup
+ * failed, as freed elsewhere.  A lookup of an unlinked inode whose in-core
+ * copy is queued for inactivation fails -ENOENT (xfs_iget_cache_hit: unlinked
+ * inodes cannot be re-grabbed) though nothing has freed it.  The reaper's own
+ * unlinked-list walk for an earlier entry of the same pass reloads the
+ * bucket's members and releases them, which queues exactly that state; the
+ * queued inactivation runs without the authority only the reaper restores, so
+ * it is skipped, and the zombie stays on its bucket with no entry left to free
+ * it (lap fwcm3: six).  reap_transient_keep 1 (default) keeps an entry whose
+ * failed lookup met that life still in core (mode set, nlink 0, the entry's
+ * generation, queued, inactivating or done with it) for the next pass; 0 is
+ * the same-build control, which retires it.  reap_iget_transient counts those
+ * failures in both arms, reap_iget_retired the entries retired on a failed
+ * lookup.
+ */
+int mxfs_reap_transient_keep = 1;
+module_param_named(reap_transient_keep, mxfs_reap_transient_keep, int, 0644);
+MODULE_PARM_DESC(reap_transient_keep,
+		 "a reap entry whose lookup failed while its zombie's in-core inode was still in its inactivation is kept for the next pass (1=default; 0=retired, the same-build control)");
+atomic_t mxfs_reap_iget_transient = ATOMIC_INIT(0);
+module_param_cb(reap_iget_transient, &mxfs_dbg_atomic_param_ops,
+		&mxfs_reap_iget_transient, 0644);
+MODULE_PARM_DESC(reap_iget_transient,
+		 "count of reap lookups that failed while the entry's zombie was still in core in its inactivation (P88-REAP-IGET-FAIL transient=1) (write resets)");
+atomic_t mxfs_reap_iget_retired = ATOMIC_INIT(0);
+module_param_cb(reap_iget_retired, &mxfs_dbg_atomic_param_ops,
+		&mxfs_reap_iget_retired, 0644);
+MODULE_PARM_DESC(reap_iget_retired,
+		 "count of reap entries retired because their lookup failed (write resets)");
+/*
+ * D-FORMATION-RAMP-LOCK-REQUEST-EXHAUSTS-RETRIES-EAGAIN, H-F2: the engine
+ * returns -EAGAIN when an acquire spent its whole retry budget on RETRY answers
+ * (remaster, pend-retry, prepare, ledger-busy: a cluster reorganising itself,
+ * as when nodes join one after another), and the inode lock's timeout
+ * classifier had no arm for it: it reached the "lock unrecoverable" shutdown.
+ * ilock_retry_exhaust_park 1 (default) parks such an acquire with backoff and
+ * asks again, as behind a live holder or a pending recovery; a killed task at
+ * a fallible boundary leaves.  0 is the same-build control, the shutdown.
+ * ilock_retry_exhaust_parks counts the parks.  dbg_ilock_force_eagain_ino
+ * (test only, 0 = off) makes the next slow-path acquire of that inode report
+ * -EAGAIN for all its attempts without asking the engine, once, so the arm
+ * can be reached on demand.
+ */
+int mxfs_ilock_retry_exhaust_park = 1;
+module_param_named(ilock_retry_exhaust_park, mxfs_ilock_retry_exhaust_park, int, 0644);
+MODULE_PARM_DESC(ilock_retry_exhaust_park,
+		 "an inode acquire whose retry budget ran out on RETRY answers (-EAGAIN) parks and asks again (1=default; 0=the lock-unrecoverable shutdown, the same-build control)");
+atomic_t mxfs_ilock_retry_exhaust_parks = ATOMIC_INIT(0);
+module_param_cb(ilock_retry_exhaust_parks, &mxfs_dbg_atomic_param_ops,
+		&mxfs_ilock_retry_exhaust_parks, 0644);
+MODULE_PARM_DESC(ilock_retry_exhaust_parks,
+		 "count of inode acquires parked after their retry budget ran out on RETRY answers (P-LKRETRY-PARK) (write resets)");
+unsigned long long mxfs_dbg_ilock_force_eagain_ino;
+module_param_named(dbg_ilock_force_eagain_ino, mxfs_dbg_ilock_force_eagain_ino, ullong, 0644);
+MODULE_PARM_DESC(dbg_ilock_force_eagain_ino,
+		 "TEST ONLY: the next slow-path acquire of this inode reports -EAGAIN for all its attempts without asking the engine, once (0=off)");
+/*
+ * D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F12: an
+ * AG release publishes its scope's unpublished inodes in its prepass, while
+ * local admission to the AG is still open, and its drain took any in-scope
+ * entry on every pass, so the creates its own node kept making in that AG fed
+ * it new children faster than its workers claimed them; it ran out its window
+ * (fw3f2: 5000 ms, the peer waiting for the AG all that time) and the release
+ * went with a claim in flight.  pub_drain_bound 1 bounds an AG release's drain
+ * to the entries listed when it began; a later child is published by its
+ * directory's release, or by the next release of the AG, exactly as one
+ * created after a drain had emptied its scope always was.  Its A/B never
+ * reached (brc1, brf1, brc2), and H-F13's fence below stops the chase at its
+ * source, so it is off: 0 (default) is the open scan every H-F13 lap ran.
+ * pub_drain_bound_left counts the newer in-scope entries a bounded drain left
+ * listed at its end.
+ */
+int mxfs_pub_drain_bound;
+module_param_named(pub_drain_bound, mxfs_pub_drain_bound, int, 0644);
+MODULE_PARM_DESC(pub_drain_bound,
+		 "an AG release's publish drain takes only the unpublished inodes listed when it began (1; 0=default, every in-scope entry on every pass)");
+atomic_t mxfs_pub_drain_bound_left = ATOMIC_INIT(0);
+module_param_cb(pub_drain_bound_left, &mxfs_dbg_atomic_param_ops,
+		&mxfs_pub_drain_bound_left, 0644);
+MODULE_PARM_DESC(pub_drain_bound_left,
+		 "count of in-scope unpublished inodes listed after a bounded AG release drain began and left listed at its end (P-PUB-DRAIN-BOUND) (write resets)");
+/*
+ * What an AG handoff exposes, in both arms of pub_drain_bound: a peer granted
+ * the AG can reach an inode of it through the AGI and inode btree without its
+ * directory, and an inode still unpublished there grants it CLEAN while this
+ * node holds it EX.  pub_unlock_exposed counts AG unlocks with an unpublished
+ * inode of the AG still listed or one of its claims in flight;
+ * pub_unlock_listed sums the listed ones (P-PUB-UNPUB-AT-UNLOCK).
+ */
+atomic_t mxfs_pub_unlock_exposed = ATOMIC_INIT(0);
+module_param_cb(pub_unlock_exposed, &mxfs_dbg_atomic_param_ops,
+		&mxfs_pub_unlock_exposed, 0644);
+MODULE_PARM_DESC(pub_unlock_exposed,
+		 "count of AG unlocks with an unpublished inode of that AG still listed or its claim in flight (P-PUB-UNPUB-AT-UNLOCK) (write resets)");
+atomic_t mxfs_pub_unlock_listed = ATOMIC_INIT(0);
+module_param_cb(pub_unlock_listed, &mxfs_dbg_atomic_param_ops,
+		&mxfs_pub_unlock_listed, 0644);
+MODULE_PARM_DESC(pub_unlock_listed,
+		 "sum over AG unlocks of the unpublished inodes of that AG still listed (P-PUB-UNPUB-AT-UNLOCK) (write resets)");
+/*
+ * D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F13.
+ * Nothing stopped the holder's own creates from allocating inodes in an AG
+ * while a peer's BAST was pending on it: they re-adopted it during the
+ * release's prepass, which publishes with admission open, and the COMMIT taken
+ * afterwards at the last-holder unlock went to the post-COMMIT drains without
+ * publishing them (pha2: 32 listed at the unlock, 6 already unlinked), or fed
+ * the prepass drain children faster than it claimed them (fw3f2, fds3: the
+ * drain ran out its window and the release went with a claim in flight).
+ * ag_ialloc_fence 1 (default): while a peer's BAST is pending on an AG this
+ * node holds, no inode is allocated in it here (xfs_dialloc_try_ag answers as
+ * for a peer-held AG), and the release COMMIT waits, publishing again, while
+ * an unpublished inode of the AG is listed or one's claim is in flight -- for
+ * at most MXFS_PUB_DRAIN_TIMEOUT_MS from the BAST, then it commits as before
+ * (P-AG-FENCE-ESCAPE).  0 is the same-build control.  ag_ialloc_fenced counts
+ * refused allocations, ag_fence_held refused COMMITs, ag_fence_escaped COMMITs
+ * the window let through with an inode of the AG still exposed.
+ */
+int mxfs_ag_ialloc_fence = 1;
+module_param_named(ag_ialloc_fence, mxfs_ag_ialloc_fence, int, 0644);
+MODULE_PARM_DESC(ag_ialloc_fence,
+		 "no inode allocation in an AG while a peer's BAST is pending on it, and no release COMMIT while an unpublished inode of it is listed or claiming (1=default; 0=the same-build control)");
+atomic_t mxfs_ag_ialloc_fenced = ATOMIC_INIT(0);
+module_param_cb(ag_ialloc_fenced, &mxfs_dbg_atomic_param_ops,
+		&mxfs_ag_ialloc_fenced, 0644);
+MODULE_PARM_DESC(ag_ialloc_fenced,
+		 "count of inode allocations refused an AG because a peer's BAST was pending on it (write resets)");
+atomic_t mxfs_ag_fence_held = ATOMIC_INIT(0);
+module_param_cb(ag_fence_held, &mxfs_dbg_atomic_param_ops,
+		&mxfs_ag_fence_held, 0644);
+MODULE_PARM_DESC(ag_fence_held,
+		 "count of AG release COMMITs refused because an unpublished inode of the AG was listed or claiming (write resets)");
+atomic_t mxfs_ag_fence_escaped = ATOMIC_INIT(0);
+module_param_cb(ag_fence_escaped, &mxfs_dbg_atomic_param_ops,
+		&mxfs_ag_fence_escaped, 0644);
+MODULE_PARM_DESC(ag_fence_escaped,
+		 "count of AG release COMMITs taken past the fence's window with an unpublished inode of the AG still listed or claiming (P-AG-FENCE-ESCAPE) (write resets)");
+/*
+ * The fence keys on a BAST pending on a tenure this node holds.  The pending
+ * flag is also left set on an AG this node holds nothing of (a disk-locking
+ * BAST reaches the whole group, the waiter's re-BASTs land after the release),
+ * and only a fresh grant clears it, so a fence that refuses on it refuses the
+ * AG for good (mxfs_ag_ialloc_fenced_now).  ag_fence_hint_exempt 1 (default)
+ * lets the allocation through to its acquire; 0 is the same-build control
+ * that refuses as before.  ag_fence_hint_passed and ag_fence_hint_refused
+ * count each.
+ */
+int mxfs_ag_fence_hint_exempt = 1;
+module_param_named(ag_fence_hint_exempt, mxfs_ag_fence_hint_exempt, int, 0644);
+MODULE_PARM_DESC(ag_fence_hint_exempt,
+		 "a BAST pending on an AG this node holds no tenure of does not fence inode allocation in it (1=default; 0=the same-build control)");
+atomic_t mxfs_ag_fence_hint_passed = ATOMIC_INIT(0);
+module_param_cb(ag_fence_hint_passed, &mxfs_dbg_atomic_param_ops,
+		&mxfs_ag_fence_hint_passed, 0644);
+MODULE_PARM_DESC(ag_fence_hint_passed,
+		 "count of inode allocations let through an AG with a BAST pending but no tenure here (write resets)");
+atomic_t mxfs_ag_fence_hint_refused = ATOMIC_INIT(0);
+module_param_cb(ag_fence_hint_refused, &mxfs_dbg_atomic_param_ops,
+		&mxfs_ag_fence_hint_refused, 0644);
+MODULE_PARM_DESC(ag_fence_hint_refused,
+		 "count of inode allocations refused an AG with a BAST pending but no tenure here, ag_fence_hint_exempt=0 (write resets)");
+/*
+ * D-UMOUNT-ROOT-DENTRY-STILL-IN-USE-DEFERRED-DIR-DCACHE-SHRINK-RACE: every
+ * completed directory reload queues a deferred dcache shrink
+ * (mxfs_dir_dshrink_queue) that igrabs the directory and holds a reference
+ * on its dentry while it runs.  The only gate on it closed in put_super,
+ * which generic_shutdown_super calls after shrink_dcache_for_umount, so a
+ * shrink queued by the reload umount's own stat of the mount point caused
+ * was still running when the dentry tree was walked: 'BUG: Dentry ... still
+ * in use (2) [unmount of mxfs sda]' (jwc3, test15).  dshrink_umount_gate 1
+ * (default): xfs_kill_sb closes a gate on new shrinks, waits for the queue
+ * calls already past it, and flushes the inode BAST workqueue before
+ * kill_block_super; 0 is the same-build control.  dshrink_at_umount counts
+ * the shrinks queued or running when xfs_kill_sb began, dshrink_gate_refused
+ * the queue calls the closed gate turned away.  dbg_dshrink_hold_ms (TEST
+ * ONLY, 0 = off) keeps each shrink's dentry reference that long before it
+ * runs, so an unmount right after a directory reload meets it.
+ */
+int mxfs_dshrink_umount_gate = 1;
+module_param_named(dshrink_umount_gate, mxfs_dshrink_umount_gate, int, 0644);
+MODULE_PARM_DESC(dshrink_umount_gate,
+		 "unmount waits out the deferred directory dcache shrinks before the dentry tree is torn down (1=default; 0=the same-build control)");
+atomic_t mxfs_dshrink_at_umount = ATOMIC_INIT(0);
+module_param_cb(dshrink_at_umount, &mxfs_dbg_atomic_param_ops,
+		&mxfs_dshrink_at_umount, 0644);
+MODULE_PARM_DESC(dshrink_at_umount,
+		 "count of deferred directory dcache shrinks queued or running when an unmount reached xfs_kill_sb (write resets)");
+atomic_t mxfs_dshrink_gate_refused = ATOMIC_INIT(0);
+module_param_cb(dshrink_gate_refused, &mxfs_dbg_atomic_param_ops,
+		&mxfs_dshrink_gate_refused, 0644);
+MODULE_PARM_DESC(dshrink_gate_refused,
+		 "count of deferred directory dcache shrinks refused because the unmount had closed their gate (write resets)");
+int mxfs_dbg_dshrink_hold_ms;
+module_param_named(dbg_dshrink_hold_ms, mxfs_dbg_dshrink_hold_ms, int, 0644);
+MODULE_PARM_DESC(dbg_dshrink_hold_ms,
+		 "TEST ONLY: a deferred directory dcache shrink holds its dentry reference this many ms before it runs (0=off)");
+/*
+ * D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-NUMBER-REUSE, H-WW1
+ * instrument: inode-cluster writes that mxfs_submit_partial_inode_write sent
+ * whole under multi-node membership, by the bail that sent them.  early: a
+ * buffer it does not split (readahead ops, maps, a fresh chunk, no perag,
+ * geometry); noskip: every slot was going out anyway; empty: every sector was
+ * skipped and no passenger skip let the refusal fire; declined: every sector
+ * was skipped and the passenger refusal declined.  kwf2's and jzf1's removed
+ * names went back on the platter in the creator's whole writes of a cluster
+ * whose directory slot was its own stale image.  Detection only.
+ */
+atomic_t mxfs_iwr_whole_early = ATOMIC_INIT(0);
+module_param_cb(iwr_whole_early, &mxfs_dbg_atomic_param_ops,
+		&mxfs_iwr_whole_early, 0644);
+MODULE_PARM_DESC(iwr_whole_early,
+		 "count of inode-cluster writes sent whole because the partial writer does not split that buffer (write resets)");
+atomic_t mxfs_iwr_whole_noskip = ATOMIC_INIT(0);
+module_param_cb(iwr_whole_noskip, &mxfs_dbg_atomic_param_ops,
+		&mxfs_iwr_whole_noskip, 0644);
+MODULE_PARM_DESC(iwr_whole_noskip,
+		 "count of inode-cluster writes sent whole because no slot was skipped (write resets)");
+atomic_t mxfs_iwr_whole_empty = ATOMIC_INIT(0);
+module_param_cb(iwr_whole_empty, &mxfs_dbg_atomic_param_ops,
+		&mxfs_iwr_whole_empty, 0644);
+MODULE_PARM_DESC(iwr_whole_empty,
+		 "count of inode-cluster writes sent whole although every sector was skipped, with no passenger skip (write resets)");
+atomic_t mxfs_iwr_whole_declined = ATOMIC_INIT(0);
+module_param_cb(iwr_whole_declined, &mxfs_dbg_atomic_param_ops,
+		&mxfs_iwr_whole_declined, 0644);
+MODULE_PARM_DESC(iwr_whole_declined,
+		 "count of inode-cluster writes sent whole although every sector was skipped, the passenger refusal declining (write resets)");
+/*
+ * H-WW1 fix: an inode-cluster write whose every sector the per-slot rules
+ * skipped, with no passenger skip, completes with no I/O instead of going
+ * out whole (the whole write publishes only slots those rules refused).
+ * 1 (default) refuses; 0 is the same-build control.  iwr_empty_refused
+ * counts the refusals.
+ */
+int mxfs_iwr_refuse_empty = 1;
+module_param_named(iwr_refuse_empty, mxfs_iwr_refuse_empty, int, 0644);
+MODULE_PARM_DESC(iwr_refuse_empty,
+		 "an inode-cluster write whose every sector was skipped completes with no I/O instead of going out whole (1=default; 0=the whole write, the same-build control)");
+atomic_t mxfs_iwr_empty_refused = ATOMIC_INIT(0);
+module_param_cb(iwr_empty_refused, &mxfs_dbg_atomic_param_ops,
+		&mxfs_iwr_empty_refused, 0644);
+MODULE_PARM_DESC(iwr_empty_refused,
+		 "count of inode-cluster writes refused because every sector was skipped (write resets)");
+/*
+ * D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, H-U6:
+ * xfs_inactive_ifree released its predecessor pin (H-U1) and hold (H-U4) with
+ * a synchronous xfs_irele after the free committed.  When it is the
+ * predecessor's last reference and the predecessor is unlinked, its whole
+ * inactivation runs nested inside this one, while this inode's number is
+ * already free in the inobt and its in-core inode still inactivating: a local
+ * create that picks the number holds the AGI and waits in xfs_iget for this
+ * inactivation to finish, and the nested one waits for that AGI (hu4df1,
+ * test29).  unlprev_rele_defer 1 (default) hands those references to the
+ * inode BAST workqueue, so the predecessor's inactivation runs after this one
+ * has finished; 0 is the same-build control, which releases them inline.
+ * unlprev_rele_deferred counts the references handed off.
+ */
+int mxfs_unlprev_rele_defer = 1;
+module_param_named(unlprev_rele_defer, mxfs_unlprev_rele_defer, int, 0644);
+MODULE_PARM_DESC(unlprev_rele_defer,
+		 "a free's predecessor pin and hold are released from the inode BAST workqueue, never inside the inactivation (1=default; 0=inline, the same-build control)");
+atomic_t mxfs_unlprev_rele_deferred = ATOMIC_INIT(0);
+module_param_cb(unlprev_rele_deferred, &mxfs_dbg_atomic_param_ops,
+		&mxfs_unlprev_rele_deferred, 0644);
+MODULE_PARM_DESC(unlprev_rele_deferred,
+		 "count of predecessor references a free released through the inode BAST workqueue (write resets)");
+/*
+ * H-U6's census and window, for the same-build A/B of unlprev_rele_defer.  A
+ * predecessor reference released after the free committed can run a nested
+ * inactivation only when it is the predecessor's last reference and the
+ * predecessor is unlinked.  A candidate is a committed free whose references
+ * are an unlinked predecessor's only ones when it starts releasing them
+ * (P-UNLPREV-RELE-LAST, once per predecessor, the same test in both arms: a
+ * free holds the pin and the hold on one predecessor, and in the fix arm the
+ * first is still queued when the second goes).  unlprev_rele_inline_last
+ * counts the inline releases that dropped the last reference (each one an
+ * inactivation run inside the outer one), unlprev_rele_deferred_last the
+ * workqueue releases that did (each one run after the outer one).
+ * dbg_unlprev_rele_hold_ms holds each candidate that long before its releases
+ * in both arms, so a local create can take the freed number while the freed
+ * inode is still inactivating: hu4df1's window, opened on purpose.
+ */
+int mxfs_dbg_unlprev_rele_hold_ms;
+module_param_named(dbg_unlprev_rele_hold_ms, mxfs_dbg_unlprev_rele_hold_ms, int, 0644);
+MODULE_PARM_DESC(dbg_unlprev_rele_hold_ms,
+		 "TEST ONLY: ms a committed free holds its last reference on an unlinked predecessor before releasing it (0=off)");
+atomic_t mxfs_unlprev_rele_inline_last = ATOMIC_INIT(0);
+module_param_cb(unlprev_rele_inline_last, &mxfs_dbg_atomic_param_ops,
+		&mxfs_unlprev_rele_inline_last, 0644);
+MODULE_PARM_DESC(unlprev_rele_inline_last,
+		 "count of committed frees that released their last reference on an unlinked predecessor inline (write resets)");
+atomic_t mxfs_unlprev_rele_deferred_last = ATOMIC_INIT(0);
+module_param_cb(unlprev_rele_deferred_last, &mxfs_dbg_atomic_param_ops,
+		&mxfs_unlprev_rele_deferred_last, 0644);
+MODULE_PARM_DESC(unlprev_rele_deferred_last,
+		 "count of workqueue releases of a committed free's reference that were an unlinked predecessor's last (write resets)");
+/*
+ * The same defect, H-U7: a reload that keeps the in-core inode (judged
+ * identical to the platter, or kept ahead of it) skips xfs_inode_from_disk, the
+ * only reload path that imports di_next_unlinked.  A peer's removal of this
+ * inode's successor rewrites that field under the peer's EX and lands it, but
+ * moves none of the fields the identical test compares (the iunlink item logs
+ * a range of the cluster buffer, not the core), so the kept in-core next still
+ * names the removed successor and this node's own free of the inode stitches
+ * the bucket to it (pfcw1: P-UNLREM-BACKREF next=0x81 rc=-22, shutdown).
+ * reload_next_refresh 1 (default) imports the reload's di_next_unlinked into a
+ * kept unlinked inode of the same life; 0 keeps the in-core value, the
+ * same-build control.  reload_next_stale counts kept reloads whose dinode
+ * named another next than the in-core inode, in both arms;
+ * reload_next_refreshed those that imported it.
+ */
+int mxfs_reload_next_refresh = 1;
+module_param_named(reload_next_refresh, mxfs_reload_next_refresh, int, 0644);
+MODULE_PARM_DESC(reload_next_refresh,
+		 "a reload that keeps an unlinked inode's in-core state imports the dinode's di_next_unlinked when it differs (1=default; 0=keeps the in-core value, the same-build control)");
+atomic_t mxfs_reload_next_stale = ATOMIC_INIT(0);
+module_param_cb(reload_next_stale, &mxfs_dbg_atomic_param_ops,
+		&mxfs_reload_next_stale, 0644);
+MODULE_PARM_DESC(reload_next_stale,
+		 "count of reloads that kept an unlinked inode whose dinode named a different di_next_unlinked than its in-core inode (P-RELOAD-NEXT-STALE) (write resets)");
+atomic_t mxfs_reload_next_refreshed = ATOMIC_INIT(0);
+module_param_cb(reload_next_refreshed, &mxfs_dbg_atomic_param_ops,
+		&mxfs_reload_next_refreshed, 0644);
+MODULE_PARM_DESC(reload_next_refreshed,
+		 "count of those reloads that imported the dinode's di_next_unlinked (P-RELOAD-NEXT-STALE refreshed=1) (write resets)");
+/*
+ * H-F8b, the same rule at the reload's P116 self-clobber guard
+ * (xfs/xfs_mxfs_reload.c mxfs_reload_self_clobber_guard): its grant term kept a
+ * clean shell over a FREE disk image on the held grant alone.
+ * selfclobber_keep_guard 1 (default) adopts the freed image for a clean held
+ * shell; 0 keeps it, the same-build control.  keep_clean counts the hazard,
+ * clean_refused the guard's reach.
+ */
+int mxfs_selfclobber_keep_guard = 1;
+module_param_named(selfclobber_keep_guard, mxfs_selfclobber_keep_guard, int, 0644);
+MODULE_PARM_DESC(selfclobber_keep_guard,
+		 "the reload's self-clobber guard keeps an in-core inode over a FREE disk image only when it has committed changes not yet on the platter (1=default; 0=a held grant also keeps it, the same-build control)");
+atomic_t mxfs_selfclobber_keep_clean = ATOMIC_INIT(0);
+module_param_cb(selfclobber_keep_clean, &mxfs_dbg_atomic_param_ops,
+		&mxfs_selfclobber_keep_clean, 0644);
+MODULE_PARM_DESC(selfclobber_keep_clean,
+		 "count of reloads whose self-clobber guard kept a CLEAN shell over a FREE disk image on the held grant alone (P116 clean_held=1) (write resets)");
+atomic_t mxfs_selfclobber_clean_refused = ATOMIC_INIT(0);
+module_param_cb(selfclobber_clean_refused, &mxfs_dbg_atomic_param_ops,
+		&mxfs_selfclobber_clean_refused, 0644);
+MODULE_PARM_DESC(selfclobber_clean_refused,
+		 "count of reloads where selfclobber_keep_guard refused that keep (P116-CLEAN-REFUSED) (write resets)");
+/* the two arms of noino_recycle_guard (xfs/xfs_mxfs_noino.c) */
+atomic_t mxfs_recycle_reset_noino = ATOMIC_INIT(0);
+module_param_cb(recycle_reset_noino, &mxfs_dbg_atomic_param_ops,
+		&mxfs_recycle_reset_noino, 0644);
+MODULE_PARM_DESC(recycle_reset_noino,
+		 "count of recycles that reset a cached grant because a no-inode release of the same inode may be in flight (P-RECYCLE-RESET-UNDER-NOINO) (write resets)");
+/* noino_recycle_dirty_wait (xfs/xfs_mxfs_noino.c) */
+atomic_t mxfs_recycle_dirty_waits = ATOMIC_INIT(0);
+module_param_cb(recycle_dirty_waits, &mxfs_dbg_atomic_param_ops,
+		&mxfs_recycle_dirty_waits, 0644);
+MODULE_PARM_DESC(recycle_dirty_waits,
+		 "count of corpses whose recycle waited for an in-flight no-inode release because they still owed the platter a committed change (P-RECYCLE-DIRTY-WAIT) (write resets)");
+atomic_t mxfs_recycle_dirty_wait_rounds = ATOMIC_INIT(0);
+module_param_cb(recycle_dirty_wait_rounds, &mxfs_dbg_atomic_param_ops,
+		&mxfs_recycle_dirty_wait_rounds, 0644);
+MODULE_PARM_DESC(recycle_dirty_wait_rounds,
+		 "count of xfs_iget passes those waits refused, one per retry (write resets)");
+atomic_t mxfs_recycle_dirty_kept = ATOMIC_INIT(0);
+module_param_cb(recycle_dirty_kept, &mxfs_dbg_atomic_param_ops,
+		&mxfs_recycle_dirty_kept, 0644);
+MODULE_PARM_DESC(recycle_dirty_kept,
+		 "count of recycles that kept a dirty corpse's grant instead of resetting it, the release having registered after the recycle began (P-RECYCLE-DIRTY-KEEP) (write resets)");
+atomic_t mxfs_recycle_dirty_hazard = ATOMIC_INIT(0);
+module_param_cb(recycle_dirty_hazard, &mxfs_dbg_atomic_param_ops,
+		&mxfs_recycle_dirty_hazard, 0644);
+MODULE_PARM_DESC(recycle_dirty_hazard,
+		 "count of recycles that met a corpse owing the platter a committed change under a tracked in-flight no-inode release and, with noino_recycle_dirty_wait=0, went on to reset it; one per iget pass (write resets)");
+atomic_t mxfs_recycle_reset_dirty = ATOMIC_INIT(0);
+module_param_cb(recycle_reset_dirty, &mxfs_dbg_atomic_param_ops,
+		&mxfs_recycle_reset_dirty, 0644);
+MODULE_PARM_DESC(recycle_reset_dirty,
+		 "count of P-RECYCLE-RESET-UNDER-NOINO resets of a corpse that still owed the platter a committed change (owes=1) (write resets)");
+atomic_t mxfs_recycle_waited_reset = ATOMIC_INIT(0);
+module_param_cb(recycle_waited_reset, &mxfs_dbg_atomic_param_ops,
+		&mxfs_recycle_waited_reset, 0644);
+MODULE_PARM_DESC(recycle_waited_reset,
+		 "count of recycles after such a wait whose unsampled measurement found the grant gone and reset it (P-RECYCLE-WAITED) (write resets)");
+/* noino_recycle_takeover (xfs/xfs_mxfs_noino.c) */
+atomic_t mxfs_recycle_dirty_takeover = ATOMIC_INIT(0);
+module_param_cb(recycle_dirty_takeover, &mxfs_dbg_atomic_param_ops,
+		&mxfs_recycle_dirty_takeover, 0644);
+MODULE_PARM_DESC(recycle_dirty_takeover,
+		 "count of recycles that could not wait and took an in-flight no-inode release over, keeping a dirty corpse's grant (P-RECYCLE-DIRTY-TAKEOVER) (write resets)");
+atomic_t mxfs_noino_takeovers = ATOMIC_INIT(0);
+module_param_cb(noino_takeovers, &mxfs_dbg_atomic_param_ops,
+		&mxfs_noino_takeovers, 0644);
+MODULE_PARM_DESC(noino_takeovers,
+		 "count of no-inode releases that found themselves taken over and did not unlock (P-NOINO-TAKEN-OVER) (write resets)");
+/* noino_acq_takeover (xfs/xfs_mxfs_noino.c) */
+atomic_t mxfs_noino_acq_meets = ATOMIC_INIT(0);
+module_param_cb(noino_acq_meets, &mxfs_dbg_atomic_param_ops,
+		&mxfs_noino_acq_meets, 0644);
+MODULE_PARM_DESC(noino_acq_meets,
+		 "count of acquires whose transaction held items that met an in-flight no-inode release of their number, whatever noino_acq_takeover says (write resets)");
+atomic_t mxfs_noino_acq_takeovers = ATOMIC_INIT(0);
+module_param_cb(noino_acq_takeovers, &mxfs_dbg_atomic_param_ops,
+		&mxfs_noino_acq_takeovers, 0644);
+MODULE_PARM_DESC(noino_acq_takeovers,
+		 "count of acquires whose transaction held items that took an in-flight no-inode release of their number over instead of waiting behind it (P-NOINO-ACQ-TAKEOVER) (write resets)");
+atomic_t mxfs_noino_fence_taken = ATOMIC_INIT(0);
+module_param_cb(noino_fence_taken, &mxfs_dbg_atomic_param_ops,
+		&mxfs_noino_fence_taken, 0644);
+MODULE_PARM_DESC(noino_fence_taken,
+		 "count of no-inode release drain fences that stopped because the release was taken over (P-NOINO-FENCE-TAKEN) (write resets)");
+atomic_t mxfs_dbg_recycle_nowait_hits = ATOMIC_INIT(0);
+module_param_cb(dbg_recycle_nowait_hits, &mxfs_dbg_atomic_param_ops,
+		&mxfs_dbg_recycle_nowait_hits, 0644);
+MODULE_PARM_DESC(dbg_recycle_nowait_hits,
+		 "TEST ONLY: count of recycles dbg_recycle_nowait sent on without the wait they would have taken (write resets)");
+atomic_t mxfs_noino_recycle_redrive = ATOMIC_INIT(0);
+module_param_cb(noino_recycle_redrive, &mxfs_dbg_atomic_param_ops,
+		&mxfs_noino_recycle_redrive, 0644);
+MODULE_PARM_DESC(noino_recycle_redrive,
+		 "count of no-inode BASTs re-driven because the corpse entered a recycle before the release was registered (P-NOINO-RECYCLE-REDRIVE) (write resets)");
+/*
+ * H-F7c, the create side of the same window (xfs/libxfs/xfs_ialloc.c
+ * mxfs_dialloc_noino_inflight): the allocator's probe is answered by the DLM's
+ * already-granted shortcut, which mints no generation, so a create that reuses
+ * a number whose no-inode release is in flight builds its new life on the very
+ * grant that release anchored at its BAST, and the release unlocks it after
+ * its live check with the new life's changes undrained.  noino_resv_guard 1
+ * (default) skips such a number as a peer-held one; 0 takes it, the same-build
+ * control.  resv_under_noino counts the hazard (a candidate reserved or taken
+ * while the release was in flight), resv_noino_skipped the guard's reach.
+ */
+int mxfs_noino_resv_guard = 1;
+module_param_named(noino_resv_guard, mxfs_noino_resv_guard, int, 0644);
+MODULE_PARM_DESC(noino_resv_guard,
+		 "the inode allocator never takes a number whose no-inode release is in flight on this node (1=default; 0=takes it, the same-build control)");
+atomic_t mxfs_dialloc_resv_under_noino = ATOMIC_INIT(0);
+module_param_cb(dialloc_resv_under_noino, &mxfs_dbg_atomic_param_ops,
+		&mxfs_dialloc_resv_under_noino, 0644);
+MODULE_PARM_DESC(dialloc_resv_under_noino,
+		 "count of inode-allocator candidates reserved or taken while a no-inode release of the same number was in flight (P-DIALLOC-RESV-UNDER-NOINO) (write resets)");
+atomic_t mxfs_dialloc_resv_noino_skipped = ATOMIC_INIT(0);
+module_param_cb(dialloc_resv_noino_skipped, &mxfs_dbg_atomic_param_ops,
+		&mxfs_dialloc_resv_noino_skipped, 0644);
+MODULE_PARM_DESC(dialloc_resv_noino_skipped,
+		 "count of inode-allocator candidates noino_resv_guard skipped because a no-inode release of the number was in flight (P-DIALLOC-NOINO-SKIP) (write resets)");
+/*
+ * H-F9, the lookup side (xfs/xfs_mxfs_bast.c __mxfs_dlm_bast_notify): a
+ * VFS-live in-core inode whose reload adopted a peer's free (mode 0,
+ * P116-ZOMBIE-ADOPT) is refused by xfs_iget(XFS_IGET_INCORE) and classified
+ * LIVE, so a peer's BAST for it was served by the no-inode release, which
+ * unlocks the grant the shell still caches.  noino_shell_guard 1 (default)
+ * serves such a BAST through the in-core path, which releases the grant and
+ * the cached mode together; 0 sends it to the no-inode release, the same-build
+ * control.  noino_live_shell counts the hazard (a BAST that met such a shell),
+ * noino_shell_routed the guard's reach.
+ */
+int mxfs_noino_shell_guard = 1;
+module_param_named(noino_shell_guard, mxfs_noino_shell_guard, int, 0644);
+MODULE_PARM_DESC(noino_shell_guard,
+		 "a peer BAST for a live in-core inode holding a freed image is served by the in-core release (1=default; 0=no-inode release, the same-build control)");
+atomic_t mxfs_noino_live_shell = ATOMIC_INIT(0);
+module_param_cb(noino_live_shell, &mxfs_dbg_atomic_param_ops,
+		&mxfs_noino_live_shell, 0644);
+MODULE_PARM_DESC(noino_live_shell,
+		 "count of BASTs whose in-core lookup refused a live inode holding a freed image (P-NOINO-LIVE-SHELL) (write resets)");
+atomic_t mxfs_noino_shell_routed = ATOMIC_INIT(0);
+module_param_cb(noino_shell_routed, &mxfs_dbg_atomic_param_ops,
+		&mxfs_noino_shell_routed, 0644);
+MODULE_PARM_DESC(noino_shell_routed,
+		 "count of those BASTs noino_shell_guard served through the in-core release (write resets)");
+/*
+ * H-F10, the publish side (xfs/xfs_mxfs_publish.c): a publish drain takes an
+ * unpublished inode off the list before its claim, which is safe only while
+ * the peer that sent the BAST is the one that could reach the inode.  An
+ * inode whose parent was not yet recorded is in every drain's scope, so the
+ * drain of an unrelated lock can take it, and its real parent's release then
+ * goes to the peer with the inode neither unpublished nor granted.
+ * pub_claim_release_guard 1 (default) holds a release until every claim in
+ * its scope taken by another publish has returned (bounded by the drain's own
+ * window); 0 lets it go, the same-build control.  pub_claim_inflight_rel
+ * counts the hazard (a release that went with such a claim in flight),
+ * pub_claim_rel_waited the guard's reach.
+ */
+int mxfs_pub_claim_release_guard = 1;
+module_param_named(pub_claim_release_guard, mxfs_pub_claim_release_guard, int, 0644);
+MODULE_PARM_DESC(pub_claim_release_guard,
+		 "a directory or AG release waits for the publish claims in flight in its scope (1=default; 0=goes with them in flight, the same-build control)");
+atomic_t mxfs_pub_claim_inflight_rel = ATOMIC_INIT(0);
+module_param_cb(pub_claim_inflight_rel, &mxfs_dbg_atomic_param_ops,
+		&mxfs_pub_claim_inflight_rel, 0644);
+MODULE_PARM_DESC(pub_claim_inflight_rel,
+		 "count of directory or AG releases that went while a publish claim in their scope was in flight (P-PUB-CLAIM-INFLIGHT-AT-RELEASE) (write resets)");
+atomic_t mxfs_pub_claim_rel_waited = ATOMIC_INIT(0);
+module_param_cb(pub_claim_rel_waited, &mxfs_dbg_atomic_param_ops,
+		&mxfs_pub_claim_rel_waited, 0644);
+MODULE_PARM_DESC(pub_claim_rel_waited,
+		 "count of releases pub_claim_release_guard held until the claims in their scope returned (write resets)");
+/* TEST ONLY: hold every BAST-drain claim this long between the take and the
+ * request, so a release in its scope meets it in flight (the H-F10 A/B). */
+unsigned int mxfs_dbg_pub_claim_delay_ms;
+module_param_named(dbg_pub_claim_delay_ms, mxfs_dbg_pub_claim_delay_ms, uint, 0644);
+MODULE_PARM_DESC(dbg_pub_claim_delay_ms,
+		 "TEST ONLY: ms a publish drain waits between taking an inode off the unpublished list and claiming it (0=off)");
+/* TEST ONLY: hold a regular-file create this long while its new inode is
+ * listed unpublished with no parent recorded, the window in which the drain
+ * of another directory can take it (the H-F10 A/B's reach; the claim delay
+ * above only lengthens what follows a take). */
+unsigned int mxfs_dbg_create_parent_delay_ms;
+module_param_named(dbg_create_parent_delay_ms, mxfs_dbg_create_parent_delay_ms, uint, 0644);
+MODULE_PARM_DESC(dbg_create_parent_delay_ms,
+		 "TEST ONLY: ms a regular-file create waits, its new inode unpublished, before recording the inode's parent directory (0=off)");
+/* TEST ONLY: hold every create this long between the allocator's take of the
+ * number and the inode's instantiation (xfs/xfs_inode.c xfs_create), the
+ * window in which a peer BAST registering a no-inode release of the number
+ * leaves the create waiting behind that release
+ * (D-4NODE-SHARED-DIR-EX-HANDOFF-6S-TAIL-DOZE's reach). */
+unsigned int mxfs_dbg_create_alloc_delay_ms;
+module_param_named(dbg_create_alloc_delay_ms, mxfs_dbg_create_alloc_delay_ms, uint, 0644);
+MODULE_PARM_DESC(dbg_create_alloc_delay_ms,
+		 "TEST ONLY: ms a create waits between the allocator's take of the inode number and the inode's instantiation (0=off)");
+/*
+ * H-F10, the write side (pal/linux/xfs_buf.c, the cluster write): between the
+ * take and the claim's return the inode is neither unpublished nor granted, and
+ * its own writeback can put a live core home while a peer may hold the number
+ * (P-LOGWR-DLM-NOGRANT pub_inflight=1: 1-2 per lap on the H-F10 fix laps, whose
+ * release guard does not reach it).  pub_claim_write_guard 1 (default) masks
+ * such a slot from the home write; the item stays dirty in the AIL and the next
+ * push writes it under the grant the claim brings.  0 writes it, the same-build
+ * control.  pub_claim_write_masked counts the masks.
+ */
+int mxfs_pub_claim_write_guard = 1;
+module_param_named(pub_claim_write_guard, mxfs_pub_claim_write_guard, int, 0644);
+MODULE_PARM_DESC(pub_claim_write_guard,
+		 "a cluster write never carries the live core of an inode whose publish claim is in flight (1=default; 0=writes it, the same-build control)");
+atomic_t mxfs_pub_claim_write_masked = ATOMIC_INIT(0);
+module_param_cb(pub_claim_write_masked, &mxfs_dbg_atomic_param_ops,
+		&mxfs_pub_claim_write_masked, 0644);
+MODULE_PARM_DESC(pub_claim_write_masked,
+		 "count of live slots pub_claim_write_guard masked from a cluster write because the inode's publish claim was in flight (P-PUB-CLAIM-WRITE-MASKED) (write resets)");
+/*
+ * D-CREATE-ON-ZOMBIE-SHELL-INHERITS-DEAD-LIFE-NBLOCKS: a reload that adopts a
+ * peer's free image (P116-ZOMBIE-ADOPT) takes only its generation and mode
+ * (xfs_inode_from_disk stops at a free image), so the shell keeps the dead
+ * life's block count, size and forks.  A create that recycles the shell is
+ * deferred as a dead shell (P-CR63 enters on a mode or a block count), but the
+ * recycle's sanitize arm ran only for a shell that still had a mode, and
+ * xfs_inode_init only asserts that the block count is 0: the new life went
+ * home with the dead life's count (2/net/mesh/direct lap q6dc1, ino 8388736:
+ * an empty file's core with nblocks 1 and no extents, which xfs_dinode_verify
+ * rejected on both nodes).  deadshell_sanitize_guard 1 (default) resets every
+ * deferred dead shell whose home reads free; 0 keeps the mode-only test, the
+ * same-build control.  deadshell_stale_blocks counts the hazard (a deferred
+ * shell with no mode over a free home), deadshell_stale_sanitized the guard's
+ * reach, and create_nblocks_inherited every create that reached
+ * xfs_inode_init with a block count, by whatever path.
+ */
+int mxfs_deadshell_sanitize_guard = 1;
+module_param_named(deadshell_sanitize_guard, mxfs_deadshell_sanitize_guard, int, 0644);
+MODULE_PARM_DESC(deadshell_sanitize_guard,
+		 "a create that recycles a peer-freed dead shell over a free home resets it to a free shell, mode or not (1=default; 0=only a shell that still has a mode, the same-build control)");
+atomic_t mxfs_deadshell_stale_blocks = ATOMIC_INIT(0);
+module_param_cb(deadshell_stale_blocks, &mxfs_dbg_atomic_param_ops,
+		&mxfs_deadshell_stale_blocks, 0644);
+MODULE_PARM_DESC(deadshell_stale_blocks,
+		 "count of create-path recycles of a deferred dead shell with no mode over a free home (P-RECYCLE-DEADSHELL-STALE) (write resets)");
+atomic_t mxfs_deadshell_stale_sanitized = ATOMIC_INIT(0);
+module_param_cb(deadshell_stale_sanitized, &mxfs_dbg_atomic_param_ops,
+		&mxfs_deadshell_stale_sanitized, 0644);
+MODULE_PARM_DESC(deadshell_stale_sanitized,
+		 "count of those shells deadshell_sanitize_guard reset to free (write resets)");
+atomic_t mxfs_create_nblocks_inherited = ATOMIC_INIT(0);
+module_param_cb(create_nblocks_inherited, &mxfs_dbg_atomic_param_ops,
+		&mxfs_create_nblocks_inherited, 0644);
+MODULE_PARM_DESC(create_nblocks_inherited,
+		 "count of creates whose new inode reached xfs_inode_init with a nonzero block count (P-CREATE-NBLOCKS-INHERITED) (write resets)");
+/*
+ * D-CREATE-REUSE-OVER-PEER-FREED-LINKED-CORPSE-SHUTS-NODE-DOWN: a create that
+ * takes a number a peer unlinked and freed while this node held the number's
+ * old life evicted with its link count intact.  The copy never saw the peer's
+ * unlink, so it still reads nlink 1, and P-CR63 deferred only a copy with
+ * nlink 0: the linked one reached xfs_iget_check_free_state, which called the
+ * free number corrupt, and xfs_create cancelled its dirty transaction
+ * (2/disk/caw/direct lap iwc1, ino 141: the peer's free image was durable
+ * 28 ms before the create took the number).  cr63_linked_defer 1 (default)
+ * defers a linked copy to the recycle path's platter re-read as it does an
+ * unlinked one; 0 lets it fall through, the same-build control.
+ * cr63_linked_deferred counts the deferrals, cr63_linked_refused the ones
+ * whose recycle then failed (a LIVE home, P-CR63-DEFER-DISKLIVE, or any other
+ * error).
+ */
+int mxfs_cr63_linked_defer = 1;
+module_param_named(cr63_linked_defer, mxfs_cr63_linked_defer, int, 0644);
+MODULE_PARM_DESC(cr63_linked_defer,
+		 "a create that finds a reclaimable copy of its number still linked defers the free-state check to the recycle path's platter re-read, as for an unlinked copy (1=default; 0=the linked copy falls through to the free-state check, the same-build control)");
+atomic_t mxfs_cr63_linked_deferred = ATOMIC_INIT(0);
+module_param_cb(cr63_linked_deferred, &mxfs_dbg_atomic_param_ops,
+		&mxfs_cr63_linked_deferred, 0644);
+MODULE_PARM_DESC(cr63_linked_deferred,
+		 "count of creates that deferred a linked reclaimable copy to the platter re-read (P-CR63-DEADSHELL-DEFER-LINKED) (write resets)");
+atomic_t mxfs_cr63_linked_refused = ATOMIC_INIT(0);
+module_param_cb(cr63_linked_refused, &mxfs_dbg_atomic_param_ops,
+		&mxfs_cr63_linked_refused, 0644);
+MODULE_PARM_DESC(cr63_linked_refused,
+		 "count of those deferrals whose recycle returned an error (P-CR63-LINKED-REFUSED) (write resets)");
+/*
+ * D-CREATE-REUSE-OVER-MID-TEARDOWN-SHELL-IGRAB-FAIL-DIRTY-CANCEL-SHUTDOWN,
+ * H-CG1: P-CR63 igrabs a non-reclaimable cached copy of the number a create
+ * took, to reset it for the create.  When the VFS inode is being torn down at
+ * that instant (I_FREEING: a drop_caches or reclaim eviction) igrab fails, and
+ * the copy fell through to xfs_iget_check_free_state, which called its stale
+ * live mode corruption; xfs_create then cancelled its dirty transaction (lap
+ * rsd11, ino 208: i_state 0x0 at the P-CR63-SHELL read, 0x60 at the igrab
+ * 10 us later).  cr63_igrab_retry 1 (default) retries the lookup, as
+ * upstream's cache-hit path treats every igrab failure (-EAGAIN, xfs_iget's
+ * delay(1) loop), so the copy is met again once its teardown has made it
+ * reclaimable and the recycle path re-reads the platter; 0 lets it fall
+ * through, the same-build control.  cr63_igrab_fail counts the failed igrabs
+ * in both settings, cr63_igrab_retried the retries.
+ */
+int mxfs_cr63_igrab_retry = 1;
+module_param_named(cr63_igrab_retry, mxfs_cr63_igrab_retry, int, 0644);
+MODULE_PARM_DESC(cr63_igrab_retry,
+		 "a create whose number's cached copy is being evicted at the igrab retries the lookup once the teardown is done instead of failing the free-state check (1=default; 0=falls through, the same-build control)");
+atomic_t mxfs_cr63_igrab_fail = ATOMIC_INIT(0);
+module_param_cb(cr63_igrab_fail, &mxfs_dbg_atomic_param_ops,
+		&mxfs_cr63_igrab_fail, 0644);
+MODULE_PARM_DESC(cr63_igrab_fail,
+		 "count of failed igrabs of a create's non-reclaimable cached copy (P-CR63-IGRAB-FAIL), in both settings (write resets)");
+atomic_t mxfs_cr63_igrab_retried = ATOMIC_INIT(0);
+module_param_cb(cr63_igrab_retried, &mxfs_dbg_atomic_param_ops,
+		&mxfs_cr63_igrab_retried, 0644);
+MODULE_PARM_DESC(cr63_igrab_retried,
+		 "count of those failed igrabs retried (cr63_igrab_retry=1) (write resets)");
+/*
+ * D-LOCAL-CREATE-RESETS-HELD-STALE-COPY-IN-PLACE-REMOVED-NAME-ACTS-ON-NEW-FILE:
+ * P-CR63 resets a VFS-live cached copy of the number a create took for the new
+ * file, which is safe only for a copy nothing references.  A peer that removes
+ * a file this node still references -- a task mid-operation through the removed
+ * name, or the name's cached dentry -- frees the number while the copy is live
+ * here, and this node's allocator may hand the number to a local create: the
+ * copy is then the new file under its holder (2/disk/caw/direct lap snl1, inos
+ * 2097281-2097283: a touch held through the removed name logged its setattr
+ * against the new file).  Waiting at P-CR63 would deadlock (the creator holds
+ * the parent's ILOCK and the AGI, and a refused holder re-walks through the
+ * parent), so dialloc_held_skip 1 (default) skips such a candidate in the
+ * allocator's walk, where nothing is dirtied, on the peer-held cooldown; 0
+ * takes it, the same-build control.  cr63_held_reset counts the hazard (a
+ * create's reset of a copy something else referenced) in both settings,
+ * dialloc_held_skipped the guard's reach.
+ */
+int mxfs_dialloc_held_skip = 1;
+module_param_named(dialloc_held_skip, mxfs_dialloc_held_skip, int, 0644);
+MODULE_PARM_DESC(dialloc_held_skip,
+		 "the inode allocator never takes a number whose cached copy on this node is referenced (1=default; 0=takes it, the same-build control)");
+atomic_t mxfs_dialloc_held_skipped = ATOMIC_INIT(0);
+module_param_cb(dialloc_held_skipped, &mxfs_dbg_atomic_param_ops,
+		&mxfs_dialloc_held_skipped, 0644);
+MODULE_PARM_DESC(dialloc_held_skipped,
+		 "count of inode-allocator candidates dialloc_held_skip skipped because this node's cached copy of the number was referenced (P-DIALLOC-HELD-SKIP) (write resets)");
+atomic_t mxfs_cr63_held_reset = ATOMIC_INIT(0);
+module_param_cb(cr63_held_reset, &mxfs_dbg_atomic_param_ops,
+		&mxfs_cr63_held_reset, 0644);
+MODULE_PARM_DESC(cr63_held_reset,
+		 "count of creates that reset a cached copy of their number something else still referenced (P-CR63-HELD), in both settings (write resets)");
+/*
+ * TEST ONLY, H-CG1's A/B: the failed igrab needs an eviction to begin in the
+ * microseconds between a create's look at the cached copy and its igrab.
+ * dbg_evict_stale_delay_ms holds a multi-node regular file's eviction that
+ * long after clear_inode (I_FREEING set, no lock held) when the copy is
+ * linked and stale -- a peer changed the number since this node cached it,
+ * rsd11's copy -- one hold at a time and at most one start a second, so a
+ * create that takes the number inside it meets the teardown at its igrab.
+ * 0 (default) = off.  dbg_evict_stale_delayed counts the holds.
+ */
+int mxfs_dbg_evict_stale_delay_ms;
+module_param_named(dbg_evict_stale_delay_ms, mxfs_dbg_evict_stale_delay_ms, int, 0644);
+MODULE_PARM_DESC(dbg_evict_stale_delay_ms,
+		 "TEST ONLY: hold a stale linked regular file's eviction this many ms after clear_inode, one at a time, at most one start a second (0=off, default)");
+atomic_t mxfs_dbg_evict_stale_delayed = ATOMIC_INIT(0);
+module_param_cb(dbg_evict_stale_delayed, &mxfs_dbg_atomic_param_ops,
+		&mxfs_dbg_evict_stale_delayed, 0644);
+MODULE_PARM_DESC(dbg_evict_stale_delayed,
+		 "count of evictions dbg_evict_stale_delay_ms held (P-EVICT-STALE-DELAY) (write resets)");
+
+void
+mxfs_dbg_evict_stale_delay(
+	struct xfs_inode	*ip)
+{
+	static atomic_t		busy = ATOMIC_INIT(0);
+	static unsigned long	last_start;
+	struct xfs_mount	*mp = ip->i_mount;
+	struct inode		*inode = VFS_I(ip);
+	int			ms = READ_ONCE(mxfs_dbg_evict_stale_delay_ms);
+
+	if (ms <= 0 || !mp->m_mxfs_dlm ||
+	    mxfs_v5_dlm_is_single_node(mp->m_mxfs_dlm))
+		return;
+	if (!S_ISREG(inode->i_mode) || inode->i_nlink == 0 ||
+	    !READ_ONCE(ip->i_dlm_stale))
+		return;
+	if (READ_ONCE(last_start) &&
+	    time_before(jiffies, READ_ONCE(last_start) + HZ))
+		return;
+	if (atomic_cmpxchg(&busy, 0, 1) != 0)
+		return;
+	WRITE_ONCE(last_start, jiffies);
+	atomic_inc(&mxfs_dbg_evict_stale_delayed);
+	mxfs_probe("mxfs: P-EVICT-STALE-DELAY ino=%llu ms=%d istate=0x%lx comm=%s -- TEST ONLY: holding a stale linked copy's eviction past clear_inode\n",
+		(unsigned long long)ip->i_ino, ms, mxfs_istate(inode),
+		current->comm);
+	msleep(ms);
+	atomic_set(&busy, 0);
+}
+/*
+ * D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F11
+ * (xfs/xfs_inode.c, the P55C classification in xfs_iflush): a free's flush
+ * whose cluster slot still holds this node's unlanded staged image of the
+ * previous life (a cluster write masked or dropped it and re-armed the item)
+ * classifies on the platter, and when the platter is already free it discharges
+ * without copying anything in.  The slot stays logged by the attached item, so
+ * the next write of the cluster put the dead life's live core home over the
+ * free (14 of 14 P-FREE-LIVE-CORE in laps ftmp1/ftdp1, each 2-4 ms after its
+ * P55C-HOME-PLATTER).  p55c_home_restore 1 (default) puts the slot back to the
+ * platter's bytes before the classification; 0 leaves the staged bytes, the
+ * same-build control.  p55c_home_restored counts the restores.
+ */
+int mxfs_p55c_home_restore = 1;
+module_param_named(p55c_home_restore, mxfs_p55c_home_restore, int, 0644);
+MODULE_PARM_DESC(p55c_home_restore,
+		 "a free's flush that classifies on the platter because its cluster slot holds this node's unlanded staged image puts the slot back to the platter's bytes first (1=default; 0=leaves the staged bytes, the same-build control)");
+atomic_t mxfs_p55c_home_restored = ATOMIC_INIT(0);
+module_param_cb(p55c_home_restored, &mxfs_dbg_atomic_param_ops,
+		&mxfs_p55c_home_restored, 0644);
+MODULE_PARM_DESC(p55c_home_restored,
+		 "count of cluster slots p55c_home_restore put back to the platter's bytes (P55C-HOME-RESTORED) (write resets)");
 /*
  * D-0532 item (c), the in-core half: xfs_iget_recycle clears the previous
  * incarnation's i_dlm_bast_pending unconditionally.  Count the recycles
@@ -1721,6 +3078,25 @@ module_param_named(recycle_adopt_fail_refuse, mxfs_recycle_adopt_fail_refuse,
 		   int, 0644);
 MODULE_PARM_DESC(recycle_adopt_fail_refuse,
 		 "xfs_iget_recycle fails the recycle when the platter image of a different incarnation is rejected, instead of handing the inode out with the fork the rejection left; 1=on (default), 0=hand it out, for A/B");
+/*
+ * A stale recycle (i_dlm_stale) re-reads the dinode through xfs_imap_to_bp,
+ * which is a cache hit when the cluster buffer is P91-protected, so the adopt
+ * verdict judged the kept buffer's bytes.  Those can still hold an
+ * incarnation the platter has replaced, and keeping it resurrects a dead life
+ * whose next unlink frees the number under the live one.  On: the verdict
+ * takes the platter side-read the deferred-deadshell create already takes.
+ * The side-read and the disagreement count run in both settings.
+ */
+int mxfs_recycle_stale_sideread = 1;
+module_param_named(recycle_stale_sideread, mxfs_recycle_stale_sideread,
+		   int, 0644);
+MODULE_PARM_DESC(recycle_stale_sideread,
+		 "xfs_iget_recycle judges a stale recycle of a P91-protected cluster buffer by the platter's dinode instead of the kept buffer's; 1=on (default), 0=the kept buffer's bytes, for A/B");
+atomic_t mxfs_recycle_sideread_disagree = ATOMIC_INIT(0);
+module_param_cb(recycle_sideread_disagree, &mxfs_dbg_atomic_param_ops,
+		&mxfs_recycle_sideread_disagree, 0644);
+MODULE_PARM_DESC(recycle_sideread_disagree,
+		 "count of stale recycles whose P91-protected cluster buffer and platter side-read disagree on the dinode's mode or generation (P-RECYCLE-SIDEREAD) (write resets)");
 int mxfs_recycle_bast_keep = 1;
 module_param_named(recycle_bast_keep, mxfs_recycle_bast_keep, int, 0644);
 MODULE_PARM_DESC(recycle_bast_keep,
@@ -2350,6 +3726,7 @@ mxfs_dlm_inode_init(
 	ip->i_dlm_dir_contended = false;	/* sticky shared-dir BAST flag */
 	ip->i_dlm_dir_want_ex = false;		/* peer-wants-EX (modifier) BAST flag (design review) */
 	ip->i_dlm_bast_during_acq = false;	/* deferred-during-ACQUIRING BAST */ ip->i_dlm_stale_src = 0; ip->i_dlm_bastq_src = 0;
+	ip->i_mxfs_noino_waited = 0;
 	ip->i_dlm_self_demote = false;		/* EDEADLK self-demote tag */
 	ip->i_dlm_upg_pid = 0;
 	ip->i_dlm_upg_until_ns = 0;
@@ -2360,6 +3737,7 @@ mxfs_dlm_inode_init(
 	mxfs_dlmtr_rec(ip, dtr_om, dtr_os, MXFS_SITE); }
 	ip->i_dlm_epoch_src = 0;
 	ip->i_dlm_epoch = 1;	/* v0.5.1: != 0 so a fresh dentry (d_time==0) never epoch-fast-paths before one coordinated validation */
+	ip->i_mxfs_unlink_epoch = 0;
 	{ u8 dtr_om = ip->i_dlm_mode, dtr_os = ip->i_dlm_state;
 	ip->i_dlm_state = MXFS_DLM_ISTATE_NONE;
 	mxfs_dlmtr_rec(ip, dtr_om, dtr_os, MXFS_SITE); }
@@ -2535,6 +3913,7 @@ mxfs_dlm_inode_init(
 	ip->i_mxfs_pub_stage_epoch = 0;
 	ip->i_mxfs_pub_stage_mode = 0;
 	ip->i_mxfs_pub_stage_ns = 0;
+	ip->i_mxfs_relmark_ns = 0;	/* H-NR1: no marked recycle yet */
 	ip->i_mxfs_atomic_bypass_ns = 0;	/* P229/P230 */
 	ip->i_mxfs_disk_nlink_seen = 0;	/* P186: fresh incarnation */
 	ip->i_mxfs_disk_nlink_gen = 0;
@@ -2544,6 +3923,10 @@ mxfs_dlm_inode_init(
 	ip->i_dlm_iclus_seen_seq = 0;	/* iclus coherency clock: never loaded */
 	ip->i_dlm_routed_iclus = false;	/* no grant, no backing resource */
 	INIT_LIST_HEAD(&ip->i_dlm_unpub_link);
+	INIT_LIST_HEAD(&ip->i_mxfs_pubclaim_link);
+	ip->i_mxfs_pubclaim_seq = 0;
+	ip->i_mxfs_pubclaim_ns = 0;
+	ip->i_mxfs_pubclaim_bseq = 0;
 	/* ILOCK last-locker forensics */
 	atomic_set(&ip->i_mxfs_ilk_rd_held, 0);
 	atomic_set(&ip->i_mxfs_ilk_wr_held, 0);	/* writer-quiescence census */
@@ -2687,6 +4070,26 @@ MODULE_PARM_DESC(reuse_reload,
                  "(1=on default, fixes create-race; 0=off, faster).");
 
 /*
+ * D-POSIX-MULTI-RANK1-COUNT-125-OF-128-AFTER-CREATE-DONE-BARRIER: 1 (default)
+ * also reloads, on a non-create iget, a reclaimable FREED copy (mode 0) that
+ * no stale flag marks when this node holds no grant on the number (its cached
+ * mode is NL, or a no-inode release unlocked the one it caches): with no grant
+ * nothing stops a peer reusing the number without telling this node, so the
+ * copy's "free" is not authoritative and only the platter can say.  Measured
+ * (tests/reused_corpse_lookup_enoent.sh, 2/disk/caw/direct): a node that
+ * removed a peer's files kept their freed copies, the peer created new files
+ * on the same numbers, and every lookup of the new names failed -ENOENT
+ * (P-IGET-ENOENT incore_mode=0 reclaimable=1 dlm_stale=0, P26-IGET-FAIL) in
+ * 10 of 10 laps at the default settings.  A reload that still reads free ends
+ * the iget -ENOENT at once, so the lookup's nudge-and-retry ladder re-arms it
+ * each lap.  0 = only a stale-flagged copy is reloaded (the same-build control).
+ */
+int mxfs_reuse_reload_ungranted = 1;
+module_param_named(reuse_reload_ungranted, mxfs_reuse_reload_ungranted, int, 0644);
+MODULE_PARM_DESC(reuse_reload_ungranted,
+                 "a non-create iget reloads a reclaimable freed copy this node holds no grant on (1, default); 0 = only a stale-flagged one (test control)");
+
+/*
  * gate the EXPENSIVE Type-A DLM PR round-trip inside the reuse_reload
  * path (BAST the peer to force its flush when disk still reads free).  Default
  * OFF — it over-fires on unlink verify-gone (~480 deleted-file igets) and times
@@ -2798,6 +4201,138 @@ MODULE_PARM_DESC(stale_stage_unlanded_shutdown,
                  "fail closed (force shutdown) when a committed change is "
                  "found unlanded under a dead tenure at NL (1=shutdown "
                  "default, 0=legacy count-and-skip for A/B)");
+
+/*
+ * D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY, H-RS1: the two masks above leave
+ * release-flush and demoter contexts alone, and those contexts also carry
+ * logged slots whose last copy-in was under a tenure that has since ended and
+ * whose image already LANDED: an item logged again after its image went home
+ * is attached to the cluster buffer again and rides a write started for other
+ * slots, with the buffer's old bytes for it (lfb2: an inactivation's
+ * re-logged item put the landed epoch-3 image over the peer's newer one).
+ * 1 masks such a slot in those contexts too (lossless: the bytes are home
+ * already, and the re-logged item stays dirty, so its next copy-in stages
+ * current state under the live tenure); 0 is the same-build control, which
+ * writes it.  stale_stage_rf_landed counts the slots found, in both settings
+ * (P-RS1-LANDED-SKIP).
+ */
+int mxfs_stale_stage_skip_landed = 1;
+module_param_named(stale_stage_skip_landed, mxfs_stale_stage_skip_landed, int, 0644);
+MODULE_PARM_DESC(stale_stage_skip_landed,
+		 "mask a dead-tenure logged inode slot whose image already landed from cluster writes in release-flush and demoter contexts too (1=mask default, 0=control)");
+atomic_t mxfs_stale_stage_rf_landed = ATOMIC_INIT(0);
+module_param_cb(stale_stage_rf_landed, &mxfs_dbg_atomic_param_ops,
+		&mxfs_stale_stage_rf_landed, 0644);
+MODULE_PARM_DESC(stale_stage_rf_landed,
+		 "count of dead-tenure, already-landed logged slots found in release-flush or demoter cluster writes (P-RS1-LANDED-SKIP), masked or not (write resets)");
+
+/*
+ * D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY, H-UB1: an inode item is attached
+ * to its cluster buffer when the inode is first logged, not when it is copied
+ * in, so the partial write's logged mask carries slots whose in-core life was
+ * never copied in (i_mxfs_pub_stage_epoch 0), with the buffer's last read of
+ * them: bytes this node never staged.  When that read predates this node's
+ * tenure of the number and a peer wrote the slot in between, the write
+ * reverts the peer (rk5: a peer's free of ino 131 put back to its older
+ * unlinked image).  1 masks such a slot when it is not being flushed by this
+ * write (lossless: the buffer's completion leaves a non-flushing item attached
+ * and dirty, and its first copy-in stages the in-core state under the live
+ * tenure); 0 is the same-build control, which writes it.
+ * unstaged_logged_found counts the slots in both settings
+ * (P-UB1-UNSTAGED-SKIP); with dino_clobber_check on, unstaged_logged_prevented
+ * counts those a mask kept off the platter while they were behind it, and
+ * unstaged_logged_regressed those written while behind it.
+ */
+int mxfs_unstaged_logged_skip = 1;
+module_param_named(unstaged_logged_skip, mxfs_unstaged_logged_skip, int, 0644);
+MODULE_PARM_DESC(unstaged_logged_skip,
+		 "mask a logged inode slot whose in-core life was never copied in from cluster writes that do not flush it (1=mask default, 0=control)");
+atomic_t mxfs_unstaged_logged_found = ATOMIC_INIT(0);
+module_param_cb(unstaged_logged_found, &mxfs_dbg_atomic_param_ops,
+		&mxfs_unstaged_logged_found, 0644);
+MODULE_PARM_DESC(unstaged_logged_found,
+		 "count of never-copied-in logged slots found in partial cluster writes (P-UB1-UNSTAGED-SKIP), masked or not (write resets)");
+atomic_t mxfs_unstaged_logged_prevented = ATOMIC_INIT(0);
+module_param_cb(unstaged_logged_prevented, &mxfs_dbg_atomic_param_ops,
+		&mxfs_unstaged_logged_prevented, 0644);
+MODULE_PARM_DESC(unstaged_logged_prevented,
+		 "count of those slots masked while behind the platter (dino_clobber_check) (write resets)");
+atomic_t mxfs_unstaged_logged_regressed = ATOMIC_INIT(0);
+module_param_cb(unstaged_logged_regressed, &mxfs_dbg_atomic_param_ops,
+		&mxfs_unstaged_logged_regressed, 0644);
+MODULE_PARM_DESC(unstaged_logged_regressed,
+		 "count of those slots written while behind the platter (dino_clobber_check) (write resets)");
+
+/*
+ * D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY, H-NR1 (fw3c3): a no-inode release
+ * that unlocks a grant a reclaimable in-core inode still caches cannot reach
+ * that inode, so its tenure epoch stays where the dead grant left it.  A create
+ * whose reservation re-takes the grant before xfs_iget recycles the inode then
+ * passes mxfs_dlm_recycle_grant_check (the DLM's EX is no lower than the cached
+ * one), the previous life's staged image in the cluster buffer reads as staged
+ * under the live tenure, and a write of another slot publishes it over what a
+ * peer wrote while it held the number.  The release marks the inode
+ * (MXFS_IF_NOINO_RELEASED, always, counted in noino_release_marked); 1 makes the
+ * recycle that finds the mark end that tenure (epoch moves, i_dlm_stale, mode
+ * lowered to what the DLM records, NL when the record cannot be read), 0 is the
+ * same-build control, which keeps it as before.  recycle_released_reset and
+ * recycle_released_kept count the marked recycles by setting;
+ * logwr_relmark_written counts slots a cluster write carried with bytes copied
+ * in before such a recycle (P-LOGWR-RELMARK-WRITTEN), in both settings; with
+ * dino_clobber_check on, logwr_relmark_regressed counts those written while
+ * the platter held a newer image of the slot.
+ */
+int mxfs_noino_release_mark_honor = 1;
+module_param_named(noino_release_mark_honor, mxfs_noino_release_mark_honor, int, 0644);
+MODULE_PARM_DESC(noino_release_mark_honor,
+		 "a recycle of an in-core inode whose grant a no-inode release unlocked ends that tenure before serving it (1=end it default, 0=control)");
+atomic_t mxfs_noino_release_marked = ATOMIC_INIT(0);
+module_param_cb(noino_release_marked, &mxfs_dbg_atomic_param_ops,
+		&mxfs_noino_release_marked, 0644);
+MODULE_PARM_DESC(noino_release_marked,
+		 "count of no-inode releases that marked an in-core inode still caching the grant they unlocked (write resets)");
+atomic_t mxfs_recycle_released_reset = ATOMIC_INIT(0);
+module_param_cb(recycle_released_reset, &mxfs_dbg_atomic_param_ops,
+		&mxfs_recycle_released_reset, 0644);
+MODULE_PARM_DESC(recycle_released_reset,
+		 "count of recycles that found a no-inode release's mark and ended the cached tenure (P-RECYCLE-RELEASED-RESET) (write resets)");
+atomic_t mxfs_recycle_released_kept = ATOMIC_INIT(0);
+module_param_cb(recycle_released_kept, &mxfs_dbg_atomic_param_ops,
+		&mxfs_recycle_released_kept, 0644);
+MODULE_PARM_DESC(recycle_released_kept,
+		 "count of recycles that found a no-inode release's mark and kept the cached tenure (noino_release_mark_honor 0, P-RECYCLE-RELEASED-KEEP) (write resets)");
+atomic_t mxfs_logwr_relmark_written = ATOMIC_INIT(0);
+module_param_cb(logwr_relmark_written, &mxfs_dbg_atomic_param_ops,
+		&mxfs_logwr_relmark_written, 0644);
+MODULE_PARM_DESC(logwr_relmark_written,
+		 "count of logged slots a cluster write carried with bytes copied in before a recycle that found a no-inode release's mark (P-LOGWR-RELMARK-WRITTEN) (write resets)");
+atomic_t mxfs_logwr_relmark_regressed = ATOMIC_INIT(0);
+module_param_cb(logwr_relmark_regressed, &mxfs_dbg_atomic_param_ops,
+		&mxfs_logwr_relmark_regressed, 0644);
+MODULE_PARM_DESC(logwr_relmark_regressed,
+		 "count of those slots written while the platter held a newer image (dino_clobber_check) (write resets)");
+
+/*
+ * D-FREED-IMAGE-ADOPT-KEEPS-DEAD-LIFE-CORE-FIELDS-REGRESSES-FREE-DINODE, H-FA1:
+ * xfs_inode_from_disk takes only the generation and mode of a free dinode,
+ * because upstream reads one only into a fresh in-core inode.  A reload that
+ * adopts a peer's free image reads it into a live one, which keeps the freed
+ * life's link count, change count, size, block count and flags, and the slot's
+ * next copy-in writes them over the peer's free (wtc2, wrf2: disk nlink 0 ->
+ * mem nlink 1, five change counts behind).  1 takes those fields from the
+ * free dinode, as from_disk takes them from a live one; 0 is the same-build
+ * control, which keeps them.  free_adopt_core_diff counts the free adopts
+ * whose core differed from the dinode, in both settings (P-FREE-ADOPT-CORE).
+ */
+int mxfs_free_adopt_core = 1;
+module_param_named(free_adopt_core, mxfs_free_adopt_core, int, 0644);
+MODULE_PARM_DESC(free_adopt_core,
+		 "a reload that adopts a free dinode takes its core fields (link count, change count, size, blocks, flags) from it (1=default, 0=control keeps the freed life's)");
+atomic_t mxfs_free_adopt_core_diff = ATOMIC_INIT(0);
+module_param_cb(free_adopt_core_diff, &mxfs_dbg_atomic_param_ops,
+		&mxfs_free_adopt_core_diff, 0644);
+MODULE_PARM_DESC(free_adopt_core_diff,
+		 "count of free-dinode adopts whose in-core core differed from the dinode (P-FREE-ADOPT-CORE), taken or not (write resets)");
 
 /*
  * — D-FOREIGN-REPLAY-UNGATED-IMAGES containment,
@@ -3034,6 +4569,8 @@ mxfs_dlm_cache_init(
 	/* v0.5.0: foreign-slice replay of dead peers (elected survivor) */
 	INIT_WORK(&mp->m_mxfs_foreign_replay_work,
 		  mxfs_dlm_foreign_replay_work_fn);
+	/* the reap duty's re-drive queues it only from here on (mxfs_freplay_redrive) */
+	smp_store_release(&mp->m_mxfs_freplay_ready, true);
 	/*
 	 * 0.85.1: the dead/torn slot bitmaps are NOT zeroed here.  This runs
 	 * after xfs_mountfs, and the mount recovery barrier inside it has

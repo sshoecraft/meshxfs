@@ -1,0 +1,44 @@
+# D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-NUMBER-REUSE: the
+# record's reproducer (tests/churn_rows_audit.sh, the record's own
+# configuration 8/net/mesh/mpath on g8) widened the way its shape needs.
+#
+# Lap crl8m2, main-tree build 311877C431E1BB444562804: every freed-inode guard
+# H-F6..H-F11 at its default, the H-N2 generation-0 guard, the recycle fixes,
+# the unlinked-list changes H-U1/H-U3/H-U4/H-U5/H-U6, and the two deferred-free
+# fixes of D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY
+# (ifree_defer_drain, ifree_defer_reap), all at their defaults.
+#
+# Lap crl8m1 (build 41D2F9237EBB21CF21E9D57, which lacked the deferred-free
+# fixes) audited CORRUPT, but none of it was this record's shape: its two
+# nlink errors were chk_mxfs counting a removed directory's '.' and '..'
+# (D-CHK-COUNTS-UNLINKED-DIR-DOT-AND-DOTDOT-AS-LINKS-FALSE-NLINK-ERRORS, fixed in
+# 0.90.131), and its one unlinked-bucket member after the clean unmount was a
+# free deferred at the unlinked-list preflight and never reaped (D-INACT's H-2
+# shape, tools/ifree_defer_attribution.py: attributed=1 reaps=0); every check
+# of this record's shape read zero (verify_fail=0 leftover_bad=0
+# leftover_unexpected=0).  So this lap also reads, at 8 nodes, whether the
+# deferred-free fixes leave any bucket member behind: after the lap, run
+# tools/ifree_defer_attribution.py <evidence dir> CHURN-ROWS-crl8m2- on it.
+#
+# Why longer rows on one mount: the one occurrence (test13.1282.r) was a name
+# left standing at the end of one row and found naming a free inode in the
+# next, after its number had been reused every few ms for minutes.  The three
+# laps of churn_rows_netmesh.queue (6 rows each, 18 rows) were CLEAN.  This lap
+# runs 20 consecutive rows on ONE mount, so 19 leftover names are carried
+# across row boundaries while the churn keeps reusing numbers, and each is
+# looked up from another node after every row.
+#
+# Verdict rules are the harness's (its header), unchanged:
+#   CORRUPT  any VERIFY_FAIL, LEFTOVER BAD/UNEXPECTED, or a CORRUPT audit;
+#   FAIL     a load error, a double grant, a load that did not report, or a
+#            check that returned nothing;
+#   CLEAN    every check passed and the audit CLEAN errors=0.
+# What this lap can settle (written before it runs): a CORRUPT lap with the
+# record's shape is the record reproduced on the current build and is
+# diagnosed from its kept logs and the creator's inode log.  A CLEAN lap is a
+# rate (0 in 20 rows on this build), never a disposition.
+#
+# Bound (the harness's derivation): prep 300 + 20 rows x (start 20 + ROW_S 60
+# + stop/report 45 + leftover check 60) + chk_clean 150 + kernel logs 120
+# = 4270 s.
+4270 ROWS=20 ROW_S=60 tests/churn_rows_audit.sh crl8m2 8/net/mesh/mpath g8

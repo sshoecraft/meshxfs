@@ -188,9 +188,6 @@ xfs_bmbt_to_iomap(
 		iomap->addr = BBTOB(daddr + target->bt_sector_offset);
 		if (mapping_flags & IOMAP_DAX)
 			iomap->addr += target->bt_dax_part_off;
-		pr_debug("mxfs: iomap addr=%lld (daddr=%lld + off=%lld)\n",
-			 (long long)iomap->addr, (long long)BBTOB(daddr),
-			 (long long)BBTOB(target->bt_sector_offset));
 
 		if (imap->br_state == XFS_EXT_UNWRITTEN)
 			iomap->type = IOMAP_UNWRITTEN;

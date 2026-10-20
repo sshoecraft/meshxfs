@@ -13,13 +13,19 @@ use base qw(PVE::Storage::Plugin);
 
 # PVE Custom Storage Plugin API version
 # Must be between (APIVER - APIAGE) and APIVER.
-# PVE warns if api() != APIVER, so return the exact APIVER when it
-# falls within our tested range. This covers PVE 8 (APIVER 10) through
-# PVE 9 (APIVER 13) without maintaining separate plugin files.
+# PVE warns if api() != APIVER ("implementing an older storage API"), so
+# return the exact APIVER when it falls within the range this plugin was
+# verified on: PVE 8 (APIVER 10) through PVE 9.2 (APIVER 16, APIAGE 7).
+# Every bump from 11 to 16 is backward compatible and touches no method this
+# plugin overrides: activate_volume's activation hints, on_update_hook_full,
+# get_identity, volume_resize's snapname, volume_snapshot_info's
+# virtual-size, the volume name and format helpers.  A newer PVE gets the
+# newest verified version, which it still loads with that notice.
 sub api {
     my $pve_apiver = eval { PVE::Storage::APIVER() };
     if (defined $pve_apiver) {
-        return $pve_apiver if $pve_apiver >= 10 && $pve_apiver <= 13;
+        return $pve_apiver if $pve_apiver >= 10 && $pve_apiver <= 16;
+        return 16 if $pve_apiver > 16;
     }
     return 10;
 }

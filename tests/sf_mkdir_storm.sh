@@ -112,7 +112,10 @@ EXP=\$(( $N * $M ))
 PENDING=""
 
 verify_round() {
-    K=\$1
+    # K is local: the round loop below reads its own K after this call (the
+    # recheck and the teardown target), and a global assignment here handed
+    # them K-2.
+    local K=\$1
     d="$BASE/d\$K"
     [ -d "\$d" ] || { echo "ROUND \$K ABSENT"; return; }
     # ONE readdir + one stat.  Per-name [ -d ] lookups cost a cluster lookup
@@ -160,6 +163,7 @@ verify_round() {
 # expected=32" on 24 nodes, which is the teardown mid-flight, not a loss).
 recheck_pending() {
     [ -n "\$PENDING" ] || return
+    local K
     C=\$1
     keep=""
     for K in \$PENDING; do

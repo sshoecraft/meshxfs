@@ -1,0 +1,40 @@
+# Flake-window laps for 4/disk/caw/mpath on the 0.90.131 release candidate
+# (main tree, mxfs.ko srcversion 92FBF2A83F12160EE95EA2E), on rig group g4
+# (test3..test6), before the release chain's board.
+#
+# Why: tools/criteria_window.py 4/disk/caw/mpath owes laps_before_board=10 for
+# dirent_type_integrity, path_failover, path_fabric, path_flap,
+# path_mount_degraded, chk_clean, guard_census, dlm_lock_correctness (newest
+# genuine FAIL at window index 0 or 1, on builds 8DAEC6B8/C047499E).  Each FAIL
+# is attributed in an open record (type-flip/poison ESTALE, the two-dirents
+# directory re-log, the census inventory); the laps are the rig half of those
+# records' verification on the candidate, and they age the window.  A lap that
+# fails is a measurement: it is attributed from its own lines before anything
+# else, never re-run to get a pass.  alloc_witness runs with chk_clean (the
+# release verdict needs the witness under the same run id).
+#
+# Bound per lap (tests/suite/manifest budgets, the board's own):
+#   prep_cluster 300 + dirent_type_integrity 60 + path_failover 300 +
+#   path_fabric 300 + path_flap 240 + path_mount_degraded 300 +
+#   alloc_witness 120 + chk_clean 180 + guard_census 20 +
+#   dlm_lock_correctness 60 + chain overhead outside the rows 160
+#   (measured 130-160 s on tests/queues/fence_return_kept_logs_netmesh_mpath.queue)
+#   = 2040 s, plus dirent_durability 240 + dirent_publish_integrity 60 = 2340 s.
+#
+# dirent_type_integrity grades the kernel-log window dirent_durability opens
+# (MXFS_DIRENT_WINDOW, tests/suite/dirent_type_integrity.sh:56-99), so every
+# lap runs dirent_durability and dirent_publish_integrity before it, as the
+# board does (manifest rows 24, 28, 29).  The first launch of this queue
+# (label qw_4-disk-caw-mpath, lap qw4m1_0.90.131) left dirent_durability out:
+# its dirent_type_integrity FAIL 'no MXFS_DIRENT_WINDOW marker on this node'
+# measured nothing; that queue was stopped after lap 1 and these laps follow it.
+2340 tests/board_4node_chain.sh qw4m2_0.90.131 4/disk/caw/mpath:dirent_durability,dirent_publish_integrity,dirent_type_integrity,path_failover,path_fabric,path_flap,path_mount_degraded,alloc_witness,chk_clean,guard_census,dlm_lock_correctness@g4
+2340 tests/board_4node_chain.sh qw4m3_0.90.131 4/disk/caw/mpath:dirent_durability,dirent_publish_integrity,dirent_type_integrity,path_failover,path_fabric,path_flap,path_mount_degraded,alloc_witness,chk_clean,guard_census,dlm_lock_correctness@g4
+2340 tests/board_4node_chain.sh qw4m4_0.90.131 4/disk/caw/mpath:dirent_durability,dirent_publish_integrity,dirent_type_integrity,path_failover,path_fabric,path_flap,path_mount_degraded,alloc_witness,chk_clean,guard_census,dlm_lock_correctness@g4
+2340 tests/board_4node_chain.sh qw4m5_0.90.131 4/disk/caw/mpath:dirent_durability,dirent_publish_integrity,dirent_type_integrity,path_failover,path_fabric,path_flap,path_mount_degraded,alloc_witness,chk_clean,guard_census,dlm_lock_correctness@g4
+2340 tests/board_4node_chain.sh qw4m6_0.90.131 4/disk/caw/mpath:dirent_durability,dirent_publish_integrity,dirent_type_integrity,path_failover,path_fabric,path_flap,path_mount_degraded,alloc_witness,chk_clean,guard_census,dlm_lock_correctness@g4
+2340 tests/board_4node_chain.sh qw4m7_0.90.131 4/disk/caw/mpath:dirent_durability,dirent_publish_integrity,dirent_type_integrity,path_failover,path_fabric,path_flap,path_mount_degraded,alloc_witness,chk_clean,guard_census,dlm_lock_correctness@g4
+2340 tests/board_4node_chain.sh qw4m8_0.90.131 4/disk/caw/mpath:dirent_durability,dirent_publish_integrity,dirent_type_integrity,path_failover,path_fabric,path_flap,path_mount_degraded,alloc_witness,chk_clean,guard_census,dlm_lock_correctness@g4
+2340 tests/board_4node_chain.sh qw4m9_0.90.131 4/disk/caw/mpath:dirent_durability,dirent_publish_integrity,dirent_type_integrity,path_failover,path_fabric,path_flap,path_mount_degraded,alloc_witness,chk_clean,guard_census,dlm_lock_correctness@g4
+2340 tests/board_4node_chain.sh qw4m10_0.90.131 4/disk/caw/mpath:dirent_durability,dirent_publish_integrity,dirent_type_integrity,path_failover,path_fabric,path_flap,path_mount_degraded,alloc_witness,chk_clean,guard_census,dlm_lock_correctness@g4
+2340 tests/board_4node_chain.sh qw4m11_0.90.131 4/disk/caw/mpath:dirent_durability,dirent_publish_integrity,dirent_type_integrity,path_failover,path_fabric,path_flap,path_mount_degraded,alloc_witness,chk_clean,guard_census,dlm_lock_correctness@g4

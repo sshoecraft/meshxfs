@@ -103,8 +103,20 @@ pending=""          # "K:node<n> ..." rounds flagged but not yet convicted
 # round on every round — 30 rounds x ~10 pending x 32 nodes = ~9600 lookups,
 # which measured out at ~190 s and blew the budget on a cluster where the real
 # work takes seconds.  A single `ls` answers the same question for one readdir.
+#
+# K and D are two `local` statements on purpose.  Bash expands every word of a
+# `local` line before it assigns any of them, so `local K="$1" D="$BASE/r$K"`
+# built D from the CALLER's loop K, the round being created, never the round
+# being judged.  Every pending round was then re-judged against the newest
+# round's listing.  Measured on 8/disk/caw/direct (run 20261019T214738Z-g8):
+# test11 convicted r21-r26 with one identical missing set, [node3,node4,node8],
+# while every one of its listings in the final settle read inode 4194445 (r30),
+# which test9, test10 and test14 were still about to fill (their r30 entries
+# landed 21:49:16-17, the settle expired 21:49:18).  r21-r26 themselves held
+# all eight names on the platter (110-byte shortform images).
 verify_round() {
-    local K="$1" D="$BASE/r$K" n present missing=""
+    local K="$1"
+    local D="$BASE/r$K" n present missing=""
     present=$(ls -1 "$D" 2>/dev/null)
     for n in $(seq 1 "$T"); do
         case "
@@ -189,6 +201,14 @@ for K in $(seq 1 "$ROUNDS"); do
         pending="${keep# }"
     fi
 done
+
+# Every node's last mkdir(2) has to have returned before the settle starts: an
+# entry its node has not made yet is neither late nor lost.  Measured on
+# 8/disk/caw/direct (run 20261019T214738Z-g8): test9, test10 and test14 ran
+# about 13 s behind the 2 s slot schedule and made their r30 entries at
+# 21:49:16-17, while test11 had finished its rounds early and its 4 s settle
+# expired at 21:49:18.  One barrier per run, not per round (see SLOT above).
+ck "dd rounds complete" coord_barrier "dd_rounds"
 
 # Final settle: give every still-pending round the full window before calling
 # it a durable loss.  This is the LATE-vs-LOST distinction; do not shorten it.

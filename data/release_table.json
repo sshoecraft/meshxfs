@@ -3,23 +3,6 @@
   "rows": [
     {
       "nodes": "2",
-      "attachment": "DRBD dual-primary, physical Proxmox VE 9 hosts (pve1/pve2)",
-      "configs": [
-        "2/net/mesh/drbd"
-      ],
-      "platform": "pve9",
-      "runs": [
-        {
-          "what": "network-cable pull on the physical pair (tests/pve_cable_pull.sh)",
-          "glob": "tests/evidence/pve_cable_pull/*/result.txt",
-          "pass": "^RESULT: PASS",
-          "version": "version=(\\S+)"
-        }
-      ],
-      "_": "The physical pair is old hardware and is used for the one test VMs cannot do: a person pulling a host's network cable (owner's decision, 2026-10-15). The board, the crash rows and every other failure test of 2/net/mesh/drbd run on VMs (the test1/test2 rig row below)."
-    },
-    {
-      "nodes": "2",
       "attachment": "DRBD dual-primary, failure tests (test1/test2 rig)",
       "configs": [
         "2/net/mesh/drbd"

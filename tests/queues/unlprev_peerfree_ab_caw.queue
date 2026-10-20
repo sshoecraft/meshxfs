@@ -1,0 +1,79 @@
+# H-IU1 directed A/B, fn32's shape, for
+# D-IUNLINK-PREV-OF-PEER-FREED-INODE-STALE-PRECOMMIT-SHUTDOWN on 2/disk/caw/direct
+# g2b (test15 test16).  Same build for both arms: ~/src/mxfs-c srcversion
+# 03857C0C22451BFB43D2B3F (main-tree sources with H-IU1 and every other open
+# campaign's fix at its default).  Module knob unlprev_held_verify: 1 = under
+# the predecessor's EX hold, a predecessor that is no longer live, unlinked and
+# naming the inode being freed clears that inode's prev pointer and starts the
+# free over (P-UNLPREV-REBUILD); 0 = the same-build control, which removes with
+# the stale pointer.  The check, its P-UNLPREV-MOVED line and the
+# unlprev_held_moved count run in both settings.  Run from ~/src/mxfs-c.
+#
+# WHY THIS SHAPE (written before the first lap).  Every earlier queue for this
+# record measured nothing: the random workload's predecessors are the freer's
+# own inodes (each node lists its unlinked inodes in its own bucket), and the
+# first directed shape had the peer free an inode it did not unlink, which B4
+# refuses without the inode's EX.  fn32 itself: test1 freed a member of
+# test2's bucket under the EX its touch took, waited for the predecessor's
+# hold, test2 freed that predecessor off the head and listed a new head, and
+# test1's retry edited the freed predecessor (P53-IUNLINK-MISMATCH
+# old_ptr=0xffffffff, next_agino=0x99) and shut down.  PUC_SHAPE=peerfree
+# makes that sequence on every iteration: the owner lists y -> z -> v, the
+# peer's setattr takes z's EX and its last close frees z, waiting on y's hold
+# for dbg_unlprev_wait_delay_ms=3000; 700 ms after the peer's c<i> the owner
+# frees y off the head, 700 ms later it lists x ahead of z, and the peer's
+# retry ~1.4 s after that holds a freed y while x heads the bucket.  z is not
+# the tail (v follows it), so the stale edit is fn32's non-idempotent one.  z
+# is a number of the owner's bucket (ino % 64 = the bucket the owner reads
+# from its own P82-ADD line), as fn32's 0x82 was of test2's bucket 2: the
+# first three laps of this queue (labels ipf1-ipf3, stopped) picked z by
+# order, and the peer's free skipped z every time (IFREE-REVALIDATE-SKIP
+# why=bucket-empty-peer-freeing: z's number named an empty bucket and z heads
+# none).  The owner's own reaper retries z 5 s after its remove
+# (P87-OPEN-DEFER), ~1.6 s after the peer's retry.  PUC_RESET_AFTER sets the
+# delay back to 0 before the settle and the cold audit.  Six iterations per
+# lap.
+#
+# HYPOTHESIS H-IU1 (in the record before the patch): when xfs_inactive_ifree
+# drops the AG DLM to take its predecessor's EX hold, the predecessor's owner
+# can take it off the list and free it in that gap; the retry trusts the freed
+# inode's in-core i_prev_unlinked without re-checking it under the hold, so
+# xfs_iunlink_remove_inode edits a free inode's next pointer, the precommit
+# finds NULLAGINO where it expects the inode being freed, and the commit shuts
+# the filesystem down.
+#
+# READING RULES (written before the first lap), on each lap's IRESULT line:
+#   Reach is a P-UNLPREV-MOVED line or unlprev_held_moved > 0.  IVACUOUS laps
+#   count for neither arm.
+#   SUPPORTED when at least one control lap is ICONTROL-SHOWS-CAUSE (a
+#   P53-IUNLINK-MISMATCH on an inode a MOVED line of the same node named as
+#   the held predecessor, and a node failure line) and at least three fix laps
+#   with reach are IPASS (a P-UNLPREV-REBUILD line, no P53-IUNLINK-MISMATCH,
+#   no node failure in either capture, cold audit CLEAN errors=0), with no fix
+#   lap IFAIL.
+#   REFUTED if a fix lap shows a P53-IUNLINK-MISMATCH followed by a shutdown on
+#   a remove whose held predecessor passed the check, or if every control lap
+#   with reach is ICONTROL-NO-SHUTDOWN (the stale pointer then does not lead
+#   to the shutdown).
+#   Otherwise undecided: more laps on the same rules, never a disposition.
+#   Any other failure (a hang, P-UNLREM-NOPREV or -BACKREF, an ifree error no
+#   MOVED line explains, the deferred-free shutdown P-IFREE-DEFER-UNLANDED-
+#   FATAL, the create-reuse shutdown P-CR63-IGRAB-FAIL -> P-CR3-CANCEL) is
+#   attributed from its own lines to its own record first.  A fix lap's frees
+#   that ran out of tries defer to the reaper: P-UNLPREV-REBUILD try=4.
+#
+# Bound per lap: measured infrastructure 184 s (the directed laps iud1-iud6 on
+# this harness: 242-251 s walls with a 65 s workload) + the harness's own
+# peerfree workload bound 450 s (six iterations of 43 s at a 17 s close wait,
+# + 8 s for the calibration and z's search, + 60 s, + one 124 s dead window;
+# printed as 'workload bound') + a control lap's reproduction path: two
+# unmounts at 70 s, the image read 10 s, two remounts at 110 s, and the LUN
+# snapshot 120 s: 1124 s.
+1124 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_SHAPE=peerfree PUC_KNOBS="unlprev_held_verify=0 dbg_unlprev_wait_delay_ms=3000" PUC_RESET_AFTER=dbg_unlprev_wait_delay_ms tests/peer_open_unlinked_chain.sh ipg1 6 2/disk/caw/direct g2b
+1124 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_SHAPE=peerfree PUC_KNOBS="unlprev_held_verify=1 dbg_unlprev_wait_delay_ms=3000" PUC_RESET_AFTER=dbg_unlprev_wait_delay_ms tests/peer_open_unlinked_chain.sh ipg2 6 2/disk/caw/direct g2b
+1124 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_SHAPE=peerfree PUC_KNOBS="unlprev_held_verify=0 dbg_unlprev_wait_delay_ms=3000" PUC_RESET_AFTER=dbg_unlprev_wait_delay_ms tests/peer_open_unlinked_chain.sh ipg3 6 2/disk/caw/direct g2b
+1124 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_SHAPE=peerfree PUC_KNOBS="unlprev_held_verify=1 dbg_unlprev_wait_delay_ms=3000" PUC_RESET_AFTER=dbg_unlprev_wait_delay_ms tests/peer_open_unlinked_chain.sh ipg4 6 2/disk/caw/direct g2b
+1124 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_SHAPE=peerfree PUC_KNOBS="unlprev_held_verify=1 dbg_unlprev_wait_delay_ms=3000" PUC_RESET_AFTER=dbg_unlprev_wait_delay_ms tests/peer_open_unlinked_chain.sh ipg5 6 2/disk/caw/direct g2b
+1124 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_SHAPE=peerfree PUC_KNOBS="unlprev_held_verify=0 dbg_unlprev_wait_delay_ms=3000" PUC_RESET_AFTER=dbg_unlprev_wait_delay_ms tests/peer_open_unlinked_chain.sh ipg6 6 2/disk/caw/direct g2b
+1124 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_SHAPE=peerfree PUC_KNOBS="unlprev_held_verify=1 dbg_unlprev_wait_delay_ms=3000" PUC_RESET_AFTER=dbg_unlprev_wait_delay_ms tests/peer_open_unlinked_chain.sh ipg7 6 2/disk/caw/direct g2b
+1124 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_SHAPE=peerfree PUC_KNOBS="unlprev_held_verify=1 dbg_unlprev_wait_delay_ms=3000" PUC_RESET_AFTER=dbg_unlprev_wait_delay_ms tests/peer_open_unlinked_chain.sh ipg8 6 2/disk/caw/direct g2b

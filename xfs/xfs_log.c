@@ -1007,6 +1007,27 @@ mxfs_log_inject_ioerr_take(void)
 }
 
 /*
+ * 0.90.131 TEST ONLY, the same-build control for the fenced-shutdown arm of
+ * xlog_force_shutdown: 0 restores the SYNC log force a cluster-fenced shutdown
+ * used to run before marking the log shut down.
+ */
+static int mxfs_fenced_shutdown_skip_logforce = 1;
+
+/*
+ * 0.90.131 TEST ONLY, one-shot: the next iclog write completion is held this
+ * many ms before the log processes it (xlog_ioend_work), so the iclog stays
+ * SYNCING and its waiters wait, as on a write held in the SCSI layer.
+ */
+static int mxfs_dbg_log_ioend_hold_ms;
+module_param_named(dbg_log_ioend_hold_ms, mxfs_dbg_log_ioend_hold_ms, int, 0644);
+MODULE_PARM_DESC(dbg_log_ioend_hold_ms,
+	"TEST ONLY: hold the next iclog write completion this many ms (one-shot, 0=off)");
+module_param_named(fenced_shutdown_skip_logforce,
+		   mxfs_fenced_shutdown_skip_logforce, int, 0644);
+MODULE_PARM_DESC(fenced_shutdown_skip_logforce,
+	"TEST ONLY: 1 (default) = a shutdown because the cluster fenced this node does not force the log first; 0 = it does (the old behaviour)");
+
+/*
  * (D-FOREIGN-REPLAY-FAILURE-PUBLISHED-AS-RECOVERED closure arm):
  * while >0, every foreign-slice replay fails with a RETRYABLE -EIO before
  * any replay work.  The callers must then refuse to publish: the live path
@@ -2618,8 +2639,28 @@ xlog_ioend_work(
 		container_of(work, struct xlog_in_core, ic_end_io_work);
 	struct xlog		*log = iclog->ic_log;
 	int			error;
+	int			hold = READ_ONCE(mxfs_dbg_log_ioend_hold_ms);
+
+	/* test only: this iclog's write has completed below us, but the log
+	 * sees it as still in flight for `hold` ms -- a write held in the SCSI
+	 * layer, with every waiter of this iclog left waiting on it */
+	if (unlikely(hold > 0) &&
+	    cmpxchg(&mxfs_dbg_log_ioend_hold_ms, hold, 0) == hold) {
+		xfs_alert(log->l_mp,
+			  "P-LOG-IOEND-HOLD ms=%d -- TEST: holding an iclog write completion",
+			  hold);
+		msleep(hold);
+		xfs_alert(log->l_mp, "P-LOG-IOEND-HOLD-END ms=%d", hold);
+	}
 
 	error = blk_status_to_errno(iclog->ic_bio.bi_status);
+	/* a write the log was shut down under: how long the layers below held
+	 * it is how long an unmount of this fenced mount waits for it */
+	if (xlog_is_shutdown(log))
+		xfs_notice(log->l_mp,
+			   "P-LOG-IOEND-AFTER-SHUTDOWN age_ms=%u error=%d",
+			   jiffies_to_msecs(jiffies - iclog->ic_mxfs_submit_jiffies),
+			   error);
 #ifdef DEBUG
 	/* treat writes with injected CRC errors as failed */
 	if (iclog->ic_fail_crc)
@@ -3104,6 +3145,7 @@ xlog_write_iclog(
 	 * If this log buffer would straddle the end of the log we will have
 	 * to split it up into two bios, so that we can continue at the start.
 	 */
+	iclog->ic_mxfs_submit_jiffies = jiffies;
 	if (bno + BTOBB(count) > log->l_logBBsize) {
 		struct bio *split;
 
@@ -4857,8 +4899,41 @@ xlog_force_shutdown(
 	 * If we are shutting down due to a log IO error, then we must avoid
 	 * trying to write the log as that may just result in more IO errors and
 	 * an endless shutdown/force loop.
+	 *
+	 * 0.90.131 (D-FENCED-VICTIM-WITHDRAW-HANGS-IN-SHUTDOWN-LOG-FORCE): nor
+	 * when the cluster has fenced this node.  Nothing this node writes from
+	 * here can land legitimately -- the target bounces it, the authority
+	 * gate refuses it, and the survivors are already replaying this slice
+	 * from the platter -- so the flush buys nothing, and it WAITS: a SYNC
+	 * force sleeps on every iclog still in flight, and the waiters are woken
+	 * only by the shutdown below.  Measured on 2/disk/caw/mpath: a victim
+	 * thawed with an iclog write still in the SCSI layer held its withdraw
+	 * worker and its load's mkdir in xlog_wait_on_iclog for 87 s and more,
+	 * and its unmount failed busy.
 	 */
-	if (!log_error && !xlog_in_recovery(log))
+	if (shutdown_flags & SHUTDOWN_CLUSTER_FENCED) {
+		struct xlog_in_core	*ic = log->l_iclog;
+		unsigned int		n = 0, oldest = 0;
+
+		spin_lock(&log->l_icloglock);
+		do {
+			if (ic->ic_state == XLOG_STATE_SYNCING) {
+				unsigned int age = jiffies_to_msecs(jiffies -
+						ic->ic_mxfs_submit_jiffies);
+				n++;
+				if (age > oldest)
+					oldest = age;
+			}
+		} while ((ic = ic->ic_next) != log->l_iclog);
+		spin_unlock(&log->l_icloglock);
+		xfs_notice(log->l_mp,
+			   "P-LOG-FENCED-SHUTDOWN inflight=%u oldest_ms=%u logforce=%d",
+			   n, oldest,
+			   READ_ONCE(mxfs_fenced_shutdown_skip_logforce) ? 0 : 1);
+	}
+	if (!log_error && !xlog_in_recovery(log) &&
+	    !((shutdown_flags & SHUTDOWN_CLUSTER_FENCED) &&
+	      READ_ONCE(mxfs_fenced_shutdown_skip_logforce)))
 		xfs_log_force(log->l_mp, XFS_LOG_SYNC);
 
 	/*

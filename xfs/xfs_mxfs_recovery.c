@@ -217,7 +217,9 @@ mxfs_dlm_fence_notify(
 		"P131-SELF-FENCE [%s]: %s -- forcing shutdown",
 		mxfs_self_fence_reason_name(reason),
 		mxfs_self_fence_reason_desc(reason));
-	xfs_force_shutdown(mp, SHUTDOWN_META_IO_ERROR);
+	/* a fence, not a metadata I/O error: xlog_force_shutdown must not try
+	 * to flush a log this node may no longer write */
+	xfs_force_shutdown(mp, SHUTDOWN_CLUSTER_FENCED);
 }
 
 /*

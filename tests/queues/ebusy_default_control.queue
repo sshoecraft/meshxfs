@@ -1,0 +1,38 @@
+# D-SOLE-SURVIVOR-CREATES-FAIL-EBUSY-FROM-DIALLOC-AFTER-PEER-FENCE: after H-EB1
+# was REFUTED (tests/queues/ebusy_retire_first_ab.queue: neither injected control
+# reproduced the double grant), does EBUSY still occur on this build at all?
+# Same build as that queue's default laps ebd1-ebd8 (~/src/mxfs-g
+# 65863B924040AF5213F2A76, 0 EBUSY in 8 with dl_import_retire_first=1), now with
+# dl_import_retire_first=0 and no injection: the build's behaviour without the
+# H-EB1 change.  Run from ~/src/mxfs-g.  2/net/mesh/mpath g2e (test17 test18);
+# path_fenced_return fences test18, test17 survives and creates; then
+# chk_clean.  Natural rate before (chain pfi, an older build, same rows and
+# group): EBUSY creates on test17 in 3 of 8 laps, each with a
+# P-TAUTH-DOUBLE-GRANT against the fenced node's EX record on an AG page.
+#
+# READING RULES (written before the first lap): per lap, 'ERR EBUSY' lines in
+# load_test17/ops.log, P-TAUTH-DOUBLE-GRANT lines naming the fenced test18
+# incarnation in either capture, row 'fence: no operation on test17 returned an
+# error', chk_clean's verdict, knobs.txt read back on both nodes (a lap whose
+# knobs did not take judges nothing).
+#   REPRODUCES: at least one lap with EBUSY on test17; those laps' own lines
+#     then carry the next hypothesis.
+#   ABSENT ON THIS BUILD: 0 EBUSY and 0 P-TAUTH-DOUBLE-GRANT in all 8: H-EB1's
+#     change is not what removed it, and the change since the pfi build that
+#     did is to be found (bisect the pfi build against this one) before any
+#     disposition; a clean run is not one.
+#   Any shutdown, BUG, Oops, hung task or chk_clean not CLEAN is attributed from
+#   its own lines first; the typeflip ESTALE shape (test18's mkdir ESTALE after
+#   rejoining) belongs to D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED.
+#
+# Bounds: as tests/queues/ebusy_retire_first_ab.queue (same rows, same group):
+# path_fenced_return 400 s + chk_clean 180 s + the chain's measured overhead
+# outside the rows (130-160 s) = 730 s; the first lap adds prep_cluster 300 s.
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebn1 1 --prep --knobs "dl_import_retire_first=0 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebn2 1 --knobs "dl_import_retire_first=0 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebn3 1 --knobs "dl_import_retire_first=0 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebn4 1 --knobs "dl_import_retire_first=0 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebn5 1 --knobs "dl_import_retire_first=0 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebn6 1 --knobs "dl_import_retire_first=0 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebn7 1 --knobs "dl_import_retire_first=0 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebn8 1 --knobs "dl_import_retire_first=0 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean

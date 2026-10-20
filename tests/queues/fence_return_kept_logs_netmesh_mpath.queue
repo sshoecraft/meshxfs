@@ -1,0 +1,99 @@
+# The rig half of two records, on the release build with every knob at its
+# default, every lap keeping both nodes' kernel logs (tests/mpath/lap_chain.sh
+# laps exports PF_KEEP_KMSG=1, so a passing row copies kmsg_<node>_fromnode.gz
+# into its evidence directory instead of deleting it).
+#
+#   D-MASTER-OWN-EX-RELEASE-GOES-STALE-RECORD-OUTLIVES-IT-PEER-GRANTS-REFUSED:
+#   its verification rules (written before the H-MO2 patch) need the release
+#   build to pass path_fenced_return and chk_clean on the rig with no
+#   P-TAUTH-DOUBLE-GRANT naming the survivor.  The release chain's 10 window
+#   laps passed their rows but kept no kernel log, so the double-grant count
+#   was never read.
+#
+#   D-SURVIVOR-DEFERRED-PUBLISH-EX-CLAIM-FAILS-AFTER-60-REMASTER-RETRIES-AT-REJOIN:
+#   seen once (window lap 7, three claims) in the only two minutes of kernel
+#   ring that survived; its rate and what each failed inode does afterwards are
+#   unmeasured.
+#
+# Build: the main tree's mxfs.ko, which must be the release build the chain
+# verified (modinfo -F srcversion mxfs.ko = the chain's clean build); run from
+# the main tree.  2/net/mesh/mpath on g2e (test17 test18), a group no release
+# board or follow-on step uses once the chain's boards are done:
+# path_fenced_return freezes and fences test18, thaws it, it unmounts and
+# mounts again and reads test17's files; then chk_clean.  Every lap on a fresh
+# prep, so each module load resets the capped probes and an absent line is not
+# a spent cap.
+#
+# READING RULES (written before the first lap), per lap, from the row's
+# kmsg_<node>_fromnode.gz scoped to the row's PF-MARK, graded with
+# tools/dead_sender_ab_grade.py <row dir> plus the counts below:
+#   D-MASTER-OWN
+#     PASS (per lap)  path_fenced_return PASS, chk_clean verdict=CLEAN
+#                     release=CLEAN errors=0, and double=s0 on both nodes (no
+#                     P-TAUTH-DOUBLE-GRANT whose record ex= is the survivor).
+#     Recorded, not graded: resync (P-TAUTH-OWN-REL-RESYNC per node), drops,
+#     passes, stale_own, relex, and 'lock request failed after' per node.
+#     FIXED AND VERIFIED on the rig side: every lap PASS.  Any lap with double
+#     naming the survivor, or a peer request refused into 'lock request failed
+#     after' on the inode the survivor held: REFUTED, a new hypothesis first.
+#   D-SURVIVOR-DEFERRED-PUBLISH-EX-CLAIM-FAILS-...
+#     RATE  laps with at least one 'deferred-publish CAW EX failed' on the
+#           survivor, and the count per lap.
+#     TRACE for each failed ino: every later line naming it on both nodes (a
+#           later grant to the creator, a grant to the peer, a P-PUB re-list),
+#           and whether the peer read it (the row's VERIFY covers the
+#           survivor's manifest).
+#     Recorded for the bar: any VERIFY bad or missing, any read of a failed
+#     ino returning other bytes than the manifest's, any P-TAUTH-DOUBLE-GRANT
+#     or double holder on a failed ino.
+#     From the release candidate with pub_claim_retry and dl_capacity_park
+#     (laps frke*): 'deferred-publish CAW EX failed' must be 0 on both nodes;
+#     recorded per node: P-PUB-CLAIM-RETRY, P-PUB-CLAIM-RETRY-GRANTED,
+#     P-CAP-PARK, P-CAP-PARK-EXPIRE.
+#   D-TCP-LEDGER-PAGE-FULL-EDQUOT-SHUTS-DOWN-BOTH-NODES-AFTER-FENCED-PEER-REJOINS
+#     PASS (per lap)  no 'rc=-122', no 'DLM inode lock unrecoverable', no
+#                     shutdown on either node; recorded: P-TAUTH-PAGE-FULL per
+#                     node (reach: a lap with page-full refusals and no -122
+#                     is the fixed path working).
+#   D-NETMESH-MPATH-REJOINED-NODE-HEARTBEAT-LOCKWAIT-STALL-DECLARED-DEAD
+#     The survivor declares the frozen victim dead once (the row's fence).  A
+#     second 'heartbeat expired' / 'lease expired/died' naming the victim's
+#     REJOINED node id is a recurrence.  Laps frke* load the module with
+#     stall_stacks=1 (MXFS_EXTRA_MODARGS, exported to the queue; it only
+#     prints), so a P278-HB-STALL dumps the heartbeat task's stack; every
+#     P278-HB-STALL and P-HB-SLOW on the rejoined node after its remount is
+#     recorded with that stack.
+#   From the release candidate with dl_capacity_reclaim, dl_capacity_nq_wouldblock,
+#   reap_active_gate and lookup_poison_retire (laps frkf*):
+#   D-TCP-CAPACITY-WAIT-NEVER-ENDS-HANGS-JOIN-FREEZE
+#     PASS (per lap)  no hung task, no 'blocked for more than', the victim's
+#                     remount completes; recorded per node: P-TAUTH-PAGE-FULL,
+#                     P-CAP-RECLAIM, P-CAP-PARK, P-CAP-PARK-EXPIRE.
+#   D-TCP-NOQUEUE-TRY-ON-FULL-LEDGER-PAGE-SPENDS-RETRY-BUDGET-CREATES-CRAWL
+#     PASS (per lap)  no 'capacity=60' on either node; recorded per node:
+#                     dl_capacity_nq_wouldblock_n read at the end of the lap.
+#   D-FAILED-MOUNT-UNWIND-RACES-REAP-WORKER-FREES-AG-AND-HANGS
+#     PASS (per lap)  no 'xg_ref', no 'Corruption detected', no mount left in
+#                     D state; recorded: P-REAP-INACTIVE-DEFER lines.
+#   D-ALLOC-WITNESS-PEER-MKDIR-ESTALE-ON-POISONED-CACHED-DIR-4CAW
+#     PASS (per lap)  no 'Stale file handle' in any row output; recorded per
+#                     node: P-LKUP-POISON-RETIRE, P-LKUP-POISON-RETURNED (0).
+#   Any shutdown, BUG, Oops, hung task or chk_clean not CLEAN is attributed
+#   from its own lines first.
+#
+# Bounds: tests/queues/dead_sender_drop_ab_netmesh_mpath.queue's lap, the same
+# rows and prep (path_fenced_return 400 s + chk_clean 180 s + the chain's
+# overhead outside the rows, measured 130-160 s = 730 s, plus prep_cluster
+# 300 s) = 1030 s.
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf1 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf2 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf3 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf4 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf5 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf6 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf7 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf8 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf9 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf10 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf11 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf12 1 --prep --rows path_fenced_return,chk_clean

@@ -1,0 +1,51 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, H-U6: the
+# fix laps tests/queues/peer_open_unlinked_hu6_census.queue owed, and a control,
+# on one build.
+#
+# WHY.  The census queue (build 1FF993ECCF04A634CC75DD8, ~/src/mxfs-e,
+# 2/net/mesh/direct g2c) judged H-U6 SUPPORTED: its control u6hc1
+# (unlprev_rele_defer=0) hung at iteration 10 with
+# mxfs_reap_worker -> xfs_inactive_ifree -> mxfs_unlprev_rele -> xfs_irele ->
+# nested xfs_inactive -> xfs_inactive_ifree -> xfs_read_agi -> xfs_buf_lock and a
+# create spinning in xfs_iget; its fix lap u6hf1 (unlprev_rele_defer=1) PASSED
+# but was VACUOUS by its rules (rele_deferred_last=0, rele_last_worker=0).  That
+# build is gone (~/src/mxfs-e now carries H-U7), so the fix laps and a control
+# run here on one build.
+#
+# Build: main tree ~/src/mxfs srcversion F09C3FED2DB371E0D9A8BC5 (0.90.131,
+# every fix at its default; it carries the census counters
+# unlprev_rele_inline_last / unlprev_rele_deferred_last, the line
+# P-UNLPREV-RELE-LAST and the test knob dbg_unlprev_rele_hold_ms).  Harness
+# tests/peer_open_unlinked_chain.sh (main tree, identical to ~/src/mxfs-e's).
+#
+# Arms, the census queue's lines unchanged but for the labels: both with
+# dbg_unlprev_rele_hold_ms=2000, dbg_ifree_midlist_delay_ms=600,
+# freshsrc_iunl_overlay=1, b6_release_drain=1, unlprev_pin=1, unlprev_tenure=1,
+# no close drops, 30 iterations, 2/net/mesh/direct g2c:
+#   F  unlprev_rele_defer=1   u6vf1 u6vf2 u6vf3 u6vf4
+#   C  unlprev_rele_defer=0   u6vc1, LAST: a hang leaves both nodes wedged
+#
+# VERDICT RULES (written before the first lap):
+#   VACUOUS (fix)      rele_deferred_last 0 or rele_last_worker 0: no deferred
+#             release of a last reference on an unlinked predecessor from a
+#             kworker, so a PASS judges nothing; more fix laps are run.
+#   VACUOUS (control)  rele_inline_last 0 or rele_last_worker 0: rerun.
+#   SUPPORTED HERE  the control REPRODUCED hung=1 with the census queue's stack
+#             shape in <node>_dstacks.txt.
+#   NOT SUPPORTED HERE  the control PASSes with rele_inline_last > 0 and
+#             rele_last_worker > 0: read P150-ALLOC-FIN as the census queue's
+#             rules say before anything else.
+#   H-U6 FIXED AND VERIFIED  SUPPORTED HERE, and at least three reached fix
+#             laps PASS (ok=30, hung=0, buflock_stuck=0, ifree_error=0,
+#             node_failures=0, late=0, cold audit CLEAN errors=0) with no reached
+#             fix lap failing.
+#   H-U6 NOT FIXED  a fix lap hangs or REPRODUCES: attributed from its stacks.
+# A lap that ABORTs, or audits STALE/NONE without a hang, has no verdict and is
+# rerun.
+#
+# Bound per lap: the census queue's 2437 s.
+2437 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1 unlprev_rele_defer=1 dbg_unlprev_rele_hold_ms=2000" tests/peer_open_unlinked_chain.sh u6vf1 30 2/net/mesh/direct g2c
+2437 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1 unlprev_rele_defer=1 dbg_unlprev_rele_hold_ms=2000" tests/peer_open_unlinked_chain.sh u6vf2 30 2/net/mesh/direct g2c
+2437 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1 unlprev_rele_defer=1 dbg_unlprev_rele_hold_ms=2000" tests/peer_open_unlinked_chain.sh u6vf3 30 2/net/mesh/direct g2c
+2437 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1 unlprev_rele_defer=1 dbg_unlprev_rele_hold_ms=2000" tests/peer_open_unlinked_chain.sh u6vf4 30 2/net/mesh/direct g2c
+2437 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1 unlprev_rele_defer=0 dbg_unlprev_rele_hold_ms=2000" tests/peer_open_unlinked_chain.sh u6vc1 30 2/net/mesh/direct g2c

@@ -1,0 +1,55 @@
+# D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY shape (c), hypothesis H-UB1:
+# same-build A/B of unstaged_logged_skip on the directed reproducer
+# tests/unstaged_slot_ab.sh, 2/disk/caw/mpath on g2d (test31 test32).  The
+# twin queue tests/queues/ub1_directed_ab_caw.queue runs the same A/B on
+# 2/disk/caw/direct (g2b, test15 test16), the configuration of the one
+# production instance (rk5); the two are graded as one campaign.
+#
+# WHAT THE REPRODUCER NOW DOES (uslc5, same build, control): X's create reused
+# the number Y had freed in 6 of 6 iterations (Y's grant on it released by its
+# cache drop, N's AG taken back by the unlink of a held spacer), and in 5 of
+# them X's partial write of the cluster carried N's slot attached and never
+# copied in with the buffer's bytes for it: P-UB1-UNSTAGED-SKIP slot=2
+# ino=8388770 masked=0 img_gen=3755326696 img_mode=0100644 img_nl=0 img_cc=6
+# then P-DINO-CLOBBER#1 path=partial regress=1 [s2 ino=8388770 disk cc=11
+# mode=00 gen=3755326697 nlink=0 -> mem cc=6 mode=0100644 gen=3755326696
+# nlink=0] -- Y's free image reverted to the previous life's unlinked image,
+# rk5's write; unstaged_logged_regressed=5 on X
+# (tests/evidence/20261018T214350Z_unstaged_slot_uslc5).
+#
+# Same build in both queues: the main tree, srcversion
+# 022F8BF6763B609A9ECC7D1, the build the final verification (fw*, in
+# ~/src/mxfs-e) runs.  8 iterations a lap, USL_PAUSE_MS 1500, no kicks.
+#
+# VERDICT RULES (written before the first lap of either queue):
+#   SUPPORTED   across both queues, at least one control lap (skip 0) reads
+#               CONTROL-SHOWS-CAUSE, at least three fix laps (skip 1) read
+#               PASS with X's unstaged_logged_prevented > 0 (the mask met the
+#               shape and held the slot back), and no fix lap reads FAIL.
+#   FIX FAILS   any fix lap FAIL (X's unstaged_logged_regressed > 0, a
+#               P-DINO-CLOBBER regress on either node, a node failure, or a
+#               cold audit not CLEAN errors=0): its own lines are attributed
+#               before anything else.  It REFUTES H-UB1 if the regressed slot's
+#               latest P-UB1-UNSTAGED-SKIP line reads masked=1 (the mask did not
+#               cover it), or if the audit names an inode a masked=1 line named
+#               (the mask lost a write: the claim that masking is lossless is
+#               wrong).
+#   WEAK        neither: more laps, not a verdict.
+#   A VACUOUS lap (no P-UB1 line on X names a reused iteration number) measured
+#   nothing and is rerun; an ABORT or an overrun is read from its own lines.
+#   A PASS lap with prevented=0 does not count toward the three.
+# The record's shape (c) closes only when this A/B is SUPPORTED and the final
+# verification on this build shows no landed P-DINO-CLOBBER regress of any
+# shape on any node.
+#
+# Bound per lap, from the harness header's step bounds: prep 300 (run.sh's
+# prep_cluster row), srcversion and knob read-back 2 x 20 per node (80), setup
+# 60, spacer list 20 and holder 20, 8 iterations x (20 + 20 + 30 + 40), Y's
+# last touch 20, holder end 20, counters and knob resets 2 x 20 per node (80),
+# stream copy 120 per node (240), chk_clean 150: 1870 s.
+1870 tests/unstaged_slot_ab.sh usa1 1 8 2/disk/caw/mpath g2d
+1870 tests/unstaged_slot_ab.sh usa2 0 8 2/disk/caw/mpath g2d
+1870 tests/unstaged_slot_ab.sh usa3 1 8 2/disk/caw/mpath g2d
+1870 tests/unstaged_slot_ab.sh usa4 1 8 2/disk/caw/mpath g2d
+1870 tests/unstaged_slot_ab.sh usa5 0 8 2/disk/caw/mpath g2d
+1870 tests/unstaged_slot_ab.sh usa6 1 8 2/disk/caw/mpath g2d

@@ -83,10 +83,30 @@ $(OBJDIR)/group_commit_test.o: group_commit_test.c tauth_testlib.h $(TOP)/dlm/ta
 $(GBIN): $(GOBJS)
 	$(CC) $(CFLAGS) -o $@ $(GOBJS) $(LDLIBS)
 
-all: $(BIN) $(LBIN) $(DBIN) $(FBIN) $(CBIN) $(UBIN) $(RBIN) $(PBIN) $(VBIN) $(SBIN) $(GBIN)
+OBIN := own_release_resync_test
+OOBJS := $(OBJDIR)/own_release_resync_test.o $(OBJDIR)/dlm.o $(OBJDIR)/dlm_shared.o \
+         $(OBJDIR)/tauth_ledger.o $(OBJDIR)/tauth_store.o $(OBJDIR)/pal_user.o
+
+$(OBJDIR)/own_release_resync_test.o: own_release_resync_test.c dlm_mesh.h tauth_testlib.h $(TOP)/dlm/dlm.h $(TOP)/dlm/tauth_ledger.h | $(OBJDIR)
+	$(CC) $(CPPFLAGS) -I$(TOP)/pal -O2 -g -std=gnu11 -Wall -c -o $@ $<
+
+$(OBIN): $(OOBJS)
+	$(CC) $(CFLAGS) -o $@ $(OOBJS) $(LDLIBS)
+
+QBIN := local_page_full_test
+QOBJS := $(OBJDIR)/local_page_full_test.o $(OBJDIR)/dlm.o $(OBJDIR)/dlm_shared.o \
+         $(OBJDIR)/tauth_ledger.o $(OBJDIR)/tauth_store.o $(OBJDIR)/pal_user.o
+
+$(OBJDIR)/local_page_full_test.o: local_page_full_test.c dlm_mesh.h tauth_testlib.h $(TOP)/dlm/dlm.h $(TOP)/dlm/tauth_ledger.h | $(OBJDIR)
+	$(CC) $(CPPFLAGS) -I$(TOP)/pal -O2 -g -std=gnu11 -Wall -c -o $@ $<
+
+$(QBIN): $(QOBJS)
+	$(CC) $(CFLAGS) -o $@ $(QOBJS) $(LDLIBS)
+
+all: $(BIN) $(LBIN) $(DBIN) $(FBIN) $(CBIN) $(UBIN) $(RBIN) $(PBIN) $(VBIN) $(SBIN) $(GBIN) $(OBIN) $(QBIN)
 
 test: all
-	./$(BIN) && ./$(LBIN) && ./$(DBIN) && ./$(FBIN) && ./$(CBIN) && ./$(UBIN) && ./$(RBIN) && ./$(VBIN) && ./$(SBIN) && ./$(GBIN)
+	./$(BIN) && ./$(LBIN) && ./$(DBIN) && ./$(FBIN) && ./$(CBIN) && ./$(UBIN) && ./$(RBIN) && ./$(VBIN) && ./$(SBIN) && ./$(GBIN) && ./$(OBIN) && ./$(QBIN)
 
 $(OBJDIR)/concurrent_release_test.o: concurrent_release_test.c dlm_mesh.h tauth_testlib.h $(TOP)/dlm/dlm.h $(TOP)/dlm/tauth_ledger.h | $(OBJDIR)
 	$(CC) $(CPPFLAGS) -I$(TOP)/pal -O2 -g -std=gnu11 -Wall -c -o $@ $<
@@ -139,7 +159,7 @@ $(LBIN): $(LOBJS)
 	$(CC) $(CFLAGS) -o $@ $(LOBJS) $(LDLIBS)
 
 clean:
-	rm -rf $(OBJDIR) $(BIN) $(LBIN) $(DBIN) $(FBIN) $(CBIN) $(UBIN) $(RBIN) $(PBIN) $(VBIN) $(SBIN) $(GBIN)
+	rm -rf $(OBJDIR) $(BIN) $(LBIN) $(DBIN) $(FBIN) $(CBIN) $(UBIN) $(RBIN) $(PBIN) $(VBIN) $(SBIN) $(GBIN) $(OBIN)
 
 .PHONY: all clean
 

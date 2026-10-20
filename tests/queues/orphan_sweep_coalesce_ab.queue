@@ -1,0 +1,61 @@
+# D-MOUNT-RUNS-THE-ORPHAN-SWEEP-TWICE-BACK-TO-BACK: same-build A/B of
+# orphan_sweep_coalesce (dlm/v5_mount.c v5_orphan_sweep_queue), run from
+# ~/src/mxfs-e (srcversion 737E182A809291DAA0B4785, which carries the
+# coalescing at its default 1) on 4/net/mesh/direct g4: the two-node TCP
+# configurations are held by the H-F11 A/B, and the departure worker's queue
+# is the same code on any TCP configuration.  One lap, four lone remounts of
+# test3 after it unmounts as the last member, the knob alternating 0,1,0,1 on
+# the same mount history (tests/orphan_sweep_coalesce_ab.sh, its header
+# describes the shape).
+#
+# VERDICT RULES (written before the first lap; the harness applies them):
+#   CONTROL (knob 0) REPRODUCED  every remount with a settled predecessor
+#                                (P-SETTLED-INCARNATION) logs two
+#                                P-DEPART-WORK-ORPHAN-SWEEP and no
+#                                P-ORPHAN-SWEEP-COALESCED.
+#   FIX (knob 1) PASS            every such remount logs one sweep, at least
+#                                one COALESCED line, and its sweep's start
+#                                (line time minus total_ms) is at or after the
+#                                departure's completion line.
+#   VACUOUS                      no remount met a settled predecessor.
+#   FAIL                         any mount or unmount nonzero or over its
+#                                bound, or a fix remount outside the rule.
+#   FIXED AND VERIFIED needs the control arm REPRODUCED and every fix remount
+#   PASS in the same lap.  A second lap on 2/net/mesh/direct, the
+#   configuration the record was observed on, follows when that configuration
+#   is free.
+#
+# Bound: the harness header's per-step bounds for NFILES=2000, CYCLES=4, four
+# nodes: prep 300 + creates 140 + three departing unmounts 3x120 + four cycles
+# x (last-member unmount 180 + knob 20 + mark 20 + lone mount 180 + quiet wait
+# 2000x6/100+10+60 = 190 + line read 20 = 610) = 3240 s.
+#
+# osc4a (2026-10-17T19:20Z) measured nothing: the harness's quiet wait counted
+# only P-DEPART-WORK lines, so it ended 10 s after 'P-DEPART-WORKER started'
+# while the takeover was still retiring pages (708/646/585 P-TAUTH-TAKEOVER-
+# RETIRE lines at the cut in cycles 1-3), and each next unmount cut that
+# takeover and its sweep short; cycle 4's one sweep was still retiring cycle
+# 1's leftover pages (via=orphan-sweep) when it was read.  The wait now counts
+# every worker line and ends only after the departure line and a sweep line.
+#
+# osc4b (19:30Z) ran the shape in every cycle (sweeps visible) and graded
+# FAIL on two harness checks, not on the behaviour: cycle 1 met TWO settled
+# departures and swept three times (the mount's sweep plus one per departure),
+# which the CONTROL rule above, written for one departure, read as not two;
+# and both fix remounts (1 sweep, 1 COALESCED) computed their sweep's start
+# 0.52 / 0.18 ms before the departure line it follows on the same worker,
+# because total_ms is whole milliseconds and the start was rounded to 3
+# decimals.  RULES AMENDED BEFORE osc4c (the next lap), stated in the
+# behaviour's own terms: CONTROL REPRODUCED = sweeps equal the settled
+# departures plus one, no COALESCED; FIX PASS = one sweep, at least one
+# COALESCED, its start at or after the departure line within total_ms's 1 ms
+# resolution.
+#
+# osc4c (19:36Z, 4/net/mesh/direct g4) PASS: control cycles 1 and 3 swept 4
+# and 2 times after 3 and 1 settled departures, no COALESCED; fix cycles 2 and
+# 4 swept once each, one COALESCED each, start after the departure line; every
+# mount and unmount rc=0 (mounts 0.5-1.0 s, unmounts 1.0-4.2 s).  Next: the
+# same lap on 2/net/mesh/direct g2c, the configuration the record was observed
+# on.  Bound for two nodes: prep 300 + creates 140 + one departing unmount 120
+# + four cycles x 610 = 3000 s.
+3000 NFILES=2000 CYCLES=4 QUIET_S=10 tests/orphan_sweep_coalesce_ab.sh osc2a 2/net/mesh/direct g2c

@@ -1,0 +1,52 @@
+# D-WHOLE-PAGE-CAW-PAYLOAD-PANICS-NODE-IN-SCSI-ALLOC-SGTABLES: the fix at its
+# natural rate, after tests/queues/caw_span_adjacent_ab.queue (lapq_spanadj1,
+# 2026-10-19 05:13-05:18Z) graded CONFIRMED AND FIXED: both control arms
+# panicked at scsi_alloc_sgtables+0x3a1 (R15=2, RAX=0x2000), both fix arms
+# answered 837 and 875 adjacent-page whole-page commands as two bvecs each.
+#
+# This queue removes the test knob: the fix build (this tree,
+# 65863B924040AF5213F2A76) at its defaults (caw_span=1, payload pages from
+# alloc_page, adjacent only by the allocator's chance) on the same rig and
+# shape as the panics (2/net/mesh/direct g2c, test29 first node).  Natural
+# rate before the fix: 4 of 5 g2c preps of the first build carrying the
+# whole-page swap panicked their first node in mount(2) (and 1 of 2 on g2e).
+# Each lap: a default prep (both nodes mount with caw_span=1), then three
+# natural-page rounds on test29 (tests/caw_span_adjacent_ab.sh with adjacent
+# 0: umount, mount, 100 creates, sync; caw_span_n read every round).
+#
+# PREDICTION: every prep completes (rc 0) and every arm PASSes (caw_span_n
+# rising every round, no panic, boot id unchanged), 10 of 10.
+# VERDICT RULES (written before the first lap): FIXED AT ITS NATURAL RATE if all
+# 10 preps and all 10 arms pass with no BUG, Oops or panic on either node's
+# serial console; FIX FAILS on any panic, attributed from its own lines first.
+# A prep that fails for another reason is read from its own lines; an arm that
+# is VACUOUS (no whole-page command answered) measured nothing.
+#
+# Bounds: prep 300 (as the A/B queue), an arm 305 (its header, ROUNDS=3).
+#
+# Run spannat1 (tests/evidence/lapq_spannat1.log, 05:19-05:29Z) completed the
+# laps commented out below, 9 preps and arms natd1..natd8, every one rc 0 and
+# every arm PASS; the session relay ended the runner during natd9 (lap 18),
+# which left no verdict.  The laps still uncommented are the rest, run as
+# spannat2 with a prep first so natd9 starts from a restored fleet.
+#300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+#305 MXFS_NODE_LIST=test29,test30 tests/caw_span_adjacent_ab.sh natd1 0 test29
+#300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+#305 MXFS_NODE_LIST=test29,test30 tests/caw_span_adjacent_ab.sh natd2 0 test29
+#300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+#305 MXFS_NODE_LIST=test29,test30 tests/caw_span_adjacent_ab.sh natd3 0 test29
+#300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+#305 MXFS_NODE_LIST=test29,test30 tests/caw_span_adjacent_ab.sh natd4 0 test29
+#300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+#305 MXFS_NODE_LIST=test29,test30 tests/caw_span_adjacent_ab.sh natd5 0 test29
+#300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+#305 MXFS_NODE_LIST=test29,test30 tests/caw_span_adjacent_ab.sh natd6 0 test29
+#300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+#305 MXFS_NODE_LIST=test29,test30 tests/caw_span_adjacent_ab.sh natd7 0 test29
+#300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+#305 MXFS_NODE_LIST=test29,test30 tests/caw_span_adjacent_ab.sh natd8 0 test29
+#300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+305 MXFS_NODE_LIST=test29,test30 tests/caw_span_adjacent_ab.sh natd9 0 test29
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+305 MXFS_NODE_LIST=test29,test30 tests/caw_span_adjacent_ab.sh natd10 0 test29

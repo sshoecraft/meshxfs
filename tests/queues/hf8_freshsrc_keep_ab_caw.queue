@@ -1,0 +1,17 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F8: the
+# same same-build A/B as tests/queues/hf8_freshsrc_keep_ab.queue (its header
+# states the hypothesis and the verdict rules), on the CAW transport
+# (2/disk/caw/direct, test15/test16) beside the two 2/net/mesh queues.  The
+# P5F arm is transport-independent code; every trace so far is TCP, so this
+# queue first answers whether CAW reaches the hazard at all (control laps:
+# fk_clean > 0?) and then whether the fix holds there.  dbg_log_mirror_check
+# stays off: its DLM query from xfs_trans_log_inode was only ever run on TCP.
+# NG0_FRESHSRC_GUARD=0 is the control, =1 the fix.
+#
+# Bound per lap: 1350 s, derived in that queue's header.
+1350 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kcc1 1 300 2/disk/caw/direct g2b
+1350 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kcf1 1 300 2/disk/caw/direct g2b
+1350 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kcc2 1 300 2/disk/caw/direct g2b
+1350 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kcf2 1 300 2/disk/caw/direct g2b
+1350 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kcc3 1 300 2/disk/caw/direct g2b
+1350 NG0_RECYCLE_GUARD=0 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh kcf3 1 300 2/disk/caw/direct g2b

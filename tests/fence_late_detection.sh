@@ -103,9 +103,9 @@ field(){ grep -aoE "(^| )$2=[^ ]*" "$1" | head -1 | cut -d= -f2; }
 # what the authority lease is FOR, and a lap in which the filesystem went down
 # because the lease expired is a lap in which containment worked.
 #
-# The withdrawal announces itself as "Metadata I/O Error ... at
-# mxfs_dlm_fence_notify", because that is the call XFS is given to force a
-# shutdown through and it names its own reason rather than the caller's.  So
+# The withdrawal announces itself as "Fenced by the cluster ... at
+# mxfs_dlm_fence_notify" (before 0.90.131, "Metadata I/O Error ... at" the same
+# site), and the shutdown line names the call that forced it.  So
 # the exemption is keyed on that CALL SITE — the cluster-withdrawal entry —
 # and on nothing broader: a shutdown from anywhere else still counts, and
 # WHICH withdrawal this was is settled separately by the assertion that no

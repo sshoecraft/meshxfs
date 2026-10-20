@@ -194,6 +194,23 @@ pf_start_gate() {
         ck "every node took PF_KNOBS ($PF_KNOBS)" "$(awk '{w=$3; g=$4; sub(/^want=/,"",w); sub(/^got=/,"",g); if (w != g) bad++} END {print bad+0}' "$OUT/knobs.txt")" 0
         [ "$fails" = 0 ] || { finish FAIL "stage=knobs"; exit 1; }
     fi
+    # PF_NODE_KNOBS="node:name=value ...": the same, written after PF_KNOBS on
+    # the one node each entry names, so a row can give one node a setting the
+    # others do not have (the elected replayer delaying its own fencing intent
+    # while every other survivor parks after it certifies).  An entry naming a
+    # node outside the row fails the row, as a missing parameter does.
+    if [ -n "${PF_NODE_KNOBS:-}" ]; then
+        local nkv nn nv
+        for nkv in $PF_NODE_KNOBS; do
+            nn=${nkv%%:*}; nv=${nkv#*:}
+            case " $NODES " in
+            *" $nn "*) echo "$nn ${nv%%=*} want=${nv#*=} got=$(rs 15 "$nn" "echo ${nv#*=} > /sys/module/mxfs/parameters/${nv%%=*} && cat /sys/module/mxfs/parameters/${nv%%=*}" 2>/dev/null | tr -d '\r\n')" >> "$OUT/knobs.txt" ;;
+            *) echo "$nn ${nv%%=*} want=${nv#*=} got=not-a-node-of-this-row" >> "$OUT/knobs.txt" ;;
+            esac
+        done
+        ck "every named node took PF_NODE_KNOBS ($PF_NODE_KNOBS)" "$(awk '{w=$3; g=$4; sub(/^want=/,"",w); sub(/^got=/,"",g); if (w != g) bad++} END {print bad+0}' "$OUT/knobs.txt")" 0
+        [ "$fails" = 0 ] || { finish FAIL "stage=knobs"; exit 1; }
+    fi
 }
 PFMARK="PF-MARK-$ROW-$RUN"
 KFILE=/run/mxfs_pf_kmsg.$RUN.$ROW
@@ -225,7 +242,11 @@ pf_load_start() {
     local n warm=${PF_WARM_S:-20} on=${1:-$LOAD_NODES} pids=()
     for n in $on; do
         mkdir -p "$OUT/load_$n"
-        rs 20 "$n" "rm -f $STOP; nohup setsid python3 /src/mxfs/tests/mpath/pathload.py run $n $MNT /src/mxfs/$OUT/load_$n $STOP > /src/mxfs/$OUT/load_$n/run.out 2>&1 < /dev/null &" >/dev/null &
+        # PATHLOAD_VERIFY=1: every churn file is checked against the inode its
+        # create was handed before it is unlinked.  Without it a name whose
+        # inode was freed under it is seen only if it is a row's last churn
+        # file, which is how the one 8/net/mesh/mpath case was found.
+        rs 20 "$n" "rm -f $STOP; PATHLOAD_VERIFY=1 nohup setsid python3 /src/mxfs/tests/mpath/pathload.py run $n $MNT /src/mxfs/$OUT/load_$n $STOP > /src/mxfs/$OUT/load_$n/run.out 2>&1 < /dev/null &" >/dev/null &
         pids+=($!)
     done
     wait "${pids[@]}"
@@ -314,6 +335,7 @@ pf_load_stop() {
         ck "$n's load ended by itself and reported" "$([ -n "$pl" ] && echo yes || echo no)" yes
         ck "$n: no operation returned an error in the whole run" "$(sed -n 's/.* err=\([0-9]*\).*/\1/p' <<<"$pl")" 0
         ck "$n: the mutual-exclusion witness saw no double grant" "$(sed -n 's/.*double_grant=\([0-9]*\).*/\1/p' <<<"$pl")" 0
+        ck "$n: every churn file still named the inode its create was handed (verify_fail, $OUT/load_$n/verify.log)" "$(sed -n 's/.*verify_fail=\([0-9]*\).*/\1/p' <<<"$pl")" 0
     done
 }
 

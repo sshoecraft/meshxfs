@@ -1,0 +1,44 @@
+# H-ES3 A/B (D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED): a lookup whose
+# poisoned shell could not be retired reads the parent again instead of
+# failing -ESTALE (switch poison_unretired_relookup, 1 default, 0 = control).
+#
+# Measured on the 0.90.131 release build, 4/disk/caw/mpath (g4b): every node of
+# path_failover, path_fabric and path_flap logged 1-3 'mutex ERR ESTALE' from
+# the workload's shared LOCK directory, each ending on P34H-POISON-UNRETIRED +
+# P-LKERR stage=3 err=-116 (or P201-TYPEFLIP-UNRESOLVED-FAIL), and
+# path_mount_degraded read two files back ESTALE.  Those rows require zero
+# failed operations, so the board fails while this stands.
+#
+# Build: the main tree's mxfs.ko carrying the switch (modinfo -F srcversion
+# mxfs.ko, recorded by each lap's prep).  4/disk/caw/mpath on g4 (test3..test6),
+# which overlaps no group in use; every lap on a fresh prep (module load resets
+# every knob and capped probe), the switch set by --knobs on every row and read
+# back by the row (knobs.txt).  Arms alternate C (0) / F (1), 3 each.
+#
+# READING RULES (written before the first lap), per lap, from the three rows'
+# load_test<N>/ops.log, verify_*.txt and kmsg_test<N>_fromnode.gz (lap_chain
+# laps keeps them, PF_KEEP_KMSG=1):
+#   ESTALE   'mutex ERR ESTALE' lines over all nodes and rows, plus
+#            read_error=ESTALE in verify files.
+#   UNRET    P34H-POISON-UNRETIRED lines; RELK P201-RELOOKUP why=poison-unretired.
+#   LKERR    P-LKERR stage=3 err=-116 lines.
+#   C lap: CONTROL REACH if UNRET >= 1 with an LKERR -116 following it.
+#   F lap: FIX if every UNRET is followed (same ino, same comm) by RELK and no
+#          LKERR -116 attributable to the poison route; the lap's ESTALE from
+#          that route is 0.
+#   SUPPORTED: >= 2 C laps with CONTROL REACH, every F lap FIX, and the F laps'
+#              total ESTALE below the C laps'.
+#   REFUTED:   an F lap whose relookups (3 in one lookup) end in -116 from this
+#              arm, or F laps' ESTALE rate equal to the C laps'.
+#   Any shutdown, BUG, Oops, hung task, chk/verify bad bytes: attributed from
+#   its own lines first; a row's other verdicts are recorded, not graded.
+#
+# Bounds: prep_cluster 300 s + path_failover 300 + path_fabric 300 +
+# path_flap 300 (the manifest budgets) + the chain's overhead outside the
+# rows, measured 130-160 s = 1360 s.
+1360 tests/mpath/lap_chain.sh laps 4/disk/caw/mpath g4 purc1 1 --prep --knobs "poison_unretired_relookup=0" --rows path_failover,path_fabric,path_flap
+1360 tests/mpath/lap_chain.sh laps 4/disk/caw/mpath g4 purf1 1 --prep --knobs "poison_unretired_relookup=1" --rows path_failover,path_fabric,path_flap
+1360 tests/mpath/lap_chain.sh laps 4/disk/caw/mpath g4 purc2 1 --prep --knobs "poison_unretired_relookup=0" --rows path_failover,path_fabric,path_flap
+1360 tests/mpath/lap_chain.sh laps 4/disk/caw/mpath g4 purf2 1 --prep --knobs "poison_unretired_relookup=1" --rows path_failover,path_fabric,path_flap
+1360 tests/mpath/lap_chain.sh laps 4/disk/caw/mpath g4 purc3 1 --prep --knobs "poison_unretired_relookup=0" --rows path_failover,path_fabric,path_flap
+1360 tests/mpath/lap_chain.sh laps 4/disk/caw/mpath g4 purf3 1 --prep --knobs "poison_unretired_relookup=1" --rows path_failover,path_fabric,path_flap

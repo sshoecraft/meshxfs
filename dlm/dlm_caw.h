@@ -124,6 +124,30 @@
 	   callback processing.  Burst only the first FAST_COUNT resends of a wait
 	   (the initial-loss window that gates the handoff), then steady 100ms. */
 #define MXFS_CAW_BAST_RESEND_FAST_COUNT 4
+#define MXFS_CAW_BAST_RESEND_BACKOFF_AFTER_MS 3000 /* a wait still blocked
+	   this long is a drain its holder has been told about ~30 times; from
+	   here each re-send waits twice as long as the last (caw_bast_resend_
+	   backoff), instead of notifying the holder ~13 times a second for the
+	   whole drain (20,164 P7B-BASTNOTIFY over one 1587 s wait, 0.89.92) */
+#define MXFS_CAW_BAST_RESEND_MAX_MS 1000    /* ... up to this: a lost hint is
+	   still recovered well inside the 4 s relaxed holder disk poll */
+#define MXFS_CAW_POLL_RESUBMIT_AFTER_MS 3000 /* the holder side of the same
+	   drain: a conflict its own disk poll has seen this long on one slot
+	   generation is one it has submitted ~30 BASTs for; from here the poll
+	   submits for that slot at most once per MXFS_CAW_POLL_RESUBMIT_MS
+	   (caw_poll_resubmit_backoff) instead of on every FAST pass.  With the
+	   waiter's re-send already backed off to 1 s, the poll's 100 ms passes
+	   still gave the holder 10.4 notifications a second over a 240 s drain
+	   (live_holder_wait cbr1a, 0.90.131) */
+#define MXFS_CAW_POLL_RESUBMIT_MS   MXFS_CAW_BAST_POLL_RELAX_MS /* ... the
+	   waiter's own re-send (1 s once backed off) is the channel for a long
+	   drain, and the poll its backstop at the relaxed poll's cadence, the
+	   lost-hint recovery this design already accepts when nothing waits */
+#define MXFS_CAW_POLL_RESUBMIT_GAP_MS 1000  /* a conflict the poll has not
+	   seen on a slot for this long is a new one when it is seen again, and
+	   is submitted at once */
+#define MXFS_CAW_POLL_RESUBMIT_SLOTS 64     /* conflicts the poll remembers,
+	   direct-mapped by slot index; a collision only costs a submit */
 #define MXFS_CAW_WAIT_TIMEOUT_MS    120000  /* 120s lock wait timeout */
 /*  hard ceiling for the liveness-extended wait.  The
  * base timeout's job is DEAD-holder detection, but dead holders are already
@@ -595,6 +619,10 @@ struct mxfs_dlm_caw_ctx {
 		uint64_t                 overflow;  /* dropped: pool exhausted */
 		uint64_t                 inline_cb; /* fallback: ran on the producer */
 		uint64_t                 fastpoll_until_ms; /* overflow -> hold FAST poll */
+		/* written by the poll thread only */
+		uint64_t                 poll_submitted; /* of submitted: by the disk poll */
+		uint64_t                 poll_held_back; /* poll conflicts not re-submitted
+							    (caw_poll_resubmit_backoff) */
 	} bq;
 	mxfs_thread_t           *bast_disp_thread[MXFS_CAW_BAST_WORKERS];
 

@@ -1,0 +1,42 @@
+# D-UMOUNT-ROOT-DENTRY-STILL-IN-USE-DEFERRED-DIR-DCACHE-SHRINK-RACE, H-DS1: the
+# same-build A/B of dshrink_umount_gate on build 37897D38118AD5E2FAAC4FC (main
+# tree ~/src/mxfs, 0.90.131), tests/umount_dshrink_race_ab.sh, 2/disk/caw/mpath
+# on g2d (test31 test32).  The record was seen on 2/disk/caw/direct; that
+# configuration's run.sh lock is held by queue kw on g2b while this one runs,
+# and the race is between the module's own deferred work and the VFS teardown,
+# which no attachment or transport takes part in.  Each lap: 3 rounds, the test
+# hold dbg_dshrink_hold_ms=1500 set on node A in both arms, the gate 0
+# (control) or 1 (fix) on node A.  prep_node.sh loads the module with
+# dyndbg=+p, so A's captured kernel log of each round carries P199's
+# residual-inode lines with their dshrink= field (work_busy of the inode's
+# deferred shrink at xfs_kill_sb).
+#
+# VERDICT RULES (written before the first lap):
+#   per lap   the harness's RESULT line: a round REACHES when it shows
+#             P-DBG-DSHRINK-HOLD and P-DSHRINK-AT-UMOUNT; control
+#             CONTROL-SHOWS-CAUSE when a reached round has 'BUG: Dentry';
+#             fix PASS when a round reached and no round has 'BUG: Dentry',
+#             'Busy inodes' or another WARNING/BUG/Oops line, every umount
+#             and mount returned 0 inside its bound and the cold audit is
+#             CLEAN; VACUOUS with no reach; FAIL otherwise.  A FAIL is
+#             attributed from the round's captured kernel log before it is
+#             counted against the fix.
+#   SUPPORTED AND FIXED on this configuration: at least one control lap
+#             CONTROL-SHOWS-CAUSE, at least two fix laps PASS, no fix lap
+#             FAIL on this mechanism.
+#   REFUTED   a reached fix round with 'BUG: Dentry' (the gate closed and the
+#             flush done, the reference still there), or a control lap whose
+#             BUG names the root while A's P199 line for ino 128 in that round
+#             reads dshrink=0 (no shrink busy at the BUG).
+#   WEAK      every reached control round without the BUG: the hold does not
+#             reproduce the race and the fix laps judge nothing.
+#
+# Bound per lap, from the harness's own steps: prep 300 + srcversion reads
+# 2x20 + findmnt 15 + knob set and readback 20 + 3 rounds x (mark and list 20
+# + peer create 20 + list, umount, mount 4+12+30 + log capture 30 = 116) +
+# counters 20 + chk_clean with alloc_witness 150 = 893 s.
+893 tests/umount_dshrink_race_ab.sh dsrc1 0 3 1500 2/disk/caw/mpath g2d
+893 tests/umount_dshrink_race_ab.sh dsrf1 1 3 1500 2/disk/caw/mpath g2d
+893 tests/umount_dshrink_race_ab.sh dsrc2 0 3 1500 2/disk/caw/mpath g2d
+893 tests/umount_dshrink_race_ab.sh dsrf2 1 3 1500 2/disk/caw/mpath g2d
+893 tests/umount_dshrink_race_ab.sh dsrf3 1 3 1500 2/disk/caw/mpath g2d

@@ -24,9 +24,31 @@
  *   4  after the ramp every node can take EX on R (the mount check)
  * A FAIL on 2/3/4 with the harness otherwise healthy reproduces the rig
  * defect; the P-lines say which transition left the bit.
+ *
+ * Usage: formation_test [ramp_ms] [run_ms] [budget] [view_unspent] [handoff_grace_ms]
+ * The budget (default 10, the 0.34.0 kernel's) is what every request in
+ * this test is given.  Today's kernel gives every inode acquire the full
+ * budget of 60 (dlm/dlm.c MXFS_DLM_FULL_BUDGET) except xfs_lock_two_inodes'
+ * second inode, which gets 3 and is re-driven when it fails; so a failure at
+ * 10 says the engine can spend a budget during a ramp, and only a failure at
+ * 60 says a kernel acquire can.  view_unspent (0 or 1; default: the engine's
+ * own, 1) sets dl_retry_view_unspent, whether a RETRY answer that follows a
+ * change of the view spends the budget; handoff_grace_ms (default: the
+ * engine's own, 1000; 0 = the control) sets dl_retry_handoff_grace_ms, how
+ * long answers that report a page hand-off in flight do not spend it; INFO
+ * reports how many of each did not.
  */
 #define NNODES 12
 #include "dlm_mesh.h"
+#include "dlm/dlm_user_compat.h"
+
+/* dlm/dlm.c's knobs and their counts; user mode has no /sys to set them through */
+extern int mxfs_dl_retry_view_unspent;
+extern atomic_t mxfs_dl_retry_view_unspent_n;
+extern int mxfs_dl_retry_handoff_grace_ms;
+extern atomic_t mxfs_dl_retry_handoff_unspent_n;
+
+static int lock_budget = 10;
 
 struct worker {
     struct vnode *n;
@@ -74,13 +96,13 @@ static void worker_fn(void *arg)
     while (!w->stop) {
         held = mxfs_dlm_held_mode(w->n->dlm, &w->res);
         t0 = mxfs_pal_time_ms();
-        rc = mxfs_dlm_lock_retries(w->n->dlm, &w->res, MXFS_LOCK_PR, 0, &granted, 10);
+        rc = mxfs_dlm_lock_retries(w->n->dlm, &w->res, MXFS_LOCK_PR, 0, &granted, lock_budget);
         if (rc) { note_fail(w, MXFS_LOCK_PR, rc, held, mxfs_pal_time_ms() - t0); mxfs_pal_sleep_ms(5); continue; }
         mxfs_pal_sleep_ms(1);
         mxfs_dlm_unlock(w->n->dlm, &w->res);
         held = mxfs_dlm_held_mode(w->n->dlm, &w->res);
         t0 = mxfs_pal_time_ms();
-        rc = mxfs_dlm_lock_retries(w->n->dlm, &w->res, MXFS_LOCK_EX, 0, &granted, 10);
+        rc = mxfs_dlm_lock_retries(w->n->dlm, &w->res, MXFS_LOCK_EX, 0, &granted, lock_budget);
         /*
          * -EDEADLK is the master's blocked-upgrade deny (P-CONVBLK-DENY): the
          * table still shows this node's PR GRANTED — the release of the PR
@@ -112,7 +134,7 @@ static void worker_fn(void *arg)
                 w->deadlk_ex++;
                 mxfs_dlm_unlock(w->n->dlm, &w->res);
                 mxfs_dlm_release_orphan_if_unheld(w->n->dlm, &w->res);
-                rc = mxfs_dlm_lock_retries(w->n->dlm, &w->res, MXFS_LOCK_EX, 0, &granted, 10);
+                rc = mxfs_dlm_lock_retries(w->n->dlm, &w->res, MXFS_LOCK_EX, 0, &granted, lock_budget);
             }
             if (p109 > w->p109_max)
                 w->p109_max = p109;
@@ -136,9 +158,18 @@ int main(int argc, char **argv)
     int ramp_ms = argc > 1 ? atoi(argv[1]) : 40;
     int run_ms = argc > 2 ? atoi(argv[2]) : 1500;
 
+    if (argc > 3)
+        lock_budget = atoi(argv[3]);
+    if (argc > 4)
+        mxfs_dl_retry_view_unspent = atoi(argv[4]);
+    if (argc > 5)
+        mxfs_dl_retry_handoff_grace_ms = atoi(argv[5]);
+    atomic_set(&mxfs_dl_retry_view_unspent_n, 0);
+    atomic_set(&mxfs_dl_retry_handoff_unspent_n, 0);
     tl_mktemp("formation_test");
-    printf("=== formation_test file=%s nodes=%d ramp_ms=%d run_ms=%d ===\n",
-           tl_path, NNODES, ramp_ms, run_ms);
+    printf("=== formation_test file=%s nodes=%d ramp_ms=%d run_ms=%d budget=%d view_unspent=%d handoff_grace_ms=%d ===\n",
+           tl_path, NNODES, ramp_ms, run_ms, lock_budget, mxfs_dl_retry_view_unspent,
+           mxfs_dl_retry_handoff_grace_ms);
     format_region(base, uuid);
     dev = mxfs_pal_bdev_open(tl_path);
     if (!dev) { perror("bdev_open"); return 2; }
@@ -191,9 +222,11 @@ int main(int argc, char **argv)
         denies += nodes[i].dlm->ledger_denies;
     }
     printf("  INFO iters=%d fails=%d busy_denies=%llu ghosts=%llu remaster=%llu ledger_denies=%llu "
-           "upgrade_denies=%d p109_max=%d\n",
+           "upgrade_denies=%d p109_max=%d view_unspent_n=%d handoff_unspent_n=%d\n",
            total_iters, total_fails, (unsigned long long)busy, (unsigned long long)ghosts,
-           (unsigned long long)remaster, (unsigned long long)denies, total_deadlk, p109_max);
+           (unsigned long long)remaster, (unsigned long long)denies, total_deadlk, p109_max,
+           atomic_read(&mxfs_dl_retry_view_unspent_n),
+           atomic_read(&mxfs_dl_retry_handoff_unspent_n));
     CHECK(total_iters > 0, "0 the workload ran (iters=%d)", total_iters);
     CHECK(total_fails == 0, "1 no lock request failed across the ramp (fails=%d)", total_fails);
     for (i = 0; i < NNODES; i++)
@@ -208,7 +241,7 @@ int main(int argc, char **argv)
     for (i = 0; i < NNODES; i++) {
         uint8_t granted = 0;
 
-        rc = mxfs_dlm_lock_retries(nodes[i].dlm, &R, MXFS_LOCK_EX, 0, &granted, 10);
+        rc = mxfs_dlm_lock_retries(nodes[i].dlm, &R, MXFS_LOCK_EX, 0, &granted, lock_budget);
         CHECK(rc == 0 && granted == MXFS_LOCK_EX, "4 node %u EX on ino=128 after the ramp rc=%d",
               nodes[i].id, rc);
         if (rc == 0)

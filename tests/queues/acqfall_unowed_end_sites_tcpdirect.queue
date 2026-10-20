@@ -1,0 +1,87 @@
+# D-ABANDONED-ACQUIRE-UNPAIRED-DLM-END-AT-OPEN-AND-UNFLAGGED-SITES: the change's
+# coverage beyond the open path.  tests/queues/acqfall_unowed_end_ab_tcpdirect.queue
+# (run acqne, main tree 28AD29D0280957262F97F85, g2c) measured the sav6 shape:
+# control acqnec1 'P71-UNDERFLOW ... un=mxfs_dlm_open_protect' after md5sum's
+# open gave up; fix acqnef1 zero P71-UNDERFLOW on either node and
+# P-ACQFALL-END-NOT-OWED for the refused inode, every harness check PASS,
+# chk_clean CLEAN.  H-NE-1 says the unpaired end comes from ANY unlock of a begin
+# whose acquire gave up, which the per-site XFS_ILOCK_MXFS_NOEND flag could not
+# express wherever a helper retries, and the change consumes the owed end at the
+# one DLM end (mxfs_dlm_ilock_end) whatever the call site.  The record also
+# names the sites the flag never covered: xfs_vn_update_time, the ichange and
+# attr transactions, the page fault's begin, the multi-inode helpers and the
+# lookup peek.  This queue drives a give-up at each through
+# tests/tcp_lockreq_blackhole.sh's fallible workloads (each refuses its own
+# acquire under the dropped request, EXPECT=bounded):
+#   held_fd_dio_unaligned  kiocb_modified -> xfs_vn_update_time (stage=timestamp)
+#   held_fd_chmod          xfs_trans_alloc_ichange's ILOCK_EXCL
+#   held_fd_setxattr       xfs_attr_add_fork / xfs_attr_set's reservation
+#   held_fd_mmap_write     page_mkwrite (stage=timestamp or write-hold)
+#   held_fd_mmap_read      the fault's own begin, mxfs_dlm_ilock_begin_fallible
+#                          (stage=read-hold)
+#   dir_rename             mxfs_lock_inodes_fallible, the multi-inode helper
+#   dir_link               mxfs_lock_two_inodes_fallible, whose ABBA/trylock
+#                          retry can drop and re-take a member after its give-up
+#   dir_lookup             the lookup's acquire of the directory
+# Same build, 2/net/mesh/direct g2d (H=test31 masters, W=test32 gives up).  Two
+# arms, control (acqfall_unowed_skip=0) then fix (1), each on one fresh prep:
+# the knob written on both nodes after the prep and read back without writing
+# after the eight laps; every harness lap leaves both nodes mounted and its knob
+# cleared, so the eight chain on one mount; then run.sh chk_clean audits it.
+#
+# RULES (written before the first lap).  Per lap, both nodes' captures in the
+# lap's own evidence directory (the harness scopes them to its kmsg mark):
+#   VALID ARM: the readbacks show the arm's value on test31 and test32 before
+#     and after, with one srcversion; every lap printed its verdict line.
+#   GIVE-UP REACHED: the lap's bounded checks PASS (the site's own refusal line
+#     on W and nothing changed on either node).  A lap without it is VACUOUS for
+#     its site in that arm.
+#   CONTROL REACH for a site: P71-UNDERFLOW on W in that site's control lap.
+#   FIX for a site: zero P71-UNDERFLOW on either node in its fix lap, and
+#     P-ACQFALL-END-NOT-OWED on W wherever its control lap reached.
+#   SUPPORTED: every site's fix lap FIX, and REACH in at least one site's
+#     control lap.  A site whose control lap gave up and showed no P71 is
+#     recorded as owing no end there (its unlock never reached an end) - not a
+#     failure of the change.
+#   REFUTED: any P71-UNDERFLOW in a fix lap, from any site: then a new
+#     hypothesis before any patch.
+#   HOLDER CHECK (each arm): chk_clean PASS (verdict=CLEAN release=CLEAN
+#     errors=0, every node unmounted and remounted inside its bound) and every
+#     lap's own checks PASS.  A fix lap or audit failing where its control
+#     passes means a skip took an owed end: the change is wrong.
+#   INTEGRITY (any lap): a shutdown, BUG, Oops, hung-task, P-TAUTH-VERIFY-FAIL
+#     or P-TAUTH-DOUBLE-GRANT line stops the work and is attributed first.
+#
+# Bounds.  g2c and g2d share 2/net/mesh/direct's run.sh lock, so the run.sh
+# laps wait for it (MXFS_CONFIG_LOCK_WAIT_S=150: the other group's longest
+# run.sh call measured 130 s, chk_clean on g2c) on top of their own bounds:
+# prep 300 + 150; knobs 60 (tests/fleet_set_params.sh: one 40 s ssh per node,
+# in parallel); file workloads 370 (the harness header: candidate search
+# 8 x 13 + ARMED_S 180 + recovery 60 + captures 20); directory workloads 460
+# (the same plus 8 x 400 entry creates, measured ~14 ms each = 45 s, and their
+# removal, the same again); audit 315 + 150 (run.sh alloc_witness 120 +
+# chk_clean 180 + preflight and marker check; measured 100-130 s on g2c).
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2d prep_cluster
+60 tests/fleet_set_params.sh "acqfall_unowed_skip=0" test31,test32 tests/evidence/acqcv_c_before.txt
+370 ARMED_S=180 EXPECT=bounded WORKLOAD=held_fd_dio_unaligned tests/tcp_lockreq_blackhole.sh acqcvc_dio test32 test31
+370 ARMED_S=180 EXPECT=bounded WORKLOAD=held_fd_chmod tests/tcp_lockreq_blackhole.sh acqcvc_chmod test32 test31
+370 ARMED_S=180 EXPECT=bounded WORKLOAD=held_fd_setxattr tests/tcp_lockreq_blackhole.sh acqcvc_setx test32 test31
+370 ARMED_S=180 EXPECT=bounded WORKLOAD=held_fd_mmap_write tests/tcp_lockreq_blackhole.sh acqcvc_mmw test32 test31
+370 ARMED_S=180 EXPECT=bounded WORKLOAD=held_fd_mmap_read tests/tcp_lockreq_blackhole.sh acqcvc_mmr test32 test31
+460 ARMED_S=180 EXPECT=bounded WORKLOAD=dir_rename tests/tcp_lockreq_blackhole.sh acqcvc_ren test32 test31
+460 ARMED_S=180 EXPECT=bounded WORKLOAD=dir_link tests/tcp_lockreq_blackhole.sh acqcvc_lnk test32 test31
+460 ARMED_S=180 EXPECT=bounded WORKLOAD=dir_lookup tests/tcp_lockreq_blackhole.sh acqcvc_lkp test32 test31
+60 tests/fleet_set_params.sh "acqfall_unowed_skip acqfall_unowed_skip_n" test31,test32 tests/evidence/acqcv_c_after.txt
+465 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2d chk_clean
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2d prep_cluster
+60 tests/fleet_set_params.sh "acqfall_unowed_skip=1" test31,test32 tests/evidence/acqcv_f_before.txt
+370 ARMED_S=180 EXPECT=bounded WORKLOAD=held_fd_dio_unaligned tests/tcp_lockreq_blackhole.sh acqcvf_dio test32 test31
+370 ARMED_S=180 EXPECT=bounded WORKLOAD=held_fd_chmod tests/tcp_lockreq_blackhole.sh acqcvf_chmod test32 test31
+370 ARMED_S=180 EXPECT=bounded WORKLOAD=held_fd_setxattr tests/tcp_lockreq_blackhole.sh acqcvf_setx test32 test31
+370 ARMED_S=180 EXPECT=bounded WORKLOAD=held_fd_mmap_write tests/tcp_lockreq_blackhole.sh acqcvf_mmw test32 test31
+370 ARMED_S=180 EXPECT=bounded WORKLOAD=held_fd_mmap_read tests/tcp_lockreq_blackhole.sh acqcvf_mmr test32 test31
+460 ARMED_S=180 EXPECT=bounded WORKLOAD=dir_rename tests/tcp_lockreq_blackhole.sh acqcvf_ren test32 test31
+460 ARMED_S=180 EXPECT=bounded WORKLOAD=dir_link tests/tcp_lockreq_blackhole.sh acqcvf_lnk test32 test31
+460 ARMED_S=180 EXPECT=bounded WORKLOAD=dir_lookup tests/tcp_lockreq_blackhole.sh acqcvf_lkp test32 test31
+60 tests/fleet_set_params.sh "acqfall_unowed_skip acqfall_unowed_skip_n" test31,test32 tests/evidence/acqcv_f_after.txt
+465 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2d chk_clean

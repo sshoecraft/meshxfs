@@ -150,7 +150,12 @@ EOF
 }
 is_domain() { $VIRSH domstate "$1" >/dev/null 2>&1; }
 vm_running() { if is_domain "$1"; then $VIRSH domstate "$1" | grep -q running; else qmp "$1" query-status | grep -q '"running": true'; fi; }
-vm_freeze() { if is_domain "$1"; then $VIRSH suspend "$1" >/dev/null; else qmp "$1" stop | grep -q '"return"'; fi; }
+# a frozen guest can hold a command at the target, so it is never frozen while
+# the target is being reconfigured (tools/lun_pool.sh, scst_quiet_begin)
+vm_freeze() {
+    if is_domain "$1"; then "$HERE/tools/lun_pool.sh" fault $VIRSH suspend "$1" >/dev/null
+    else ( exec {f}>>"$("$HERE/tools/lun_pool.sh" fault-lock)" && flock -s -w 90 "$f" && qmp "$1" stop ) | grep -q '"return"'; fi
+}
 vm_thaw() { if is_domain "$1"; then $VIRSH resume "$1" >/dev/null; else qmp "$1" cont | grep -q '"return"'; fi; }
 on() { local h t=$2; h=$(addr "$1"); shift 2; timeout "$t" "$SSH" "$h" "$@" 2>&1 | grep --line-buffered -v -E "^Warning: Permanently|^$|Unauthorized access|authorized user, disconnect"; return "${PIPESTATUS[0]}"; }
 

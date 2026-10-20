@@ -1,0 +1,38 @@
+# The live-feed laps on the main-tree build with no test delay held open:
+# 2/net/mesh/direct g2c (test29 test30), build ~/src/mxfs srcversion
+# 4C46C2DE6232F3C1F9C96CB (the build of tests/queues/livefeed_main_caw.queue).
+# Every setting of that queue's laps except the two test delays:
+# NG0_PUBCLAIM_DELAY_MS (dbg_pub_claim_delay_ms 200, which holds every publish
+# claim in flight for 200 ms) and NG0_CREATE_PARENT_DELAY_MS (5 ms) are unset,
+# so both knobs stay at their default 0.
+#
+# WHY (written before the first lap).  lfb1 (livefeed_main_caw.queue lap 1)
+# did not refute H-WW1-R: its 80 refusal streaks all closed with a partial
+# write of the same block, the longest after 197 ms, and their counts sum to
+# its ww_refused 26737.  But a streak spins: one counted 8676 refusals in under
+# 0.2 s, xfsaild re-pushing a re-armed item that completes with no I/O.  The
+# refused slots were regular files held EX (mode=5, rf=0, pubskip=1), whose
+# only skip rules are the publish-claim write mask (H-F10,
+# pub_claim_write_masked 97029 / 38089 on the two nodes) and the EX
+# stale-stage restage (P235, 108 / 304 lines); every streak that began while
+# the mask's probe still printed (4 of 4) followed a mask line for its block
+# within 50 ms, and the claims those lines name were in flight 155-173 ms at
+# the median, 208 ms at most -- the test delay.
+# HYPOTHESIS H-WW1-R2: a streak lasts as long as the mask that empties the
+# write, so with no claim delay the streaks shrink to a claim's own length.
+# PREDICTION: every streak closes, the longest streak_ms is under 50 ms, and
+# the lap's refusals (ww_refused) fall below a tenth of lfb1's 26737.
+# REFUTED if any streak lasts 200 ms or more or is still open at unmount, or
+# ww_refused stays above 2674 with no claim delay.
+#
+# Also read on every lap: the H-WW1 F rules of iwr_refuse_empty_ab.queue
+# (WPASS: ww_refused > 0, ww_empty 0, ww_declined 0, no directory clobber by
+# either path, no P218-RECOV-REFUSED, audit CLEAN errors=0, node_failures 0;
+# WVACUOUS when ww_refused 0), and a CORRUPT audit or node failure is
+# attributed from the lap's own lines first.  These laps do not grade
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT's board (not
+# its queue's settings); their audits and failures still count against it.
+#
+# Bound: the kw and wr laps' 1680 s per lap (they ran 472-597 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh lfn1 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh lfn2 1 300 2/net/mesh/direct g2c

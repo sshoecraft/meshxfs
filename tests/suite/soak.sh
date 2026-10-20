@@ -16,7 +16,10 @@ echo "$MARKER" > /dev/kmsg 2>/dev/null
 # free" and "... has blocks allocated".  Bare, case-insensitive, it also
 # matched the allocator's own diagnostics ("every free inode in this AG is
 # peer-held", "all free inodes peer-held"), which failed a clean 0.89.85 run.
-DPAT='Internal error|Corruption|SHUTDOWN|shutting down|Free inode (0x)?[0-9a-f]+|reservation conflict|BUG:|Oops|stuck for|call trace'
+# "Oops" is a whole word for the same reason: case-insensitive, it matched the
+# "loops=14" field of "P-IGET-CREATE-RETRIED ... rc=0" (a create that retried
+# and succeeded), which failed 8/disk/caw/mpath on the 0.90.131 release build.
+DPAT='Internal error|Corruption|SHUTDOWN|shutting down|Free inode (0x)?[0-9a-f]+|reservation conflict|BUG:|\bOops\b|stuck for|call trace'
 end=$(( $(date +%s) + DUR )); ops=0; errs=0
 while [ "$(date +%s)" -lt "$end" ]; do
   f="$W/f$((ops % 50))"

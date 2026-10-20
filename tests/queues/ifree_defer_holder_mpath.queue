@@ -1,0 +1,41 @@
+# Attribution laps for D-IFREE-DEFER-UNLANDED-FATAL-SHUTDOWN-BEHIND-LOCKED-
+# CLUSTER-BUFFER on 2/disk/caw/mpath g2d (test31 test32), the configuration of
+# iub3, where test31 shut down on it.  Build ~/src/mxfs-b srcversion
+# 18D7F814BCE91F270464D6F: the main tree's sources (every fix at its default)
+# plus an instrument and no change of behaviour: when the deferred free's
+# bounded drain (H-1, ifree_defer_drain) or the open-holder release drain (B6)
+# runs out with the inode's committed state not at home, P-INACT-UNLANDED-STATE
+# prints the item's state (pin, in_ail, fields, last_fields, iflushing) and
+# mxfs_buf_report_locked prints P-BUFLOCK-HOLDER for the inode's cluster
+# buffer (flags, sema, lock_ip, lock_pid, lock_age_ms, ioend/relse counters,
+# the event ring) and dumps the holder's stack.  The partial cluster write logs
+# no buf_io line, so until now nothing in the log could say who held the
+# buffer across the 200 ms drain or whether a write of it was in flight (rs33,
+# iub3).  Run from ~/src/mxfs-b.  Settings: exactly
+# tests/queues/freed_nodelay_caw.queue's (production settings: both test
+# delays off).
+#
+# READING RULES (written before the first lap):
+#   A lap with P-IFREE-DEFER-UNLANDED-FATAL is read first from the
+#   P-INACT-UNLANDED-STATE and P-BUFLOCK-HOLDER lines just before it: the
+#   holder's call site (lock_ip), task (lock_pid, then its stack) and lock
+#   age, and whether the buffer was under a write (XBF_WRITE with an ioend not
+#   yet seen) or held by a task, and what that task was waiting for.  That
+#   names the next hypothesis; none is written before it.
+#   A lap with no fatal still counts its P-INACT-UNLANDED-STATE lines (drains
+#   that ran out without a shutdown, B6 kept=1 or a fatal-exempt EX hold) and
+#   reads them the same way: the same holder shape below the fatal line is the
+#   same mechanism.
+#   Any other CORRUPT shape, node failure, stall or ABORT is attributed from
+#   its own lines to its own record.  A lap that ABORTs on a shutdown is not
+#   rerun to see if it passes; its streams are the evidence.
+#
+# Bound: the freed_nodelay laps' 1680 s per lap (they ran 472-597 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh ifd1 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh ifd2 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh ifd3 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh ifd4 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh ifd5 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh ifd6 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh ifd7 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh ifd8 1 300 2/disk/caw/mpath g2d

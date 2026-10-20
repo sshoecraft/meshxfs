@@ -7,6 +7,8 @@
 #   - Userspace tools: mkfs.mxfs, chk_mxfs, resize_mxfs, mxfs_admin
 #   - /etc/modules-load.d/mxfs.conf (auto-load at boot)
 #   - /etc/udev/rules.d/60-mxfs-blkid.rules (blkid/lsblk detect MXFS)
+#   - /etc/udev/rules.d/61-mxfs-stranded-path.rules (another initiator's
+#     reset is reported to the module)
 #   - fsck.mxfs symlink (for fstab fsck dispatch)
 #   - an SELinux module giving mxfs the xattr labeling rule XFS has (RPM
 #     only: the Debian family ships no SELinux policy by default)
@@ -62,6 +64,7 @@ cp "$SRCDIR/tools/mxfs_admin.c" "$TARDIR/tools/"
 cp "$SRCDIR/tools/mxfs_offline.h" "$TARDIR/tools/"
 cp "$SRCDIR/tools/crc32c.h" "$TARDIR/tools/"
 cp "$SRCDIR/tools/mxfs_lu_reset_witness.py" "$TARDIR/tools/"
+cp "$SRCDIR/tools/mxfs_fenced_path_reset.sh" "$TARDIR/tools/"
 cp "$SRCDIR/tools/mxfs_fence_vcenter.py" "$TARDIR/tools/"
 cp "$SRCDIR/tools/mxfs_quorumd.py" "$TARDIR/tools/"
 cp "$SRCDIR/tools/mxfs_drbd_witness.py" "$TARDIR/tools/"
@@ -75,6 +78,7 @@ cp -r "$SRCDIR/include" "$TARDIR/tools/"
 # udev rule
 mkdir -p "$TARDIR/udev"
 cp "$SCRIPTDIR/60-mxfs-blkid.rules" "$TARDIR/udev/"
+cp "$SCRIPTDIR/61-mxfs-stranded-path.rules" "$TARDIR/udev/"
 
 # SELinux labeling rule
 mkdir -p "$TARDIR/selinux"
@@ -110,6 +114,8 @@ BuildRequires:  gcc make
 Requires:       dkms
 Requires:       kernel-devel
 Requires:       python3
+# ss -K: the fenced-path reset helper drops a fenced node's iSCSI connections
+Requires:       iproute
 Recommends:     iscsi-initiator-utils
 
 %description
@@ -142,6 +148,8 @@ install -m 755 tools/mxfs_admin %{buildroot}/usr/sbin/mxfs_admin
 ln -sf chk_mxfs %{buildroot}/usr/sbin/fsck.mxfs
 # the witnessed LOGICAL UNIT RESET helper the module upcalls (see mkdeb.sh)
 install -m 755 tools/mxfs_lu_reset_witness.py %{buildroot}/usr/sbin/mxfs_lu_reset_witness.py
+# the fenced-path reset helper the module runs when this node is fenced (see common.sh)
+install -m 755 tools/mxfs_fenced_path_reset.sh %{buildroot}/usr/sbin/mxfs_fenced_path_reset.sh
 # the shared attachment's vCenter fence helper (fence=vcenter, see common.sh)
 install -m 755 tools/mxfs_fence_vcenter.py %{buildroot}/usr/sbin/mxfs_fence_vcenter.py
 # the shared attachment's quorum reporter (fence=quorum, see common.sh)
@@ -181,6 +189,9 @@ echo 'omit_drivers+=" mxfs "' > %{buildroot}/etc/dracut.conf.d/mxfs.conf
 # udev rule: blkid/lsblk/mount (no -t) recognize MXFS by its on-disk magic
 mkdir -p %{buildroot}/etc/udev/rules.d
 install -m 644 udev/60-mxfs-blkid.rules %{buildroot}/etc/udev/rules.d/60-mxfs-blkid.rules
+# udev rule: another initiator's reset of the shared LUN is reported to the
+# module, which aborts and retries the commands it left unanswered
+install -m 644 udev/61-mxfs-stranded-path.rules %{buildroot}/etc/udev/rules.d/61-mxfs-stranded-path.rules
 
 # Transport: TCP (net/mesh) is the package default; CAW (disk/caw) is released too
 mkdir -p %{buildroot}/etc/modprobe.d
@@ -281,6 +292,7 @@ fi
 /usr/sbin/mxfs_admin
 /usr/sbin/fsck.mxfs
 /usr/sbin/mxfs_lu_reset_witness.py
+/usr/sbin/mxfs_fenced_path_reset.sh
 /usr/sbin/mxfs_fence_vcenter.py
 /usr/sbin/mxfs_quorumd
 /usr/sbin/mxfs_drbd_witness.py
@@ -296,6 +308,7 @@ fi
 /etc/modules-load.d/mxfs.conf
 /etc/dracut.conf.d/mxfs.conf
 /etc/udev/rules.d/60-mxfs-blkid.rules
+/etc/udev/rules.d/61-mxfs-stranded-path.rules
 %config(noreplace) /etc/modprobe.d/mxfs.conf
 /usr/share/selinux/packages/mxfs.cil
 SPECEOF

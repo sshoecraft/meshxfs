@@ -534,6 +534,8 @@ xfs_buf_free_callback(
 	kmem_cache_free(xfs_buf_cache, bp);
 }
 
+static void mxfs_iwr_refuse_streak_end(struct xfs_buf *bp, const char *why);
+
 static void
 xfs_buf_free(
 	struct xfs_buf		*bp)
@@ -559,6 +561,8 @@ xfs_buf_free(
 		dump_stack();
 		return;
 	}
+
+	mxfs_iwr_refuse_streak_end(bp, "freed");
 
 	/* F4: buffer teardown with an open obligation fails closed —
 	 * orphan the descriptor (kept until registry destroy) + P286. */
@@ -1256,7 +1260,9 @@ mxfs_dir_canonical_buf_ptr(
  * caller and task that locked it and how long ago, and that task's stack.
  * For a caller that skipped the buffer and needs to know whether the holder
  * is I/O in flight, writeback, or another task working on it.  Capped:
- * the first 40 reports, the first 12 with a stack.
+ * the first 40 reports, the first 12 with a stack.  The stacks come with the
+ * stall_stacks switch, or always when @stacks asks for them (a caller about
+ * to fail closed, whose one report is the evidence).
  */
 extern void mxfs_pal_dump_task_stack(int pid);
 extern bool mxfs_pal_stall_stacks(void);
@@ -1266,7 +1272,8 @@ mxfs_buf_report_locked(
 	xfs_daddr_t		blkno,
 	size_t			numblks,
 	const char		*why,
-	unsigned long long	ino)
+	unsigned long long	ino,
+	bool			stacks)
 {
 	static atomic_t		rl_n = ATOMIC_INIT(0);
 	struct xfs_buf_map	cmap = { .bm_bn = blkno, .bm_len = numblks };
@@ -1318,7 +1325,7 @@ mxfs_buf_report_locked(
 		current->comm, current->pid, current->tgid);
 	/* the holder's stack, and the reporting task's own (which caller
 	 * skipped the buffer) */
-	if (n <= 12 && mxfs_pal_stall_stacks()) {
+	if (n <= 12 && (stacks || mxfs_pal_stall_stacks())) {
 		if (pid > 0 && pid != current->pid)
 			mxfs_pal_dump_task_stack(pid);
 		dump_stack();
@@ -1493,7 +1500,20 @@ static atomic64_t mxfs_logwr_sskip_ex_unl;	/* ...unlanded subset (watermark roll
 extern int mxfs_stale_stage_skip_ex;	/* xfs_mxfs_dlm.c knob, EX-side epoch gate */
 extern int mxfs_stale_stage_skip;	/* xfs_mxfs_dlm.c knob, default 1 since 0.11.272 */	/* stale && submit at NL (class X) */  /* ...staged under a tenure since lost (epoch moved) */
 extern int mxfs_stale_stage_unlanded_shutdown;	/* unlanded arm fails closed (design review cond-1) */
+extern int mxfs_stale_stage_skip_landed;	/* xfs_mxfs_dlm.c knob, H-RS1 */
+extern atomic_t mxfs_stale_stage_rf_landed;	/* H-RS1 reach, both settings */
+extern int mxfs_unstaged_logged_skip;		/* xfs_mxfs_dlm.c knob, H-UB1 */
+extern atomic_t mxfs_unstaged_logged_found;	/* H-UB1 reach, both settings */
+extern atomic_t mxfs_unstaged_logged_prevented;	/* H-UB1 slots masked behind the platter */
+extern atomic_t mxfs_unstaged_logged_regressed;	/* H-UB1 slots written behind the platter */
+extern atomic_t mxfs_logwr_relmark_written;	/* H-NR1 slots copied in before a marked recycle, written */
+extern atomic_t mxfs_logwr_relmark_regressed;	/* ...of those, written behind the platter */
 static atomic64_t mxfs_logwr_nocore;        /* bli-dirty-only slot, no in-core inode to consult */
+static atomic64_t mxfs_logwr_incarn_mm;     /* written slot image of another incarnation, or live over a free in-core inode */
+extern int mxfs_dbg_log_mirror_check;	/* xfs_mxfs_dlm.c test knob */
+extern atomic_t mxfs_logwr_dlm_nogrant;	/* live core written while the DLM records no EX of ours */
+extern int mxfs_pub_claim_write_guard;	/* xfs_mxfs_dlm.c knob, H-F10 write side */
+extern atomic_t mxfs_pub_claim_write_masked;	/* slots that guard kept out of a cluster write */
 
 /*
  * FIX knob for D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY.  1 = drop
@@ -1728,7 +1748,7 @@ mxfs_cluster_authority_dump_set(const char *val, const struct kernel_param *kp)
 		(long long)atomic64_read(&mxfs_clpass_pr),
 		(long long)atomic64_read(&mxfs_clpass_genmm),
 		(long long)atomic64_read(&mxfs_clpass_nocore));
-	mxfs_probe("mxfs: P219-LOGGED-AUTHORITY-TOTAL written=%lld staged=%lld noauth=%lld noauth_dir=%lld stale_tenure=%lld stale_nl=%lld stale_ex=%lld nocore=%lld sskip_landed=%lld sskip_unlanded=%lld sskip_ex=%lld sskip_ex_unl=%lld\n",
+	mxfs_probe("mxfs: P219-LOGGED-AUTHORITY-TOTAL written=%lld staged=%lld noauth=%lld noauth_dir=%lld stale_tenure=%lld stale_nl=%lld stale_ex=%lld nocore=%lld sskip_landed=%lld sskip_unlanded=%lld sskip_ex=%lld sskip_ex_unl=%lld incarn_mm=%lld\n",
 		(long long)atomic64_read(&mxfs_logwr_written),
 		(long long)atomic64_read(&mxfs_logwr_staged),
 		(long long)atomic64_read(&mxfs_logwr_noauth),
@@ -1740,7 +1760,8 @@ mxfs_cluster_authority_dump_set(const char *val, const struct kernel_param *kp)
 		(long long)atomic64_read(&mxfs_logwr_sskip_landed),
 		(long long)atomic64_read(&mxfs_logwr_sskip_unlanded),
 		(long long)atomic64_read(&mxfs_logwr_sskip_ex),
-		(long long)atomic64_read(&mxfs_logwr_sskip_ex_unl));
+		(long long)atomic64_read(&mxfs_logwr_sskip_ex_unl),
+		(long long)atomic64_read(&mxfs_logwr_incarn_mm));
 	return 0;
 }
 static const struct kernel_param_ops mxfs_cluster_authority_dump_ops = {
@@ -4833,6 +4854,183 @@ mxfs_iwr_dir_probe(struct xfs_buf *bp, const char *reason)
 	}
 }
 
+extern atomic_t mxfs_iwr_whole_early;
+extern atomic_t mxfs_iwr_whole_noskip;
+extern atomic_t mxfs_iwr_whole_empty;
+extern atomic_t mxfs_iwr_whole_declined;
+extern int mxfs_iwr_refuse_empty;
+extern atomic_t mxfs_iwr_empty_refused;
+
+/*
+ * H-WW1 instrument (D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-
+ * NUMBER-REUSE): a 'return false' of mxfs_submit_partial_inode_write under
+ * multi-node membership sends the WHOLE buffer, the slots its per-slot rules
+ * refused included.  kwf2 and jzf1 lost a peer's removal to the creator's
+ * whole write of a cluster whose directory slot was its own stale image.
+ * Count each whole write by the bail that sent it and, when the buffer
+ * carries a directory slot, name every such slot with what this node holds
+ * of it, so a P-DINO-CLOBBER on a directory slot can be tied to its bail.
+ * The masks are zero for a bail taken before they were computed.  Detection
+ * only.
+ */
+static void
+mxfs_iwr_whole_note(
+	struct xfs_buf		*bp,
+	const char		*why,
+	atomic_t		*ctr,
+	u64			logged,
+	u64			bli_dirty,
+	u64			skip,
+	u64			pr_skip)
+{
+	struct xfs_mount	*mp = bp->b_mount;
+	struct xfs_perag	*pag = bp->b_pag;
+	xfs_agino_t		base_agino = 0;
+	unsigned int		isize, ni, s, ndir = 0;
+	char			det[3][112];
+
+	atomic_inc(ctr);
+	if (!mp || !mp->m_sb.sb_inodesize || !bp->b_addr)
+		return;
+	isize = mp->m_sb.sb_inodesize;
+	ni = min_t(unsigned int, BBTOB(bp->b_length) / isize, 64);
+	if (pag) {
+		xfs_fsblock_t fsb = (xfs_fsblock_t)(bp->b_maps[0].bm_bn >>
+						    mp->m_blkbb_log);
+
+		base_agino = (xfs_agino_t)(fsb % mp->m_sb.sb_agblocks) <<
+			     mp->m_sb.sb_inopblog;
+	}
+	for (s = 0; s < ni; s++) {
+		struct xfs_dinode	*d = bp->b_addr + (size_t)s * isize;
+		struct xfs_inode	*ip = NULL;
+		int			cnt = -1, mode = -1, rf = 0;
+
+		if (be16_to_cpu(d->di_magic) != MXFS_DINODE_MAGIC ||
+		    (be16_to_cpu(d->di_mode) & S_IFMT) != S_IFDIR)
+			continue;
+		if (d->di_format == XFS_DINODE_FMT_LOCAL)
+			cnt = ((struct xfs_dir2_sf_hdr *)XFS_DFORK_DPTR(d))->count;
+		if (pag) {
+			mxfs_ici_lock(pag);
+			ip = radix_tree_lookup(&pag->pag_ici_root,
+					       base_agino + s);
+			if (ip) {
+				mode = ip->i_dlm_mode;
+				rf = xfs_iflags_test(ip, MXFS_IF_DLM_RELFLUSH);
+			}
+			spin_unlock(&pag->pag_ici_lock);
+		}
+		if (ndir < 3)
+			snprintf(det[ndir], sizeof(det[ndir]),
+				 " [s%u ino=%llu fmt=%u cnt=%d cc=%llu incore=%d mode=%d rf=%d]",
+				 s, (unsigned long long)be64_to_cpu(d->di_ino),
+				 d->di_format, cnt,
+				 (unsigned long long)be64_to_cpu(d->di_changecount),
+				 ip ? 1 : 0, mode, rf ? 1 : 0);
+		ndir++;
+	}
+	if (ndir)
+		mxfs_probe_ratelimited(
+			"mxfs: P-IWR-WHOLE why=%s daddr=%lld dirs=%u logged=0x%llx bli=0x%llx skip=0x%llx pr_skip=0x%llx comm=%s%s%s%s\n",
+			why, (long long)bp->b_maps[0].bm_bn, ndir,
+			(unsigned long long)logged,
+			(unsigned long long)bli_dirty,
+			(unsigned long long)skip,
+			(unsigned long long)pr_skip, current->comm,
+			det[0], ndir > 1 ? det[1] : "", ndir > 2 ? det[2] : "");
+}
+
+/*
+ * H-WW1 refusal instrument.  An empty-case refusal (iwr_refuse_empty)
+ * completes the buffer with no I/O, and a logged slot it skipped stays dirty
+ * in the AIL (P187-PUB-REARM), so the next push of that item refuses again
+ * until the slot can be written or its item goes.  wrf1 counted 17467
+ * refusals where its control counted 290 whole writes of the same case.  A
+ * streak is one buffer's refusals no more than a second apart: its 1st, 2nd,
+ * 4th, ... refusal prints P-IWR-REFUSED with the streak's age and the logged
+ * slots it skipped, and P-IWR-REFUSE-END prints the streak's count and length
+ * when the buffer is next written, refused again after a gap, or freed.
+ * Called under the buffer lock (or on a buffer being freed).  Detection only.
+ */
+static void
+mxfs_iwr_refuse_streak_end(
+	struct xfs_buf		*bp,
+	const char		*why)
+{
+	if (likely(!bp->b_mxfs_refuse_n))
+		return;
+	pr_warn("mxfs: P-IWR-REFUSE-END daddr=%lld n=%u streak_ms=%llu idle_ms=%llu why=%s comm=%s\n",
+		(long long)bp->b_maps[0].bm_bn, bp->b_mxfs_refuse_n,
+		(bp->b_mxfs_refuse_last - bp->b_mxfs_refuse_start) /
+			NSEC_PER_MSEC,
+		(ktime_get_ns() - bp->b_mxfs_refuse_last) / NSEC_PER_MSEC,
+		why, current->comm);
+	bp->b_mxfs_refuse_n = 0;
+}
+
+static void
+mxfs_iwr_refuse_note(
+	struct xfs_buf		*bp,
+	u64			logged,
+	u64			bli_dirty,
+	u64			skip,
+	unsigned int		spi)
+{
+	struct xfs_mount	*mp = bp->b_mount;
+	struct xfs_perag	*pag = bp->b_pag;
+	u64			now = ktime_get_ns();
+	unsigned int		isize, ni, s, nl = 0;
+	u32			n;
+	char			det[2][120];
+
+	if (bp->b_mxfs_refuse_n &&
+	    now - bp->b_mxfs_refuse_last > NSEC_PER_SEC)
+		mxfs_iwr_refuse_streak_end(bp, "gap");
+	if (!bp->b_mxfs_refuse_n)
+		bp->b_mxfs_refuse_start = now;
+	bp->b_mxfs_refuse_last = now;
+	n = ++bp->b_mxfs_refuse_n;
+	if (n & (n - 1))
+		return;			/* print the 1st, 2nd, 4th, ... only */
+	isize = (mp && mp->m_sb.sb_inodesize) ? mp->m_sb.sb_inodesize : 0;
+	ni = isize ? min_t(unsigned int, BBTOB(bp->b_length) / isize, 64) : 0;
+	for (s = 0; s < ni && nl < 2; s++) {
+		struct xfs_dinode	*d = bp->b_addr + (size_t)s * isize;
+		struct xfs_inode	*ip = NULL;
+		xfs_ino_t		ino;
+		int			mode = -1, rf = 0, sk = 0;
+
+		if (!(logged & (1ULL << (s * spi))) ||
+		    be16_to_cpu(d->di_magic) != MXFS_DINODE_MAGIC)
+			continue;
+		ino = be64_to_cpu(d->di_ino);
+		if (pag) {
+			mxfs_ici_lock(pag);
+			ip = radix_tree_lookup(&pag->pag_ici_root,
+					       XFS_INO_TO_AGINO(mp, ino));
+			if (ip) {
+				mode = ip->i_dlm_mode;
+				rf = xfs_iflags_test(ip, MXFS_IF_DLM_RELFLUSH);
+				sk = xfs_iflags_test(ip, MXFS_IF_PUB_SKIPPED);
+			}
+			spin_unlock(&pag->pag_ici_lock);
+		}
+		snprintf(det[nl], sizeof(det[nl]),
+			 " [L%u ino=%llu dimode=0%o cc=%llu incore=%d mode=%d rf=%d pubskip=%d]",
+			 s, (unsigned long long)ino, be16_to_cpu(d->di_mode),
+			 (unsigned long long)be64_to_cpu(d->di_changecount),
+			 ip ? 1 : 0, mode, rf ? 1 : 0, sk ? 1 : 0);
+		nl++;
+	}
+	pr_warn("mxfs: P-IWR-REFUSED daddr=%lld n=%u streak_ms=%llu logged=0x%llx bli=0x%llx skip=0x%llx comm=%s%s%s\n",
+		(long long)bp->b_maps[0].bm_bn, n,
+		(now - bp->b_mxfs_refuse_start) / NSEC_PER_MSEC,
+		(unsigned long long)logged, (unsigned long long)bli_dirty,
+		(unsigned long long)skip, current->comm,
+		nl > 0 ? det[0] : "", nl > 1 ? det[1] : "");
+}
+
 /*
  * P-DINO-CLOBBER (D-ICLUS-RELMARK-POSTMARK-CRASH-ALLOC-FREE-CORE-
  * UNLINKED-DANGLING-0517 / D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY):
@@ -4874,7 +5072,9 @@ static void
 mxfs_dino_clobber_probe(
 	struct xfs_buf		*bp,
 	u64			sects,
-	const char		*path)
+	const char		*path,
+	u64			ub1,		/* H-UB1's slots in this write */
+	u64			nr1)		/* H-NR1's slots in this write */
 {
 	extern int mxfs_dino_clobber_check;
 	extern atomic_t mxfs_dino_clobber_n;
@@ -4886,6 +5086,9 @@ mxfs_dino_clobber_probe(
 	 * printed 'mem FREE cc=10 gen=206' for a generation of 2060535958),
 	 * which is how a free being published read as a revert. */
 	char			(*det)[160];
+	/* the masked slots behind the platter, named the way det names the
+	 * written ones: a mask's catch is countable per slot (H-RS1) */
+	char			(*mdet)[112];
 	uint64_t		lba;
 
 	if (!(unlikely(mxfs_dino_clobber_check || mxfs_instr_enabled) &&
@@ -4917,12 +5120,14 @@ mxfs_dino_clobber_probe(
 		return;
 	tmp = kmalloc(len, GFP_NOFS);
 	det = tmp ? kmalloc(4 * sizeof(det[0]), GFP_NOFS) : NULL;
+	mdet = det ? kmalloc(4 * sizeof(mdet[0]), GFP_NOFS) : NULL;
 	lba = (uint64_t)bp->b_maps[0].bm_bn + bp->b_target->bt_sector_offset;
 
-	if (tmp && det &&
+	if (tmp && det && mdet &&
 	    mxfs_pal_scsi_read_fua_bdev(bp->b_target->bt_bdev,
 					lba, tmp, len) == 0) {
 		unsigned int s, regress = 0, masked = 0, shown = 0, realloc = 0;
+		unsigned int mshown = 0;
 		unsigned int live_revert = 0, ownfree = 0, ownchurn = 0;
 		struct xfs_buf_log_item *bip = bp->b_log_item;
 		struct xfs_perag *pag = bp->b_pag;
@@ -5015,8 +5220,22 @@ mxfs_dino_clobber_probe(
 					slotbits |= 1ULL << (s * spi + k);
 				if (!(sects & slotbits)) {
 					masked++;
+					if (ub1 & slotbits)
+						atomic_inc(&mxfs_unstaged_logged_prevented);
+					if (mshown < 4) {
+						snprintf(mdet[mshown], sizeof(mdet[mshown]),
+							 " [m%u ino=%llu disk LIVE cc=%llu -> mem FREE cc=%llu]",
+							 s, (unsigned long long)be64_to_cpu(dk->di_ino),
+							 (unsigned long long)dcc,
+							 (unsigned long long)mcc);
+						mshown++;
+					}
 					continue;
 				}
+				if (ub1 & slotbits)
+					atomic_inc(&mxfs_unstaged_logged_regressed);
+				if (nr1 & slotbits)
+					atomic_inc(&mxfs_logwr_relmark_regressed);
 				regress++;
 				live_revert++;
 				if (shown < 4) {
@@ -5070,8 +5289,22 @@ mxfs_dino_clobber_probe(
 				slotbits |= 1ULL << (s * spi + k);
 			if (!(sects & slotbits)) {
 				masked++;
+				if (ub1 & slotbits)
+					atomic_inc(&mxfs_unstaged_logged_prevented);
+				if (mshown < 4) {
+					snprintf(mdet[mshown], sizeof(mdet[mshown]),
+						 " [m%u ino=%llu disk cc=%llu -> mem cc=%llu]",
+						 s, (unsigned long long)be64_to_cpu(dk->di_ino),
+						 (unsigned long long)dcc,
+						 (unsigned long long)mcc);
+					mshown++;
+				}
 				continue;
 			}
+			if (ub1 & slotbits)
+				atomic_inc(&mxfs_unstaged_logged_regressed);
+			if (nr1 & slotbits)
+				atomic_inc(&mxfs_logwr_relmark_regressed);
 			regress++;
 			if (shown < 4) {
 				snprintf(det[shown], sizeof(det[shown]),
@@ -5097,9 +5330,17 @@ mxfs_dino_clobber_probe(
 		if (masked) {
 			int m = atomic_inc_return(&mxfs_dino_clobber_masked_n);
 
-			pr_warn_ratelimited("mxfs: P-DINO-CLOBBER-MASKED#%d daddr=%lld path=%s masked=%u written_regress=%u comm=%s -- stale slot(s) behind the platter were dropped from this cluster write by the authority mask\n",
-				m, (long long)bp->b_maps[0].bm_bn, path, masked,
-				regress, current->comm);
+			/* capped, not ratelimited: each line names the slots
+			 * a mask kept off the platter, and a dropped line is a
+			 * catch nobody can count */
+			if (m <= 4000)
+				pr_warn("mxfs: P-DINO-CLOBBER-MASKED#%d daddr=%lld path=%s masked=%u written_regress=%u comm=%s%s%s%s%s -- stale slot(s) behind the platter were dropped from this cluster write by the authority mask\n",
+					m, (long long)bp->b_maps[0].bm_bn, path,
+					masked, regress, current->comm,
+					mshown > 0 ? mdet[0] : "",
+					mshown > 1 ? mdet[1] : "",
+					mshown > 2 ? mdet[2] : "",
+					mshown > 3 ? mdet[3] : "");
 		}
 		if (regress) {
 			int n = atomic_inc_return(&mxfs_dino_clobber_n);
@@ -5125,6 +5366,7 @@ mxfs_dino_clobber_probe(
 				dump_stack();
 		}
 	}
+	kfree(mdet);
 	kfree(det);
 	kfree(tmp);
 }
@@ -5139,6 +5381,13 @@ mxfs_submit_partial_inode_write(
 	unsigned int		inodelog, sectsize, inodesize, len, ni;
 	unsigned int		total_sects, spi, nslots = 0, nskip = 0;
 	u64			logged = 0, bli_dirty = 0, skip = 0, dirty = 0, all;
+	/* H-UB1: logged slots never copied in, masked or not, for the
+	 * clobber check's prevented/regressed counts */
+	u64			ub1_found = 0;
+	/* H-NR1: logged slots written with bytes copied in before a recycle
+	 * that found a no-inode release's mark, for the clobber check's
+	 * regressed count */
+	u64			nr1_written = 0;
 	/* D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY fix: slots we hold
 	 * only in PR and did not log this round.  Kept SEPARATE from `skip` so
 	 * it can be dropped wholesale if applying it would empty the write —
@@ -5196,10 +5445,18 @@ mxfs_submit_partial_inode_write(
 		    !READ_ONCE(mxfs_partial_iwrite_sole))
 			return false;
 	}
-	if (!(bp->b_flags & XBF_WRITE) || bp->b_ops != &xfs_inode_buf_ops)
+	if (!(bp->b_flags & XBF_WRITE))
 		return false;
+	if (bp->b_ops != &xfs_inode_buf_ops) {
+		if (bp->b_ops == &xfs_inode_buf_ra_ops)
+			mxfs_iwr_whole_note(bp, "ops-ra", &mxfs_iwr_whole_early,
+					    0, 0, 0, 0);
+		return false;
+	}
 	if (bp->b_map_count != 1 || !bp->b_addr) {
 		mxfs_iwr_dir_probe(bp, "WHOLE-maps");
+		mxfs_iwr_whole_note(bp, "maps", &mxfs_iwr_whole_early,
+				    0, 0, 0, 0);
 		return false;
 	}
 	/*
@@ -5225,6 +5482,8 @@ mxfs_submit_partial_inode_write(
 	if (bp->b_log_item &&
 	    (bp->b_log_item->bli_flags & XFS_BLI_INODE_ALLOC_BUF)) {
 		mxfs_iwr_dir_probe(bp, "WHOLE-allocbuf");
+		mxfs_iwr_whole_note(bp, "allocbuf", &mxfs_iwr_whole_early,
+				    0, 0, 0, 0);
 		return false;
 	}
 	/*
@@ -5243,6 +5502,8 @@ mxfs_submit_partial_inode_write(
 				"mxfs: P28-IWR-BAIL daddr=%lld reason=NO_PAG -> WHOLE\n",
 				(long long)bp->b_maps[0].bm_bn);
 		mxfs_iwr_dir_probe(bp, "WHOLE-nopag");
+		mxfs_iwr_whole_note(bp, "nopag", &mxfs_iwr_whole_early,
+				    0, 0, 0, 0);
 		return false;		/* need the AG ici radix to find NL inodes */
 	}
 
@@ -5253,12 +5514,16 @@ mxfs_submit_partial_inode_write(
 	ni  = len >> inodelog;
 	if (ni == 0 || ni > 64 || sectsize == 0 || (inodesize % sectsize) != 0) {
 		mxfs_iwr_dir_probe(bp, "WHOLE-geom");
+		mxfs_iwr_whole_note(bp, "geom", &mxfs_iwr_whole_early,
+				    0, 0, 0, 0);
 		return false;
 	}
 	spi = inodesize / sectsize;		/* sectors per inode */
 	total_sects = len / sectsize;
 	if (total_sects == 0 || total_sects > 64) {
 		mxfs_iwr_dir_probe(bp, "WHOLE-geom");
+		mxfs_iwr_whole_note(bp, "geom", &mxfs_iwr_whole_early,
+				    0, 0, 0, 0);
 		return false;
 	}
 
@@ -5888,7 +6153,7 @@ mxfs_submit_partial_inode_write(
 				}
 				if (stale || (!ex && !rf && !dem))
 					mxfs_probe_ratelimited(
-					    "mxfs: P219-LOGGED-NO-AUTHORITY daddr=%lld slot=%d ino=%llu isdir=%d staged=%d dlm_mode=%d stage_mode=%d relflush=%d demoter=%d stage_epoch=%lu now_epoch=%lu epsrc=%u:%u stale=%d img_gen=%u img_cc=%llu img_mode=%o img_nl=%u stage_ns=%llu comm=%s realns=%llu bflags=0x%x -- publishing a LOGGED image to home without the tenure it was staged under\n",
+					    "mxfs: P219-LOGGED-NO-AUTHORITY daddr=%lld slot=%d ino=%llu isdir=%d staged=%d dlm_mode=%d stage_mode=%d relflush=%d demoter=%d stage_epoch=%lu now_epoch=%lu epsrc=%u:%u stale=%d img_gen=%u img_cc=%llu img_mode=%o img_nl=%u stage_ns=%llu comm=%s realns=%llu bflags=0x%x pend=%llu flush=%llu dur=%llu landed=%d iflushing=%d -- publishing a LOGGED image to home without the tenure it was staged under\n",
 					    (long long)bp->b_maps[0].bm_bn, s,
 					    (unsigned long long)be64_to_cpu(d->di_ino),
 					    isdir ? 1 : 0, staged ? 1 : 0,
@@ -5906,7 +6171,65 @@ mxfs_submit_partial_inode_write(
 					    (unsigned long long)ip->i_mxfs_pub_stage_ns,
 					    current->comm,
 					    (unsigned long long)ktime_get_real_ns(),
-					    (unsigned int)bp->b_flags);
+					    (unsigned int)bp->b_flags,
+					    (unsigned long long)ip->i_mxfs_pub_pending_seq,
+					    (unsigned long long)ip->i_mxfs_pub_flush_seq,
+					    (unsigned long long)ip->i_mxfs_pub_durable_seq,
+					    ip->i_mxfs_pub_durable_seq ==
+						ip->i_mxfs_pub_flush_seq ? 1 : 0,
+					    (ip->i_itemp &&
+					     test_bit(XFS_LI_FLUSHING,
+						      &ip->i_itemp->ili_item.li_flags)) ? 1 : 0);
+				/*
+				 * H-RS1 (D-INODE-CLUSTER-PUBLISH-WITHOUT-
+				 * AUTHORITY): a release-flush or demoter context
+				 * publishes the slots of the tenure it is ending,
+				 * which is why the two masks below leave it alone.
+				 * A slot staged under a dead tenure whose image
+				 * already LANDED is not one of those: its item is
+				 * on this buffer only because it was logged again
+				 * since, and the buffer still holds the old image
+				 * for it, older than anything a peer published in
+				 * between (lfb2: an inactivation's re-logged item
+				 * put the landed epoch-3 image over the peer's
+				 * newer one).  Masking it loses nothing -- the
+				 * bytes are at home already, and the re-logged
+				 * item stays dirty, so its next copy-in stages
+				 * current state under the live tenure.  An
+				 * unlanded stale slot (the release pipeline's own
+				 * image, copied in before the release moved the
+				 * epoch) is left as it was.
+				 */
+				if (stale && (rf || dem) &&
+				    ip->i_mxfs_pub_durable_seq ==
+				    ip->i_mxfs_pub_flush_seq) {
+					static atomic_t p_rs1 = ATOMIC_INIT(0);
+					bool rs1_mask =
+						READ_ONCE(mxfs_stale_stage_skip_landed);
+
+					atomic_inc(&mxfs_stale_stage_rf_landed);
+					if (atomic_inc_return(&p_rs1) <= 4000)
+						mxfs_probe("mxfs: P-RS1-LANDED-SKIP daddr=%lld slot=%d ino=%llu masked=%d dlm_mode=%d relflush=%d demoter=%d stage_epoch=%lu now_epoch=%lu pend=%llu dur=%llu img_gen=%u img_cc=%llu img_mode=0%o img_nl=%u comm=%s -- a dead-tenure image that already landed rides this cluster write\n",
+							(long long)bp->b_maps[0].bm_bn, s,
+							(unsigned long long)be64_to_cpu(d->di_ino),
+							rs1_mask ? 1 : 0,
+							ip->i_dlm_mode, rf ? 1 : 0,
+							dem ? 1 : 0,
+							ip->i_mxfs_pub_stage_epoch,
+							ip->i_dlm_epoch,
+							(unsigned long long)ip->i_mxfs_pub_pending_seq,
+							(unsigned long long)ip->i_mxfs_pub_durable_seq,
+							be32_to_cpu(d->di_gen),
+							(unsigned long long)be64_to_cpu(d->di_changecount),
+							be16_to_cpu(d->di_mode),
+							be32_to_cpu(d->di_nlink),
+							current->comm);
+					if (rs1_mask) {
+						skip |= slotbits;
+						nskip++;
+						continue;
+					}
+				}
 				/*
 				 * CONTAINMENT (review-ruled, default OFF —
 				 * mxfs.stale_stage_skip): never publish a LOGGED
@@ -6091,6 +6414,275 @@ mxfs_submit_partial_inode_write(
 						be32_to_cpu(d->di_nlink),
 						current->comm);
 					continue;
+				}
+				/*
+				 * INCARNATION CENSUS (D-FREED-INODE-HOME-NEVER-
+				 * PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F4).
+				 * This logged slot goes to its home now.  Its bytes
+				 * are what xfs_iflush staged, possibly under an
+				 * earlier tenure, and a release flush or demoter
+				 * context publishes them even then (the EX-side gate
+				 * above leaves rf/dem alone).  Bytes of another
+				 * incarnation than the in-core inode (di_gen !=
+				 * i_generation), or a live image while the in-core
+				 * inode is free, put an inode this node no longer
+				 * has back on the platter: a free that already
+				 * landed is reverted, and the next free of the
+				 * number finds a foreign incarnation at home and
+				 * discharges without writing (P55C-FREE-FOREIGN),
+				 * leaving it LIVE under a FREE inobt bit.  Detection
+				 * only; nothing is skipped.
+				 */
+				if (be32_to_cpu(d->di_gen) != VFS_I(ip)->i_generation ||
+				    (be16_to_cpu(d->di_mode) != 0 &&
+				     VFS_I(ip)->i_mode == 0)) {
+					static atomic_t p_lim = ATOMIC_INIT(0);
+
+					atomic64_inc(&mxfs_logwr_incarn_mm);
+					if (atomic_inc_return(&p_lim) <= 20000)
+						mxfs_probe("mxfs: P-LOGWR-INCARN-MISMATCH daddr=%lld slot=%d ino=%llu img_gen=%u img_mode=0%o img_nl=%u img_cc=%llu img_lsn=0x%llx incore_gen=%u incore_mode=0%o incore_nl=%u dlm_mode=%d staged=%d stale=%d rf=%d dem=%d stage_epoch=%lu now_epoch=%lu pend=%llu flush=%llu dur=%llu comm=%s realns=%llu -- publishing a logged image of another incarnation than the in-core inode\n",
+							(long long)bp->b_maps[0].bm_bn, s,
+							(unsigned long long)be64_to_cpu(d->di_ino),
+							be32_to_cpu(d->di_gen),
+							be16_to_cpu(d->di_mode),
+							be32_to_cpu(d->di_nlink),
+							(unsigned long long)be64_to_cpu(d->di_changecount),
+							(unsigned long long)be64_to_cpu(d->di_lsn),
+							VFS_I(ip)->i_generation,
+							VFS_I(ip)->i_mode,
+							VFS_I(ip)->i_nlink,
+							ip->i_dlm_mode,
+							staged ? 1 : 0, stale ? 1 : 0,
+							rf ? 1 : 0, dem ? 1 : 0,
+							ip->i_mxfs_pub_stage_epoch,
+							ip->i_dlm_epoch,
+							(unsigned long long)ip->i_mxfs_pub_pending_seq,
+							(unsigned long long)ip->i_mxfs_pub_flush_seq,
+							(unsigned long long)ip->i_mxfs_pub_durable_seq,
+							current->comm,
+							(unsigned long long)ktime_get_real_ns());
+				}
+				/*
+				 * H-F10, write side (pub_claim_write_guard): an
+				 * inode whose publish claim is in flight was taken
+				 * off the unpublished list and has no grant yet,
+				 * so this write would put its live core home while
+				 * a peer may still hold the number (wdf3: the new
+				 * life's core went home 5 ms after the old life's
+				 * free release, 3 ms into the claim).  Mask the
+				 * slot the way every dropped logged slot is masked:
+				 * the watermark rolls back and PUB_SKIPPED makes the
+				 * completion keep the item dirty in the AIL, so the
+				 * next push writes it under the grant the claim
+				 * brings.  Bytes a buffer log item carries for the
+				 * slot are never masked (the buffer completes them
+				 * as durable), nor a cluster-routed inode, whose
+				 * grant is on the cluster resource.
+				 */
+				if (READ_ONCE(mxfs_pub_claim_write_guard) &&
+				    be16_to_cpu(d->di_mode) != 0 &&
+				    !(bli_dirty & slotbits) &&
+				    !ip->i_dlm_routed_iclus &&
+				    !list_empty_careful(&ip->i_mxfs_pubclaim_link)) {
+					static atomic_t p_pcwm = ATOMIC_INIT(0);
+
+					skip |= slotbits;
+					nskip++;
+					ip->i_mxfs_pub_flush_seq =
+						ip->i_mxfs_pub_durable_seq;
+					xfs_iflags_set(ip, MXFS_IF_PUB_SKIPPED);
+					atomic_inc(&mxfs_pub_claim_write_masked);
+					if (atomic_inc_return(&p_pcwm) <= 2000)
+						/* claim_ms: how long this item has been
+						 * held out of the platter (and the AIL
+						 * tail with it) by the claim so far. */
+						pr_warn("mxfs: P-PUB-CLAIM-WRITE-MASKED daddr=%lld slot=%d ino=%llu img_gen=%u img_mode=0%o img_cc=%llu cached_mode=%d exacq_ms=%lld claim_ms=%lld staged=%d comm=%s -- the live core of an inode whose publish claim is in flight is kept out of this cluster write\n",
+							(long long)bp->b_maps[0].bm_bn, s,
+							(unsigned long long)be64_to_cpu(d->di_ino),
+							be32_to_cpu(d->di_gen),
+							be16_to_cpu(d->di_mode),
+							(unsigned long long)be64_to_cpu(d->di_changecount),
+							ip->i_dlm_mode,
+							ip->i_dlm_ex_acquire_ns ?
+								(long long)((ktime_get_ns() -
+									     ip->i_dlm_ex_acquire_ns) /
+									    NSEC_PER_MSEC) : -1LL,
+							(long long)((ktime_get_ns() -
+								     READ_ONCE(ip->i_mxfs_pubclaim_ns)) /
+								    NSEC_PER_MSEC),
+							staged ? 1 : 0,
+							current->comm);
+					continue;
+				}
+				/*
+				 * The same record, write side (test only, under
+				 * dbg_log_mirror_check): a live core going home
+				 * while the DLM records no EX of this node for the
+				 * inode reaches the platter after the inode was
+				 * handed over.  The cached mode cannot say so (a
+				 * cached EX the DLM no longer records passes every
+				 * gate above), so ask the mirror -- never sleeping,
+				 * pag_ici_lock is held; a busy table or CAW answers
+				 * nothing.  An unpublished inode is granted locally
+				 * with no DLM entry by design, and a cluster-routed
+				 * one holds its grant on the cluster resource, so
+				 * neither is asked (the log-side detector in
+				 * xfs_trans_log_inode leaves the same two out).
+				 * Detection only.
+				 */
+				if (unlikely(READ_ONCE(mxfs_dbg_log_mirror_check)) &&
+				    be16_to_cpu(d->di_mode) != 0 &&
+				    !READ_ONCE(ip->i_dlm_unpublished) &&
+				    !ip->i_dlm_routed_iclus) {
+					uint8_t gm = MXFS_LOCK_NL;
+
+					if (mxfs_v5_dlm_inode_held_mode_nb(
+						    bp->b_mount->m_mxfs_dlm,
+						    be64_to_cpu(d->di_ino), &gm) == 0 &&
+					    gm < MXFS_LOCK_EX) {
+						static atomic_t p_lwng = ATOMIC_INIT(0);
+
+						atomic_inc(&mxfs_logwr_dlm_nogrant);
+						/*
+						 * cgen is the DLM generation this inode cached
+						 * at its last slow-path acquire: equal to the
+						 * generation a free release just retired, it
+						 * names the grant this life was riding.
+						 */
+						if (atomic_inc_return(&p_lwng) <= 20000)
+							pr_warn("mxfs: P-LOGWR-DLM-NOGRANT daddr=%lld slot=%d ino=%llu isdir=%d dlm_held=%u cached_mode=%d state=%u staged=%d stale=%d rf=%d dem=%d stage_mode=%d stage_epoch=%lu now_epoch=%lu stage_ns=%llu img_gen=%u img_mode=0%o img_nl=%u img_cc=%llu img_lsn=0x%llx incore_gen=%u incore_mode=0%o incore_nl=%u pend=%llu flush=%llu dur=%llu cgen=%u acq=%u reused=%d freecom=%d nl_line=L%u:%u exacq_ms=%lld pub_inflight=%d comm=%s realns=%llu -- a logged live core goes home while the DLM records no EX of this node\n",
+								(long long)bp->b_maps[0].bm_bn, s,
+								(unsigned long long)be64_to_cpu(d->di_ino),
+								isdir ? 1 : 0, gm,
+								ip->i_dlm_mode, ip->i_dlm_state,
+								staged ? 1 : 0, stale ? 1 : 0,
+								rf ? 1 : 0, dem ? 1 : 0,
+								(int)ip->i_mxfs_pub_stage_mode,
+								ip->i_mxfs_pub_stage_epoch,
+								ip->i_dlm_epoch,
+								(unsigned long long)ip->i_mxfs_pub_stage_ns,
+								be32_to_cpu(d->di_gen),
+								be16_to_cpu(d->di_mode),
+								be32_to_cpu(d->di_nlink),
+								(unsigned long long)be64_to_cpu(d->di_changecount),
+								(unsigned long long)be64_to_cpu(d->di_lsn),
+								VFS_I(ip)->i_generation,
+								VFS_I(ip)->i_mode,
+								VFS_I(ip)->i_nlink,
+								(unsigned long long)ip->i_mxfs_pub_pending_seq,
+								(unsigned long long)ip->i_mxfs_pub_flush_seq,
+								(unsigned long long)ip->i_mxfs_pub_durable_seq,
+								ip->i_dlm_cached_grant_gen,
+								(unsigned)ip->i_dlm_acq_inflight,
+								ip->i_mxfs_reused_create ? 1 : 0,
+								(READ_ONCE(ip->i_flags) &
+								 MXFS_IF_FREE_COMMITTED) ? 1 : 0,
+								MXFS_SITE_ARGS(ip->i_dlm_nl_line),
+								ip->i_dlm_ex_acquire_ns ?
+									(long long)((ktime_get_ns() -
+										     ip->i_dlm_ex_acquire_ns) /
+										    NSEC_PER_MSEC) : -1LL,
+								/* H-F10: a publish claim
+								 * of it is in flight */
+								!list_empty_careful(&ip->i_mxfs_pubclaim_link) ? 1 : 0,
+								current->comm,
+								(unsigned long long)ktime_get_real_ns());
+					}
+				}
+				/*
+				 * H-UB1 (D-INODE-CLUSTER-PUBLISH-WITHOUT-
+				 * AUTHORITY): an inode item is attached to this
+				 * buffer when the inode is first logged, so
+				 * `staged` also holds for a slot whose in-core
+				 * life was never copied in (stage epoch 0).  Its
+				 * bytes here are the buffer's last read of the
+				 * slot, not an image this node staged, and when
+				 * that read predates this node's tenure of the
+				 * number a peer may have written the slot since
+				 * (rk5: a peer's free of ino 131 put back to its
+				 * older unlinked image).  Masking it loses
+				 * nothing: an item this write is not flushing is
+				 * left attached and dirty by the completion, and
+				 * its first copy-in stages the in-core state
+				 * under the live tenure.  Never masked: a slot
+				 * this write flushes (its completion would call
+				 * bytes that never went out durable), bytes a
+				 * buffer log item carries, a staled inode.
+				 */
+				if (staged && ip->i_mxfs_pub_stage_epoch == 0 &&
+				    !(bli_dirty & slotbits) &&
+				    !xfs_iflags_test(ip, XFS_ISTALE | XFS_IFLUSHING) &&
+				    !(ip->i_itemp &&
+				      test_bit(XFS_LI_FLUSHING,
+					       &ip->i_itemp->ili_item.li_flags))) {
+					static atomic_t p_ub1 = ATOMIC_INIT(0);
+					bool ub1_mask =
+						READ_ONCE(mxfs_unstaged_logged_skip) != 0;
+
+					ub1_found |= slotbits;
+					atomic_inc(&mxfs_unstaged_logged_found);
+					if (atomic_inc_return(&p_ub1) <= 20000)
+						mxfs_probe("mxfs: P-UB1-UNSTAGED-SKIP daddr=%lld slot=%d ino=%llu masked=%d dlm_mode=%d relflush=%d demoter=%d img_gen=%u img_mode=0%o img_nl=%u img_cc=%llu incore_gen=%u incore_mode=0%o incore_nl=%u pend=%llu comm=%s -- a logged slot this node never copied in rides a cluster write with the buffer's bytes for it\n",
+							(long long)bp->b_maps[0].bm_bn, s,
+							(unsigned long long)be64_to_cpu(d->di_ino),
+							ub1_mask ? 1 : 0,
+							ip->i_dlm_mode, rf ? 1 : 0,
+							dem ? 1 : 0,
+							be32_to_cpu(d->di_gen),
+							be16_to_cpu(d->di_mode),
+							be32_to_cpu(d->di_nlink),
+							(unsigned long long)be64_to_cpu(d->di_changecount),
+							VFS_I(ip)->i_generation,
+							VFS_I(ip)->i_mode,
+							VFS_I(ip)->i_nlink,
+							(unsigned long long)ip->i_mxfs_pub_pending_seq,
+							current->comm);
+					if (ub1_mask) {
+						skip |= slotbits;
+						nskip++;
+						continue;
+					}
+				}
+				/*
+				 * H-NR1 (D-INODE-CLUSTER-PUBLISH-WITHOUT-
+				 * AUTHORITY, fw3c3): this slot goes home with
+				 * bytes last copied in before a recycle that
+				 * found a no-inode release's mark, so they are
+				 * from the tenure that release ended, and a peer
+				 * may have written the slot since.  With
+				 * noino_release_mark_honor that recycle moved the
+				 * epoch and the dead-tenure masks above keep such
+				 * a slot out; one that reaches here is named.
+				 * Detection only, in both settings.
+				 */
+				if (ip->i_mxfs_relmark_ns &&
+				    ip->i_mxfs_pub_stage_ns < ip->i_mxfs_relmark_ns) {
+					static atomic_t p_nr1 = ATOMIC_INIT(0);
+
+					nr1_written |= slotbits;
+					atomic_inc(&mxfs_logwr_relmark_written);
+					if (atomic_inc_return(&p_nr1) <= 20000)
+						pr_warn("mxfs: P-LOGWR-RELMARK-WRITTEN daddr=%lld slot=%d ino=%llu staged=%d stale=%d dlm_mode=%d rf=%d dem=%d stage_epoch=%lu now_epoch=%lu stage_ns=%llu relmark_ns=%llu img_gen=%u img_mode=0%o img_nl=%u img_cc=%llu incore_gen=%u incore_mode=0%o incore_nl=%u pend=%llu flush=%llu dur=%llu comm=%s -- a cluster write carries a slot copied in before the recycle that found a no-inode release's mark\n",
+							(long long)bp->b_maps[0].bm_bn, s,
+							(unsigned long long)be64_to_cpu(d->di_ino),
+							staged ? 1 : 0, stale ? 1 : 0,
+							ip->i_dlm_mode, rf ? 1 : 0,
+							dem ? 1 : 0,
+							ip->i_mxfs_pub_stage_epoch,
+							ip->i_dlm_epoch,
+							(unsigned long long)ip->i_mxfs_pub_stage_ns,
+							(unsigned long long)ip->i_mxfs_relmark_ns,
+							be32_to_cpu(d->di_gen),
+							be16_to_cpu(d->di_mode),
+							be32_to_cpu(d->di_nlink),
+							(unsigned long long)be64_to_cpu(d->di_changecount),
+							VFS_I(ip)->i_generation,
+							VFS_I(ip)->i_mode,
+							VFS_I(ip)->i_nlink,
+							(unsigned long long)ip->i_mxfs_pub_pending_seq,
+							(unsigned long long)ip->i_mxfs_pub_flush_seq,
+							(unsigned long long)ip->i_mxfs_pub_durable_seq,
+							current->comm);
 				}
 			}
 			continue;
@@ -6514,8 +7106,10 @@ mxfs_submit_partial_inode_write(
 	 * usually nonzero — free/NL slots are common — but that is luck, not
 	 * design.)
 	 */
-	if (nskip == 0 && n_pr_skip == 0)
+	if (nskip == 0 && n_pr_skip == 0) {
+		atomic_inc(&mxfs_iwr_whole_noskip);
 		return false;		/* nothing to skip -> whole-buffer write */
+	}
 	if (dirty == 0 && bp->b_mxfs_recov_slots) {
 		/*
 		 * D-0976 assertion: a recovery-owned slot never reaches an
@@ -6585,19 +7179,46 @@ mxfs_submit_partial_inode_write(
 			xfs_buf_ioend(bp);
 			return true;	/* we own completion; no I/O issued */
 		}
+		/*
+		 * D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-NUMBER-
+		 * REUSE, H-WW1: the same refusal when no passenger was skipped.
+		 * Every sector is in `skip` here, each slot refused by a rule
+		 * above -- an unlogged directory slot, a free or released slot,
+		 * a logged slot dropped for want of authority with its
+		 * watermark rolled back -- so the whole write this used to fall
+		 * back to publishes only bytes those rules refused.  kwf2 and
+		 * jzf1: the creator of a name whole-wrote its stale image of
+		 * the directory over the peer's landed removal, and the name
+		 * stood on after its inode was freed.  iwr_refuse_empty 0 is
+		 * the same-build control.
+		 */
+		if (!n_pr_skip && READ_ONCE(mxfs_iwr_refuse_empty) &&
+		    ((logged | bli_dirty) & ~skip) == 0) {
+			atomic_inc(&mxfs_iwr_empty_refused);
+			mxfs_iwr_refuse_note(bp, logged, bli_dirty, skip, spi);
+			xfs_buf_ioend(bp);
+			return true;	/* we own completion; no I/O issued */
+		}
 		if (n_pr_skip) {
 			atomic64_add(n_pr_skip, &mxfs_clpass_skip_declined);
 			pr_warn_ratelimited(
 				"mxfs: P218-SKIP-DECLINED daddr=%lld slots=%u logged=0x%llx bli_dirty=0x%llx skip=0x%llx -- SHOULD NOT HAPPEN: an owed sector survives outside `skip` yet the write is empty; writing whole buffer so no committed change is lost\n",
 				(long long)bp->b_maps[0].bm_bn, n_pr_skip,
 				logged, bli_dirty, skip);
+			mxfs_iwr_whole_note(bp, "declined",
+					    &mxfs_iwr_whole_declined, logged,
+					    bli_dirty, skip, pr_skip);
+		} else {
+			mxfs_iwr_whole_note(bp, "empty", &mxfs_iwr_whole_empty,
+					    logged, bli_dirty, skip, pr_skip);
 		}
 		return false;		/* would write nothing -> whole write */
 	}
 
 	base_512 = bp->b_maps[0].bm_bn + bp->b_target->bt_sector_offset;
 	vmalloc = is_vmalloc_addr(bp->b_addr);
-	mxfs_dino_clobber_probe(bp, dirty, "partial");
+	mxfs_iwr_refuse_streak_end(bp, "partial");
+	mxfs_dino_clobber_probe(bp, dirty, "partial", ub1_found, nr1_written);
 	mxfs_slot_ring_record(bp, dirty, false);
 
 	/* Find the LAST contiguous owned-sector run; it becomes the parent bio. */
@@ -8252,7 +8873,9 @@ xfs_buf_submit_bio(
 	 */
 	if (mxfs_submit_partial_inode_write(bp))
 		return;
-	mxfs_dino_clobber_probe(bp, ~0ULL, "whole");
+	mxfs_iwr_refuse_streak_end(bp, (bp->b_flags & XBF_WRITE) ?
+					"whole" : "read");
+	mxfs_dino_clobber_probe(bp, ~0ULL, "whole", 0, 0);
 	mxfs_slot_ring_record(bp, ~0ULL, true);
 
 	/*

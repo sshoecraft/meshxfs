@@ -896,7 +896,26 @@ mxfs_inode_wedge(struct xfs_inode *ip, struct mxfs_release_cert *cert,
  * v0.6.5 next-acquire merge is the sanctioned path to land it; the caller
  * must NOT report that as durable.  Sleeps (slot read on CAW): drain/worker
  * context only.
+ *
+ * The mode is the one the transport says this node was granted.  The
+ * held/not-held read (mxfs_v5_dlm_inode_held_rawmode) reports any CAW slot
+ * bit of this node as EX, PR included, so on CAW the EX test above passed
+ * for a shared holder.  Measured on 8/disk/caw/mpath (0.90.131 release
+ * build): test23, releasing a PR hold of the workload's shortform LOCK
+ * directory (P-RELFLUSH-NOTENURE held_mode=3), re-logged its in-core core
+ * (P146V-UNLANDED incore size=20, disk size=6) and wrote it over test28's
+ * newer image (P56-DIRWRITE mode=0 write=[test28 ]): the entry test28 had
+ * removed came back, named a file whose inode number was later freed and
+ * reused, and the audit found a file with nlink 1 named by two entries
+ * (D-CAW-MPATH-8NODE-REUSED-INODE-NAMED-BY-TWO-DIRENTS-NLINK-1-AFTER-SUITE).
+ * relog_auth_granted_mode (1, default) authorizes on the granted mode;
+ * 0 = the held/not-held read (the same-build control).
  */
+int mxfs_relog_auth_granted_mode = 1;
+module_param_named(relog_auth_granted_mode, mxfs_relog_auth_granted_mode, int, 0644);
+MODULE_PARM_DESC(relog_auth_granted_mode,
+		 "a synthetic re-log of an inode core is authorized on the mode this node was granted (1, default); 0 = on the held/not-held slot read, which reports a CAW PR hold as EX (test control)");
+
 bool
 mxfs_dlm_relog_authorized(
 	struct xfs_inode	*ip,
@@ -904,12 +923,14 @@ mxfs_dlm_relog_authorized(
 	uint32_t		disk_gen)
 {
 	struct xfs_mount	*mp = ip->i_mount;
-	uint8_t			held_mode;
+	uint8_t			held_mode, raw_mode, granted_mode;
 	bool			foreign;
 
 	if (!mp->m_mxfs_dlm || mxfs_v5_dlm_is_single_node(mp->m_mxfs_dlm))
 		return true;
-	held_mode = mxfs_v5_dlm_inode_held_rawmode(mp->m_mxfs_dlm, ip->i_ino);
+	raw_mode = mxfs_v5_dlm_inode_held_rawmode(mp->m_mxfs_dlm, ip->i_ino);
+	granted_mode = mxfs_v5_dlm_inode_granted_mode(mp->m_mxfs_dlm, ip->i_ino);
+	held_mode = READ_ONCE(mxfs_relog_auth_granted_mode) ? granted_mode : raw_mode;
 	foreign = disk_gen != VFS_I(ip)->i_generation;
 	/*
 	 * 0.23.8 MEASURED (6 laps, 32/caw): the first cut also vetoed on
@@ -929,11 +950,18 @@ mxfs_dlm_relog_authorized(
 	 * reload/adoption").
 	 */
 	if (held_mode >= MXFS_LOCK_EX &&
-	    (!foreign || ip->i_mxfs_self_created))
+	    (!foreign || ip->i_mxfs_self_created)) {
+		mxfs_probe_ratelimited("mxfs: P146V-AUTH ino=%llu site=%s held_mode=%u raw_mode=%u granted_mode=%u by_granted=%d dlm_mode=%u stale=%d stale_src=%u foreign=%d -- synthetic re-log authorized\n",
+			(unsigned long long)ip->i_ino, site, held_mode, raw_mode,
+			granted_mode, READ_ONCE(mxfs_relog_auth_granted_mode) ? 1 : 0,
+			ip->i_dlm_mode, ip->i_dlm_stale ? 1 : 0, ip->i_dlm_stale_src,
+			foreign ? 1 : 0);
 		return true;
+	}
 
-	pr_warn("mxfs: P146V-NOAUTH-REFUSE ino=%llu site=%s held_mode=%u icd_refused=%d self_created=%d dlm_mode=%u state=%u incore[gen=%u mode=0%o nlink=%u] disk_gen=%u foreign=%d comm=%s -- synthetic re-log refused: %s\n",
-		(unsigned long long)ip->i_ino, site, held_mode,
+	pr_warn("mxfs: P146V-NOAUTH-REFUSE ino=%llu site=%s held_mode=%u raw_mode=%u granted_mode=%u stale=%d stale_src=%u icd_refused=%d self_created=%d dlm_mode=%u state=%u incore[gen=%u mode=0%o nlink=%u] disk_gen=%u foreign=%d comm=%s -- synthetic re-log refused: %s\n",
+		(unsigned long long)ip->i_ino, site, held_mode, raw_mode, granted_mode,
+		ip->i_dlm_stale ? 1 : 0, ip->i_dlm_stale_src,
 		ip->i_dlm_icd_refused ? 1 : 0, ip->i_mxfs_self_created ? 1 : 0,
 		ip->i_dlm_mode, ip->i_dlm_state,
 		VFS_I(ip)->i_generation, VFS_I(ip)->i_mode, VFS_I(ip)->i_nlink,

@@ -370,6 +370,26 @@ xfs_inode_init(
 
 	ip->i_disk_size = 0;
 	ip->i_df.if_nextents = 0;
+	/*
+	 * D-CREATE-ON-ZOMBIE-SHELL-INHERITS-DEAD-LIFE-NBLOCKS: the assert is
+	 * compiled out, and a new life that reaches here with a block count
+	 * carries its dead predecessor's into its core (an empty file's then
+	 * fails xfs_dinode_verify on every node).  Detection only: counted
+	 * and printed, the value left as it is.
+	 */
+	if (ip->i_nblocks) {
+		extern atomic_t	mxfs_create_nblocks_inherited;
+		static atomic_t	p_cni_n = ATOMIC_INIT(0);
+
+		atomic_inc(&mxfs_create_nblocks_inherited);
+		if (atomic_inc_return(&p_cni_n) <= 2000)
+			pr_warn("mxfs: P-CREATE-NBLOCKS-INHERITED ino=%llu nblocks=%llu mode=0%o gen=%u df_fmt=%d df_bytes=%lld forkoff=%u comm=%s -- a new life reached xfs_inode_init with a block count; its core goes home with the dead life's blocks\n",
+				(unsigned long long)ip->i_ino,
+				(unsigned long long)ip->i_nblocks, args->mode,
+				inode->i_generation, (int)ip->i_df.if_format,
+				(long long)ip->i_df.if_bytes,
+				(unsigned)ip->i_forkoff, current->comm);
+	}
 	ASSERT(ip->i_nblocks == 0);
 
 	ip->i_extsize = 0;
@@ -1274,6 +1294,29 @@ xfs_iunlink_remove_inode(
 			return -EFSCORRUPTED;
 		}
 
+		/*
+		 * D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-
+		 * NODES, H-U4: the edit below is a field of the PREDECESSOR's
+		 * slot.  A peer holding that inode's EX publishes the whole
+		 * slot from its own buffer and reverts it, so the edit belongs
+		 * under this node's own EX hold on the predecessor
+		 * (xfs_inactive_ifree takes it).  Both arms say when it is not.
+		 */
+		if (mp->m_mxfs_dlm &&
+		    !mxfs_v5_dlm_is_single_node(mp->m_mxfs_dlm) &&
+		    (prev_ip->i_dlm_mode != MXFS_LOCK_EX ||
+		     prev_ip->i_dlm_ex_holders <= 0)) {
+			extern atomic_t mxfs_unlprev_notenure;
+
+			atomic_inc(&mxfs_unlprev_notenure);
+			mxfs_probe("mxfs: P-UNLPREV-NOTENURE ino=%llu agno=%u agino=0x%x prev=0x%x prev_mode=%u prev_ex_holders=%d next=0x%x comm=%s realns=%llu -- predecessor edited without this node's EX hold on it\n",
+				(unsigned long long)ip->i_ino, pag_agno(pag),
+				agino, ip->i_prev_unlinked,
+				prev_ip->i_dlm_mode, prev_ip->i_dlm_ex_holders,
+				ip->i_next_unlinked, current->comm,
+				(unsigned long long)ktime_get_real_ns());
+		}
+
 		error = xfs_iunlink_log_inode(tp, prev_ip, pag,
 				ip->i_next_unlinked);
 		prev_ip->i_next_unlinked = ip->i_next_unlinked;
@@ -1420,6 +1463,7 @@ xfs_droplink(
 	 * low-level xfs_iunlink below is shared with internal re-insert paths and
 	 * is NOT a reliable intent signal.  See MXFS_IF_LOCAL_UNLINK.
 	 */
+	ip->i_mxfs_unlink_epoch = READ_ONCE(ip->i_dlm_epoch);
 	xfs_iflags_set(ip, MXFS_IF_LOCAL_UNLINK);
 
 	return xfs_iunlink(tp, ip);

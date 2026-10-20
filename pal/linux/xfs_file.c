@@ -2166,6 +2166,14 @@ xfs_file_open(
 			(unsigned long long)XFS_I(inode)->i_ino);
 		mxfs_incarn_poison(XFS_I(inode));
 	}
+	/* TEST ONLY: see dbg_open_delay_ms (xfs_mxfs_dlm.c) */
+	{
+		extern int mxfs_dbg_open_delay_ms;
+
+		if (unlikely(READ_ONCE(mxfs_dbg_open_delay_ms) > 0) &&
+		    XFS_M(inode->i_sb)->m_mxfs_dlm)
+			msleep(READ_ONCE(mxfs_dbg_open_delay_ms));
+	}
 	/* never hand out an fd on a poisoned dead incarnation; the
 	 * -ESTALE makes the VFS re-walk with LOOKUP_REVAL → fresh lookup →
 	 * the retire arm re-igets the live incarnation.  The gate's own

@@ -129,11 +129,90 @@ mxfs_ag_handoff_closing(
 	if (!mxfs_ag_handoff_latch || !pag->pag_dlm_bast_pending ||
 	    !pag->pag_dlm_prepass_done)
 		return false;
+	/* H-F13: an inode of this AG is still unpublished; the worker
+	 * publishes it before anyone commits */
+	if (mxfs_ag_fence_holds_commit(pag))
+		return false;
 	if (mxfs_ag_handoff_admit_cap > 0 &&
 	    pag->pag_dlm_readopt_n >= (u32)mxfs_ag_handoff_admit_cap)
 		return true;
 	return jiffies_to_msecs(jiffies - pag->pag_dlm_bast_pending_since) >=
 	       (unsigned int)max(mxfs_ag_handoff_grace_ms, 0);
+}
+
+/*
+ * D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F13
+ * (ag_ialloc_fence, xfs/xfs_mxfs_dlm.c).  An inode allocated in this AG while a
+ * peer's BAST is pending on it is an unpublished inode the release has to
+ * chase or leave behind, so xfs_dialloc_try_ag passes the AG by.  Read without
+ * pag_dlm_lock: an allocation that slips in as the BAST lands is held to the
+ * COMMIT check below.
+ *
+ * Only a BAST pending on a tenure this node holds (cached, or in use by a
+ * holder) fences the AG.  The flag is also set on an AG this node holds
+ * nothing of: on disk locking every BAST reaches the whole group, and the
+ * waiter's re-BASTs land after our release has completed.  Nothing clears
+ * such a hint but the next fresh grant (P12-STALE-HINT, mxfs_ag_dlm_lock) or
+ * a later BAST past the orphan window, so refusing on it refuses the AG until
+ * the peer happens to ask again; with every owned AG in that state the create
+ * sweep backed off for 237 s holding its parent directory (jwf1).  The
+ * acquire below drops the hint at the fresh grant, and a BAST that lands
+ * after it is held to the COMMIT check like any other.  ag_fence_hint_exempt 0
+ * is the same-build control that refuses on the hint as before.
+ */
+bool
+mxfs_ag_ialloc_fenced_now(
+	struct xfs_mount	*mp,
+	struct xfs_perag	*pag)
+{
+	static atomic_t		hint_n = ATOMIC_INIT(0);
+	bool			tenure;
+	int			n;
+
+	if (!mp->m_mxfs_dlm || !READ_ONCE(mxfs_ag_ialloc_fence) ||
+	    !READ_ONCE(pag->pag_dlm_bast_pending))
+		return false;
+	tenure = READ_ONCE(pag->pag_dlm_cached) ||
+		 READ_ONCE(pag->pag_dlm_holders) > 0;
+	if (!tenure) {
+		bool	exempt = READ_ONCE(mxfs_ag_fence_hint_exempt);
+
+		atomic_inc(exempt ? &mxfs_ag_fence_hint_passed :
+				    &mxfs_ag_fence_hint_refused);
+		n = atomic_inc_return(&hint_n);
+		if (n <= 32 || (n % 1000) == 0)
+			mxfs_probe("mxfs: P-AG-FENCE-HINT ag=%u exempt=%d demoting=%d page_ms=%u n=%d comm=%s -- a BAST is pending on an AG this node holds no tenure of\n",
+				pag_agno(pag), exempt ? 1 : 0,
+				READ_ONCE(pag->pag_dlm_demoting) ? 1 : 0,
+				jiffies_to_msecs(jiffies -
+					READ_ONCE(pag->pag_dlm_bast_pending_since)),
+				n, current->comm);
+		if (exempt)
+			return false;
+	}
+	atomic_inc(&mxfs_ag_ialloc_fenced);
+	return true;
+}
+
+/*
+ * H-F13, under pag_dlm_lock: the release COMMIT waits while an unpublished
+ * inode of this AG is listed or one's claim is in flight -- a create admitted
+ * before the BAST, or a child the drain deferred -- for at most
+ * MXFS_PUB_DRAIN_TIMEOUT_MS from the BAST; after that it commits as before and
+ * mxfs_ag_handoff_commit says so.
+ */
+bool
+mxfs_ag_fence_holds_commit(
+	struct xfs_perag	*pag)
+{
+	struct xfs_mount	*mp = pag_mount(pag);
+
+	if (!READ_ONCE(mxfs_ag_ialloc_fence) || !mp->m_mxfs_dlm)
+		return false;
+	if (jiffies_to_msecs(jiffies - pag->pag_dlm_bast_pending_since) >=
+	    MXFS_PUB_DRAIN_TIMEOUT_MS)
+		return false;
+	return mxfs_pub_ag_exposed(mp, pag_agno(pag));
 }
 
 /*
@@ -333,6 +412,19 @@ mxfs_ag_handoff_commit(
 	 * the epoch just zeroed may still be between its check and its
 	 * attach — the worker's drain must see every sanctioned image. */
 	mxfs_ag_pubwrite_quiesce(pag);
+	/* H-F13: a COMMIT the fence's window let through with an inode of
+	 * this AG still unpublished */
+	if (READ_ONCE(mxfs_ag_ialloc_fence) && pag_mount(pag)->m_mxfs_dlm &&
+	    mxfs_pub_ag_exposed(pag_mount(pag), pag_agno(pag))) {
+		static atomic_t pafe_n = ATOMIC_INIT(0);
+
+		atomic_inc(&mxfs_ag_fence_escaped);
+		if (atomic_inc_return(&pafe_n) <= 200)
+			pr_warn("mxfs: P-AG-FENCE-ESCAPE ag=%u by=%s page_ms=%u -- the release COMMIT went past the fence's window with an unpublished inode of this AG still listed or claiming\n",
+				pag_agno(pag), who ? who : "worker",
+				jiffies_to_msecs(jiffies -
+					pag->pag_dlm_bast_pending_since));
+	}
 	if (stat)
 		atomic64_inc(stat);
 	if (who)

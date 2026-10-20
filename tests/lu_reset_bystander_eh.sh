@@ -115,8 +115,52 @@
 # not the 180 s this budget is derived from.  A harness whose budget rests on a
 # tunable has to check the tunable.
 #
+# WHERE A STALL SITS, two opt-in instruments.  hbf3: after the first reset
+# aborted one of the bystander's commands, its whole session completed nothing
+# for 28 s -- the next three resets aborted none of its commands and drew no
+# unit attention -- while its keep-alives went on; the heartbeat abandoned
+# three reads and a beat and the authority lease ran out.  Whether its commands
+# were never sent, sent and not received, or received and not answered decides
+# the fix.
+#   LRBE_TRACE=1  the bystander records scsi dispatch and libiscsi session,
+#                 connection and EH trace events (each command's prep line
+#                 carries its CmdSN and the window; "CmdSN closed" is the
+#                 window shut); the ring is frozen once the writer has stalled
+#                 LRBE_TRACE_FREEZE_S (25) s so the stall survives, and saved
+#                 as B_trace.txt
+#   LRBE_WATCH=1  this host samples the target's view of the bystander's
+#                 sessions every 0.5 s (tests/scst_session_watch.sh: commands
+#                 received, active, connection state) into host_scst_watch.txt
+#
+# THE FIX UNDER TEST (H-B4).  diag1 showed why the whole device stops: the
+# reset's unit attention makes the midlayer block the device, and a blocked
+# device dispatches nothing while the command the target dropped is still
+# outstanding.  The module now hears of the unit attention through udev
+# (packaging/61-mxfs-stranded-path.rules -> scsi_reset_seen) and walks every
+# request sent before it and still unanswered stranded_abort_ms later down
+# libiscsi's ladder with blk_abort_request, one rung per call, to the error
+# handler's abort and retry (pal/linux/kern.c).  No connection is dropped.
+#   LRBE_ABORT_MS  written to the bystander's stranded_abort_ms after the prep
+#                  and read back: 0 is the same-build control (the ladder runs
+#                  its 540 s, and the walk only counts, in its P-STRANDED-OFF
+#                  line, what it would have walked), unset keeps the build's
+#                  default.
+# PREDICTION: with the walk on, a lap that catches a strand logs P-STRANDED-
+# NOTICE, -ABORT and -RELEASED on the bystander, the release comes within
+# RELEASE_BOUND_MS of the notice, and the node keeps its lease.  With it off,
+# the same strand fences the bystander (hbc1, hbc2).
+# A lap whose arm never met a strand measured nothing about it: VACUOUS.  The
+# walk's arm knows it met one from its own P-STRANDED-ABORT line; the control's
+# from the stall (two samples without progress) or the self-fence.
+# RELEASE_BOUND_MS (8000) is derived from the walk, not chosen: the 3000 ms
+# hold, three rungs a quarter second apart, the ABORT TASK round trip and the
+# blocked device's three dispatch attempts come to ~3.8 s; twice that.
+#
 # Usage: tests/lu_reset_bystander_eh.sh <label>
-# Env:   MXFS_NODE_LIST (test1,test2), OBSERVE (900), EXPECT_CMD_TIMEOUT (180)
+# Env:   MXFS_NODE_LIST (test1,test2), MXFS_CONFIG (2/net/mesh/direct: what the
+#        prep deploys), OBSERVE (900), EXPECT_CMD_TIMEOUT (180),
+#        LRBE_GROUP (g2: the rig group MXFS_NODE_LIST is), LRBE_TRACE,
+#        LRBE_TRACE_FREEZE_S, LRBE_WATCH, LRBE_ABORT_MS, RELEASE_BOUND_MS
 # Exit 0 PASS, 1 FAIL, 2 ABORT/INFRA, 3 VACUOUS.
 set -u
 LABEL=${1:?usage: lu_reset_bystander_eh.sh <label>}
@@ -133,10 +177,14 @@ RESETS=${RESETS:-10}             # one shot missed the race; try a series
 RESET_GAP=${RESET_GAP:-6}        # seconds between resets
 SAMPLE_EVERY=${SAMPLE_EVERY:-10} # fine enough to see a stall that recovers
 CLEAN_AFTER=${CLEAN_AFTER:-90}   # continuous progress that says "not stranded"
+RELEASE_BOUND_MS=${RELEASE_BOUND_MS:-8000}
 OUT=tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_lrbe_$LABEL
 mkdir -p "$OUT"
 fails=0
 . "$(dirname "$0")/lib/rig.sh"
+# pool VMs nobody holds are shut off by release helpers mid-lap: hold both
+. "$(dirname "$0")/lib/runlock.sh"
+vmhold_take lu_reset_bystander_eh "$A" "$B" || { echo "RESULT: ABORT label=$LABEL stage=hold -- could not hold $A $B"; exit 2; }
 MARK="LRBE-MARK-$LABEL"
 s0=$(date +%s)
 el() { echo $(( $(date +%s) - s0 )); }
@@ -147,7 +195,18 @@ field(){ grep -aoE "(^| )$2=[^ ]*" "$1" | head -1 | cut -d= -f2; }
 
 # A trace flag left on is a hazard in its own right.  Disarm on every exit.
 ARMED=0
+TR=/sys/kernel/tracing
+TRACED=0
+TRACE_FROZEN=0
+WATCHPID=
 disarm() {
+    [ -n "$WATCHPID" ] && kill "$WATCHPID" 2>/dev/null
+    if [ "$TRACED" = 1 ]; then
+        timeout 120 $SSH "$B" "echo 0 > $TR/tracing_on; cat $TR/trace; echo 0 > $TR/events/enable; echo > $TR/trace; echo 1408 > $TR/buffer_size_kb" \
+            > "$OUT/B_trace.txt" 2>/dev/null
+        echo "STAGE saved the bystander's trace ($(grep -ac . "$OUT/B_trace.txt") lines, frozen=$TRACE_FROZEN)"
+        TRACED=0
+    fi
     [ "$ARMED" = 1 ] || return 0
     timeout 30 $SSH "$B" \
         "echo 0 > /sys/module/libiscsi/parameters/debug_libiscsi_eh 2>/dev/null; \
@@ -163,7 +222,9 @@ echo "=== lu_reset_bystander_eh label=$LABEL A(issuer)=$A B(bystander)=$B observ
 
 # ---- 1. both nodes mounted on the tree build
 SV=$(modinfo mxfs.ko | sed -n 's/^srcversion: *//p')
-MXFS_FORCE_PREP=1 timeout 400 ./run.sh 2/net/mesh/direct prep_cluster > "$OUT/prep.log" 2>&1
+# a group prep takes the rig lock shared, so it coexists with other groups'
+# runs; run.sh holds the prep to its own budget
+MXFS_FORCE_PREP=1 ./run.sh "$MXFS_CONFIG" --group "${LRBE_GROUP:-g2}" prep_cluster > "$OUT/prep.log" 2>&1
 prc=$?
 echo "STAGE prep rc=$prc wall=$(el)s  $(grep -am1 'prep_cluster OK\|FAIL' "$OUT/prep.log" | cut -c1-140)"
 [ $prc = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=prep evidence=$OUT"; exit 2; }
@@ -173,6 +234,20 @@ for n in "$A" "$B"; do
     ck "prep deployed the tree build on $n" "$sv" "$SV"
 done
 [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=build evidence=$OUT"; exit 2; }
+# the arm, read back: the walk's knob and the udev rule that feeds it
+ABORT_ARM=${LRBE_ABORT_MS:-}
+measure "$B" 30 "$OUT/B_sra.txt" '^SRA_END$' "the bystander's stranded-command walk" \
+    "$([ -n "$ABORT_ARM" ] && echo "echo $ABORT_ARM > /sys/module/mxfs/parameters/stranded_abort_ms;") \
+     echo ABORT_MS=\$(cat /sys/module/mxfs/parameters/stranded_abort_ms 2>/dev/null); \
+     echo RULE=\$(test -f /etc/udev/rules.d/61-mxfs-stranded-path.rules && echo 1 || echo 0); \
+     echo NOTICE_PARAM=\$(test -e /sys/module/mxfs/parameters/scsi_reset_seen && echo 1 || echo 0); \
+     echo SRA_END"
+SRA_MS=$(field "$OUT/B_sra.txt" ABORT_MS)
+[ -n "$ABORT_ARM" ] && ck "the bystander's stranded_abort_ms reads the arm's value" "$SRA_MS" "$ABORT_ARM"
+ck "the reset-notice udev rule is installed on the bystander" "$(field "$OUT/B_sra.txt" RULE)" 1
+ck "the bystander's module takes reset notices" "$(field "$OUT/B_sra.txt" NOTICE_PARAM)" 1
+[ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=arm-walk evidence=$OUT"; exit 2; }
+echo "STAGE the stranded-command walk on $B: stranded_abort_ms=$SRA_MS ($([ "${SRA_MS:-0}" -gt 0 ] && echo on || echo 'off: the control'))"
 mxfs_dev_resolve "$A"; DEV_A=$MXFS_DEV_RESOLVED
 mxfs_dev_resolve "$B"; DEV_B=$MXFS_DEV_RESOLVED
 
@@ -217,6 +292,34 @@ ck "the bystander is narrating its error recovery" "$(field "$OUT/B_arm.txt" EH)
 measure "$A" 30 "$OUT/A_mark.txt" '^MARKED$' "the issuer's lap mark" \
     "echo $MARK > /dev/kmsg; echo MARKED"
 [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=arm evidence=$OUT"; exit 2; }
+if [ "${LRBE_TRACE:-0}" = 1 ]; then
+    # per-segment tcp events are left off: at ~1600 writes/s they would wrap
+    # the ring before a stall began
+    measure "$B" 30 "$OUT/B_trace_arm.txt" '^TRACE_ON=1$' "the bystander's scsi/iscsi trace" \
+        "echo 0 > $TR/tracing_on; echo > $TR/trace; echo 16384 > $TR/buffer_size_kb; \
+         for e in scsi/scsi_dispatch_cmd_start scsi/scsi_dispatch_cmd_done scsi/scsi_dispatch_cmd_error \
+                  scsi/scsi_dispatch_cmd_timeout scsi/scsi_eh_wakeup iscsi/iscsi_dbg_session \
+                  iscsi/iscsi_dbg_conn iscsi/iscsi_dbg_eh; do echo 1 > $TR/events/\$e/enable; done; \
+         echo 1 > $TR/tracing_on; echo TRACE_ON=\$(cat $TR/tracing_on)"
+    TRACED=1
+fi
+if [ "${LRBE_WATCH:-0}" = 1 ]; then
+    INI_B=$(rs 20 "$B" "sed -n 's/^InitiatorName=//p' /etc/iscsi/initiatorname.iscsi" | tail -1)
+    TGT_B=$(rs 20 "$B" "cat /sys/class/iscsi_session/session*/targetname | sort -u" | tail -1)
+    [ -n "$INI_B" ] && [ -n "$TGT_B" ] || { echo "RESULT: ABORT label=$LABEL stage=watch -- no initiator/target name on $B evidence=$OUT"; exit 2; }
+    tests/scst_session_watch.sh "$TGT_B" "$INI_B" 0.5 $(( OBSERVE + RESETS * (RESET_GAP + 3) + 300 )) \
+        > "$OUT/host_scst_watch.txt" 2>&1 &
+    WATCHPID=$!
+    echo "STAGE watching the target's view of $B ($INI_B on $TGT_B), pid $WATCHPID"
+fi
+# the ring holds about a minute of this load: freeze it once the writer has
+# stalled long enough that the stall, not what follows, is what it keeps
+trace_freeze_if_stalled() {
+    [ "$TRACED" = 1 ] && [ "$TRACE_FROZEN" = 0 ] && [ "$1" -ge "${LRBE_TRACE_FREEZE_S:-25}" ] || return 0
+    rs 20 "$B" "echo 0 > $TR/tracing_on" > /dev/null
+    TRACE_FROZEN=1
+    echo "STAGE froze the bystander's trace at stall=${1}s"
+}
 
 # ---- 4. in-flight MXFS I/O on BOTH nodes: the bystander is the subject, the
 # issuer is the control that says the reset did what it always does.
@@ -316,6 +419,7 @@ while [ "$r" -le "$RESETS" ]; do
     stall=$(( now - LAST_ADVANCE ))
     [ "$stall" -gt "$MAX_STALL" ] && MAX_STALL=$stall
     echo "  reset $r/$RESETS rc=${rc:-?} ${ms:-?}ms  t=$(( now - T0 ))s state=${SAMPLE_STATE:-?} ok=${SAMPLE_OK:-?} err=${SAMPLE_ERR:-?} stall=${stall}s eh=${SAMPLE_EH:-?}"
+    trace_freeze_if_stalled "$stall"
     r=$(( r + 1 ))
     [ "$r" -le "$RESETS" ] && sleep "$RESET_GAP"
 done
@@ -343,6 +447,7 @@ while [ "$i" -lt "$OBSERVE" ]; do
     [ "$stall" -gt "$MAX_STALL" ] && MAX_STALL=$stall
     [ "$stall" -ge $(( SAMPLE_EVERY * 2 )) ] && STRANDED=1
     echo "  t=$(( now - T0 ))s state=${SAMPLE_STATE:-?} ok=${SAMPLE_OK:-?} err=${SAMPLE_ERR:-?} stall=${stall}s max_stall=${MAX_STALL}s eh=${SAMPLE_EH:-?}"
+    trace_freeze_if_stalled "$stall"
     # Advancing and never having stalled past a sample pair: the stimulus did
     # not reach the bystander at all.  Stop watching once that is established.
     if [ "$STRANDED" = 0 ] && [ "$MAX_STALL" -lt $(( SAMPLE_EVERY * 2 )) ] &&
@@ -369,8 +474,19 @@ grep -a '^WRITER_ERR_' "$OUT/A_writer_tally.txt" | sed 's/^/    /'
 echo "STAGE the issuer's writer: done=$ADONE writes_ok=$AOK errors=$AERR"
 
 # ---- 7. what the error handler actually did, which is the point of the lap
-window_into "$OUT/B_window.txt" "$B" 120 "$MARK"
-window_into "$OUT/A_window.txt" "$A" 120 "$MARK"
+# SCSI logging level 63 or the rig's per-I/O debug lines on a node under write
+# load can overrun the ring buffer past the mark, which leaves the window empty
+# (tasc1: one line, while the node's journal held its self-fence; diag1: the
+# ring-only capture aborted the lap): take the lap's span from the journal
+for n in "$A" "$B"; do
+    f="$OUT/A_window.txt"; [ "$n" = "$B" ] && f="$OUT/B_window.txt"
+    measure "$n" 120 "$f" '^WINDOW_END$' "the kernel log on $n from '$MARK'" \
+        "dmesg | sed -n \"/$MARK/,\\\$p\"; echo WINDOW_END"
+    if ! grep -qaF -- "$MARK" "$f"; then
+        rs 120 "$n" "journalctl -k --since @$s0 --no-pager -o short-iso 2>/dev/null; echo WINDOW_END" > "$f"
+        echo "STAGE $n's ring buffer no longer held the mark; its window is the journal since the lap began ($(grep -ac . "$f") lines)"
+    fi
+done
 TIMEDOUT=$(cnt "$OUT/B_window.txt" 'iscsi_eh_cmd_timed_out')
 RESETTIMER=$(cnt "$OUT/B_window.txt" 'return timer reset')
 NOTHANDLED=$(cnt "$OUT/B_window.txt" 'return shutdown or nh')
@@ -388,25 +504,68 @@ echo "FINDING H-EH predicted every expiry answered 'timer reset' and no abort: t
 # one outcome that matters.
 ck "the bystander's writer is not left stranded" \
    "$([ "$STRANDED" = 1 ] && echo stranded || echo advancing)" advancing
+# a writer whose writes FAIL is not one the reset left alone: tasc1's stall
+# ended in 851200 refused writes after its node self-fenced
+ck "the bystander's writer saw no write error" \
+   "$(grep -a '^ERRN=' "$OUT/B_samples.txt" | tail -1 | cut -d= -f2)" 0
 ck "the issuing node's writer terminated rather than hanging" "${ADONE:-0}" 1
 ck "the issuing node's writer made progress across the series" \
    "$([ -n "${AOK:-}" ] && [ "${AOK:-0}" -gt 0 ] && echo yes || echo no)" yes
-if [ "$MAX_STALL" -lt $(( SAMPLE_EVERY * 2 )) ]; then
-    echo "FINDING THE HAZARD DID NOT REPRODUCE on this lap: $RESETS resets never stalled the bystander's writes for as much as $(( SAMPLE_EVERY * 2 ))s (longest ${MAX_STALL}s).  That disposes of nothing — the strand needs the target to be holding one of this initiator's commands at the instant the task-management function runs, and this series did not catch it."
+# the walk's own account: a notice per reset unit attention, an ABORT line
+# for each notice that found requests sent before it still unanswered, then
+# RELEASED (or GIVE-UP) when they are gone
+NOTICES=$(cnt "$OUT/B_window.txt" 'P-STRANDED-NOTICE path=')
+SRA_ABORT=$(cnt "$OUT/B_window.txt" 'P-STRANDED-ABORT path=')
+SRA_REL=$(cnt "$OUT/B_window.txt" 'P-STRANDED-RELEASED path=')
+SRA_GIVEUP=$(cnt "$OUT/B_window.txt" 'P-STRANDED-GIVE-UP path=')
+SRA_REL_MAX=$(grep -aoE 'P-STRANDED-RELEASED path=[^ ]+ rungs=[0-9]+ since_reset_ms=[0-9]+' "$OUT/B_window.txt" |
+    sed 's/.*since_reset_ms=//' | sort -n | tail -1)
+# the control's walk takes in what it would have walked and walks nothing: its
+# OFF line counts the requests armed before the notice and still unanswered
+# after the hold, the strand itself
+SRA_OFF_MAX=$(grep -aoE 'P-STRANDED-OFF path=[^ ]+ in_flight=[0-9]+' "$OUT/B_window.txt" |
+    sed 's/.*in_flight=//' | sort -n | tail -1)
+grep -a 'P-STRANDED-' "$OUT/B_window.txt" | sed 's/.*kernel: //' | cut -c1-220 | head -12
+echo "STAGE the walk on $B: notices=$NOTICES strands_caught=$SRA_ABORT released=$SRA_REL gave_up=$SRA_GIVEUP slowest_release_ms=${SRA_REL_MAX:-none} off_most_held=${SRA_OFF_MAX:-none}"
+SELFFENCE_B=$(cnt "$OUT/B_window.txt" 'P131-SELF-FENCE\|P-WITHDRAW\|Fenced by the cluster')
+if [ "${SRA_MS:-0}" -gt 0 ]; then
+    CAUGHT=$([ "${SRA_ABORT:-0}" -gt 0 ] && echo 1 || echo 0)
+    if [ "$CAUGHT" = 1 ]; then
+        ck "every strand the walk caught was released, none left to the ladder" "${SRA_GIVEUP:-0}" 0
+        ck "the walk released as many strands as it caught" "${SRA_REL:-0}" "${SRA_ABORT:-0}"
+        ck "the slowest release came within ${RELEASE_BOUND_MS} ms of its notice" \
+           "$([ -n "$SRA_REL_MAX" ] && [ "$SRA_REL_MAX" -le "$RELEASE_BOUND_MS" ] && echo yes || echo "no(${SRA_REL_MAX:-none})")" yes
+        ck "the bystander's writer never stalled two samples running" \
+           "$([ "$MAX_STALL" -lt $(( SAMPLE_EVERY * 2 )) ] && echo yes || echo "no(${MAX_STALL}s)")" yes
+    fi
 else
-    echo "FINDING THE HAZARD REPRODUCED: the bystander's writes stalled for ${MAX_STALL}s$([ -n "$RESOLVED_AT" ] && echo " and recovered at t=${RESOLVED_AT}s" || echo " and had not recovered when the watch ended at ${OBSERVE}s")"
+    CAUGHT=$([ "$MAX_STALL" -ge $(( SAMPLE_EVERY * 2 )) ] || [ "${SELFFENCE_B:-0}" -gt 0 ] ||
+             [ "${SRA_OFF_MAX:-0}" -gt 0 ] && echo 1 || echo 0)
+fi
+if [ "$CAUGHT" = 0 ]; then
+    echo "FINDING THE HAZARD DID NOT REPRODUCE on this lap: $RESETS resets (notices=$NOTICES) never left the bystander a request the target dropped$([ "${SRA_MS:-0}" -gt 0 ] || echo " long enough to stall its writes $(( SAMPLE_EVERY * 2 ))s (longest ${MAX_STALL}s)").  That disposes of nothing — the strand needs the target to be holding one of this initiator's commands at the instant the task-management function runs, and this series did not catch it."
+elif [ "${SRA_MS:-0}" -gt 0 ]; then
+    echo "FINDING THE HAZARD REPRODUCED AND THE WALK MET IT: $SRA_ABORT strand(s) caught, $SRA_REL released, slowest ${SRA_REL_MAX:-none} ms after its notice; longest sampled stall ${MAX_STALL}s"
+else
+    echo "FINDING THE HAZARD REPRODUCED: the bystander's writes stalled for ${MAX_STALL}s$([ -n "$RESOLVED_AT" ] && echo " and recovered at t=${RESOLVED_AT}s" || echo " and had not recovered when the watch ended at ${OBSERVE}s")$([ "${SELFFENCE_B:-0}" -gt 0 ] && echo "; the bystander fenced itself")"
 fi
 for n in "$A" "$B"; do
     f="$OUT/A_window.txt"; [ "$n" = "$B" ] && f="$OUT/B_window.txt"
     ck "no BUG or Oops on $n" "$(cnt "$f" 'BUG:\|Oops')" 0
-    ck "no filesystem shutdown on $n" "$(cnt "$f" 'Filesystem has been shut down')" 0
+    # a fence-driven shutdown prints 'Fenced by the cluster ... Shutting down'
+    # and the self-fence and withdrawal lines, never 'has been shut down'
+    ck "no filesystem shutdown, self-fence or withdrawal on $n" \
+       "$(cnt "$f" 'Filesystem has been shut down\|Shutting down filesystem\|Fenced by the cluster\|P131-SELF-FENCE\|P-WITHDRAW')" 0
     value_now_into alive "$n" 30 "$OUT/${n}_alive.txt" '^ALIVE=1$' "liveness of $n" "echo ALIVE=1"
     ck "$n still answers" "$alive" "ALIVE=1"
 done
 
-echo "--- resets=$RESET_OK/$RESETS max_stall=${MAX_STALL}s stranded=$STRANDED issuer_writes=${AOK:-?} issuer_errors=${AERR:-?} bystander_eh: timeouts=$TIMEDOUT timer_reset=$RESETTIMER not_handled=$NOTHANDLED aborts=$ABORTS"
+echo "--- resets=$RESET_OK/$RESETS max_stall=${MAX_STALL}s stranded=$STRANDED issuer_writes=${AOK:-?} issuer_errors=${AERR:-?} bystander_eh: timeouts=$TIMEDOUT timer_reset=$RESETTIMER not_handled=$NOTHANDLED aborts=$ABORTS walk: abort_ms=${SRA_MS:-?} notices=$NOTICES caught=$SRA_ABORT released=$SRA_REL gave_up=$SRA_GIVEUP slowest_release_ms=${SRA_REL_MAX:-none}"
 echo "NOTE if the bystander stranded it has unkillable I/O and cannot be unmounted; run prep_cluster before any lap that mounts."
-if [ $fails = 0 ]; then
-    echo "RESULT: PASS label=$LABEL fails=0 wall=$(el)s evidence=$OUT"; exit 0
+if [ $fails = 0 ] && [ "$CAUGHT" = 0 ]; then
+    echo "RESULT: VACUOUS label=$LABEL abort_ms=${SRA_MS:-?} caught=0 wall=$(el)s evidence=$OUT"; exit 3
 fi
-echo "RESULT: FAIL label=$LABEL fails=$fails wall=$(el)s evidence=$OUT"; exit 1
+if [ $fails = 0 ]; then
+    echo "RESULT: PASS label=$LABEL abort_ms=${SRA_MS:-?} caught=1 fails=0 wall=$(el)s evidence=$OUT"; exit 0
+fi
+echo "RESULT: FAIL label=$LABEL abort_ms=${SRA_MS:-?} caught=$CAUGHT fails=$fails wall=$(el)s evidence=$OUT"; exit 1

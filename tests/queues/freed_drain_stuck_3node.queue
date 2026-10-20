@@ -1,0 +1,45 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT: what the
+# publish drain of fw3f2 waited on.  fw3f2 (tests/queues/freed_inode_final_3node.queue,
+# build 311877C431E1BB444562804, 3/net/mesh/direct g3b) failed on pc_ok=0: test16's
+# AG 1 release drain ran out its MXFS_PUB_DRAIN_TIMEOUT_MS (5000 ms,
+# P-PUB-DRAIN-TIMEOUT parent=0 agno=1 backlog=1) and the release went with claim
+# 2097309 in flight in its scope (P-PUB-CLAIM-INFLIGHT-AT-RELEASE
+# outcome=drain-timeout).  No probe of that build names the child the drain's
+# worker was on or what it waited in, so the cause is not established.  One drain
+# timeout in the 18 final-queue noino laps of that build, and it was a 3-node lap.
+#
+# Build: main tree ~/src/mxfs srcversion F09C3FED2DB371E0D9A8BC5 (0.90.131: the
+# fw3 build's source plus D-INACT's H-3 (reap_transient_keep, default 1),
+# D-PEER-OPEN's H-U6 census and H-U7 (reload_next_refresh, default 1), and the
+# drain instrument: each drain worker records the child, step (1 settle, 2 demote,
+# 3 cluster claim, 4 evicted settle, 5 claim), start and pid of what it publishes,
+# and a timed-out drain logs P-PUB-DRAIN-STUCK per unfinished worker with its
+# stack (capped 20); P-PUB-CLAIM-INFLIGHT-AT-RELEASE prints inscope=, oldest= and
+# oldest_age_us=).  No behaviour change from the instrument.  Harness:
+# tests/noino_gen0_ab.sh now marks, holds, sets and grades every node of the
+# group, the third node's whole kernel log included (fw3 kept only A and B).
+#
+# Settings: fw3f2's line unchanged except the group: g3 (test1 test2 test3), since
+# g3b's test15/test16 carry the D-INACT H-3 A/B.  Laps run until a drain times out.
+#
+# MEASURES, per lap: P-PUB-DRAIN-TIMEOUT and P-PUB-DRAIN-STUCK lines after the
+# lap's mark on every node (<node>_dmesg_stream.gz), the harness's RESULT
+# (pc_inflight_rel, pc_rel_waited, audit, node_failures, if_*).
+#
+# RULES (written before the first lap):
+#   REACH: a P-PUB-DRAIN-TIMEOUT after the lap's mark on any node.  A lap without
+#     one judges nothing about the timeout.
+#   For each timeout: its P-PUB-DRAIN-STUCK lines name the child, step and stack
+#     of each unfinished worker; the hypothesis for the 5 s wait is written from
+#     them and the other nodes' lines for that child, before any change.
+#   A STUCK line absent at a timeout whose backlog > 0 is an instrument gap and is
+#     settled before anything is concluded.
+#   Every lap is still graded by the harness: a CORRUPT audit or a node failure
+#     line is this record's (or another's) finding and is attributed first.
+#   An ABORT has no verdict and is rerun.
+#
+# Bound: fw3's, 1680 s per lap.
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fds1 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fds2 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fds3 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=20 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fds4 1 300 3/net/mesh/direct g3

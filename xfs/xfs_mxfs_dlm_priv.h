@@ -619,6 +619,18 @@ struct mxfs_acqfallible {
 	bool			gave_up;
 	int			rc;	/* 0.84.5: the errno the give-up names (-EIO
 				 * unless the arm that took it said otherwise) */
+	/*
+	 * 0.90.131: DLM ends this task owes to no begin, per mode ([1] EX,
+	 * [0] PR).  Each give-up of the named inode's acquire is one begin that
+	 * returned with no holder counted, so the unlock of the components it
+	 * took owes no end; mxfs_dlm_ilock_end consumes one instead of
+	 * decrementing a holder count some other begin made.  The helpers that
+	 * unlock a given-up member (the page fault, the multi-inode helpers,
+	 * open) cannot say so with XFS_ILOCK_MXFS_NOEND: a helper may drop and
+	 * re-take a member after its give-up, and the flag would then skip the
+	 * re-taken member's owed end.
+	 */
+	u16			unowed[2];
 };
 
 struct mxfs_f4_record {
@@ -694,12 +706,30 @@ struct mxfs_noino_bast_work {
 	 * release uses unlock_gen(rel_gen): -ESTALE = a newer local tenure
 	 * owns the resource, skip (the peer re-BASTs the new tenure). */
 	uint32_t		rel_gen;
+	u64			bast_ns;	/* when the BAST queued it */
+	bool			untracked;	/* counted in mxfs_noino_untracked_inflight */
+	uint8_t			req_mode;	/* the peer's request, for a re-drive */
 };
 struct mxfs_noino_inflight {
 	struct hlist_node	hnode;
 	struct xfs_mount	*mp;
 	uint64_t		ino;
+	/* where the release is, for an acquire waiting behind it
+	 * (mxfs_noino_wait_report) */
+	u64			add_ns;		/* registered */
+	u64			start_ns;	/* its work began; 0 = still queued */
+	int			phase;		/* MXFS_NOINO_PH_* */
+	int			fence_try;	/* drain fence attempt in progress */
+	s64			fence_target;	/* AIL max when that attempt began */
+	/* a recycle that cannot wait kept the corpse's grant: this release
+	 * must not unlock it (mxfs_noino_inflight_take) */
+	bool			taken;
 };
+#define MXFS_NOINO_PH_QUEUED	0
+#define MXFS_NOINO_PH_LAND	1
+#define MXFS_NOINO_PH_FENCE	2
+#define MXFS_NOINO_PH_LIVE	3
+#define MXFS_NOINO_PH_UNLOCK	4
 
 /*
  * — PROGRESS-BASED noino release fence.
@@ -770,6 +800,7 @@ struct mxfs_noino_lc_work {
 struct mxfs_incarn_revoke {
 	struct work_struct	work;
 	struct xfs_inode	*ip;	/* carries one inode reference */
+	uint32_t		gen;	/* the incarnation the poison condemned */
 };
 
 #define MXFS_PUB_DRAIN_WORKERS	16
@@ -780,6 +811,25 @@ struct mxfs_pub_drain_batch;
 /* inodes one drain pass has already deferred; see mxfs_dlm_publish_drain_loop */
 #define MXFS_PUB_SEEN_DEFER_MAX	128
 
+/* H-F12: an AG release's drain takes only what was listed when it began
+ * (xfs/xfs_mxfs_dlm.c) */
+extern int mxfs_pub_drain_bound;
+extern atomic_t mxfs_pub_drain_bound_left;
+/* what an AG unlock leaves unpublished (xfs/xfs_mxfs_dlm.c) */
+extern atomic_t mxfs_pub_unlock_exposed;
+extern atomic_t mxfs_pub_unlock_listed;
+/* H-F13: no inode allocation in, and no release COMMIT of, an AG while it
+ * would expose an unpublished inode (xfs/xfs_mxfs_dlm.c) */
+extern int mxfs_ag_ialloc_fence;
+extern atomic_t mxfs_ag_ialloc_fenced;
+extern atomic_t mxfs_ag_fence_held;
+extern atomic_t mxfs_ag_fence_escaped;
+extern int mxfs_ag_fence_hint_exempt;
+extern atomic_t mxfs_ag_fence_hint_passed;
+extern atomic_t mxfs_ag_fence_hint_refused;
+bool mxfs_pub_ag_exposed(struct xfs_mount *mp, xfs_agnumber_t agno);
+bool mxfs_ag_fence_holds_commit(struct xfs_perag *pag);
+
 struct mxfs_pub_drain_worker {
 	struct work_struct	work;
 	struct xfs_mount	*mp;
@@ -787,9 +837,18 @@ struct mxfs_pub_drain_worker {
 	xfs_agnumber_t		agno;
 	struct mxfs_pub_drain_batch *batch;
 	unsigned int		published;
+	/* the newest i_mxfs_unpub_seq this drain may take; U64_MAX = any */
+	u64			seq_limit;
 	/* the drain loop's scratch, here because the batch is heap-allocated
 	 * and the loop's own stack frame was over 1 KB with it */
 	xfs_ino_t		seen_defer[MXFS_PUB_SEEN_DEFER_MAX];
+	/* the child this worker is publishing and the step it is in, read by
+	 * the drain's timeout report (P-PUB-DRAIN-STUCK); cur_ino 0 = between
+	 * children or done */
+	xfs_ino_t		cur_ino;
+	int			cur_phase;
+	u64			cur_ns;
+	pid_t			cur_pid;
 };
 
 /*
@@ -1005,6 +1064,31 @@ struct mxfs_pubob {
 #define MXFS_PUBOB_INFLIGHT_NONE	0u
 #define MXFS_PUBOB_INFLIGHT_UNLINK	1u	/* nlink=0 conversion image */
 #define MXFS_PUBOB_INFLIGHT_FREE	2u	/* committed mode=0 image */
+
+/*
+ * Test aid (dbg_freepub_handoff_check, default 0): every free this node
+ * commits, kept past the end of its obligation, so the AG release can read
+ * each one's home dinode off the LUN as the grant leaves.  The obligation
+ * store says what this node believes it still owes; this measures what the
+ * acquirer will actually read, and when the two disagree it names how the
+ * obligation ended.  The ring lives on the mount, under m_mxfs_pubob_lock.
+ */
+#define MXFS_FRX_RING		1024
+#define MXFS_FRX_EMPTY		0
+#define MXFS_FRX_UNCHECKED	1
+#define MXFS_FRX_CHECKED	2
+struct mxfs_frx {
+	uint64_t		ino;
+	uint64_t		epoch;		/* AG EX tenure the free committed in */
+	uint64_t		commit_ns;
+	uint64_t		end_ns;		/* when the obligation ended */
+	const char		*end_why;	/* how it ended; NULL while open */
+	uint32_t		gen;		/* the freed incarnation's new gen */
+	xfs_agnumber_t		agno;
+	xfs_agino_t		agino;
+	uint8_t			state;		/* MXFS_FRX_* */
+};
+void mxfs_frx_handoff_check(struct xfs_perag *pag, const char *path);
 #define MXFS_AG_YIELD_DOUBLE_THRESH 4	/* v0.3.147 N consecutive
 					 * non-contended epochs before doubling
 					 * the effective quantum back up. */
@@ -1712,6 +1796,10 @@ extern atomic64_t mxfs_b_p34j_defer;
 extern atomic64_t mxfs_b_stamp_n;
 extern atomic_t mxfs_p71_underflows;
 extern atomic_t mxfs_noino_bast_reclaimable;
+extern atomic_t mxfs_noino_gen0_releases;
+extern atomic_t mxfs_noino_gen0_live;
+extern atomic_t mxfs_noino_gen0_refused;
+extern int mxfs_noino_gen0_guard;
 extern atomic_t mxfs_recycle_grant_cached;
 extern atomic_t mxfs_recycle_grant_phantom;
 extern atomic_t mxfs_demote_survivor;
@@ -1795,6 +1883,7 @@ void mxfs_dlm_authority_install(struct xfs_inode *ip, const struct mxfs_grant_re
 void mxfs_inact_cert_evict_check_locked(struct xfs_inode *ip, u32 line);
 void mxfs_dlmtr_rec(struct xfs_inode *ip, u8 om, u8 os, u32 line);
 void mxfs_dlmtr_dump(void);
+void mxfs_free_release_probe(struct xfs_inode *ip, const char *site);
 void mxfs_caw_orphan_forensic(struct xfs_inode *ip, int site);
 bool mxfs_drain_ilock_read(struct xfs_inode *ip);
 int mxfs_blkdev_flush_epoch(struct xfs_mount *mp);
@@ -1863,9 +1952,13 @@ void mxfs_acqfall_enter(struct mxfs_acqfallible *e, u64 ino);
 void mxfs_acqfall_exit(struct mxfs_acqfallible *e);
 bool mxfs_acqfall_armed_for(u64 ino);
 int mxfs_sb_summary_lock_fallible(struct xfs_mount *mp, uint64_t key, struct mxfs_grant_result *gres);
-void mxfs_acqfall_give_up_rc(u64 ino, int rc);
-void mxfs_acqfall_give_up(u64 ino);
+void mxfs_acqfall_give_up_rc(u64 ino, int rc, uint8_t mode);
+void mxfs_acqfall_give_up(u64 ino, uint8_t mode);
 bool mxfs_acqfall_taken(struct mxfs_acqfallible *e, int *rc);
+extern atomic_t mxfs_acqfall_unowed_total;
+extern int mxfs_acqfall_unowed_skip;
+extern atomic_t mxfs_acqfall_unowed_skip_n;
+bool mxfs_acqfall_consume_unowed(u64 ino, uint8_t mode);
 int mxfs_ilock_fallible(struct xfs_inode *ip, uint flags);
 int mxfs_readdir_refused(struct xfs_inode *dp, const char *stage, int rc);
 int mxfs_lookup_refused(struct xfs_inode *dp, const char *stage, int rc);
@@ -1893,9 +1986,50 @@ void mxfs_dlm_bast_work_fn( struct work_struct *work);
 void mxfs_dlm_bast_dwork_fn( struct work_struct *work);
 unsigned long mxfs_dlm_dir_tenure_keep_delay( struct xfs_inode *ip);
 void mxfs_dlm_sf_tenure_arm( struct xfs_inode *ip, unsigned long delay_j);
-bool mxfs_noino_inflight_try_add(struct xfs_mount *mp, uint64_t ino);
-void mxfs_noino_inflight_remove(struct xfs_mount *mp, uint64_t ino);
+bool mxfs_noino_inflight_try_add(struct xfs_mount *mp, uint64_t ino, bool *tracked);
+bool mxfs_noino_inflight_remove(struct xfs_mount *mp, uint64_t ino);
 bool mxfs_noino_inflight_contains(struct xfs_mount *mp, uint64_t ino);
+void mxfs_noino_inflight_note(struct xfs_mount *mp, uint64_t ino, int phase, int try, s64 target);
+bool mxfs_noino_inflight_take(struct xfs_mount *mp, uint64_t ino);
+bool mxfs_noino_inflight_is_taken(struct xfs_mount *mp, uint64_t ino);
+bool mxfs_noino_acq_try_takeover(struct xfs_inode *ip);
+bool mxfs_noino_inflight_begin_unlock(struct xfs_mount *mp, uint64_t ino);
+void mxfs_noino_taken_over(struct xfs_mount *mp, uint64_t ino, uint8_t req_mode, uint32_t rel_gen);
+extern int mxfs_noino_recycle_takeover;
+void mxfs_noino_wait_report(struct xfs_mount *mp, uint64_t ino, int rounds, u64 wait_start_ns);
+extern int mxfs_noino_recycle_guard;
+extern atomic_t mxfs_noino_untracked_inflight;
+bool mxfs_noino_release_may_be_inflight(struct xfs_mount *mp, uint64_t ino);
+/* the protective reload's FREE-fresh-image keep (xfs_mxfs_reload.c, P5F) */
+extern int mxfs_freshsrc_keep_guard;
+extern atomic_t mxfs_freshsrc_keep_clean;
+extern atomic_t mxfs_freshsrc_clean_refused;
+/* the protective reload's graft of committed next pointers (xfs_mxfs_reload.c, H-U3) */
+extern int mxfs_freshsrc_iunl_overlay;
+extern atomic_t mxfs_freshsrc_iunl_stale;
+extern atomic_t mxfs_freshsrc_iunl_overlaid;
+extern int mxfs_unlprev_tenure;
+extern atomic_t mxfs_unlprev_notenure;
+extern atomic_t mxfs_unlprev_waits;
+extern atomic_t mxfs_nextwr_stale;
+extern atomic_t mxfs_iunl_owed_release;
+extern atomic_t mxfs_kept_next_stale;
+/* a kept reload's import of di_next_unlinked (xfs_mxfs_reload.c, H-U7) */
+extern int mxfs_reload_next_refresh;
+extern atomic_t mxfs_reload_next_stale;
+extern atomic_t mxfs_reload_next_refreshed;
+/* the open-holder deferral's release drain (xfs_inode.c xfs_inactive, H-U5) */
+extern int mxfs_b6_release_drain;
+extern atomic_t mxfs_b6_release_dirty;
+extern atomic_t mxfs_b6_release_drained;
+extern atomic_t mxfs_b6_release_kept;
+/* TEST ONLY: the BAST work's trailing irele held until it is the last (xfs_mxfs_dlm.c, H-F6a) */
+extern int mxfs_dbg_bast_lastref_wait_ms;
+void mxfs_dbg_bast_lastref_wait(struct xfs_inode *ip);
+/* the reload's P116 self-clobber keep (xfs_mxfs_reload.c, H-F8b) */
+extern int mxfs_selfclobber_keep_guard;
+extern atomic_t mxfs_selfclobber_keep_clean;
+extern atomic_t mxfs_selfclobber_clean_refused;
 void mxfs_release_coalesced_flush( struct xfs_mount *mp);
 bool mxfs_noino_drain_fence( struct xfs_mount *mp, uint64_t ino, int landed);
 void mxfs_dlm_noino_bast_work_fn( struct work_struct *work);
@@ -1920,14 +2054,18 @@ int mxfs_ilock_redrive_stalegen(struct xfs_inode *ip, uint8_t mode,
 void mxfs_dlm_ilock_begin( struct xfs_inode *ip, uint8_t mode);
 void mxfs_dlm_ilock_end( struct xfs_inode *ip, uint8_t mode);
 bool mxfs_dlm_unpublish_drop( struct xfs_inode *ip);
+bool mxfs_dlm_unpublish_take(struct xfs_inode *ip);
+void mxfs_pubclaim_end(struct xfs_mount *mp, u64 seq);
+void mxfs_pubclaim_drop(struct xfs_inode *ip);
 void mxfs_dlm_creator_baseline_query( struct xfs_inode *ip, unsigned int site);
 void mxfs_dlm_publish_unpublished( struct xfs_mount *mp, xfs_ino_t parent_ino, xfs_agnumber_t agno);
+void mxfs_pub_unlock_exposure(struct xfs_mount *mp, xfs_agnumber_t agno, const char *site);
 void mxfs_reap_sched(struct xfs_mount *mp, unsigned int delay_ms, const char *why);
 void mxfs_defer_reap_add_mode(struct xfs_mount *mp, uint64_t ino, uint32_t gen, int16_t bucket, uint8_t kind);
 void mxfs_reap_worker(struct work_struct *work);
 void mxfs_freplay_retry_worker(struct work_struct *work);
 void mxfs_iunl_store_purge_ag(struct xfs_mount *mp, xfs_agnumber_t agno, const char *why);
-bool mxfs_pubob_drop_ino(struct xfs_mount *mp, uint64_t ino);
+bool mxfs_pubob_drop_ino(struct xfs_mount *mp, uint64_t ino, const char *why);
 struct mxfs_pubob *mxfs_pubob_find_locked(struct xfs_mount *mp, uint64_t ino);
 void mxfs_pubob_discharge(struct xfs_mount *mp, struct xfs_inode *ip, const char *why);
 void mxfs_ag_dlm_wait_demote( struct xfs_perag *pag);

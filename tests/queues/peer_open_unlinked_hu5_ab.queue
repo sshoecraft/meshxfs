@@ -1,0 +1,66 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, hypothesis
+# H-U5 (the record, session 55): xfs_inactive's open-holder deferral (B6, the
+# P87-OPEN-DEFER and P87-OPEN-DEFER-ERR exits) releases the inode's EX grant
+# raw while the unlink it follows is still pinned, logged or in the AIL.  When
+# this node takes the inode EX again before xfsaild flushed that state, the
+# state was logged under the previous tenure, P17B-EPOCH-GHOST-SKIP refuses its
+# flush on every push, P235 masks the slot, P187 re-arms the item, the AIL min
+# freezes, and the next no-inode release fence shuts the node down
+# (P-NOINO-RELFENCE-WEDGE).  The H-U4 tenure step (unlprev_tenure=1) re-takes
+# the predecessor's EX within a millisecond of its B6 release: hu4f1 and hu4f2
+# (tests/evidence/lapq_hu4ab.log, lapq_hu4ab2.log, build
+# E7205F34DF105614363FC7F) each shut test29 down this way after one iteration.
+# The fix, module parameter b6_release_drain (1 = on, 0 = the same-build
+# control): the B6 exit forces the log, settles the pin, drains the inode's
+# item (bounded, mxfs_ifree_drain_ms), waits for the buftarg and flushes the
+# device before it releases; a drain that cannot land the state keeps the grant
+# cached.  Both arms run freshsrc_iunl_overlay=1 and unlprev_tenure=1, so the
+# drain is the one variable.  Both arms count and print: P-B6-RELEASE-DIRTY (a
+# B6 release that found the inode's committed state not at home; drain=0 in
+# the control, drained=1 or kept=1 in the fix arm) and the module counters
+# b6_release_dirty, b6_release_drained, b6_release_kept, zeroed after the prep
+# and read after the settle.  The harness counts, per node, P17B-EPOCH-GHOST-SKIP
+# lines and ghost_b6: those whose inode a P-B6-RELEASE-DIRTY line with
+# drained=0 named earlier.  Run from ~/src/mxfs on the tree build that carries
+# the change; the harness refuses a node running anything else and reads each
+# knob back.
+#
+# VERDICT RULES (written before the first lap):
+#   SUPPORTED AND FIXED  at least 2 of the 3 control laps REPRODUCED, each with
+#             ghost_b6 > 0 and b6_release_dirty > 0; and all 3 fix laps PASS
+#             (no 'xfs_ifree returned error' and no node failure line in either
+#             node's kernel log through the post-audit capture, the workload
+#             complete, cold audit CLEAN errors=0), with ghost_b6 0 and no
+#             P-IUNL-LAND-FAIL in each, and b6_release_drained > 0 over the fix
+#             laps (the drain ran and landed).
+#   NOT SUPPORTED  a control lap that reproduces with ghost_b6 0: another
+#             mechanism, attributed before anything else.
+#   NOT FIXED  a fix lap that REPRODUCES, or counts ghost_b6 > 0 or a
+#             P-IUNL-LAND-FAIL line: attributed from its kept logs and image.
+#             A fix lap with b6_release_kept > 0 is read line by line: a kept
+#             grant is the designed fallback, not a failure, unless that inode
+#             then logs P17B-EPOCH-GHOST-SKIP.
+#   WEAK      fewer than 2 control laps reproduce: more laps, not a verdict.
+#   VACUOUS   b6_release_dirty 0 over all three fix laps: the deferral never
+#             met dirty state there, so the fix arm measured nothing.
+# A lap that ABORTs, or audits STALE/NONE without a reproduction, has no verdict
+# and is rerun.  A reproduction's cold audit (after the remount replays both
+# journals) is recorded either way: CORRUPT there makes the record an integrity
+# defect.  Nothing here disposes of H-U4, H-U1 (NOPREV) or H-U2 (BACKREF): a
+# NOPREV, BACKREF, P-UNLPREV-NOTENURE or P-NEXTWR-STALE line in any lap is
+# attributed and recorded.
+#
+# Bound per lap (tests/peer_open_unlinked_chain.sh's derivation): prep 300 +
+# srcversion 2x20 + the instr knob 2x20 + three PUC_KNOBS knobs 2x3x20 + the
+# counter reset 2x20 + the mount's device 2x20 + mkdir 30 + workload
+# 30 x (3 + 5 + ceil(3 x 0.3) + 2) + 60 = 390, +10 for the peer + the done file
+# on both nodes 2x20 + instr reset 2x20 + the settle 7 + the counters 2x20 +
+# stream copy 2x120 + on a failure: unmount 2x(70 + 20) + snapshot 60 + image
+# check 10 + remount 2x(110 + 20), + the cold audit 150 + the post-audit stream
+# copy 2x120 = 2277 s.
+2277 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1 b6_release_drain=0" tests/peer_open_unlinked_chain.sh hu5c1 30 2/net/mesh/direct g2c
+2277 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1 b6_release_drain=1" tests/peer_open_unlinked_chain.sh hu5f1 30 2/net/mesh/direct g2c
+2277 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1 b6_release_drain=0" tests/peer_open_unlinked_chain.sh hu5c2 30 2/net/mesh/direct g2c
+2277 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1 b6_release_drain=1" tests/peer_open_unlinked_chain.sh hu5f2 30 2/net/mesh/direct g2c
+2277 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1 b6_release_drain=0" tests/peer_open_unlinked_chain.sh hu5c3 30 2/net/mesh/direct g2c
+2277 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1 b6_release_drain=1" tests/peer_open_unlinked_chain.sh hu5f3 30 2/net/mesh/direct g2c

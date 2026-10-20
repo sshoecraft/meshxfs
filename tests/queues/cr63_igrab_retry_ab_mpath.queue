@@ -1,0 +1,50 @@
+# H-CG1 A/B for D-CREATE-REUSE-OVER-MID-TEARDOWN-SHELL-IGRAB-FAIL-DIRTY-CANCEL-
+# SHUTDOWN on 2/disk/caw/mpath g2d (test31 test32).  Same build for both arms:
+# ~/src/mxfs-c srcversion 03857C0C22451BFB43D2B3F, the main tree's sources
+# (every fix at its default) with H-CG1 and H-UB1: when a create's P-CR63
+# igrab of a non-reclaimable cached copy fails because the VFS inode is being
+# torn down, module knob cr63_igrab_retry=1 takes out_skip (-EAGAIN) so
+# xfs_iget looks again once the teardown is done, as upstream's cache-hit path
+# does for every igrab failure; 0 falls through to xfs_iget_check_free_state
+# as before (rsd11's shutdown).  Run from ~/src/mxfs-c.  Every other setting is
+# exactly tests/queues/ifree_defer_extend_ab_mpath.queue's without its H-IFD1
+# knobs (production settings: both test delays off, ifree_defer_extend at its
+# default 1).  NG0_CR63_IGRAB_RETRY alternates 0 (control) and 1 (fix), and
+# NG0_EVICT_STALE_DELAY_MS=200 sets the test knob dbg_evict_stale_delay_ms for
+# the workload in both arms: a stale linked regular file's eviction is held
+# 200 ms after clear_inode (I_FREEING set), one at a time and at most one start
+# a second, so a create that takes that number meets the teardown at its igrab.
+# Without the hold the arm is rare: the sweep of kept laps found rsd11 alone.
+#
+# READING RULES (written before the first lap):
+#   GRESULT grades each lap (tests/noino_gen0_ab.sh, THE H-CG1 FIX).  A lap
+#   whose cr63_igrab_fail is 0 on every node is GVACUOUS and counts for
+#   neither arm.
+#   THE CONTROL SHOWS THE CAUSE when a control lap is GCONTROL-SHOWS-CAUSE: a
+#   retry=0 P-CR63-IGRAB-FAIL whose number the free-state check ('Free inode
+#   0x... not marked free') or a create's P-CR3-CANCEL then names on the same
+#   node.  The node then shutting down from xfs_trans_cancel of the dirty
+#   create transaction is rsd11's chain whole.
+#   THE FIX IS VERIFIED (for this window) when at least three fix laps are
+#   GPASS: cr63_igrab_fail > 0 with every failed igrab retried, no
+#   P-CR3-CANCEL, every P-IGET-CREATE-RETRIED rc=0, the longest retried lookup
+#   of a number a retry=1 line named (igrab_retry_max_ms) within the hold plus
+#   one second, no node failure, cold audit CLEAN.  That longest wait is a cost
+#   this record must also state: the create holds its AG's AGI through it.
+#   H-CG1 IS REFUTED by a fix lap that shuts down through P-CR3-CANCEL on a
+#   number a retry=1 line named, or whose retried create outlasts the hold by
+#   more than a second, or does not end (rc != 0, 'blocked for more than', a
+#   lap overrunning its bound).  Any other node failure, CORRUPT shape, stall
+#   or ABORT is attributed from its own lines to its own record.  Production
+#   laps with the hold off follow on the final build before the record is
+#   closed.
+#
+# Bound: the freed_nodelay laps' 1680 s per lap (they ran 404-597 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_CR63_IGRAB_RETRY=0 NG0_EVICT_STALE_DELAY_MS=200 tests/noino_gen0_ab.sh cgm1 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_CR63_IGRAB_RETRY=1 NG0_EVICT_STALE_DELAY_MS=200 tests/noino_gen0_ab.sh cgm2 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_CR63_IGRAB_RETRY=0 NG0_EVICT_STALE_DELAY_MS=200 tests/noino_gen0_ab.sh cgm3 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_CR63_IGRAB_RETRY=1 NG0_EVICT_STALE_DELAY_MS=200 tests/noino_gen0_ab.sh cgm4 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_CR63_IGRAB_RETRY=1 NG0_EVICT_STALE_DELAY_MS=200 tests/noino_gen0_ab.sh cgm5 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_CR63_IGRAB_RETRY=0 NG0_EVICT_STALE_DELAY_MS=200 tests/noino_gen0_ab.sh cgm6 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_CR63_IGRAB_RETRY=1 NG0_EVICT_STALE_DELAY_MS=200 tests/noino_gen0_ab.sh cgm7 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_CR63_IGRAB_RETRY=0 NG0_EVICT_STALE_DELAY_MS=200 tests/noino_gen0_ab.sh cgm8 1 300 2/disk/caw/mpath g2d

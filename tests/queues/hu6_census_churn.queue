@@ -1,0 +1,36 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, H-U6: does
+# the freed-inode churn reach H-U6's precondition?  A MEASUREMENT, no verdict
+# on H-U6 by itself.  Run from ~/src/mxfs-e, build 1FF993ECCF04A634CC75DD8 (the
+# main tree's source plus H-U6's census, every knob at its default: the hold
+# knob dbg_unlprev_rele_hold_ms is 0, so the build behaves as the main tree's).
+#
+# Why this workload.  The census lap u6hf1 (tests/queues/peer_open_unlinked_hu6_census.queue)
+# took 56 predecessor holds on the owner and none ended as the predecessor's
+# last reference: in tests/clmerge_window_node.sh the owner always frees z<i>
+# while the peer still holds y<i> open, and mxfs_dlm_ilock_end hands a held
+# inode with a peer request pending to the BAST workqueue with a reference of
+# its own (xfs/xfs_mxfs_ilock.c:5595-5657), so the free's release is never the
+# last.  hu4df1's outer free ran from mxfs_reap_worker, retrying a deferred
+# free whose predecessor nobody else wanted.  The final laps' churn
+# (tests/noino_gen0_ab.sh, production settings) deferred 111 frees at the
+# unlinked-list preflight in fwcm3 and retried them from the reaper while
+# creates went on: that is hu4df1's context.
+#
+# READ AFTER THE LAP (from each node's <node>_dmesg_stream.gz after the mark):
+# the P-UNLPREV-RELE-LAST lines (each a committed free's last reference on an
+# unlinked predecessor; defer=1 here, so each was handed to the workqueue),
+# split by comm (kworker or not).  Any such line makes this churn the H-U6 A/B
+# workload: then a control lap with MXFS_EXTRA_MODARGS='unlprev_rele_defer=0
+# dbg_unlprev_rele_hold_ms=2000' and a fix lap with
+# MXFS_EXTRA_MODARGS='dbg_unlprev_rele_hold_ms=2000', rules written before
+# them.  None means this churn does not reach it either.
+#
+# The lap is also a production-settings sample of
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY's grading on
+# 2/disk/caw/mpath (fwcm3, the same settings on g2b, left 6 deferred zombies):
+# its if_* fields and tools/ifree_defer_attribution.py output are recorded
+# beside the census, judged by tests/queues/freed_inode_final_caw.queue's
+# production-lap condition (if_ok=1, if_zombies=0).
+#
+# Bound: the final queue's noino-lap 1680 s.
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh u6cm1 1 300 2/disk/caw/mpath g2c

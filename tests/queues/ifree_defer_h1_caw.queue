@@ -1,0 +1,11 @@
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY, H-1 A/B on
+# 2/disk/caw/direct g2b, run from ~/src/mxfs-c: ifree_defer_drain 1 (fix) vs 0
+# (control), ifree_defer_reap 0 in both arms (a reaper retry over a stale core
+# would free its old blocks a second time), every other knob as the fzc
+# final-verification laps.  Arms alternate so a drift in the rig cannot fall on
+# one arm only.  Fix arm passes with reach > 0, no fork-ownership error and no
+# unlanded drain; the control arm is expected to audit CORRUPT.
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_REAP=0 NG0_IFREE_DRAIN=1 tests/noino_gen0_ab.sh idcf1 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_REAP=0 NG0_IFREE_DRAIN=0 tests/noino_gen0_ab.sh idcc1 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_REAP=0 NG0_IFREE_DRAIN=1 tests/noino_gen0_ab.sh idcf2 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_REAP=0 NG0_IFREE_DRAIN=0 tests/noino_gen0_ab.sh idcc2 1 300 2/disk/caw/direct g2b

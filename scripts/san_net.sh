@@ -198,7 +198,11 @@ cmd_link() {
     local n=${1:?node} k=${2:?a|b} st=${3:?up|down}
     case "$k" in a|b) ;; *) die "network is a or b" ;; esac
     case "$st" in up|down) ;; *) die "state is up or down" ;; esac
-    $V domif-setlink "$n" "$(mac_of "$n" "$k")" "$st" >/dev/null || die "cannot set $n's NIC on $k $st"
+    # a cut path can hold a command at the target, so it is never cut while
+    # the target is being reconfigured (tools/lun_pool.sh, scst_quiet_begin)
+    local gate=()
+    [ "$st" = down ] && gate=("$HERE/tools/lun_pool.sh" fault)
+    "${gate[@]}" $V domif-setlink "$n" "$(mac_of "$n" "$k")" "$st" >/dev/null || die "cannot set $n's NIC on $k $st"
     echo "san_net: $n $k $st $(date -u +%FT%T.%3NZ)"
 }
 
@@ -208,7 +212,7 @@ cmd_mute() {
     tap=$($V domiflist "$n" 2>/dev/null | awk -v m="$(mac_of "$n" "$k")" 'tolower($5) == m {print $1}')
     [ -n "$tap" ] || die "no live NIC of $n on network $k"
     case "$st" in
-        on)  sudo -n tc qdisc replace dev "$tap" root netem loss 100% || die "cannot mute $tap" ;;
+        on)  "$HERE/tools/lun_pool.sh" fault sudo -n tc qdisc replace dev "$tap" root netem loss 100% || die "cannot mute $tap" ;;
         off) sudo -n tc qdisc del dev "$tap" root 2>/dev/null; sudo -n tc qdisc show dev "$tap" | grep -q netem && die "$tap is still muted" ;;
         *) die "state is on or off" ;;
     esac

@@ -1,0 +1,27 @@
+# tests/d0977_open_unlink_tcp.sh on the release candidate, ~/src/mxfs-e
+# E9B83D5632B58D3C14FDF5A (the main tree's module sources: the
+# D-STALE-NAME-SETATTR poison, the allocator's held-copy skip, the whole-page
+# ledger swap), 2/net/mesh/mpath on g2e (A test17, B test18).  Run from
+# ~/src/mxfs-e.
+#
+# Two things are read.  (1) The harness's arm A last-close check, corrected
+# after s102d2: it now asks A's ring whether the reaper freed the zombie after
+# B's last close (P89-REAP-DONE, printed only once the ifree transaction
+# committed for an inode on the reap list) within the same 70 s, and that no
+# such line came before the last close; a create taking the number again is
+# printed and not graded.  (2) The open face and the containment arms on the
+# build being released: arm D's fresh open on a reused number reads the new
+# file's bytes with no ESTALE leaking, arm C's held descriptors are refused
+# and never serve the successor's bytes.
+#
+# READING RULES (written before the first lap): a lap PASSES when every check
+# passes (arms A, B, C, D and the kernel-evidence checks, zero splats).  Any
+# failed check is attributed from its own lines before anything else.  An
+# ABORT at stage=capture is a lock wait read from B's ring (in s102d1 B's
+# first open waited 4.15 s for the root directory, held exclusive by A's mkdir
+# for 6.7 s) and is recorded on the directory-handoff performance record it
+# matches; it is not a pass and the lap is rerun.
+#
+# Bound: run.sh's prep_cluster row (300 s) plus the harness's own 340 s.
+640 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/mpath --group g2e prep_cluster && tests/d0977_open_unlink_tcp.sh d77r1 test17 test18
+640 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/mpath --group g2e prep_cluster && tests/d0977_open_unlink_tcp.sh d77r2 test17 test18

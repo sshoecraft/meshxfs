@@ -924,9 +924,29 @@ static int peer_connect_impl(struct mxfs_peer_ctx *ctx,
 	/* Read NODE_JOIN reply */
 	ret = mxfs_pal_tcp_recv(sock, &reply, sizeof(reply));
 	if (ret < 0) {
-		mxfs_pal_log(MXFS_LOG_ERR,
-			     "peer: handshake reply from node %u failed: %d",
-			     node_id, ret);
+		/*
+		 * A reset here is the peer's host refusing the connection, not a
+		 * failure of this join.  The host routes every connection on its
+		 * shared port to the mount whose volume the NODE_JOIN names, and
+		 * one for a volume none of its mounts listens for (yet) is closed
+		 * with the NODE_JOIN still unread, which resets it ('a connection
+		 * for no filesystem mounted here; closed', debug level there).
+		 * Two hosts starting their mounts of a volume at once meet that
+		 * whenever the first connect beats the peer's listener (physical
+		 * DRBD pair, 0.90.116: this read failed -104 and the join was
+		 * installed 0.1 ms later).  The next discovery retries it, as for
+		 * any connection that does not complete.
+		 */
+		if (ret == -ECONNRESET)
+			mxfs_pal_log(MXFS_LOG_INFO,
+				     "peer: node %u reset the handshake: its host has "
+				     "no mount of this volume listening yet (or the "
+				     "connection was lost); retrying on the next "
+				     "discovery", node_id);
+		else
+			mxfs_pal_log(MXFS_LOG_ERR,
+				     "peer: handshake reply from node %u failed: %d",
+				     node_id, ret);
 		mxfs_pal_tcp_close(sock);
 		mxfs_pal_mutex_lock(peer->send_lock);
 		peer->state = MXFS_CONN_DISCONNECTED;

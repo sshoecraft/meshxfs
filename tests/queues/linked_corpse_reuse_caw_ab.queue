@@ -1,0 +1,15 @@
+# D-CREATE-REUSE-OVER-PEER-FREED-LINKED-CORPSE-SHUTS-NODE-DOWN, H-L1, on the
+# disk-locking transport, where the record was first observed (lap iwc1).
+# The hypothesis, build (main tree, srcversion 90C41489237AC8D0BA136E8), knob
+# (cr63_linked_defer, 0 control / 1 fix), measures and VERDICT RULES are those
+# of tests/queues/linked_corpse_reuse_ab.queue, written before the first lap of
+# either queue; only the configuration (2/disk/caw/direct g2b, test15 test16)
+# and the labels differ.  The two queues are judged separately, each by those
+# rules, and the record needs both before any disposition.
+#
+# Bound: tests/linked_corpse_reuse_ab.sh header, 1160 s at 40 rounds.
+1160 tests/linked_corpse_reuse_ab.sh lwc1 0 40 2/disk/caw/direct g2b
+1160 tests/linked_corpse_reuse_ab.sh lwf1 1 40 2/disk/caw/direct g2b
+1160 tests/linked_corpse_reuse_ab.sh lwc2 0 40 2/disk/caw/direct g2b
+1160 tests/linked_corpse_reuse_ab.sh lwf2 1 40 2/disk/caw/direct g2b
+1160 tests/linked_corpse_reuse_ab.sh lwf3 1 40 2/disk/caw/direct g2b

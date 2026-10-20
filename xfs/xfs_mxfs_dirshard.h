@@ -71,6 +71,12 @@ struct mxfs_dirshard_cache {
 	bool				valid;
 };
 void mxfs_dirshard_cache_drop(struct xfs_inode *dp);
+/* measurement at a parent's lock release: is its manifest block durable? */
+void mxfs_dirshard_release_note(struct xfs_inode *dp);
+/* is this cached buffer the manifest block of sharded parent `ino`? (the
+ * release fence's owner scan lands it with the parent's own blocks) */
+bool mxfs_dirshard_buf_of_parent(struct xfs_buf *bp, xfs_ino_t ino);
+extern int mxfs_dirshard_release_land;	/* test-only control: 0 = old fence */
 
 /*
  * Logical emptiness of a sharded parent for rmdir.  Caller holds the parent

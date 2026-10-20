@@ -1,0 +1,10 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, H-U4 A/B:
+# laps 4-6 of tests/queues/peer_open_unlinked_hu4_ab.queue, unchanged.  The
+# first run of that queue (label hu4ab, tests/evidence/lapq_hu4ab.log) was
+# killed at a session relay during lap 4's prep (hu4f2, 02:06:28Z), so laps 4-6
+# have no RESULT.  Same commands, same bounds, same tree build
+# E7205F34DF105614363FC7F; all six laps are judged together by the verdict
+# rules written in the original queue file before its first lap.
+2237 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1" tests/peer_open_unlinked_chain.sh hu4f2 30 2/net/mesh/direct g2c
+2237 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=0" tests/peer_open_unlinked_chain.sh hu4c3 30 2/net/mesh/direct g2c
+2237 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1" tests/peer_open_unlinked_chain.sh hu4f3 30 2/net/mesh/direct g2c

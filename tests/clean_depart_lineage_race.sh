@@ -155,7 +155,7 @@ else
     # ---- SUSPEND choreography (race 6 corroboration) -----------------------
     echo "--- T0=$T0; suspending $A"
     SUSP_T0=$SECONDS
-    $VIRSH suspend "$A" >/dev/null || { echo "FAIL: virsh suspend $A"; exit 1; }
+    "$REPO/tools/lun_pool.sh" fault $VIRSH suspend "$A" >/dev/null || { echo "FAIL: virsh suspend $A"; exit 1; }
 
     "$SSH" "$B" "timeout 60 umount $MNT" >/dev/null 2>&1 \
         || { echo "FAIL: umount on $B"; $VIRSH resume "$A" >/dev/null; exit 1; }

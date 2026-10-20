@@ -1,0 +1,43 @@
+# D-CREATE-REUSE-OVER-PEER-FREED-LINKED-CORPSE-SHUTS-NODE-DOWN, H-L1, on the
+# live-feed workload that reproduced it in 6 of the 8 H-F13 laps (izg, iwg).
+#
+# HYPOTHESIS H-L1 (on the record before any patch): the shutdown is caused only
+# by a create's linked reclaimable copy of its number reaching
+# xfs_iget_check_free_state; deferring it to the recycle path's platter re-read
+# (FREE: P-RECYCLE-SANITIZE, the create proceeds; LIVE: P-CR63-DEFER-DISKLIVE
+# fails it as before) removes the shutdown.
+#
+# Same-build A/B, one knob between the arms: cr63_linked_defer, set and read
+# back on every node by NG0_CR63_DEFER (0 control, 1 fix).  Build
+# ~/src/mxfs-b, srcversion A97F45838280C5F3B4C352C (the H-F13 build with the
+# H-L1 change added; printed by each lap, whose harness refuses a node running
+# anything else).  Every other setting is the H-F13 queues' with the H-F13
+# fence held at 0 in both arms (the control laps iwc1, iwc2, izc2 shut down
+# through this path with it at 0): NG0_IALLOC_FENCE=0 NG0_DRAIN_BOUND=0, the
+# live peer feed NG0_PEER_UNLINK=300, claim delay 200 ms, create parent delay
+# 5 ms, every guard 1.  Control and fix alternate, control first, one more fix
+# lap at the end; 3/net/mesh/direct g3 (test1 test2 test3).
+#
+# MEASURES, per lap (the CRESULT line, tests/noino_gen0_ab.sh header):
+# cr_deferred, cr_refused, cr_fall, cr_cancel, cr_disklive, audit,
+# node_failures; the RESULT line is H-F13's and judges nothing here.
+#
+# VERDICT RULES (written before the first lap):
+#   CVACUOUS judges nothing.  A lap that never prints CRESULT has no verdict
+#   and is rerun.
+#   CONTROL: CCONTROL-SHOWS-CAUSE confirms the mechanism; CCONTROL-NO-SHUTDOWN
+#     (a fall-through the node survived) refutes it and ends the judgement.
+#   FIX: CPASS as graded.  A CFAIL is attributed before it judges H-L1: a node
+#     failure or audit error that is not this record's signature (a P-CR63-*
+#     line for the number, then P-CR3-CANCEL) is another defect's evidence,
+#     recorded on that defect, and the lap is rerun; one that is, or any
+#     cr_refused > 0 or cr_fall > 0, REFUTES H-L1.
+#   SUPPORTED AND FIXED HERE: at least one CCONTROL-SHOWS-CAUSE and at least
+#     two CPASS, with no fix lap refuting.
+#
+# Bound: fw3's, 1680 s per lap (the H-F13 laps on this workload took 390-490 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=0 NG0_IALLOC_FENCE=0 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh crzc1 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=0 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh crzf1 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=0 NG0_IALLOC_FENCE=0 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh crzc2 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=0 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh crzf2 1 300 3/net/mesh/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=0 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh crzf3 1 300 3/net/mesh/direct g3

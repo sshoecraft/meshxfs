@@ -622,6 +622,17 @@ xfs_free_eofblocks(
 	}
 
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	/*
+	 * MXFS: a dead incarnation's post-EOF extents are no longer its own;
+	 * the node that freed the number freed them.  Nothing to trim, and
+	 * nothing for the background scan to come back for.
+	 */
+	if (mxfs_incarn_refused_locked(ip, "free_eofblocks")) {
+		xfs_trans_cancel(tp);
+		xfs_inode_clear_eofblocks_tag(ip);
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		return -ESTALE;
+	}
 	xfs_trans_ijoin(tp, ip, 0);
 
 	/*

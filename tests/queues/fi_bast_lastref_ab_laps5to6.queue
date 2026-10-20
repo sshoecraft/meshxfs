@@ -1,0 +1,9 @@
+# Laps 5 and 6 of tests/queues/fi_bast_lastref_ab.queue (H-F6a), whose
+# hypothesis, verdict rules and per-lap bound are in that file and are judged
+# over all six laps together.  Laps 1-4 (lrc1, lrf1, lrc2, lrf2) finished with
+# RESULT lines in tests/evidence/lapq_lrab.log (~/src/mxfs-b); the queue was
+# killed with the session that launched it 14 s into lap 5.  Same harness, same
+# build (B4F93E2AFF5821385980439), same group: run with ~/src/mxfs-b's
+# tests/lap_queue.sh, which runs each lap from ~/src/mxfs-b.
+1170 PLC_LASTREF_WAIT_MS=3000 tests/peer_last_closer_ab.sh lrc3 0 40 2/net/mesh/mpath g2
+1170 PLC_LASTREF_WAIT_MS=3000 tests/peer_last_closer_ab.sh lrf3 1 40 2/net/mesh/mpath g2

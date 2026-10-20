@@ -452,6 +452,147 @@ int mxfs_iunl_store_overlay(struct xfs_mount *mp, xfs_daddr_t daddr,
 EXPORT_SYMBOL(mxfs_iunl_store_overlay);
 
 /*
+ * Whether the committed, not yet retired di_next_unlinked this node recorded
+ * for one inode differs from the platter image at base/len, matched as the
+ * overlay matches (the record's cluster range and offset, a dinode magic, the
+ * same incarnation).  Reads only.  Returns 1, with the image's value and the
+ * record's, when they differ.
+ */
+int mxfs_iunl_store_stale(struct xfs_mount *mp, uint64_t ino,
+			  xfs_daddr_t daddr, int bblen, const void *base,
+			  unsigned int len, uint32_t *imgp, uint32_t *committedp)
+{
+	struct mxfs_iunl_rec *r;
+	int stale = 0;
+
+	if (!mp->m_mxfs_iunl_count)
+		return 0;
+	spin_lock(&mp->m_mxfs_iunl_lock);
+	list_for_each_entry(r, &mp->m_mxfs_iunl_list, l) {
+		const struct xfs_dinode *dip;
+
+		if (r->ino != ino)
+			continue;
+		if (r->daddr < daddr || r->daddr >= daddr + bblen ||
+		    r->boffset + sizeof(struct xfs_dinode) > len)
+			break;
+		dip = (const struct xfs_dinode *)((const char *)base + r->boffset);
+		if (be16_to_cpu(dip->di_magic) != MXFS_DINODE_MAGIC ||
+		    be32_to_cpu(dip->di_gen) != r->gen)
+			break;
+		if (be32_to_cpu(dip->di_next_unlinked) != r->next_agino) {
+			*imgp = be32_to_cpu(dip->di_next_unlinked);
+			*committedp = r->next_agino;
+			stale = 1;
+		}
+		break;
+	}
+	spin_unlock(&mp->m_mxfs_iunl_lock);
+	return stale;
+}
+EXPORT_SYMBOL(mxfs_iunl_store_stale);
+
+/*
+ * Whether this node holds a record for this incarnation of @ino at all, homed
+ * or not: a next pointer it committed itself, which is why its buffer may
+ * legitimately differ from the platter.
+ */
+bool mxfs_iunl_store_live(struct xfs_mount *mp, uint64_t ino, uint32_t gen)
+{
+	struct mxfs_iunl_rec *r;
+	bool live = false;
+
+	if (!mp->m_mxfs_iunl_count)
+		return false;
+	spin_lock(&mp->m_mxfs_iunl_lock);
+	list_for_each_entry(r, &mp->m_mxfs_iunl_list, l) {
+		if (r->ino == ino) {
+			live = r->gen == gen;
+			break;
+		}
+	}
+	spin_unlock(&mp->m_mxfs_iunl_lock);
+	return live;
+}
+EXPORT_SYMBOL(mxfs_iunl_store_live);
+
+/* a live record of @ip's incarnation that no completed write has carried */
+static bool mxfs_iunl_store_owed(struct xfs_mount *mp, struct xfs_inode *ip,
+				 uint32_t *committedp)
+{
+	struct mxfs_iunl_rec *r;
+	bool owed = false;
+
+	if (!mp->m_mxfs_iunl_count)
+		return false;
+	spin_lock(&mp->m_mxfs_iunl_lock);
+	list_for_each_entry(r, &mp->m_mxfs_iunl_list, l) {
+		if (r->ino != ip->i_ino)
+			continue;
+		owed = r->gen == VFS_I(ip)->i_generation && !r->wr_epoch;
+		*committedp = r->next_agino;
+		break;
+	}
+	spin_unlock(&mp->m_mxfs_iunl_lock);
+	return owed;
+}
+
+/*
+ * D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, H-U4: an
+ * inode's lock is leaving this node while this node still owes the platter a
+ * next pointer it committed for the inode's slot -- the predecessor edit of a
+ * mid-list unlinked remove.  That edit travels home as a buffer-logged range
+ * of the cluster buffer (xfs_iunlink_log_dinode), so neither the inode's own
+ * log item nor a regular file's clean-release early-out knows about it, and
+ * the peer that takes the lock next reads the slot from the platter and
+ * publishes it from that copy.  With @land set: force the log (the range's
+ * commit must be in the journal before its buffer goes home), write the
+ * cluster synchronously -- its write path overlays the store's committed
+ * values -- and advance the flush epoch; the write's completion stamps the
+ * record when the image carried the value.  Returns 1 when it wrote, 0 when
+ * nothing was owed or @land is clear (the control arm only reports), and a
+ * negative errno when the record is still unstamped after the writes.
+ */
+int mxfs_iunl_store_land(struct xfs_mount *mp, struct xfs_inode *ip,
+			 bool land, const char *site)
+{
+	uint32_t committed = NULLAGINO;
+	struct xfs_buf *bp;
+	int tries, error = 0;
+
+	/* a freed incarnation owes nothing here (xfs_ifree moved its
+	 * generation past every record) and its cluster may be freed too:
+	 * never write it from this path */
+	if (xfs_iflags_test(ip, MXFS_IF_FREE_COMMITTED) ||
+	    !mxfs_iunl_store_owed(mp, ip, &committed))
+		return 0;
+	atomic_inc(&mxfs_iunl_owed_release);
+	mxfs_probe("mxfs: P-IUNL-OWED-AT-RELEASE ino=%llu committed=0x%x dlm_mode=%u site=%s landed=%d comm=%s -- this node committed a next pointer of this slot that no write has carried home\n",
+		(unsigned long long)ip->i_ino, committed, ip->i_dlm_mode, site,
+		land ? 1 : 0, current->comm);
+	if (!land)
+		return 0;
+	for (tries = 1; tries <= 3; tries++) {
+		xfs_log_force(mp, XFS_LOG_SYNC);
+		error = xfs_imap_to_bp(mp, NULL, &ip->i_imap, &bp);
+		if (error)
+			break;
+		error = xfs_bwrite(bp);
+		xfs_buf_relse(bp);
+		if (error)
+			break;
+		mxfs_blkdev_flush_epoch(mp);
+		if (!mxfs_iunl_store_owed(mp, ip, &committed))
+			return 1;
+	}
+	pr_warn("mxfs: P-IUNL-LAND-FAIL ino=%llu committed=0x%x tries=%d rc=%d site=%s comm=%s -- the committed next pointer is still not carried home\n",
+		(unsigned long long)ip->i_ino, committed, tries, error, site,
+		current->comm);
+	return error ? error : -EIO;
+}
+EXPORT_SYMBOL(mxfs_iunl_store_land);
+
+/*
  * (D-0524) fault injection: widen the post-commit window of
  * xfs_inactive_ifree (between xfs_trans_commit and mxfs_pubob_free_commit)
  * so a cluster-buffer write completion reliably lands inside it.  0 = off.
@@ -461,6 +602,208 @@ module_param_named(freeob_commit_delay_ms, mxfs_freeob_commit_delay_ms, int, 064
 MODULE_PARM_DESC(freeob_commit_delay_ms,
 	"D-0524 fault injection: ms to sleep between the ifree commit and the FREE obligation commit (0=off)");
 EXPORT_SYMBOL(mxfs_freeob_commit_delay_ms);
+
+/*
+ * Test aid for D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT:
+ * a cold audit after a clean two-node unmount found an inode the inobt calls
+ * free whose home dinode is still the live image of the incarnation that was
+ * freed.  FREE-PUBLISH is enforced at the AG handoff, and the kernel logs of
+ * the lap that showed it are blind there: the obligation probes had used up
+ * their print budgets long before.  With this on, every free this node commits
+ * is remembered past its obligation, and every AG release reads the home of
+ * each of them straight off the LUN as the grant leaves (the read the next
+ * acquirer makes), reporting a live image as P-FREEPUB-HANDOFF-LIVE with how
+ * the obligation ended and the in-core state behind it.  One 512-byte read per
+ * free at the release of its AG: test laps only, never a campaign.
+ */
+int mxfs_dbg_freepub_handoff_check;
+module_param_named(dbg_freepub_handoff_check, mxfs_dbg_freepub_handoff_check, int, 0644);
+MODULE_PARM_DESC(dbg_freepub_handoff_check,
+	"TEST ONLY: read every committed free's home off the LUN at its AG release and report a live image (0=off)");
+static atomic64_t mxfs_frx_checked = ATOMIC64_INIT(0);
+static atomic64_t mxfs_frx_ok = ATOMIC64_INIT(0);
+static atomic64_t mxfs_frx_live = ATOMIC64_INIT(0);
+static atomic64_t mxfs_frx_late = ATOMIC64_INIT(0);
+static atomic64_t mxfs_frx_realloc = ATOMIC64_INIT(0);
+static atomic64_t mxfs_frx_unread = ATOMIC64_INIT(0);
+static atomic64_t mxfs_frx_overrun = ATOMIC64_INIT(0);
+static atomic64_t mxfs_frx_ctxskip = ATOMIC64_INIT(0);
+
+/* a free committed: remember it (caller holds m_mxfs_pubob_lock) */
+static void mxfs_frx_commit_locked(struct xfs_mount *mp, struct xfs_inode *ip,
+				   uint64_t epoch)
+{
+	struct mxfs_frx *f;
+
+	if (!mp->m_mxfs_frx)
+		return;
+	f = &mp->m_mxfs_frx[mp->m_mxfs_frx_head++ % MXFS_FRX_RING];
+	if (f->state == MXFS_FRX_UNCHECKED)
+		atomic64_inc(&mxfs_frx_overrun);
+	f->ino = ip->i_ino;
+	f->agno = XFS_INO_TO_AGNO(mp, ip->i_ino);
+	f->agino = XFS_INO_TO_AGINO(mp, ip->i_ino);
+	f->gen = VFS_I(ip)->i_generation;
+	f->epoch = epoch;
+	f->commit_ns = ktime_get_real_ns();
+	f->end_ns = 0;
+	f->end_why = NULL;
+	f->state = MXFS_FRX_UNCHECKED;
+}
+
+/* @ino's FREE obligation ended by @why (caller holds m_mxfs_pubob_lock) */
+static void mxfs_frx_end_locked(struct xfs_mount *mp, uint64_t ino,
+				const char *why)
+{
+	unsigned int i;
+
+	if (!mp->m_mxfs_frx)
+		return;
+	for (i = 1; i <= MXFS_FRX_RING; i++) {
+		struct mxfs_frx *f = &mp->m_mxfs_frx[(mp->m_mxfs_frx_head - i) %
+						     MXFS_FRX_RING];
+
+		if (f->state == MXFS_FRX_EMPTY || f->ino != ino || f->end_why)
+			continue;
+		f->end_why = why;
+		f->end_ns = ktime_get_real_ns();
+		return;
+	}
+}
+
+static void mxfs_frx_check_one(struct xfs_perag *pag, const struct mxfs_frx *f,
+			       uint64_t rel_ep, const char *path)
+{
+	struct xfs_mount	*mp = pag_mount(pag);
+	struct xfs_inode	*ip;
+	struct mxfs_pubob	*ob;
+	uint32_t		dnl = 0, dnext = 0, dgen = 0;
+	uint16_t		dmode = 0;
+	bool			found = false, in_ail = false;
+	umode_t			imode = 0;
+	unsigned int		inlink = 0, ili = 0;
+	uint32_t		igen = 0;
+	unsigned long		iflags = 0;
+	int			freeob = -1, dlm_mode = -1, pin = 0;
+	uint64_t		pend = 0, flush = 0, dur = 0, fp_epoch = 0;
+	int			okind = -1, oinflight = -1;
+	uint64_t		oepoch = 0, now = ktime_get_real_ns();
+	bool			late;
+	int			rc;
+	static atomic_t		printed = ATOMIC_INIT(0);
+
+	atomic64_inc(&mxfs_frx_checked);
+	rc = mxfs_p87_read_home_dinode(pag, f->agino, &dnl, &dnext, &dgen, &dmode);
+	if (rc) {
+		atomic64_inc(&mxfs_frx_unread);
+		return;
+	}
+	if (dmode == 0) {
+		atomic64_inc(&mxfs_frx_ok);
+		return;
+	}
+	rcu_read_lock();
+	ip = radix_tree_lookup(&pag->pag_ici_root, f->agino);
+	if (ip && ip->i_ino == f->ino) {
+		found = true;
+		imode = VFS_I(ip)->i_mode;
+		inlink = VFS_I(ip)->i_nlink;
+		igen = VFS_I(ip)->i_generation;
+		iflags = READ_ONCE(ip->i_flags);
+		freeob = READ_ONCE(ip->i_mxfs_freeob);
+		dlm_mode = ip->i_dlm_mode;
+		pin = atomic_read(&ip->i_pincount);
+		pend = READ_ONCE(ip->i_mxfs_pub_pending_seq);
+		flush = READ_ONCE(ip->i_mxfs_pub_flush_seq);
+		dur = READ_ONCE(ip->i_mxfs_pub_durable_seq);
+		fp_epoch = READ_ONCE(ip->i_mxfs_freepub_epoch);
+		if (ip->i_itemp) {
+			in_ail = test_bit(XFS_LI_IN_AIL,
+					  &ip->i_itemp->ili_item.li_flags);
+			ili = ip->i_itemp->ili_fields;
+		}
+	}
+	rcu_read_unlock();
+	if (found && imode != 0) {
+		/* this node allocated the number again: the inobt says
+		 * allocated, so a live home owes FREE-PUBLISH nothing */
+		atomic64_inc(&mxfs_frx_realloc);
+		return;
+	}
+	spin_lock(&mp->m_mxfs_pubob_lock);
+	ob = mxfs_pubob_find_locked(mp, f->ino);
+	if (ob) {
+		okind = ob->kind;
+		oinflight = ob->inflight;
+		oepoch = ob->epoch;
+	}
+	spin_unlock(&mp->m_mxfs_pubob_lock);
+	/* a free from an earlier tenure whose own release could not check it:
+	 * a peer may have allocated the number since, so live is not proof */
+	late = !rel_ep || f->epoch != rel_ep;
+	atomic64_inc(late ? &mxfs_frx_late : &mxfs_frx_live);
+	if (atomic_inc_return(&printed) > 500)
+		return;
+	pr_warn("mxfs: P-FREEPUB-HANDOFF-%s ag=%u ino=%llu gen=%u epoch=%llu rel_epoch=%llu path=%s disk_mode=0%o disk_gen=%u disk_nlink=%u pred=%d commit_age_ms=%llu ended=%s end_age_ms=%llu store_kind=%d store_inflight=%d store_epoch=%llu incore=%d imode=0%o inlink=%u igen=%u iflags=0x%lx freeob=%d dlm_mode=%d pin=%d in_ail=%d ili=0x%x pend=%llu flush=%llu dur=%llu fp_epoch=%llu realns=%llu -- this node's committed free is not on the LUN as its AG grant leaves\n",
+		late ? "LATE" : "LIVE", pag_agno(pag),
+		(unsigned long long)f->ino, f->gen,
+		(unsigned long long)f->epoch, (unsigned long long)rel_ep, path,
+		dmode, dgen, dnl, dgen == f->gen - 1u ? 1 : 0,
+		(unsigned long long)((now - f->commit_ns) / NSEC_PER_MSEC),
+		f->end_why ? f->end_why : "open",
+		f->end_ns ? (unsigned long long)((now - f->end_ns) /
+						 NSEC_PER_MSEC) : 0ULL,
+		okind, oinflight, (unsigned long long)oepoch,
+		found ? 1 : 0, imode, inlink, igen, iflags, freeob, dlm_mode,
+		pin, in_ail ? 1 : 0, ili,
+		(unsigned long long)pend, (unsigned long long)flush,
+		(unsigned long long)dur, (unsigned long long)fp_epoch,
+		(unsigned long long)now);
+}
+
+/*
+ * Called from mxfs_pubob_unlock_census, i.e. at every site where this node's
+ * grant for @pag is about to leave.  The buffer-workqueue fallback cannot
+ * wait for a read and is only counted; the free stays unchecked and is read
+ * at the AG's next release from this node (reported as LATE if live).
+ */
+void mxfs_frx_handoff_check(struct xfs_perag *pag, const char *path)
+{
+	struct xfs_mount	*mp = pag_mount(pag);
+	uint64_t		rel_ep = READ_ONCE(pag->pag_mxfs_rel_epoch);
+	struct mxfs_frx		*snap;
+	unsigned int		i;
+	int			n, k, round;
+
+	if (!READ_ONCE(mxfs_dbg_freepub_handoff_check) || !mp->m_mxfs_frx)
+		return;
+	if (!strcmp(path, "iodone-fallback")) {
+		atomic64_inc(&mxfs_frx_ctxskip);
+		return;
+	}
+	snap = kmalloc_array(64, sizeof(*snap), GFP_NOFS);
+	if (!snap)
+		return;
+	for (round = 0; round < MXFS_FRX_RING / 64; round++) {
+		n = 0;
+		spin_lock(&mp->m_mxfs_pubob_lock);
+		for (i = 0; mp->m_mxfs_frx && i < MXFS_FRX_RING && n < 64; i++) {
+			struct mxfs_frx *f = &mp->m_mxfs_frx[i];
+
+			if (f->state != MXFS_FRX_UNCHECKED ||
+			    f->agno != pag_agno(pag))
+				continue;
+			snap[n++] = *f;
+			f->state = MXFS_FRX_CHECKED;
+		}
+		spin_unlock(&mp->m_mxfs_pubob_lock);
+		if (!n)
+			break;
+		for (k = 0; k < n; k++)
+			mxfs_frx_check_one(pag, &snap[k], rel_ep, path);
+	}
+	kfree(snap);
+}
 
 void mxfs_pubob_arm(struct xfs_mount *mp, struct xfs_inode *ip)
 {
@@ -510,8 +853,9 @@ void mxfs_pubob_arm(struct xfs_mount *mp, struct xfs_inode *ip)
 }
 EXPORT_SYMBOL(mxfs_pubob_arm);
 
-/* Drop the store entry for @ino; returns true if one was found. */
-bool mxfs_pubob_drop_ino(struct xfs_mount *mp, uint64_t ino)
+/* Drop the store entry for @ino (@why: the release audit's verdict); returns
+ * true if one was found. */
+bool mxfs_pubob_drop_ino(struct xfs_mount *mp, uint64_t ino, const char *why)
 {
 	struct mxfs_pubob *ob, *tmp;
 	bool found = false;
@@ -522,6 +866,8 @@ bool mxfs_pubob_drop_ino(struct xfs_mount *mp, uint64_t ino)
 	list_for_each_entry_safe(ob, tmp, &mp->m_mxfs_pubob_list, l) {
 		if (ob->ino != ino)
 			continue;
+		if (ob->kind == MXFS_PUBOB_FREE)
+			mxfs_frx_end_locked(mp, ino, why);
 		list_del(&ob->l);
 		mp->m_mxfs_pubob_count--;
 		kfree(ob);
@@ -657,6 +1003,8 @@ void mxfs_pubob_free_commit(struct xfs_mount *mp, struct xfs_inode *ip,
 	ob->pending_epoch = 0;
 	WRITE_ONCE(ip->i_mxfs_freeob, 2);
 	xfs_iflags_set(ip, MXFS_IF_PUBOB);
+	if (READ_ONCE(mxfs_dbg_freepub_handoff_check))
+		mxfs_frx_commit_locked(mp, ip, epoch);
 	spin_unlock(&mp->m_mxfs_pubob_lock);
 	kfree(n);
 	if (created)
@@ -859,11 +1207,15 @@ void mxfs_pubob_recycle(struct xfs_mount *mp, struct xfs_inode *ip,
 		if ((ob->kind == MXFS_PUBOB_FREE ||
 		     ob->kind == MXFS_PUBOB_FREE_PENDING) &&
 		    epoch && ob->epoch == epoch && ob->chain < 0xffffu) {
+			if (ob->kind == MXFS_PUBOB_FREE)
+				mxfs_frx_end_locked(mp, ip->i_ino, "recycle-chain");
 			ob->kind = MXFS_PUBOB_CHAIN_LIVE;
 			ob->chain++;
 			chain = ob->chain;
 			verdict = 1;
 		} else {
+			if (ob->kind == MXFS_PUBOB_FREE)
+				mxfs_frx_end_locked(mp, ip->i_ino, "recycle-drop");
 			list_del(&ob->l);
 			mp->m_mxfs_pubob_count--;
 			kfree(ob);
@@ -1085,6 +1437,8 @@ void mxfs_pubob_discharge(struct xfs_mount *mp, struct xfs_inode *ip,
 		ob->inflight = MXFS_PUBOB_INFLIGHT_NONE;
 		kept = ob->chain;
 	} else if (ob) {
+		if (okind == MXFS_PUBOB_FREE)
+			mxfs_frx_end_locked(mp, ip->i_ino, why);
 		list_del(&ob->l);
 		mp->m_mxfs_pubob_count--;
 		kfree(ob);
@@ -1365,6 +1719,12 @@ void mxfs_defer_reap_init(struct xfs_mount *mp)
 	spin_lock_init(&mp->m_mxfs_pubob_lock);
 	INIT_LIST_HEAD(&mp->m_mxfs_pubob_list);
 	mp->m_mxfs_pubob_count = 0;
+	/* the handoff check's ring exists only for a mount made with the knob
+	 * on (set at module load by the test lap) */
+	mp->m_mxfs_frx_head = 0;
+	mp->m_mxfs_frx = READ_ONCE(mxfs_dbg_freepub_handoff_check) ?
+		kvcalloc(MXFS_FRX_RING, sizeof(struct mxfs_frx), GFP_KERNEL) :
+		NULL;
 	INIT_DELAYED_WORK(&mp->m_mxfs_reap_work, mxfs_reap_worker);
 	INIT_DELAYED_WORK(&mp->m_mxfs_freplay_retry_work,
 			  mxfs_freplay_retry_worker);
@@ -1417,6 +1777,27 @@ void mxfs_defer_reap_destroy(struct xfs_mount *mp)
 		if (undischarged)
 			pr_warn("mxfs: P88-PUBOB-UNMOUNT-PENDING count=%d -- obligations die with the mount; a dirty departure's journal slice carries the conversions for replay\n",
 				undischarged);
+	}
+	if (mp->m_mxfs_frx) {
+		struct mxfs_frx *ring;
+
+		/* the releases of the unmount itself run after this and go
+		 * unchecked: the ring is detached under the lock its users take */
+		spin_lock(&mp->m_mxfs_pubob_lock);
+		ring = mp->m_mxfs_frx;
+		mp->m_mxfs_frx = NULL;
+		spin_unlock(&mp->m_mxfs_pubob_lock);
+		pr_info("mxfs: P-FREEPUB-HANDOFF-TOTALS committed=%u checked=%lld ok=%lld live=%lld late=%lld realloc=%lld unread=%lld overrun=%lld ctxskip=%lld -- dbg_freepub_handoff_check: committed frees whose home was read off the LUN as their AG grant left this node\n",
+			mp->m_mxfs_frx_head,
+			(long long)atomic64_read(&mxfs_frx_checked),
+			(long long)atomic64_read(&mxfs_frx_ok),
+			(long long)atomic64_read(&mxfs_frx_live),
+			(long long)atomic64_read(&mxfs_frx_late),
+			(long long)atomic64_read(&mxfs_frx_realloc),
+			(long long)atomic64_read(&mxfs_frx_unread),
+			(long long)atomic64_read(&mxfs_frx_overrun),
+			(long long)atomic64_read(&mxfs_frx_ctxskip));
+		kvfree(ring);
 	}
 	spin_lock(&mp->m_mxfs_reap_lock);
 	list_for_each_entry_safe(e, tmp, &mp->m_mxfs_reap_list, l) {

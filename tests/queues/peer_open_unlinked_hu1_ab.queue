@@ -1,0 +1,62 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, hypothesis
+# H-U1 (the record, from lap cmwd1): the owner holds no reference to y, the
+# member of its unlinked bucket the peer holds open.  Its copy of y goes
+# reclaimable when the owner's inactivation of y defers for the open holder,
+# and a cache drop reclaims it.  The free of z, the member after y, then finds
+# its predecessor not in core (xfs_iunlink_remove_inode, P-UNLREM-NOPREV) and
+# returns -EFSCORRUPTED with the transaction already dirty: 'xfs_ifree returned
+# error -117', forced shutdown.  The preflight that loads and pins the
+# predecessor (mxfs_ifree_unlinked_preflight) ran only when z's own chain state
+# was incomplete, which it was not.
+# The fix, module parameter unlprev_pin (1 = on, 0 = the same-build control):
+# a mid-list free pins a live in-core predecessor for the length of the free,
+# and when the predecessor is absent, a reclaimable shell or mid-evict it runs
+# the preflight, which loads and pins it.  Both arms count unlprev_absent (a
+# mid-list free whose predecessor was not live in core, P-UNLPREV-ABSENT with
+# pin=0 or pin=1) and unlprev_pinned (the preflight then pinned it).
+# The window, forced in both arms: test knob dbg_ifree_midlist_delay_ms=600
+# holds every mid-list free 600 ms before it starts (no AG lock held), and
+# PUC_CLOSE_DROPS=20 makes the owner run 20 cache drops 50 ms apart in the
+# background across its close of z, so y's reclaimable copy is reclaimed
+# before z's free looks it up.  Both arms run freshsrc_iunl_overlay=1,
+# unlprev_tenure=1 and b6_release_drain=1 (H-U3, H-U4 and H-U5 on), so
+# unlprev_pin is the one variable.  Run from ~/src/mxfs on the tree build that
+# carries the change; the harness refuses a node running anything else and
+# reads every knob back.
+#
+# VERDICT RULES (written before the first lap):
+#   SUPPORTED AND FIXED  at least 2 of the 3 control laps REPRODUCED, each with
+#             noprev > 0 and unlprev_absent > 0; and all 3 fix laps PASS (no
+#             'xfs_ifree returned error', no P-UNLREM-NOPREV and no node
+#             failure line in either node's kernel log through the post-audit
+#             capture, the workload complete, cold audit CLEAN errors=0), with
+#             unlprev_absent > 0 and unlprev_pinned > 0 over the fix laps (the
+#             pin was offered and taken).
+#   NOT SUPPORTED  a control lap that reproduces with noprev 0: another
+#             mechanism, attributed before anything else.
+#   NOT FIXED  a fix lap that REPRODUCES or logs P-UNLREM-NOPREV: attributed from
+#             its kept logs and image.
+#   WEAK      fewer than 2 control laps reproduce: more laps, not a verdict.
+#   VACUOUS   unlprev_absent 0 over all three fix laps: the window was not
+#             reached and the fix arm measured nothing.
+# A lap that ABORTs, or audits STALE/NONE without a reproduction, has no verdict
+# and is rerun.  A reproduction's cold audit (after the remount replays both
+# journals) is recorded either way: CORRUPT there makes the record an integrity
+# defect.  A line of another H-U mechanism (BACKREF, P17B ghost loop,
+# P-NEXTWR-STALE) in any lap is attributed and recorded.
+#
+# Bound per lap (tests/peer_open_unlinked_chain.sh's derivation): prep 300 +
+# srcversion 2x20 + the instr knob 2x20 + five PUC_KNOBS knobs 2x5x20 + the
+# counter reset 2x20 + the mount's device 2x20 + mkdir 30 + workload
+# 30 x (3 + 5 + ceil(3 x 0.3) + 2) + 60 = 390 plus the close drops
+# 30 x (ceil(20 x 0.05) + 1) = 60, +10 for the peer + the done file on both
+# nodes 2x20 + instr reset 2x20 + the settle 7 + the counters 2x20 + stream copy
+# 2x120 + on a failure: unmount 2x(70 + 20) + snapshot 60 + image check 10 +
+# remount 2x(110 + 20), + the cold audit 150 + the post-audit stream copy 2x120
+# = 2417 s.
+2417 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1 b6_release_drain=1 dbg_ifree_midlist_delay_ms=600 unlprev_pin=0" tests/peer_open_unlinked_chain.sh hu1c1 30 2/net/mesh/direct g2c
+2417 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1 b6_release_drain=1 dbg_ifree_midlist_delay_ms=600 unlprev_pin=1" tests/peer_open_unlinked_chain.sh hu1f1 30 2/net/mesh/direct g2c
+2417 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1 b6_release_drain=1 dbg_ifree_midlist_delay_ms=600 unlprev_pin=0" tests/peer_open_unlinked_chain.sh hu1c2 30 2/net/mesh/direct g2c
+2417 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1 b6_release_drain=1 dbg_ifree_midlist_delay_ms=600 unlprev_pin=1" tests/peer_open_unlinked_chain.sh hu1f2 30 2/net/mesh/direct g2c
+2417 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1 b6_release_drain=1 dbg_ifree_midlist_delay_ms=600 unlprev_pin=0" tests/peer_open_unlinked_chain.sh hu1c3 30 2/net/mesh/direct g2c
+2417 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="freshsrc_iunl_overlay=1 unlprev_tenure=1 b6_release_drain=1 dbg_ifree_midlist_delay_ms=600 unlprev_pin=1" tests/peer_open_unlinked_chain.sh hu1f3 30 2/net/mesh/direct g2c

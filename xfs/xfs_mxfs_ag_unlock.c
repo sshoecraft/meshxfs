@@ -210,6 +210,161 @@ MODULE_PARM_DESC(typeflip_fail_unresolved,
 	"fail a lookup with -ESTALE when a dirent/inode type flip cannot be resolved, instead of publishing the mismatch; 1=on (default)");
 
 /*
+ * When the type-flip resolver gives up, xfs_lookup reads the parent again if
+ * the entry is behind what the number names now.  1 also counts the coherent
+ * platter image as saying so when it is free, or is a live inode of another
+ * type than the entry names, although the in-core shell still holds its old
+ * mode: measured on 2/net/mesh/mpath path_fenced_return, the shared LOCK
+ * entry named a number the platter showed free or reused as a regular file,
+ * and the lookup failed mkdir with -ESTALE without reading the parent again.
+ * 0 = only an in-core free inode or a platter image equal to the in-core one
+ * (the same-build control).
+ */
+int mxfs_typeflip_relookup_platter = 1;
+EXPORT_SYMBOL(mxfs_typeflip_relookup_platter);
+module_param_named(typeflip_relookup_platter, mxfs_typeflip_relookup_platter, int, 0644);
+MODULE_PARM_DESC(typeflip_relookup_platter,
+	"an unresolved type flip reads the parent again when the coherent platter image is free or of another type than the entry; 0 = control; 1=on (default)");
+
+/*
+ * When the poisoned-shell arm of xfs_lookup runs out of its retire budget, it
+ * reads the parent again (bounded with the type-flip relookups, at most 3)
+ * instead of failing the lookup -ESTALE.  Measured on 4/disk/caw/mpath (the
+ * 0.90.131 release build, path_failover/fabric/flap): the workload's shared
+ * LOCK directory was removed and recreated from four nodes while this node's
+ * image of their parent was stale; the entry named a number whose cached
+ * regular-file shell was poisoned, retired, recycled and poisoned again as
+ * the platter moved on (directory, then free), the second poison's revocation
+ * reference outlived the spent budget, and the mkdir failed ESTALE
+ * (P34H-POISON-UNRETIRED, P-LKERR stage=3 err=-116) without the parent ever
+ * being read again.  0 = fail -ESTALE at once (the same-build control).
+ */
+/*
+ * When the type-flip resolver's reload poisons the shell (the platter holds
+ * another incarnation of the number, incarn_poison_unexposed), xfs_lookup
+ * drops it and gets the inode again, so the poisoned-shell arm retires it and
+ * the re-get reads the incarnation the entry names, instead of reloading the
+ * poisoned shell for the rest of its 200 rounds.  Measured on the 0.90.131
+ * release build (dirent_type_integrity at 4/disk/caw/mpath and
+ * 8/disk/caw/direct): P95-TYPEFLIP-RELOAD of a cached regular file whose entry
+ * names a directory, P-RELOAD-XINCARN-POISON with the directory on the
+ * platter, then P95B-TYPEFLIP-WAIT resolved=0 rounds=201 and the mkdir failed
+ * -ESTALE (P201-TYPEFLIP-UNRESOLVED-FAIL).  At most 3 per lookup.
+ * 0 = keep reloading the poisoned shell (the same-build control).
+ */
+int mxfs_typeflip_poison_retire = 1;
+module_param_named(typeflip_poison_retire, mxfs_typeflip_poison_retire, int, 0644);
+MODULE_PARM_DESC(typeflip_poison_retire,
+	"a type-flip resolver whose reload poisoned the shell drops it and gets the inode again (1, default); 0 = keeps reloading it (test control)");
+
+/*
+ * The same-type resolver of xfs_lookup (P95-SAMETYPE-RELOAD) stops reloading
+ * as soon as its reload poisons the shell, instead of after its 200 rounds:
+ * a poisoned shell is never adopted in place, so every further round reloads
+ * it for nothing, and the poisoned-shell arm then retires it.  Measured on
+ * 2/disk/caw/direct (tests/recreated_dir_peer_mkdir.sh): P95-SAMETYPE-RELOAD,
+ * P-RELOAD-XINCARN-POISON, then P95C-SAMETYPE-WAIT resolved=0 rounds=201
+ * 2.4 s later and the retire at its first try, on every lap; and posix_multi
+ * on the 0.90.131 release build at 8 and 16 nodes spent ~2.5 s a name in
+ * rank 1's ls.  0 = all 200 rounds (the same-build control).
+ */
+int mxfs_sametype_poison_break = 1;
+module_param_named(sametype_poison_break, mxfs_sametype_poison_break, int, 0644);
+MODULE_PARM_DESC(sametype_poison_break,
+	"the same-type lookup resolver stops reloading once its reload poisons the shell (1, default); 0 = all 200 rounds (test control)");
+
+/*
+ * xfs_lookup never returns a shell an arm after the poisoned-shell arm has
+ * just poisoned: it drops it and gets the inode again, so the poisoned-shell
+ * arm retires it and instantiates the incarnation the entry names.  The
+ * same-type resolver's reload poisons the shell and falls through, and the
+ * grant-taking directory verify skips a shell already poisoned, so without
+ * this the lookup succeeded with a dead directory.  Measured on
+ * 2/net/mesh/mpath (fence_during_write, run 20261020T151838Z-g2d): a mkdir
+ * that lost the create race, then mkdir -p's chdir looked the name up fresh,
+ * P95-SAMETYPE-RELOAD poisoned test32's cached directory and the lookup
+ * returned it; the cwd was the dead incarnation and the relative mkdir was
+ * refused 'Stale file handle' (P240-QUAR-NSOP-REFUSE op=lookup rc=-116).
+ * At most 3 per lookup.  0 = return the poisoned shell (the same-build
+ * control).
+ */
+int mxfs_lookup_poison_retire = 1;
+module_param_named(lookup_poison_retire, mxfs_lookup_poison_retire, int, 0644);
+MODULE_PARM_DESC(lookup_poison_retire,
+	"a lookup about to return a shell poisoned after the poisoned-shell arm drops it and gets the inode again (1, default); 0 = returns it (test control)");
+
+int mxfs_poison_unretired_relookup = 1;
+module_param_named(poison_unretired_relookup, mxfs_poison_unretired_relookup, int, 0644);
+MODULE_PARM_DESC(poison_unretired_relookup,
+	"a lookup whose poisoned shell could not be retired reads the parent again (bounded) instead of failing -ESTALE (1, default); 0 = -ESTALE at once (test control)");
+
+/*
+ * A lookup that is about to hand the VFS a cached DIRECTORY holding no grant
+ * first takes the directory's coherent read grant, the same acquire the next
+ * operation in that directory takes.  The acquire's reload compares the
+ * platter with the in-core incarnation and poisons a shell a peer has
+ * replaced, and the lookup then retires the shell and instantiates the live
+ * directory before any dentry is bound to it.  Measured on 2/net/mesh/mpath
+ * (path_fenced_return, then alloc_witness): a directory number the peer had
+ * just reused for another directory came back from the lookup as the dead
+ * shell, `mkdir -p` chdir'd into it, and its relative mkdir of the next
+ * component was refused ESTALE twice (the VFS retry starts from the same cwd),
+ * so the row's shared directory was never made.  A type change is caught by
+ * the dirent's ftype and the CAW eviction ring flags a freed number; a
+ * directory reused as a directory on the TCP transport had neither.
+ * 0 = the lookup returns the cached directory unverified (the same-build
+ * control).  Writing the knob resets the two counters.
+ */
+int mxfs_lookup_dir_incarn_verify = 1;
+atomic_t mxfs_lookup_dir_incarn_n = ATOMIC_INIT(0);
+atomic_t mxfs_lookup_dir_incarn_dead_n = ATOMIC_INIT(0);
+static int lookup_dir_incarn_verify_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc) {
+		atomic_set(&mxfs_lookup_dir_incarn_n, 0);
+		atomic_set(&mxfs_lookup_dir_incarn_dead_n, 0);
+	}
+	return rc;
+}
+static const struct kernel_param_ops lookup_dir_incarn_verify_ops = {
+	.set = lookup_dir_incarn_verify_set,
+	.get = param_get_int,
+};
+module_param_cb(lookup_dir_incarn_verify, &lookup_dir_incarn_verify_ops, &mxfs_lookup_dir_incarn_verify, 0644);
+MODULE_PARM_DESC(lookup_dir_incarn_verify,
+	"a lookup returning a cached directory with no grant takes its read grant first and retires the shell if the platter names another incarnation (default 1); 0 = control; writing it resets lookup_dir_incarn_n and lookup_dir_incarn_dead_n");
+module_param_named(lookup_dir_incarn_n, mxfs_lookup_dir_incarn_n.counter, int, 0444);
+MODULE_PARM_DESC(lookup_dir_incarn_n,
+	"cached grant-less directories a lookup verified, since lookup_dir_incarn_verify was last written");
+module_param_named(lookup_dir_incarn_dead_n, mxfs_lookup_dir_incarn_dead_n.counter, int, 0444);
+MODULE_PARM_DESC(lookup_dir_incarn_dead_n,
+	"of those, the ones whose acquire found a dead incarnation and that the lookup retired, since lookup_dir_incarn_verify was last written");
+
+/*
+ * The verification above was limited to a directory that had lost a grant on
+ * this node (i_dlm_epoch above 1), on the premise that one never granted here
+ * was read from the platter and is current.  It is current only when it is
+ * read: a shell instantiated by a lookup alone stays in the inode cache with
+ * its dentry, and when a peer frees the number and reuses it for another
+ * directory, nothing on this node marks it.  Measured on 2/net/mesh/mpath
+ * (alloc_witness, run 20261019T182250Z-g2e): test18's only contact with
+ * pathload's LOCK directory was a mkdir that answered EEXIST; test17 removed
+ * LOCK and made the run directory on its number a minute later; test18's
+ * lookup of the run directory returned the LOCK shell unverified, and mkdir -p
+ * was refused ESTALE in it twice.  tests/recreated_dir_peer_mkdir.sh
+ * NEWNAME=1 YCACHE=eexist reproduces it (rdmx1: 7 of 10 laps).  1 = verify a
+ * grant-less cached directory whether or not it ever held a grant here (the
+ * acquire is the one its next readdir, lookup or create takes anyway); 0 =
+ * only one that lost a grant (the same-build control).
+ */
+int mxfs_lookup_dir_incarn_ungranted = 1;
+module_param_named(lookup_dir_incarn_ungranted, mxfs_lookup_dir_incarn_ungranted, int, 0644);
+MODULE_PARM_DESC(lookup_dir_incarn_ungranted,
+	"lookup_dir_incarn_verify also takes a cached directory this node never held a grant on (default 1); 0 = only one that lost a grant here (control)");
+
+/*
  *  (D-DIRENT-INODE-TYPE-MISMATCH).  The dirent ftype
  * written by rename/link is snapshotted from the in-core i_mode BEFORE the
  * ILOCK is taken (xfs_vn_rename / xfs_vn_link), and in MXFS the acquire can
@@ -1867,6 +2022,9 @@ mxfs_pubob_unlock_census(
 	int			 nfree = 0, npend = 0, nchain = 0, nunl = 0;
 	uint64_t		 ino1 = 0;
 
+	/* test aid: what the acquirer will read for every free this node
+	 * committed, whatever the store below still holds */
+	mxfs_frx_handoff_check(pag, path);
 	if (!mp->m_mxfs_pubob_count)
 		return;
 	spin_lock(&mp->m_mxfs_pubob_lock);
@@ -2188,6 +2346,7 @@ mxfs_dlm_ag_bast_work_fn(
 	 * and cleared cached, or cleared cached itself if the re-acquire
 	 * also released back to a different state.
 	 */
+phase2:
 	mxfs_pag_dlm_lock(pag, MXFS_SITE);
 	pag->pag_dlm_prepass_done = true;	/* latch armed */
 	if (!pag->pag_dlm_armed_ns)
@@ -2237,6 +2396,20 @@ mxfs_dlm_ag_bast_work_fn(
 			pag_agno(pag));
 		mxfs_pag_dlm_unlock(pag, MXFS_SITE);
 		return;
+	}
+	if (mxfs_ag_fence_holds_commit(pag)) {
+		/*
+		 * H-F13: an unpublished inode of this AG is listed or claiming
+		 * -- a create admitted before the BAST, or a child the drain
+		 * deferred while a local holder had it.  Publish again before
+		 * the COMMIT; the pause lets that holder's own demote run.
+		 * Bounded by the fence's window from the BAST.
+		 */
+		mxfs_pag_dlm_unlock(pag, MXFS_SITE);
+		atomic_inc(&mxfs_ag_fence_held);
+		msleep(2);
+		mxfs_dlm_publish_unpublished(mp, 0, pag_agno(pag));
+		goto phase2;
 	}
 	/*
 	 * The release COMMIT (mxfs_ag_handoff_commit): cached=false,
@@ -2659,6 +2832,7 @@ committed:
 			pag_agno(pag), current->comm,
 			READ_ONCE(mxfs_ag_release_nogrant_total));
 	}
+	mxfs_pub_unlock_exposure(mp, pag_agno(pag), "ag-bast");
 	us = mxfs_v5_dlm_ag_unlock(dlm, pag_agno(pag));
 	atomic64_inc(&mxfs_dlm_stat_ag_release);
 	ags_unlk = ktime_get_ns();
@@ -3073,6 +3247,7 @@ mxfs_dlm_ag_force_release_all(
 			mxfs_iunl_store_purge_ag(mp, agno, "unmount");
 			mxfs_agifc_release_audit(pag, "unmount");
 			mxfs_pubob_unlock_census(pag, "unmount");
+			mxfs_pub_unlock_exposure(mp, agno, "unmount");
 			us = mxfs_v5_dlm_ag_unlock(dlm, agno);
 			if (us == MXFS_UNLOCK_STILL_HELD &&
 			    mxfs_v5_dlm_is_poisoned(dlm)) {

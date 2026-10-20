@@ -367,6 +367,17 @@ nothing to do with this file and must survive.
   `tools/mxfs_sshpass.sh` is the SSH chokepoint every script goes through, so a
   fresh checkout needs only that one file.
 
+- **A session here needs ccenv installed** (<https://github.com/sshoecraft/ccenv>).
+  It provides the global rules file this one builds on, the ccmemory server and
+  hooks behind `.ccmemory/`, the project-awareness skill the routing table below
+  uses, and the `grind`, `scout`, `miner` and `memory-compactor` agents.
+  Without it `.ccmemory/*.md` can still be read directly, but no lesson is
+  injected on `Read`.
+
+- **The lab's VMs are built with osimager**
+  (<https://github.com/sshoecraft/osimager>, `pip install osimager`);
+  `lab/README.md` has the build steps.
+
 - Rig topology, the harnesses (`stress_session.sh`, `cluster_reset.sh`,
   `rsync_bench.sh`), their known failure modes and the dmesg patterns are all in
   `.claude/awareness/subsystems/tests.md` — which the routing table below already

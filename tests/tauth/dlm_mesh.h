@@ -556,7 +556,8 @@ static struct vnode *node_up(int idx, mxfs_node_id_t id, uint64_t inc, uint16_t 
          * the REGION's geometry (it read the header; it just holds no
          * active ledger) — otherwise its view of who masters what
          * diverges from the cluster's. */
-        mxfs_dlm_set_ledger_geometry(n->dlm, MXFS_TAUTH_NPAGES, TL_SEED);
+        mxfs_dlm_set_ledger_geometry(n->dlm, MXFS_TAUTH_NPAGES, TL_SEED,
+                                     MXFS_TAUTH_HASH_VERSION);
     }
     n->rx = mxfs_pal_thread_create(vrx_fn, n);
     n->tick = mxfs_pal_thread_create(vtick_fn, n);

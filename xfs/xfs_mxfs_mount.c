@@ -46,6 +46,17 @@ module_param_named(dbg_barrier_admit_hold_ms, mxfs_dbg_barrier_admit_hold_ms,
 MODULE_PARM_DESC(dbg_barrier_admit_hold_ms,
 	"TEST: one-shot hold (ms) after the mount barrier admits, before the root lookup; self-clears");
 
+/*
+ * TEST ONLY, one-shot, self-clears: when the barrier completes, note a
+ * synthetic OPEN obligation case for slot 62 and hold the mount this many ms
+ * inside xfs_mountfs, then take the case back (see its use below).  0 = off.
+ */
+static int mxfs_dbg_barrier_open_hold_ms;
+module_param_named(dbg_barrier_open_hold_ms, mxfs_dbg_barrier_open_hold_ms,
+		   int, 0644);
+MODULE_PARM_DESC(dbg_barrier_open_hold_ms,
+	"TEST: one-shot: when the mount barrier completes, note a synthetic OPEN obligation case for slot 62 and hold the mount this many ms inside xfs_mountfs, then take it back; self-clears");
+
 static int mxfs_dbg_barrier_refuse_after_claim;
 module_param_named(dbg_barrier_refuse_after_claim,
 		   mxfs_dbg_barrier_refuse_after_claim, int, 0644);
@@ -1316,6 +1327,32 @@ barrier_slice_replayed:
 		(unsigned long long)cohort, (unsigned long long)drained,
 		nreplayed, (unsigned long long)published,
 		(unsigned long long)terminal);
+	/*
+	 * TEST ONLY (dbg_barrier_open_hold_ms): note an OPEN obligation case for
+	 * a slot no node uses, through the barrier's own
+	 * mxfs_barrier_note_open_cases, hold the mount inside xfs_mountfs that
+	 * long, then take the synthetic dead bit back before the mount goes on,
+	 * so no replay of that slot can follow.  It puts a mount where the reap
+	 * worker's 20 s mount-settle timer finds the replay duty armed before
+	 * mxfs_dlm_cache_init has initialised the replay work
+	 * (D-REAP-WORKER-QUEUES-UNINITIALISED-FOREIGN-REPLAY-WORK-INSIDE-SLOW-
+	 * MOUNT, tests/reap_inactive_mount_ab.sh).
+	 */
+	if (unlikely(mxfs_dbg_barrier_open_hold_ms > 0)) {
+		int		hold = mxfs_dbg_barrier_open_hold_ms;
+		uint64_t	syn_pub = 0;
+
+		mxfs_dbg_barrier_open_hold_ms = 0;	/* one shot */
+		xfs_alert(mp,
+	"MXFS: P-DBG-BARRIER-OPEN-HOLD slot=62 ms=%d -- TEST: a synthetic OPEN obligation case is noted and the mount waits inside its recovery barrier",
+			  hold);
+		mxfs_barrier_note_open_cases(mp, 1ULL << 62, &syn_pub);
+		msleep(hold);
+		clear_bit(62, mp->m_mxfs_foreign_dead_slots);
+		xfs_alert(mp,
+	"MXFS: P-DBG-BARRIER-OPEN-HOLD-END slot=62 dead_slots=0x%llx -- TEST: the synthetic case is taken back; the mount goes on",
+			  (unsigned long long)mp->m_mxfs_foreign_dead_slots[0]);
+	}
 	/*
 	 * (§6.6, shape B): the whole-cluster bootstrap completes
 	 * HERE — every sealed foreign slice replayed and published behind

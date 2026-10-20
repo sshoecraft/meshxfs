@@ -1,0 +1,55 @@
+# D-JOIN-OUTBOUND-HANDSHAKE-ECONNRESET-LOGGED-AS-ERROR-ON-A-JOIN-THAT-SUCCEEDS:
+# A/B of the reply-read reset's log level (dlm/peer.c mxfs_peer_connect), on
+# test18 test19 with the TCP transport, two filesystems on the same hosts.
+# Run from the main tree (cwd /home/steve/src/mxfs, for scripts/lab_power.sh);
+# each multi_mount line runs the harness of a sibling checkout by absolute
+# path, and the harness loads THAT checkout's mxfs.ko and refuses a node whose
+# srcversion differs:
+#   control  ~/src/mxfs-e  737E182A809291DAA0B4785  (reset logged at ERR)
+#   fix      ~/src/mxfs-c  9E03AF016F66F5400C65EBF  (reset logged at INFO as
+#            'reset the handshake'; any other reply-read failure still ERR)
+# The two builds differ in dlm/peer.c and dlm/dlm_caw.c only (the CAW change
+# is not on this transport's path).
+#
+# CAUSE UNDER TEST (read in the code, session 41): a host routes every
+# connection on its shared port by the volume its NODE_JOIN names; one for a
+# volume no mount there listens for yet is released with the NODE_JOIN unread
+# ('pal: port N: a connection for no filesystem mounted here; closed', debug
+# level, printed because prep_node.sh loads the module with dyndbg=+p), and a
+# socket closed with unread data resets, so the connector's reply read
+# returns -104.  MM_SIMUL_B=10 mounts B on both hosts at the same instant ten
+# times while A stays mounted, which is the incident's shape (two hosts
+# starting their mounts of a second volume at once).
+#
+# VERDICT RULES (written before the first lap):
+#   CONTROL REPRODUCED  some node logs 'handshake reply from node N failed:
+#               -104' and its peer logs at least one unrouted close in the
+#               same run (the harness then FAILs on the ERR line, as the old
+#               build is expected to).  A control lap with no unrouted close on
+#               either node did not reach the race and is reported unreached.
+#   CONTROL REFUTES  a -104 reply failure on a node whose peer logged no
+#               unrouted close in that run: another producer of the reset.
+#   FIX PASS    the harness's RESULT: PASS (every mount and unmount rc=0 inside
+#               its bound, every lease ACTIVE, both cold checks clean, no
+#               'handshake reply from node' line, no BUG/WARNING/corruption
+#               line), at least one 'reset the handshake' line in the run
+#               (reach), and on each node its reset count is no more than its
+#               peer's unrouted-close count.
+#   FIX FAIL    any ERR handshake line, any mount failure, or a reset count
+#               above the peer's unrouted closes.
+#   FIXED AND VERIFIED needs at least one control lap REPRODUCED and both fix
+#   laps PASS.  If no control lap reaches the race the record stays open and
+#   the cycle count is raised before any claim.
+#
+# Bounds: power-up BOOT_S=240 (scripts/lab_power.sh, nodes in parallel).  Each
+# multi_mount lap: the harness's own two-node estimate 150 s (LUN binds, load,
+# 2 mkfs, mounts, workload, umounts, 2 chk) + ten simultaneous cycles at two
+# unmounts of 0.4 s and one joiner mount that may wait one BAST period (~10 s,
+# D-ON-THE-TCP-TRANSPORT-A-NODE-MOUNTING-WHILE-ITS) = 11 s each, 110 s = 260 s.
+# Power-down SHUTDOWN_S=90 + 10 for the destroy.
+240 scripts/lab_power.sh up test18 test19
+260 MM_SIMUL_B=10 /home/steve/src/mxfs-e/tests/multi_mount.sh tcp test18 test19
+260 MM_SIMUL_B=10 /home/steve/src/mxfs-c/tests/multi_mount.sh tcp test18 test19
+260 MM_SIMUL_B=10 /home/steve/src/mxfs-e/tests/multi_mount.sh tcp test18 test19
+260 MM_SIMUL_B=10 /home/steve/src/mxfs-c/tests/multi_mount.sh tcp test18 test19
+100 scripts/lab_power.sh down test18 test19

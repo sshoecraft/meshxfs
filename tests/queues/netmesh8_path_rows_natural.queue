@@ -1,0 +1,38 @@
+# Two records on 8/net/mesh/mpath, read from the same path-row laps with every
+# row keeping its kernel logs (lap_chain.sh sets PF_KEEP_KMSG=1).  No knob is
+# set.
+#
+# D-8NETMESH-MPATH-PATH-DOWN-AT-MOUNT-LATE-STALL-35S: path_mount_degraded's
+# late window stalled the victim 35.4 s against its 30 s bound while the
+# host's root device (which carries every pool LUN) averaged 22 ms per I/O
+# under two snapshot copies; the passing run (16.8 s) sat in a 0.7 ms minute.
+# Snapshots now go to /mxfs/snapshots, a separate disk.  This is the baseline
+# that reading needs: the same row on the current build with no storm.
+# D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED's stale-parent shape was also
+# captured on net/mesh (4/net/mesh/mpath path_fabric); these rows look for its
+# natural P201-RELOOKUP why=reused-live as the CAW queue does.
+#
+# Runs from the sibling checkout ~/src/mxfs-b (main-tree source plus the
+# D-4NODE wait report and the orphan-sweep coalescing, which is on by default
+# on this transport; srcversion 57C7184D46A87018889E689 at launch) on g8.
+#
+# Bound per chain: prep_cluster 300 (manifest) + 2 laps x (path_fabric 308 s +
+# path_mount_degraded 300 s + path_fenced_return 297 s at 8 nodes by their
+# headers' derivations + 40 s board overhead per row) = 300 + 2 x 1025 = 2350 s.
+#
+# VERDICT RULES (written before the first lap):
+#   D-8NETMESH-MPATH-PATH-DOWN-AT-MOUNT-LATE-STALL-35S, baseline only (it
+#   disposes nothing by itself; the controlled latency run decides):
+#     ENVIRONMENT READING HOLDS  every path_mount_degraded row's late stall is
+#                inside 30 s, the excess over the path failover (P-IOWAIT-STUCK
+#                to 'Failing path') is under 5 s, and the host's sar await for
+#                each late window's minute is under 2 ms.
+#     ENVIRONMENT READING REFUTED  a late stall over 30 s in a minute whose
+#                host await is under 2 ms: the shared-directory handoff chain
+#                itself is the defect; trace it.
+#   D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED (net/mesh): the CAW queue's
+#   rules (tests/queues/relookup_reused_live_natural_caw.queue), applied to
+#   these rows.
+#   OTHER  a row FAIL for any other reason is its own finding.
+2350 tests/mpath/lap_chain.sh laps 8/net/mesh/mpath g8 nmn1 2 --prep --rows path_fabric,path_mount_degraded,path_fenced_return
+2350 tests/mpath/lap_chain.sh laps 8/net/mesh/mpath g8 nmn2 2 --prep --rows path_fabric,path_mount_degraded,path_fenced_return

@@ -159,7 +159,7 @@ publishes=$(grep -h "terminal outcome PUBLISHED" "$OUT"/*.dmesg 2>/dev/null | wc
 importers=$(grep -l "P240-QUAR-IMPORT" "$OUT"/*.dmesg 2>/dev/null | wc -l)
 recovered_pub=$(grep -h "published as recovered\|slice recovery complete" "$OUT"/*.dmesg 2>/dev/null | wc -l)
 shutdowns=$(grep -l "Filesystem has been shut down\|forced shutdown\|MXFS.*withdraw" "$OUT"/*.dmesg 2>/dev/null | wc -l)
-faults=$(grep -ciE 'kernel BUG|BUG:|Oops|general protection|Call Trace' "$OUT"/*.dmesg | awk -F: '{s+=$2} END{print s+0}')
+faults=$(grep -ciE 'kernel BUG|BUG:|\bOops\b|general protection|Call Trace' "$OUT"/*.dmesg | awk -F: '{s+=$2} END{print s+0}')
 
 echo "--- arm 1 assertions (foreign write failure)"
 echo "injection consumed on survivors (want 1): $inj  node=${inj_node:-none}"

@@ -1,0 +1,47 @@
+# D-STALE-NAME-SETATTR-ADOPTS-PEER-REUSED-INCARNATION-CHANGES-UNRELATED-FILE:
+# the truncate face of the per-operation A/B, rerun with the corrected
+# operation.  tests/queues/snop_ab_tcpmpath.queue's truncate laps sotr0 and
+# sotr1 measured nothing: `truncate -c -s 1 f` opens f and ftruncates the fd,
+# so Y held an OPEN of f across the hold, X's rm deferred the free behind it
+# (P87-OPEN-DEFER ino=f on X in every iteration) and no g took the number
+# (reused=0, 16 of 16 iterations).  tests/stale_name_setattr_reuse.sh now
+# issues the truncate on the NAME (perl's truncate, truncate(2): the path
+# lookup, then vfs_truncate -> notify_change -> xfs_vn_setattr, held at the
+# setattr's entry by dbg_setattr_delay_any with nothing open), exiting with
+# the errno it got.  Same-build A/B of incarn_poison_unexposed, control then
+# two fix laps, 2/disk/caw/direct on g2b (test15 test16), run from
+# ~/src/mxfs-b srcversion 00FAEA889543FE4A6C9B415 (the main tree's sources:
+# the complete H-SN1 fix, the allocator's held-copy skip and its count, and
+# the test-only knobs dbg_setattr_delay_any and dbg_open_delay_ms).  8
+# iterations a lap, SNR_DELAY_MS 6000.
+#
+# PREDICTION (H-SN1 carried to the size path): with the poison off (arm 0) the
+# held truncate's acquire rebuilds the shell in place as g<k> and the truncate
+# lands on it -- g<k>'s size reads 1 after X's cache drop -- with
+# P-RELOAD-XINCARN-ADOPT comm=perl on Y and touch_rc=0; with it on (arm 1) the
+# reload poisons the shell (P-RELOAD-XINCARN-POISON comm=perl), the size path
+# refuses after its lock, the VFS re-walks and the removed name gives ENOENT:
+# touch_rc=2, never 116 (ESTALE reaching user space).
+#
+# VERDICT RULES (written before the first lap):
+#   SHOWN       the control lap reads CONTROL-SHOWS-CAUSE and both fix laps
+#               read PASS (reused > 0, hit 0, y_poison_touch -- comm=perl --
+#               > 0, node_failures 0) with a cold audit CLEAN errors=0.
+#   FIX FAILS   a fix lap reads FAIL, its cold audit is not CLEAN errors=0, or
+#               any of its iterations reads touch_rc=116: attributed from its
+#               own lines first.  The record stays open.
+#   NOT SHOWN   the control lap reads CONTROL-NO-HIT with reused > 0: the
+#               truncate does not reach the new file on the pre-fix path, read
+#               from its own lines (which path refused it) and recorded.
+#   A VACUOUS lap (no reuse) measured nothing and is rerun after its cause is
+#   read from its own lines; a NOREACH fix lap does not count; an ABORT or an
+#   overrun is read from its own lines.
+#
+# Bound per lap, from the harness header's step bounds (as in
+# snop_ab_tcpmpath.queue): prep 300, the read-backs 5 x 20 per node (200),
+# mkdir 20, 8 iterations x (20 + 20 + 30 + (6 + 30) + 20), Y's closing reset
+# 20, counter reads 20 per node (40), stream copy 120 per node (240),
+# chk_clean 150: 1978 s.
+1978 SNR_SHAPE=peer SNR_OP=truncate SNR_DELAY_MS=6000 SNR_POISON=0 tests/stale_name_setattr_reuse.sh strc0 8 2/disk/caw/direct g2b
+1978 SNR_SHAPE=peer SNR_OP=truncate SNR_DELAY_MS=6000 SNR_POISON=1 tests/stale_name_setattr_reuse.sh strc1 8 2/disk/caw/direct g2b
+1978 SNR_SHAPE=peer SNR_OP=truncate SNR_DELAY_MS=6000 SNR_POISON=1 tests/stale_name_setattr_reuse.sh strc2 8 2/disk/caw/direct g2b

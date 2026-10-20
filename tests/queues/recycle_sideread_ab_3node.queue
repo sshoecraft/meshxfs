@@ -1,0 +1,42 @@
+# H-F14 A/B for D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT
+# on 3/disk/caw/direct g3 (test1 test2 test3).  Same build for both arms:
+# ~/src/mxfs-e srcversion D91D7504990C6BD4175874E, the main tree's sources plus
+# the H-F14 change (xfs_iget_recycle takes a platter side-read for a stale
+# recycle of a P91-protected cluster buffer; module knob recycle_stale_sideread,
+# 1 = the adopt verdict uses the platter, 0 = the kept buffer; the side-read,
+# its P-RECYCLE-SIDEREAD line and the recycle_sideread_disagree count run in
+# both settings).  Run from ~/src/mxfs-e.  Every other setting is exactly
+# tests/queues/freed_nodelay_3node.queue's (production settings: both test delays
+# off); NG0_RECYCLE_SIDEREAD alternates 0 (control) and 1 (fix).
+#
+# HYPOTHESIS H-F14 (in the record before the patch): a stale-gated recycle whose
+# cluster buffer is P91-protected judges the kept buffer's bytes, so a shell
+# poisoned for a cross-incarnation platter image is re-instantiated as the dead
+# incarnation, and a namespace operation retried on it frees the number while
+# the platter's incarnation is live (lfn1, 2/net/mesh/direct, ino 136).
+#
+# READING RULES (written before the first lap; shared by the four
+# recycle_sideread_ab_*.queue files, graded as one campaign):
+#   Reach is SRESULT's rs_live_reuse: P-RECYCLE-SIDEREAD lines whose kept buffer
+#   holds the in-core generation and whose platter holds a different live
+#   incarnation (lfn1's shape).  A lap without reach is SVACUOUS and counts for
+#   neither arm.
+#   SUPPORTED when at least one control lap is SCONTROL-SHOWS-CAUSE with the
+#   audit's P-FREE-LIVE-CORE inode named by a verdict=kept P-RECYCLE-SIDEREAD
+#   line of that lap, and every fix lap with reach is SPASS (audit CLEAN, no
+#   node failure), with at least three fix laps reaching.
+#   REFUTED if a fix lap shows P-FREE-LIVE-CORE on an inode whose recycle took
+#   the platter verdict, or a control lap shows P-FREE-LIVE-CORE on an inode no
+#   verdict=kept line of that lap names (the corruption then has another path).
+#   Otherwise undecided: more laps on the same rules, never a disposition.
+#   Any other CORRUPT shape, node failure, stall or ABORT is attributed from its
+#   own lines to its own record before anything else.  Also read on every lap:
+#   the D-FREED F fields, WRESULT, CRESULT, and tests/iwr_refuse_streaks.sh.
+#
+# Bound: the freed_nodelay laps' 1680 s per lap (they ran 492-536 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RECYCLE_SIDEREAD=0 tests/noino_gen0_ab.sh rs31 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RECYCLE_SIDEREAD=1 tests/noino_gen0_ab.sh rs32 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RECYCLE_SIDEREAD=0 tests/noino_gen0_ab.sh rs33 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RECYCLE_SIDEREAD=1 tests/noino_gen0_ab.sh rs34 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RECYCLE_SIDEREAD=0 tests/noino_gen0_ab.sh rs35 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RECYCLE_SIDEREAD=1 tests/noino_gen0_ab.sh rs36 1 300 3/disk/caw/direct g3

@@ -1,0 +1,15 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F7b: the
+# same same-build A/B as tests/queues/hf7b_recycle_guard_ab.queue (its header
+# states the hypothesis and the verdict rules), on the configuration of all
+# three corrupt laps (2/net/mesh/mpath, test1/test2), run from ~/src/mxfs-b
+# (build 20B13312E9D131CF33DDF44) beside that queue's 2/net/mesh/direct laps
+# on test29/test30.  NG0_RECYCLE_GUARD=0 is the control, =1 the fix.
+# Bound per lap, the sum of the harness's own step bounds: prep_cluster 300 +
+# workload SECS+60 = 360 + counters 2x40 + knob sets/resets 2x(20+20+20) +
+# chk_clean with alloc_witness 150 + stream capture 2x120 + snapshot 60 = 1310 s.
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hmc1 1 300 2/net/mesh/mpath g2
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hmf1 1 300 2/net/mesh/mpath g2
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hmc2 1 300 2/net/mesh/mpath g2
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hmf2 1 300 2/net/mesh/mpath g2
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hmc3 1 300 2/net/mesh/mpath g2
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hmf3 1 300 2/net/mesh/mpath g2

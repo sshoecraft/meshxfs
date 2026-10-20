@@ -284,6 +284,14 @@ enum mxfs_lock_state {
  * before returning -EAGAIN.
  */
 #define MXFS_LKF_DEMAND     (1 << 6)  /* NOQUEUE: leave a sticky revoke behind */
+/*
+ * D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349: an inode-number reserve,
+ * the allocator's exclusion claim on a free number.  On the TCP transport an
+ * EX mirror this node already holds answers it locally instead of a round trip
+ * to a remote master (whose answer is the re-affirm of the same durable grant).
+ * Local to the requester: never sent on the wire.
+ */
+#define MXFS_LKF_RESERVE    (1 << 7)
 
 /* ─── Peer-to-peer DLM messages (daemon <-> daemon over TCP) ─── */
 

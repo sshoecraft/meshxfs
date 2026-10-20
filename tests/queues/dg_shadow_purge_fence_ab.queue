@@ -1,0 +1,58 @@
+# D-DG-SHADOW-KEEPS-A-PURGED-DEAD-NODES-EX-AND-REPORTS-FALSE-DOUBLE-GRANTS:
+# the DLM's double-grant instrument (dg_shadow, dlm/dlm.c dg_grant_ex) kept a
+# fenced node's EX grants active after the master purged that node's locks,
+# so every later EX grant of those resources printed P-DOUBLEGRANT naming the
+# dead incarnation as owner_existing.  Measured on 2/net/mesh/mpath
+# path_fenced_return (g2e, laps ebc1..ebd8, ~/src/mxfs-g 65863B92): in 28 of
+# 36 captures, every owner_existing the lap's fenced test18 incarnation, each
+# with a P48-DG-CHAIN dump holding only the new owner; the ledger's own check
+# (P-TAUTH-DOUBLE-GRANT) 0 in all 36.  The user-mode A/B (dlm_ledger_test
+# case 7, tests/evidence/dg_shadow_purge_ab_um) passed the fix 2 of 2 and
+# failed the control 2 of 2.
+#
+# Build: a sibling synced from the main tree (tools/sibling_sync.sh, marker
+# P-DG-PURGE-RELEASED): the main tree's sources, i.e. 65863B92's plus
+# dl_dg_purge_releases (default 1), dl_local_wait_keeps_decided (default 1),
+# dl_local_refusal_redrives (default 1), dl_local_acq_end (default 1) and
+# dl_retry_handoff_grace_ms (default 1000).  2/net/mesh/mpath on g2e (test17
+# test18); path_fenced_return fences test18, which unmounts, mounts again and
+# runs its load; then chk_clean.
+#
+# ARMS.  Same-build A/B of dl_dg_purge_releases, written and read back on both
+# nodes by the row (knobs.txt): 0 = control (the shadow keeps a purged
+# owner's EX), 1 = fix.  Order c1 f1 f2 c2.  The three other new switches stay
+# at their defaults in both arms, so these laps are also their first kernel
+# run on the rig.
+#
+# READING RULES (written before the first lap), per lap, lines attributed by
+# the row window (consecutive laps' kernel windows overlap):
+#   knobs.txt shows dl_dg_purge_releases taken on both nodes (else the lap
+#     judges nothing: rerun).
+#   P-DOUBLEGRANT lines per node with their owner_existing, the fenced test18
+#     incarnation's node id from the row's own fence lines, P48-DG-CHAIN for
+#     each P-DOUBLEGRANT's ino, P-DG-PURGE-RELEASED lines (owner, n).
+#   CONTROL: P-DOUBLEGRANT naming the fenced incarnation as owner_existing, its
+#     P48-DG-CHAIN without that owner, no P-DG-PURGE-RELEASED.
+#   FIX: no P-DOUBLEGRANT whose owner_existing is a purged incarnation, and
+#     P-DG-PURGE-RELEASED naming the fenced incarnation on the node that purged
+#     it.
+#   REACH: at least one control lap with the control shape.
+#   SUPPORTED: REACH and every fix lap as FIX.  REFUTED: a fix lap with a
+#     P-DOUBLEGRANT naming a purged incarnation after that incarnation's
+#     P-DG-PURGE-RELEASED (then some purge path does not reach the release).
+#   VACUOUS: no fence in a lap (no purge to release), or the knob not taken.
+#   FIX FAILS (any arm, attributed from its own lines first): a shutdown, BUG,
+#     Oops or hung task, P-TAUTH-DOUBLE-GRANT (the ledger's check), a lost or
+#     corrupt file, chk_clean not CLEAN.
+#   Recorded, not graded: counts of P-LOCAL-WAIT-REFUSED,
+#     P958-ACQ-LOCAL-ANSWER-END, P-LOCAL-WAIT-KEPT-DECIDED per node; the
+#     typeflip ESTALE shape (test18's mkdir ESTALE after rejoining) belongs to
+#     D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED.
+#
+# Bounds: as tests/queues/ebusy_retire_first_ab.queue (same rows, same group):
+# path_fenced_return 400 s + chk_clean 180 s + the chain's measured overhead
+# outside the rows (130-160 s) = 730 s; the first lap adds prep_cluster 300 s.
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dgc1 1 --prep --knobs "dl_dg_purge_releases=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dgf1 1 --knobs "dl_dg_purge_releases=1" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dgf2 1 --knobs "dl_dg_purge_releases=1" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dgc2 1 --knobs "dl_dg_purge_releases=0" --rows path_fenced_return,chk_clean

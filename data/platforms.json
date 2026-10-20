@@ -27,6 +27,25 @@
         "amd64"
       ]
     },
+    "pve92": {
+      "name": "Proxmox VE 9.2 (kernel 7.0)",
+      "status": "released",
+      "kernels": [
+        "7.0.14-25-pve (PVE 9.2 updated: pve-manager 9.2.21)"
+      ],
+      "packages": [
+        "mxfs_<v>_amd64.deb",
+        "pve-storage-mxfs_<v>_all.deb"
+      ],
+      "build_check": "scripts/vm_kbuild_check.sh pve92 7.0.2-6-pve 7.0.14-25-pve",
+      "verify_env": "two Proxmox VE 9.2 nodes built as lab/vms.md describes (pve92-1, pve92-2): installed from the 9.2 ISO (pve-manager 9.2.2, kernel 7.0.2-6-pve) and updated from the no-subscription repository to pve-manager 9.2.21 and kernel 7.0.14-25-pve, sharing one iSCSI LUN that supports SCSI persistent reservations and COMPARE AND WRITE (clyde's SCST target), attached in-guest; which nodes and which LUN come from this site's lab file (tools/mxfs_lab.sh nodes pve92). Platform rounds run on two nodes, the node and a peer to fence; scale is verified on the development rig by the release boards.",
+      "verify_tests": "install both .debs from the built packages on every node of the set; DKMS builds on every installed PVE kernel (7.0.2-6-pve and 7.0.14-25-pve); on the running kernel and EACH configuration of the release matrix: mount with no options on every node, transport announced by every mount; cross-node checksums (each node's data read on every other); create/remote-delete counts; chk_mxfs clean; peer= between two nodes with multicast blocked; pvesm add/status/remove holds one mount; O_DIRECT read on a stable-writes device; every node rebooted, module auto-loaded with the configured transport, remount, earlier data intact (CONFIG=<configuration> tests/packaged_round.sh pve92); hung-node freeze on each configuration (CONFIG=<configuration> PREP=pve92 tests/tcp_peer_freeze_death.sh): death declared, fence certified, replay, survivor writing",
+      "notes": "Released from 0.90.131 (owner, 2026-10-20: \"add 2 more VMs for 9.2 so we can support that too\"). A Proxmox forum tester on pve-manager 9.2.21 and kernel 7.0.14-25-pve reported the storage-API notice and the missing GUI entry fixed in 0.90.131 (tests/evidence/pve92_gui_tag).",
+      "priority": 1,
+      "arch": [
+        "amd64"
+      ]
+    },
     "ubuntu2404": {
       "name": "Ubuntu 24.04 LTS (GA kernel 6.8)",
       "status": "released",

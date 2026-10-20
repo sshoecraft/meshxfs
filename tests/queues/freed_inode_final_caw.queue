@@ -1,0 +1,117 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT: the CAW
+# half of the final verification, 2/disk/caw/direct and 2/disk/caw/mpath on
+# g2b, on the build of the final source: srcversion F09C3FED2DB371E0D9A8BC5
+# (main tree ~/src/mxfs, 0.90.131: the H-F11 fix, both halves of the fix for
+# D-RECYCLE-RESET-UNDER-NOINO-STRANDS-COMMITTED-DIR-CHANGE-WEDGE-SHUTDOWN, the
+# unlinked-list fixes of
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, and the
+# deferred-free fixes of
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY, all at their
+# defaults; run from ~/src/mxfs, the harness prints each lap's build and
+# refuses a node running anything else).  The record reaches every
+# configuration; every corrupt lap so far was on TCP.  These laps run the TCP
+# half's production settings on both CAW attachments: every guard at its
+# module default 1 (noino_gen0_guard, inact_local_epoch_guard,
+# noino_recycle_guard, freshsrc_keep_guard, selfclobber_keep_guard,
+# noino_resv_guard, noino_shell_guard, pub_claim_release_guard,
+# pub_claim_write_guard, deadshell_sanitize_guard, p55c_home_restore,
+# noino_recycle_dirty_wait, noino_recycle_takeover, freshsrc_iunl_overlay,
+# unlprev_tenure, b6_release_drain, unlprev_pin, unlprev_rele_defer,
+# ifree_defer_drain, ifree_defer_reap), no window held open,
+# mirror check on so the H-F7/H-F10 counters read.  NG0_P55C_RESTORE and
+# NG0_DIRTY_WAIT are not set (the knobs stay at their default 1; see the TCP
+# half's queue for why); the harness keeps H-F11's lines and chain and the
+# dirty-corpse lines on every lap.  Node failures are counted from each node's
+# whole kernel log after the lap's mark in both harnesses.
+#
+# The previous run of this half (build 737E182A809291DAA0B4785, labels
+# fxcd1..fxcm3): every noino lap VACUOUS by its generation-0 gate, both
+# peer-last-closer laps PASS; it ran before the recycle fix, so it does not
+# speak for this build.  The run on build C06A6D4A9AB7A357503DF51 (labels
+# fycd1..fycm3) was 8 of 8 cold audits CLEAN with hf11_chain 0; it ran before
+# the unlinked-list fixes, which change the inactivation and unlinked-list
+# paths every lap here exercises, so it does not speak for this build either.
+# The run on build 41D2F9237EBB21CF21E9D57 (labels fzcd1..fzcm3, log
+# tests/evidence/lapq_fzc.log) audited CORRUPT in every noino lap (logged
+# VACUOUS by the generation-0 gate, which then printed no audit; harness since
+# fixed), with every audited inode a free deferred at the unlinked-list
+# preflight: D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY,
+# whose two fixes this build carries.  Both peer-last-closer laps passed.
+#
+# THE DEFERRED-FREE GRADING (added for build 311877C4, before its first lap).
+# A free deferred at the unlinked-list preflight leaves its inode on its AGI
+# bucket, and tools/chk_mxfs grades a bucket member as legal crash residue, not
+# an error, so a CLEAN audit alone cannot show that the deferred inodes were
+# freed.  Every noino lap therefore also sets NG0_IFREE_DRAIN=1
+# NG0_IFREE_REAP=1 (the module defaults, written and read back): the harness
+# then attributes every bucket member and fork-ownership error to the
+# deferrals that name it (tools/ifree_defer_attribution.py) and passes the lap
+# only with no fork-ownership error, no unlanded drain and no bucket member
+# left (if_ok=1).  The deferrals' reach (20 to 30 a lap on CAW on the previous
+# build) is then those laps' vacuity gate, in place of the generation-0
+# release's, which CAW never reached.
+#
+# VERDICT RULES (written before the first lap):
+#   CLEAN     every lap's cold audit CLEAN errors=0 with node_failures=0 and
+#             hf11_chain=0, and every noino lap if_ok=1 with if_zombies=0 and
+#             if_fork_errors=0.  A noino lap graded VACUOUS by the deferrals'
+#             reach gate keeps its cold audit and hf11_chain as its verdict and
+#             is reported as unreached.  The peer-last-closer
+#             laps must pass their harness (PASS, ZRESULT not ZFAIL) and reach
+#             the H-F6 branch (inact_peerfreed > 0 in aggregate).
+#   REACH     p55_restored_lof per lap (H-F11 on CAW: the H-F11 A/B's CAW
+#             control xcc1 did not reach it), the guards' counters, and the
+#             dirty-corpse lines (P-RECYCLE-DIRTY-WAIT/KEEP/TAKEOVER,
+#             P-NOINO-TAKEN-OVER).
+#   CORRUPT   any CORRUPT audit, hf11_chain > 0, or P-RECYCLE-RESET-UNDER-NOINO
+#             with owes=1 blocks the record: attribute the audited inode
+#             (chk_audit.log, <node>_audited_inos.txt) or the line to a known
+#             shape or a new one.
+#   UNSTABLE  any node failure line in a lap's whole kernel log: blocks both
+#             records until attributed.
+# A lap whose audit is STALE/NONE has no verdict and is rerun.
+#
+# The run on build 311877C431E1BB444562804 (labels fwcd1..fwcm3, log
+# tests/evidence/lapq_fwc.log) was 7 of 8 PASS: lap fwcm3 (2/disk/caw/mpath)
+# FAILED if_ok=0 with six deferred zombies left on AG 1 bucket 1 after the clean
+# unmount, each one's reap entry retired by a lookup that met its in-core inode
+# queued for inactivation: H-3 of
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY, whose change
+# (reap_transient_keep, default 1) this build carries along with H-U7 of
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES
+# (reload_next_refresh, default 1) and a publish-drain instrument (no behaviour
+# change).  This run (labels fucm1..fucd3) puts the mpath laps first: the
+# direct laps of tests/queues/peer_open_unlinked_final_g_caw.queue hold
+# run.sh's 2/disk/caw/direct lock on g2d while it starts.  The rules below are
+# unchanged; under H-3's change a lap also fails on any reap entry retired by a
+# transient lookup failure (if_retired_transient > 0, the harness's if_ok).
+#
+# The run on build F09C3FED2DB371E0D9A8BC5 (labels fucm1..fucd3, log
+# tests/evidence/lapq_fuc.log) was 8 of 8 PASS.  This run (labels fvc*,
+# written before its first lap) is on build 37897D38118AD5E2FAAC4FC (main tree
+# ~/src/mxfs, 0.90.131): that source plus every change made since, each at its
+# module default.  Behaviour: H-F13's inode-allocation fence with its revision
+# H-F13b (ag_ialloc_fence 1, ag_fence_hint_exempt 1), H-F12's bounded drain
+# built but off (pub_drain_bound 0, the open scan every earlier run had), and
+# the fixes of D-CREATE-REUSE-OVER-PEER-FREED-LINKED-CORPSE-SHUTS-NODE-DOWN
+# (cr63_linked_defer), D-UMOUNT-ROOT-DENTRY-STILL-IN-USE-DEFERRED-DIR-DCACHE-SHRINK-RACE
+# (dshrink_umount_gate), D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-NUMBER-REUSE
+# (sf_kept_ahead_base) and D-FORMATION-RAMP-LOCK-REQUEST-EXHAUSTS-RETRIES-EAGAIN
+# (ilock_retry_exhaust_park, dl_retry_view_unspent).  Instruments only: the
+# handoff exposure census (P-PUB-UNPUB-AT-UNLOCK), the phantom detector's
+# in-flight sample and the next-write detector's own-free exception.  The
+# direct laps go first this time: the dentry-race A/B
+# (tests/queues/umount_dshrink_race_ab.queue) holds run.sh's 2/disk/caw/mpath
+# lock on g2d while this queue starts.  The rules above are unchanged.
+#
+# Bounds: noino laps 1680 s (the TCP half's derivation: 1660 + the P55C stream
+# pass 2x10); the peer-last-closer laps 1130 s (the H-F6 queue's 1090 + 2x20
+# for the sanitize knob set/readback).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fvcd1 1 300 2/disk/caw/direct g2b
+1130 PLC_SANITIZE_GUARD=1 tests/peer_last_closer_ab.sh fvcl2 1 40 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fvcd2 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fvcm1 1 300 2/disk/caw/mpath g2b
+1130 PLC_SANITIZE_GUARD=1 tests/peer_last_closer_ab.sh fvcl1 1 40 2/disk/caw/mpath g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fvcm2 1 300 2/disk/caw/mpath g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fvcd3 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh fvcm3 1 300 2/disk/caw/mpath g2b

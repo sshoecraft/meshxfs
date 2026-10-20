@@ -1,0 +1,63 @@
+# D-CREATE-ON-ZOMBIE-SHELL-INHERITS-DEAD-LIFE-NBLOCKS, H-Z1: a reload that
+# adopts a peer's free image (P116-ZOMBIE-ADOPT) sets only the shell's
+# generation and mode, so the shell keeps the dead life's block count; a create
+# that recycles it is deferred as a dead shell (P-CR63-DEADSHELL-DEFER), the
+# recycle's sanitize arm (xfs/xfs_icache.c, P-RECYCLE-SANITIZE) resets only a
+# shell that still has a mode, and xfs_inode_init only asserts the block count
+# is 0, so the new life's core goes home with the dead life's count.  Traced on
+# lap q6dc1 (2/net/mesh/direct g2c, build 3AEA31FDF4AD31EFBBA6A90, H-F6 control):
+# ino 8388736 'done' went home with nblocks 1 and no extents and failed
+# xfs_dinode_verify (xfs_inode_buf.c:1166) on both nodes.
+#
+# Same-build A/B of module knob deadshell_sanitize_guard (0 = control: the
+# mode-only test; 1 = fix: every deferred dead shell over a free home is reset),
+# on tests/peer_last_closer_ab.sh with its own guard (inact_local_epoch_guard)
+# at 0 in both arms, because that arm makes every peer-freed verdict on the
+# unlinker end in a zombie adopt (q6mc1 20, q6mc2 19, q6dc1 19), and the
+# unlinker's next create of the number recycles that shell.  Setattr delay 400
+# ms and unlink live delay 1000 ms as in the H-F6 queues; every other guard at
+# its module default.  Runs from ~/src/mxfs-c, build A7E5F619C93D6F05C21A1CB
+# (main-tree source at 17:58Z: the guard, the counters deadshell_stale_blocks /
+# deadshell_stale_sanitized / create_nblocks_inherited, the probes
+# P-RECYCLE-DEADSHELL-STALE and P-CREATE-NBLOCKS-INHERITED; the harness prints
+# each lap's build and refuses a node running anything else) on
+# 2/net/mesh/mpath g2 (test1 test2).
+#
+# THE AUDIT.  chk_clean runs /src/mxfs/tools/chk_mxfs, the main tree's binary;
+# P-NBLOCKS-MISMATCH (a live core whose block count is not the blocks its forks
+# name) is in that binary only from its rebuild on.  Each lap's ZRESULT prints
+# audit_nblocks_mismatch; a lap audited before the rebuild reads 0 there by
+# construction and is judged on the kernel counters and the verifier lines.
+#
+# VERDICT RULES (written before the first lap):
+#   REACHED       every control lap reads a_stale_blocks > 0 (ZCONTROL with the
+#                 hazard counted on the unlinker).  If no control lap is
+#                 reached, the window is redesigned before anything is judged.
+#   PROVEN        a reached control lap reads nblocks_inherited > 0, and at
+#                 least one of its P-CREATE-NBLOCKS-INHERITED lines names a
+#                 number that has a P-RECYCLE-DEADSHELL-STALE line guard=0 on
+#                 the same node within the preceding second (the harness keeps
+#                 both in <node>_zshell.txt).
+#   FIX VERIFIED  REACHED and PROVEN, and every non-vacuous fix lap
+#                 (a_sanitized > 0) reads ZPASS: nblocks_inherited 0 on both
+#                 nodes, dinode_verify_fail 0, audit CLEAN, node_failures 0.
+#   REFUTED       a non-vacuous fix lap reads nblocks_inherited > 0 or a dinode
+#                 verify failure: the guard does not close the path; trace the
+#                 instance.
+#   OTHER         a P-CREATE-NBLOCKS-INHERITED line on either arm whose number
+#                 has no P-RECYCLE-DEADSHELL-STALE line before it: a second path
+#                 into xfs_inode_init with a block count, its own finding,
+#                 traced; it does not judge this guard but blocks the record's
+#                 closure.  So does any P-NBLOCKS-MISMATCH in an audit.
+# A lap whose audit is STALE/NONE has no verdict and is rerun; a ZVACUOUS lap
+# has no verdict.
+#
+# Bound per lap: the harness's own step bounds, as in
+# tests/queues/hf6_peer_last_closer_tcp_ab.queue (1086 s), plus 2x20 s for the
+# sanitize knob set/readback = 1126 s.  Its laps took 283-447 s.
+1130 PLC_SANITIZE_GUARD=0 tests/peer_last_closer_ab.sh nbmc1 0 40 2/net/mesh/mpath g2
+1130 PLC_SANITIZE_GUARD=1 tests/peer_last_closer_ab.sh nbmf1 0 40 2/net/mesh/mpath g2
+1130 PLC_SANITIZE_GUARD=0 tests/peer_last_closer_ab.sh nbmc2 0 40 2/net/mesh/mpath g2
+1130 PLC_SANITIZE_GUARD=1 tests/peer_last_closer_ab.sh nbmf2 0 40 2/net/mesh/mpath g2
+1130 PLC_SANITIZE_GUARD=1 tests/peer_last_closer_ab.sh nbmf3 0 40 2/net/mesh/mpath g2
+1130 PLC_SANITIZE_GUARD=1 tests/peer_last_closer_ab.sh nbmf4 0 40 2/net/mesh/mpath g2

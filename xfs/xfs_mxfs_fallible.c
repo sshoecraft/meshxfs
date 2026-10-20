@@ -105,6 +105,30 @@ mxfs_recovtask_set_phase(uint8_t phase)
 static DEFINE_SPINLOCK(mxfs_acqfall_lock);
 static DEFINE_HASHTABLE(mxfs_acqfall_hash, 4);
 
+/*
+ * 0.90.131: ends owed to no begin (struct mxfs_acqfallible unowed[]), summed
+ * over every live registration.  mxfs_dlm_ilock_end reads only this on its
+ * fast path and looks a registration up only while it is non-zero.
+ * acqfall_unowed_skip=0 is the control: give-ups are still counted, every
+ * end decrements as it did before, and a given-up member's unlock prints
+ * P71-UNDERFLOW.
+ */
+atomic_t mxfs_acqfall_unowed_total = ATOMIC_INIT(0);
+int mxfs_acqfall_unowed_skip = 1;
+module_param_named(acqfall_unowed_skip, mxfs_acqfall_unowed_skip, int, 0644);
+MODULE_PARM_DESC(acqfall_unowed_skip,
+		 "an unlock of an inode whose fallible acquire gave up and counted no holder skips its DLM end (1, default); 0 = the end runs and underflows (test control)");
+atomic_t mxfs_acqfall_unowed_skip_n = ATOMIC_INIT(0);
+module_param_named(acqfall_unowed_skip_n, mxfs_acqfall_unowed_skip_n.counter, int, 0444);
+MODULE_PARM_DESC(acqfall_unowed_skip_n,
+		 "DLM ends skipped because a give-up owed none (acqfall_unowed_skip)");
+
+static inline int
+mxfs_acqfall_mode_ix(uint8_t mode)
+{
+	return mode == MXFS_LOCK_EX ? 1 : 0;
+}
+
 static void
 mxfs_acqfall_enter_kind(struct mxfs_acqfallible *e, u64 id, bool ag)
 {
@@ -113,6 +137,7 @@ mxfs_acqfall_enter_kind(struct mxfs_acqfallible *e, u64 id, bool ag)
 	e->ag = ag;
 	e->gave_up = false;
 	e->rc = 0;
+	e->unowed[0] = e->unowed[1] = 0;
 	spin_lock(&mxfs_acqfall_lock);
 	hash_add(mxfs_acqfall_hash, &e->node, (unsigned long)current);
 	spin_unlock(&mxfs_acqfall_lock);
@@ -124,12 +149,64 @@ mxfs_acqfall_enter(struct mxfs_acqfallible *e, u64 ino)
 	mxfs_acqfall_enter_kind(e, ino, false);
 }
 
-void
+/* noinline: the dropped-count line names its caller by return address */
+noinline void
 mxfs_acqfall_exit(struct mxfs_acqfallible *e)
 {
+	static atomic_t	p_dropped_n = ATOMIC_INIT(0);
+	int		n, pr, ex;
+
 	spin_lock(&mxfs_acqfall_lock);
 	hash_del(&e->node);
+	/* a given-up member unlocked with XFS_ILOCK_MXFS_NOEND never reached
+	 * an end to consume its count: nothing is owed past the registration */
+	pr = e->unowed[0];
+	ex = e->unowed[1];
+	n = pr + ex;
+	e->unowed[0] = e->unowed[1] = 0;
 	spin_unlock(&mxfs_acqfall_lock);
+	if (n) {
+		atomic_sub(n, &mxfs_acqfall_unowed_total);
+		/*
+		 * Instrument, no behaviour: a count dropped here was owed by a
+		 * give-up whose unlock had not run yet or ran with
+		 * XFS_ILOCK_MXFS_NOEND.  The caller names which: a NOEND site
+		 * (mxfs_ilock_fallible) drops by design, a site that unlocks
+		 * after its exit leaves that unlock's end to underflow.
+		 */
+		if (atomic_inc_return(&p_dropped_n) <= 64)
+			mxfs_probe("mxfs: P-ACQFALL-UNOWED-DROPPED ino=%llu ex=%d pr=%d comm=%s by=%pS -- a registration ended with ends still owed none; an unlock after this point runs its end\n",
+				(unsigned long long)e->ino, ex, pr,
+				current->comm, __builtin_return_address(0));
+	}
+}
+
+/*
+ * The DLM end's question, asked only while mxfs_acqfall_unowed_total is
+ * non-zero: does the current task owe no end for this inode in this mode?
+ * Consumes one when it does.
+ */
+bool
+mxfs_acqfall_consume_unowed(u64 ino, uint8_t mode)
+{
+	struct mxfs_acqfallible *e;
+	int ix = mxfs_acqfall_mode_ix(mode);
+	bool consumed = false;
+
+	spin_lock(&mxfs_acqfall_lock);
+	hash_for_each_possible(mxfs_acqfall_hash, e, node,
+			       (unsigned long)current) {
+		if (e->task == current && !e->ag && e->ino == ino &&
+		    e->unowed[ix]) {
+			e->unowed[ix]--;
+			consumed = true;
+			break;
+		}
+	}
+	spin_unlock(&mxfs_acqfall_lock);
+	if (consumed)
+		atomic_dec(&mxfs_acqfall_unowed_total);
+	return consumed;
 }
 
 /* Is the current task's acquire of THIS inode allowed to fail instead of
@@ -264,11 +341,14 @@ mxfs_iget_root_fallible(struct xfs_mount *mp, xfs_ino_t ino,
 
 /* The hook's verdict: this acquire is being abandoned, fail the operation
  * with `rc` (0.84.5: -EIO for an abandoned wait, -EAGAIN for a stalled
- * authority transition — the caller may simply try again later). */
+ * authority transition — the caller may simply try again later).  Every
+ * caller is a begin-hook arm that returns with no holder counted for `mode`,
+ * so the unlock of what this begin took owes no DLM end (unowed[]). */
 void
-mxfs_acqfall_give_up_rc(u64 ino, int rc)
+mxfs_acqfall_give_up_rc(u64 ino, int rc, uint8_t mode)
 {
 	struct mxfs_acqfallible *e;
+	bool counted = false;
 
 	spin_lock(&mxfs_acqfall_lock);
 	hash_for_each_possible(mxfs_acqfall_hash, e, node,
@@ -276,16 +356,22 @@ mxfs_acqfall_give_up_rc(u64 ino, int rc)
 		if (e->task == current && !e->ag && e->ino == ino) {
 			e->gave_up = true;
 			e->rc = rc;
+			if (e->unowed[mxfs_acqfall_mode_ix(mode)] < U16_MAX) {
+				e->unowed[mxfs_acqfall_mode_ix(mode)]++;
+				counted = true;
+			}
 			break;
 		}
 	}
 	spin_unlock(&mxfs_acqfall_lock);
+	if (counted)
+		atomic_inc(&mxfs_acqfall_unowed_total);
 }
 
 void
-mxfs_acqfall_give_up(u64 ino)
+mxfs_acqfall_give_up(u64 ino, uint8_t mode)
 {
-	mxfs_acqfall_give_up_rc(ino, -EIO);
+	mxfs_acqfall_give_up_rc(ino, -EIO, mode);
 }
 
 /* Read and clear, so a caller that retries starts from a clean verdict.
@@ -662,6 +748,12 @@ mxfs_namespace_refused(struct xfs_inode *dp, const char *op, int rc)
  * set is released again (an unlock after a given-up acquire is the same
  * balance mxfs_ilock_fallible relies on) and the first refusal's errno is
  * returned with nothing held.
+ *
+ * The registrations end only after that release.  A given-up member's
+ * acquire installed no holder, and its unlock's DLM end consumes the count
+ * the give-up left on the member's registration; ended first, the
+ * registration took the count with it and the end ran against no holder
+ * (P71-UNDERFLOW at both helpers in acqcv2's acqfall_unowed_skip=1 arm).
  */
 int
 mxfs_lock_two_inodes_fallible(struct xfs_inode *ip0, uint ip0_mode,
@@ -676,13 +768,13 @@ mxfs_lock_two_inodes_fallible(struct xfs_inode *ip0, uint ip0_mode,
 	xfs_lock_two_inodes(ip0, ip0_mode, ip1, ip1_mode);
 	g0 = mxfs_acqfall_taken(&f0, &rc0);
 	g1 = mxfs_acqfall_taken(&f1, &rc1);
-	mxfs_acqfall_exit(&f1);
-	mxfs_acqfall_exit(&f0);
 	if (g0 || g1) {
 		xfs_iunlock(ip1, ip1_mode);
 		xfs_iunlock(ip0, ip0_mode);
 		ret = fatal_signal_pending(current) ? -EINTR : (g0 ? rc0 : rc1);
 	}
+	mxfs_acqfall_exit(&f1);
+	mxfs_acqfall_exit(&f0);
 	return ret;
 }
 
@@ -707,7 +799,6 @@ mxfs_lock_inodes_fallible(struct xfs_inode **ips, int n, uint lock_mode)
 			continue;
 		if (mxfs_acqfall_taken(&f[i], &frc) && !ret)
 			ret = frc;
-		mxfs_acqfall_exit(&f[i]);
 	}
 	if (ret) {
 		for (i = n - 1; i >= 0; i--) {
@@ -717,6 +808,12 @@ mxfs_lock_inodes_fallible(struct xfs_inode **ips, int n, uint lock_mode)
 		}
 		if (fatal_signal_pending(current))
 			ret = -EINTR;
+	}
+	/* after the release, as mxfs_lock_two_inodes_fallible's */
+	for (i = 0; i < n; i++) {
+		if (!ips[i] || (i && ips[i] == ips[i - 1]))
+			continue;
+		mxfs_acqfall_exit(&f[i]);
 	}
 	return ret;
 }

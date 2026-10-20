@@ -121,6 +121,532 @@ module_param_named(dl_noqueue_ledger_nowait, mxfs_dl_noqueue_ledger_nowait, int,
 MODULE_PARM_DESC(dl_noqueue_ledger_nowait,
 		 "an AG lock's no-queue request does no ledger I/O and leaves an unready page to the hand-off worker (1, default); 0 = it prepares the page itself (test control)");
 /*
+ * A request that asked not to queue and got no answer within one attempt
+ * answers would-block (P-ACQ-NOQUEUE-UNANSWERED), so a caller holding inode
+ * locks falls back to a wait that holds nothing.  0 = it goes on re-sending
+ * for the whole budget like a queued request: the same-build control arm,
+ * never a production value.  Measured on 8/net/mesh/mpath path_all_lost: a
+ * rename's AG probe toward a victim that had withdrawn with its connections
+ * up re-sent 60 times, 1 s each, with two directory ILOCKs held, and every
+ * survivor stalled 131 s behind the AIL those inodes pinned.
+ */
+int mxfs_dl_noqueue_unanswered_wouldblock = 1;
+module_param_named(dl_noqueue_unanswered_wouldblock, mxfs_dl_noqueue_unanswered_wouldblock, int, 0644);
+MODULE_PARM_DESC(dl_noqueue_unanswered_wouldblock,
+		 "a no-queue request with no answer in one attempt answers would-block (1, default); 0 = it re-sends for the whole budget (test control)");
+/*
+ * An acquire answered RETRY (a remaster to the view's master, a page parked
+ * for its hand-off, a pending request purged) when the view has changed since
+ * its previous answer is waiting for the view to settle, and the view is
+ * moving.  1 (default): such an answer does not spend the retry budget, for
+ * at most MXFS_DLM_DEAD_MASTER_WAIT_MS from the acquire's start; 0 = it spends
+ * one retry as every RETRY did (the same-build control).  Measured in user
+ * mode (tests/tauth/formation_test, 12 nodes joining 40 ms apart on two CPUs
+ * under four busy loops): a node's first PR after its join spent its 10
+ * retries in 659 ms, 7 of them on answers that followed a view change, and
+ * returned -EAGAIN; the inode lock's timeout classifier has no arm for
+ * -EAGAIN and shuts the filesystem down when a full budget ends that way.
+ * dl_retry_view_unspent_n counts those answers; writing the knob resets it.
+ */
+int mxfs_dl_retry_view_unspent = 1;
+atomic_t mxfs_dl_retry_view_unspent_n = ATOMIC_INIT(0);
+static int dl_retry_view_unspent_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_retry_view_unspent_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_retry_view_unspent_ops = {
+	.set = dl_retry_view_unspent_set,
+	.get = param_get_int,
+};
+module_param_cb(dl_retry_view_unspent, &dl_retry_view_unspent_ops,
+		&mxfs_dl_retry_view_unspent, 0644);
+MODULE_PARM_DESC(dl_retry_view_unspent,
+		 "a RETRY answer that follows a change of the view does not spend the acquire's retry budget (1, default); 0 = it does (test control); writing it resets dl_retry_view_unspent_n");
+module_param_named(dl_retry_view_unspent_n, mxfs_dl_retry_view_unspent_n.counter, int, 0444);
+MODULE_PARM_DESC(dl_retry_view_unspent_n,
+		 "RETRY answers that followed a change of the view and did not spend the retry budget, since dl_retry_view_unspent was last written");
+/*
+ * An acquire answered RETRY because the ledger page of its resource is being
+ * handed over, with the view unchanged, is waiting on that hand-off: a remote
+ * master's REMASTER (its page parked or its view ahead), or this node's own
+ * prepare park while it asks the page of its live owner, of the live
+ * bootstrap node, or waits for a live target it prepared the page to.  A
+ * hand-off is a FREEZE_REQ round trip and two durable page commits, asked
+ * again every DLM_HANDOFF_REQ_INTERVAL_MS, while a count budget parks 12 ms
+ * at 3 and 60 ms at 5: measured in user mode, formation_test at budget 3
+ * failed every run on such answers and dlm_ledger_test case 15's first EX
+ * (budget 5) spent its budget on REMASTER while the bootstrap node had not
+ * yet answered the master's FREEZE_REQ.  Such an answer to a queued request
+ * does not spend the budget for this many ms after the acquire's first one;
+ * after that it spends as before, so a hand-off that never completes still
+ * ends the request.  0 = every such answer spends (the same-build control).
+ * dl_retry_handoff_unspent_n counts the unspent answers; writing the knob
+ * resets it.
+ */
+int mxfs_dl_retry_handoff_grace_ms = 1000;
+atomic_t mxfs_dl_retry_handoff_unspent_n = ATOMIC_INIT(0);
+static int dl_retry_handoff_grace_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_retry_handoff_unspent_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_retry_handoff_grace_ops = {
+	.set = dl_retry_handoff_grace_set,
+	.get = param_get_int,
+};
+module_param_cb(dl_retry_handoff_grace_ms, &dl_retry_handoff_grace_ops,
+		&mxfs_dl_retry_handoff_grace_ms, 0644);
+MODULE_PARM_DESC(dl_retry_handoff_grace_ms,
+		 "how long a queued acquire's RETRY answers that report a ledger page hand-off in flight do not spend its retry budget (default 1000 ms); 0 = they do (test control); writing it resets dl_retry_handoff_unspent_n");
+module_param_named(dl_retry_handoff_unspent_n, mxfs_dl_retry_handoff_unspent_n.counter, int, 0444);
+MODULE_PARM_DESC(dl_retry_handoff_unspent_n,
+		 "RETRY answers reporting a page hand-off in flight that did not spend the retry budget, since dl_retry_handoff_grace_ms was last written");
+/*
+ * A locally mastered acquire whose one-second wait runs out after a release
+ * has already decided its grant (its entry PENDING_DURABLE, the ledger commit
+ * still in flight) waits for that commit's outcome instead of giving up.
+ * Giving up detached the only waiter: the grant then landed with nobody to
+ * take it, was retired as a local orphan (P-TAUTH-LOCAL-ORPHAN-RELEASE), and
+ * the next attempt waited on that retirement before it could be granted again,
+ * three ledger commits for one grant.  Measured in user mode
+ * (dlm_ledger_test case 3 under host load): the re-driven request was not
+ * granted within 3 s of the holder's release.  The wait goes on one
+ * MXFS_LOCK_ACQUIRE_WAIT_MS round at a time, only while the entry is still
+ * this request's and still PENDING_DURABLE, for at most
+ * MXFS_DL_KEEP_DECIDED_ROUNDS rounds: the slowest single durable page write
+ * measured on a released configuration is ~12 s (a heartbeat swap on the
+ * physical DRBD pair under seven VM installs), so a commit that outlasts 15 s
+ * goes back to the re-drive as before.  0 = give up as before (the same-build
+ * control).  dl_local_wait_kept_n counts the rounds kept; writing the knob
+ * resets it.
+ */
+#define MXFS_DL_KEEP_DECIDED_ROUNDS	15
+int mxfs_dl_local_wait_keeps_decided = 1;
+atomic_t mxfs_dl_local_wait_kept_n = ATOMIC_INIT(0);
+static int dl_local_wait_keeps_decided_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_local_wait_kept_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_local_wait_keeps_decided_ops = {
+	.set = dl_local_wait_keeps_decided_set,
+	.get = param_get_int,
+};
+module_param_cb(dl_local_wait_keeps_decided, &dl_local_wait_keeps_decided_ops,
+		&mxfs_dl_local_wait_keeps_decided, 0644);
+MODULE_PARM_DESC(dl_local_wait_keeps_decided,
+		 "a locally mastered acquire whose wait runs out while its grant is already decided and committing waits for that commit (default 1); 0 = it gives up and re-drives (test control); writing it resets dl_local_wait_kept_n");
+module_param_named(dl_local_wait_kept_n, mxfs_dl_local_wait_kept_n.counter, int, 0444);
+MODULE_PARM_DESC(dl_local_wait_kept_n,
+		 "acquire wait rounds kept for a decided, committing local grant, since dl_local_wait_keeps_decided was last written");
+/*
+ * A locally mastered wait that is answered with a refusal was granted nothing.
+ * dlm_txn_finalize answers a local waiter whose grant commit was refused with
+ * (NL, -EIO) after it has removed the waiter's entry, or put back the grant
+ * the entry converted from, and the local wait used to read any answer that
+ * was not RETRY as its grant: the caller was told it held the mode while the
+ * table and the ledger held nothing for it, and the next requester was granted
+ * the same resource.  Measured in user mode (dlm_ledger_test case 19, the
+ * hand-off commit refused once with -EUCLEAN): the master's own EX wait
+ * returned granted 0 ms after the holder's release with its table holding
+ * nothing and the platter free, and the former holder's next EX was granted at
+ * once.  The refused wait takes the timeout arm and is re-driven within its
+ * budget, as the remote path treats a master that could not make its decision
+ * durable; a fail-stopped master's next attempt is refused by
+ * dlm_ledger_prepare with -EIO.  0 = the answer is read as a grant (test
+ * control).  dl_local_refusal_redrive_n counts the refused waits re-driven;
+ * writing the knob resets it.
+ */
+int mxfs_dl_local_refusal_redrives = 1;
+atomic_t mxfs_dl_local_refusal_redrive_n = ATOMIC_INIT(0);
+static int dl_local_refusal_redrives_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_local_refusal_redrive_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_local_refusal_redrives_ops = {
+	.set = dl_local_refusal_redrives_set,
+	.get = param_get_int,
+};
+module_param_cb(dl_local_refusal_redrives, &dl_local_refusal_redrives_ops,
+		&mxfs_dl_local_refusal_redrives, 0644);
+MODULE_PARM_DESC(dl_local_refusal_redrives,
+		 "a locally mastered wait answered with a refusal (its grant's commit refused) is re-driven, never reported granted (default 1); 0 = the answer is read as a grant (test control); writing it resets dl_local_refusal_redrive_n");
+module_param_named(dl_local_refusal_redrive_n, mxfs_dl_local_refusal_redrive_n.counter, int, 0444);
+MODULE_PARM_DESC(dl_local_refusal_redrive_n,
+		 "locally mastered waits answered with a refusal and re-driven, since dl_local_refusal_redrives was last written");
+/*
+ * A locally mastered request that is answered anywhere but the promote path
+ * retires the acquisition record its earlier attempts opened.  The record is
+ * minted by the local queue path and kept across its one-second timeouts, and
+ * only the promote path, the remote path and the dead-holder refusal retired
+ * it; a request that timed out once and was then answered by the attach to its
+ * own committing grant, the immediate grant, the already-granted shortcut, the
+ * imported re-grant or the in-place upgrade left it in use until the idle scan
+ * (MXFS_DLM_ACQ_IDLE_MS).  The node's next acquire of that resource and mode
+ * joined it and inherited its notification clock, so its holder was not asked
+ * to release for up to MXFS_DLM_ACQ_BAST_REFIRE_MS.  Measured in user mode
+ * (dlm_ledger_test case 3 with the hand-off commit held 1300 ms and the kept
+ * wait off, so the retry attaches): case 4's acquire logged
+ * P958-ACQ-KEY-COLLIDE, never re-notified the holder, and ended -110.
+ * 0 = those exits keep the record (test control).  dl_local_acq_end_n counts
+ * the records they retired; writing the knob resets it.
+ */
+int mxfs_dl_local_acq_end = 1;
+atomic_t mxfs_dl_local_acq_end_n = ATOMIC_INIT(0);
+static int dl_local_acq_end_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_local_acq_end_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_local_acq_end_ops = {
+	.set = dl_local_acq_end_set,
+	.get = param_get_int,
+};
+module_param_cb(dl_local_acq_end, &dl_local_acq_end_ops, &mxfs_dl_local_acq_end, 0644);
+MODULE_PARM_DESC(dl_local_acq_end,
+		 "a locally mastered request answered outside the promote path retires its acquisition record (default 1); 0 = the record is left to the idle scan (test control); writing it resets dl_local_acq_end_n");
+module_param_named(dl_local_acq_end_n, mxfs_dl_local_acq_end_n.counter, int, 0444);
+MODULE_PARM_DESC(dl_local_acq_end_n,
+		 "acquisition records retired by a locally mastered answer outside the promote path, since dl_local_acq_end was last written");
+/*
+ * D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349 (ruling step 1,
+ * docs/rulings/d0349-pregrant-pool-and-chunk-delegation.md): an inode-number
+ * reserve (MXFS_LKF_RESERVE) for a number whose master is a peer, made while
+ * this node already holds EX on it, is answered from the mirror.  The master's
+ * answer would be the re-affirm of the same durable grant id with a fresh
+ * generation and no page write, so for a number granted ahead of its create
+ * the round trip was all the reserve cost.  A locally mastered number already
+ * takes the already-granted shortcut.  0 = such a reserve asks the master (the
+ * same-build control).  dl_reserve_held_local_n counts the reserves answered
+ * locally; writing the knob resets it.
+ */
+int mxfs_dl_reserve_held_local = 1;
+atomic_t mxfs_dl_reserve_held_local_n = ATOMIC_INIT(0);
+static int dl_reserve_held_local_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_reserve_held_local_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_reserve_held_local_ops = {
+	.set = dl_reserve_held_local_set,
+	.get = param_get_int,
+};
+module_param_cb(dl_reserve_held_local, &dl_reserve_held_local_ops, &mxfs_dl_reserve_held_local, 0644);
+MODULE_PARM_DESC(dl_reserve_held_local,
+		 "an inode-number reserve for a peer-mastered number this node already holds EX is answered from the mirror (default 1); 0 = it asks the master (test control); writing it resets dl_reserve_held_local_n");
+module_param_named(dl_reserve_held_local_n, mxfs_dl_reserve_held_local_n.counter, int, 0444);
+MODULE_PARM_DESC(dl_reserve_held_local_n,
+		 "inode-number reserves answered from a held EX mirror without asking the master, since dl_reserve_held_local was last written");
+/*
+ * A ledger page import retires, on that page, the records of owners already
+ * purged before it marks the page imported, then imports the page again
+ * (P-TAUTH-IMPORT-RETIRE-FIRST).  The import never installs such a record as
+ * a blocker, so a page that answers as imported while the record is still on
+ * the platter lets this master decide a grant the ledger refuses as a double
+ * grant.  Measured on 2/net/mesh/mpath path_fenced_return: the survivor's AG
+ * trylock was refused that way 0.3 s into the recovery completion's 770 ms
+ * purge of the fenced node, and the create it served failed EBUSY.  0 = the
+ * page is marked imported first and its records are retired after (the
+ * same-build control).  dl_import_retire_first_n counts the pages retired
+ * this way; writing the knob resets it.
+ */
+int mxfs_dl_import_retire_first = 1;
+atomic_t mxfs_dl_import_retire_first_n = ATOMIC_INIT(0);
+static int dl_import_retire_first_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_import_retire_first_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_import_retire_first_ops = {
+	.set = dl_import_retire_first_set,
+	.get = param_get_int,
+};
+module_param_cb(dl_import_retire_first, &dl_import_retire_first_ops,
+		&mxfs_dl_import_retire_first, 0644);
+MODULE_PARM_DESC(dl_import_retire_first,
+		 "a ledger page import retires purged owners' records on the page before it marks the page imported (1, default); 0 = after (test control); writing it resets dl_import_retire_first_n");
+module_param_named(dl_import_retire_first_n, mxfs_dl_import_retire_first_n.counter, int, 0444);
+MODULE_PARM_DESC(dl_import_retire_first_n,
+		 "pages whose purged owners' records an import retired before marking the page imported, since dl_import_retire_first was last written");
+/*
+ * A master's release of its own exclusive grant names the record the page
+ * holds for it, not whatever its table entry carries.  The entry's grant id
+ * can be rewritten after the grant: a LOCK_GRANT re-affirm for a grant this
+ * node already holds overwrites it (mxfs_dlm_process_remote_grant), and the
+ * fenced incarnation of a peer that mastered the resource before the fence
+ * sent exactly that after it thawed.  The release then named the old id, the
+ * ledger applied it as stale, the finalize freed the entry while the record
+ * still named this node's EX, and every later grant of the resource to the
+ * peer was refused as a double grant (P-TAUTH-DOUBLE-GRANT), its operations
+ * failing after their retry budget and its unmount stuck.  Measured on
+ * 2/net/mesh/mpath path_fenced_return.  Only a record naming this node and
+ * this incarnation as its EX holder is taken, read before the transition
+ * applies; see dlm_own_release_resync.  0 = the entry's id is sent as before
+ * (the same-build control).  dl_own_release_resync_n counts the releases
+ * re-pointed at the record; writing the knob resets it.
+ */
+int mxfs_dl_own_release_resync = 1;
+atomic_t mxfs_dl_own_release_resync_n = ATOMIC_INIT(0);
+static int dl_own_release_resync_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_own_release_resync_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_own_release_resync_ops = {
+	.set = dl_own_release_resync_set,
+	.get = param_get_int,
+};
+module_param_cb(dl_own_release_resync, &dl_own_release_resync_ops,
+		&mxfs_dl_own_release_resync, 0644);
+MODULE_PARM_DESC(dl_own_release_resync,
+		 "a master's release of its own exclusive grant names the page record's grant id when the record names this node and incarnation (1, default); 0 = the table entry's id (test control); writing it resets dl_own_release_resync_n");
+module_param_named(dl_own_release_resync_n, mxfs_dl_own_release_resync_n.counter, int, 0444);
+MODULE_PARM_DESC(dl_own_release_resync_n,
+		 "master-local exclusive releases whose grant id was taken from the page record, since dl_own_release_resync was last written");
+/*
+ * A grant this node decides for its own request, as the master of the
+ * resource's ledger page, can find the home page full: the commit returns
+ * -EDQUOT (P-TAUTH-PAGE-FULL "requester waits") and dlm_txn_finalize has
+ * already undone the decision.  A remote requester refused for the same
+ * reason gets MXFS_ERR_LEDGER_FULL and waits 50 ms and asks again (D-0348);
+ * the local immediate and upgrade sites returned the raw -EDQUOT, which the
+ * inode lock treats as a coordination failure and answers by shutting the
+ * filesystem down.  Measured on 2/net/mesh/mpath after a fenced peer
+ * rejoined: both nodes of the pair shut down that way
+ * (D-TCP-LEDGER-PAGE-FULL-EDQUOT-SHUTS-DOWN-BOTH-NODES-AFTER-FENCED-PEER-REJOINS).
+ * dl_capacity_wait_local (1, default) answers the local request as the remote
+ * one is answered; 0 = the raw -EDQUOT (the same-build control).
+ * dl_capacity_wait_local_n counts the waits; writing the knob resets it.
+ */
+int mxfs_dl_capacity_wait_local = 1;
+atomic_t mxfs_dl_capacity_wait_local_n = ATOMIC_INIT(0);
+static int dl_capacity_wait_local_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_capacity_wait_local_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_capacity_wait_local_ops = {
+	.set = dl_capacity_wait_local_set,
+	.get = param_get_int,
+};
+module_param_cb(dl_capacity_wait_local, &dl_capacity_wait_local_ops,
+		&mxfs_dl_capacity_wait_local, 0644);
+MODULE_PARM_DESC(dl_capacity_wait_local,
+		 "a request this node grants itself on a full ledger page waits and asks again, as a remote requester does (1, default); 0 = it fails with -EDQUOT (test control); writing it resets dl_capacity_wait_local_n");
+module_param_named(dl_capacity_wait_local_n, mxfs_dl_capacity_wait_local_n.counter, int, 0444);
+MODULE_PARM_DESC(dl_capacity_wait_local_n,
+		 "local grants refused on a full ledger page and retried, since dl_capacity_wait_local was last written");
+/*
+ * A request refused for capacity keeps its place in the resource's queue.
+ * dlm_txn_finalize used to free the entry of a grant the ledger refused for a
+ * full home page, so between the requester's re-asks nothing on the master
+ * said it was waiting: a later request for the same resource was decided
+ * against an empty chain and, once a record left the page, whichever request
+ * landed first took the entry.  Measured on 2/net/mesh/mpath after a fenced
+ * peer rejoined, the publish drain's claim of a child its creator held EX
+ * only locally waited out its budget on full pages
+ * (D-SURVIVOR-DEFERRED-PUBLISH-EX-CLAIM-FAILS-AFTER-60-REMASTER-RETRIES-AT-REJOIN);
+ * a peer that sees the child's name once the drain window ends could then be
+ * granted the child before its creator.
+ * dl_capacity_park (1, default): a fresh request refused for capacity stays a
+ * WAITING waiter (cap_parked) holding its queued_at; its owner's next request
+ * for the resource replaces it and is decided with that age, so a later
+ * request queues behind it.  A parked entry not asked again for
+ * MXFS_CAP_PARK_TTL_MS is dropped by the next request for the resource.
+ * 0 = the entry is freed (the same-build control).  dl_capacity_park_n counts
+ * the parks; writing the knob resets it.
+ * dbg_cap_refuse_ino / dbg_cap_refuse_n (TEST ONLY): the next n commits of a
+ * grant of that inode are refused -EDQUOT without asking the ledger, as a full
+ * page refuses them (0 = off).
+ */
+#define MXFS_CAP_PARK_TTL_MS	2000
+int mxfs_dl_capacity_park = 1;
+atomic_t mxfs_dl_capacity_park_n = ATOMIC_INIT(0);
+static int dl_capacity_park_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_capacity_park_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_capacity_park_ops = {
+	.set = dl_capacity_park_set,
+	.get = param_get_int,
+};
+module_param_cb(dl_capacity_park, &dl_capacity_park_ops, &mxfs_dl_capacity_park, 0644);
+MODULE_PARM_DESC(dl_capacity_park,
+		 "a request refused for a full ledger page keeps its place in the resource's queue (1, default); 0 = its entry is freed (test control); writing it resets dl_capacity_park_n");
+module_param_named(dl_capacity_park_n, mxfs_dl_capacity_park_n.counter, int, 0444);
+MODULE_PARM_DESC(dl_capacity_park_n,
+		 "requests kept queued after a capacity refusal, since dl_capacity_park was last written");
+unsigned long long mxfs_dbg_cap_refuse_ino;
+int mxfs_dbg_cap_refuse_n;
+module_param_named(dbg_cap_refuse_ino, mxfs_dbg_cap_refuse_ino, ullong, 0644);
+MODULE_PARM_DESC(dbg_cap_refuse_ino,
+		 "TEST ONLY: grants of this inode are refused as by a full ledger page, dbg_cap_refuse_n times (0 = off)");
+module_param_named(dbg_cap_refuse_n, mxfs_dbg_cap_refuse_n, int, 0644);
+MODULE_PARM_DESC(dbg_cap_refuse_n,
+		 "TEST ONLY: how many more grants of dbg_cap_refuse_ino are refused");
+/*
+ * A no-queue request refused for a full ledger page is answered would-block
+ * at once.  The capacity wait above (the local one, and the remote requester's
+ * answer to MXFS_ERR_LEDGER_FULL) sleeps 50 ms and asks again, and for a
+ * no-queue caller that spent the whole retry budget, about 9 s, before the
+ * -EAGAIN it would have had at once from a busy resource; xfs_dialloc's inode
+ * reservation try then picked the same number and paid it again.  Measured on
+ * 2/net/mesh/mpath with one node creating 16384 files in one directory: one
+ * page full, the same inode's try failing 'capacity=60' every 10 s, creates at
+ * about 100/s and stalled
+ * (D-TCP-4NODE-NOQUEUE-TRY-WAITS-9S-ON-FULL-LEDGER-PAGE-CREATES-STALL).  The
+ * master does not park such a request either: no one asks for it again.
+ * dl_capacity_nq_wouldblock (1, default); 0 = the wait (the same-build
+ * control).  dl_capacity_nq_wouldblock_n counts the answers; writing the knob
+ * resets it.
+ */
+int mxfs_dl_capacity_nq_wouldblock = 1;
+atomic_t mxfs_dl_capacity_nq_wouldblock_n = ATOMIC_INIT(0);
+static int dl_capacity_nq_wouldblock_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_capacity_nq_wouldblock_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_capacity_nq_wouldblock_ops = {
+	.set = dl_capacity_nq_wouldblock_set,
+	.get = param_get_int,
+};
+module_param_cb(dl_capacity_nq_wouldblock, &dl_capacity_nq_wouldblock_ops,
+		&mxfs_dl_capacity_nq_wouldblock, 0644);
+MODULE_PARM_DESC(dl_capacity_nq_wouldblock,
+		 "a no-queue request refused for a full ledger page is answered would-block at once and not parked (1, default); 0 = it waits and asks again like a blocking one (test control); writing it resets dl_capacity_nq_wouldblock_n");
+module_param_named(dl_capacity_nq_wouldblock_n, mxfs_dl_capacity_nq_wouldblock_n.counter, int, 0444);
+MODULE_PARM_DESC(dl_capacity_nq_wouldblock_n,
+		 "no-queue requests answered would-block for a full ledger page, since dl_capacity_nq_wouldblock was last written");
+
+/*
+ * A full ledger page is asked to make room.  Its records are grants their
+ * holders keep cached, and a record leaves the page only when its holder
+ * releases the grant; nothing asked one to, so a request refused for capacity
+ * (the waits above) waited for as long as the page stayed full.  Measured on
+ * 2/net/mesh/mpath path_fenced_return (run 20261020T142123Z-g2d): page 3197
+ * held 31 of the survivor's own EX grants, four 8-inode shards, none in use; a
+ * truncating open on the survivor waited on it without end in
+ * dlm_capacity_wait_local, the freeze for the rejoining peer's join waited
+ * behind that open, the peer's mount was refused and the survivor's join
+ * worker hung (D-TCP-CAPACITY-WAIT-NEVER-ENDS-HANGS-JOIN-FREEZE).
+ * dl_capacity_reclaim (1, default): a grant refused for a full page asks the
+ * holders of that page's MXFS_DL_CAP_RECLAIM oldest other records (by their
+ * last transition) to release them, as a DEMAND request asks: a blocking
+ * notification and no queued request.  Each holder releases once its own use
+ * of the lock ends, which retires the record, and the refused request is
+ * granted when it asks again.  One page is asked at most once per
+ * MXFS_DL_CAP_RECLAIM_MS.  0 = no one is asked (the same-build control).
+ * dl_capacity_reclaim_n counts the notifications fired; writing the knob
+ * resets it.
+ */
+#define MXFS_DL_CAP_RECLAIM	MXFS_TAUTH_INO_SHARD
+#define MXFS_DL_CAP_RECLAIM_MS	200
+int mxfs_dl_capacity_reclaim = 1;
+atomic_t mxfs_dl_capacity_reclaim_n = ATOMIC_INIT(0);
+static int dl_capacity_reclaim_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_capacity_reclaim_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_capacity_reclaim_ops = {
+	.set = dl_capacity_reclaim_set,
+	.get = param_get_int,
+};
+module_param_cb(dl_capacity_reclaim, &dl_capacity_reclaim_ops,
+		&mxfs_dl_capacity_reclaim, 0644);
+MODULE_PARM_DESC(dl_capacity_reclaim,
+		 "a grant refused for a full ledger page asks the holders of the page's oldest other records to release them (1, default); 0 = no one is asked (test control); writing it resets dl_capacity_reclaim_n");
+module_param_named(dl_capacity_reclaim_n, mxfs_dl_capacity_reclaim_n.counter, int, 0444);
+MODULE_PARM_DESC(dl_capacity_reclaim_n,
+		 "release notifications fired to make room on full ledger pages, since dl_capacity_reclaim was last written");
+
+/* a no-queue request refused for a full page: would-block now (see
+ * dl_capacity_nq_wouldblock) */
+static bool dlm_capacity_nq_answer(uint32_t flags)
+{
+	if (!(flags & MXFS_LKF_NOQUEUE) || !READ_ONCE(mxfs_dl_capacity_nq_wouldblock))
+		return false;
+	atomic_inc_return(&mxfs_dl_capacity_nq_wouldblock_n);
+	return true;
+}
+/*
+ * TEST ONLY: when a ledger page import found records of purged owners, sleep
+ * this many ms after the page answers as imported and before the lazy
+ * retirement of those owners, so that a decision lands where the control arm
+ * of dl_import_retire_first leaves the page imported over records it did not
+ * install.  0 = off.  Never set in production.
+ */
+unsigned int mxfs_dl_inject_import_lazy_delay_ms;
+module_param_named(dl_inject_import_lazy_delay_ms, mxfs_dl_inject_import_lazy_delay_ms, uint, 0644);
+MODULE_PARM_DESC(dl_inject_import_lazy_delay_ms,
+		 "TEST ONLY: ms an import that found purged owners' records sleeps between marking the page imported and retiring them (0 = off)");
+/*
+ * TEST ONLY: sleep this many ms in the purge that first marks an owner
+ * purged, between the mark and its walk of the ledger.  The recovery
+ * completion's purge is that first one, and its walk retires the owner's
+ * records page by page while imports already skip them, so this holds every
+ * page's records on the platter for imports to meet.  With
+ * dl_inject_import_lazy_delay_ms also set (the imports' own retirement held
+ * the same way) the window dl_import_retire_first closes is certain.  0 = off.
+ * Never set in production.
+ */
+unsigned int mxfs_dl_inject_purge_walk_delay_ms;
+module_param_named(dl_inject_purge_walk_delay_ms, mxfs_dl_inject_purge_walk_delay_ms, uint, 0644);
+MODULE_PARM_DESC(dl_inject_purge_walk_delay_ms,
+		 "TEST ONLY: ms the purge that first marks an owner purged sleeps between the mark and its ledger walk (0 = off)");
+/*
+ * TEST ONLY: sleep this many ms after an acquire's wait times out and before
+ * its retry asks again.  The retry otherwise follows the timeout at once, so
+ * the window in which a decided grant can land with no waiter attached (the
+ * master then releases it as a local orphan) is as wide as the scheduler makes
+ * it: open on a loaded host, closed on an idle one.  This holds it open for a
+ * test that aims a delayed commit into it.  0 = off.  Never set in production.
+ */
+unsigned int mxfs_dl_inject_timeout_retry_delay_ms;
+module_param_named(dl_inject_timeout_retry_delay_ms, mxfs_dl_inject_timeout_retry_delay_ms, uint, 0644);
+MODULE_PARM_DESC(dl_inject_timeout_retry_delay_ms,
+		 "TEST ONLY: ms an acquire whose wait timed out sleeps before its retry (0 = off)");
+/*
  * The drop count is the harness's evidence that the target is remotely
  * mastered and that the fault fired during the armed read; the probe LINE
  * is not, because it prints only the first 8 drops and every 64th after
@@ -151,7 +677,34 @@ MODULE_PARM_DESC(dl_drop_lockreq_ino,
 		 "writing it resets dl_drop_lockreq_n");
 module_param_named(dl_drop_lockreq_n, mxfs_dl_drop_lockreq_n.counter, int, 0444);
 MODULE_PARM_DESC(dl_drop_lockreq_n,
-		 "TEST ONLY: requests dropped since dl_drop_lockreq_ino was last written");
+		 "TEST ONLY: requests dropped since dl_drop_lockreq_ino or dl_drop_lockreq_ag was last written");
+/*
+ * TEST ONLY: the AG twin of dl_drop_lockreq_ino.  An AG lock's LOCK_REQ for
+ * allocation group (value - 1) is reported sent and never sent, so its master
+ * answers nothing, which is what a master that withdrew with its connections
+ * up looks like from here (the 131 s survivor stall on 8/net/mesh/mpath
+ * path_all_lost).  Inode and every other resource's traffic is untouched.
+ * 0 = off; writing it restarts dl_drop_lockreq_n and its print budget.
+ */
+unsigned long long mxfs_dl_drop_lockreq_ag;
+static int dl_drop_lockreq_ag_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_ullong(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_dl_drop_lockreq_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops dl_drop_lockreq_ag_ops = {
+	.set = dl_drop_lockreq_ag_set,
+	.get = param_get_ullong,
+};
+module_param_cb(dl_drop_lockreq_ag, &dl_drop_lockreq_ag_ops,
+		&mxfs_dl_drop_lockreq_ag, 0644);
+MODULE_PARM_DESC(dl_drop_lockreq_ag,
+		 "TEST ONLY: do not send the LOCK_REQ of AG (value - 1) to its remote "
+		 "master; let the request time out unanswered (0 = off); "
+		 "writing it resets dl_drop_lockreq_n");
 
 /*
  * 0.90.12 (D-A-STALLED-PAGE-TRANSITION-IS-AN-UNBOUNDED-WAIT-FOR-A-NON-
@@ -828,6 +1381,8 @@ static struct mxfs_lock *lock_alloc(const struct mxfs_resource_id *resource,
 	lk->acq_last_ms = lk->queued_at;
 	lk->acq_bast_ms = 0;
 	lk->acq_retx = 0;
+	lk->cap_parked = false;
+	lk->cap_parked_ms = 0;
 	lk->handoff = false;   /* set true only by dg_grant_ex on handoff */
 	lk->next = NULL;
 	lk->work_next = NULL;
@@ -1418,11 +1973,15 @@ static int waiter_cmp(const void *a, const void *b)
  * keep their priority (denying a holder's upgrade cannot help the
  * waiter — the holder's existing grant blocks it anyway — and queuing
  * upgrades behind waiters is the classic conversion deadlock).
+ *
+ * `since` is 0 for a request arriving now (every queued waiter is older).  A
+ * request replacing its own capacity-parked entry passes the parked queued_at:
+ * a waiter queued after it is behind it and does not block it.
  */
 static struct mxfs_lock *find_conflicting_waiter(struct mxfs_lock *chain,
 						 const struct mxfs_resource_id *resource,
 						 mxfs_node_id_t requester,
-						 uint8_t mode)
+						 uint8_t mode, uint64_t since)
 {
 	struct mxfs_lock *lk;
 
@@ -1434,10 +1993,47 @@ static struct mxfs_lock *find_conflicting_waiter(struct mxfs_lock *chain,
 			continue;
 		if (lk->owner == requester)
 			continue;
+		if (since && lk->queued_at >= since)
+			continue;
 		if (!lock_compat[lk->mode][mode])
 			return lk;
 	}
 	return NULL;
+}
+
+/*
+ * The capacity-parked entries of `resource` whose owners stopped asking (none
+ * of them re-asked within MXFS_CAP_PARK_TTL_MS) are dropped, so a requester
+ * that gave up cannot hold the queue for good.  Under table_rwlock held for
+ * writing.  Returns how many were dropped.
+ */
+static int dlm_cap_park_expire(struct mxfs_dlm_ctx *ctx, uint32_t bucket,
+			       const struct mxfs_resource_id *resource)
+{
+	struct mxfs_lock **pp = &ctx->buckets[bucket], *lk;
+	uint64_t now = mxfs_pal_time_ms();
+	int n = 0;
+
+	while ((lk = *pp) != NULL) {
+		if (lk->cap_parked && resource_equal(&lk->resource, resource) &&
+		    (lk->state == MXFS_LSTATE_WAITING ||
+		     lk->state == MXFS_LSTATE_BLOCKED) &&
+		    now >= lk->cap_parked_ms &&
+		    now - lk->cap_parked_ms > MXFS_CAP_PARK_TTL_MS) {
+			*pp = lk->next;
+			ctx->lock_count--;
+			pr_warn_ratelimited(
+			    "mxfs: P-CAP-PARK-EXPIRE type=%u ino=%llu ag=%u owner=%u mode=%s idle_ms=%llu -- a request parked for capacity was not asked again; dropped\n",
+			    resource->type, (unsigned long long)resource->ino,
+			    resource->ag_number, lk->owner, mode_name(lk->mode),
+			    (unsigned long long)(now - lk->cap_parked_ms));
+			lock_free(lk);
+			n++;
+			continue;
+		}
+		pp = &lk->next;
+	}
+	return n;
 }
 
 /*
@@ -1654,6 +2250,10 @@ static bool dg_grant_ex(struct mxfs_dlm_ctx *ctx,
 			uint32_t *epoch_out);
 static void dg_release(const struct mxfs_resource_id *res,
 		       mxfs_node_id_t owner);
+static void dg_release_owner(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t owner);
+static void dg_release_volume(struct mxfs_dlm_ctx *ctx);
+extern int mxfs_dl_dg_purge_releases;
+extern int mxfs_dl_dg_destroy_releases;
 
 /* the durable grant id + lineage + request id ride on the grant. */
 struct dlm_grant_ids {
@@ -1799,7 +2399,8 @@ static inline uint32_t dlm_res_page(struct mxfs_dlm_ctx *ctx,
 {
 	uint32_t np = ctx->page_count ? ctx->page_count : MXFS_TAUTH_NPAGES;
 
-	return mxfs_tauth_home_page(mxfs_tauth_res_hash(res, sizeof(*res), ctx->hash_seed), np);
+	return mxfs_tauth_home_page(mxfs_tauth_route_hash(res, ctx->hash_seed,
+							  ctx->hash_version), np);
 }
 
 /* 3a: page-aligned mastership.  page = the resource's home page (
@@ -3066,6 +3667,66 @@ static int dlm_settle_attribute(struct mxfs_dlm_ctx *ctx,
 	return n;
 }
 
+/* A residue grant of this node's slot found by a page import, released once
+ * the page is marked imported (dlm_ledger_import_page_pass). */
+struct dlm_import_residue {
+	struct mxfs_resource_id res;
+	int ent;                /* its record in the import's dlm_import_acc */
+	int slot;
+	uint64_t inc;
+};
+
+/*
+ * Caller holds table_rwlock (write).  Account one residue grant of this
+ * node's slot found by a page import.  One info line per mount, the items at
+ * debug: after an unclean departure there is one per leftover grant, and
+ * pve1 printed 60 of them to its console in two minutes of an ordinary
+ * release.  The count is import_residue on P-TAUTH-DLM-STATS; a failed
+ * release stays an error.
+ */
+static void dlm_import_residue_note(struct mxfs_dlm_ctx *ctx,
+				    const struct mxfs_resource_id *res,
+				    uint32_t page_id, int s, uint8_t mode)
+{
+	if (!ctx->ledger_import_residue)
+		mxfs_pal_log(MXFS_LOG_INFO,
+			     "mxfs: P-TAUTH-IMPORT-RESIDUE-FOUND node=%u slot=%d -- "
+			     "this node's slot holds grants of a predecessor "
+			     "incarnation whose departure purge never ran (an "
+			     "unclean shutdown); releasing each as its page is "
+			     "imported",
+			     ctx->local_node, s);
+	mxfs_pal_log(MXFS_LOG_DEBUG,
+		     "mxfs: P-TAUTH-IMPORT-RESIDUE type=%u ino=%llu ag=%u "
+		     "page=%u slot=%d mode=%s -- a shared holder bit on this "
+		     "node's own slot with no local entry and no request in "
+		     "flight: a predecessor incarnation's grant whose "
+		     "departure purge never reached this page; releasing it",
+		     res->type, (unsigned long long)res->ino, res->ag_number,
+		     page_id, s, mode_name(mode));
+	ctx->ledger_import_residue++;
+}
+
+/*
+ * Retire `node`'s records on ONE page, for the import's retire-first order
+ * (mxfs_dl_import_retire_first).  The scope is the lazy retirement's: by node
+ * id, and the slot's bits only while no live successor occupies the slot (the
+ * rule of mxfs_dlm_ledger_purge_owner).  Returns the records cleared or a
+ * negative errno.
+ */
+static int dlm_retire_purged_on_page(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t node,
+				     int slot, uint32_t page_id, uint64_t gen)
+{
+	if (slot >= 0 && ctx->slot_node_cb) {
+		mxfs_node_id_t occupant = ctx->slot_node_cb(ctx->cb_data, slot, NULL);
+
+		if (occupant != 0 && occupant != MXFS_DLM_NODE_UNKNOWN && occupant != node)
+			slot = -1;
+	}
+	return mxfs_tauth_ledger_purge_owner_page(ctx->ledger, node, 0, slot, gen,
+						  (uint64_t)ctx->current_epoch, page_id);
+}
+
 /* Make page `page_id` current under `gen` and import its ACTIVE records as
  * holders.  Records of a recovery-purged owner are retired instead.  Does
  * I/O; caller holds NO locks.
@@ -3091,18 +3752,18 @@ static int dlm_settle_attribute(struct mxfs_dlm_ctx *ctx,
  * are left alone: they resolve to live nodes that answer the BAST for a
  * grant they do not hold, or to no node at all (an UNKNOWN blocker until
  * recovery names it, the ruling). */
-static int dlm_ledger_import_page(struct mxfs_dlm_ctx *ctx, uint32_t page_id,
-				  uint64_t gen)
+static int dlm_ledger_import_page_pass(struct mxfs_dlm_ctx *ctx, uint32_t page_id,
+				       uint64_t gen, bool retire_first)
 {
 	struct dlm_import_acc *acc;
 	struct { mxfs_node_id_t node; int slot; } purge[MXFS_TAUTH_ENTRIES_PER_PAGE];
-	struct mxfs_resource_id *residue;
+	struct dlm_import_residue *residue;
 	struct dlm_slot_tenant *tenants;
 	int npurge = 0, nresidue = 0, i, n, rc, absent_kept = 0;
-	int nretained_ex = 0, nretained_sh = 0;
+	int nretained_ex = 0, nretained_sh = 0, nattrib = 0;
 	mxfs_node_id_t rnode = 0;
 	uint64_t rinc = 0;
-	bool retained;
+	bool retained, defer_residue = retire_first;
 
 	rc = mxfs_tauth_ledger_ensure(ctx->ledger, page_id, gen);
 	if (rc)
@@ -3279,7 +3940,7 @@ static int dlm_ledger_import_page(struct mxfs_dlm_ctx *ctx, uint32_t page_id,
 			    mxfs_tauth_tenant_attribute) {
 				node = tenants[s].node;
 				inc = tenants[s].inc;
-				ctx->ledger_tenant_attributed++;
+				nattrib++;
 				mxfs_pal_log(MXFS_LOG_DEBUG,
 					     "mxfs: P-TAUTH-IMPORT-TENANT type=%u ino=%llu ag=%u "
 					     "page=%u slot=%d -> owner=%u inc=%llu -- the "
@@ -3371,34 +4032,29 @@ static int dlm_ledger_import_page(struct mxfs_dlm_ctx *ctx, uint32_t page_id,
 			}
 			if (node == ctx->local_node && node != 0 &&
 			    !dlm_local_entry_any(ctx, &res) && !dlm_pending_exists(ctx, &res)) {
-				/* One info line per mount, the items at debug: after an
-				 * unclean departure there is one per leftover grant, and
-				 * pve1 printed 60 of them to its console in two minutes of
-				 * an ordinary release.  The count is import_residue on
-				 * P-TAUTH-DLM-STATS; a failed release stays an error. */
-				if (!ctx->ledger_import_residue)
-					mxfs_pal_log(MXFS_LOG_INFO,
-						     "mxfs: P-TAUTH-IMPORT-RESIDUE-FOUND node=%u slot=%d -- "
-						     "this node's slot holds grants of a predecessor "
-						     "incarnation whose departure purge never ran (an "
-						     "unclean shutdown); releasing each as its page is "
-						     "imported",
-						     ctx->local_node, s);
-				mxfs_pal_log(MXFS_LOG_DEBUG,
-					     "mxfs: P-TAUTH-IMPORT-RESIDUE type=%u ino=%llu ag=%u "
-					     "page=%u slot=%d mode=%s -- a shared holder bit on this "
-					     "node's own slot with no local entry and no request in "
-					     "flight: a predecessor incarnation's grant whose "
-					     "departure purge never reached this page; releasing it",
-					     res.type, (unsigned long long)res.ino, res.ag_number,
-					     page_id, s,
-					     mode_name(e->shared_mode ? e->shared_mode : MXFS_LOCK_PR));
-				ctx->ledger_import_residue++;
-				if (mxfs_tauth_import_residue_release) {
-					if (nresidue < (int)MXFS_TAUTH_ENTRIES_PER_PAGE)
-						residue[nresidue++] = res;
-					/* imported as ours below so the unlock finds a holder entry */
-				} else {
+				if (mxfs_tauth_import_residue_release &&
+				    nresidue < (int)MXFS_TAUTH_ENTRIES_PER_PAGE) {
+					residue[nresidue].res = res;
+					residue[nresidue].ent = i;
+					residue[nresidue].slot = s;
+					residue[nresidue].inc = inc;
+					nresidue++;
+					/*
+					 * An import that may retire purged owners' records
+					 * first notes and installs it only as it marks the
+					 * page (below): installed now, the pass that follows
+					 * the retirement would find this holder entry, read
+					 * the bit as a live grant of ours and never release
+					 * it.
+					 */
+					if (defer_residue)
+						continue;
+				}
+				dlm_import_residue_note(ctx, &res, page_id, s,
+							e->shared_mode ? e->shared_mode : MXFS_LOCK_PR);
+				/* with the release on it is imported as ours below so the
+				 * unlock finds a holder entry */
+				if (!mxfs_tauth_import_residue_release) {
 					/* DEBUG: keep the phantom as a GRANTED entry of ours (the
 					 * pre-fix shape) so the inode layer's own defence against
 					 * a grant it does not hold can be exercised on demand. */
@@ -3414,35 +4070,101 @@ static int dlm_ledger_import_page(struct mxfs_dlm_ctx *ctx, uint32_t page_id,
 					  e, false);
 		}
 	}
-	if (ctx->page_import_gen && page_id < ctx->page_count)
-		ctx->page_import_gen[page_id] = gen;
+	retire_first = retire_first && npurge > 0;
+	if (!retire_first) {
+		/* the residue this pass deferred: noted and installed as ours as
+		 * the page is marked, so the release below finds a holder entry */
+		for (i = 0; defer_residue && i < nresidue; i++) {
+			const struct mxfs_tauth_entry *re = &acc->ent[residue[i].ent];
+			uint8_t rmode = re->shared_mode ? re->shared_mode : MXFS_LOCK_PR;
+
+			dlm_import_residue_note(ctx, &residue[i].res, page_id,
+						residue[i].slot, rmode);
+			dlm_import_holder(ctx, &residue[i].res, ctx->local_node,
+					  residue[i].inc, (uint16_t)residue[i].slot, rmode,
+					  re, false);
+		}
+		ctx->ledger_tenant_attributed += nattrib;
+		if (ctx->page_import_gen && page_id < ctx->page_count)
+			ctx->page_import_gen[page_id] = gen;
+	}
 	mxfs_pal_rwlock_unlock(ctx->table_rwlock);
 	mxfs_pal_free(acc);
 	mxfs_pal_free(tenants);
-	if (nretained_ex + nretained_sh)
+	if (!retire_first && nretained_ex + nretained_sh)
 		mxfs_probe("mxfs: P-TAUTH-IMPORT-RETAINED page=%u node=%u inc=%llu ex=%d "
 			   "shared=%d -- records of the incarnation this mount's slot was "
 			   "adopted from, installed as its holders until the bootstrap "
 			   "term completes\n",
 			   page_id, rnode, (unsigned long long)rinc, nretained_ex,
 			   nretained_sh);
+	if (retire_first) {
+		/*
+		 * The page is not marked imported: the purged owners' records found
+		 * on it are retired here, then the page is imported again, so no
+		 * decision on it is made over a record the table does not carry.
+		 * The second pass releases our slot's residue.  A failed retirement
+		 * leaves the page unmarked, and the next request imports it again.
+		 */
+		int cleared = 0, prc = 0;
+
+		for (i = 0; i < npurge; i++) {
+			prc = dlm_retire_purged_on_page(ctx, purge[i].node, purge[i].slot,
+							page_id, gen);
+			if (prc < 0)
+				break;
+			cleared += prc;
+		}
+		mxfs_pal_free(residue);
+		mxfs_pal_log(prc < 0 ? MXFS_LOG_WARN : MXFS_LOG_DEBUG,
+			     "mxfs: P-TAUTH-IMPORT-RETIRE-FIRST page=%u owners=%d cleared=%d rc=%d -- "
+			     "purged owners' records retired on the page before it answers as "
+			     "imported",
+			     page_id, npurge, cleared, prc < 0 ? prc : 0);
+		if (prc < 0)
+			return prc == -ENOMEM ? prc : -ESTALE;
+		atomic_inc_return(&mxfs_dl_import_retire_first_n);
+		rc = dlm_ledger_import_page_pass(ctx, page_id, gen, false);
+		if (rc)
+			return rc;
+		/* the page is marked now; their records on the other pages this
+		 * node masters are retired as before */
+		for (i = 0; i < npurge; i++)
+			mxfs_dlm_ledger_purge_owner(ctx, purge[i].node, purge[i].slot);
+		return 0;
+	}
+	if (npurge && mxfs_dl_inject_import_lazy_delay_ms) {
+		mxfs_pal_log(MXFS_LOG_DEBUG,
+			     "mxfs: P-TAUTH-IMPORT-INJECT-LAZY-DELAY page=%u records=%d ms=%u -- "
+			     "TEST ONLY: the page answers as imported; retiring its purged "
+			     "owners' records waits",
+			     page_id, npurge, mxfs_dl_inject_import_lazy_delay_ms);
+		mxfs_pal_sleep_ms(mxfs_dl_inject_import_lazy_delay_ms);
+	}
 	/* lazy retirement of already-purged owners found on this page */
 	for (i = 0; i < npurge; i++)
 		mxfs_dlm_ledger_purge_owner(ctx, purge[i].node, purge[i].slot);
 	/* our slot's residue: the local-master release retires the record in
 	 * one ledger transition and promotes whoever waits behind it */
 	for (i = 0; i < nresidue; i++) {
-		int urc = mxfs_dlm_unlock(ctx, &residue[i]);
+		int urc = mxfs_dlm_unlock(ctx, &residue[i].res);
 
 		if (urc)
 			mxfs_pal_log(MXFS_LOG_ERR,
 				     "mxfs: P-TAUTH-IMPORT-RESIDUE-RELEASE-FAIL type=%u ino=%llu "
 				     "ag=%u page=%u rc=%d -- the residue stays a blocker",
-				     residue[i].type, (unsigned long long)residue[i].ino,
-				     residue[i].ag_number, page_id, urc);
+				     residue[i].res.type, (unsigned long long)residue[i].res.ino,
+				     residue[i].res.ag_number, page_id, urc);
 	}
 	mxfs_pal_free(residue);
 	return 0;
+}
+
+static int dlm_ledger_import_page(struct mxfs_dlm_ctx *ctx, uint32_t page_id,
+				  uint64_t gen)
+{
+	return dlm_ledger_import_page_pass(ctx, page_id, gen,
+					   mxfs_dl_import_retire_first != 0);
 }
 
 /* ── step 4: ordered page handoff ── */
@@ -3818,7 +4540,36 @@ static bool dlm_rblk_authority_deny(struct mxfs_dlm_ctx *ctx, uint32_t page,
 	return true;
 }
 
-static int dlm_page_acquire(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_t gen)
+/*
+ * Where a 'prepare' RETRY answer (dlm_retry reason 4) parked: every -EAGAIN
+ * exit of dlm_ledger_prepare and of the page functions under it, by number,
+ * so an acquire that spends its budget on prepare answers can say which park
+ * spent it (formation_test at budget 3 spent all three with the view
+ * unchanged, and the import-stale park implies a view change).
+ */
+enum {
+	DLM_PREP_NOWAIT = 1,		/* no-queue request, page not ready */
+	DLM_PREP_IMPORT_STALE,		/* the page image moved under the import */
+	DLM_PREP_NOT_OWNER,		/* the view names another owner */
+	DLM_PREP_ADOPT_STALE,		/* ACTIVE and ours, activation went stale */
+	DLM_PREP_PREPARED_STALE,	/* PREPARED to us, activation went stale */
+	DLM_PREP_HANDED_OFF,		/* PREPARED by us for a target not taken back */
+	DLM_PREP_BOOT_STALE,		/* UNOWNED, our bootstrap activation went stale */
+	DLM_PREP_UNOWNED_NOROUTE,	/* UNOWNED, no bootstrap node to ask */
+	DLM_PREP_UNOWNED_ASKED,		/* UNOWNED, the bootstrap node asked */
+	DLM_PREP_NOT_TRANSITION,	/* unreachable authority, nothing to wait on */
+	DLM_PREP_ASK_OWNER,		/* owned elsewhere in the view, owner asked */
+	DLM_PREP_SITES			/* = ARRAY_SIZE(ctx->prep_site) */
+};
+
+static inline void dlm_prep_site(int *site, int s)
+{
+	if (site)
+		*site = s;
+}
+
+static int dlm_page_acquire(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_t gen,
+			    int *site)
 {
 	struct mxfs_tauth_page_auth a;
 	mxfs_node_id_t to;
@@ -3842,7 +4593,11 @@ static int dlm_page_acquire(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_t ge
 			dlm_page_now_mine(ctx, page, "adopt");
 			return 0;
 		}
-		return rc == -ESTALE ? -EAGAIN : rc;
+		if (rc == -ESTALE) {
+			dlm_prep_site(site, DLM_PREP_ADOPT_STALE);
+			return -EAGAIN;
+		}
+		return rc;
 	}
 	if (a.state == MXFS_TAUTH_PG_PREPARED && a.target_node == ctx->local_node &&
 	    a.target_inc == ctx->local_inc) {
@@ -3855,7 +4610,11 @@ static int dlm_page_acquire(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_t ge
 			dlm_page_now_mine(ctx, page, "prepared");
 			return 0;
 		}
-		return rc == -ESTALE ? -EAGAIN : rc;
+		if (rc == -ESTALE) {
+			dlm_prep_site(site, DLM_PREP_PREPARED_STALE);
+			return -EAGAIN;
+		}
+		return rc;
 	}
 	if (a.state == MXFS_TAUTH_PG_PREPARED && a.auth_node == ctx->local_node &&
 	    a.auth_inc == ctx->local_inc) {
@@ -3928,6 +4687,7 @@ static int dlm_page_acquire(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_t ge
 					(unsigned long long)ctx->ledger_gen,
 					ctx->local_node, (unsigned long long)ctx->local_inc);
 		}
+		dlm_prep_site(site, DLM_PREP_HANDED_OFF);
 		return -EAGAIN;
 	}
 	if (a.state == MXFS_TAUTH_PG_UNOWNED) {
@@ -3939,7 +4699,11 @@ static int dlm_page_acquire(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_t ge
 				dlm_page_now_mine(ctx, page, "bootstrap");
 				return 0;
 			}
-			return rc == -ESTALE ? -EAGAIN : rc;
+			if (rc == -ESTALE) {
+				dlm_prep_site(site, DLM_PREP_BOOT_STALE);
+				return -EAGAIN;
+			}
+			return rc;
 		}
 		/*
 		 * (D-0345, proven by instrument in tests/tauth/unowned_page_test):
@@ -3951,8 +4715,10 @@ static int dlm_page_acquire(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_t ge
 		 * bootstrap and PREPAREs the page to us ("bootstrap-for-request").
 		 */
 		to = ctx->bootstrap_node_cb ? ctx->bootstrap_node_cb(ctx->cb_data, NULL) : 0;
-		if (to == 0 || to == ctx->local_node || !dlm_node_in_view(ctx, to))
+		if (to == 0 || to == ctx->local_node || !dlm_node_in_view(ctx, to)) {
+			dlm_prep_site(site, DLM_PREP_UNOWNED_NOROUTE);
 			return -EAGAIN;
+		}
 		now = mxfs_pal_time_ms();
 		if (ctx->page_req_ms && now - ctx->page_req_ms[page] >= DLM_HANDOFF_REQ_INTERVAL_MS) {
 			ctx->page_req_ms[page] = now;
@@ -3961,6 +4727,7 @@ static int dlm_page_acquire(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_t ge
 			dlm_send_handoff(ctx, to, page, MXFS_HANDOFF_FREEZE_REQ, ctx->local_node,
 					 ctx->local_inc, 0, 0, 0);
 		}
+		dlm_prep_site(site, DLM_PREP_UNOWNED_ASKED);
 		return -EAGAIN;
 	}
 	/* owned (or prepared) by someone else: ask along the chain */
@@ -4138,6 +4905,7 @@ static int dlm_page_acquire(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_t ge
 			dlm_node_in_view(ctx, a.auth_node) ? 1 : 0,
 			bn, bn ? (dlm_node_in_view(ctx, bn) ? 1 : 0) : 0,
 			ctx->local_node, (unsigned long long)ctx->local_inc);
+		dlm_prep_site(site, DLM_PREP_NOT_TRANSITION);
 		return -EAGAIN;
 	}
 	/*
@@ -4162,11 +4930,14 @@ static int dlm_page_acquire(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_t ge
 		dlm_send_handoff(ctx, to, page, MXFS_HANDOFF_FREEZE_REQ, ctx->local_node,
 				 ctx->local_inc, 0, a.auth_node, a.auth_inc);
 	}
+	dlm_prep_site(site, DLM_PREP_ASK_OWNER);
 	return -EAGAIN;
 }
 
-/* 0 = the page is ours under `gen` (decisions allowed); -EAGAIN = park. */
-static int dlm_page_ensure_mine(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_t gen)
+/* 0 = the page is ours under `gen` (decisions allowed); -EAGAIN = park,
+ * with *site (when given) naming the exit that parked. */
+static int dlm_page_ensure_mine(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_t gen,
+				int *site)
 {
 	if (!ctx->page_state || page >= ctx->page_count)
 		return 0;
@@ -4181,9 +4952,10 @@ static int dlm_page_ensure_mine(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_
 		mxfs_probe_ratelimited(
 		    "mxfs: P960-PARK-NOT-OWNER page=%u state=%u owner=%u we=%u -- parked: the view names another owner\n",
 		    page, ctx->page_state[page], dlm_page_owner(ctx, page), ctx->local_node);
+		dlm_prep_site(site, DLM_PREP_NOT_OWNER);
 		return -EAGAIN;
 	}
-	return dlm_page_acquire(ctx, page, gen);
+	return dlm_page_acquire(ctx, page, gen, site);
 }
 
 /*
@@ -5619,7 +6391,7 @@ int mxfs_dlm_handoff_depart(struct mxfs_dlm_ctx *ctx)
  * mxfs_dlm_prepare_wanted. */
 static int dlm_ledger_prepare(struct mxfs_dlm_ctx *ctx,
 			      const struct mxfs_resource_id *resource,
-			      uint64_t *gen_out, bool nowait)
+			      uint64_t *gen_out, bool nowait, int *site)
 {
 	uint64_t gen;
 	int rc;
@@ -5676,6 +6448,7 @@ static int dlm_ledger_prepare(struct mxfs_dlm_ctx *ctx,
 			    resource->type, (unsigned long long)resource->ino,
 			    resource->ag_number, page, ctx->page_state[page], ready,
 			    dlm_cur_comm());
+			dlm_prep_site(site, DLM_PREP_NOWAIT);
 			return -EAGAIN;
 		}
 	}
@@ -5685,7 +6458,7 @@ static int dlm_ledger_prepare(struct mxfs_dlm_ctx *ctx,
 	{
 		uint64_t od0 = ctx->handoff_ondemand;
 
-		rc = dlm_page_ensure_mine(ctx, dlm_res_page(ctx, resource), gen);
+		rc = dlm_page_ensure_mine(ctx, dlm_res_page(ctx, resource), gen, site);
 		/* 0.84.5 (D-...-0960): names the resource an on-demand takeover
 		 * served, so a lap can tell whether a joiner's root request met
 		 * the transition HERE (this node masters its page) or at the
@@ -5709,6 +6482,7 @@ static int dlm_ledger_prepare(struct mxfs_dlm_ctx *ctx,
 		    "mxfs: P960-PARK-IMPORT-STALE type=%u ino=%llu ag=%u page=%u -- parked: the page image moved under the import\n",
 		    resource->type, (unsigned long long)resource->ino,
 		    resource->ag_number, dlm_res_page(ctx, resource));
+		dlm_prep_site(site, DLM_PREP_IMPORT_STALE);
 		return -EAGAIN;
 	}
 	if (rc)
@@ -5747,7 +6521,7 @@ void mxfs_dlm_prepare_wanted(struct mxfs_dlm_ctx *ctx)
 		    dlm_ledger_refuses(ctx) || !dlm_ledger_active(ctx))
 			break;
 		gen = ctx->ledger_gen;
-		rc = dlm_page_ensure_mine(ctx, p, gen);
+		rc = dlm_page_ensure_mine(ctx, p, gen, NULL);
 		if (rc == 0)
 			rc = dlm_ledger_import_page(ctx, p, gen);
 		if (rc) {
@@ -5886,6 +6660,132 @@ static struct dlm_txn_item *dlm_txn_add_release(struct dlm_txn *txn,
 	return it;
 }
 
+/*
+ * dl_own_release_resync: a master-local exclusive release names the grant id
+ * of the record the page holds for this node, read before the transition
+ * applies.  The record is taken only when it is ACTIVE and names the
+ * releasing owner AND its incarnation as the EX holder: a node holds one
+ * exclusive grant per resource, so that record is the grant being released,
+ * and while the entry is PENDING_RELEASE nothing else is granted on the
+ * resource to change it before the commit.  A record naming another node or
+ * incarnation, a remote release and a shared mode are left as they are.
+ * Called outside table_rwlock (the lookup takes the page lock).
+ */
+static void dlm_own_release_resync(struct mxfs_dlm_ctx *ctx, struct dlm_txn *txn)
+{
+	static mxfs_atomic32_t logged;
+	int i;
+
+	if (!mxfs_dl_own_release_resync)
+		return;
+	for (i = 0; i < txn->n; i++) {
+		struct dlm_txn_item *it = &txn->it[i];
+		struct mxfs_tauth_entry ent;
+		int32_t k;
+
+		if (!it->release || it->remote_rel || it->owner != ctx->local_node ||
+		    !dlm_mode_exclusive(it->mode))
+			continue;
+		if (mxfs_tauth_ledger_lookup(ctx->ledger, &txn->resource, txn->gen, &ent))
+			continue;
+		if (ent.state != MXFS_TAUTH_ST_ACTIVE || ent.ex_node != it->owner ||
+		    ent.ex_inc != it->inc ||
+		    (ent.authority_epoch == it->rel_auth && ent.grant_seq64 == it->rel_seq))
+			continue;
+		atomic_inc_return(&mxfs_dl_own_release_resync_n);
+		k = mxfs_atomic32_inc(&logged);
+		if (k <= 64)
+			mxfs_pal_log(MXFS_LOG_WARN,
+				     "mxfs: P-TAUTH-OWN-REL-RESYNC n=%d type=%u ino=%llu ag=%u page=%u "
+				     "owner=%u inc=%llu gen=%u entry_id={%llu,%llu} record_id={%llu,%llu} "
+				     "-- this master's release of its own EX names the page record's "
+				     "grant id, not the entry's",
+				     k, txn->resource.type, (unsigned long long)txn->resource.ino,
+				     txn->resource.ag_number, dlm_res_page(ctx, &txn->resource),
+				     it->owner, (unsigned long long)it->inc, it->gen,
+				     (unsigned long long)it->rel_auth, (unsigned long long)it->rel_seq,
+				     (unsigned long long)ent.authority_epoch,
+				     (unsigned long long)ent.grant_seq64);
+		it->rel_auth = ent.authority_epoch;
+		it->rel_seq = ent.grant_seq64;
+	}
+}
+
+/* the oldest records of a full page, by their last transition (see
+ * dl_capacity_reclaim) */
+struct dlm_cap_pick {
+	const struct mxfs_resource_id *skip;    /* the refused resource */
+	struct mxfs_resource_id res[MXFS_DL_CAP_RECLAIM];
+	uint64_t                seq[MXFS_DL_CAP_RECLAIM];
+	int                     n;
+};
+
+static void dlm_cap_pick_cb(void *data, uint32_t slot, const struct mxfs_tauth_entry *e)
+{
+	struct dlm_cap_pick *p = data;
+	int i, at;
+
+	(void)slot;
+	if (e->state != MXFS_TAUTH_ST_ACTIVE || mxfs_tauth_entry_is_res(e, p->skip))
+		return;
+	if (p->n < MXFS_DL_CAP_RECLAIM) {
+		at = p->n++;
+	} else {
+		at = 0;
+		for (i = 1; i < p->n; i++)
+			if (p->seq[i] > p->seq[at])
+				at = i;
+		if (e->transition_seq64 >= p->seq[at])
+			return;
+	}
+	mxfs_tauth_entry_res(e, &p->res[at]);
+	p->seq[at] = e->transition_seq64;
+}
+
+/* A grant of `res` was refused for a full home page: ask the holders of the
+ * page's oldest other records to release them (dl_capacity_reclaim).  Caller
+ * holds NO locks. */
+static void dlm_capacity_reclaim(struct mxfs_dlm_ctx *ctx, const struct mxfs_resource_id *res,
+				 uint64_t gen)
+{
+	static atomic_t calls = ATOMIC_INIT(0);
+	struct mxfs_bast_record recs[MXFS_MAX_BAST_RECORDS];
+	struct dlm_cap_pick pick;
+	uint32_t page = dlm_res_page(ctx, res);
+	uint64_t now = mxfs_pal_time_ms();
+	int i, k, fired = 0, total = 0, cn;
+
+	if (!READ_ONCE(mxfs_dl_capacity_reclaim))
+		return;
+	if (READ_ONCE(ctx->cap_reclaim_page) == page &&
+	    now - READ_ONCE(ctx->cap_reclaim_ms) < MXFS_DL_CAP_RECLAIM_MS)
+		return;
+	WRITE_ONCE(ctx->cap_reclaim_page, page);
+	WRITE_ONCE(ctx->cap_reclaim_ms, now);
+	memset(&pick, 0, sizeof(pick));
+	pick.skip = res;
+	if (mxfs_tauth_ledger_scan_active(ctx->ledger, page, gen, dlm_cap_pick_cb, &pick) < 0)
+		return;
+	for (i = 0; i < pick.n; i++) {
+		uint32_t bucket = resource_hash(&pick.res[i], ctx->bucket_count);
+		int n;
+
+		mxfs_pal_rwlock_rdlock(ctx->table_rwlock);
+		n = demand_collect_holders(ctx, bucket, &pick.res[i], MXFS_LOCK_EX, recs);
+		mxfs_pal_rwlock_unlock(ctx->table_rwlock);
+		fire_bast_records(ctx, &pick.res[i], recs, n);
+		fired += n;
+		for (k = 0; k < n; k++)
+			total = atomic_inc_return(&mxfs_dl_capacity_reclaim_n);
+	}
+	cn = atomic_inc_return(&calls);
+	if (cn <= 200 || (cn % 1000) == 0)
+		pr_warn(
+		    "mxfs: P-CAP-RECLAIM page=%u type=%u ino=%llu ag=%u picked=%d fired=%d total=%d asks=%d first=%llu -- a grant refused for a full ledger page; the holders of the page's oldest records asked to release them\n",
+		    page, res->type, (unsigned long long)res->ino, res->ag_number, pick.n, fired,
+		    total, cn, pick.n ? (unsigned long long)pick.res[0].ino : 0ULL);
+}
+
 /* Commit the transition.  0 = durable (per-item rc set); -ESTALE = the page
  * ownership generation moved (nothing written); other = refused. */
 static int dlm_txn_commit(struct mxfs_dlm_ctx *ctx, struct dlm_txn *txn)
@@ -5901,6 +6801,28 @@ static int dlm_txn_commit(struct mxfs_dlm_ctx *ctx, struct dlm_txn *txn)
 		for (i = 0; i < txn->n; i++)
 			txn->it[i].rc = 0;
 		return 0;
+	}
+	dlm_own_release_resync(ctx, txn);
+	/* TEST ONLY (dbg_cap_refuse_ino): refused as a full page refuses it */
+	if (unlikely(READ_ONCE(mxfs_dbg_cap_refuse_ino)) &&
+	    txn->resource.type == MXFS_LTYPE_INODE &&
+	    txn->resource.ino == READ_ONCE(mxfs_dbg_cap_refuse_ino) &&
+	    READ_ONCE(mxfs_dbg_cap_refuse_n) > 0) {
+		bool grant = false;
+
+		for (i = 0; i < txn->n; i++)
+			if (!txn->it[i].release)
+				grant = true;
+		if (grant) {
+			int left = --mxfs_dbg_cap_refuse_n;
+
+			pr_warn_ratelimited("mxfs: P-DBG-CAP-REFUSE ino=%llu left=%d -- grant refused as by a full ledger page (test)\n",
+					    (unsigned long long)txn->resource.ino, left);
+			for (i = 0; i < txn->n; i++)
+				txn->it[i].rc = -EDQUOT;
+			ctx->ledger_denies++;
+			return -EDQUOT;
+		}
 	}
 	ops = mxfs_pal_alloc(sizeof(*ops) * (size_t)txn->n);
 	if (!ops)
@@ -5986,6 +6908,8 @@ static int dlm_txn_commit(struct mxfs_dlm_ctx *ctx, struct dlm_txn *txn)
 			break;
 		}
 	}
+	if (rc == -EDQUOT)
+		dlm_capacity_reclaim(ctx, &txn->resource, txn->gen);
 	if (rc == -EIO || rc == -ENOTRECOVERABLE) {
 		/* fail stop: this master cannot make authority durable */
 		ctx->ledger_failed = true;
@@ -6202,6 +7126,42 @@ struct dlm_txn_basts {
 	struct mxfs_bast_record post_basts[MXFS_MAX_BAST_RECORDS];
 };
 
+/*
+ * Instrument, no behaviour: a master's release of its OWN grant that the
+ * ledger applied as stale (the page's record did not match it).  The finalize
+ * frees the entry as superseded, and when the record still names this node
+ * nothing retires it afterwards: every later grant of the resource to a peer
+ * is refused against it (P-TAUTH-DOUBLE-GRANT).  The ledger's
+ * P-TAUTH-REL-EX-STALE-HOLDER carries the record's identity; this line the
+ * entry's, and whether the entry was installed from a page load.  Caller
+ * holds table_rwlock.
+ */
+static void dlm_note_own_release_stale(struct mxfs_dlm_ctx *ctx,
+				       const struct dlm_txn *txn,
+				       const struct dlm_txn_item *it,
+				       const struct mxfs_lock *lk)
+{
+	static mxfs_atomic32_t n;
+	int32_t k = mxfs_atomic32_inc(&n);
+
+	if (k > 64)
+		return;
+	mxfs_pal_log(MXFS_LOG_WARN,
+		     "mxfs: P-TAUTH-OWN-REL-STALE n=%d type=%u ino=%llu ag=%u page=%u "
+		     "owner=%u inc=%llu mode=%s gen=%u rel_auth=%llu rel_seq=%llu "
+		     "lineage=%#llx entry=%d imported=%d held_ms=%lld ledger_gen=%llu "
+		     "txn_gen=%llu -- this master's release of its own grant was applied "
+		     "as stale; its table entry is freed as superseded",
+		     k, txn->resource.type, (unsigned long long)txn->resource.ino,
+		     txn->resource.ag_number, dlm_res_page(ctx, &txn->resource),
+		     it->owner, (unsigned long long)it->inc, mode_name(it->mode), it->gen,
+		     (unsigned long long)it->rel_auth, (unsigned long long)it->rel_seq,
+		     (unsigned long long)it->rel_lineage, lk ? 1 : 0,
+		     lk ? (lk->imported ? 1 : 0) : -1,
+		     lk ? (long long)(mxfs_pal_time_ms() - lk->granted_at) : -1LL,
+		     (unsigned long long)ctx->ledger_gen, (unsigned long long)txn->gen);
+}
+
 static int dlm_txn_finalize(struct mxfs_dlm_ctx *ctx, struct dlm_txn *txn,
 			    int commit_rc)
 {
@@ -6248,6 +7208,9 @@ static int dlm_txn_finalize(struct mxfs_dlm_ctx *ctx, struct dlm_txn *txn,
 		bool ok = (commit_rc == 0) && !remaster;
 
 		if (it->release) {
+			if (commit_rc == 0 && it->rc == -ESTALE && !it->remote_rel &&
+			    it->owner == ctx->local_node)
+				dlm_note_own_release_stale(ctx, txn, it, lk);
 			/* durable (or superseded: the releaser holds nothing) -> retire
 			 * the table entry; refused -> keep PENDING_RELEASE (blocker),
 			 * the releaser retries */
@@ -6321,6 +7284,30 @@ static int dlm_txn_finalize(struct mxfs_dlm_ctx *ctx, struct dlm_txn *txn,
 			lk->grant_gen = it->prev_gen;
 			if (it->reimport)
 				lk->imported = true;
+		} else if (commit_rc == -EDQUOT && READ_ONCE(mxfs_dl_capacity_park) &&
+			   !lk->cancelled &&
+			   !((lk->flags & MXFS_LKF_NOQUEUE) &&
+			     READ_ONCE(mxfs_dl_capacity_nq_wouldblock))) {
+			/* a no-queue request is not parked: its owner is answered
+			 * would-block and does not ask again
+			 * (dl_capacity_nq_wouldblock) */
+			/* refused for capacity: keep the request's place in the
+			 * queue (see dl_capacity_park) */
+			int pn = atomic_inc_return(&mxfs_dl_capacity_park_n);
+
+			lk->state = MXFS_LSTATE_WAITING;
+			lk->grant_gen = 0;
+			lk->pend_waiter = NULL;
+			lk->unclaimed = false;
+			lk->cap_parked = true;
+			lk->cap_parked_ms = mxfs_pal_time_ms();
+			if (pn <= 200 || (pn % 1000) == 0)
+				pr_warn(
+				    "mxfs: P-CAP-PARK type=%u ino=%llu ag=%u owner=%u mode=%s parks=%d wait_ms=%llu -- refused for a full ledger page; the request keeps its place in the queue\n",
+				    txn->resource.type, (unsigned long long)txn->resource.ino,
+				    txn->resource.ag_number, it->owner, mode_name(it->mode), pn,
+				    (unsigned long long)(lk->cap_parked_ms >= lk->queued_at ?
+							 lk->cap_parked_ms - lk->queued_at : 0));
 		} else {
 			*pp = lk->next;
 			ctx->lock_count--;
@@ -7268,12 +8255,13 @@ static bool dlm_store_fenced_cb(void *data, uint32_t node, uint64_t inc)
 }
 
 void mxfs_dlm_set_ledger_geometry(struct mxfs_dlm_ctx *ctx, uint32_t npages,
-				  uint64_t hash_seed)
+				  uint64_t hash_seed, uint16_t hash_version)
 {
 	if (!ctx)
 		return;
 	ctx->page_count = npages;
 	ctx->hash_seed = hash_seed;
+	ctx->hash_version = hash_version;
 }
 
 void mxfs_dlm_attach_ledger(struct mxfs_dlm_ctx *ctx,
@@ -7289,6 +8277,7 @@ void mxfs_dlm_attach_ledger(struct mxfs_dlm_ctx *ctx,
 		ledger->store.fenced_data = ctx;
 		ctx->page_count = ledger->npages;
 		ctx->hash_seed = ledger->store.hash_seed;
+		ctx->hash_version = ledger->store.hash_version;
 		ctx->page_import_gen = mxfs_pal_alloc(sizeof(uint64_t) * ledger->npages);
 		if (ctx->page_import_gen)
 			memset(ctx->page_import_gen, 0xff, sizeof(uint64_t) * ledger->npages);
@@ -7346,7 +8335,13 @@ int mxfs_dlm_ledger_purge_owner(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t node,
 	}
 	/* remember (dead ids never return): later page loads retire instead
 	 * of importing */
-	dlm_owner_mark_purged(ctx, node, slot);
+	if (dlm_owner_mark_purged(ctx, node, slot) && mxfs_dl_inject_purge_walk_delay_ms) {
+		mxfs_pal_log(MXFS_LOG_DEBUG,
+			     "mxfs: P-TAUTH-PURGE-INJECT-WALK-DELAY node=%u slot=%d ms=%u -- "
+			     "TEST ONLY: the owner is marked purged; its ledger walk waits",
+			     node, slot, mxfs_dl_inject_purge_walk_delay_ms);
+		mxfs_pal_sleep_ms(mxfs_dl_inject_purge_walk_delay_ms);
+	}
 	if (dlm_ledger_active(ctx)) {
 		rc = mxfs_tauth_ledger_purge_owner(ctx->ledger, node, slot, ctx->ledger_gen,
 						   (uint64_t)ctx->current_epoch,
@@ -7676,6 +8671,7 @@ void mxfs_dlm_destroy(struct mxfs_dlm_ctx *ctx)
 
 	mxfs_pal_rwlock_wrlock(ctx->table_rwlock);
 
+	dg_release_volume(ctx);
 	for (i = 0; i < ctx->bucket_count; i++) {
 		struct mxfs_lock *lk = ctx->buckets[i];
 
@@ -7735,6 +8731,26 @@ void mxfs_dlm_destroy(struct mxfs_dlm_ctx *ctx)
 
 	mxfs_pal_log(MXFS_LOG_DEBUG,
 		     "dlm: destroyed, freed %u lock entries", freed);
+	/* every RETRY answer this mount's acquires were given, by site (the
+	 * key is at dlm_retry): what an acquire slept on between attempts */
+	mxfs_pal_log(MXFS_LOG_INFO,
+		     "mxfs: P-DLM-RETRY-TALLY pend-retry=%u remaster=%u "
+		     "ledger-busy=%u prepare=%u own-pending=%u own-release=%u "
+		     "refused=%u grant-again=%u wait-retry=%u capacity=%u",
+		     ctx->retry_why[1], ctx->retry_why[2], ctx->retry_why[3],
+		     ctx->retry_why[4], ctx->retry_why[5], ctx->retry_why[6],
+		     ctx->retry_why[7], ctx->retry_why[8], ctx->retry_why[9],
+		     ctx->retry_why[10]);
+	/* and the 'prepare' answers by the exit that parked them */
+	mxfs_pal_log(MXFS_LOG_INFO,
+		     "mxfs: P-DLM-PREPARE-SITE-TALLY nowait=%u import-stale=%u "
+		     "not-owner=%u adopt-stale=%u prepared-stale=%u handed-off=%u "
+		     "boot-stale=%u unowned-noroute=%u unowned-asked=%u "
+		     "not-transition=%u ask-owner=%u unsited=%u",
+		     ctx->prep_site[1], ctx->prep_site[2], ctx->prep_site[3],
+		     ctx->prep_site[4], ctx->prep_site[5], ctx->prep_site[6],
+		     ctx->prep_site[7], ctx->prep_site[8], ctx->prep_site[9],
+		     ctx->prep_site[10], ctx->prep_site[11], ctx->prep_site[0]);
 	mxfs_pal_free(ctx);
 }
 
@@ -7755,11 +8771,45 @@ void mxfs_dlm_destroy(struct mxfs_dlm_ctx *ctx)
  * PENDING_RELEASE; 7 local decision refused (see site); 8 local grant txn
  * -EAGAIN (remaster); 9 local WAITING pending completed RETRY.
  */
-static int dlm_retry(struct mxfs_dlm_ctx *ctx, int why)
+/* which RETRY one attempt returned, for the retry loop: the per-ctx tallies
+ * above are shared by every acquire running on the node */
+struct dlm_retry_answer {
+	int why;	/* the dlm_retry reason; 0 = the attempt returned no RETRY */
+	int site;	/* reason 4: the prepare exit that parked (DLM_PREP_*) */
+};
+
+static int dlm_retry(struct mxfs_dlm_ctx *ctx, int why, struct dlm_retry_answer *ans)
 {
 	if (why > 0 && why < 11)
 		ctx->retry_why[why]++;
+	if (ans)
+		ans->why = why;
 	return MXFS_DLM_RETRY;
+}
+
+/* a local grant refused on a full home page: the remote requester's answer
+ * to MXFS_ERR_LEDGER_FULL (see dl_capacity_wait_local) */
+static int dlm_capacity_wait_local(struct mxfs_dlm_ctx *ctx, uint32_t flags,
+				   struct dlm_retry_answer *ans)
+{
+	if (dlm_capacity_nq_answer(flags))
+		return -EAGAIN;
+	atomic_inc_return(&mxfs_dl_capacity_wait_local_n);
+	mxfs_pal_sleep_ms(50);
+	return dlm_retry(ctx, 10, ans);
+}
+
+/*
+ * Does the answer report a ledger page hand-off in flight: a remote master's
+ * REMASTER, or a park while this node asks the page's live owner or the live
+ * bootstrap node, or waits for the live target it prepared the page to?
+ */
+static bool dlm_answer_handoff(const struct dlm_retry_answer *ans)
+{
+	return ans->why == 2 ||
+	       (ans->why == 4 && (ans->site == DLM_PREP_ASK_OWNER ||
+				  ans->site == DLM_PREP_UNOWNED_ASKED ||
+				  ans->site == DLM_PREP_HANDED_OFF));
 }
 
 /*
@@ -8039,20 +9089,21 @@ static int dlm_acq_bast_due(struct mxfs_dlm_ctx *ctx,
  * grant or denial that completed a pending entry, a send failure, a
  * membership retry — leaves an adopted grant with no owner, and it is
  * released here exactly as the unsolicited-grant bounce would have.
+ * Returns 1 when a record was retired, 0 when the resource and mode had none.
  */
-static void dlm_acq_end(struct mxfs_dlm_ctx *ctx,
-			const struct mxfs_resource_id *resource,
-			uint8_t mode, int claimed)
+static int dlm_acq_end(struct mxfs_dlm_ctx *ctx,
+		       const struct mxfs_resource_id *resource,
+		       uint8_t mode, int claimed)
 {
 	uint64_t degraded_for = 0, age = 0, seq = 0;
 	uint32_t retx = 0;
 	mxfs_node_id_t master = 0;
 	struct mxfs_dlm_acq_grant orphan;
-	int i;
+	int i, ended = 0;
 
 	memset(&orphan, 0, sizeof(orphan));
 	if (!ctx->acq_lock)
-		return;
+		return 0;
 	mxfs_pal_spinlock_lock(ctx->acq_lock);
 	for (i = 0; i < MXFS_DLM_ACQ_SLOTS; i++) {
 		if (ctx->acq[i].in_use &&
@@ -8071,6 +9122,7 @@ static void dlm_acq_end(struct mxfs_dlm_ctx *ctx,
 				orphan = ctx->acq[i].grant;
 			ctx->acq[i].in_use = 0;
 			ctx->acq_retired++;
+			ended = 1;
 			break;
 		}
 	}
@@ -8089,6 +9141,32 @@ static void dlm_acq_end(struct mxfs_dlm_ctx *ctx,
 			     mode_name(mode), master, retx,
 			     (unsigned long long)age,
 			     (unsigned long long)degraded_for);
+	return ended;
+}
+
+/*
+ * dl_local_acq_end: a locally mastered request answered outside the promote
+ * path retires the acquisition record its earlier attempts opened.  `site`
+ * names the answer.  Called holding no lock: dlm_acq_end may release an
+ * adopted grant, which takes table_rwlock.
+ */
+static void dlm_local_answered(struct mxfs_dlm_ctx *ctx,
+			       const struct mxfs_resource_id *resource,
+			       uint8_t mode, const char *site)
+{
+	int n;
+
+	if (!READ_ONCE(mxfs_dl_local_acq_end) || !dlm_acq_end(ctx, resource, mode, 0))
+		return;
+	n = atomic_inc_return(&mxfs_dl_local_acq_end_n);
+	if (n <= 8 || (n % 64) == 0)
+		mxfs_pal_log(MXFS_LOG_DEBUG,
+			     "mxfs: P958-ACQ-LOCAL-ANSWER-END type=%u ino=%llu ag=%u mode=%s "
+			     "site=%s n=%d -- a locally mastered request answered outside "
+			     "the promote path retired the acquisition record its earlier "
+			     "attempts opened",
+			     resource->type, (unsigned long long)resource->ino,
+			     resource->ag_number, mode_name(mode), site, n);
 }
 
 /*
@@ -8802,16 +9880,48 @@ static bool dlm_authority_lost(struct mxfs_dlm_ctx *ctx)
 	return ctx->authority_lost_cb && ctx->authority_lost_cb(ctx->cb_data);
 }
 
+/*
+ * Is `newlk`, the entry a local wait queued, still that wait's own and
+ * already decided (PENDING_DURABLE: a release promoted it and the ledger
+ * commit of its grant is in flight)?  Found by pointer in its bucket under the
+ * table lock, never dereferenced unless found there, and matched on owner,
+ * request id and resource, so a freed and reused allocation is not taken for
+ * it.  Takes the table lock (read); for callers that hold none.
+ */
+static bool dlm_own_wait_decided(struct mxfs_dlm_ctx *ctx, uint32_t bucket,
+				 const struct mxfs_resource_id *resource,
+				 const struct mxfs_lock *newlk,
+				 const struct mxfs_dlm_pending *pend)
+{
+	struct mxfs_lock *lk;
+	bool decided = false;
+
+	mxfs_pal_rwlock_rdlock(ctx->table_rwlock);
+	for (lk = ctx->buckets[bucket]; lk; lk = lk->next) {
+		if (lk != newlk)
+			continue;
+		decided = lk->owner == ctx->local_node &&
+			  lk->state == MXFS_LSTATE_PENDING_DURABLE &&
+			  lk->req_id == pend->req_id &&
+			  resource_equal(&lk->resource, resource);
+		break;
+	}
+	mxfs_pal_rwlock_unlock(ctx->table_rwlock);
+	return decided;
+}
+
 static int dlm_lock_impl(struct mxfs_dlm_ctx *ctx,
 			  const struct mxfs_resource_id *resource,
 			  uint8_t mode, uint32_t flags,
-			  uint8_t *granted_mode, uint64_t *progress)
+			  uint8_t *granted_mode, uint64_t *progress,
+			  struct dlm_retry_answer *ans)
 {
 	mxfs_node_id_t master;
 	uint32_t bucket;
 	struct mxfs_lock *chain, *lk;
 	int compat;
 	uint64_t ledger_gen = 0;
+	uint64_t cap_since = 0;     /* our parked request's age, carried */
 	uint32_t req_id;
 
 	if (ctx->shutting_down)
@@ -8936,6 +10046,34 @@ static int dlm_lock_impl(struct mxfs_dlm_ctx *ctx,
 			return -EHOSTDOWN;
 		}
 
+		/* A reserve of a number this node holds EX: the mirror answers
+		 * (mxfs_dl_reserve_held_local).  Only a GRANTED mirror: a release
+		 * in flight has already unlinked it, and a conversion or a grant
+		 * still committing is not GRANTED. */
+		if ((flags & MXFS_LKF_RESERVE) && mode == MXFS_LOCK_EX &&
+		    READ_ONCE(mxfs_dl_reserve_held_local)) {
+			uint32_t hbucket = resource_hash(resource, ctx->bucket_count);
+			struct mxfs_lock *hlk;
+			uint8_t held = MXFS_LOCK_NL;
+
+			mxfs_pal_rwlock_rdlock(ctx->table_rwlock);
+			for (hlk = ctx->buckets[hbucket]; hlk; hlk = hlk->next) {
+				if (resource_equal(&hlk->resource, resource) &&
+				    hlk->owner == ctx->local_node &&
+				    hlk->state == MXFS_LSTATE_GRANTED &&
+				    hlk->mode >= MXFS_LOCK_EX) {
+					held = hlk->mode;
+					break;
+				}
+			}
+			mxfs_pal_rwlock_unlock(ctx->table_rwlock);
+			if (held != MXFS_LOCK_NL) {
+				atomic_inc_return(&mxfs_dl_reserve_held_local_n);
+				*granted_mode = held;
+				return 0;
+			}
+		}
+
 		/* Build the wire message */
 		memset(&req, 0, sizeof(req));
 		req.hdr.magic = MXFS_DLM_MAGIC;
@@ -8947,7 +10085,7 @@ static int dlm_lock_impl(struct mxfs_dlm_ctx *ctx,
 		req.hdr.epoch = ctx->current_epoch;
 		req.resource = *resource;
 		req.mode = mode;
-		req.flags = flags;
+		req.flags = flags & ~MXFS_LKF_RESERVE;
 		req.owner_inc = ctx->local_inc;      /* ledger identity */
 		req.owner_slot = ctx->local_slot;
 		req.req_id = req_id;
@@ -9029,8 +10167,12 @@ static int dlm_lock_impl(struct mxfs_dlm_ctx *ctx,
 		 * are affected; everything else, including the traffic that keeps the
 		 * peer a live member, goes out normally.
 		 */
-		if (unlikely(READ_ONCE(mxfs_dl_drop_lockreq_ino)) &&
-		    resource->ino == READ_ONCE(mxfs_dl_drop_lockreq_ino)) {
+		if ((unlikely(READ_ONCE(mxfs_dl_drop_lockreq_ino)) &&
+		     resource->ino == READ_ONCE(mxfs_dl_drop_lockreq_ino)) ||
+		    (unlikely(READ_ONCE(mxfs_dl_drop_lockreq_ag)) &&
+		     resource->type == MXFS_LTYPE_AG &&
+		     (unsigned long long)resource->ag_number + 1 ==
+				READ_ONCE(mxfs_dl_drop_lockreq_ag))) {
 			int dropped = atomic_inc_return(&mxfs_dl_drop_lockreq_n);
 
 			ret = 0;
@@ -9154,7 +10296,7 @@ lockreq_sent:
 		if (pend->status == MXFS_DLM_RETRY) {
 			/* Membership changed — retry with new master */
 			pending_free(pend);
-			return dlm_retry(ctx, 1);
+			return dlm_retry(ctx, 1, ans);
 		}
 
 		if (pend->status != 0) {
@@ -9228,16 +10370,19 @@ lockreq_sent:
 				    resource->type, (unsigned long long)resource->ino,
 				    resource->ag_number, master, mode_name(mode),
 				    (unsigned long long)vh, vc);
-				return dlm_retry(ctx, 2);
+				return dlm_retry(ctx, 2, ans);
 			}
 			/* a durable holder's retirement was in flight when
 			 * the master decided — it retires it and we retry */
 			if (ret == MXFS_ERR_LEDGER_BUSY)
-				return dlm_retry(ctx, 3);
-			/* (D-0348): the home page is full — wait, never EIO */
+				return dlm_retry(ctx, 3, ans);
+			/* (D-0348): the home page is full — wait, never EIO;
+			 * a no-queue request is answered would-block instead */
 			if (ret == MXFS_ERR_LEDGER_FULL) {
+				if (dlm_capacity_nq_answer(flags))
+					return -EAGAIN;
 				mxfs_pal_sleep_ms(50);
-				return dlm_retry(ctx, 10);
+				return dlm_retry(ctx, 10, ans);
 			}
 			/*
 			 * The master could not make its decision durable.  That is
@@ -9298,8 +10443,10 @@ lockreq_sent:
 		bool noqueue = flags & MXFS_LKF_NOQUEUE;
 		bool agtry = noqueue && resource->type == MXFS_LTYPE_AG;
 		uint64_t pt0 = mxfs_pal_time_ms();
+		int psite = 0;
 		int prc = dlm_ledger_prepare(ctx, resource, &ledger_gen,
-					     agtry && READ_ONCE(mxfs_dl_noqueue_ledger_nowait));
+					     agtry && READ_ONCE(mxfs_dl_noqueue_ledger_nowait),
+					     &psite);
 		uint64_t pms = mxfs_pal_time_ms() - pt0;
 
 		if (noqueue && pms >= 1000)
@@ -9321,8 +10468,12 @@ lockreq_sent:
 			if (wb)
 				return -EAGAIN;
 		}
-		if (prc == -EAGAIN)
-			return dlm_retry(ctx, 4);
+		if (prc == -EAGAIN) {
+			ctx->prep_site[psite > 0 && psite < DLM_PREP_SITES ? psite : 0]++;
+			if (ans)
+				ans->site = psite;
+			return dlm_retry(ctx, 4, ans);
+		}
 		/* 0.84.5 (D-...-0960): the page is in a takeover a live bootstrap
 		 * (us, or the one whose NOT_OWNER answers relay its count) is
 		 * making; wait on that count, not on the budget */
@@ -9338,6 +10489,35 @@ lockreq_sent:
 
 	mxfs_pal_rwlock_wrlock(ctx->table_rwlock);
 	chain = ctx->buckets[bucket];
+
+	/*
+	 * dl_capacity_park: a parked request whose owner stopped asking leaves
+	 * the queue; our own parked request is replaced by this one, which is
+	 * decided with the age the parked one had.
+	 */
+	{
+		struct mxfs_lock **cpp = &ctx->buckets[bucket];
+		bool dropped = dlm_cap_park_expire(ctx, bucket, resource) > 0;
+
+		while (*cpp) {
+			struct mxfs_lock *c = *cpp;
+
+			if (c->cap_parked && c->owner == ctx->local_node &&
+			    resource_equal(&c->resource, resource) &&
+			    (c->state == MXFS_LSTATE_WAITING ||
+			     c->state == MXFS_LSTATE_BLOCKED)) {
+				cap_since = c->queued_at;
+				*cpp = c->next;
+				ctx->lock_count--;
+				lock_free(c);
+				dropped = true;
+				break;
+			}
+			cpp = &c->next;
+		}
+		if (dropped)
+			chain = ctx->buckets[bucket];
+	}
 
 	/* Check for existing lock: same resource, same owner */
 	for (lk = chain; lk; lk = lk->next) {
@@ -9382,12 +10562,14 @@ lockreq_sent:
 				    pend->granted_mode != MXFS_LOCK_NL) {
 					*granted_mode = pend->granted_mode;
 					pending_free(pend);
+					dlm_local_answered(ctx, resource, mode, "attach");
 					return 0;
 				}
 				ret = pend->done ? pend->status : MXFS_DLM_RETRY;
 				pending_free(pend);
 				if (ret == MXFS_DLM_RETRY || ret == -ETIMEDOUT || ret == 0)
-					return dlm_retry(ctx, 5);
+					return dlm_retry(ctx, 5, ans);
+				dlm_local_answered(ctx, resource, mode, "attach-err");
 				return ret;
 			}
 			if (lk->state == MXFS_LSTATE_PENDING_RELEASE) {
@@ -9395,7 +10577,7 @@ lockreq_sent:
 				 * queue afresh */
 				mxfs_pal_rwlock_unlock(ctx->table_rwlock);
 				mxfs_pal_sleep_ms(10);
-				return dlm_retry(ctx, 6);
+				return dlm_retry(ctx, 6, ans);
 			}
 			if (lk->state == MXFS_LSTATE_GRANTED) {
 				/*
@@ -9451,7 +10633,7 @@ lockreq_sent:
 							     resource->ag_number,
 							     (unsigned long long)lk->owner_inc,
 							     (unsigned long long)ctx->local_inc, mode_name(mode));
-						return dlm_retry(ctx, 7);
+						return dlm_retry(ctx, 7, ans);
 					}
 					lk->imported = false;
 					lk->grant_gen = dlm_next_gen(ctx);
@@ -9556,7 +10738,9 @@ lockreq_sent:
 								     (unsigned long long)ns,
 								     (unsigned long long)nl);
 							if (grc == -EAGAIN)
-								return dlm_retry(ctx, 7);
+								return dlm_retry(ctx, 7, ans);
+							dlm_local_answered(ctx, resource, mode,
+									   grc ? "regrant-err" : "regrant");
 							if (grc)
 								return grc;
 							*granted_mode = prev_mode;
@@ -9572,6 +10756,7 @@ lockreq_sent:
 								    mode_name(lk->mode), lk->owner);
 							*granted_mode = lk->mode;
 							mxfs_pal_rwlock_unlock(ctx->table_rwlock);
+							dlm_local_answered(ctx, resource, mode, "shortcut");
 							return 0;
 						}
 					}
@@ -9663,7 +10848,11 @@ lockreq_sent:
 						grc = dlm_grant_txn(ctx, txn);
 						mxfs_pal_free(txn);
 						if (grc == -EAGAIN)
-							return dlm_retry(ctx, 7);
+							return dlm_retry(ctx, 7, ans);
+						if (grc == -EDQUOT && mxfs_dl_capacity_wait_local)
+							return dlm_capacity_wait_local(ctx, flags, ans);
+						dlm_local_answered(ctx, resource, mode,
+								   grc ? "upgrade-err" : "upgrade");
 						if (grc)
 							return grc;
 						*granted_mode = mode;
@@ -9741,7 +10930,8 @@ check_compat:
 	 * older conflicting waiter (see find_conflicting_waiter). */
 	if (compat) {
 		struct mxfs_lock *cw = find_conflicting_waiter(chain, resource,
-							       ctx->local_node, mode);
+							       ctx->local_node, mode,
+							       cap_since);
 		if (cw) {
 			static atomic_t p6f_n = ATOMIC_INIT(0);
 			compat = 0;
@@ -9802,6 +10992,8 @@ check_compat:
 		newlk->owner_slot = ctx->local_slot;
 		newlk->req_id = req_id;
 		newlk->decide_gen = ledger_gen;
+		if (cap_since)
+			newlk->queued_at = cap_since;   /* replaces our parked entry */
 
 		/* PROVEN BY INSTRUMENT (run44 wedge): this was the
 		 * ONE grant path that never stamped grant_gen — every uncontended
@@ -9828,7 +11020,10 @@ check_compat:
 		grc = dlm_grant_txn(ctx, txn);
 		mxfs_pal_free(txn);
 		if (grc == -EAGAIN)
-			return dlm_retry(ctx, 8);
+			return dlm_retry(ctx, 8, ans);
+		if (grc == -EDQUOT && mxfs_dl_capacity_wait_local)
+			return dlm_capacity_wait_local(ctx, flags, ans);
+		dlm_local_answered(ctx, resource, mode, grc ? "immediate-err" : "immediate");
 		if (grc)
 			return grc;
 		*granted_mode = mode;
@@ -9898,6 +11093,8 @@ check_compat:
 			newlk->acq_seq = dlm_acq_begin(ctx, resource, mode, &acq_first, NULL, false);
 			if (acq_first && acq_first < newlk->queued_at)
 				newlk->queued_at = acq_first;
+			if (cap_since && cap_since < newlk->queued_at)
+				newlk->queued_at = cap_since;
 		}
 		newlk->next = ctx->buckets[bucket];
 		ctx->buckets[bucket] = newlk;
@@ -9963,6 +11160,28 @@ check_compat:
 		 * -ETIMEDOUT (re-fires the BAST) to recover a lost grant/release. */
 		ret = pending_wait(pend, MXFS_LOCK_ACQUIRE_WAIT_MS);
 
+		/* dl_local_wait_keeps_decided: a grant already decided for this
+		 * wait is waited for, not abandoned to an orphan retirement; the
+		 * pending entry stays hashed, so the commit's delivery finds it */
+		if (ret == -ETIMEDOUT && READ_ONCE(mxfs_dl_local_wait_keeps_decided)) {
+			int kept = 0;
+
+			while (ret == -ETIMEDOUT && kept < MXFS_DL_KEEP_DECIDED_ROUNDS &&
+			       !mxfs_pal_fatal_signal_pending() &&
+			       dlm_own_wait_decided(ctx, bucket, resource, newlk, pend)) {
+				kept++;
+				atomic_inc_return(&mxfs_dl_local_wait_kept_n);
+				ret = pending_wait(pend, MXFS_LOCK_ACQUIRE_WAIT_MS);
+			}
+			if (kept)
+				mxfs_pal_log(MXFS_LOG_DEBUG,
+				    "mxfs: P-LOCAL-WAIT-KEPT-DECIDED type=%u ino=%llu ag=%u req=%s rounds=%d outcome=%s -- "
+				    "the wait ran out after its grant was decided; waited for the commit instead of giving up",
+				    resource->type, (unsigned long long)resource->ino,
+				    resource->ag_number, mode_name(mode), kept,
+				    ret == 0 ? "answered" : "still-waiting");
+		}
+
 		pending_remove(ctx, pend);
 
 		/* 0.89.69: same as the remote path — an answer that landed while
@@ -9986,7 +11205,21 @@ check_compat:
 			 * freed by update_active_nodes' table purge. Do NOT try
 			 * to find/free newlk (use-after-free). Just retry. */
 			pending_free(pend);
-			return dlm_retry(ctx, 9);
+			return dlm_retry(ctx, 9, ans);
+		}
+
+		/* dl_local_refusal_redrives: an answer that is a refusal granted
+		 * nothing; the timeout arm drops the entry only if it is still this
+		 * wait's own WAITING one, and the caller re-drives */
+		if (ret == 0 && pend->status != 0 &&
+		    READ_ONCE(mxfs_dl_local_refusal_redrives)) {
+			int n = atomic_inc_return(&mxfs_dl_local_refusal_redrive_n);
+
+			pr_warn_ratelimited(
+			    "mxfs: P-LOCAL-WAIT-REFUSED type=%u ino=%llu ag=%u req=%s status=%d n=%d -- this local wait's grant was refused; nothing was granted, the acquire is re-driven\n",
+			    resource->type, (unsigned long long)resource->ino,
+			    resource->ag_number, mode_name(mode), pend->status, n);
+			ret = -ETIMEDOUT;
 		}
 
 		if (ret == -ETIMEDOUT) {
@@ -10422,6 +11655,7 @@ static int dlm_lock_retries_impl(struct mxfs_dlm_ctx *ctx,
 	int retries = max_retries > 0 ? max_retries : 1;
 	int retries0 = retries;
 	uint32_t why0[11];
+	uint32_t ps0[12];
 	int n_timeout = 0, n_xport = 0;
 	/*
 	 * 0.75.53 (D-0922, instrumented stack-proven on the two-node TCP rig): a
@@ -10467,11 +11701,27 @@ static int dlm_lock_retries_impl(struct mxfs_dlm_ctx *ctx,
 	mxfs_node_id_t xport_master = 0;
 	uint64_t xport_t0 = 0;
 	int n_xport_unspent = 0;
+	/*
+	 * Instrument, no behaviour: whether each RETRY answer that spent the
+	 * budget came after a membership change since the previous one (the
+	 * view still forming) or with the view unchanged (a handoff that is not
+	 * finishing).  A formation ramp's failures carry no other trace of it.
+	 */
+	uint64_t vs0, vs_last;
+	int n_retry_moved = 0, n_retry_still = 0, n_retry_unspent = 0;
+	/* which RETRY each attempt returned, and the hand-off wait's clock
+	 * (mxfs_dl_retry_handoff_grace_ms): from the first answer that reported
+	 * a page hand-off in flight */
+	struct dlm_retry_answer ans;
+	uint64_t handoff_t0 = 0;
+	int n_handoff = 0, n_handoff_unspent = 0;
 
 	if (!ctx || !resource || mode >= MXFS_LOCK_MODE_COUNT)
 		return -EINVAL;
 	acq_t0 = mxfs_pal_time_ms();
+	vs0 = vs_last = ctx->view_seq;
 	memcpy(why0, ctx->retry_why, sizeof(why0));   /* per-request tally */
+	memcpy(ps0, ctx->prep_site, sizeof(ps0));
 
 	/* DLM_TRACE: log entry for inode 128 debugging */
 	if (resource->ino == 128 && resource->type == MXFS_LTYPE_INODE)
@@ -10507,7 +11757,10 @@ static int dlm_lock_retries_impl(struct mxfs_dlm_ctx *ctx,
 			    retries, dlm_cur_comm());
 			return -ESHUTDOWN;
 		}
-		ret = dlm_lock_impl(ctx, resource, mode, flags, granted_mode, &tprog);
+		ans.why = 0;
+		ans.site = 0;
+		ret = dlm_lock_impl(ctx, resource, mode, flags, granted_mode, &tprog,
+				    &ans);
 		if (ret == MXFS_DLM_RETRY_TRANSITION) {
 			uint64_t now = mxfs_pal_time_ms();
 
@@ -10684,7 +11937,8 @@ static int dlm_lock_retries_impl(struct mxfs_dlm_ctx *ctx,
 					     ret, mode_name(mode), retries - 1);
 				n_xport++;
 				mxfs_pal_sleep_ms(500);
-			} else if (ret == -ETIMEDOUT && (flags & MXFS_LKF_NOQUEUE)) {
+			} else if (ret == -ETIMEDOUT && (flags & MXFS_LKF_NOQUEUE) &&
+				   READ_ONCE(mxfs_dl_noqueue_unanswered_wouldblock)) {
 				/*
 				 * A request that asked not to queue and got no answer
 				 * within one attempt answers "would block", as it does
@@ -10766,6 +12020,12 @@ static int dlm_lock_retries_impl(struct mxfs_dlm_ctx *ctx,
 							mxfs_pal_dump_stack();
 					}
 				}
+				{
+					unsigned int d = READ_ONCE(mxfs_dl_inject_timeout_retry_delay_ms);
+
+					if (d)
+						mxfs_pal_sleep_ms(d);
+				}
 			} else {
 				/*
 				 * Instrument, no behaviour.  An acquire whose LAST
@@ -10818,6 +12078,50 @@ static int dlm_lock_retries_impl(struct mxfs_dlm_ctx *ctx,
 				return ret;
 			}
 		} else {
+			bool moved = ctx->view_seq != vs_last;
+
+			if (moved)
+				n_retry_moved++;
+			else
+				n_retry_still++;
+			vs_last = ctx->view_seq;
+			/*
+			 * The view changed since this acquire's previous answer: it
+			 * is still forming, and the answer is the request meeting
+			 * that, not the resource refusing it.  A queued request
+			 * waits on the view as it waits on a takeover (the
+			 * transition arm above), for MXFS_DLM_DEAD_MASTER_WAIT_MS at
+			 * most; a no-queue one keeps its answer prompt.  An answer
+			 * with the view unchanged spends the budget as always.
+			 */
+			if (moved && !(flags & MXFS_LKF_NOQUEUE) &&
+			    READ_ONCE(mxfs_dl_retry_view_unspent) &&
+			    mxfs_pal_time_ms() - acq_t0 < MXFS_DLM_DEAD_MASTER_WAIT_MS) {
+				n_retry_unspent++;
+				atomic_inc_return(&mxfs_dl_retry_view_unspent_n);
+				retries++;      /* undone by the loop's --retries */
+			}
+			/*
+			 * With the view unchanged, an answer that the page is being
+			 * handed over is the request meeting that hand-off: a queued
+			 * one waits on it for mxfs_dl_retry_handoff_grace_ms from the
+			 * first such answer instead of counting its own polls of it,
+			 * and spends the budget as always once that has passed.
+			 */
+			if (!moved && dlm_answer_handoff(&ans)) {
+				int grace = READ_ONCE(mxfs_dl_retry_handoff_grace_ms);
+				uint64_t now = mxfs_pal_time_ms();
+
+				n_handoff++;
+				if (!handoff_t0)
+					handoff_t0 = now;
+				if (!(flags & MXFS_LKF_NOQUEUE) && grace > 0 &&
+				    now - handoff_t0 < (uint64_t)grace) {
+					n_handoff_unspent++;
+					atomic_inc_return(&mxfs_dl_retry_handoff_unspent_n);
+					retries++;      /* undone by the loop's --retries */
+				}
+			}
 			mxfs_pal_log(MXFS_LOG_DEBUG,
 				     "dlm: lock retry after membership change "
 				     "(mode=%s, retries_left=%d)",
@@ -10839,7 +12143,14 @@ static int dlm_lock_retries_impl(struct mxfs_dlm_ctx *ctx,
 		     "flags=0x%x age_ms=%llu comm=%s timeouts=%d transport=%d "
 		     "why[pend-retry=%u remaster=%u ledger-busy=%u prepare=%u "
 		     "own-pending=%u own-release=%u refused=%u grant-again=%u "
-		     "wait-retry=%u capacity=%u transition-waits=%d])",
+		     "wait-retry=%u capacity=%u transition-waits=%d] "
+		     "view_seq=%llu->%llu retries_view_moved=%d "
+		     "retries_view_still=%d view_unspent=%d handoff=%d "
+		     "handoff_unspent=%d since_memb_ms=%lld "
+		     "prepare_site[nowait=%u import-stale=%u not-owner=%u "
+		     "adopt-stale=%u prepared-stale=%u handed-off=%u boot-stale=%u "
+		     "unowned-noroute=%u unowned-asked=%u not-transition=%u "
+		     "ask-owner=%u unsited=%u])",
 		     retries0,
 		     (flags & MXFS_LKF_NOQUEUE) ?
 			"a no-queue caller reads this as would-block" :
@@ -10853,7 +12164,17 @@ static int dlm_lock_retries_impl(struct mxfs_dlm_ctx *ctx,
 		     ctx->retry_why[5] - why0[5], ctx->retry_why[6] - why0[6],
 		     ctx->retry_why[7] - why0[7], ctx->retry_why[8] - why0[8],
 		     ctx->retry_why[9] - why0[9], ctx->retry_why[10] - why0[10],
-		     n_trans);
+		     n_trans, (unsigned long long)vs0,
+		     (unsigned long long)ctx->view_seq, n_retry_moved,
+		     n_retry_still, n_retry_unspent, n_handoff, n_handoff_unspent,
+		     ctx->last_memb_change_ms ?
+			(long long)(mxfs_pal_time_ms() - ctx->last_memb_change_ms) : -1LL,
+		     ctx->prep_site[1] - ps0[1], ctx->prep_site[2] - ps0[2],
+		     ctx->prep_site[3] - ps0[3], ctx->prep_site[4] - ps0[4],
+		     ctx->prep_site[5] - ps0[5], ctx->prep_site[6] - ps0[6],
+		     ctx->prep_site[7] - ps0[7], ctx->prep_site[8] - ps0[8],
+		     ctx->prep_site[9] - ps0[9], ctx->prep_site[10] - ps0[10],
+		     ctx->prep_site[11] - ps0[11], ctx->prep_site[0] - ps0[0]);
 	return -EAGAIN;
 }
 
@@ -10964,9 +12285,22 @@ int mxfs_dlm_unlock_gen(struct mxfs_dlm_ctx *ctx,
 	return mxfs_dlm_unlock_open(ctx, resource, expected_gen, MXFS_TAUTH_OPEN_NONE);
 }
 
-int mxfs_dlm_unlock_open(struct mxfs_dlm_ctx *ctx,
-			 const struct mxfs_resource_id *resource,
-			 uint32_t expected_gen, int open_op)
+/*
+ * The release body.  expected_gen != 0 releases only that tenure.
+ * expected_gen 0 releases the first granted entry of ours, whatever its
+ * generation -- unless `unanchored`: then a generation-bearing grant is
+ * refused (-ESTALE) and only a generation-less entry (an imported record no
+ * request adopted) or an abandoned request is released.  An unanchored
+ * caller is one whose capture found no tenure of ours to name; a grant that
+ * carries a generation now was minted after it looked, by a fresh acquire,
+ * and is not the caller's to release.  The refusal is decided under the
+ * table lock, so no grant can land between the check and the release.
+ * `caller` names the call site in the diagnostics below.
+ */
+static int dlm_unlock_tenure(struct mxfs_dlm_ctx *ctx,
+			     const struct mxfs_resource_id *resource,
+			     uint32_t expected_gen, int open_op,
+			     bool unanchored, void *caller)
 {
 	uint32_t bucket;
 	struct mxfs_lock **pp;
@@ -10983,8 +12317,7 @@ int mxfs_dlm_unlock_open(struct mxfs_dlm_ctx *ctx,
 	if (!ctx || !resource)
 		return -EINVAL;
 
-	dlm_note_release_while_poisoned(ctx, "unlock_gen", resource,
-					__builtin_return_address(0));
+	dlm_note_release_while_poisoned(ctx, "unlock_gen", resource, caller);
 
 	bucket = resource_hash(resource, ctx->bucket_count);
 
@@ -11006,7 +12339,8 @@ int mxfs_dlm_unlock_open(struct mxfs_dlm_ctx *ctx,
 		    lk->owner == ctx->local_node &&
 		    (lk->state == MXFS_LSTATE_GRANTED ||
 		     lk->state == MXFS_LSTATE_CONVERTING)) {
-			if (expected_gen && lk->grant_gen != expected_gen) {
+			if ((expected_gen && lk->grant_gen != expected_gen) ||
+			    (unanchored && lk->grant_gen != 0)) {
 				/* Not the tenure this release belongs to — skip it. */
 				other_gen = lk->grant_gen;
 				pp = &lk->next;
@@ -11031,8 +12365,8 @@ int mxfs_dlm_unlock_open(struct mxfs_dlm_ctx *ctx,
 	 * DIFFERENT tenure (normally newer — a re-acquire that completed during
 	 * our release window) owns the resource now.  Do NOT touch it, do NOT
 	 * dg_release, do NOT send LOCK_RELEASE. */
-	if (!found && expected_gen && other_gen) {
-		if (resource->type == MXFS_LTYPE_INODE) {
+	if (!found && (expected_gen || unanchored) && other_gen) {
+		if (resource->type == MXFS_LTYPE_INODE && expected_gen) {
 			static atomic_t p6g_n = ATOMIC_INIT(0);
 			if ((unsigned)atomic_inc_return(&p6g_n) <= 20000)
 				pr_warn("mxfs: P6G-STALE-RELEASE-SKIP ino=%llu rel_gen=%u cur_gen=%u comm=%s -- release outlived its tenure; refused\n",
@@ -11100,7 +12434,7 @@ int mxfs_dlm_unlock_open(struct mxfs_dlm_ctx *ctx,
 					    resource->type, (unsigned long long)resource->ino,
 					    resource->ag_number, (unsigned)lk->state,
 					    (unsigned)lk->mode, lk->grant_gen, expected_gen,
-					    __builtin_return_address(0), dlm_cur_comm(),
+					    caller, dlm_cur_comm(),
 					    (unsigned long long)ctx->unlock_fallback_inflight_skips);
 					pp = &lk->next;
 					continue;
@@ -11342,6 +12676,24 @@ int mxfs_dlm_unlock_open(struct mxfs_dlm_ctx *ctx,
 		    resource->ag_number, master, ctx->local_node, rel_gen);
 
 	return 0;
+}
+
+int mxfs_dlm_unlock_open(struct mxfs_dlm_ctx *ctx,
+			 const struct mxfs_resource_id *resource,
+			 uint32_t expected_gen, int open_op)
+{
+	return dlm_unlock_tenure(ctx, resource, expected_gen, open_op, false,
+				 __builtin_return_address(0));
+}
+
+/* a release whose caller found no tenure of ours to anchor it to: never
+ * a generation-bearing grant (see dlm_unlock_tenure); -ESTALE when one
+ * is held */
+int mxfs_dlm_unlock_unanchored(struct mxfs_dlm_ctx *ctx,
+			       const struct mxfs_resource_id *resource)
+{
+	return dlm_unlock_tenure(ctx, resource, 0, MXFS_TAUTH_OPEN_NONE, true,
+				 __builtin_return_address(0));
 }
 
 /* Legacy unconditional unlock — releases whatever tenure the local node
@@ -11691,6 +13043,10 @@ static int dlm_purge_node_impl(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t node,
 			 * platter — it stays until the purge re-drive retires it */
 			if (lk->owner == node &&
 			    !(lk->imported && dlm_purge_pending(ctx, node))) {
+				/* a selective purge keeps the rest as frozen
+				 * blockers: end in the shadow only what it drops */
+				if (selective && READ_ONCE(mxfs_dl_dg_purge_releases))
+					dg_release(&lk->resource, node);
 				*pp = lk->next;
 				lock_free(lk);
 				ctx->lock_count--;
@@ -11700,6 +13056,10 @@ static int dlm_purge_node_impl(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t node,
 			}
 		}
 	}
+	/* the whole tenure of a dead owner ends here, including EX grants whose
+	 * table entries a membership change dropped before this purge */
+	if (!selective)
+		dg_release_owner(ctx, node);
 
 	/*
 	 * successors are granted through the ledger — collect every
@@ -12680,6 +14040,48 @@ uint8_t mxfs_dlm_granted_mode(struct mxfs_dlm_ctx *ctx,
 	return best;
 }
 
+static int dlm_own_entry_rank(uint8_t state)
+{
+	switch (state) {
+	case MXFS_LSTATE_GRANTED:		return 6;
+	case MXFS_LSTATE_CONVERTING:		return 5;
+	case MXFS_LSTATE_PENDING_DURABLE:	return 4;
+	case MXFS_LSTATE_PENDING_RELEASE:	return 3;
+	case MXFS_LSTATE_WAITING:		return 2;
+	case MXFS_LSTATE_BLOCKED:		return 1;
+	default:				return 0;
+	}
+}
+
+uint8_t mxfs_dlm_own_entry(struct mxfs_dlm_ctx *ctx,
+			   const struct mxfs_resource_id *resource,
+			   uint8_t *mode_out, uint32_t *gen_out)
+{
+	uint32_t bucket;
+	struct mxfs_lock *lk;
+	uint8_t state = MXFS_LSTATE_UNLOCKED;
+
+	*mode_out = MXFS_LOCK_NL;
+	*gen_out = 0;
+	if (!ctx || !resource || !ctx->buckets)
+		return MXFS_LSTATE_UNLOCKED;
+
+	mxfs_pal_rwlock_rdlock(ctx->table_rwlock);
+	bucket = resource_hash(resource, ctx->bucket_count);
+	for (lk = ctx->buckets[bucket]; lk; lk = lk->next) {
+		if (lk->owner != ctx->local_node ||
+		    !resource_equal(&lk->resource, resource))
+			continue;
+		if (dlm_own_entry_rank(lk->state) > dlm_own_entry_rank(state)) {
+			state = lk->state;
+			*mode_out = lk->mode;
+			*gen_out = lk->grant_gen;
+		}
+	}
+	mxfs_pal_rwlock_unlock(ctx->table_rwlock);
+	return state;
+}
+
 int mxfs_dlm_open_holders(struct mxfs_dlm_ctx *ctx,
 			  const struct mxfs_resource_id *resource,
 			  uint64_t *oh_out)
@@ -12884,6 +14286,39 @@ mxfs_epoch_t mxfs_dlm_get_epoch(struct mxfs_dlm_ctx *ctx)
  * eviction (evict the least-recently-GRANTED inactive slot): the dir inode is
  * granted ~800×/round (every file create takes the parent-dir EX), so its
  * last_grant_seq is always near the top → never the LRU victim → never evicted. */
+/*
+ * A dead owner's exclusive grants end when the master purges that owner
+ * (dlm_purge_node_impl): the purge is the sanctioned end of its tenure, so its
+ * shadow entries are released there.  Before this, nothing released them, and
+ * every later EX grant of such a resource to a survivor printed P-DOUBLEGRANT
+ * naming the dead node as the existing holder, with a P48-DG-CHAIN dump that
+ * held only the new owner: a double grant that did not happen, on every fence
+ * lap (2/net/mesh/mpath, every arm of the EBUSY A/B).  Only `active` is
+ * cleared; last_owner and the handoff epoch, which the grantee's coherency
+ * reload reads, are untouched.  0 = the purge releases nothing (the same-build
+ * control).  dg_doublegrant_n counts P-DOUBLEGRANT reports.
+ */
+int mxfs_dl_dg_purge_releases = 1;
+module_param_named(dl_dg_purge_releases, mxfs_dl_dg_purge_releases, int, 0644);
+MODULE_PARM_DESC(dl_dg_purge_releases,
+		 "a dead owner's purge ends its EX grants in the double-grant shadow (default 1); 0 = it does not (test control)");
+/*
+ * The shadow is one table per module, so it outlives the context whose
+ * grants it recorded: a node that unmounts and mounts again (a fenced victim
+ * rejoining) starts its new context over entries its previous context left
+ * active, and its first EX grant of such a resource printed P-DOUBLEGRANT
+ * naming the previous incarnation of this node, or a holder that released
+ * while another node was its master.  The context's end ends them.
+ * 0 = nothing ends at the context's end (the same-build control).
+ */
+int mxfs_dl_dg_destroy_releases = 1;
+module_param_named(dl_dg_destroy_releases, mxfs_dl_dg_destroy_releases, int, 0644);
+MODULE_PARM_DESC(dl_dg_destroy_releases,
+		 "an ending DLM context ends every EX grant of its volume in the double-grant shadow (default 1); 0 = it does not (test control)");
+atomic_t mxfs_dg_doublegrant_n = ATOMIC_INIT(0);
+module_param_named(dg_doublegrant_n, mxfs_dg_doublegrant_n.counter, int, 0444);
+MODULE_PARM_DESC(dg_doublegrant_n,
+		 "P-DOUBLEGRANT reports since load: an EX grant while the shadow still shows another node's EX");
 #define DG_SHADOW_N 8192	/* 512->8192.  The 8-node x 100-file storm
 				 * grants 800+ distinct inodes/round; at 512 the
 				 * shadow table can overflow (no empty/inactive slot)
@@ -12948,6 +14383,10 @@ static bool dg_grant_ex(struct mxfs_dlm_ctx *ctx,
 		*epoch_out = 0;
 	if (res->type != MXFS_LTYPE_INODE)
 		return false;
+	if (!ctx->dg_volume_set) {
+		ctx->dg_volume = res->volume;
+		ctx->dg_volume_set = true;
+	}
 
 	/* SPLIT-BRAIN MASTERSHIP probe: recompute the master LOCKLESSLY
 	 * (plain reads — a torn read only mislogs a diagnostic, never wedges; no
@@ -12975,6 +14414,7 @@ static bool dg_grant_ex(struct mxfs_dlm_ctx *ctx,
 			mine = i;
 			/* Double-grant: a DIFFERENT node still holds an ACTIVE EX. */
 			if (dg_shadow[i].active && dg_shadow[i].owner != owner) {
+				atomic_inc_return(&mxfs_dg_doublegrant_n);
 				mxfs_probe_ratelimited(
 				    "mxfs: P-DOUBLEGRANT ino=%llu type=%u "
 				    "owner_existing=%u gen_existing=%u "
@@ -13130,6 +14570,49 @@ static void dg_release(const struct mxfs_resource_id *res, mxfs_node_id_t owner)
 	}
 }
 
+/* Caller holds ctx->table_rwlock (write).  The purge of a dead `owner` ends
+ * every EX grant it held on this mount's volume (dl_dg_purge_releases). */
+static void dg_release_owner(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t owner)
+{
+	int i, n = 0;
+
+	if (!ctx->dg_volume_set || !READ_ONCE(mxfs_dl_dg_purge_releases))
+		return;
+	for (i = 0; i < DG_SHADOW_N; i++) {
+		if (dg_shadow[i].active && dg_shadow[i].owner == owner &&
+		    dg_shadow[i].res.volume == ctx->dg_volume) {
+			dg_shadow[i].active = false;
+			n++;
+		}
+	}
+	if (n)
+		mxfs_pal_log(MXFS_LOG_DEBUG,
+			     "mxfs: P-DG-PURGE-RELEASED owner=%u n=%d -- the purged owner's EX grants end in the double-grant shadow",
+			     owner, n);
+}
+
+/* Caller holds ctx->table_rwlock (write).  The context is going away: this
+ * node masters nothing on its volume any more, so no EX grant its shadow
+ * shows active can still be one it is the authority for
+ * (dl_dg_destroy_releases). */
+static void dg_release_volume(struct mxfs_dlm_ctx *ctx)
+{
+	int i, n = 0;
+
+	if (!ctx->dg_volume_set || !READ_ONCE(mxfs_dl_dg_destroy_releases))
+		return;
+	for (i = 0; i < DG_SHADOW_N; i++) {
+		if (dg_shadow[i].active && dg_shadow[i].res.volume == ctx->dg_volume) {
+			dg_shadow[i].active = false;
+			n++;
+		}
+	}
+	if (n)
+		mxfs_pal_log(MXFS_LOG_DEBUG,
+			     "mxfs: P-DG-DESTROY-RELEASED local=%u n=%d -- the ending context's EX grants end in the double-grant shadow",
+			     ctx->local_node, n);
+}
+
 /* ─── Remote request processing ─── */
 
 static int dlm_process_remote_request_body(struct mxfs_dlm_ctx *ctx,
@@ -13178,8 +14661,9 @@ static int dlm_process_remote_request_body(struct mxfs_dlm_ctx *ctx,
 	uint32_t bucket;
 	struct mxfs_lock *chain, *lk;
 	struct mxfs_lock *newlk;
-	int compat, unk_resolved;
+	int compat, unk_resolved, cap_dropped;
 	uint64_t ledger_gen = 0;
+	uint64_t cap_since = 0;     /* a parked request's age, carried */
 	struct dlm_grant_ids deny_ids;
 
 	if (!ctx || !req || req->mode >= MXFS_LOCK_MODE_COUNT)
@@ -13224,7 +14708,7 @@ static int dlm_process_remote_request_body(struct mxfs_dlm_ctx *ctx,
 	/* page current + blockers imported before any decision */
 	{
 		uint64_t pt0 = mxfs_pal_time_ms();
-		int prc = dlm_ledger_prepare(ctx, resource, &ledger_gen, false);
+		int prc = dlm_ledger_prepare(ctx, resource, &ledger_gen, false, NULL);
 
 		*prep_ms = mxfs_pal_time_ms() - pt0;
 		if (prc) {
@@ -13392,6 +14876,12 @@ static int dlm_process_remote_request_body(struct mxfs_dlm_ctx *ctx,
 			    "ino=128 (none)");
 	}
 
+	/* a request parked for capacity whose owner stopped asking leaves the
+	 * queue (dl_capacity_park) */
+	cap_dropped = dlm_cap_park_expire(ctx, bucket, resource);
+	if (cap_dropped)
+		chain = ctx->buckets[bucket];
+
 	/* Check for existing lock from same sender — handle conversion */
 	for (lk = chain; lk; lk = lk->next) {
 		if (resource_equal(&lk->resource, resource) &&
@@ -13399,6 +14889,15 @@ static int dlm_process_remote_request_body(struct mxfs_dlm_ctx *ctx,
 			if (lk->state == MXFS_LSTATE_WAITING ||
 			    lk->state == MXFS_LSTATE_BLOCKED) {
 				uint8_t old_state = lk->state;
+
+				/*
+				 * Its own request parked for capacity, or a wait whose
+				 * blocker just left as an expired park: decided afresh
+				 * below with the age it already has, so it is not sent
+				 * behind the requests that queued after it.
+				 */
+				if (lk->cap_parked || cap_dropped)
+					cap_since = lk->queued_at;
 
 				/*
 				 * A RE-SEND OF A WAIT THIS ENTRY ALREADY SERVES.
@@ -13430,7 +14929,7 @@ static int dlm_process_remote_request_body(struct mxfs_dlm_ctx *ctx,
 				 */
 				if (req->acq_seq && lk->acq_seq == req->acq_seq &&
 				    lk->owner_inc == req->owner_inc &&
-				    lk->mode == mode) {
+				    lk->mode == mode && !cap_since) {
 					struct mxfs_bast_record rx_recs[MXFS_MAX_BAST_RECORDS];
 					struct dlm_grant_ids rx_ids;
 					uint8_t rx_hold = MXFS_LOCK_NL;
@@ -13866,7 +15365,7 @@ remote_check_compat:
 	 * older conflicting waiter (see find_conflicting_waiter). */
 	if (compat) {
 		struct mxfs_lock *cw = find_conflicting_waiter(chain, resource,
-							       sender, mode);
+							       sender, mode, cap_since);
 		if (cw) {
 			static atomic_t p6fr_n = ATOMIC_INIT(0);
 			compat = 0;
@@ -13959,6 +15458,8 @@ remote_check_compat:
 	newlk->owner_slot = req->owner_slot;
 	newlk->req_id = req->req_id;
 	newlk->acq_seq = req->acq_seq;
+	if (cap_since)
+		newlk->queued_at = cap_since;   /* replaces its parked entry */
 	/* The notification this insertion is about to fire counts as this
 	 * entry's first, so the earliest a re-send may fire another is one
 	 * re-fire interval from now.  Stamped under the table lock because
@@ -14406,7 +15907,7 @@ int mxfs_dlm_process_cancel(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t sender,
 		return -EREMOTE;
 	}
 	if (dlm_ledger_active(ctx)) {
-		int prc = dlm_ledger_prepare(ctx, resource, &ledger_gen, false);
+		int prc = dlm_ledger_prepare(ctx, resource, &ledger_gen, false, NULL);
 
 		if (prc) {
 			/* the page is not ours to decide on right now: the sender
@@ -14525,7 +16026,7 @@ int mxfs_dlm_process_remote_release(struct mxfs_dlm_ctx *ctx,
 	 * ledger-imported blocker of this very sender (mirror purged on its
 	 * side by a membership change, record still ACTIVE) */
 	if (dlm_ledger_active(ctx)) {
-		int prc = dlm_ledger_prepare(ctx, resource, &ledger_gen, false);
+		int prc = dlm_ledger_prepare(ctx, resource, &ledger_gen, false, NULL);
 
 		if (prc) {
 			if (sender != ctx->local_node)

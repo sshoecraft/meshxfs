@@ -1,0 +1,68 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, H-U6 with
+# its census and its window held open.  Run from ~/src/mxfs-e, build
+# 1FF993ECCF04A634CC75DD8: the main tree's source (311877C431E1BB444562804's)
+# plus, in mxfs_unlprev_rele (xfs/xfs_inode.c), the census counters
+# unlprev_rele_inline_last / unlprev_rele_deferred_last, the
+# P-UNLPREV-RELE-LAST line, and the test knob dbg_unlprev_rele_hold_ms
+# (xfs/xfs_mxfs_dlm.c), all keyed on one condition: the free committed and the
+# released reference is the last one on an unlinked predecessor, the only
+# release whose irele can run that predecessor's inactivation (the synchronous
+# multi-node inactivation in xfs_inode_mark_reclaimable, xfs/xfs_icache.c).
+# The harness copy in ~/src/mxfs-e reads the two counters and counts the
+# P-UNLPREV-RELE-LAST lines released from a kworker (rele_last_worker).
+#
+# WHY.  The H-U6 control u6c1 (tests/queues/peer_open_unlinked_hu6_c6.queue)
+# did not hang, but its inline arm counted nothing, so it could not show it
+# ever reached H-U6's precondition.  hu4df1's cycle needed three things at
+# once: the outer free running in a kworker (mxfs_reap_worker), its release
+# being the predecessor's last reference (a nested inactivation), and a local
+# create taking the outer number before the nested free read the AGI (464 ms
+# after the commit, inside the nested free's 600 ms mid-list delay).  The hold
+# opens the third for every candidate: 2000 ms between the commit and the
+# release, in BOTH arms, so the arms differ only in unlprev_rele_defer.
+#
+# H-U6 (the record, unchanged): released inline, a last reference on an unlinked
+# predecessor runs its inactivation nested inside the outer one after the outer
+# free committed; a local create that took the outer number holds the AGI and
+# waits in xfs_iget for the outer inode, and the nested free waits for that AGI.
+# PREDICTION: the control lap (unlprev_rele_defer=0) hangs with
+# rele_inline_last > 0; the fix lap (unlprev_rele_defer=1) completes and PASSes
+# with rele_deferred_last > 0.  Under the hold both arms may log P-CR3-NEEDINACT
+# (a create waiting for a held inactivation) and that alone is no failure.
+#
+# Arms, both with dbg_unlprev_rele_hold_ms=2000, dbg_ifree_midlist_delay_ms=600,
+# freshsrc_iunl_overlay=1, b6_release_drain=1, unlprev_pin=1, unlprev_tenure=1,
+# no close drops, 30 iterations, 2/net/mesh/direct g2c:
+#   F  unlprev_rele_defer=1   u6hf1
+#   C  unlprev_rele_defer=0   u6hc1, LAST: a hang leaves both nodes wedged
+#
+# VERDICT RULES (written before the first lap):
+#   VACUOUS (control)  rele_inline_last 0, or rele_last_worker 0: no nested
+#             inactivation ran in the context hu4df1's ran in, so a PASS judges
+#             nothing.  The control is then rerun with more iterations.
+#   VACUOUS (fix)      rele_deferred_last 0.
+#   H-U6 SUPPORTED  the control REPRODUCED hung=1, its <node>_dstacks.txt showing
+#             xfs_inactive_ifree -> mxfs_unlprev_rele -> xfs_irele -> a nested
+#             xfs_inactive -> xfs_inactive_ifree waiting on an AGI buffer lock,
+#             and a create in xfs_iget holding it.
+#   H-U6 FIXED      with SUPPORTED: the fix lap PASS, hung=0, buflock_stuck=0,
+#             rele_deferred_last > 0 and rele_last_worker > 0.  (Two more fix
+#             laps and a second control follow before the record is judged
+#             FIXED AND VERIFIED; they are a later queue.)
+#   H-U6 NOT FIXED  the fix lap hangs or REPRODUCES: attributed from its stacks.
+#   H-U6 NOT SUPPORTED HERE  the control PASSes with rele_inline_last > 0 and
+#             rele_last_worker > 0: the nested inactivation ran in a kworker
+#             with a 2 s hold and nothing deadlocked.  Then the lap's
+#             P150-ALLOC-FIN lines are read for a create that took a freed=
+#             number inside its hold: none means the window was open but no
+#             create used it (rerun with more iterations); one or more means
+#             the hypothesis as written is refuted on this build.
+# A lap that ABORTs, or audits STALE/NONE without a hang, has no verdict and is
+# rerun.
+#
+# Bound per lap: tests/queues/peer_open_unlinked_hu6_ab.queue's 2397 s plus the
+# seventh PUC_KNOBS knob, 2 x 20 = 2437 s.  The holds sit inside the harness's
+# own workload bound (30 x 11 + 60 = 390 s): the fix laps of that queue ran
+# 300 s per lap end to end, and a hold delays only a free's tail.
+2437 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1 unlprev_rele_defer=1 dbg_unlprev_rele_hold_ms=2000" tests/peer_open_unlinked_chain.sh u6hf1 30 2/net/mesh/direct g2c
+2437 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1 unlprev_rele_defer=0 dbg_unlprev_rele_hold_ms=2000" tests/peer_open_unlinked_chain.sh u6hc1 30 2/net/mesh/direct g2c

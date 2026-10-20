@@ -198,6 +198,7 @@ mxfs_dlm_evict(
 	struct xfs_inode	*ip)
 {
 	struct xfs_mount	*mp = ip->i_mount;
+	bool			unpub;
 
 	/*
 	 *  (instrumented instrument — hunting a PROVEN but
@@ -317,7 +318,16 @@ mxfs_dlm_evict(
 	 * the claim (flag already clear), it acquired a real slot and we fall
 	 * through to the normal release below.
 	 */
-	if (mxfs_dlm_unpublish_drop(ip)) {
+	unpub = mxfs_dlm_unpublish_drop(ip);
+	/*
+	 * H-F10: reclaim frees this inode; a publish claim still tracked on it
+	 * leaves the in-flight list now, whatever its claimant does.  Only
+	 * after the drop above: until the inode is off the unpublished list a
+	 * drain can take it and track it again (the obligation landing above
+	 * sleeps), and reclaim would free it while it is still listed.
+	 */
+	mxfs_pubclaim_drop(ip);
+	if (unpub) {
 		/*
 		 * D-INODE-WIRE-EX-ORPHAN-ON-EVICT: the "unpublished ⇒
 		 * no on-disk slot" premise above is violated in practice —
@@ -617,6 +627,21 @@ mxfs_dlm_evict(
 		}
 	}
 
+	/*
+	 * D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES,
+	 * H-U4: the grant leaves through reclaim as well as through a BAST
+	 * release, and a predecessor edit made under it -- a buffer-logged next
+	 * pointer of this slot, which leaves the inode clean enough to reclaim
+	 * -- lands first, as the release path lands it (xfs_mxfs_bast.c).
+	 * Reclaim holds i_lock; the landing takes the cluster buffer after it,
+	 * the order every transaction uses.
+	 */
+	if (ip->i_dlm_mode != MXFS_LOCK_NL &&
+	    !mxfs_v5_dlm_is_single_node(mp->m_mxfs_dlm) &&
+	    !xfs_is_shutdown(mp))
+		mxfs_iunl_store_land(mp, ip, READ_ONCE(mxfs_unlprev_tenure) != 0,
+				     "evict");
+
 	/* Release the DLM lock if held */
 	if (ip->i_dlm_mode != MXFS_LOCK_NL) {
 		/* the tenure this eviction gives up, for its clean-release
@@ -691,6 +716,7 @@ mxfs_dlm_evict(
 			mxfs_inode_authority_check_published(ip, MXFS_SITE);
 			mxfs_evict_relmark(ip, rel_res, rel_epoch, rel_lineage,
 					   &rel_marked, true, rel_rearm);
+			mxfs_free_release_probe(ip, "evict");
 			mxfs_v5_dlm_inode_unlock_free(mp->m_mxfs_dlm, ip->i_ino);
 		}
 		else if (mxfs_evict_retain_pr &&
@@ -865,6 +891,70 @@ module_param_named(dbg_reap_wait_dead_ms, mxfs_dbg_reap_wait_dead_ms, int, 0644)
 MODULE_PARM_DESC(dbg_reap_wait_dead_ms,
 	"DEBUG one-shot: the reap worker's next run waits until a node has died and its recovery completed, at most this many ms (0=off)");
 
+/* reap_active_gate (1, default): the reap worker's grant-taking duties wait
+ * for the mount to be active (see mxfs_reap_worker); 0 = they run on an
+ * inactive mount (the same-build control).  reap_inactive_defer_n counts the
+ * deferred runs; writing the knob resets it. */
+static int mxfs_reap_active_gate = 1;
+static atomic_t mxfs_reap_inactive_defer_n = ATOMIC_INIT(0);
+static int reap_active_gate_set(const char *val, const struct kernel_param *kp)
+{
+	int rc = param_set_int(val, kp);
+
+	if (!rc)
+		atomic_set(&mxfs_reap_inactive_defer_n, 0);
+	return rc;
+}
+static const struct kernel_param_ops reap_active_gate_ops = {
+	.set = reap_active_gate_set,
+	.get = param_get_int,
+};
+module_param_cb(reap_active_gate, &reap_active_gate_ops, &mxfs_reap_active_gate, 0644);
+MODULE_PARM_DESC(reap_active_gate,
+	"the reap worker's grant-taking duties wait for the mount to be active (1, default); 0 = they run on an inactive mount (test control); writing it resets reap_inactive_defer_n");
+module_param_named(reap_inactive_defer_n, mxfs_reap_inactive_defer_n.counter, int, 0444);
+MODULE_PARM_DESC(reap_inactive_defer_n,
+	"reap worker runs that deferred their grant-taking duties because the mount was not active, since reap_active_gate was last written");
+
+/*
+ * The foreign replay work is initialised by mxfs_dlm_cache_init, after
+ * xfs_mountfs returns, but the duty that re-drives it is armed inside
+ * xfs_mountfs: the mount barrier sets MXFS_REAPF_FREPLAY and a dead-slot bit
+ * for every OPEN obligation case (mxfs_barrier_note_open_cases), and the reap
+ * worker's first run is a 20 s timer from mxfs_defer_reap_init, before
+ * xfs_mountfs.  A mount still inside xfs_mountfs at 20 s with an OPEN case
+ * queued a zeroed work_struct, and the kworker that runs it calls a NULL
+ * function (D-REAP-WORKER-QUEUES-UNINITIALISED-FOREIGN-REPLAY-WORK-INSIDE-SLOW-
+ * MOUNT).  The re-drive now waits for m_mxfs_freplay_ready, set right after
+ * the INIT_WORK; the duty keeps its bit and the next pass queues it.
+ * freplay_redrive_ready_gate=0 queues it regardless (the same-build control).
+ */
+static int mxfs_freplay_redrive_ready_gate = 1;
+module_param_named(freplay_redrive_ready_gate, mxfs_freplay_redrive_ready_gate, int, 0644);
+MODULE_PARM_DESC(freplay_redrive_ready_gate,
+	"the foreign replay re-drive waits until the replay work is initialised after xfs_mountfs (1, default); 0 = queues it regardless (test control)");
+
+static bool mxfs_freplay_redrive(struct xfs_mount *mp, const char *who)
+{
+	bool ready = smp_load_acquire(&mp->m_mxfs_freplay_ready);
+
+	if (!ready) {
+		if (READ_ONCE(mxfs_freplay_redrive_ready_gate)) {
+			xfs_warn_ratelimited(mp,
+	"MXFS P-FREPLAY-REDRIVE-WAIT who=%s dead_slots=0x%llx duties=0x%lx -- the foreign replay work is not initialised yet (the mount is inside xfs_mountfs); the re-drive waits for it",
+				who,
+				(unsigned long long)mp->m_mxfs_foreign_dead_slots[0],
+				READ_ONCE(mp->m_mxfs_reap_duties));
+			return false;
+		}
+		xfs_warn(mp,
+	"MXFS P-FREPLAY-QUEUE-UNINIT who=%s func=%ps dead_slots=0x%llx -- control (freplay_redrive_ready_gate=0): queueing the foreign replay work before it is initialised",
+			 who, mp->m_mxfs_foreign_replay_work.func,
+			 (unsigned long long)mp->m_mxfs_foreign_dead_slots[0]);
+	}
+	return queue_work(system_unbound_wq, &mp->m_mxfs_foreign_replay_work);
+}
+
 /*
  * The retry of a refused or unpublished slice replay has a timer of its own.
  *
@@ -901,8 +991,7 @@ void mxfs_freplay_retry_worker(struct work_struct *work)
 	       !bitmap_subset(mp->m_mxfs_foreign_dead_slots,
 			      mp->m_mxfs_foreign_torn_slots, 64);
 	if (owed)
-		q = queue_work(system_unbound_wq,
-			       &mp->m_mxfs_foreign_replay_work);
+		q = mxfs_freplay_redrive(mp, "retry");
 	mxfs_probe("mxfs: P-FREPLAY-RETRY owed=%d queued=%d dead_slots=0x%llx torn_slots=0x%llx duties=0x%lx reap_in_duty=%s\n",
 		owed ? 1 : 0, q ? 1 : 0,
 		(unsigned long long)mp->m_mxfs_foreign_dead_slots[0],
@@ -910,6 +999,44 @@ void mxfs_freplay_retry_worker(struct work_struct *work)
 		READ_ONCE(mp->m_mxfs_reap_duties),
 		READ_ONCE(mxfs_reap_in_duty));
 }
+
+/*
+ * The replay retry keeps the EARLIEST deadline anyone asked for.  While a
+ * replay is owed, every arm of the reap work arms this timer as well, and the
+ * reap worker's own tail asks for 30 s; schedule_delayed_work keeps a pending
+ * timer as it found it, so a 30 s arm that landed first swallowed the 1 s retry
+ * a refusal asked for.  Measured on 8/disk/caw/mpath path_fenced_return with the
+ * prover parked between its certificate and its manifest (laps rpwD,
+ * 2026-10-17): the first 1 s retry ran, the reap worker re-armed both timers for
+ * 30 s in the same pass, the second refusal's 1 s arm found them pending
+ * (P89-REAP-SCHED why=freplay-fence delay_ms=1000 armed=0 busy=+PENDING), and the
+ * replayer claimed the recovery 30.3 s after it was refused.
+ * freplay_retry_earliest=0 is the same-build control: the arm keeps the timer it
+ * finds, as before.
+ */
+#ifndef MXFS_TEST_REPLAY_RETRY_BY_REAP
+static int mxfs_freplay_retry_earliest = 1;
+module_param_named(freplay_retry_earliest, mxfs_freplay_retry_earliest, int, 0644);
+MODULE_PARM_DESC(freplay_retry_earliest,
+	"a slice replay's retry timer keeps the earliest deadline asked for (1, default); 0 = an arm over a pending timer keeps it (test control)");
+
+static void mxfs_freplay_retry_arm(struct xfs_mount *mp, unsigned int delay_ms,
+				   const char *why)
+{
+	struct delayed_work	*dw = &mp->m_mxfs_freplay_retry_work;
+	unsigned long		delay = msecs_to_jiffies(delay_ms);
+
+	if (!READ_ONCE(mxfs_freplay_retry_earliest) || !delayed_work_pending(dw)) {
+		schedule_delayed_work(dw, delay);
+		return;
+	}
+	if (time_before(jiffies + delay, READ_ONCE(dw->timer.expires))) {
+		mod_delayed_work(system_wq, dw, delay);
+		mxfs_probe_ratelimited("mxfs: P-FREPLAY-RETRY-SOONER why=%s delay_ms=%u -- a later pending retry was brought forward to this one\n",
+			why, delay_ms);
+	}
+}
+#endif
 
 void mxfs_reap_sched(struct xfs_mount *mp, unsigned int delay_ms,
 			    const char *why)
@@ -940,8 +1067,7 @@ void mxfs_reap_sched(struct xfs_mount *mp, unsigned int delay_ms,
 		why);
 #else
 	if (test_bit(MXFS_REAPF_FREPLAY, &mp->m_mxfs_reap_duties))
-		schedule_delayed_work(&mp->m_mxfs_freplay_retry_work,
-				      msecs_to_jiffies(delay_ms));
+		mxfs_freplay_retry_arm(mp, delay_ms, why);
 #endif
 }
 
@@ -1077,8 +1203,7 @@ void mxfs_reap_worker(struct work_struct *work)
 				  mp->m_mxfs_foreign_torn_slots, 64))
 			clear_bit(MXFS_REAPF_FREPLAY, &mp->m_mxfs_reap_duties);
 		else
-			queue_work(system_unbound_wq,
-				   &mp->m_mxfs_foreign_replay_work);
+			mxfs_freplay_redrive(mp, "reap");
 	}
 
 	/* See dbg_reap_wait_dead_ms: the worker stands where a duty that
@@ -1107,6 +1232,41 @@ void mxfs_reap_worker(struct work_struct *work)
 			"MXFS P-DBG-REAP-WAIT-END waited_ms=%d death_seen=%d dead_slots=0x%llx",
 			waited, seen ? 1 : 0,
 			(unsigned long long)mp->m_mxfs_foreign_dead_slots[0]);
+	}
+
+	/*
+	 * The sweep retry, the bucket-scan duties and the entry retries below
+	 * take AG and inode grants and hold AG references; they run only on a
+	 * mount the VFS has made active.  Their first schedule is a 20 s
+	 * timer from mount start (mxfs_defer_reap_init), which stood for "the
+	 * mount is done"; a mount still waiting at 20 s ran the unclaimed-bucket
+	 * scan inside it.  Measured on 2/net/mesh/mpath (run
+	 * 20261020T142123Z-g2d, test32's rejoin): the scan waited in an AG
+	 * grant the mount could not get either, the mount failed, its unwind
+	 * freed the AG groups under the scan's reference (xfs_group_free:
+	 * xg_ref != 0, "Corruption detected") and then waited for the worker
+	 * in mxfs_defer_reap_destroy without end
+	 * (D-FAILED-MOUNT-UNWIND-RACES-REAP-WORKER-FREES-AG-AND-HANGS).  A
+	 * duty skipped here keeps its bit and the tail reschedule retries it;
+	 * a pending timer is what the unwind's cancel removes at once.  The
+	 * foreign replay re-drive above is not gated: a mount's recovery
+	 * barrier may wait on it.
+	 */
+	if (!(READ_ONCE(mp->m_super->s_flags) & SB_ACTIVE)) {
+		if (READ_ONCE(mxfs_reap_active_gate)) {
+			int n = atomic_inc_return(&mxfs_reap_inactive_defer_n);
+
+			if (n <= 20 || (n % 100) == 0)
+				xfs_warn(mp,
+	"MXFS P-REAP-INACTIVE-DEFER n=%d duties=0x%lx entries=%d -- the mount is not active yet; the grant-taking reap duties wait for it",
+					 n, READ_ONCE(mp->m_mxfs_reap_duties),
+					 mp->m_mxfs_reap_count);
+			mxfs_reap_duty(mp, "inactive-mount");
+			goto tail;
+		}
+		xfs_warn(mp,
+	"MXFS P-REAP-INACTIVE-RAN duties=0x%lx entries=%d -- control (reap_active_gate=0): the grant-taking reap duties run on a mount that is not active",
+			 READ_ONCE(mp->m_mxfs_reap_duties), mp->m_mxfs_reap_count);
 	}
 
 	/*
@@ -1167,6 +1327,53 @@ void mxfs_reap_worker(struct work_struct *work)
 		    "mxfs: P88-REAP-RETRY ino=%llu gen=%u iget_rc=%d\n",
 			(unsigned long long)e->ino, e->gen, rc);
 		if (rc) {
+			static atomic_t		p88f_n = ATOMIC_INIT(0);
+			enum xfs_ino_lifecycle	lc;
+			unsigned long		lfl;
+			unsigned int		lnl;
+			umode_t			lmode;
+			uint32_t		lgen;
+			bool			transient, keep;
+
+			/*
+			 * A failed lookup is not proof of a free (H-3 of
+			 * D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-
+			 * AUTHORITY, xfs_mxfs_dlm.c): -ENOENT also answers for a
+			 * zombie whose in-core inode is queued for inactivation,
+			 * and that inactivation runs without the authority this
+			 * entry restores.  The entry's life still in core, mode
+			 * set and nlink 0, is the zombie the entry exists to free;
+			 * a freed one reads mode 0.
+			 */
+			lc = xfs_icache_ino_lifecycle_life(mp, e->ino, &lfl, &lnl,
+							   NULL, NULL, &lmode,
+							   &lgen);
+			transient = rc == -ENOENT && lmode != 0 && lnl == 0 &&
+				    lgen == e->gen &&
+				    (lc == XFS_ILC_NEED_INACTIVE ||
+				     lc == XFS_ILC_INACTIVATING ||
+				     lc == XFS_ILC_RECLAIMABLE ||
+				     lc == XFS_ILC_IRECLAIM);
+			keep = transient && READ_ONCE(mxfs_reap_transient_keep);
+			if (transient)
+				atomic_inc(&mxfs_reap_iget_transient);
+			if (!keep)
+				atomic_inc(&mxfs_reap_iget_retired);
+			if (atomic_inc_return(&p88f_n) <= 4000)
+				mxfs_probe("mxfs: P88-REAP-IGET-FAIL ino=%llu gen=%u rc=%d lc=%s iflags=0x%lx nlink=%u mode=0%o incore_gen=%u transient=%d keep=%d\n",
+					(unsigned long long)e->ino, e->gen, rc,
+					xfs_ino_lifecycle_name(lc), lfl, lnl,
+					lmode, lgen, transient ? 1 : 0,
+					keep ? 1 : 0);
+			if (keep) {
+				/* The next pass meets the shell its skipped
+				 * inactivation left, or reads it from disk. */
+				list_del(&e->l);
+				spin_lock(&mp->m_mxfs_reap_lock);
+				list_add_tail(&e->l, &mp->m_mxfs_reap_list);
+				spin_unlock(&mp->m_mxfs_reap_lock);
+				continue;
+			}
 			/* Freed elsewhere / vanished: entry retired. */
 			list_del(&e->l);
 			spin_lock(&mp->m_mxfs_reap_lock);
@@ -1221,6 +1428,7 @@ void mxfs_reap_worker(struct work_struct *work)
 		 * this mount is its responsible freer and knows its bucket.
 		 * ADOPTED (survivor-sweep) authority uses its own flag so
 		 * the P2L-OWNFREE disk-free bypass stays strictly OWN. */
+		ip->i_mxfs_unlink_epoch = READ_ONCE(ip->i_dlm_epoch);
 		xfs_iflags_set(ip, e->kind == MXFS_REAP_ADOPTED ?
 				   MXFS_IF_ADOPTED_UNLINK :
 				   MXFS_IF_LOCAL_UNLINK);
@@ -1242,6 +1450,7 @@ void mxfs_reap_worker(struct work_struct *work)
 		xfs_irele(ip);
 	}
 
+tail:
 	spin_lock(&mp->m_mxfs_reap_lock);
 	remaining = mp->m_mxfs_reap_count;
 	spin_unlock(&mp->m_mxfs_reap_lock);

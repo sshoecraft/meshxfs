@@ -1,0 +1,56 @@
+# D-DG-SHADOW-KEEPS-A-PURGED-DEAD-NODES-EX-AND-REPORTS-FALSE-DOUBLE-GRANTS:
+# hypothesis H-DG2 (the record, session 118).  The double-grant shadow
+# (dg_shadow in dlm/dlm.c) is one table per module, so it outlives the DLM
+# context whose grants it recorded: the fenced victim that unmounts and mounts
+# again with the module kept loaded starts its new context over the entries its
+# previous context left active, and its first EX grant of such a resource
+# prints P-DOUBLEGRANT naming its own previous incarnation.  Measured in queue
+# ors (~/src/mxfs-c B5D4A525, which predates the change): the rejoined test18
+# logged 53, 55, 56, 30 and 40 such reports in laps ors4-ors8.  The change:
+# mxfs_dlm_destroy ends every active entry of its volume first
+# (dg_release_volume, P-DG-DESTROY-RELEASED local= n=; knob
+# dl_dg_destroy_releases, 1 default, 0 = the same-build control).
+#
+# Build: ~/src/mxfs-e (mxfs.ko srcversion A4C1E0DA75665C882237C4E), the same
+# build queue dsd (tests/queues/dead_sender_drop_ab_netmesh_mpath.queue) runs;
+# dl_dead_sender_drop and dl_dg_purge_releases at their default 1 in both arms,
+# every other knob at its default.  Run from ~/src/mxfs-e after dsd ends.
+# 2/net/mesh/mpath g2e (test17 test18); path_fenced_return freezes and fences
+# test18, thaws it, it unmounts and mounts again and reads test17's files; then
+# chk_clean.  Arms alternate C (dl_dg_destroy_releases=0) and F (=1), every lap
+# on a fresh prep, so the shadow starts empty at each lap's module load and the
+# variant can only come from that lap's own fenced context.
+#
+# READING RULES (written before the first lap), per lap, by
+# tools/dead_sender_ab_grade.py <row dir> (the row's kept kmsg captures, scoped
+# after its PF-MARK; knobs from knobs.txt; a lap whose knob did not read back on
+# both nodes judges nothing):
+#   VARIANT       on the victim node (the fenced test18, which rejoins), the
+#                 shadow count whose owner_existing is the victim's fenced node
+#                 id (the grader's shadow=[<victim>:s?/fN/...], N = VARIANT),
+#   DESTROYED     P-DG-DESTROY-RELEASED lines on the victim node (destroyN).
+#   CONTROL REACH: a C lap with VARIANT > 0.
+#   FIX: an F lap with VARIANT = 0 and DESTROYED > 0 (the context's end ran the
+#     release; DESTROYED = 0 in an F lap is VACUOUS for that lap, not a pass).
+#   SUPPORTED: CONTROL REACH in at least one C lap and FIX in every F lap.
+#   REFUTED: any F lap with VARIANT > 0: a new hypothesis before any patch.
+#   HOLDER CHECK (each lap): path_fenced_return PASS and chk_clean CLEAN
+#     (verdict=CLEAN release=CLEAN errors=0); an F lap failing where the C laps
+#     pass means the change is wrong.
+#   Recorded, not graded: the shadow's other classes (s, o) on either node,
+#     P-TAUTH-DOUBLE-GRANT (the ledger's own refusal, a different instrument:
+#     D-MASTER-OWN-EX-RELEASE-GOES-STALE-RECORD-OUTLIVES-IT-PEER-GRANTS-REFUSED),
+#     'lock request failed after' per node.  Any shutdown, BUG, Oops, hung task
+#     or chk_clean not CLEAN is attributed from its own lines first.
+#
+# Bounds: as dsd's lap (path_fenced_return 400 s + chk_clean 180 s + the
+# chain's overhead outside the rows, measured 130-160 s, + prep_cluster 300 s)
+# = 1030 s.
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dgdc1 1 --prep --knobs "dl_dg_destroy_releases=0" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dgdf1 1 --prep --knobs "dl_dg_destroy_releases=1" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dgdc2 1 --prep --knobs "dl_dg_destroy_releases=0" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dgdf2 1 --prep --knobs "dl_dg_destroy_releases=1" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dgdc3 1 --prep --knobs "dl_dg_destroy_releases=0" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dgdf3 1 --prep --knobs "dl_dg_destroy_releases=1" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dgdc4 1 --prep --knobs "dl_dg_destroy_releases=0" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e dgdf4 1 --prep --knobs "dl_dg_destroy_releases=1" --rows path_fenced_return,chk_clean

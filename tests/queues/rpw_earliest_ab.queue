@@ -1,0 +1,16 @@
+# D-REPLAYER-WAITS-FLAT-30S-ON-LIVE-PEER-FENCE-ATTEMPT: the replay retry
+# timer keeps the EARLIEST deadline asked for (freplay_retry_earliest=1, the
+# fix) instead of the pending one (0, the same-build control).  The record's
+# own configuration and the trigger rpwD reached: test21, the elected replayer,
+# parks 3 s before its own intent so another survivor proves the fence and
+# parks 5 s after certify, and test21's claim meets a LIVE holder.  Fix laps
+# must show test21's refusals about 1 s apart with no 30 s gap and
+# P236-RECOV-CLAIMED within about 1 s of the prover's P236-FENCE-SEALED; the
+# control must show the 30 s gap again.
+# Bound per chain: prep_cluster 300 (manifest) + 2 laps x (path_fenced_return
+# about 320 s at 8 nodes, its header's derivation + 40 s board overhead) = 1020 s.
+# The knobs go in as PF_KNOBS/PF_NODE_KNOBS (lap_chain.sh keeps them when no
+# --knobs is given): lap_queue.sh takes any line whose remainder holds an '='
+# for an assignment, so no '=' may follow the script name.
+1020 PF_KNOBS='dbg_fence_crash_hold_ms=5000 dbg_fence_crash_cut=5' PF_NODE_KNOBS='test21:dbg_fence_crash_hold_ms=3000 test21:dbg_fence_crash_cut=1' tests/mpath/lap_chain.sh laps 8/disk/caw/mpath g8b rpwE 2 --prep --rows path_fenced_return
+1020 PF_KNOBS='dbg_fence_crash_hold_ms=5000 dbg_fence_crash_cut=5 freplay_retry_earliest=0' PF_NODE_KNOBS='test21:dbg_fence_crash_hold_ms=3000 test21:dbg_fence_crash_cut=1' tests/mpath/lap_chain.sh laps 8/disk/caw/mpath g8b rpwF 2 --prep --rows path_fenced_return

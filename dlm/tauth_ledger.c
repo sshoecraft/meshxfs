@@ -41,11 +41,13 @@ struct tauth_gc_vec {
 /* (D-0348 step 2): the seeded fnv1a-32 in mxfs_tauth.h over the
  * identity bytes of a resource id, routed by the region's page count.  The
  * DLM engine (dlm_shared.c resource_hash_raw) keeps its own unseeded fold
- * for its in-memory tables; the ledger's routing is the region's. */
+ * for its in-memory tables; the ledger's routing is the region's, under the
+ * region's routing version (D-0349: version 2 shards inode numbers). */
 uint32_t mxfs_tauth_ledger_hash(const struct mxfs_tauth_ledger *l,
 				const struct mxfs_resource_id *res)
 {
-	return mxfs_tauth_res_hash(res, sizeof(*res), l ? l->store.hash_seed : 0);
+	return mxfs_tauth_route_hash(res, l ? l->store.hash_seed : 0,
+				     l ? l->store.hash_version : MXFS_TAUTH_HASH_V1);
 }
 
 uint32_t mxfs_tauth_ledger_page(const struct mxfs_tauth_ledger *l,
@@ -58,8 +60,9 @@ uint32_t mxfs_tauth_ledger_page(const struct mxfs_tauth_ledger *l,
 uint32_t mxfs_tauth_ledger_home(const struct mxfs_tauth_ledger *l,
 				const struct mxfs_resource_id *res)
 {
-	return mxfs_tauth_home_index(mxfs_tauth_ledger_hash(l, res),
-				     l ? l->npages : MXFS_TAUTH_NPAGES);
+	return mxfs_tauth_route_index(res, mxfs_tauth_ledger_hash(l, res),
+				      l ? l->npages : MXFS_TAUTH_NPAGES,
+				      l ? l->store.hash_version : MXFS_TAUTH_HASH_V1);
 }
 
 bool mxfs_tauth_entry_is_res(const struct mxfs_tauth_entry *e,
@@ -1066,6 +1069,40 @@ static void entry_apply_open_op(struct mxfs_tauth_ledger *l,
 	l->open_marks++;
 }
 
+/*
+ * Instrument, no behaviour.  An exclusive release that names the record's
+ * holder but not the rest of its identity (incarnation, authority epoch,
+ * grant sequence) leaves the record on the page.  For a master's release of
+ * its own grant that strands the record: the caller frees its table entry as
+ * superseded and nothing retires the record afterwards (measured on
+ * 2/net/mesh/mpath: 1537 grants to the peer refused against it in three
+ * minutes).  Which field differs names the path that moved one side.
+ */
+static void note_release_ex_stale_holder(const struct mxfs_tauth_page *img, int idx,
+					 const struct mxfs_tauth_entry *e,
+					 const struct mxfs_tauth_op *op)
+{
+	static mxfs_atomic32_t n;
+	int32_t k = mxfs_atomic32_inc(&n);
+
+	if (k > 64)
+		return;
+	mxfs_pal_log(MXFS_LOG_WARN,
+		     "tauth: P-TAUTH-REL-EX-STALE-HOLDER n=%d page=%u entry=%d type=%u "
+		     "ino=%llu ag=%u node=%u op inc=%llu auth=%llu seq=%llu vs record "
+		     "inc=%llu auth=%llu seq=%llu last_seq=%llu auth_node=%u holders=%#llx "
+		     "-- an exclusive release naming the record's holder does not match "
+		     "its identity; the record is not retired",
+		     k, img->hdr.page_id, idx, op->res.type,
+		     (unsigned long long)op->res.ino, op->res.ag_number, op->node,
+		     (unsigned long long)op->inc, (unsigned long long)op->authority_epoch,
+		     (unsigned long long)op->grant_seq64, (unsigned long long)e->ex_inc,
+		     (unsigned long long)e->authority_epoch,
+		     (unsigned long long)e->grant_seq64,
+		     (unsigned long long)e->last_grant_seq64, e->auth_node,
+		     (unsigned long long)e->holders);
+}
+
 /* Apply one op to the scratch image.  Returns 0 (applied), -ESTALE (not
  * applicable, recorded in op->rc, batch continues) or a fatal code that
  * refuses the whole batch. */
@@ -1241,6 +1278,9 @@ static int apply_op(struct mxfs_tauth_ledger *l, struct mxfs_tauth_page *img,
 		    e->ex_node != op->node || e->ex_inc != op->inc ||
 		    e->authority_epoch != op->authority_epoch ||
 		    e->grant_seq64 != op->grant_seq64) {
+			if (e->state == MXFS_TAUTH_ST_ACTIVE && same_res &&
+			    e->ex_node == op->node)
+				note_release_ex_stale_holder(img, idx, e, op);
 			l->stale_ops++;
 			op->rc = -ESTALE;
 			op->lineage_out = same_res ? e->resource_lineage : 0;

@@ -1,0 +1,43 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F8b: the
+# reload's P116 self-clobber guard (xfs/xfs_mxfs_reload.c
+# mxfs_reload_self_clobber_guard) kept a CLEAN shell over a FREE disk image on
+# the held grant alone; kdc3's nlink-0 audited core was the lookup node's dead
+# shell kept that way (pin=0 ili_fields=0x0 held=1, disk generation unrelated
+# to the shell's), then truncated by its inactivation and written home over
+# the peer's free.  Same-build A/B of module knob selfclobber_keep_guard with
+# tests/noino_gen0_ab.sh (its header states the window and the grades): 0 is
+# the control, 1 the fix.  Every lap holds the window open with
+# NG0_SETATTR_DELAY_MS=500 (dbg_setattr_time_delay_ms: the lookup loop's
+# touch sleeps after its lookup, before its first lock, about two churn rounds)
+# and runs every other guard on (noino_gen0_guard 1, recycle, freshsrc and the
+# inactivation epoch guard at 1), so only the P116 rule differs between arms.
+# Runs from the sibling checkout carrying the fixes and the knobs (~/src/mxfs-c,
+# srcversion FAB8FDFCBFD75AFF34154F6 at launch; the harness prints each lap's
+# build).
+#
+# VERDICT RULES (written before the first lap):
+#   PROVEN    a control lap reaches H-F8b (sc_clean > 0, not VACUOUS) and
+#             audits CORRUPT with an audited inode attributed p116_keep_clean
+#             > 0 on a node, AND every fix lap reaches it (sc_refused > 0)
+#             and audits CLEAN with sc_clean 0 and no node failure
+#   REFUTED   the control laps reach H-F8b (sc_clean >= 20 in aggregate) and
+#             every one audits CLEAN: a clean held keep does not by itself
+#             produce the shape, and kdc3 needs another step named
+#   FIX FAILS a fix lap that reached H-F8b audits CORRUPT, or counts
+#             sc_clean > 0
+#   OPEN      every lap VACUOUS: the delay does not reach the keep; redesign
+#             the window before judging
+# A lap whose audit is STALE/NONE has no verdict and is rerun.
+#
+# Bound per lap, the sum of the harness's own step bounds, every ssh step
+# counted: prep_cluster 300 + srcversion reads 2x20 + knob sets 2x(6x20: gen0
+# guard+delay, recycle, freshsrc, selfclobber, mirror, setattr) + mkdir 30 +
+# workload SECS+60 = 360 + counter reads 2x40 + knob resets 2x(3x20: delay,
+# mirror, setattr) + chk_clean with alloc_witness 150 + stream capture 2x120 +
+# snapshot 60 = 1620 s.
+1620 NG0_SELFCLOBBER_GUARD=0 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh sdc1 1 300 2/net/mesh/direct g2c
+1620 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh sdf1 1 300 2/net/mesh/direct g2c
+1620 NG0_SELFCLOBBER_GUARD=0 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh sdc2 1 300 2/net/mesh/direct g2c
+1620 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh sdf2 1 300 2/net/mesh/direct g2c
+1620 NG0_SELFCLOBBER_GUARD=0 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh sdc3 1 300 2/net/mesh/direct g2c
+1620 NG0_SELFCLOBBER_GUARD=1 NG0_SETATTR_DELAY_MS=500 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh sdf3 1 300 2/net/mesh/direct g2c

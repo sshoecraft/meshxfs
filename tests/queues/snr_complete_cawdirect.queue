@@ -1,0 +1,38 @@
+# D-STALE-NAME-SETATTR-ADOPTS-PEER-REUSED-INCARNATION-CHANGES-UNRELATED-FILE:
+# the reproducer tests/stale_name_setattr_reuse.sh on the COMPLETE H-SN1 fix,
+# ~/src/mxfs-e srcversion 0F7793731517873F5755B1A (the A/B build ~/src/mxfs-g
+# plus the create reset's poison clear and the revocation worker's generation
+# check; module sources identical to the main tree's), 2/disk/caw/direct on
+# g2b (test15 test16), 8 iterations a lap.  Run from ~/src/mxfs-e.
+#
+# Lap snl1 (SNR_SHAPE=localcreate, incarn_poison_unexposed at its default 1):
+# the record's SAME CLASS, NOT MEASURED hazard.  Y creates f, Y's touch
+# resolves f and is held, X removes f and lets its grant go, and Y itself
+# creates the file that takes f's number while the touch is held; Y's iget of
+# that number finds the copy the touch still references (xfs_iget_cache_hit's
+# P-CR63 arm resets it for the create).  SNR_DELAY_MS 6000: the touch must
+# still be held after X's rm, sync, push and cache drop (~1.5 s) and Y's
+# create and sync (~1 s).
+# Laps snf1-snf3 (SNR_SHAPE=peer, SNR_POISON=1): the A/B's fix arm on this
+# build.
+#
+# READING RULES (written before the first lap):
+#   snl1  HIT: the hazard is real on the complete fix; it is filed as its own
+#         record (2/any) from this lap's lines before anything else.  CLEAN
+#         with reused > 0: not shown in this lap, which disposes of nothing;
+#         the record says what ran.  VACUOUS: the shape did not reuse the
+#         number; its own lines say why, the shape is corrected and rerun.
+#   snf1-snf3  the complete fix passes the reproducer when all three read PASS
+#         (reused > 0, hit 0, y_poison_touch > 0, node_failures 0) with a cold
+#         audit CLEAN errors=0.  Any FAIL is attributed from its own lines
+#         first.
+#
+# Bounds from the harness's step bounds: the peer laps 1842 s (as
+# tests/queues/snr_ab_cawdirect.queue); the local-create lap adds Y's create
+# step (30) and the longer hold (2) to each of its 8 iterations: prep 300,
+# read-backs 120, mkdir 20, 8 x (20 + 20 + 30 + 30 + (6 + 30) + 20), closing
+# reset 20, stream copy 240, chk_clean 150: 2098 s.
+2098 SNR_SHAPE=localcreate SNR_DELAY_MS=6000 tests/stale_name_setattr_reuse.sh snl1 8 2/disk/caw/direct g2b
+1842 SNR_SHAPE=peer SNR_POISON=1 tests/stale_name_setattr_reuse.sh snf1 8 2/disk/caw/direct g2b
+1842 SNR_SHAPE=peer SNR_POISON=1 tests/stale_name_setattr_reuse.sh snf2 8 2/disk/caw/direct g2b
+1842 SNR_SHAPE=peer SNR_POISON=1 tests/stale_name_setattr_reuse.sh snf3 8 2/disk/caw/direct g2b

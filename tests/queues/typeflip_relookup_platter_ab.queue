@@ -1,0 +1,64 @@
+# D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED, hypothesis H-ES1 (in the
+# record, written before the patch): an unresolved type flip on an entry that
+# is behind the platter ends -ESTALE because xfs_lookup's re-read-the-parent
+# arm reads only the in-core shell's mode and the in-core == platter case,
+# not the coherent platter image it has just read.  Measured on 2/net/mesh/mpath
+# path_fenced_return (queue ebq1, ~/src/mxfs-g 65863B924040AF5213F2A76, laps
+# ebc1 and ebf1): the rejoined test18's mkdir of the shared LOCK failed ESTALE
+# once a lap, the entry naming a directory, the shell a regular file, the
+# platter the number free (coh_mode 0) or a later regular file; no
+# P201-RELOOKUP followed.  Natural rate on that build: 2 of 2 laps.
+#
+# Build: ~/src/mxfs-e 3F0ACA563217227BA17F0B2 (tools/sibling_sync.sh of the
+# main tree, marker platter-free): the main tree's sources, i.e. 65863B92's
+# plus dl_retry_handoff_grace_ms (default 1000, user-mode A/B in progress) and
+# typeflip_relookup_platter (default 1).  Run from ~/src/mxfs-e.  2/net/mesh/mpath
+# on g2e (test17 test18); path_fenced_return fences test18, which unmounts,
+# mounts again and runs its load; then chk_clean.
+#
+# ARMS.  Same-build A/B of typeflip_relookup_platter, written and read back on
+# both nodes by the row (knobs.txt): 0 = control (today's predicate), 1 = fix.
+# Order c1 f1 f2 c2 c3 f3 f4 c4.
+#
+# THE SHAPE, per lookup on either node (kmsg_<node>_fromnode.gz): a
+# P201-TYPEFLIP-UNRESOLVED-FAIL whose P207-COHERENT-TRUTH (same ino, the line
+# before it) shows coh_mode=00, or coh_mode of another file type than
+# dirent_ft (coh_mode=0177777 is unknown and is not the shape).
+#
+# PREDICTION / READING RULES (written before the first lap):
+#   CONTROL: no P201-RELOOKUP why=platter-free|platter-other anywhere; each
+#     instance of the shape is the lookup's last line and, when it is a
+#     mkdir of LOCK, a 'mutex ERR ESTALE' in that node's ops.log at the
+#     instance's time (row 'test18's load after rejoining completed
+#     operations and returned no error' FAIL when it is test18's).
+#   FIX: every instance of the shape is followed, same ino and name, by
+#     P201-RELOOKUP why=platter-free or why=platter-other, and the lookup then
+#     resolves: no further P201-TYPEFLIP-UNRESOLVED-FAIL for that name within
+#     the next 10 s of that node's log, and no ops.log ESTALE at its time.
+#   REACH: at least one control lap holds an instance of the shape.
+#   SUPPORTED: REACH, at least one instance in the fix arm, and every fix-arm
+#     instance resolved as above.
+#   REFUTED: a fix-arm instance whose relookup is followed by another
+#     P201-TYPEFLIP-UNRESOLVED-FAIL for the same name that ends the lookup
+#     (the re-read parent still names the number): the parent's refresh is
+#     then what is stale, a new hypothesis.
+#   VACUOUS: no instance in the fix arm (it measured nothing), or knobs.txt
+#     shows a node did not take the knob: rerun or force.
+#   FIX FAILS: a shutdown, BUG, Oops or hung task, a lost or corrupt file, or
+#     chk_clean not CLEAN in a fix lap: attributed from its own lines first.
+#   The dead-shell shape (coh type EQUAL to dirent_ft, an in-core shell of
+#     another type the reload poisons) is out of scope: counted per arm and
+#     recorded, not graded.  Kernel windows of consecutive laps overlap: a line
+#     counts for the lap whose row window holds its timestamp.
+#
+# Bounds: as tests/queues/ebusy_retire_first_ab.queue (same rows, same group):
+# path_fenced_return 400 s + chk_clean 180 s + the chain's measured overhead
+# outside the rows (130-160 s) = 730 s; the first lap adds prep_cluster 300 s.
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e trc1 1 --prep --knobs "typeflip_relookup_platter=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e trf1 1 --knobs "typeflip_relookup_platter=1" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e trf2 1 --knobs "typeflip_relookup_platter=1" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e trc2 1 --knobs "typeflip_relookup_platter=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e trc3 1 --knobs "typeflip_relookup_platter=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e trf3 1 --knobs "typeflip_relookup_platter=1" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e trf4 1 --knobs "typeflip_relookup_platter=1" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e trc4 1 --knobs "typeflip_relookup_platter=0" --rows path_fenced_return,chk_clean

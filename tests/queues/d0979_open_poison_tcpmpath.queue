@@ -1,0 +1,25 @@
+# The open face of the D-STALE-NAME-SETATTR fix.  With incarn_poison_unexposed
+# the reload poisons a clean copy whose platter names another incarnation
+# whether or not it is exposed, which covers the case 0.89.1 (D-0979) exempted:
+# an open still inside its protecting acquire (measured s65b: B's fresh open
+# of a new file on a number it still cached under the previous incarnation
+# succeeded and its first read failed ESTALE).  The open now re-checks the
+# poison after its acquire (P95-OPEN-POISONED-INCARNATION) and refuses
+# -ESTALE, so the VFS re-walks with LOOKUP_REVAL and the lookup reads the live
+# incarnation.  tests/d0977_open_unlink_tcp.sh arm D asks exactly whether
+# that open reads the new file; this queue runs the whole harness on the
+# complete fix, ~/src/mxfs-e 0F7793731517873F5755B1A, 2/net/mesh/mpath on g2e
+# (A test17, B test18).  Run from ~/src/mxfs-e.
+#
+# READING RULES (written before the first lap): arm D's open must read rc 0
+# and the new file's bytes (its two checks).  B's unexposed poison line for
+# that number (P-RELOAD-XINCARN-POISON) and the refused first open
+# (P95-OPEN-POISONED-INCARNATION) are expected now and are read, not graded;
+# arm D's third check counts only P977-RELOAD-EXPOSED-MISMATCH, the exposed
+# arm, and stays 0.  Arms A, B and C keep their checks.  Any failed check is
+# attributed from its own lines first; a failed arm-D read is a regression of
+# D-0979 by this fix and is recorded on the D-STALE-NAME-SETATTR record.
+#
+# Bound: run.sh's prep_cluster row (300 s) plus the harness's own 340 s.
+640 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/mpath --group g2e prep_cluster && tests/d0977_open_unlink_tcp.sh s102d1 test17 test18
+640 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/mpath --group g2e prep_cluster && tests/d0977_open_unlink_tcp.sh s102d2 test17 test18

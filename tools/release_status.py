@@ -192,6 +192,19 @@ def defect_problem(configs: list, queue: list, platform: str = "") -> tuple:
     return "bad", f"{len(hits)} open release-blocking defects"
 
 
+def reaching(rows: list, queue: list) -> dict:
+    """Every record that reaches a row's configuration, `noblock` or not: id -> the rows it reaches."""
+    hits: dict = {}
+    for row in rows:
+        for config in row.get("configs", []):
+            nodes, selector, platform = defects.parse_at(
+                config + (f"@{row['platform']}" if row.get("platform") else ""))
+            for entry in queue:
+                if defects.blocks(entry, nodes, selector, platform):
+                    hits.setdefault(entry["id"], set()).add(f"{row['nodes']} {row['attachment']}")
+    return hits
+
+
 #: what a row's status is when its sources disagree, worst first: an open defect or a real
 #: failure is Not ready whatever else is running; a run still filling cells is In progress;
 #: a source with nothing on the release build yet is Not ready
@@ -233,6 +246,8 @@ def table(rows: list) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("-v", "--verbose", action="store_true", help="every reason behind each row")
+    ap.add_argument("--defects", action="store_true",
+                    help="every record that reaches a released configuration, noblock included")
     args = ap.parse_args()
 
     spec = json.loads(TABLE.read_text())
@@ -260,6 +275,19 @@ def main() -> int:
                 rows.append({"nodes": "2", "attachment": f"Platform: {label} (packaged install, hung-node test)",
                              "configs": rounds["configs"], "platform": key, "_platform_round": True,
                              "_kernel": prefix.group(1) if prefix else ""})
+    if args.defects:
+        #: release-blocking first, then noblock; each by severity
+        rank = {s: i for i, s in enumerate(defects.SEVERITIES)}
+        byid = {e["id"]: e for e in queue}
+        hits = reaching(rows, queue)
+        noblock = {i for i in hits if str(byid[i].get("impact", "")).lower() == "noblock"}
+        for i in sorted(hits, key=lambda i: (i in noblock, rank.get(byid[i].get("severity"), 9), i)):
+            e = byid[i]
+            print(f"{e.get('severity', '?'):8}  {str(e.get('impact') or 'unadjudicated'):14}  "
+                  f"rows={len(hits[i]):<3} {i}")
+        print(f"Total: {len(hits)} records reach a released configuration: "
+              f"{len(hits) - len(noblock)} block a release, {len(noblock)} marked noblock")
+        return 0
     for row in rows:
         state, reasons = row_status(row, version, srcv, queue, crit_cache)
         if row.get("_platform_round"):

@@ -164,6 +164,15 @@ struct mxfs_v5_dlm_opts {
 	 * downgrade loud and attributable instead of invisible.  Default 0.
 	 */
 	bool            fence_capability_override;
+	/*
+	 * Where the init writes the errno that a refusal with a cause of its own
+	 * maps to, so mount(8) reports that cause instead of the EPERM every
+	 * refusal with a reason otherwise gets: util-linux 2.39 prints only the
+	 * errno's text, never the reason the mount hands it through errorfc.
+	 * Left as the caller set it (0) when the init has no such cause.
+	 * NULL = the caller takes none.
+	 */
+	int             *refuse_rc;
 };
 
 /* ─── Lifecycle ─── */
@@ -538,6 +547,9 @@ int  mxfs_v5_dlm_node_recovery_blocked(struct mxfs_v5_dlm *ctx,
  * replayer or not (the disklock's pending markers, which every node's monitor
  * sets)?  The acquire classifier parks on this rather than shutting down. */
 int  mxfs_v5_dlm_any_recovery_pending(struct mxfs_v5_dlm *ctx);
+/* A peer's death is declared and its fence is still running, so the pending
+ * marker above is not set yet: the classifier parks on this too. */
+int  mxfs_v5_dlm_any_death_inflight(struct mxfs_v5_dlm *ctx);
 int  mxfs_v5_dlm_other_slots_held(struct mxfs_v5_dlm *ctx);
 /* 0.75.25: a victim whose slice replay was terminally refused (quarantine
  * imported for its slot) answers the node_ query the same way a blocked one
@@ -722,6 +734,10 @@ int  mxfs_v5_dlm_inode_unlock_open(struct mxfs_v5_dlm *ctx, uint64_t ino,
 				   uint32_t expected_gen, int open_op);
 int  mxfs_v5_dlm_inode_unlock_gen(struct mxfs_v5_dlm *ctx, uint64_t ino,
 				  uint32_t expected_gen);
+/* the release of a caller whose tenure capture found nothing of ours (gen 0):
+ * on TCP never a generation-bearing grant (-ESTALE when one is held, see
+ * mxfs_dlm_unlock_unanchored); on CAW the unconditional release. */
+int  mxfs_v5_dlm_inode_unlock_unanchored(struct mxfs_v5_dlm *ctx, uint64_t ino);
 void mxfs_v5_dlm_inode_dump_slot(struct mxfs_v5_dlm *ctx, uint64_t ino);
 int  mxfs_v5_dlm_inode_ex_count(struct mxfs_v5_dlm *ctx, uint64_t ino,
 				int *nslots_out);
@@ -964,6 +980,10 @@ int  mxfs_v5_dlm_ag_orphan_nak(struct mxfs_v5_dlm *ctx, uint32_t agno);
 int  mxfs_v5_dlm_inode_orphan_nak(struct mxfs_v5_dlm *ctx, uint64_t ino);
 int  mxfs_v5_dlm_is_caw(struct mxfs_v5_dlm *ctx);
 int  mxfs_v5_dlm_inode_held_nb(struct mxfs_v5_dlm *ctx, uint64_t ino);
+/* the same never-sleeping query, with the mode held: 0 and *mode on TCP,
+ * -EWOULDBLOCK when the table is busy or on CAW */
+int  mxfs_v5_dlm_inode_held_mode_nb(struct mxfs_v5_dlm *ctx, uint64_t ino,
+				    uint8_t *mode);
 /* read shared on-disk AG slot generation (cross-node coherency epoch) */
 int  mxfs_v5_dlm_ag_read_generation(struct mxfs_v5_dlm *ctx, uint32_t agno,
 				    uint64_t *out_gen);
@@ -1079,6 +1099,10 @@ uint64_t mxfs_v5_dlm_inode_orphan_clock_get(struct mxfs_v5_dlm *ctx,
 void mxfs_v5_dlm_inode_orphan_clock_set(struct mxfs_v5_dlm *ctx, uint64_t ino,
 					bool starve, uint64_t val);
 uint8_t mxfs_v5_dlm_inode_granted_mode(struct mxfs_v5_dlm *ctx, uint64_t ino);
+/* diagnostic, TCP only: this node's own entry for the inode in any state
+ * (mxfs_dlm_own_entry); MXFS_LSTATE_UNLOCKED when it has none or on CAW. */
+uint8_t mxfs_v5_dlm_inode_own_entry(struct mxfs_v5_dlm *ctx, uint64_t ino,
+				    uint8_t *mode_out, uint32_t *gen_out);
 /* C5 fail-closed rc contract — see v5_mount.c comment. */
 int mxfs_v5_dlm_inode_open_holders(struct mxfs_v5_dlm *ctx, uint64_t ino,
 				   uint64_t *oh_out);

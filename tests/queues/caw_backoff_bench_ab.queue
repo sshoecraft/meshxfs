@@ -1,0 +1,64 @@
+# D-CAW-WAITER-NOTIFIES-A-DRAINING-HOLDER-13-TIMES-A-SECOND: the step the
+# record still owes before removal.  Both halves of the change are measured on
+# a long drain (tests/queues/caw_poll_resubmit_ab.queue, run cpr: holder rate
+# 12.8-13.3/s with both backoffs off, 1.38/s with both on).  What is not yet
+# shown is that the backoffs cost nothing on SHORT waits, which the 100 ms
+# cadence was tuned for: the waiter's UDP hint re-send keeps 100 ms for the
+# first 3 s of a wait (caw_bast_resend_backoff) and the holder's poll keeps
+# submitting on every pass for the first 3 s of a conflict
+# (caw_poll_resubmit_backoff), so a bench whose waits stay under 3 s should not
+# move.  Same build, runtime knobs, 2/disk/caw/direct g2 (test1, test2):
+#   X  = caw_bast_resend_backoff=0 caw_poll_resubmit_backoff=0 (the behaviour
+#        before the change)
+#   P1 = both 1 (the defaults, the change)
+# Order X1 P1a P1b X2, each arm on a fresh prep.  Rows: dlm_scaling
+# (create+stat+unlink in private dirs), rsync_paired (each node rsyncs its own
+# tree), dlm_fairness (every node churns one shared directory: repeated EX
+# hand-offs, the waits the cadence serves), dir_reuse_coherency (concurrent
+# same-directory creates under reuse churn).
+#
+# RULES (written before the first lap).  VALID ARM: tests/fleet_set_params.sh
+# reads the arm's two values on both nodes before the rows AND (read-only, bare
+# names) after them, with one srcversion throughout; every row printed a
+# verdict line.  An arm that fails this is VOID and rerun, never graded.
+# PREDICTION (P1 unchanged on short waits): every row PASSes in all four arms,
+# and for every row each P1 lap's wall is at most 1.15 x the larger of the two
+# X walls + 2 s.  REGRESSION: a P1 wall above that line, or a row passing in
+# both X arms and failing in a P1 arm: the backoff costs the common case, and a
+# new hypothesis comes before removal.  INTEGRITY: a shutdown, BUG, Oops,
+# hung-task or Internal error line on either node stops the work and is
+# attributed from its own lines first.
+#
+# Bounds: prep 300 (run.sh prep_cluster, measured 38-99 s on the 2-node
+# groups); knobs 60 (fleet_set_params.sh bounds each ssh at 40 s, nodes in
+# parallel); rows 1450: manifest budgets dlm_scaling 90 + rsync_paired 60 +
+# dlm_fairness 30 + dir_reuse_coherency 120 = 300, plus preflight and the
+# marker check, ~10-20 s per run.sh invocation, plus, for each of the two
+# throughput rows (dlm_scaling, rsync_paired: run.sh's PERF_ROWS), run.sh's own
+# waits before the row starts: the host lock taken exclusive waits for every
+# other group's row in flight to end (the longest on this rig while g2e runs
+# its path rows is path_fenced_return, 400 s) and host_quiesce then waits up
+# to HOST_QUIET_S 45 + HOST_IDLE_MAX_S 120 s, so 2 x 565 = 1130.  The first
+# run of this queue (label cawbk, 2026-10-19 08:26Z, ~/src/mxfs-f
+# 6C131EEA932C1F7FE3072EC) had a 360 s rows bound: its X1 rows lap was killed
+# at 360 s after dlm_fairness 2 s and dlm_scaling 5 s had PASSed, run.sh having
+# waited 75 s for the host lock and 39 s quiescing before dlm_scaling, and the
+# queue then ended at lap 7; that run is VOID by the rules above (rows without a
+# verdict) and is not graded.  Its evidence files keep their cawbk_ names;
+# this queue's are cawbk2_.
+300 MXFS_FORCE_PREP=1 ./run.sh 2/disk/caw/direct --group g2 prep_cluster
+60 tests/fleet_set_params.sh "caw_bast_resend_backoff=0 caw_poll_resubmit_backoff=0" 2 tests/evidence/cawbk2_X1_before.txt
+1450 ./run.sh 2/disk/caw/direct --group g2 dlm_scaling rsync_paired dlm_fairness dir_reuse_coherency
+60 tests/fleet_set_params.sh "caw_bast_resend_backoff caw_poll_resubmit_backoff" 2 tests/evidence/cawbk2_X1_after.txt
+300 MXFS_FORCE_PREP=1 ./run.sh 2/disk/caw/direct --group g2 prep_cluster
+60 tests/fleet_set_params.sh "caw_bast_resend_backoff=1 caw_poll_resubmit_backoff=1" 2 tests/evidence/cawbk2_P1a_before.txt
+1450 ./run.sh 2/disk/caw/direct --group g2 dlm_scaling rsync_paired dlm_fairness dir_reuse_coherency
+60 tests/fleet_set_params.sh "caw_bast_resend_backoff caw_poll_resubmit_backoff" 2 tests/evidence/cawbk2_P1a_after.txt
+300 MXFS_FORCE_PREP=1 ./run.sh 2/disk/caw/direct --group g2 prep_cluster
+60 tests/fleet_set_params.sh "caw_bast_resend_backoff=1 caw_poll_resubmit_backoff=1" 2 tests/evidence/cawbk2_P1b_before.txt
+1450 ./run.sh 2/disk/caw/direct --group g2 dlm_scaling rsync_paired dlm_fairness dir_reuse_coherency
+60 tests/fleet_set_params.sh "caw_bast_resend_backoff caw_poll_resubmit_backoff" 2 tests/evidence/cawbk2_P1b_after.txt
+300 MXFS_FORCE_PREP=1 ./run.sh 2/disk/caw/direct --group g2 prep_cluster
+60 tests/fleet_set_params.sh "caw_bast_resend_backoff=0 caw_poll_resubmit_backoff=0" 2 tests/evidence/cawbk2_X2_before.txt
+1450 ./run.sh 2/disk/caw/direct --group g2 dlm_scaling rsync_paired dlm_fairness dir_reuse_coherency
+60 tests/fleet_set_params.sh "caw_bast_resend_backoff caw_poll_resubmit_backoff" 2 tests/evidence/cawbk2_X2_after.txt

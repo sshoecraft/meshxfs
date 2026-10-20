@@ -419,6 +419,19 @@ filesystem can let go of it.
      `mxfs_tauth_ledger_page/home/hash(l, res)` take the open ledger.  A
      member that routes by a different geometry would master a resource on a
      different page (two writers for one record) — hence the proto-gen bump.
+   - **Routing version 2 (D-0349, what mkfs writes):** an INODE resource
+     hashes with the low `MXFS_TAUTH_INO_SHARD_BITS` (3) bits of its number
+     cleared, so the eight consecutive numbers an inode chunk hands out in
+     order share one home page (one master, one page write, one first-touch
+     hand-off), and its preferred index on that page is offset by those bits;
+     every other resource type routes as in version 1.  The header's
+     `hash_version` selects it (`mxfs_tauth_route_hash` /
+     `mxfs_tauth_route_index`, used by the module, chk and the tests); the DLM
+     ctx carries it beside the seed; `mxfs_tauth_region_valid` accepts 1-2, so
+     a version-1 volume keeps routing as before while a module that knows
+     only version 1 refuses a version-2 region at open instead of misrouting.
+     The mount logs `P-TAUTH-OPEN npages= hash_version=`; chk prints
+     `hash_version=`; `mkfs_mxfs -H 1|2` (test only) formats either.
    - mkfs: `-t ENTRIES` or the default `tauth_npages_for_device` = one
      record per 64 KiB of device, clamped (128 GiB → 67,650 pages = 2.1M
      records, 528 MiB dual copy, 0.4 % of the device).  The seed comes from

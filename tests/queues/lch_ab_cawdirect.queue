@@ -1,0 +1,48 @@
+# D-LOCAL-CREATE-RESETS-HELD-STALE-COPY-IN-PLACE-REMOVED-NAME-ACTS-ON-NEW-FILE,
+# hypothesis H-LC1: same-build A/B of dialloc_held_skip on the reproducer
+# tests/stale_name_setattr_reuse.sh SNR_SHAPE=localcreate, 2/disk/caw/direct on
+# g2b (test15 test16).  Run from ~/src/mxfs-g: the main tree's sources, which
+# are ~/src/mxfs-e's complete H-SN1 build (0F7793731517873F5755B1A) plus the
+# held-copy skip in the allocator walk (xfs/libxfs/xfs_ialloc.c
+# mxfs_dialloc_held_skip_cand), its knob and counters (xfs/xfs_mxfs_dlm.c) and
+# the P-CR63-HELD count at the reset (xfs/xfs_icache.c), and nothing else in
+# the module.  8 iterations a lap, SNR_DELAY_MS 6000 (the touch must still be
+# held after X's rm, sync, push and cache drop and Y's create), each g<k>
+# created empty so a touch applied to it keeps STAMP.
+#
+# H-LC1: when Y's create takes the number of the f that X removed, P-CR63
+# resets the cached copy that Y's held touch and f's dentry still reference,
+# and the touch's setattr (HIT) or a stat of f (NAMEHIT) then reaches the new
+# file.  cr63_held_reset counts every reset of a referenced copy; the fix
+# (arm 1) skips such a number in the allocator walk (P-DIALLOC-HELD-SKIP).
+#
+# VERDICT RULES (written before the first lap):
+#   SUPPORTED   at least one control lap (arm 0) reads CONTROL-SHOWS-CAUSE
+#               (an iteration HIT or NAMEHIT, and Y's cr63_held_reset > 0), at
+#               least three fix laps (arm 1) read PASS (no HIT, no NAMEHIT,
+#               Y's cr63_held_reset 0, y_held_skip_f > 0, node_failures 0) with
+#               a cold audit CLEAN errors=0, and no fix lap reads FAIL.
+#   REFUTED     a control lap's reused iteration HIT or NAMEHIT with Y's
+#               cr63_held_reset 0: the new file was reached by another path,
+#               and its own lines are read before anything else.
+#   FIX FAILS   any fix lap FAIL, or a fix lap whose cold audit is not CLEAN
+#               errors=0: its own lines are attributed first.
+#   WEAK        none of the above: more laps, not a verdict.
+#   A VACUOUS control lap (no reuse) measured nothing and is rerun; a NOREACH
+#   fix lap does not count toward the three; an ABORT or an overrun is read
+#   from its own lines.  name_stale (the removed name resolving to its own
+#   dead life) is read from each lap and is not part of this verdict.
+# The record closes only when this A/B is SUPPORTED and the fix also passes
+# the regression laps named on the record.
+#
+# Bound per lap, from the harness header's step bounds: prep 300 (run.sh's
+# prep_cluster row), srcversion, delay, poison, held-skip and counter
+# read-backs 5 x 20 per node (200), mkdir 20, 8 iterations x (20 + 20 + 30 +
+# 30 + (6 + 30) + 20), Y's closing reset 20, counter reads 20 per node (40),
+# stream copy 120 per node (240), chk_clean 150: 2238 s.
+2238 SNR_SHAPE=localcreate SNR_DELAY_MS=6000 SNR_HELDSKIP=0 tests/stale_name_setattr_reuse.sh lch1 8 2/disk/caw/direct g2b
+2238 SNR_SHAPE=localcreate SNR_DELAY_MS=6000 SNR_HELDSKIP=1 tests/stale_name_setattr_reuse.sh lch2 8 2/disk/caw/direct g2b
+2238 SNR_SHAPE=localcreate SNR_DELAY_MS=6000 SNR_HELDSKIP=1 tests/stale_name_setattr_reuse.sh lch3 8 2/disk/caw/direct g2b
+2238 SNR_SHAPE=localcreate SNR_DELAY_MS=6000 SNR_HELDSKIP=0 tests/stale_name_setattr_reuse.sh lch4 8 2/disk/caw/direct g2b
+2238 SNR_SHAPE=localcreate SNR_DELAY_MS=6000 SNR_HELDSKIP=1 tests/stale_name_setattr_reuse.sh lch5 8 2/disk/caw/direct g2b
+2238 SNR_SHAPE=localcreate SNR_DELAY_MS=6000 SNR_HELDSKIP=1 tests/stale_name_setattr_reuse.sh lch6 8 2/disk/caw/direct g2b

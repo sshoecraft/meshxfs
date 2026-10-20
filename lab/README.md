@@ -25,8 +25,9 @@ release's node count is verified on the development rig by the release
 boards. The steps are per node. A node of the development rig is never also in a platform
 set: a node logged in to two targets orders its disks by session, and the
 rig's prep has formed a cluster short of that node because of it.
-1. **Install osimager** — `pip install osimager` (it drives HashiCorp Packer,
-   which must be installed too). Run `mkosimage` with no arguments once: it
+1. **Install [osimager](https://github.com/sshoecraft/osimager)** —
+   `pip install osimager` (it drives HashiCorp Packer, which must be installed
+   too). Run `mkosimage` with no arguments once: it
    says what to set up. Its documentation covers locations, credentials and
    specs: <https://sshoecraft.github.io/osimager>. A *location* is your
    network — bridge, addressing, DNS — and is yours to define. The lab
@@ -92,7 +93,7 @@ dns domain=<domain>
 addr <node>=<ipv4>
 qemu monitor_dir=<dir>
 group <g>=<n1>,<n2>,... <g2>=...
-paths pool=<dir> delay_image=<file> vmdir=<dir> qemu_root=<dir>
+paths pool=<dir> snapshots=<dir> delay_image=<file> vmdir=<dir> qemu_root=<dir>
 ```
 On the dev host, whose LUNs come from the pool, `storage` carries only
 `portal=<ip>`: the target, the device and the WWID belong to whichever pool
@@ -119,7 +120,11 @@ groups and so run at a different time than they do.
 `paths` names the build host's own files: the LUN pool's directory, the
 dm-delay rig's image, the VM directory and the qemu guests' root; the
 rig-setup scripts and the host preflight read them from here unless an
-`MXFS_*` variable overrides them for one run. A platform with no
+`MXFS_*` variable overrides them for one run. `snapshots` (optional, default
+`<pool dir>/../snapshots`) is where a run's kept LUN images are copied, and
+belongs on a different disk from the pool: a copy onto the filesystem the
+target serves the LUNs from fills its page cache with gigabytes of unwritten
+data, and the target's writes to every LUN wait behind it. A platform with no
 `nodes` (or `pair`) line, or with fewer nodes than the release claims, cannot
 be verified here, and the harness says so and stops.
 

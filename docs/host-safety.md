@@ -344,10 +344,12 @@ journal down with it — schedule them apart.
 
 ---
 
-## Crash D-bis — 2026-09-01 07:15: corrupted folio order, source UNPROVEN
+## Crash D-bis — 2026-09-01 07:15: tensor data written over page-cache index nodes
 
-Ledger: `D-HOST-CLYDE-CRASH-XAS-SPLIT-ALLOC-FOLIO-ORDER-CORRUPT-0901A`
-(critical, **OPEN**).  Record `.evidence/crash_20260901_121751/`.
+Ledger (DISPROVED): `D-HOST-CLYDE-CRASH-XAS-SPLIT-ALLOC-FOLIO-ORDER-CORRUPT-0901A`.
+Record `.evidence/crash_20260901_121751/` (no longer on disk: the archive and
+the pstore directories it came from are empty; the register values below
+were transcribed from it at the time).
 
 A 9.07-day boot died at uptime 784227 s with **seven** `WARNING: at
 lib/xarray.c:1010 xas_split_alloc+0x12e/0x180` across two unrelated processes
@@ -364,6 +366,21 @@ kernel pointer.  `R13` holds a vmemmap address.  A folio order of 189 is
 impossible: this is a **corrupted `struct page`/folio fed into the page
 cache**, hitting two unrelated processes milliseconds apart, so the corruption
 is broad rather than one bad folio.
+
+**What the corrupt words are.**  `__filemap_add_folio` takes `order` from
+`xa_get_order`, which adds the node's own `shift`, and `entry` is the slot it
+loaded: both come from the page cache's radix-tree nodes, the slab objects
+every file's index shares.  Read as the bytes in memory, each `entry` is four
+16-bit floats of one sign and one magnitude band: `0xc1d8c166c1c7c1d1` is fp16
+−2.908 −2.889 −2.699 −2.922 (bf16 −26.1 −24.9 −14.4 −27.0) and
+`0xc21dc0d8c0fcc209` is fp16 −3.018 −2.492 −2.422 −3.057 (bf16 −34.3 −7.9 −6.8
+−39.3).  Eight halves whose top byte is 0xc0-0xc2 come out of random or text
+data about once in 10^15; packed half-precision values such as a model's
+log-probabilities look exactly like this.  So the radix-tree nodes had been
+overwritten with machine-learning tensor data, three minutes after the model
+server below was torn down and a training job started, on a host whose IOMMU
+is off.  MXFS never loads in the host kernel, and no guest workload writes
+half-precision arrays.
 
 **Ruled out — GPU PCIe P2P.**  `grep -c nv_dma_map_peer` over every file of
 this record returns **0**, and `grep NVRM` returns **nothing at all**, against
@@ -388,9 +405,11 @@ interactive ssh login landed at 07:15:37, and `train.py`'s PID (1839647) is
 training job started is exactly the reclaim and page-cache churn under which a
 latent `struct page` corruption surfaces.
 
-**Do not re-dispose this without new evidence.**  "Probably the GPU" is what
-produced the bad filing in the first place.  Progress is gated on the same
-instrumentation as Crash E below.
+**Why it was disposed only on the payload.**  "Probably the GPU" produced the
+first, wrong filing: it rested on the 08:45 crash's P2P lines.  The
+disposition stands on this crash's own registers.  Naming which driver or
+device wrote the tensor bytes would need IOMMU fault reporting, which is off
+on this host.
 
 **Process lesson.**  A disposition covering two incidents must carry
 *per-incident* evidence.  "Both traces show X" must be checked against **both**

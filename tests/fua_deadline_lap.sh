@@ -97,7 +97,7 @@ huge=$(grep -c 'budget_ms=4294967295' "$D")
 over=$(grep -o 'P-FUA-READ-RETRY.*budget_ms=[0-9]*' "$D" | sed 's/.*budget_ms=//' | awk -v d="$DEADLINE_MS" '$1 > d' | wc -l)
 err21=$(grep -c 'P-FUA-READ-ERR.*tries=21' "$D")
 brk=$(grep -c 'P303-VERIFY-BREAKER' "$D")
-bad=$(cat "$EV/dmesg_$H.log" "$D" | grep -ciE 'shutting down filesystem|Corruption of in-memory|xfs_do_force_shutdown|BUG:|Oops|WARNING: CPU')
+bad=$(cat "$EV/dmesg_$H.log" "$D" | grep -ciE 'shutting down filesystem|Corruption of in-memory|xfs_do_force_shutdown|BUG:|\bOops\b|WARNING: CPU')
 say "P302-INJECT=$inj P302-FUA-READ-DEADLINE=$dl P-FUA-READ-RETRY=$retries budget_huge=$huge budget_over_deadline=$over P-FUA-READ-ERR_tries21=$err21 P303-VERIFY-BREAKER=$brk shutdown_or_splat=$bad"
 grep -m3 'P-FUA-READ-RETRY' "$D" | cut -c1-200
 grep -m2 'P302-FUA-READ-DEADLINE' "$D" | cut -c1-200

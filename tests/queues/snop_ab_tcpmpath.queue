@@ -1,0 +1,50 @@
+# D-STALE-NAME-SETATTR-ADOPTS-PEER-REUSED-INCARNATION-CHANGES-UNRELATED-FILE:
+# the operations the record names besides a timestamp setattr -- a truncate
+# (xfs_setattr_size and its post-lock refusal), a chmod (the mode path through
+# the namespace gate) and an open (the open path's post-acquire P95 re-check) --
+# each held through a name the peer then removes, with the peer's next file
+# taking the number.  Same-build A/B of incarn_poison_unexposed per operation
+# on tests/stale_name_setattr_reuse.sh (SNR_SHAPE=peer, SNR_OP), 2/net/mesh/mpath
+# on g2e (test17 test18), run from ~/src/mxfs-b srcversion
+# 00FAEA889543FE4A6C9B415: the main tree's sources (the complete H-SN1 fix,
+# the allocator's held-copy skip and its count, and the test-only knobs
+# dbg_setattr_delay_any and dbg_open_delay_ms, which hold the operation before
+# any lock).  8 iterations a lap, SNR_DELAY_MS 6000 (X's rm, sync, push, create
+# and sync must land inside the hold; the root directory hand-off alone took
+# ~1 s on this configuration in lap s102d1).
+#
+# PREDICTION (H-SN1 carried to these operations): with the poison off (arm 0)
+# the held operation's acquire rebuilds the shell in place as g<k> and the
+# operation lands on it -- g<k>'s size reads 1 / its mode 600 / Y's cat returns
+# g<k>'s bytes -- with P-RELOAD-XINCARN-ADOPT comm=truncate|chmod|cat on Y;
+# with it on (arm 1) the reload poisons the shell (P-RELOAD-XINCARN-POISON
+# comm=<op>), the operation is refused after its lock or acquire, the VFS
+# re-walks and the removed name gives ENOENT.
+#
+# VERDICT RULES (written before the first lap), per operation:
+#   SHOWN       its control lap reads CONTROL-SHOWS-CAUSE and both its fix laps
+#               read PASS (reused > 0, hit 0, y_poison_touch -- the held
+#               operation's comm -- > 0, node_failures 0) with a cold audit
+#               CLEAN errors=0.
+#   FIX FAILS   a fix lap reads FAIL, or its cold audit is not CLEAN errors=0:
+#               attributed from its own lines first.  The record stays open.
+#   NOT SHOWN   the control lap reads CONTROL-NO-HIT with reused > 0: that
+#               operation does not reach the new file on the pre-fix path, which
+#               is read from its own lines (which path refused it) and recorded.
+#   A VACUOUS lap (no reuse) measured nothing and is rerun, a NOREACH fix lap
+#   does not count, and an ABORT or an overrun is read from its own lines.
+#
+# Bound per lap, from the harness header's step bounds: prep 300, srcversion,
+# delay, op-knob, poison, held-skip and counter read-backs 5 x 20 per node
+# (200), mkdir 20, 8 iterations x (20 + 20 + 30 + (6 + 30) + 20), Y's closing
+# reset 20, counter reads 20 per node (40), stream copy 120 per node (240),
+# chk_clean 150: 1978 s.
+1978 SNR_SHAPE=peer SNR_OP=truncate SNR_DELAY_MS=6000 SNR_POISON=0 tests/stale_name_setattr_reuse.sh sotr0 8 2/net/mesh/mpath g2e
+1978 SNR_SHAPE=peer SNR_OP=truncate SNR_DELAY_MS=6000 SNR_POISON=1 tests/stale_name_setattr_reuse.sh sotr1 8 2/net/mesh/mpath g2e
+1978 SNR_SHAPE=peer SNR_OP=chmod SNR_DELAY_MS=6000 SNR_POISON=0 tests/stale_name_setattr_reuse.sh socm0 8 2/net/mesh/mpath g2e
+1978 SNR_SHAPE=peer SNR_OP=chmod SNR_DELAY_MS=6000 SNR_POISON=1 tests/stale_name_setattr_reuse.sh socm1 8 2/net/mesh/mpath g2e
+1978 SNR_SHAPE=peer SNR_OP=open SNR_DELAY_MS=6000 SNR_POISON=0 tests/stale_name_setattr_reuse.sh soop0 8 2/net/mesh/mpath g2e
+1978 SNR_SHAPE=peer SNR_OP=open SNR_DELAY_MS=6000 SNR_POISON=1 tests/stale_name_setattr_reuse.sh soop1 8 2/net/mesh/mpath g2e
+1978 SNR_SHAPE=peer SNR_OP=truncate SNR_DELAY_MS=6000 SNR_POISON=1 tests/stale_name_setattr_reuse.sh sotr2 8 2/net/mesh/mpath g2e
+1978 SNR_SHAPE=peer SNR_OP=chmod SNR_DELAY_MS=6000 SNR_POISON=1 tests/stale_name_setattr_reuse.sh socm2 8 2/net/mesh/mpath g2e
+1978 SNR_SHAPE=peer SNR_OP=open SNR_DELAY_MS=6000 SNR_POISON=1 tests/stale_name_setattr_reuse.sh soop2 8 2/net/mesh/mpath g2e

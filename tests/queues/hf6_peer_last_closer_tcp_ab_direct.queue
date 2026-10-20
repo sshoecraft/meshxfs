@@ -1,0 +1,46 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F6 on
+# the transport ng0rf1 was observed on.  Same-build A/B of module knob
+# inact_local_epoch_guard with tests/peer_last_closer_ab.sh (its header states
+# the window and the grades): guard 0 is the control, 1 the fix, both with the
+# two delay knobs.
+#
+# WHY TCP.  The CAW queue (hf6w, ~/src/mxfs-b, build 33CACD0929304C2D9D203AB,
+# laps pwc1 pwf1 pwc2 pwf2) reached the branch -- 14 control and 31 fix
+# peer-freed verdicts -- and every lap audited CLEAN, but each control verdict
+# was followed by a reload whose zombie arm adopted the peer's free
+# (P103-RELOAD-REUSE-ADOPT + P116-ZOMBIE-ADOPT), because every CAW acquire
+# reloads.  ng0rf1 (2/net/mesh/mpath) had no such reload: the unlinker
+# mastered the inode and got EX back by master handoff (P64-MASTER-HANDOFF),
+# and its truncate ran on the stale map through the AG-wait seam.  On TCP that
+# path exists only in a lap where the unlinker masters the reused number, so
+# the harness prints each node's master_handoffs and zombie_adopts.
+#
+# Runs from the main tree (srcversion 3AEA31FDF4AD31EFBBA6A90 at launch: the
+# same tests/peer_last_closer_ab.sh and H-F6 knobs as ~/src/mxfs-b, plus the
+# H-F7c, H-F9 and H-F10 guards at their default 1 in both arms).  The first launch,
+# from ~/src/mxfs-b, measured nothing: every lap ABORTed at the host preflight
+# (root filesystem full).
+#
+# VERDICT RULES (written before the first lap; the CAW queue's, unchanged):
+#   PROVEN    a control lap reaches peer-freed on the unlinker (not VACUOUS)
+#             and audits CORRUPT with P-FREE-LIVE-CORE, AND every fix lap
+#             reaches peer-freed and audits CLEAN with no node failure
+#   REFUTED   the control laps reach peer-freed (>= 20 verdicts in aggregate,
+#             on both TCP configurations together) and every one audits
+#             CLEAN: H-F6 does not produce the shape, and ng0rf1 needs another
+#             cause
+#   FIX FAILS a fix lap that reached peer-freed audits CORRUPT
+#   OPEN      every lap VACUOUS: the window does not reach the branch; redesign
+#             the workload before judging
+# A lap whose audit is STALE/NONE has no verdict and is rerun.  A REFUTED that
+# rests only on laps where the unlinker never mastered the number
+# (master_handoffs 0 on it) is not judged: the ng0rf1 path was not offered.
+#
+# Bound per lap, the sum of the harness's own step bounds, every ssh step
+# counted: prep_cluster 300 + srcversion reads 2x20 + knob sets 2x20 + mkdir 30
+# + workload 40 x (150+1000+1500) ms + 60 = 166 + counters 2x40 + knob resets
+# 2x20 + chk_clean with alloc_witness 150 + stream capture 2x120 = 1086 s.
+1090 tests/peer_last_closer_ab.sh q6dc1 0 40 2/net/mesh/direct g2c
+1090 tests/peer_last_closer_ab.sh q6df1 1 40 2/net/mesh/direct g2c
+1090 tests/peer_last_closer_ab.sh q6dc2 0 40 2/net/mesh/direct g2c
+1090 tests/peer_last_closer_ab.sh q6df2 1 40 2/net/mesh/direct g2c

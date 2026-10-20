@@ -4,6 +4,14 @@
 #
 # Usage: tests/fleet_set_params.sh "<name=val> [<name=val> ...]" [nodes=32] [outfile]
 #
+# nodes is a count (test1..testN) or a comma list of node names, for a rig
+# group's nodes (e.g. test29,test30 for g2c).
+#
+# A bare <name> (no '=') is only read back, never written: that is how a run
+# proves that knobs it set before a workload were still in force after it.
+# Setting them again afterwards would hide a module reload in between, which
+# puts every parameter back to its default.
+#
 # Example (the enforcement-armed board, sess404):
 #   tests/fleet_set_params.sh "target_cache_protected=1 foreign_replay_token_enforce=1" 32 \
 #       tests/evidence/<dir>/knobs.txt
@@ -24,19 +32,25 @@ SSH=tools/mxfs_sshpass.sh
 CMD=""
 for kv in $PARAMS; do
     k=${kv%%=*}; v=${kv#*=}
-    CMD="$CMD echo $v > /sys/module/mxfs/parameters/$k 2>/dev/null || echo SETFAIL=$k; echo $k=\$(cat /sys/module/mxfs/parameters/$k 2>/dev/null);"
+    [ "$k" = "$kv" ] || CMD="$CMD echo $v > /sys/module/mxfs/parameters/$k 2>/dev/null || echo SETFAIL=$k;"
+    CMD="$CMD echo $k=\$(cat /sys/module/mxfs/parameters/$k 2>/dev/null);"
 done
+case "$NODES" in
+    *[!0-9]*) NODE_LIST=$(printf '%s\n' "$NODES" | tr ',' ' ') ;;
+    *)        NODE_LIST=$(seq 1 "$NODES" | sed 's/^/test/') ;;
+esac
+NN=$(printf '%s\n' $NODE_LIST | grep -c .)
 D=$(mktemp -d)
-for i in $(seq 1 "$NODES"); do
-    ( timeout 40 $SSH test$i "$CMD echo ver=\$(cat /sys/module/mxfs/srcversion 2>/dev/null) m=\$(grep -c ' mxfs ' /proc/mounts)" >"$D/t$i" 2>/dev/null; echo $? >"$D/rc$i" ) &
+for n in $NODE_LIST; do
+    ( timeout 40 $SSH "$n" "$CMD echo ver=\$(cat /sys/module/mxfs/srcversion 2>/dev/null) m=\$(grep -c ' mxfs ' /proc/mounts)" >"$D/t.$n" 2>/dev/null; echo $? >"$D/rc.$n" ) &
 done
 wait
-for i in $(seq 1 "$NODES"); do
-    echo "test$i rc=$(cat "$D/rc$i") $(grep -av '^Unauthorized\|^Warning:\|^If you' "$D/t$i" | tr '\n' ' ')"
+for n in $NODE_LIST; do
+    echo "$n rc=$(cat "$D/rc.$n") $(grep -av '^Unauthorized\|^Warning:\|^If you' "$D/t.$n" | tr '\n' ' ')"
 done > "$D/knobs.txt"
 [ -n "$OUTF" ] && cp "$D/knobs.txt" "$OUTF"
 cat "$D/knobs.txt"
 echo "params: $(grep -oE '(SETFAIL=[a-z_]+|[a-z_]+=[0-9]+)' "$D/knobs.txt" | grep -vE '^(ver|m)=' | sort | uniq -c | tr '\n' ' ')"
-echo "mounted: $(grep -c 'm=1' "$D/knobs.txt")/$NODES  rc0: $(grep -c ' rc=0 ' "$D/knobs.txt")/$NODES"
+echo "mounted: $(grep -c 'm=1' "$D/knobs.txt")/$NN  rc0: $(grep -c ' rc=0 ' "$D/knobs.txt")/$NN"
 if grep -q SETFAIL "$D/knobs.txt"; then echo "FAIL: setter refused on some node(s)"; exit 2; fi
 exit 0

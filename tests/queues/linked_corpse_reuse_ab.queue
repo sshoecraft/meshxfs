@@ -1,0 +1,41 @@
+# D-CREATE-REUSE-OVER-PEER-FREED-LINKED-CORPSE-SHUTS-NODE-DOWN, H-L1.
+#
+# HYPOTHESIS H-L1 (on the record before any patch): the shutdown is caused only
+# by a create's linked reclaimable copy of its number reaching
+# xfs_iget_check_free_state; deferring it to the recycle path's platter re-read
+# removes the shutdown.
+#
+# Same-build A/B, one knob between the arms: cr63_linked_defer, set and read
+# back on both nodes by tests/linked_corpse_reuse_ab.sh (0 control, 1 fix).
+# Build: the main tree, srcversion 90C41489237AC8D0BA136E8 (each lap refuses a
+# node running anything else).  2/net/mesh/direct g2c (test29 test30); the
+# record's lap was 2/disk/caw/direct, whose rig is busy with queue iwg, and the
+# code path (xfs_iget_cache_hit) is the same on both transports.  40 rounds a
+# lap; control first, then alternating, with one more fix lap at the end.
+#
+# MEASURES, per lap (RESULT line): reused (rounds whose create read the
+# previous round's number), a_deferred / a_refused (cr63_linked_deferred /
+# cr63_linked_refused on test29), fallthrough (P-CR63-DEADSHELL lines), cancels
+# (P-CR3-CANCEL), disklive (P-CR63-DEFER-DISKLIVE), steps_bad, step_timeouts,
+# audit, node_failures.
+#
+# VERDICT RULES (written before the first lap):
+#   A VACUOUS lap reached nothing and judges nothing; two VACUOUS controls mean
+#   the workload does not offer the hazard here and the A/B moves to
+#   2/disk/caw/direct.  An ABORT has no verdict and is rerun.
+#   CONTROL: CONTROL-SHOWS-CAUSE confirms the mechanism on this transport;
+#     CONTROL-NO-SHUTDOWN (a fall-through the node survived) refutes H-L1's
+#     mechanism and stops the queue's judgement.
+#   FIX: PASS needs a_deferred > 0, a_refused 0, fallthrough 0, cancels 0,
+#     disklive 0, every step ok, no node failure and a CLEAN audit.
+#   REFUTED: a reached fix lap that shuts down, or whose deferral was refused.
+#   SUPPORTED AND FIXED HERE: at least one CONTROL-SHOWS-CAUSE and at least two
+#     PASS fix laps, with no reached fix lap failing.  The record then needs the
+#     same on 2/disk/caw/direct before any disposition.
+#
+# Bound: tests/linked_corpse_reuse_ab.sh header, 1160 s at 40 rounds.
+1160 tests/linked_corpse_reuse_ab.sh lcc1 0 40 2/net/mesh/direct g2c
+1160 tests/linked_corpse_reuse_ab.sh lcf1 1 40 2/net/mesh/direct g2c
+1160 tests/linked_corpse_reuse_ab.sh lcc2 0 40 2/net/mesh/direct g2c
+1160 tests/linked_corpse_reuse_ab.sh lcf2 1 40 2/net/mesh/direct g2c
+1160 tests/linked_corpse_reuse_ab.sh lcf3 1 40 2/net/mesh/direct g2c

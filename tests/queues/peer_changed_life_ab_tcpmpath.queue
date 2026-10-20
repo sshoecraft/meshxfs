@@ -1,0 +1,18 @@
+# D-LOCAL-UNLINK-INACT-AFTER-GRANT-LOSS-WRITES-STALE-CORE-OVER-PEER-CHANGE,
+# hypothesis H-LU1, the same A/B on 2/net/mesh/mpath g2e (test17 test18): the
+# TCP lock manager over multipath, so the fix is measured on the other
+# transport too.  Same build and the same harness settings as
+# tests/queues/peer_changed_life_ab_caw.queue, run from ~/src/mxfs-e at
+# srcversion 022F8BF6763B609A9ECC7D1; its header carries the cause as lap
+# pclc3 showed it, the prediction, the VERDICT RULES (written before the
+# first lap of either queue, and applied to this queue on its own) and the
+# per-lap bound derivation (1278 s).  No control lap has run on this
+# transport yet: if every lap here is VACUOUS, the shape is not reached on TCP
+# and this queue gives no verdict either way; the record then rests on the
+# disk-locking A/B and the final verification.
+1278 tests/peer_changed_life_ab.sh pct1 0 12 2/net/mesh/mpath g2e
+1278 tests/peer_changed_life_ab.sh pct2 1 12 2/net/mesh/mpath g2e
+1278 tests/peer_changed_life_ab.sh pct3 0 12 2/net/mesh/mpath g2e
+1278 tests/peer_changed_life_ab.sh pct4 1 12 2/net/mesh/mpath g2e
+1278 tests/peer_changed_life_ab.sh pct5 0 12 2/net/mesh/mpath g2e
+1278 tests/peer_changed_life_ab.sh pct6 1 12 2/net/mesh/mpath g2e

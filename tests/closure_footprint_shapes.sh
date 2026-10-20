@@ -255,7 +255,7 @@ waiter_only)
     echo "--- $HOLDER caches EX on .cfs-wo-target, then is suspended so it cannot answer a BAST"
     "$SSH" "$HOLDER" "echo lock > $MNT/.cfs-wo-target; sync" >/dev/null 2>&1
     sleep 2
-    sudo virsh -c qemu:///system suspend "$HOLDER" >/dev/null 2>&1 || {
+    "$REPO/tools/lun_pool.sh" fault sudo virsh -c qemu:///system suspend "$HOLDER" >/dev/null 2>&1 || {
         echo "FAIL: virsh suspend $HOLDER"; exit 1; }
     SUSPENDED_AT=$SECONDS
 

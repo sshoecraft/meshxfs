@@ -118,7 +118,7 @@ run_arm() { # <tag> <mode>
     # sess467: one integer — `grep -c` over TWO files prints "file:count"
     # per file, which failed the -eq test below on every chain-95 arm as
     # "kernel fault lines=<file>:0" (a harness verdict, not a kernel fault).
-    faults=$(cat "$log_l" "$log_p" | grep -ciE 'kernel BUG|BUG:|Oops|general protection|Call Trace')
+    faults=$(cat "$log_l" "$log_p" | grep -ciE 'kernel BUG|BUG:|\bOops\b|general protection|Call Trace')
     local peer_pass
     peer_pass=$(grep -c 'P275-SAMENODE PASS run=[0-9]* mode=hold ' "$log_p")
     echo "--- $tag: local_rc=$rc_l peer_rc=$rc_p pass=$pass fail=$fail peer_hold_pass=$peer_pass p272=$p272 knob_after=$knob faults=$faults ---"

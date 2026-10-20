@@ -176,6 +176,12 @@ mxfs_stage_node_files() {
     # default path).  Without it that fence is refused and the survivor stays
     # frozen, so it ships with the module, not with the test rig.
     install -m 755 "$SRCDIR/tools/mxfs_lu_reset_witness.py" "$root/usr/sbin/mxfs_lu_reset_witness.py"
+    # The fenced-path reset helper the module runs when the cluster fences
+    # this node (pal/linux/kern.c's default path): it drops the node's own
+    # iSCSI connections so the writes the fence aborted without an answer
+    # return at once.  Without it a fenced node cannot unmount until the
+    # initiator's timeout ladder ends (three expiries of the command timeout).
+    install -m 755 "$SRCDIR/tools/mxfs_fenced_path_reset.sh" "$root/usr/sbin/mxfs_fenced_path_reset.sh"
     # The shared attachment's vCenter helper (fence=vcenter): the module runs
     # it at mount and at a peer's death (pal/linux/drbd.c).  Without it every
     # fence=vcenter mount is refused.  It needs pyVmomi on the node.
@@ -237,6 +243,11 @@ mxfs_stage_node_files() {
     # without needing it explicitly specified.
     mkdir -p "$root/etc/udev/rules.d"
     install -m 644 "$pkgdir/60-mxfs-blkid.rules" "$root/etc/udev/rules.d/60-mxfs-blkid.rules"
+    # udev rule: tell the module when another initiator resets the shared
+    # logical unit, so the commands that reset left unanswered are aborted and
+    # retried at once instead of holding the device for three expiries of the
+    # command timeout (pal/linux/kern.c scsi_reset_seen).
+    install -m 644 "$pkgdir/61-mxfs-stranded-path.rules" "$root/etc/udev/rules.d/61-mxfs-stranded-path.rules"
 }
 
 # Print banner

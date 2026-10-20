@@ -2010,6 +2010,10 @@ struct mxfs_disklock_ctx {
 	uint64_t                hb_inc_zero_retained;   /* P-HB-INC-ZERO count */
 	int                     hb_pid;
 	mxfs_thread_t           *hb_watchdog;
+	/* the workers the heartbeat thread's own I/O runs on, so a command the
+	 * target never answers cannot hold the whole cycle (disklock.c, HEARTBEAT
+	 * I/O THAT A TARGET NEVER ANSWERS) */
+	struct mxfs_disklock_hbio *hbio;
 	mxfs_mutex_t            *lock;
 	/*
 	 * D-RECOVERY-CTXLOCK-HOLD-HB-STARVATION: serializes local dead-node
@@ -3637,6 +3641,8 @@ bool mxfs_disklock_authority_ok(struct mxfs_disklock_ctx *ctx);
  * 0 = the beat landed and the lease was renewed.
  */
 int mxfs_disklock_beat_now(struct mxfs_disklock_ctx *ctx);
+/* beats whose wait the heartbeat gave up and whose command has not returned */
+int mxfs_disklock_beats_unresolved(struct mxfs_disklock_ctx *ctx);
 
 void mxfs_disklock_authority_renew(struct mxfs_disklock_ctx *ctx,
 				   uint64_t anchor_ms);

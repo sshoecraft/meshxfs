@@ -1,0 +1,73 @@
+# FINAL VERIFICATION on 2/net/mesh/direct g2c (test29 test30), the configuration where
+# the recycle side-read guard reached (rsd2 rsd3 rsd4 rsd8 rsd19: rs_live_reuse=1 in 5
+# of 22 production laps); eight laps so the campaign can show that guard's reach,
+# production settings, on the
+# candidate final build ~/src/mxfs-b srcversion 00FAEA889543FE4A6C9B415: the
+# main tree's sources, every fix at its default.  This is the campaign's fifth run.  The fourth, on ~/src/mxfs-e
+# 0F7793731517873F5755B1A (labels fs*), carried the complete H-SN1 fix of
+# D-STALE-NAME-SETATTR-ADOPTS-PEER-REUSED-INCARNATION-CHANGES-UNRELATED-FILE.
+# This build is that one plus the allocator's held-copy skip of
+# D-LOCAL-CREATE-RESETS-HELD-STALE-COPY-IN-PLACE-REMOVED-NAME-ACTS-ON-NEW-FILE
+# (xfs/libxfs/xfs_ialloc.c mxfs_dialloc_held_skip_cand: with
+# dialloc_held_skip, default 1, the candidate walk skips a free number whose
+# cached copy on this node is referenced, on the peer-held cooldown, in both
+# phases and on a sole survivor), its counters and the P-CR63-HELD count at
+# the create's reset (xfs/xfs_mxfs_dlm.c, xfs/xfs_icache.c), and two TEST-ONLY
+# knobs off by default (dbg_setattr_delay_any, dbg_open_delay_ms); its laps
+# are labelled fb*.  The skip changes every create's candidate walk, so this
+# run is the regression run of that fix and the campaign rerun on the build
+# that carries every fix.  Added for this run before its first lap: graded
+# with FVG_KNOBS="incarn_poison_unexposed=1 dialloc_held_skip=1"
+# (tests/noino_gen0_ab.sh reads both back after each workload); a P-CR63-HELD
+# line after the mark in any node's stream FAILS the lap
+# (tests/final_verify_grade.sh class cr63held); the skip's lines are counted
+# per node as reach (hs_skip).  The fourth run's added rules (the FVG_KNOBS
+# read-back, ops_err, the stale-name guard's reach) are kept.  Every other
+# rule below is unchanged.
+# One queue per configuration, graded as one campaign
+# (tests/queues/final_verify_*.queue).  The workload is tests/noino_gen0_ab.sh
+# with the settings every A/B of these records used, and every guard knob set
+# to its module default (1) so the harness reads each back and reports each
+# fix's reach (NG0_RS1_SKIP, NG0_RECYCLE_SIDEREAD, NG0_UNLPREV_VERIFY,
+# NG0_FREE_ADOPT_CORE, NG0_IFREE_EXTEND, NG0_CR63_IGRAB_RETRY, NG0_UB1_SKIP);
+# no test delay, hold or bound override is set.
+#
+# WHAT IT COUNTS TOWARD: the churn regression laps that both
+# D-STALE-NAME-SETATTR-ADOPTS-PEER-REUSED-INCARNATION-CHANGES-UNRELATED-FILE
+# and
+# D-LOCAL-CREATE-RESETS-HELD-STALE-COPY-IN-PLACE-REMOVED-NAME-ACTS-ON-NEW-FILE
+# ask of their complete fixes (their same-build A/Bs -- lapq_snr and lapq_lch
+# in ~/src/mxfs-g, lapq_sop in ~/src/mxfs-b -- are graded by their own rules;
+# a lap of this campaign never stands in for an A/B).  A lap of this run that
+# fails is a regression of this build and is attributed before anything else.
+#
+# READING RULES (written before the first lap of any final_verify queue):
+#   A lap PASSES when its cold audit is CLEAN with errors=0, node_failures=0
+#   (every node's whole kernel stream after the lap's mark), no *RESULT line
+#   reads FAIL, and none of these appears after the mark in any node's
+#   stream: a P-DINO-CLOBBER#N line with regress >= 1 (any path, any shape),
+#   P-IFREE-DEFER-UNLANDED-FATAL, P-CR3-CANCEL, P53-IUNLINK-MISMATCH; nor
+#   P-FREE-LIVE-CORE in its chk_audit.log.  A lap that ends ABORT or overruns
+#   (rc=124) FAILS unless its own lines show a rig cause (host preflight, a
+#   configuration lock held by another group, a node that never booted),
+#   which is then recorded as that and the lap rerun.
+#   THE CAMPAIGN PASSES when every lap PASSES.  Each guard's reach summed over
+#   the campaign is stated with the result (CRESULT cr_deferred, WRESULT
+#   ww_refused, SRESULT rs_live_reuse, RRESULT found, ARESULT found, ERESULT
+#   found, GRESULT failed, BRESULT found/prevented, URESULT moved, NRESULT recycle_reset, and the base
+#   RESULT line's hf7_reset, fk_refused, sc_refused, pc_rel_waited); a record
+#   whose own rules require its guard's reach > 0 is closed only when that sum
+#   is > 0, else more laps are owed for it.
+#   One failing lap fails the campaign: its lines are attributed to their own
+#   record, new or existing, before anything else.
+#
+# Bound: the freed_nodelay laps' 1680 s per lap (they ran 404-597 s on 2 and 3
+# nodes).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_NR1_HONOR=1 tests/noino_gen0_ab.sh fb2t1 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_NR1_HONOR=1 tests/noino_gen0_ab.sh fb2t2 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_NR1_HONOR=1 tests/noino_gen0_ab.sh fb2t3 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_NR1_HONOR=1 tests/noino_gen0_ab.sh fb2t4 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_NR1_HONOR=1 tests/noino_gen0_ab.sh fb2t5 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_NR1_HONOR=1 tests/noino_gen0_ab.sh fb2t6 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_NR1_HONOR=1 tests/noino_gen0_ab.sh fb2t7 1 300 2/net/mesh/direct g2c
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_NR1_HONOR=1 tests/noino_gen0_ab.sh fb2t8 1 300 2/net/mesh/direct g2c

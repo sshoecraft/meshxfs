@@ -497,6 +497,18 @@ struct xfs_perag {
 	unsigned int		pag_resv_cool_next;
 	xfs_agino_t		pag_resv_cursor;
 	/*
+	 * D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349: reserve-ahead
+	 * (xfs_ialloc.c mxfs_resv_ahead_queue).  pag_resv_ahead_rec is the
+	 * inobt record whose free numbers were last requested ahead of the
+	 * allocator (NULLAGINO = none) and pag_resv_ahead_mask the offsets in
+	 * it requested so far; both reset when the allocator moves to another
+	 * record.  Search advice only, like the cooldown ring: a requested
+	 * number is held only once its grant lands, and the allocator's own
+	 * probe of it is still what claims it.
+	 */
+	xfs_agino_t		pag_resv_ahead_rec;
+	uint64_t		pag_resv_ahead_mask;
+	/*
 	 * (D-0351 containment, design-consult ruling
 	 * d0351-dialloc-containment-two-phase): DISK-LIVE quarantine.
 	 * aginos dialloc found FREE in the inobt but LIVE on the platter (a

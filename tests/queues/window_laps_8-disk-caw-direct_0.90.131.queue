@@ -1,0 +1,37 @@
+# Flake-window laps for 8/disk/caw/direct on the 0.90.131 release candidate
+# (main tree, mxfs.ko srcversion 92FBF2A83F12160EE95EA2E), on rig group g8
+# (test7..test14), before the release chain's board.
+#
+# Why: tools/criteria_window.py 8/disk/caw/direct owes laps_before_board=10 for
+# posix_multi, dirent_type_integrity, guard_census (newest genuine FAIL at
+# window index 0-2).  Each FAIL is attributed in an open record (posix_multi:
+# the reused-corpse lookup and the dead-shell revocation wait; dirent type:
+# the type-flip poison; the census inventory); these laps are the rig half of
+# those records' verification on the candidate, and they age the window.  A
+# lap that fails is attributed from its own lines first, never re-run to get a
+# pass.
+#
+# Bound per lap (tests/suite/manifest budgets): prep_cluster 300 +
+# posix_multi 30 + dirent_type_integrity 60 + guard_census 20 + chain overhead
+# outside the rows 160 (measured 130-160 s,
+# tests/queues/fence_return_kept_logs_netmesh_mpath.queue) = 570 s, plus
+# dirent_durability 240 + dirent_publish_integrity 60 = 870 s.
+#
+# dirent_type_integrity grades the kernel-log window dirent_durability opens
+# (MXFS_DIRENT_WINDOW, tests/suite/dirent_type_integrity.sh:56-99), so every
+# lap runs dirent_durability and dirent_publish_integrity before it, as the
+# board does (manifest rows 24, 28, 29).  The first launch of this queue
+# (label qw_8-disk-caw-direct, lap qw8d1_0.90.131) left dirent_durability out,
+# so its dirent_type_integrity verdict measured nothing; that queue was stopped
+# after lap 1 (its lap 2, qw8d2, was stopped in prep), and these laps (qw8e*,
+# queue label qw8e) follow it.
+870 tests/board_4node_chain.sh qw8e2_0.90.131 8/disk/caw/direct:posix_multi,dirent_durability,dirent_publish_integrity,dirent_type_integrity,guard_census@g8
+870 tests/board_4node_chain.sh qw8e3_0.90.131 8/disk/caw/direct:posix_multi,dirent_durability,dirent_publish_integrity,dirent_type_integrity,guard_census@g8
+870 tests/board_4node_chain.sh qw8e4_0.90.131 8/disk/caw/direct:posix_multi,dirent_durability,dirent_publish_integrity,dirent_type_integrity,guard_census@g8
+870 tests/board_4node_chain.sh qw8e5_0.90.131 8/disk/caw/direct:posix_multi,dirent_durability,dirent_publish_integrity,dirent_type_integrity,guard_census@g8
+870 tests/board_4node_chain.sh qw8e6_0.90.131 8/disk/caw/direct:posix_multi,dirent_durability,dirent_publish_integrity,dirent_type_integrity,guard_census@g8
+870 tests/board_4node_chain.sh qw8e7_0.90.131 8/disk/caw/direct:posix_multi,dirent_durability,dirent_publish_integrity,dirent_type_integrity,guard_census@g8
+870 tests/board_4node_chain.sh qw8e8_0.90.131 8/disk/caw/direct:posix_multi,dirent_durability,dirent_publish_integrity,dirent_type_integrity,guard_census@g8
+870 tests/board_4node_chain.sh qw8e9_0.90.131 8/disk/caw/direct:posix_multi,dirent_durability,dirent_publish_integrity,dirent_type_integrity,guard_census@g8
+870 tests/board_4node_chain.sh qw8e10_0.90.131 8/disk/caw/direct:posix_multi,dirent_durability,dirent_publish_integrity,dirent_type_integrity,guard_census@g8
+870 tests/board_4node_chain.sh qw8e11_0.90.131 8/disk/caw/direct:posix_multi,dirent_durability,dirent_publish_integrity,dirent_type_integrity,guard_census@g8

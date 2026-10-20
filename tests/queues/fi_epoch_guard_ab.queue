@@ -1,0 +1,25 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F6: the
+# unlinker's inactivation trusts its in-core image under a fresh EX even when
+# its grant was lost since the unlink, so after a peer (the file's last closer)
+# freed the life it stages and publishes the dead live image over the free.
+# Same-build A/B of inact_local_epoch_guard (NG0_INACT_GUARD), arms
+# interleaved so rig drift lands on both: 0 = control (fast path kept, the
+# platter read only reported), 1 = fix.  The noino churn/lookup workload,
+# production no-inode guard, NG0_DELAY_MS=200 (the arm that audited CORRUPT in
+# ng0nc1 and ng0rf1).  Graded by the cold audit; the reach is
+# inact_moved/inact_peerfreed and the P-INACT-LOCAL-EPOCH verdicts.
+# Bound per lap, the sum of the harness's own step bounds: prep_cluster 300 +
+# workload SECS+60 = 360 + counters 2x40 + knob reset 2x20 + chk_clean with
+# alloc_witness 150 + stream capture 2x120 + snapshot 60 = 1230 s.
+1230 NG0_INACT_GUARD=0 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh egc1 1 300 2/net/mesh/mpath g2
+1230 NG0_INACT_GUARD=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh egf1 1 300 2/net/mesh/mpath g2
+1230 NG0_INACT_GUARD=0 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh egc2 1 300 2/net/mesh/mpath g2
+1230 NG0_INACT_GUARD=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh egf2 1 300 2/net/mesh/mpath g2
+1230 NG0_INACT_GUARD=0 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh egc3 1 300 2/net/mesh/mpath g2
+1230 NG0_INACT_GUARD=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh egf3 1 300 2/net/mesh/mpath g2
+1230 NG0_INACT_GUARD=0 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh egc4 1 300 2/net/mesh/mpath g2
+1230 NG0_INACT_GUARD=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh egf4 1 300 2/net/mesh/mpath g2
+1230 NG0_INACT_GUARD=0 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh egc5 1 300 2/net/mesh/mpath g2
+1230 NG0_INACT_GUARD=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh egf5 1 300 2/net/mesh/mpath g2
+1230 NG0_INACT_GUARD=0 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh egc6 1 300 2/net/mesh/mpath g2
+1230 NG0_INACT_GUARD=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh egf6 1 300 2/net/mesh/mpath g2

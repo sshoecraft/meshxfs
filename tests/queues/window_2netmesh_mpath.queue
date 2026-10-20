@@ -1,0 +1,28 @@
+# Flake-window laps for 2/net/mesh/mpath on g2d (test31 test32), run from the
+# main tree on the module the release chain will build (the chain's clean build
+# must report the srcversion these laps ran, or they count for nothing).
+#
+# Window indexes of the newest genuine FAIL (11-run window, tools/criteria.py),
+# read 2026-10-20 16:05Z:
+#   fence_during_write  k=0 (15:27Z, D-ALLOC-WITNESS-PEER-MKDIR-ESTALE-ON-
+#                       POISONED-CACHED-DIR-4CAW): 11 more runs
+#   fio_perf_vs_xfs     k=1 (14:24Z): 10 more runs
+#   alloc_witness       k=2 (10:44Z): 9 more runs
+#   chk_clean           k=2 (10:45Z): 9 more runs
+# These 10 laps and the chain's board cover all four.  fio_perf runs before
+# fio_perf_vs_xfs, which grades it against the native-XFS yardstick.
+#
+# Bound per lap: prep_cluster 300 s + fence_during_write 60 s + fio_perf 120 s
+# + fio_perf_vs_xfs 10 s + alloc_witness 120 s + chk_clean 180 s
+# (tests/suite/manifest) + the chain's overhead outside the rows, measured
+# about 60 s = 850 s.
+850 tests/board_4node_chain.sh wm1_r131 2/net/mesh/mpath:fence_during_write,fio_perf,fio_perf_vs_xfs,alloc_witness,chk_clean@g2d
+850 tests/board_4node_chain.sh wm2_r131 2/net/mesh/mpath:fence_during_write,fio_perf,fio_perf_vs_xfs,alloc_witness,chk_clean@g2d
+850 tests/board_4node_chain.sh wm3_r131 2/net/mesh/mpath:fence_during_write,fio_perf,fio_perf_vs_xfs,alloc_witness,chk_clean@g2d
+850 tests/board_4node_chain.sh wm4_r131 2/net/mesh/mpath:fence_during_write,fio_perf,fio_perf_vs_xfs,alloc_witness,chk_clean@g2d
+850 tests/board_4node_chain.sh wm5_r131 2/net/mesh/mpath:fence_during_write,fio_perf,fio_perf_vs_xfs,alloc_witness,chk_clean@g2d
+850 tests/board_4node_chain.sh wm6_r131 2/net/mesh/mpath:fence_during_write,fio_perf,fio_perf_vs_xfs,alloc_witness,chk_clean@g2d
+850 tests/board_4node_chain.sh wm7_r131 2/net/mesh/mpath:fence_during_write,fio_perf,fio_perf_vs_xfs,alloc_witness,chk_clean@g2d
+850 tests/board_4node_chain.sh wm8_r131 2/net/mesh/mpath:fence_during_write,fio_perf,fio_perf_vs_xfs,alloc_witness,chk_clean@g2d
+850 tests/board_4node_chain.sh wm9_r131 2/net/mesh/mpath:fence_during_write,fio_perf,fio_perf_vs_xfs,alloc_witness,chk_clean@g2d
+850 tests/board_4node_chain.sh wm10_r131 2/net/mesh/mpath:fence_during_write,fio_perf,fio_perf_vs_xfs,alloc_witness,chk_clean@g2d

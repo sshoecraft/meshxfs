@@ -1,0 +1,37 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, the final
+# verification on the build that carries every fix at its default, including
+# H-U7's: the eight laps of tests/queues/peer_open_unlinked_final.queue (its
+# VERDICT RULES apply unchanged, over all eight laps) split by transport into
+# this file (the three 2/disk/caw/direct laps) and
+# tests/queues/peer_open_unlinked_final_g_tcp.queue (the five 2/net/mesh/direct
+# laps), so the TCP laps never take run.sh's 2/net/mesh/direct configuration
+# lock while tests/queues/peer_open_unlinked_hu6_verify.queue holds it on g2c.
+#
+# WHY A NEW RUN.  The previous run (pof/pof2, build 311877C431E1BB444562804)
+# reproduced the record in pfcw1 (2/disk/caw/direct, both window openers on):
+# the peer's free of y used an in-core next pointer a judged-identical reload
+# had kept stale (H-U7), BACKREF -22 and a forced shutdown.  H-U7's same-build
+# A/B (tests/queues/peer_open_unlinked_hu7_ab.queue, ~/src/mxfs-e) is judged at
+# its QUEUE DONE; this run is the record's own question on the build with its
+# change (reload_next_refresh, default 1) at the default.
+#
+# Build: main tree ~/src/mxfs srcversion F09C3FED2DB371E0D9A8BC5 (0.90.131).  Its
+# fixes for this record, each at its default and none set by the harness:
+# freshsrc_iunl_overlay (H-U3), unlprev_tenure (H-U4), b6_release_drain (H-U5),
+# unlprev_pin (H-U1), unlprev_rele_defer (H-U6), reload_next_refresh (H-U7).
+# It also carries D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY's
+# ifree_defer_drain, ifree_defer_reap and reap_transient_keep, and an instrument
+# of D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT's publish
+# drain (no behaviour change).
+#
+# VERDICT RULES: tests/queues/peer_open_unlinked_final.queue's, unchanged, over
+# the eight laps of both files, plus (written before the first lap) H-U7's own
+# line: next_stale_r0 0 in every lap (no reload kept a stale next pointer
+# unrefreshed).  A lap's nextwr_stale is judged through
+# tools/nextwr_stale_attribution.py <lap dir>: an OWN-FREE-RESET line is the
+# detector's known keying gap, an UNEXPLAINED line is the record's finding.
+#
+# Bounds: the final queue's (plain 2157 s, forced 2257 s).
+2157 MXFS_SNAPSHOT_DIR=/mxfs/snapshots tests/peer_open_unlinked_chain.sh pgc1 30 2/disk/caw/direct g2d
+2257 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600" tests/peer_open_unlinked_chain.sh pgcw1 30 2/disk/caw/direct g2d
+2157 MXFS_SNAPSHOT_DIR=/mxfs/snapshots tests/peer_open_unlinked_chain.sh pgc2 30 2/disk/caw/direct g2d

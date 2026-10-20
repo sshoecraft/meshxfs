@@ -195,8 +195,21 @@ cqval(){ # <chunk line> <key>
 # chk_clean VACUOUS.  The same row passed on a young filesystem (s168a).
 # So before the counters are cleared, each node creates files in a private
 # directory until the witness shows its affine AG carve a chunk: the free
-# reserve is then gone and phase 1's creates must carve.  Bounded by FILL_MAX;
-# never reaching a carve inside it is a failure with its own reason, not a pass.
+# reserve is then gone and phase 1's creates must carve.  Bounded by time,
+# FILL_S; never reaching a carve inside it is a failure with its own reason,
+# not a pass.
+#
+# The bound is time, not a count of creates.  How many free inodes a
+# partition holds depends on what the earlier rows deleted, and a clustered
+# mount keeps every fully free chunk (see the header), so no fixed count bounds
+# it.  Measured 2/net/mesh/mpath, 0.90.131, run 20261020T094530Z-g2d: rank 2's
+# affine AG held about 15.5k free inodes, the fill was bounded at 8192
+# creates, and it aborted the row with every one of its creates done.  What
+# the fill may spend comes from the row's budget (120 s,
+# tests/criteria/TIMEOUT_BUDGETS.md): its other phases' expected wall is
+# about 58 s, which leaves the fill 60 s; a fill that cannot carve in that
+# time is a create rate too slow for the budget, and its reason says so with
+# the count and the time.
 #
 # The carve is counted over the node's whole partition (agno mod stride ==
 # slot mod stride, the model the verdict half grades), never over AG slot
@@ -214,7 +227,7 @@ cqval(){ # <chunk line> <key>
 # first run had made, and own_ag and overlap failed; the occupant list read
 # back at the end would also have taken in the earlier run's u<i> files.
 D="$MNT/alloc_witness/$RUN_ID"
-FILL_MAX="${AW_FILL_MAX:-8192}"
+FILL_S="${AW_FILL_S:-60}"
 W0=$(cat "$WIT" 2>/dev/null)
 AFF=$(( $(field "$W0" slot) % $(field "$W0" agcount) ))
 FSTRIDE=$(field "$W0" stride)
@@ -232,8 +245,8 @@ partcarves(){ # <witness text>: carves summed over this node's partition
 [ "$RANK" = 1 ] && { mkdir -p "$D/shared" 2>/dev/null; sync -f "$MNT" 2>/dev/null; }
 mkdir -p "$D/fill_r$RANK" || fail_out "fill_mkdir=failed rank=$RANK" "mkdir of the node's fill directory failed"
 echo 1 > "$WIT" 2>/dev/null || fail_out "clear=failed rank=$RANK" "the witness counters could not be cleared before the fill"
-fill=0; fcarved=0; fstart=$(date +%s%N)
-while [ "$fill" -lt "$FILL_MAX" ]; do
+fill=0; fcarved=0; fstart=$(date +%s%N); fdeadline=$(( $(date +%s) + FILL_S ))
+while :; do
     j=0
     while [ "$j" -lt 64 ]; do
         : > "$D/fill_r$RANK/x$fill" || fail_out "fill_create=failed i=$fill rank=$RANK" "a create in the node's fill directory failed"
@@ -241,8 +254,9 @@ while [ "$fill" -lt "$FILL_MAX" ]; do
     done
     fcarved=$(partcarves "$(cat "$WIT" 2>/dev/null)")
     [ "${fcarved:-0}" -ge 1 ] && break
+    [ "$(date +%s)" -lt "$fdeadline" ] || break
 done
-[ "${fcarved:-0}" -ge 1 ] || fail_out "fill=exhausted files=$fill affine_ag=$AFF stride=$FSTRIDE rank=$RANK" "$fill creates in the node's AG partition never carved a chunk; the free reserve could not be exhausted inside AW_FILL_MAX"
+[ "${fcarved:-0}" -ge 1 ] || fail_out "fill=timeout files=$fill fill_s=$FILL_S affine_ag=$AFF stride=$FSTRIDE rank=$RANK" "$fill creates in $FILL_S s in the node's AG partition never carved a chunk; the free reserve outlasted the time the row's budget leaves the fill"
 # The carve came somewhere inside the last batch of 64, so the chunk it made
 # still holds as many free inodes as the AG had before the fill (0-63, left by
 # earlier rows).  Those are created now, until the live inobt record of the

@@ -1,0 +1,45 @@
+# H-IFD1 A/B for D-IFREE-DEFER-UNLANDED-FATAL-SHUTDOWN-BEHIND-LOCKED-CLUSTER-
+# BUFFER on 2/disk/caw/mpath g2d (test31 test32), the configuration of iub3 and
+# ifd2, where two of the seven laps of 2026-10-18 shut a node down on it.  Same
+# build for both arms: ~/src/mxfs-g (srcversion recorded on the defect when the
+# queue starts), the main tree's sources (every fix at its default, H-FA1 in)
+# plus H-IFD1: when the deferred free's bounded drain (the H-1 block in
+# xfs_inactive) runs out with the cached mode not EX, mxfs_ifree_defer_extend_drain
+# prints P-IFREE-DEFER-EXTENDED (the item's state at the bound) and, with module
+# knob ifree_defer_extend=1, keeps draining without a bound
+# (mxfs_ail_drain_inode_sync), failing closed only if the state still owes
+# home after the item lands; 0 fails closed at the bound as before.  Run from
+# ~/src/mxfs-g.  Every other setting is exactly
+# tests/queues/ifree_defer_holder_mpath.queue's (production settings: both
+# test delays off); NG0_IFREE_EXTEND alternates 0 (control) and 1 (fix), and
+# NG0_IFREE_BOUND_MS=50 sets the test knob dbg_ifree_defer_bound_ms for the
+# workload in both arms, so the bound runs out in most laps: of the 355
+# deferred-free drains on g2d that day, 59 took more than 50 ms and 4 more
+# than 200 ms (P-IFREE-DEFER-DIRTY ms=).
+#
+# READING RULES (written before the first lap):
+#   ERESULT grades each lap (tests/noino_gen0_ab.sh, THE H-IFD1 FIX).  A lap
+#   whose ifree_defer_extended is 0 on every node is EVACUOUS and counts for
+#   neither arm.
+#   THE CONTROL SHOWS THE CAUSE when a control lap is ECONTROL-SHOWS-CAUSE: a
+#   P-IFREE-DEFER-UNLANDED-FATAL after a P-IFREE-DEFER-EXTENDED landed=0 line
+#   for the same inode, and the node shut down from that arm.
+#   THE FIX IS VERIFIED (for this window) when at least three fix laps are
+#   EPASS: ifree_defer_extended > 0, every P-IFREE-DEFER-EXTENDED line
+#   landed=1, no P-IFREE-DEFER-UNLANDED-FATAL, no node failure, cold audit
+#   CLEAN.  Read every extended line's ms= (the extra wait is a cost this
+#   record must also state).
+#   H-IFD1 IS REFUTED by an extended drain that does not land (a
+#   P113-DRAIN-WEDGE for the inode with no P113-DRAIN-WEDGE-END, or a fix lap
+#   that overruns its bound), or by a fix lap that shuts down from this arm.
+#   Any other node failure, CORRUPT shape, stall or ABORT is attributed from
+#   its own lines to its own record.  The production-bound laps (no
+#   NG0_IFREE_BOUND_MS) follow on the final build before the record is closed.
+#
+# Bound: the freed_nodelay laps' 1680 s per lap (they ran 404-597 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_IFREE_EXTEND=0 NG0_IFREE_BOUND_MS=50 tests/noino_gen0_ab.sh ixd1 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_IFREE_EXTEND=1 NG0_IFREE_BOUND_MS=50 tests/noino_gen0_ab.sh ixd2 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_IFREE_EXTEND=0 NG0_IFREE_BOUND_MS=50 tests/noino_gen0_ab.sh ixd3 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_IFREE_EXTEND=1 NG0_IFREE_BOUND_MS=50 tests/noino_gen0_ab.sh ixd4 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_IFREE_EXTEND=1 NG0_IFREE_BOUND_MS=50 tests/noino_gen0_ab.sh ixd5 1 300 2/disk/caw/mpath g2d
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_IFREE_EXTEND=1 NG0_IFREE_BOUND_MS=50 tests/noino_gen0_ab.sh ixd6 1 300 2/disk/caw/mpath g2d

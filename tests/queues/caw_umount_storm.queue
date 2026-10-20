@@ -1,0 +1,32 @@
+# D-CAWMPATH-UMOUNT-RELEASE-ALL-CAW-HELD-57S-BOTH-NODES, H-CAW2: a write storm on
+# the lab host's root filesystem (the ext4 that also carries every pool LUN
+# file, data=ordered) holds a two-node CAW cluster's unmount because the LUN's
+# target threads wait in ext4/jbd2 for their O_DIRECT READ16/WRITE16, not in
+# SCST's CAW serialisation.  tests/caw_umount_storm.sh reproduces the incident's
+# shape (both nodes mounted on 2/disk/caw/mpath holding many grants, the storm,
+# both unmount at once) and samples the LUN's target threads and the root jbd2
+# thread at 10 Hz; its header carries the predictions, written before any run.
+# Run order from the record: storm=0 once, then storm=1 three times.  Runs from
+# the main tree (A7E5F619C93D6F05C21A1CB) on g2b with NO other lap on the host:
+# the storm slows every LUN on it.
+#
+# VERDICT RULES (written before the first lap):
+#   BASELINE      the storm=0 lap's unmounts both finish in < 10 s; if not, the
+#                 unmount is slow without a storm and that is the finding.
+#   SUPPORTED     a storm=1 lap with an unmount > 30 s whose target-thread
+#                 samples in D carry ext4/jbd2 frames (start_this_handle,
+#                 jbd2_log_wait_commit, __jbd2_log_wait_for_space,
+#                 file_update_time, ext4_dirty_inode, or an i_rwsem wait) while
+#                 the jbd2 thread is sampled in D flushing ordered data.
+#   REFUTED       all three storm=1 laps with every unmount < 10 s, or a > 30 s
+#                 unmount whose target threads show no such wait (then the hold
+#                 is elsewhere: read the node-side inflight samples and the
+#                 unmount stacks).
+#   OTHER         an unmount between 10 and 30 s is recorded with its stacks and
+#                 judges nothing; an ABORT has no verdict and is rerun.
+#
+# Bound per lap: the script's own derivation, 720 s.
+720 tests/caw_umount_storm.sh cus0 0 2/disk/caw/mpath g2b
+720 tests/caw_umount_storm.sh cus1 1 2/disk/caw/mpath g2b
+720 tests/caw_umount_storm.sh cus2 1 2/disk/caw/mpath g2b
+720 tests/caw_umount_storm.sh cus3 1 2/disk/caw/mpath g2b

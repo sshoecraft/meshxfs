@@ -186,6 +186,32 @@ if [ -f /src/mxfs/tools/mxfs_lu_reset_witness.py ]; then
 else
     echo "WARN: /src/mxfs/tools/mxfs_lu_reset_witness.py is not readable here — no LU-reset witness helper installed"
 fi
+# The fenced-path reset helper (pal/linux/kern.c fenced_path_reset_helper's
+# default path): run when the cluster fences this node, it drops the node's
+# own iSCSI connections so the writes the fence aborted without an answer
+# return at once instead of after three expiries of the command timeout.
+# Node-local for the same reason as the witness above.
+FPR_HELPER=/usr/sbin/mxfs_fenced_path_reset.sh
+if [ -f /src/mxfs/tools/mxfs_fenced_path_reset.sh ] &&
+   cp -f /src/mxfs/tools/mxfs_fenced_path_reset.sh "$FPR_HELPER" 2>/dev/null; then
+    chmod 755 "$FPR_HELPER"
+    echo "MXFS_FPR_HELPER path=$FPR_HELPER md5=$(md5sum "$FPR_HELPER" 2>/dev/null | awk '{print $1}')"
+else
+    echo "WARN: could not install $FPR_HELPER — a fenced node here holds the writes its fence aborted until the initiator's timeout ladder ends"
+fi
+# The reset-notice udev rule (packaging/61-mxfs-stranded-path.rules): it tells
+# the module when another initiator resets the shared logical unit, so the
+# commands that reset left unanswered are aborted and retried at once
+# (pal/linux/kern.c scsi_reset_seen) instead of holding the whole device for
+# three expiries of the command timeout.
+SRA_RULE=/etc/udev/rules.d/61-mxfs-stranded-path.rules
+if [ -f /src/mxfs/packaging/61-mxfs-stranded-path.rules ] &&
+   cp -f /src/mxfs/packaging/61-mxfs-stranded-path.rules "$SRA_RULE" 2>/dev/null &&
+   udevadm control --reload-rules 2>/dev/null; then
+    echo "MXFS_SRA_RULE path=$SRA_RULE md5=$(md5sum "$SRA_RULE" 2>/dev/null | awk '{print $1}')"
+else
+    echo "WARN: could not install $SRA_RULE — a reset another node issues leaves this node's unanswered commands to the initiator's timeout ladder"
+fi
 [ "$KEEP" = 1 ] && MODULE_SOURCE_LOAD=kept || MODULE_SOURCE_LOAD=$MODULE_SOURCE
 case "$MODULE_SOURCE_LOAD" in
     kept) ;;

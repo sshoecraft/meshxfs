@@ -194,6 +194,17 @@ mkdir -p "$OUT"
 # ABORT, never a count of zero.  A node's kernel log is always taken from the
 # lap marker, so the marker line IS its shape.
 . "$(dirname "$0")/lib/rig.sh"
+# The pool shuts off a VM nobody holds (tools/vm_pool.sh): the release helper
+# a prep's run.sh leaves behind powered test3..test6 down 10 min after the
+# prep, in the middle of a queue of these laps (cbr1b, 0.90.131: W's read cut
+# by 'Connection to test4 closed by remote host').  So this lap holds H, W and
+# LHW_HOLD (the cluster's other mounted members, space-separated) for its
+# lifetime (comma-separated: a queue line cannot carry a quoted space); a
+# member shut off mid-lap would be a peer death, not this lap.
+. "$(dirname "$0")/lib/runlock.sh"
+LHW_HOLD=${LHW_HOLD:-}
+vmhold_take "live_holder_wait $LABEL" "$H" "$W" ${LHW_HOLD//,/ } \
+    || { echo "ABORT: could not hold $H $W ${LHW_HOLD//,/ }"; exit 2; }
 fails=0
 # ck: tests/lib/rig.sh (sourced above) provides it, and its version ABORTs on an EMPTY value instead of printing a FAIL about MXFS
 hd() { rsx 20 "$1" "dmesg | sed -n \"/$MARK/,\\\$p\""; }
@@ -240,6 +251,38 @@ done
 # P-LKWAIT-LIVE past the 480 s cap).  Everything else scores the same.
 CAW=0; [ "${ncaw:-0}" = 2 ] && CAW=1
 echo "  INFO transport=$([ $CAW = 1 ] && echo caw || echo tcp)"
+# LHW_CAW_BACKOFF=0|1 (CAW laps; D-CAW-WAITER-NOTIFIES-A-DRAINING-HOLDER-13-
+# TIMES-A-SECOND): writes caw_bast_resend_backoff on both nodes and reads it
+# back.  The score then reports the waiter's hint count and cadence (its last
+# P-ACQ-STUCK hints= hint_ms=) and the holder's notification rate over the
+# drain, and on the backed-off arm checks the cadence reached its cap and the
+# hint count stayed inside its derived budget.
+LHW_CAW_BACKOFF=${LHW_CAW_BACKOFF:-}
+case "$LHW_CAW_BACKOFF" in ''|0|1) ;; *) echo "ABORT: LHW_CAW_BACKOFF must be 0 or 1"; exit 2;; esac
+if [ -n "$LHW_CAW_BACKOFF" ]; then
+    [ "$CAW" = 1 ] || { echo "ABORT: LHW_CAW_BACKOFF needs the CAW lap (both nodes force_transport=0)"; exit 2; }
+    for n in "$H" "$W"; do
+        g=$(timeout 15 $SSH "$n" "echo $LHW_CAW_BACKOFF > $P/caw_bast_resend_backoff && cat $P/caw_bast_resend_backoff" 2>/dev/null | filt | tr -dc '0-9')
+        [ "$g" = "$LHW_CAW_BACKOFF" ] || { echo "ABORT: $n caw_bast_resend_backoff read '$g', not $LHW_CAW_BACKOFF (a build without the knob?)"; exit 2; }
+    done
+    echo "  INFO caw_bast_resend_backoff=$LHW_CAW_BACKOFF on $H $W"
+fi
+# LHW_CAW_POLLBACK=0|1 (CAW laps, the same record's holder side): writes
+# caw_poll_resubmit_backoff on both nodes and reads it back.  The score then
+# reports what the holder's own disk poll submitted and held back over the
+# lap (the poll_submitted / poll_held_back fields of its first and last
+# P265-BASTQ-STATS after the mark, printed every 10 s), next to the holder's
+# notification rate.
+LHW_CAW_POLLBACK=${LHW_CAW_POLLBACK:-}
+case "$LHW_CAW_POLLBACK" in ''|0|1) ;; *) echo "ABORT: LHW_CAW_POLLBACK must be 0 or 1"; exit 2;; esac
+if [ -n "$LHW_CAW_POLLBACK" ]; then
+    [ "$CAW" = 1 ] || { echo "ABORT: LHW_CAW_POLLBACK needs the CAW lap (both nodes force_transport=0)"; exit 2; }
+    for n in "$H" "$W"; do
+        g=$(timeout 15 $SSH "$n" "echo $LHW_CAW_POLLBACK > $P/caw_poll_resubmit_backoff && cat $P/caw_poll_resubmit_backoff" 2>/dev/null | filt | tr -dc '0-9')
+        [ "$g" = "$LHW_CAW_POLLBACK" ] || { echo "ABORT: $n caw_poll_resubmit_backoff read '$g', not $LHW_CAW_POLLBACK (a build without the knob?)"; exit 2; }
+    done
+    echo "  INFO caw_poll_resubmit_backoff=$LHW_CAW_POLLBACK on $H $W"
+fi
 if [ "$GAP_MS" -gt 0 ]; then
     g=$(timeout 15 $SSH "$W" "test -w $P/dl_acq_gap_ino && test -w $P/dl_acq_gap_ms && echo 1 || echo 0" 2>/dev/null | filt | tr -dc '0-9')
     [ "${g:-0}" = "1" ] || { echo "ABORT: $W has no writable dl_acq_gap_ino/dl_acq_gap_ms knob (build older than 0.84.0)"; exit 2; }
@@ -855,6 +898,35 @@ fi
 # the pause, plus 5 for the opening fire and ordinary jitter.
 if [ "$CAW" = 1 ]; then
     echo "  INFO master-side notification budget not scored on CAW (no lock master; P7S-BAST-FIRE H=$(grep -ac "P7S-BAST-FIRE ino=$ino " "$OUT/dmesg_$H.txt") W=$(grep -ac "P7S-BAST-FIRE ino=$ino " "$OUT/dmesg_$W.txt"); holder P7B-BASTNOTIFY=$(grep -ac "P7B-BASTNOTIFY ino=$ino " "$OUT/dmesg_$H.txt"))"
+    if [ -n "$LHW_CAW_POLLBACK" ]; then
+        pq() { grep -a 'P265-BASTQ-STATS ' "$OUT/dmesg_$H.txt" | "$1" -1; }
+        pf() { echo "$1" | grep -o " $2=[0-9]*" | cut -d= -f2; }
+        pt() { echo "$1" | sed -n 's/^\[ *\([0-9]*\)\..*/\1/p'; }
+        q0=$(pq head); q1=$(pq tail)
+        ps0=$(pf "$q0" poll_submitted); ps1=$(pf "$q1" poll_submitted)
+        ph0=$(pf "$q0" poll_held_back); ph1=$(pf "$q1" poll_held_back)
+        tq0=$(pt "$q0"); tq1=$(pt "$q1")
+        qs=$(( ${tq1:-0} - ${tq0:-0} ))
+        echo "  INFO CAW holder poll: pollback=$LHW_CAW_POLLBACK; $H poll_submitted +$(( ${ps1:-0} - ${ps0:-0} )) poll_held_back +$(( ${ph1:-0} - ${ph0:-0} )) between its first and last P265-BASTQ-STATS of the lap (${qs:-?} s)"
+        ck "the holder's P265-BASTQ-STATS carry the poll counters (two lines after the mark)" "$([ -n "$ps0" ] && [ -n "$ps1" ] && [ "$q0" != "$q1" ] && echo 1 || echo 0)" "1"
+    fi
+    if [ -n "$LHW_CAW_BACKOFF$LHW_CAW_POLLBACK" ]; then
+        recv=$(grep -ac "P7B-BASTNOTIFY ino=$ino " "$OUT/dmesg_$H.txt")
+        st=$(grep -a "P-ACQ-STUCK ino=$ino " "$OUT/dmesg_$W.txt" | tail -1)
+        hints=$(echo "$st" | grep -o ' hints=[0-9]*' | cut -d= -f2)
+        hms=$(echo "$st" | grep -o ' hint_ms=[0-9]*' | cut -d= -f2)
+        sel=$(echo "$st" | grep -o ' el_ms=[0-9]*' | cut -d= -f2)
+        ps=$(( PAUSE_MS / 1000 ))
+        echo "  INFO CAW hint cadence: backoff=$LHW_CAW_BACKOFF; W's last P-ACQ-STUCK el_ms=${sel:-none} hints=${hints:-none} hint_ms=${hms:-none}; holder $H P7B-BASTNOTIFY ino=$ino = $recv over a ${ps} s drain ($(awk -v r="$recv" -v s="$ps" 'BEGIN { printf "%.2f", r / s }')/s)"
+        ck "the waiter's last P-ACQ-STUCK reports its hint count" "$([ -n "$hints" ] && echo 1 || echo 0)" "1"
+        if [ "$LHW_CAW_BACKOFF" = 1 ]; then
+            # derived: 30 hints in the first 3 s at 100 ms, three doubling steps
+            # (200, 400, 800 ms: 1.4 s), then one a second, plus 5 for jitter
+            hb=$(( ${sel:-0} / 1000 + 34 ))
+            ck "the backed-off wait's hint interval reached its 1000 ms cap" "${hms:-none}" "1000"
+            ck "the backed-off wait sent no more hints than its derived budget ($hb)" "$([ "${hints:-999999}" -le "$hb" ] && echo 1 || echo 0)" "1"
+        fi
+    fi
 else
 MNODE=$([ "$MLOC" = "remote" ] && echo "$H" || echo "$W")
 OTHER=$([ "$MLOC" = "remote" ] && echo "$W" || echo "$H")

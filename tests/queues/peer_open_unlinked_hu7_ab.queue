@@ -1,0 +1,71 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, H-U7.
+# Run from ~/src/mxfs-e: the main tree's source (D-INACT's H-3 and the H-U6
+# census rewrite included) plus, in xfs/xfs_mxfs_reload.c
+# mxfs_reload_kept_next, the instrument and the change: on a reload that keeps
+# the in-core inode (judged identical to the platter, or kept ahead of it), an
+# unlinked inode of the same life (both nlink 0, same generation, mode set)
+# whose dinode names another di_next_unlinked than i_next_unlinked is counted
+# (reload_next_stale) and logged (P-RELOAD-NEXT-STALE incore_next disk_next
+# kept_ahead refreshed), and with reload_next_refresh=1 its next pointer is
+# imported from the dinode (reload_next_refreshed).  The harness reads both
+# counters and counts the lines per node, plus sig_next: the P-UNLREM-BACKREF
+# lines whose inode and next pointer an earlier refreshed=0 line of the same
+# node named as the kept in-core next.
+#
+# WHY.  pof2's pfcw1 (2/disk/caw/direct g2d, every fix at its default, close
+# drops 20, dbg_ifree_midlist_delay_ms=600) reproduced the record: the owner
+# removed z (0x81) with y (0x82) its predecessor under y's EX, landed y's slot
+# with next=NULL and released; the peer's next reload of y said
+# P-RELOAD-IDENTICAL (cc=10), its in-core next still 0x81 from its last full
+# adopt, and its free of y failed P-UNLREM-BACKREF next=0x81 rc=-22 and shut it
+# down.  The identical test compares none of the fields an iunlink-item edit
+# moves, and a kept reload skips xfs_inode_from_disk.
+#
+# H-U7 (the record): a peer's tenure-held edit of an unlinked inode's
+# di_next_unlinked lands on the platter, and this node's next reload of that
+# inode keeps its in-core next naming the removed successor; its own free of
+# the inode then stitches the bucket or backref to a freed inode: BACKREF -22.
+#
+# Arms, both with PUC_CLOSE_DROPS=20 and dbg_ifree_midlist_delay_ms=600
+# (pfcw1's settings), 30 iterations, 2/disk/caw/direct g2d (test31 owner,
+# test32 peer); every other knob at its module default:
+#   C  reload_next_refresh=0   h7c1 h7c2 h7c3
+#   F  reload_next_refresh=1   h7f1 h7f2 h7f3
+# alternating, control first.
+#
+# MEASURES, per lap, from the RESULT line: next_stale / next_refreshed (the
+# counters, both nodes summed), next_stale_r0 / next_stale_r1 (the lines),
+# sig_next, backref, noprev, ifree_error, node_failures, late, ok, audit.
+#
+# VERDICT RULES (written before the first lap):
+#   A lap that ABORTs, or audits STALE/NONE without a reproduction, has no
+#   verdict and is rerun.  A NOPREV or -117 failure in either arm is a different
+#   exit (H-U1, H-U3) and is attributed from the lap's logs before anything
+#   below is judged.  A late=1 reproduction is attributed from the second
+#   capture (<node>_post_new.txt), which sig_next does not read.
+#   REACH: next_stale > 0.  A lap with next_stale 0 did not reach and judges
+#   nothing.
+#   CONTROL, reached: SHOWS THE CAUSE if REPRODUCED with backref >= 1 and
+#     sig_next == backref (every BACKREF used the next pointer a kept reload had
+#     left stale); CLEAN-REACHED if it PASSes (a stale next was kept but no free
+#     used it).  REPRODUCED with sig_next < backref: a BACKREF this instrument
+#     does not explain -- H-U7 REFUTED as the record's whole cause.
+#   FIX, reached: PASS if the lap PASSes (ok=30, owner and peer rc 0, backref 0,
+#     noprev 0, ifree_error 0, node_failures 0, late 0, cold audit CLEAN
+#     errors=0) with next_refreshed > 0 and next_stale_r0 == 0.
+#   H-U7 SUPPORTED AND FIXED: at least one control lap SHOWS THE CAUSE and at
+#     least two reached fix laps PASS, with no reached fix lap failing.
+#   H-U7 REFUTED: a reached fix lap that REPRODUCES (BACKREF, -22) -- a new
+#     hypothesis, not a patch on this one; or a control BACKREF with sig_next
+#     short of it, as above.
+#   WEAK: the controls reach but none SHOWS THE CAUSE: more control laps on the
+#     same build, judged by these rules.
+#
+# Bound per lap: pfcw1's derivation in tests/queues/peer_open_unlinked_final.queue
+# (2257 s with one PUC_KNOBS knob) plus the second knob, 2 x 20 = 2297 s.
+2297 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600 reload_next_refresh=0" tests/peer_open_unlinked_chain.sh h7c1 30 2/disk/caw/direct g2d
+2297 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600 reload_next_refresh=1" tests/peer_open_unlinked_chain.sh h7f1 30 2/disk/caw/direct g2d
+2297 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600 reload_next_refresh=0" tests/peer_open_unlinked_chain.sh h7c2 30 2/disk/caw/direct g2d
+2297 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600 reload_next_refresh=1" tests/peer_open_unlinked_chain.sh h7f2 30 2/disk/caw/direct g2d
+2297 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600 reload_next_refresh=0" tests/peer_open_unlinked_chain.sh h7c3 30 2/disk/caw/direct g2d
+2297 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600 reload_next_refresh=1" tests/peer_open_unlinked_chain.sh h7f3 30 2/disk/caw/direct g2d

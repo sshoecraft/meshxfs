@@ -33,6 +33,7 @@ struct mxfs_tauth_store {
     uint64_t        size;
     uint32_t        npages;         /* from the region header (v2 geometry) */
     uint64_t        hash_seed;      /* from the region header */
+    uint16_t        hash_version;   /* from the region header: the routing */
     uint32_t        fs_gen;
     uint8_t         fs_uuid[16];
     uint32_t        local_node;     /* stamped into page headers */
@@ -74,19 +75,25 @@ struct mxfs_tauth_store {
      */
     bool            fua_durable;
     /*
-     * Commit a single page in ONE swap that compares the spare's sector 0 and
+     * Commit a single page in ONE swap that compares the spare copy and
      * writes the whole image (mxfs_pal_bdev_compare_and_write_span), instead
-     * of ticket swap, body and publish swap.  The ticket exists because a
-     * SCSI COMPARE AND WRITE covers sector 0 alone, so the body has to land
-     * outside any swap and the copy has to read as invalid meanwhile; where
-     * every swap is emulated (the DRBD attachment), one swap covers the page,
-     * and a copy torn by a crash mid-write fails its CRC, leaving the other
-     * copy the truth, as an abandoned ticket does.  Mutual exclusion is the
-     * same compare on the same sector the ticket swap made: whoever changes
-     * the spare's sector 0 first wins, and a live ticket of an older writer
-     * still answers -EBUSY from step 2.  Set by the mount for a DRBD device;
-     * cleared by the first commit that is answered -EOPNOTSUPP.  A batched
-     * commit (page_write_many, the group commit) keeps the ticket protocol.
+     * of ticket swap, body and publish swap.  The ticket exists for a SCSI
+     * target whose COMPARE AND WRITE covers one sector (LIO's default), so
+     * the body has to land outside any swap and the copy has to read as
+     * invalid meanwhile.  Where every swap is emulated (the DRBD attachment),
+     * one swap compares the spare's sector 0 and writes the page; a SCSI
+     * target whose Block Limits page allows a page in one COMPARE AND WRITE
+     * compares the whole spare copy as step 1 read it.  A copy torn by a
+     * crash mid-write fails its CRC, leaving the other copy the truth, as an
+     * abandoned ticket does.  Mutual exclusion is a compare that covers the
+     * sector the ticket swap compares: whoever changes the spare first wins,
+     * and a live ticket of an older writer still answers -EBUSY from step 2.
+     * Set by the mount; each commit takes the swap only while the PAL answers
+     * that the device can (mxfs_pal_bdev_span_swap_ok: every emulated swap; a
+     * SCSI target that allows the length while caw_span is on).  Cleared by a
+     * commit answered -EOPNOTSUPP by a device that still answers that it can.
+     * A batched commit (page_write_many, the group commit) keeps the ticket
+     * protocol.
      */
     bool            span_commit;
     /*

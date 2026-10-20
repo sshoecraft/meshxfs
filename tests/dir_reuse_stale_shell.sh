@@ -22,6 +22,25 @@
 #              B = unlink authority, zombie on B), A closes, B reaps/frees the
 #              ino, A IMMEDIATELY reuses it as a DIR, B walks it.  B's stale
 #              FILE shell for the ino must give way to the new DIR incarnation.
+#   mkdirp_new  — B caches two directory levels and holds their read grants; A
+#              removes them, then makes directories under a NEW path until one
+#              reuses a number B still has cached, and B at once runs
+#              `mkdir -p <new>/sub/b<cycle>`.  coreutils mkdir -p chdir's into
+#              every existing component and creates the last one relative to
+#              the cwd, so a dead directory shell bound as the cwd makes the
+#              create fail ESTALE, and the VFS's one LOOKUP_REVAL retry starts
+#              from that same cwd.  B has never looked the new names up, so its
+#              walk instantiates them through xfs_lookup: the alloc_witness
+#              shape seen on 2/net/mesh/mpath.
+#   mkdirp_same — as mkdirp_new, but A reuses the numbers under the SAME path,
+#              so B's walk revalidates its cached dentries (mxfs_drevalidate)
+#              instead of looking the names up.
+#   Both mkdirp modes grade a cycle by B's mkdir rc and by whether A then sees
+#   the directory B made, and end with one RESULT line counting ESTALE, other
+#   errors, creates A cannot see, and B's lookup/reload/refusal probe lines.
+#   Per cycle ~7 ssh round trips (~0.3 s each), a 2 s settle after the remove
+#   and 1 s per reuse retry: ~5 s when the first remake reuses, so the caller
+#   bound is cycles x 12 s + 60 s.
 #
 # usage: dir_reuse_stale_shell.sh [A=test1] [B=test2] [cycles=25] [mode=dir2dir]
 set -u
@@ -92,6 +111,62 @@ for c in $(seq 1 "$CY"); do
   echo "cycle=$c ok mode=file2dir reuse=$RE freed=$FREED ino=$I1->${I2:-?} tries=$k B_sees=${LSN:-?}"
   $SSH "$NA" "rm -rf $BASE" >/dev/null 2>&1
 done
+elif [ "$MODE" = "mkdirp_new" ] || [ "$MODE" = "mkdirp_same" ]; then
+ESTALE_N=0; OTHER_N=0; LOST_N=0
+for c in $(seq 1 "$CY"); do
+  OLD="/mnt/shared/.${RID}_o$c"
+  # 1. A makes two directory levels; their numbers are what B will cache
+  $SSH "$NA" "mkdir -p $OLD/sub && echo pay-$c > $OLD/sub/f0" >/dev/null 2>&1
+  OI=$($SSH "$NA" "stat -c '%i' $OLD $OLD/sub" 2>/dev/null | tr -s ' \r\n' ' ')
+  # 2. B caches both and takes their read grants (a readdir of each)
+  $SSH "$NB" "ls -la $OLD $OLD/sub >/dev/null 2>&1; cat $OLD/sub/f0 >/dev/null 2>&1"
+  # 3. A removes them: B loses both grants and keeps the inodes cached
+  $SSH "$NA" "rm -rf $OLD" >/dev/null 2>&1
+  sleep 2
+  # 4. A makes directories until one reuses a number B holds (bounded)
+  NEW=""; NI=""; RE=no; k=0
+  while [ $k -lt 12 ]; do
+    k=$((k+1))
+    if [ "$MODE" = "mkdirp_new" ]; then NEW="/mnt/shared/.${RID}_n${c}_$k"; else NEW="$OLD"; fi
+    NI=$($SSH "$NA" "mkdir -p $NEW/sub && stat -c '%i' $NEW $NEW/sub" 2>/dev/null | tr -s ' \r\n' ' ')
+    for n in $NI; do
+      case " $OI " in *" $n "*) RE=yes ;; esac
+    done
+    [ "$RE" = yes ] && break
+    $SSH "$NA" "rm -rf $NEW" >/dev/null 2>&1
+    sleep 1
+  done
+  [ "$RE" = yes ] && REUSED=$((REUSED+1))
+  # 5. B at once: mkdir -p through the (possibly reused) directories
+  OUT=$($SSH "$NB" "LC_ALL=C mkdir -p $NEW/sub/b$c 2>&1; echo rc=\$?" 2>/dev/null | tr -d '\r' | tr '\n' ' ')
+  rc=${OUT##*rc=}; rc=${rc%% *}
+  SEEN=$($SSH "$NA" "[ -d $NEW/sub/b$c ] && echo yes || echo no" 2>/dev/null | tr -d ' \r\n')
+  V=ok
+  if echo "$OUT" | grep -q 'Stale file handle'; then
+    V=ESTALE; ESTALE_N=$((ESTALE_N+1))
+  elif [ "${rc:-x}" != 0 ]; then
+    V=ERR; OTHER_N=$((OTHER_N+1))
+  elif [ "${SEEN:-no}" != yes ]; then
+    V=LOST; LOST_N=$((LOST_N+1))
+  fi
+  if [ "$V" != ok ]; then
+    FAILS=$((FAILS+1))
+    $SSH "$NB" "echo ${RID}-FAIL-c$c > /dev/kmsg" >/dev/null 2>&1
+  fi
+  echo "cycle=$c $V mode=$MODE reuse=$RE old=[${OI% }] new=[${NI% }] tries=$k b_rc=${rc:-?} a_sees=${SEEN:-?} out='$(echo "$OUT" | cut -c1-160)'"
+  $SSH "$NA" "rm -rf $NEW" >/dev/null 2>&1
+done
+KM="dmesg | sed -n \"/${RID}-start/,\\\$p\""
+PLD=$($SSH "$NB" "$KM | grep -c 'P-LKUP-DIR-INCARN ino='" 2>/dev/null | tr -d ' \r\n')
+P240=$($SSH "$NB" "$KM | grep 'P240-QUAR-NSOP-REFUSE' | grep -c 'comm=mkdir'" 2>/dev/null | tr -d ' \r\n')
+PXP=$($SSH "$NB" "$KM | grep -c 'P-RELOAD-XINCARN-POISON'" 2>/dev/null | tr -d ' \r\n')
+GM=$($SSH "$NB" "$KM | grep -c 'P-DREVAL-GENMISS'" 2>/dev/null | tr -d ' \r\n')
+UNR=$($SSH "$NB" "$KM | grep -c 'P34H-POISON-UNRETIRED'" 2>/dev/null | tr -d ' \r\n')
+DV=$($SSH "$NB" "P=/sys/module/mxfs/parameters; echo knob=\$(cat \$P/lookup_dir_incarn_verify 2>/dev/null) dv_n=\$(cat \$P/lookup_dir_incarn_n 2>/dev/null) dv_dead=\$(cat \$P/lookup_dir_incarn_dead_n 2>/dev/null)" 2>/dev/null | tr -d '\r\n')
+VERD=PASS; [ "$FAILS" -eq 0 ] || VERD=FAIL
+echo "RESULT: $VERD | mode=$MODE cycles=$CY reused=$REUSED estale=$ESTALE_N other_err=$OTHER_N lost=$LOST_N b_lkup_dead=${PLD:-?} b_p240_mkdir=${P240:-?} b_xincarn_poison=${PXP:-?} b_genmiss=${GM:-?} b_unretired=${UNR:-?} b: $DV"
+[ "$FAILS" -eq 0 ]
+exit
 else
 for c in $(seq 1 "$CY"); do
   BASE="/mnt/shared/.${RID}_$c"

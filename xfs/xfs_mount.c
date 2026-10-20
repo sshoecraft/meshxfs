@@ -1382,6 +1382,12 @@ xfs_mountfs(
 	if (error)
 		goto out_agresv;
 
+	/* TEST ONLY: dbg_mountfs_fail_kick_ms (xfs/xfs_mxfs_ag_lock.c) */
+	{ extern int mxfs_dbg_mountfs_fail_kick(struct xfs_mount *);
+	  error = mxfs_dbg_mountfs_fail_kick(mp);
+	  if (error)
+		goto out_agresv; }
+
 	/*
 	 * MXFS 0.84.5 (D-...-0960): the lifecycle mark a refused mount never
 	 * reaches; xfs_log_quiesce writes no SB summary, and takes no cluster
@@ -1426,6 +1432,13 @@ xfs_mountfs(
 	 * quota inodes.
 	 */
 	xfs_unmount_flush_inodes(mp);
+	/*
+	 * MXFS: the last inactivation is behind us; cancel the delayed work it
+	 * armed before the log and the AG groups below are freed (put_super,
+	 * which cancels it on an unmount, never runs for a failed mount).
+	 */
+	{ extern void mxfs_mountfs_unwind_quiesce(struct xfs_mount *);
+	  mxfs_mountfs_unwind_quiesce(mp); }
 	xfs_log_mount_cancel(mp);
  out_inodegc_shrinker:
 	shrinker_free(mp->m_inodegc_shrinker);

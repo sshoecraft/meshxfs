@@ -4,6 +4,7 @@
  */
 #define MXFS_TU_ID 17	/* igrab/iput call-site file id */
 #include "xfs_mxfs_dlm_priv.h"
+#include "xfs_mxfs_dirshard.h"
 
 static void mxfs_iclus_pi_reconcile(struct xfs_inode *ip, int clus_rc);
 
@@ -2526,6 +2527,7 @@ static void mxfs_bast_close_dir_cil_ail_race(struct inode *vip,
 						    wb * 2,
 						    atomic_read(&mp->m_mxfs_dir_wr_inflight));
 				}
+				mxfs_dirshard_release_note(ip);
 				break;
 			}
 
@@ -5694,6 +5696,18 @@ skip_bast_cluster_stale:
 	 * platter before the peer's FUA read.  gated mxfs_reg_release_durable
 	 * (default on) so it can be A/B'd against the perf cost.
 	 */
+	/*
+	 * D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES,
+	 * H-U4: a predecessor edit this node made in a mid-list unlinked
+	 * remove reached this inode's slot as a buffer-logged range of its
+	 * cluster buffer, which neither the inode's log item nor the regular
+	 * file's clean early-out below sees, and the node that takes this lock
+	 * next reads the slot from the platter.  Land it before the unlock;
+	 * the control arm (unlprev_tenure=0) only reports what was owed.
+	 */
+	if (mp->m_mxfs_dlm && !mxfs_v5_dlm_is_single_node(mp->m_mxfs_dlm))
+		mxfs_iunl_store_land(mp, ip, READ_ONCE(mxfs_unlprev_tenure) != 0,
+				     "release");
 	mxfs_bast_flush_inode_core_for_release(vip, ip, &p2_drain_watch,
 					       &rel_drain_wb_err, p_held_mode,
 					       p15h_reap, mp, &p2_loop_wrote,
@@ -6387,6 +6401,9 @@ mxfs_dlm_bast_work_fn(
 						ip->i_dlm_state);
 				MXFS_CLEAR_DEMOTER(ip);
 			}
+			/* TEST ONLY: make this irele the last on demand (H-F6a) */
+			if (unlikely(READ_ONCE(mxfs_dbg_bast_lastref_wait_ms) > 0))
+				mxfs_dbg_bast_lastref_wait(ip);
 			xfs_irele(ip);
 		}
 	}
@@ -7161,6 +7178,8 @@ __mxfs_dlm_bast_notify(
 	struct xfs_inode	*ip;
 	int			error;
 	uint32_t		noino_rel_gen;
+	enum xfs_ino_lifecycle	first_lc = XFS_ILC_ABSENT;
+	bool			noino_untracked = false;
 
 	mxfs_idbg("mxfs: MX-INSTR bast_notify ENTRY ino=%llu req_mode=%u",
 		(unsigned long long)ino, requested_mode);
@@ -7223,6 +7242,7 @@ __mxfs_dlm_bast_notify(
 				       lc == XFS_ILC_VFS_TEARDOWN);
 			static atomic_t p_lc_n = ATOMIC_INIT(0);
 
+			first_lc = lc;
 			if (lc < XFS_ILC_NR)
 				atomic64_inc(&mxfs_noino_lifecycle_stat[lc]);
 			/* D-0532 item (c): a RECLAIMABLE inode is in core and may
@@ -7249,6 +7269,54 @@ __mxfs_dlm_bast_notify(
 			    mxfs_noino_lifecycle_park(mp, ino, requested_mode,
 						      lc))
 				return;
+		}
+		/*
+		 * H-F9 (mxfs_noino_shell_guard): a LIVE inode the INCORE lookup
+		 * refused with -ENOENT holds a freed image (mode 0: its reload
+		 * adopted a peer's free, P116-ZOMBIE-ADOPT).  No lifecycle op
+		 * runs on it, so nothing above parks the BAST, and the no-inode
+		 * release below unlocks the grant the shell still caches.
+		 * Traced on 2/net/mesh/mpath (lap smc1, ino 18874522): the
+		 * release unlocked with the shell LIVE at cached EX
+		 * (P-NOINO-UNLOCK-LEFT-GRANT lifecycle=LIVE), a lookup of the
+		 * number's next life resurrected the shell with that mode
+		 * (P-RELOAD-IOPS-REWIRE), the touch that followed logged at an
+		 * EX the DLM no longer recorded (P-LOG-MIRROR-PHANTOM), and
+		 * xfsaild wrote the live image over the churner's free
+		 * (P-LOGWR-DLM-NOGRANT): the core the cold audit found.  The
+		 * shell is in core, so its BAST belongs to the in-core path,
+		 * which ends the cached mode together with the grant.
+		 */
+		if (error == -ENOENT && first_lc == XFS_ILC_LIVE) {
+			extern int mxfs_noino_shell_guard;
+			extern atomic_t mxfs_noino_live_shell;
+			extern atomic_t mxfs_noino_shell_routed;
+			static atomic_t p_nls_n = ATOMIC_INIT(0);
+			struct xfs_inode *sip = NULL;
+			uint8_t sdm = MXFS_LOCK_NL;
+			bool routed = READ_ONCE(mxfs_noino_shell_guard) &&
+				      !xfs_icache_grab_live_shell(mp, ino, &sip);
+
+			atomic_inc(&mxfs_noino_live_shell);
+			if (routed)
+				atomic_inc(&mxfs_noino_shell_routed);
+			if (atomic_inc_return(&p_nls_n) <= 2000) {
+				if (sip)
+					sdm = READ_ONCE(sip->i_dlm_mode);
+				else
+					(void)xfs_icache_ino_lifecycle_grant(mp,
+						ino, NULL, NULL, NULL, &sdm);
+				pr_warn("mxfs: P-NOINO-LIVE-SHELL ino=%llu cached_mode=%u req=%u rel_gen=%u routed=%d -- BAST for a live in-core inode holding a freed image; %s\n",
+					(unsigned long long)ino, sdm,
+					requested_mode, noino_rel_gen,
+					routed ? 1 : 0,
+					routed ? "served by the in-core release" :
+					"the no-inode release unlocks the grant it caches");
+			}
+			if (routed) {
+				ip = sip;
+				goto incore;
+			}
 		}
 		/*
 		 * Inode not in cache — it was evicted but the DLM lock
@@ -7278,9 +7346,56 @@ __mxfs_dlm_bast_notify(
 		 * re-BASTs while our bit stays set, so no release is lost.  This
 		 * removes the hot-inode unlock-CAS self-competition/livelock.
 		 */
-		if (mxfs_noino_bast_dedup &&
-		    !mxfs_noino_inflight_try_add(mp, ino))
-			return;
+		{
+			bool tracked = false;
+
+			if (mxfs_noino_bast_dedup &&
+			    !mxfs_noino_inflight_try_add(mp, ino, &tracked))
+				return;
+			noino_untracked = mxfs_noino_bast_dedup && !tracked;
+			if (noino_untracked)
+				atomic_inc(&mxfs_noino_untracked_inflight);
+		}
+		/*
+		 * H-F7 (mxfs_noino_recycle_guard): a recycle that began between
+		 * the INCORE lookup above and the registration just made decided
+		 * on the corpse's cached grant without seeing this release, and
+		 * may be serving it.  The recycle marks the corpse XFS_IRECLAIM
+		 * before it decides, so a corpse that was reclaimable at the
+		 * lookup and is now mid-recycle or live is that case: the
+		 * lifecycle park re-drives this BAST once the recycle is done, and
+		 * the re-drive meets the inode through the in-core path.  A recycle
+		 * that starts after the registration sees it and resets the grant
+		 * instead (mxfs_dlm_recycle_grant_check).
+		 */
+		if (first_lc == XFS_ILC_RECLAIMABLE && allow_requeue &&
+		    READ_ONCE(mxfs_noino_recycle_guard)) {
+			unsigned long rfl = 0, rst = 0;
+			unsigned int rnl = 0;
+			enum xfs_ino_lifecycle rlc =
+				xfs_icache_ino_lifecycle(mp, ino, &rfl, &rnl,
+							 &rst);
+
+			if ((rlc == XFS_ILC_LIVE || rlc == XFS_ILC_INEW ||
+			     rlc == XFS_ILC_IRECLAIM) &&
+			    mxfs_noino_lifecycle_park(mp, ino, requested_mode,
+						      rlc)) {
+				extern atomic_t mxfs_noino_recycle_redrive;
+				static atomic_t p_nrrd_n = ATOMIC_INIT(0);
+
+				atomic_inc(&mxfs_noino_recycle_redrive);
+				if (atomic_inc_return(&p_nrrd_n) <= 200)
+					pr_warn("mxfs: P-NOINO-RECYCLE-REDRIVE ino=%llu class=%s iflags=0x%lx req=%u -- the reclaimable corpse entered a recycle before this release was registered; BAST re-driven through the lifecycle park\n",
+						(unsigned long long)ino,
+						xfs_ino_lifecycle_name(rlc), rfl,
+						requested_mode);
+				if (mxfs_noino_bast_dedup && !noino_untracked)
+					mxfs_noino_inflight_remove(mp, ino);
+				if (noino_untracked)
+					atomic_dec(&mxfs_noino_untracked_inflight);
+				return;
+			}
+		}
 		/*
 		 * FIX — durable dir-block lost-update (proven by instrument,
 		 * Design-consult review-designed).  The in-core inode is GONE
@@ -7323,17 +7438,20 @@ __mxfs_dlm_bast_notify(
 				w->mp = mp;
 				w->ino = ino;
 				w->rel_gen = noino_rel_gen;
+				w->bast_ns = ktime_get_ns();
+				w->untracked = noino_untracked;
+				w->req_mode = requested_mode;
 				if (queue_work(mp->m_mxfs_inode_bast_wq,
 					       &w->work))
 					return;	/* work fn frees w + unlocks */
 				kfree(w);	/* already queued? fall through */
 			}
 
-			/* the async work won't run (OOM/wq gone) — drop
-			 * the dedup entry so the inline release below isn't
-			 * gated out and a later BAST can re-queue. */
-			if (mxfs_noino_bast_dedup)
-				mxfs_noino_inflight_remove(mp, ino);
+			/* the async work won't run (OOM/wq gone): release
+			 * inline.  The registration stays until the inline
+			 * release has unlocked -- a recycle in between must
+			 * see it (mxfs_noino_recycle_guard) -- and a duplicate
+			 * BAST meanwhile is dropped; the peer re-BASTs. */
 
 			/* Fallback: inline release (rare — OOM / wq gone).
 			 * FIX-12: same whole-AIL LSN-targeted fence as
@@ -7355,23 +7473,46 @@ __mxfs_dlm_bast_notify(
 						(unsigned long long)ino);
 					xfs_force_shutdown(mp,
 						SHUTDOWN_META_IO_ERROR);
+					if (mxfs_noino_bast_dedup && !noino_untracked)
+						mxfs_noino_inflight_remove(mp, ino);
+					if (noino_untracked)
+						atomic_dec(&mxfs_noino_untracked_inflight);
 					return;
 				}
 				if (mp->m_ddev_targp &&
 				    mp->m_ddev_targp->bt_bdev)
 					mxfs_blkdev_flush_epoch(mp);
 			}
+			/* a recycle took this release over (see the work fn) */
+			if (mxfs_noino_bast_dedup && !noino_untracked &&
+			    !mxfs_noino_inflight_begin_unlock(mp, ino)) {
+				mxfs_noino_inflight_remove(mp, ino);
+				mxfs_noino_taken_over(mp, ino, requested_mode,
+						      noino_rel_gen);
+				return;
+			}
 			mxfs_dlm_publish_unpublished(mp, ino, NULLAGNUMBER);
 			/* same tenure guard as the work fn —
 			 * the drain fence above sleeps, so a local re-acquire
 			 * can win a new tenure mid-fence even on this inline
-			 * path. */
-			mxfs_v5_dlm_inode_unlock_gen(mp->m_mxfs_dlm, ino,
-						     noino_rel_gen);
+			 * path; an anchor of 0 takes the unanchored release
+			 * for the same reason (mxfs_noino_gen0_guard). */
+			if (noino_rel_gen == 0 &&
+			    READ_ONCE(mxfs_noino_gen0_guard))
+				mxfs_v5_dlm_inode_unlock_unanchored(
+						mp->m_mxfs_dlm, ino);
+			else
+				mxfs_v5_dlm_inode_unlock_gen(mp->m_mxfs_dlm, ino,
+							     noino_rel_gen);
+			if (mxfs_noino_bast_dedup && !noino_untracked)
+				mxfs_noino_inflight_remove(mp, ino);
+			if (noino_untracked)
+				atomic_dec(&mxfs_noino_untracked_inflight);
 		}
 		return;
 	}
 
+incore:
 	spin_lock(&ip->i_dlm_lock);
 	/* v0.5.4: a peer BAST = proven peer interest in this inode; from now
 	 * on the create-time shortform-parent durability barrier must fire

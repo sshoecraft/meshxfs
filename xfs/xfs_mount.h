@@ -17,6 +17,7 @@ struct xfs_perag;
 struct xfs_healthmon;
 /* This incarnation's authority over the shared LUN; see dlm/disklock.h. */
 struct mxfs_authority;
+struct mxfs_frx;
 
 /* dynamic preallocation free space thresholds, 5% down to 1% */
 enum {
@@ -682,6 +683,10 @@ typedef struct xfs_mount {
 	spinlock_t		m_mxfs_pubob_lock;
 	struct list_head	m_mxfs_pubob_list;
 	int			m_mxfs_pubob_count;
+	/* test aid (dbg_freepub_handoff_check): this node's committed frees,
+	 * read back off the LUN at their AG's release; under m_mxfs_pubob_lock */
+	struct mxfs_frx		*m_mxfs_frx;
+	unsigned int		m_mxfs_frx_head;
 	/* (D-0351): FREE-obligation recovery worker — re-scopes a
 	 * free whose AG EX tenure was lost before its image was published
 	 * (P55C denials) under a fresh AG EX, after an out-of-cache
@@ -770,6 +775,14 @@ typedef struct xfs_mount {
 	spinlock_t		m_mxfs_unpub_lock;
 	atomic_t		m_mxfs_pubdrain_active;	/* detached timed-out publish drain workers still referencing mp */
 	/*
+	 * Publish claims in flight (H-F10): inodes a publish has taken off
+	 * m_mxfs_unpub_list whose claim has not returned, under
+	 * m_mxfs_unpub_lock.  A directory or AG release looks here for the ones
+	 * in its scope; m_mxfs_pubclaim_wq is woken as each one leaves.
+	 */
+	struct list_head	m_mxfs_pubclaim_list;
+	wait_queue_head_t	m_mxfs_pubclaim_wq;
+	/*
 	 * v0.5.4: background publisher for
 	 * unpublished DIRECTORY inodes.  Queued (on m_mxfs_inode_bast_wq)
 	 * by xfs_create after a mkdir so the new dir's on-disk CAW slot is
@@ -806,6 +819,8 @@ typedef struct xfs_mount {
 	 * mirrors MXFS_DISKLOCK_HB_SLOTS (64) — slice index == HB slot.
 	 */
 	struct work_struct	m_mxfs_foreign_replay_work;
+	/* set once mxfs_dlm_cache_init has initialised the work above */
+	bool			m_mxfs_freplay_ready;
 	DECLARE_BITMAP(m_mxfs_foreign_dead_slots, 64);
 	/*
 	 * The task replaying a dead peer's slice through this node's cache,
@@ -998,6 +1013,20 @@ typedef struct xfs_mount {
 	 */
 	struct workqueue_struct	*m_mxfs_inode_bast_wq;
 	/*
+	 * D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349 (ruling
+	 * docs/rulings/d0349-batched-reserve-ahead.md): reserve-ahead requests
+	 * (xfs_ialloc.c mxfs_resv_ahead_queue).  Each work item is one ordinary
+	 * no-queue EX request for a free inode number, made with no XFS lock
+	 * held; up to MXFS_RESV_AHEAD_MAX run at once so their ledger commits
+	 * overlap.  xfs_fs_put_super sets m_mxfs_resv_ahead_off and flushes the
+	 * queue while the DLM is still up; an item that runs after that drops
+	 * its request.
+	 */
+#define MXFS_RESV_AHEAD_MAX	64
+	struct workqueue_struct	*m_mxfs_resv_ahead_wq;
+	atomic_t		m_mxfs_resv_ahead_inflight;
+	bool			m_mxfs_resv_ahead_off;
+	/*
 	 * D-DWORK-TEARDOWN-LASTREF-LEAK class fix: every bast
 	 * work/dwork arm goes through one gate (mxfs_bast_dwork_queue /
 	 * the m_mxfs_arms_off check) so put_super can refuse NEW arms,
@@ -1010,6 +1039,16 @@ typedef struct xfs_mount {
 	 */
 	spinlock_t		m_mxfs_arm_lock;
 	bool			m_mxfs_arms_off;
+	/*
+	 * D-UMOUNT-ROOT-DENTRY-STILL-IN-USE-DEFERRED-DIR-DCACHE-SHRINK-RACE: a
+	 * directory's deferred dcache shrink holds a reference on the
+	 * directory's dentry while it runs, and generic_shutdown_super walks
+	 * the dentry tree before put_super closes m_mxfs_arms_off above.
+	 * xfs_kill_sb closes this gate, waits for the queue calls already past
+	 * it (m_mxfs_dshrink_inflight) and flushes the shrinks first.
+	 */
+	bool			m_mxfs_dshrink_off;
+	atomic_t		m_mxfs_dshrink_inflight;
 	/*
 	 * release-side device-flush COALESCING.  Every BAST
 	 * release that must persist data before the on-disk DLM unlock (LIO
@@ -1346,6 +1385,8 @@ __XFS_HAS_FEAT(nouuid, NOUUID)
 #define XFS_OPSTATE_WARNED_ZONED	19
 /* (Zoned) GC is in progress */
 #define XFS_OPSTATE_ZONEGC_RUNNING	20
+/* MXFS: the writes the cluster's fence left unanswered have been released */
+#define XFS_OPSTATE_MXFS_FENCED_PATHS_RESET	24
 
 #define __XFS_IS_OPSTATE(name, NAME) \
 static inline bool xfs_is_ ## name (struct xfs_mount *mp) \

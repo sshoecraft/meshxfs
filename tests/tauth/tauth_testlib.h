@@ -40,12 +40,13 @@ static inline void raw_read(uint64_t off, void *buf, size_t len)
 }
 
 /* (D-0348 step 2): every usermode region is formatted with the
- * MINIMUM geometry and this fixed seed, so a test can route a resource
- * without an open ledger (tl_page / tl_home == the ledger's own routing). */
+ * MINIMUM geometry, this fixed seed and mkfs's routing version, so a test
+ * can route a resource without an open ledger (tl_page / tl_home == the
+ * ledger's own routing). */
 #define TL_SEED 0x5eed0000c0ffee11ULL
 static inline uint32_t tl_hash(const struct mxfs_resource_id *r)
 {
-    return mxfs_tauth_res_hash(r, sizeof(*r), TL_SEED);
+    return mxfs_tauth_route_hash(r, TL_SEED, MXFS_TAUTH_HASH_VERSION);
 }
 static inline uint32_t tl_page(const struct mxfs_resource_id *r)
 {
@@ -53,7 +54,8 @@ static inline uint32_t tl_page(const struct mxfs_resource_id *r)
 }
 static inline uint32_t tl_home(const struct mxfs_resource_id *r)
 {
-    return mxfs_tauth_home_index(tl_hash(r), MXFS_TAUTH_NPAGES);
+    return mxfs_tauth_route_index(r, tl_hash(r), MXFS_TAUTH_NPAGES,
+                                  MXFS_TAUTH_HASH_VERSION);
 }
 
 /* mkfs's format, reproduced here byte-for-byte from the shared helpers */

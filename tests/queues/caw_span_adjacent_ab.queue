@@ -1,0 +1,48 @@
+# D-WHOLE-PAGE-CAW-PAYLOAD-PANICS-NODE-IN-SCSI-ALLOC-SGTABLES: A/B of the fix
+# (caw_manual_bio adds each payload page as its own bvec with __bio_add_page)
+# under the test knob that puts the two payload pages side by side in physical
+# memory on every whole-page COMPARE AND WRITE (dbg_caw_span_adjacent).
+#
+# HYPOTHESIS (in the record before the patch): bio_add_page folds a physically
+# adjacent second page into the first page's bvec; 6.8's blk_rq_append_bio
+# counts that 8 KiB bvec as one segment; __blk_rq_map_sg maps it as two at
+# iscsi_tcp's page boundary (dma_boundary PAGE_SIZE - 1); scsi_alloc_sgtables
+# then hits BUG_ON(count > nents) at +0x3a1 (6.8.0-101 disassembly: the ud2 at
+# 0xffffffff81c47621 is the cmp of the mapped count, R15, with sdb.table.nents;
+# the crash registers held R15=2 and RAX=0x2000, the request length).
+#
+# BUILDS: control ~/src/mxfs-e srcversion 9371C61A4507F1DBC93670B (the main
+# tree's sources with the knob, payload pages added with bio_add_page); fix:
+# this tree 65863B924040AF5213F2A76 (the same plus __bio_add_page).  The two
+# trees' sources differ only in pal/linux/kern.c's payload loop and its
+# comments (diff -rq, then diff of kern.c).
+# RIG: 2/net/mesh/direct on g2c (test29 test30, 6.8.0-101-generic), where the
+# panic was observed; every arm on a cluster freshly prepped from its own tree
+# with caw_span=0, so no prep issues a whole-page command on either build.
+#
+# PREDICTION:
+#   control arms (adjc1, adjc2): PANIC in round 1, test29's serial console
+#     printing the BUG with RIP scsi_alloc_sgtables+0x3a1;
+#   fix arms (adjf1, adjf2): PASS: 3 rounds of umount/mount/100 creates/sync,
+#     caw_span_n rising every round, every P-DBG-CAW-SPAN-ADJACENT line naming
+#     two adjacent pfns built as vcnt=2, no panic, boot id unchanged.
+#
+# VERDICT RULES (written before the first lap):
+#   CONFIRMED AND FIXED  both control arms PANIC with scsi_alloc_sgtables on the
+#                        serial console, and both fix arms PASS.
+#   HYPOTHESIS REFUTED   a control arm completes a round without a panic (the
+#                        adjacent payload did not crash the merging build).
+#   FIX FAILS            a fix arm PANIC, or FAIL on a merged/non-adjacent knob
+#                        line or a failed round.
+#   ABORT or VACUOUS     measured nothing: read from its own lines and rerun.
+#
+# Bounds: prep 300 (as tests/queues/p6_span_ab_tcpdirect.queue); an arm 305
+# (tests/caw_span_adjacent_ab.sh header, ROUNDS=3).
+300 MXFS_EXTRA_MODARGS=caw_span=0 MXFS_FORCE_PREP=1 /home/steve/src/mxfs-e/run.sh 2/net/mesh/direct --group g2c prep_cluster
+305 MXFS_NODE_LIST=test29,test30 /home/steve/src/mxfs-e/tests/caw_span_adjacent_ab.sh adjc1 100000 test29
+300 MXFS_EXTRA_MODARGS=caw_span=0 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+305 MXFS_NODE_LIST=test29,test30 tests/caw_span_adjacent_ab.sh adjf1 100000 test29
+300 MXFS_EXTRA_MODARGS=caw_span=0 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+305 MXFS_NODE_LIST=test29,test30 tests/caw_span_adjacent_ab.sh adjf2 100000 test29
+300 MXFS_EXTRA_MODARGS=caw_span=0 MXFS_FORCE_PREP=1 /home/steve/src/mxfs-e/run.sh 2/net/mesh/direct --group g2c prep_cluster
+305 MXFS_NODE_LIST=test29,test30 /home/steve/src/mxfs-e/tests/caw_span_adjacent_ab.sh adjc2 100000 test29

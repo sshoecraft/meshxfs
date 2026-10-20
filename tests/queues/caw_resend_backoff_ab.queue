@@ -1,0 +1,47 @@
+# D-CAW-WAITER-NOTIFIES-A-DRAINING-HOLDER-13-TIMES-A-SECOND: same-build A/B
+# of caw_bast_resend_backoff (dlm/dlm_caw.c caw_wait_for_grant), run from a
+# sibling carrying the main tree's source with the change (the harness refuses
+# a node whose srcversion is not the checkout's), 4/disk/caw/direct on g4
+# (test3 holds, test4 waits, test5 and test6 mounted and idle; moved from
+# 2/disk/caw/direct on g2 before any lap ran, because g2 and that
+# configuration's lock are held by the freed-inode final verification).  The
+# record reaches every CAW configuration and the waiter's re-send does not
+# depend on the cluster size.  tests/live_holder_wait.sh holds one inode's
+# grant on H with its release drain paused PAUSE_MS while W reads it; the CAW
+# lap's waiter re-sends its UDP BAST hint while blocked, and the holder logs a
+# P7B-BASTNOTIFY per notification it receives.  LHW_CAW_BACKOFF writes the
+# knob on both nodes and reads it back; W's P-ACQ-STUCK now carries hints= (the
+# wait's re-sends so far) and hint_ms= (its current interval).
+#
+# HYPOTHESIS (from the record's code read, not yet measured on a lap): the
+# holder's ~12.7 notifications a second through a long drain are driven by the
+# waiter's flat 100 ms re-send.  Backed off after 3 s to 1 s, the waiter's hints
+# fall to about one a second, and so do the holder's notifications.
+#
+# VERDICT RULES (written before the first lap):
+#   VALID LAP      the harness's own checks pass (W's read returns only after
+#                  H's pause ends, md5 equal, no shutdown or splat on either
+#                  node) and W's last P-ACQ-STUCK carries hints=; otherwise the
+#                  lap has no verdict and is rerun.
+#   CONTROL (0) REPRODUCED  hints >= 8 per second of W's wait (el_ms) and the
+#                  holder's P7B-BASTNOTIFY >= 8 per second of the pause.
+#   FIX (1) PASS   hint_ms=1000, hints <= el_ms/1000 + 34 (the harness's derived
+#                  budget), and the holder's P7B-BASTNOTIFY <= 1.5 per second
+#                  of the pause.
+#   RESIDUAL       the fix arm meets its hint checks but the holder's rate stays
+#                  above 1.5/s: the waiter's re-send is not the holder's only
+#                  source (its own 100 ms contention poll is the candidate);
+#                  the residual is measured and attributed before any further
+#                  change, and the record is not closed.
+#   FIXED AND VERIFIED needs both control laps REPRODUCED and both fix laps
+#   PASS; then the 2-node CAW create and rsync benches on both arms (waits
+#   under 3 s are unchanged by construction, which the benches confirm).
+#
+# Bounds: prep_cluster 300 (tests/suite/manifest); each lap the harness's
+# derivation: setup 5 + PAUSE_MS 240 + drain 10 + captures 10, with the read's
+# own bound at PAUSE_MS/1000 + 60 = 300, so 330 s.
+300 MXFS_FORCE_PREP=1 ./run.sh 4/disk/caw/direct --group g4 prep_cluster
+330 LHW_CAW_BACKOFF=0 PAUSE_MS=240000 tests/live_holder_wait.sh cbr0a test3 test4
+330 LHW_CAW_BACKOFF=1 PAUSE_MS=240000 tests/live_holder_wait.sh cbr1a test3 test4
+330 LHW_CAW_BACKOFF=1 PAUSE_MS=240000 tests/live_holder_wait.sh cbr1b test3 test4
+330 LHW_CAW_BACKOFF=0 PAUSE_MS=240000 tests/live_holder_wait.sh cbr0b test3 test4

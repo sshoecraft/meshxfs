@@ -1,0 +1,25 @@
+# D-NETMESH-UMOUNT-RELEASES-TO-DEPARTED-PEER-200MS-EACH: same-build A/B of
+# dl_relall_skip_unreachable (1 = a release-all sends nothing more to a master
+# a release could not reach; 0 = the same-build control, every grant retried
+# 3 x 100 ms).  tests/mpath/umount_pair_race.sh makes the race certain: B (the
+# group's last node) steps its release-all dl_relall_step_ms per release so it
+# outlasts A's whole unmount, which starts PF_GAP_S later.  The row leaves both
+# nodes unmounted, so every row is preceded by a prep.
+# Control must show failed sends to A (FAILED_SENDS > 0) and a long B unmount;
+# the fix must show P-RELALL-MASTER-UNREACHABLE and B's unmount inside its
+# bound.  A control with no failed send means the harness did not reach the
+# race and the pair proves nothing.
+# Bounds: prep_cluster 300 (tests/suite/manifest); the row's own --budget 300
+# (its header: gate + warm-up 20 s + load 30 s + stop/verify 15 s + stepped
+# release-all ~20 s + slack 30 s + readback 10 s = ~150 s) + 30 s for
+# lap_chain's marker read and result write = 330.
+# Knobs go in as PF_KNOBS: lap_queue.sh treats any '=' after the script name
+# as an assignment.
+300 MXFS_FORCE_PREP=1 ./run.sh 4/net/mesh/mpath --group g4 prep_cluster
+330 PF_KNOBS='dl_relall_skip_unreachable=0' tests/mpath/lap_chain.sh row 4/net/mesh/mpath g4 uprc1 tests/mpath/umount_pair_race.sh --budget 300
+300 MXFS_FORCE_PREP=1 ./run.sh 4/net/mesh/mpath --group g4 prep_cluster
+330 PF_KNOBS='dl_relall_skip_unreachable=1' tests/mpath/lap_chain.sh row 4/net/mesh/mpath g4 uprf1 tests/mpath/umount_pair_race.sh --budget 300
+300 MXFS_FORCE_PREP=1 ./run.sh 4/net/mesh/mpath --group g4 prep_cluster
+330 PF_KNOBS='dl_relall_skip_unreachable=0' tests/mpath/lap_chain.sh row 4/net/mesh/mpath g4 uprc2 tests/mpath/umount_pair_race.sh --budget 300
+300 MXFS_FORCE_PREP=1 ./run.sh 4/net/mesh/mpath --group g4 prep_cluster
+330 PF_KNOBS='dl_relall_skip_unreachable=1' tests/mpath/lap_chain.sh row 4/net/mesh/mpath g4 uprf2 tests/mpath/umount_pair_race.sh --budget 300

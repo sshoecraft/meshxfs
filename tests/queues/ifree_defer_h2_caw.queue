@@ -1,0 +1,26 @@
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY, H-2 A/B on
+# 2/disk/caw/direct g2b, run from ~/src/mxfs-c (build 311877C431E1BB444562804):
+# ifree_defer_reap 1 (fix) vs 0 (control), ifree_defer_drain 1 in both arms
+# (H-1's change, so a reaper retry frees a core that already carries its
+# truncate), every other knob as the fzc final-verification laps.  Arms
+# alternate.
+#
+# H-2 (the record, written before the patch): the P-UNLPRE-SKIP deferral
+# records no reap entry, so no node ever frees the zombie: every later
+# inactivation of it, on either node, is refused (no local unlink, no EX) and
+# after a clean unmount it is still on its bucket.  PREDICTION: fix laps record
+# a reap entry for each preflight deferral (if_reaps > 0), the reaper retries
+# and frees them (P88-REAP-RETRY, P89-REAP-DONE), and the clean-unmount audit
+# lists no bucket member (if_zombies 0); control laps leave every deferred
+# zombie on its bucket (if_zombies > 0).
+#
+# VERDICT RULES (written before the first lap): SUPPORTED AND FIXED when both
+# control laps reach (if_reach > 0) and leave zombies, and both fix laps reach,
+# record reap entries, leave no zombie and PASS (audit CLEAN, no node failure,
+# no fork-ownership error).  NOT FIXED: a reached fix lap with a zombie left, a
+# fork error, or a node failure, attributed from its kept logs.  A lap with no
+# deferral is VACUOUS and judges nothing.
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh idrcf1 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=0 tests/noino_gen0_ab.sh idrcc1 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh idrcf2 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=0 tests/noino_gen0_ab.sh idrcc2 1 300 2/disk/caw/direct g2b

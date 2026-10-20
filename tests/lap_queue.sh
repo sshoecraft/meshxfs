@@ -73,13 +73,18 @@ while IFS= read -r line || [ -n "$line" ]; do
     case $bound in
         ''|*[!0-9]*) echo "queue line has no numeric bound: [$line]" >&2; exit 2 ;;
     esac
-    # the script is the first word of the command that is not VAR=value
+    # the script is the first word of the command that is not VAR=value.
+    # Only the leading word is tested: matched against the whole remaining
+    # command, an '=' in any later argument (--knobs name=0) made every word
+    # before it look like an assignment and named an argument as the script.
     script=$cmd
     while :; do
-        case $script in
-            [A-Za-z_]*=*) script=${script#* } ;;
-            *) break ;;
+        w=${script%% *}
+        case ${w%%=*} in
+            "$w"|''|[!A-Za-z_]*|*[!A-Za-z0-9_]*) break ;;
         esac
+        [ "$w" = "$script" ] && break
+        script=${script#* }
     done
     script=${script%% *}
     [ -x "$script" ] || { echo "queue line names a script that is not executable: [$script] from [$line]" >&2; exit 2; }

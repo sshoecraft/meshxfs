@@ -1,0 +1,52 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES: step (1)
+# of the record, reproduce on build X (main tree ~/src/mxfs, srcversion
+# C06A6D4A9AB7A357503DF51, 0.90.131) with no test knob, keeping the LUN image
+# after a failure.  The record's two laps (cmwd1, cmwn1) ran build F
+# (4533348C8D27CA5288B31CA, build X plus the read-only dbg_clmerge_recheck
+# check, on in both laps); this queue runs the same workload
+# (tests/clmerge_window_node.sh) on build X with every knob at its default.
+# The harness refuses a node running anything else.
+#
+# The laps: two with the module's `instr` parameter at its default 0, then one
+# with instr=1 (P83-UNL-REMCHK logs every remove's in-core next against the
+# platter's, for hypothesis H-U2; it adds a FUA dinode read per remove).  All on
+# 2/net/mesh/direct g2c, where both failures were seen, 30 iterations each.
+#
+# HYPOTHESES (the record's, written before any patch):
+#   H-U1, the NOPREV arm: the remove of z needs its predecessor y in core, and
+#     nothing keeps y in core on the owner once the peer is y's last closer; the
+#     predecessor preflight runs only when z's own chain state is incomplete.
+#   H-U2, the BACKREF arm: an in-core i_next_unlinked of a chain member is not
+#     refreshed when a peer's free of that member's successor rewrites its
+#     di_next_unlinked on the platter.
+#
+# VERDICT RULES (written before the first lap):
+#   REPRODUCED  any lap REPRODUCED: the defect is on build X with no knob.  Its
+#               kept image and both nodes' traces decide which arm it was:
+#               H-U1 SUPPORTED for a NOPREV whose prev is on the image's bucket
+#               chain with nlink 0 and whose in-core copy on that node was
+#               reclaimed (P140-RECLAIM-COMMIT) before the failure with no
+#               reload after it; H-U2 SUPPORTED for a BACKREF whose next is free
+#               on the image while the image's chain does not name it there, or
+#               a P83-UNL-REMCHK STALE=1 line for the freed inode before the
+#               failure (instr lap); PLATTER-INCONSISTENT when the image's own
+#               chain names a free inode, which is an integrity defect in its
+#               own right and is recorded as one.
+#   PASS        all three laps PASS: the shape did not recur on build X in 90
+#               iterations.  That disposes of nothing; the next step is an arm
+#               that forces the window (y reclaimed on the owner before z's
+#               inactivation), written as its own hypothesis first.
+#   VACUOUS     a lap whose owner completed no acknowledged iteration measured
+#               nothing; the workload is redesigned before any claim.
+#   FAIL        no remove failed and no node failed, but the workload or the
+#               cold audit did: attributed before anything else.
+#
+# Bound per lap (tests/peer_open_unlinked_chain.sh's derivation): prep 300 +
+# srcversion and the instr knob 2x20 + 2x20 + mkdir 30 + workload 30 x (3 + 5
+# + ceil(3 x 0.3) + 2) + 60 = 390, +10 for the peer + the owner's done fallback
+# 20 + instr reset 2x20 + stream copy 2x120 + on a failure: unmount 2x(70 + 20)
+# + snapshot 60 (the final-verification queues' term) + image check 10, + the
+# cold audit 150 = 1515 s.
+1515 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_INSTR=0 tests/peer_open_unlinked_chain.sh puca1 30 2/net/mesh/direct g2c
+1515 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_INSTR=0 tests/peer_open_unlinked_chain.sh puca2 30 2/net/mesh/direct g2c
+1515 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_INSTR=1 tests/peer_open_unlinked_chain.sh puci1 30 2/net/mesh/direct g2c

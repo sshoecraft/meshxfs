@@ -1,0 +1,24 @@
+# Flake-window laps for 2/disk/caw/direct on the 0.90.131 release candidate
+# (main tree, mxfs.ko srcversion 92FBF2A83F12160EE95EA2E), on rig group g2
+# (test1 test2), before the release chain's board.
+#
+# Why: tools/criteria_window.py 2/disk/caw/direct owes laps_before_board=10 for
+# guard_census (FAIL 'new=2 grown=0' at window index 0 on build 8DAEC6B8, the
+# two single-node sites recorded in
+# D-GUARD-CENSUS-0.90.131-TWO-SINGLE-NODE-SITES-UNCLASSIFIED and classified
+# since).  These laps are that record's rig verification on the candidate and
+# age the window.  A lap that fails is attributed from its own lines first.
+#
+# Bound per lap (tests/suite/manifest budgets): prep_cluster 300 +
+# guard_census 20 + chain overhead outside the rows 160 (measured 130-160 s,
+# tests/queues/fence_return_kept_logs_netmesh_mpath.queue) = 480 s.
+480 tests/board_4node_chain.sh qw2d1_0.90.131 2/disk/caw/direct:guard_census@g2
+480 tests/board_4node_chain.sh qw2d2_0.90.131 2/disk/caw/direct:guard_census@g2
+480 tests/board_4node_chain.sh qw2d3_0.90.131 2/disk/caw/direct:guard_census@g2
+480 tests/board_4node_chain.sh qw2d4_0.90.131 2/disk/caw/direct:guard_census@g2
+480 tests/board_4node_chain.sh qw2d5_0.90.131 2/disk/caw/direct:guard_census@g2
+480 tests/board_4node_chain.sh qw2d6_0.90.131 2/disk/caw/direct:guard_census@g2
+480 tests/board_4node_chain.sh qw2d7_0.90.131 2/disk/caw/direct:guard_census@g2
+480 tests/board_4node_chain.sh qw2d8_0.90.131 2/disk/caw/direct:guard_census@g2
+480 tests/board_4node_chain.sh qw2d9_0.90.131 2/disk/caw/direct:guard_census@g2
+480 tests/board_4node_chain.sh qw2d10_0.90.131 2/disk/caw/direct:guard_census@g2

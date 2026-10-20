@@ -75,7 +75,9 @@ for lap in $(seq 1 "$LAPS"); do
     o=$(r $N1 "cd $MNT/$A && rm -f f* && cd / && rmdir $MNT/$A; echo RMDIR_RC=\$?"); echo "$o" | grep -q 'RMDIR_RC=0' || fail "lap $lap: rmdir $A: $o"
     o=$(mk $N1 $B 8); echo "$o" | grep -q 'MK_RC=0' || fail "lap $lap: mkdir $B: $o"
     o=$(r $N2 "s=\$(date +%s%N); n=\$(ls $MNT/$B 2>&1 | wc -l); rc=\${PIPESTATUS[0]}; e=\$(date +%s%N); echo n=\$n rc=\$rc ms=\$(( (e-s)/1000000 )); ls $MNT/$B 2>&1 | head -3")
-    echo "lap $lap armA: $(echo "$o" | head -1)" | tee -a "$OUT/laps.txt"
+    # the wall clock on each lap line: a slow lap is read against what else the
+    # host was doing at that moment
+    echo "lap $lap armA: $(echo "$o" | head -1) at=$(date -u +%T)" | tee -a "$OUT/laps.txt"
     set -- $(echo "$o" | head -1 | tr '=' ' ')
     n=${2:-}; rc=${4:-}; ms=${6:-}
     { [ "$n" = 8 ] && [ "$rc" = 0 ]; } || fail "lap $lap: peer list of reused $B: $(echo "$o" | tr '\n' '|' | cut -c1-200)"
@@ -87,7 +89,7 @@ for lap in $(seq 1 "$LAPS"); do
     o=$(r $N1 "cd $MNT/$C && rm -f f* && cd / && rmdir $MNT/$C; echo RMDIR_RC=\$?"); echo "$o" | grep -q 'RMDIR_RC=0' || fail "lap $lap: rmdir $C: $o"
     o=$(r $N1 "python3 $PY mkdir $MNT $D 16 | tail -1"); [ "$(echo "$o" | tail -1)" = OK ] || fail "lap $lap: mkdir $D: $o"
     o=$(r $N2 "s=\$(date +%s%N); rmdir $MNT/$D 2>&1; rc=\$?; e=\$(date +%s%N); echo rc=\$rc ms=\$(( (e-s)/1000000 ))")
-    echo "lap $lap armB: $(echo "$o" | tail -1)" | tee -a "$OUT/laps.txt"
+    echo "lap $lap armB: $(echo "$o" | tail -1) at=$(date -u +%T)" | tee -a "$OUT/laps.txt"
     echo "$o" | tail -1 | grep -q '^rc=0' || fail "lap $lap: peer rmdir of reused $D: $(echo "$o" | tr '\n' '|' | cut -c1-200)"
     o=$(r $N1 "stat $MNT/$D 2>&1 | grep -c 'No such file'"); [ "$(echo "$o" | tail -1)" = 1 ] || fail "lap $lap: $D still visible on creator after the peer's rmdir: $o"
 done

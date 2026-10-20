@@ -1,0 +1,68 @@
+# D-SOLE-SURVIVOR-CREATES-FAIL-EBUSY-FROM-DIALLOC-AFTER-PEER-FENCE, hypothesis
+# H-EB1 (in the record, written before the patch; the corrected fix and the
+# redesigned injection recorded there before this queue's first lap).
+#
+# Build: ~/src/mxfs-g 65863B924040AF5213F2A76 (tools/sibling_sync.sh of the
+# main tree).  Run from ~/src/mxfs-g.  2/net/mesh/mpath on g2e (test17
+# test18); path_fenced_return fences test18, test17 survives.  This replaces
+# 78C5D779CAE4214A092685B before any lap ran: that build added a whole-page
+# COMPARE AND WRITE's two pages with bio_add_page and could panic a node
+# (D-WHOLE-PAGE-CAW-PAYLOAD-PANICS-NODE-IN-SCSI-ALLOC-SGTABLES); this one adds
+# them as two bvecs.  The arms below still differ only by dl_import_retire_first.
+#
+# Natural rate before the fix, chain pfi (2026-10-19, same rows, same group):
+# EBUSY creates on test17 in 3 of 8 laps (c 1, f 66, g 20), every one with a
+# P-TAUTH-DOUBLE-GRANT against the fenced node's EX record on an AG page.
+#
+# ARMS.  Laps ebc*/ebf* are the same-build A/B of dl_import_retire_first
+# (0 = control: the page is marked imported and the purged owner's records
+# are retired after; 1 = fix: retired on the page first), both with
+# dl_inject_purge_walk_delay_ms=2000 (the recovery completion's purge holds
+# its ledger walk after marking the owner purged) and
+# dl_inject_import_lazy_delay_ms=1000 (an import that found purged owners'
+# records holds its own retirement, control order only), written and read
+# back on both nodes by the row (knobs.txt).  Order ABBA: ebc1 ebf1 ebf2 ebc2.
+# Laps ebd1..ebd8 run the build at its defaults with both injections written
+# back to 0 and the knob to 1.
+#
+# PREDICTION / READING RULES (written before the first lap):
+#   CONTROL (ebc1, ebc2): test17's kmsg shows P-TAUTH-PURGE-INJECT-WALK-DELAY
+#     naming test18's node id; in each control lap where test17 creates in
+#     the held window, P-TAUTH-DOUBLE-GRANT naming test18's node id as the
+#     record's ex owner and EBUSY creates in load_test17/ops.log (row 32
+#     'fence: no operation on test17 returned an error' FAIL).
+#   FIX (ebf1, ebf2): P-TAUTH-PURGE-INJECT-WALK-DELAY present on test17,
+#     P-TAUTH-IMPORT-RETIRE-FIRST present on test17, no P-TAUTH-DOUBLE-GRANT
+#     naming test18's node id, zero 'ERR EBUSY' in load_test17/ops.log,
+#     row 32 PASS, chk_clean CLEAN errors=0.
+#   DEFAULT (ebd1..ebd8): zero P-TAUTH-DOUBLE-GRANT naming the fenced node,
+#     zero EBUSY on test17, row 32 PASS, chk_clean CLEAN, in all 8.
+#   REFUTED if a fix or default lap shows a double grant against the fenced
+#     node's record, or neither control lap shows one with the walk delay
+#     fired.  VACUOUS (rerun, measures nothing) if a control lap's walk-delay
+#     line is absent, or knobs.txt shows a node did not take a knob.
+#   Any other failure, shutdown, BUG, Oops or hung task is attributed from
+#   its own lines before anything else.  Kernel windows of consecutive laps
+#   overlap (pfi showed it): a line counts for the lap whose row window
+#   holds its timestamp.
+#
+# Bounds: path_fenced_return 400 s + chk_clean 180 s (the chain's own row
+# budgets) + the chain's measured overhead outside the rows (pfi: 130-160 s)
+# = 730 s; the first lap adds run.sh's prep_cluster 300 s.
+#
+# Run ebq1 (~/src/mxfs-g/tests/evidence/lapq_ebq1.log, 05:14-05:29Z) completed
+# ebc1 and ebf1, commented out below; the session relay ended the runner
+# during ebf2, which left no verdict and the fleet in an unknown state, so the
+# rest runs as ebq2 with ebf2 re-prepping first (bound 1030, as ebc1).
+#1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebc1 1 --prep --knobs "dl_import_retire_first=0 dl_inject_purge_walk_delay_ms=2000 dl_inject_import_lazy_delay_ms=1000" --rows path_fenced_return,chk_clean
+#730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebf1 1 --knobs "dl_import_retire_first=1 dl_inject_purge_walk_delay_ms=2000 dl_inject_import_lazy_delay_ms=1000" --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebf2 1 --prep --knobs "dl_import_retire_first=1 dl_inject_purge_walk_delay_ms=2000 dl_inject_import_lazy_delay_ms=1000" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebc2 1 --knobs "dl_import_retire_first=0 dl_inject_purge_walk_delay_ms=2000 dl_inject_import_lazy_delay_ms=1000" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebd1 1 --knobs "dl_import_retire_first=1 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebd2 1 --knobs "dl_import_retire_first=1 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebd3 1 --knobs "dl_import_retire_first=1 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebd4 1 --knobs "dl_import_retire_first=1 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebd5 1 --knobs "dl_import_retire_first=1 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebd6 1 --knobs "dl_import_retire_first=1 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebd7 1 --knobs "dl_import_retire_first=1 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean
+730 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e ebd8 1 --knobs "dl_import_retire_first=1 dl_inject_purge_walk_delay_ms=0 dl_inject_import_lazy_delay_ms=0" --rows path_fenced_return,chk_clean

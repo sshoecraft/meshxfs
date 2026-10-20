@@ -82,6 +82,15 @@ echo "  CLI:    pvesm add mxfs <name> --blockdevice /dev/sdX --shared 1 --conten
 POSTEOF
 chmod 755 "$STAGING/DEBIAN/postinst"
 
+# triggers: index.html.tpl belongs to pve-manager, and every pve-manager
+# upgrade installs a fresh copy without the script tag, which took MXFS out
+# of Datacenter -> Storage -> Add.  A file trigger on the template runs
+# postinst ("triggered") after each such install, which puts the tag back
+# and restarts pveproxy.
+cat > "$STAGING/DEBIAN/triggers" << 'TRIGEOF'
+interest-noawait /usr/share/pve-manager/index.html.tpl
+TRIGEOF
+
 # postrm: remove JS injection and restart services
 cat > "$STAGING/DEBIAN/postrm" << 'POSTRMEOF'
 #!/bin/bash

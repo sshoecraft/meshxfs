@@ -1,0 +1,33 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F7b: a
+# no-inode release's drain fence covers what this node committed before the
+# fence's last log force.  When the inode's reclaimable corpse is recycled
+# while the release is in flight and keeps its cached grant
+# (P-RECYCLE-KEEP-UNDER-NOINO: 13 and 68 of them in hf7a1/hf7a2, one inode
+# touched 11 times through the kept grant before the release unlocked it and
+# the peer freed it 6 ms later), the changes committed after that log force are
+# still in core when the unlock hands the inode to the peer, and are written
+# home later over the peer's newer state (egc2's audited core).
+#
+# Same-build A/B on build 20B13312E9D131CF33DDF44 (~/src/mxfs-b), the spare
+# pair, NG0_MIRROR_CHECK=1 throughout; NG0_RECYCLE_GUARD=0 is the control,
+# =1 the fix (noino_recycle_guard).
+# PROVEN if the control laps count noino_unlock_undrained > 0 (an unlock that
+# left committed changes off the platter) with cc above the release's start_cc.
+# REFUTED if the control laps count none: the fix is then not shown to address
+# anything and comes out.
+# FIX VERIFIED only if every fix lap reads hf7_keep=0 and hf7_undrained=0
+# (hf7_ok=1, part of its PASS), the fix arm's hf7_reset > 0 in aggregate (it
+# was reached), and every fix lap's cold audit is CLEAN with no node failure.
+# Six laps hold the gen-0 window open (NG0_DELAY_MS=200, the arm of all three
+# corrupt laps), two run production timing.
+# Bound per lap, the sum of the harness's own step bounds: prep_cluster 300 +
+# workload SECS+60 = 360 + counters 2x40 + knob sets/resets 2x(20+20+20) +
+# chk_clean with alloc_witness 150 + stream capture 2x120 + snapshot 60 = 1310 s.
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hgc1 1 300 2/net/mesh/direct g2c
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hgf1 1 300 2/net/mesh/direct g2c
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hgc2 1 300 2/net/mesh/direct g2c
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hgf2 1 300 2/net/mesh/direct g2c
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hgc3 1 300 2/net/mesh/direct g2c
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_DELAY_MS=200 tests/noino_gen0_ab.sh hgf3 1 300 2/net/mesh/direct g2c
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=0 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh hgcp1 1 300 2/net/mesh/direct g2c
+1310 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_DELAY_MS=0 tests/noino_gen0_ab.sh hgfp1 1 300 2/net/mesh/direct g2c

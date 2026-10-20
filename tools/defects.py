@@ -629,8 +629,15 @@ def cmd_update(data: dict, args) -> int:
         have = entry.get("next") or ""
         entry["next"] = (have + " ===== " if have else "") + appended
         changed.append("next")
+    #: The same for evidence: a board cell a record accounts for (configuration, row, verdict,
+    #: stamp) is added to what the record already cites, never typed over it.
+    appended = getattr(args, "append_evidence", None)
+    if appended:
+        have = entry.get("evidence") or ""
+        entry["evidence"] = (have + " ===== " if have else "") + appended
+        changed.append("evidence")
     if not changed:
-        sys.exit("defects: update needs at least one of -s/-m/-n/-a/-w/-N/-C/-P/-I")
+        sys.exit("defects: update needs at least one of -s/-m/-n/-a/-w/-W/-N/-C/-P/-I")
     #: Checked against what the record will HOLD, not only against what this call passed, so that
     #: `-I noblock` on a record whose reason was written earlier is accepted while `-I noblock` with
     #: no reason anywhere is not.
@@ -793,6 +800,9 @@ def main() -> int:
     update.add_argument("-s", "--severity", choices=SEVERITIES)
     update.add_argument("-m", "--summary")
     update.add_argument("-w", "--evidence")
+    update.add_argument("-W", "--append-evidence", dest="append_evidence",
+                        help="append to the evidence after a ' ===== ' separator instead of "
+                             "replacing it")
     update.add_argument("-n", "--next", dest="next_step")
     update.add_argument("-a", "--append-next", dest="append_next",
                         help="append to the next step after a ' ===== ' separator instead of "

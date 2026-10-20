@@ -569,6 +569,7 @@ xfs_vn_unlink(
 	struct inode	*dir,
 	struct dentry	*dentry)
 {
+	extern int	mxfs_dbg_unlink_live_delay_ms;
 	struct xfs_name	name;
 	int		error;
 
@@ -587,6 +588,13 @@ xfs_vn_unlink(
 		error = xfs_remove(XFS_I(dir), &name, XFS_I(d_inode(dentry)));
 	if (error)
 		return error;
+
+	/* TEST ONLY: see dbg_unlink_live_delay_ms (xfs_mxfs_dlm.c) */
+	if (unlikely(READ_ONCE(mxfs_dbg_unlink_live_delay_ms) > 0) &&
+	    S_ISREG(d_inode(dentry)->i_mode) &&
+	    d_inode(dentry)->i_nlink == 0 &&
+	    xfs_iflags_test(XFS_I(d_inode(dentry)), MXFS_IF_LOCAL_UNLINK))
+		msleep(READ_ONCE(mxfs_dbg_unlink_live_delay_ms));
 
 	/*
 	 * With unlink, the VFS makes the dentry "negative": no inode,
@@ -1346,6 +1354,12 @@ xfs_setattr_size(
 		error = -ESTALE;
 		goto out_trans_cancel;
 	}
+	/* the same change of incarnation without a change of type: the
+	 * acquire above poisoned the shell (see mxfs_incarn_refused_locked) */
+	if (mxfs_incarn_refused_locked(ip, "truncate")) {
+		error = -ESTALE;
+		goto out_trans_cancel;
+	}
 
 	/*
 	 * mxfs: load the extent list the truncate below walks while the
@@ -1463,6 +1477,17 @@ xfs_vn_setattr(
 	if (unlikely(error))
 		return error;
 
+	/* TEST ONLY: see dbg_setattr_delay_any (xfs_mxfs_dlm.c) */
+	{
+		extern int mxfs_dbg_setattr_delay_any;
+		extern int mxfs_dbg_setattr_time_delay_ms;
+
+		if (unlikely(READ_ONCE(mxfs_dbg_setattr_delay_any)) &&
+		    READ_ONCE(mxfs_dbg_setattr_time_delay_ms) > 0 &&
+		    S_ISREG(inode->i_mode))
+			msleep(READ_ONCE(mxfs_dbg_setattr_time_delay_ms));
+	}
+
 	if (iattr->ia_valid & ATTR_SIZE) {
 		uint			iolock;
 
@@ -1478,7 +1503,18 @@ xfs_vn_setattr(
 		error = xfs_vn_setattr_size(idmap, dentry, iattr);
 		xfs_iunlock(ip, XFS_MMAPLOCK_EXCL);
 	} else {
+		extern int mxfs_dbg_setattr_time_delay_ms;
+		extern int mxfs_dbg_setattr_delay_any;
+
 		trace_xfs_setattr(ip);
+
+		/* TEST ONLY: see dbg_setattr_time_delay_ms (xfs_mxfs_dlm.c) */
+		if (unlikely(READ_ONCE(mxfs_dbg_setattr_time_delay_ms) > 0) &&
+		    !READ_ONCE(mxfs_dbg_setattr_delay_any) &&
+		    S_ISREG(inode->i_mode) &&
+		    (iattr->ia_valid & (ATTR_ATIME | ATTR_MTIME)) &&
+		    !(iattr->ia_valid & (ATTR_MODE | ATTR_UID | ATTR_GID)))
+			msleep(READ_ONCE(mxfs_dbg_setattr_time_delay_ms));
 
 		error = xfs_vn_change_ok(idmap, dentry, iattr);
 		if (!error)
@@ -1651,6 +1687,11 @@ xfs_vn_update_time(
 			xfs_trans_cancel(tp);
 			return -EIO;
 		}
+	}
+	if (mxfs_incarn_refused_locked(ip, "update_time")) {
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		xfs_trans_cancel(tp);
+		return -ESTALE;
 	}
 /* see the fs_update_time note above xfs_vn_update_time's definition */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 90, 0)

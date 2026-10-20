@@ -173,9 +173,21 @@ static inline bool dl_inject_take(int *knob)
 	}
 	return false;
 }
+
+/* how long the heartbeat thread waits on one of its own I/Os before it goes
+ * on without it (see HEARTBEAT I/O THAT A TARGET NEVER ANSWERS) */
+static unsigned int mxfs_hb_io_bound_ms = 8000;
+module_param_named(hb_io_bound_ms, mxfs_hb_io_bound_ms, uint, 0644);
+MODULE_PARM_DESC(hb_io_bound_ms,
+		 "The heartbeat thread waits at most this long (ms) for one of "
+		 "its own reads or its beat's compare-and-write, then goes on "
+		 "without it while a worker waits the command out (8000, "
+		 "default); 0 issues them synchronously on the heartbeat thread "
+		 "(same-build control)");
 #else
 #define dl_instr_on() (0)
 #define dl_inject_take(k) (false)
+static unsigned int mxfs_hb_io_bound_ms = 8000;
 static int mxfs_dl_inject_hb_pause_ms;	/* user-mode: never armed */
 static int mxfs_dbg_hb_skip_auth_check;	/* user-mode: never armed */
 static int mxfs_dbg_hb_completion_delay_ms;	/* user-mode: never armed */
@@ -1318,6 +1330,374 @@ static int hb_caw(struct mxfs_disklock_ctx *ctx, unsigned int op,
 	return mxfs_pal_bdev_compare_and_write(ctx->dev, off, expect, want);
 }
 
+/*
+ * HEARTBEAT I/O THAT A TARGET NEVER ANSWERS.
+ *
+ * A task-management function from another initiator (a LOGICAL UNIT RESET
+ * any node's error handler issues, or a PREEMPT AND ABORT) aborts this node's
+ * commands queued at the target, and a target may release them without
+ * sending any response: iscsi-scst does, whatever the Control mode page's TAS
+ * bit says.  The initiator then holds each one for three expiries of its
+ * request timeout before its error handler aborts it (libiscsi
+ * iscsi_eh_cmd_timed_out: "making progress", the transport check, then the
+ * error handler), measured 90 s at a 30 s timeout and 540 s at 180 s.  One
+ * such command on the heartbeat thread held the whole cycle, beat and monitor
+ * alike, past the 30 s authority lease, so a node another host's reset had
+ * touched closed its own authority and shut its mount down
+ * (D-A-BYSTANDER-INITIATOR-HANGS-ON-AN-UNANNOUNCED-LU-RESET).
+ *
+ * So the heartbeat thread's own reads and its beat's compare-and-write run on
+ * a small pool of workers, and the thread waits at most hb_io_bound_ms for
+ * each.  Past that it goes on without the answer: a read counts as unreadable
+ * this pass (every caller already handles a read error), a beat as outcome
+ * unknown (the compare image is read again before the next one).  The worker
+ * waits the command out and frees what it owns.  No SCSI timeout changes, so
+ * nothing here adds an error-handler abort or a reset.
+ *
+ * A beat that lands after its wait was given up still renews, anchored at its
+ * own issue instant: a slow target that answers inside the lease must renew
+ * exactly as before.  A late landing is safe for the slot: the next beat
+ * compares against an image read after it, and an older beat executing after
+ * a newer one miscompares instead of overwriting it.
+ *
+ * Only these side-effect-free or self-correcting operations are bounded.
+ * Recovery and fence compare-and-writes stay synchronous: their callers
+ * reason from "it did not land", which a late landing would contradict.
+ *
+ * At most MXFS_HB_IO_WORKERS commands are outstanding; a request that finds
+ * every worker holding one is refused at once (-EBUSY) and the lease decides.
+ * Outside the heartbeat's lifetime (pool stopped or never started) the same
+ * calls run synchronously on the caller.  Stopping joins every worker: a
+ * worker may still own an in-flight command, and module text must outlive its
+ * completion.
+ */
+#define MXFS_HB_IO_WORKERS	4
+
+enum { HB_IO_READ, HB_IO_READ_PRIO, HB_IO_BEAT };
+
+struct hb_io {
+	struct hb_io    *next;
+	int             op;
+	uint64_t        off;
+	uint32_t        len;
+	void            *buf;           /* the read's target, or the beat's compare image */
+	void            *want;          /* the beat's new image */
+	uint64_t        anchor_ms;      /* the beat's issue instant */
+	uint64_t        queued_ms;
+	int             rc;
+	bool            done;
+	bool            abandoned;
+};
+
+struct mxfs_disklock_hbio {
+	mxfs_mutex_t    *lock;
+	mxfs_cond_t     *work;          /* a request was queued, or stop */
+	mxfs_cond_t     *done;          /* a request finished, or stop */
+	struct hb_io    *head, *tail;
+	int             outstanding;    /* queued + running, abandoned included */
+	bool            stop;
+	int             nthreads;
+	mxfs_thread_t   *thread[MXFS_HB_IO_WORKERS];
+	struct mxfs_disklock_ctx *ctx;
+	uint64_t        abandoned;      /* waits given up, lifetime of the context */
+	uint64_t        late_beats;     /* of those, beats that landed afterwards */
+	int             beats_unresolved; /* abandoned beats still in flight */
+};
+
+static const char *hb_io_op_name(int op)
+{
+	switch (op) {
+	case HB_IO_READ:      return "read";
+	case HB_IO_READ_PRIO: return "read_prio";
+	default:              return "beat";
+	}
+}
+
+static int hb_io_exec(struct mxfs_disklock_ctx *ctx, int op, uint64_t off,
+		      void *buf, const void *want, uint32_t len)
+{
+	switch (op) {
+	case HB_IO_READ:
+		return mxfs_pal_bdev_read(ctx->dev, off, buf, len);
+	case HB_IO_READ_PRIO:
+		return mxfs_pal_bdev_read_prio(ctx->dev, off, buf, len);
+	default:
+		return mxfs_pal_bdev_compare_and_write(ctx->dev, off, buf, want);
+	}
+}
+
+static void hb_io_free(struct hb_io *r)
+{
+	if (r->buf)
+		mxfs_pal_free_io(r->buf);
+	if (r->want)
+		mxfs_pal_free_io(r->want);
+	mxfs_pal_free(r);
+}
+
+static void hb_io_worker_fn(void *arg)
+{
+	struct mxfs_disklock_hbio *p = arg;
+	struct mxfs_disklock_ctx *ctx = p->ctx;
+	struct hb_io *r;
+	bool abandoned;
+
+	for (;;) {
+		mxfs_pal_mutex_lock(p->lock);
+		while (!p->head && !p->stop)
+			mxfs_pal_cond_wait(p->work, p->lock);
+		r = p->head;
+		if (!r) {               /* stopping, and nothing left queued */
+			mxfs_pal_mutex_unlock(p->lock);
+			break;
+		}
+		p->head = r->next;
+		if (!p->head)
+			p->tail = NULL;
+		mxfs_pal_mutex_unlock(p->lock);
+
+		r->rc = hb_io_exec(ctx, r->op, r->off, r->buf, r->want, r->len);
+
+		mxfs_pal_mutex_lock(p->lock);
+		r->done = true;
+		p->outstanding--;
+		abandoned = r->abandoned;
+		if (abandoned && r->op == HB_IO_BEAT) {
+			p->beats_unresolved--;
+			if (r->rc == 0)
+				p->late_beats++;
+		}
+		mxfs_pal_cond_broadcast(p->done);
+		mxfs_pal_mutex_unlock(p->lock);
+
+		if (!abandoned)
+			continue;       /* the waiter owns it */
+		if (r->op == HB_IO_BEAT && r->rc == 0) {
+			ctx->hb_last_ok_ms = mxfs_pal_time_ms();
+			mxfs_disklock_authority_renew(ctx, r->anchor_ms);
+		}
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "mxfs: P-HB-IO-LATE node %u slot %d op=%s off=%llu rc=%d "
+			     "held_ms=%llu -- a heartbeat I/O the heartbeat thread "
+			     "stopped waiting for has returned%s",
+			     ctx->local_node, ctx->local_slot, hb_io_op_name(r->op),
+			     (unsigned long long)r->off, r->rc,
+			     (unsigned long long)(mxfs_pal_time_ms() - r->queued_ms),
+			     r->op == HB_IO_BEAT && r->rc == 0 ?
+			     "; the beat landed and renews from its issue instant" : "");
+		hb_io_free(r);
+	}
+}
+
+static int hbio_start(struct mxfs_disklock_ctx *ctx)
+{
+	struct mxfs_disklock_hbio *p = ctx->hbio;
+	int i;
+
+	if (!p) {
+		p = mxfs_pal_alloc(sizeof(*p));
+		if (!p)
+			return -ENOMEM;
+		memset(p, 0, sizeof(*p));
+		p->lock = mxfs_pal_mutex_create();
+		p->work = mxfs_pal_cond_create();
+		p->done = mxfs_pal_cond_create();
+		if (!p->lock || !p->work || !p->done) {
+			if (p->lock)
+				mxfs_pal_mutex_destroy(p->lock);
+			if (p->work)
+				mxfs_pal_cond_destroy(p->work);
+			if (p->done)
+				mxfs_pal_cond_destroy(p->done);
+			mxfs_pal_free(p);
+			return -ENOMEM;
+		}
+		p->ctx = ctx;
+		ctx->hbio = p;
+	}
+	mxfs_pal_mutex_lock(p->lock);
+	p->stop = false;
+	mxfs_pal_mutex_unlock(p->lock);
+	for (i = 0; i < MXFS_HB_IO_WORKERS; i++) {
+		p->thread[i] = mxfs_pal_thread_create(hb_io_worker_fn, p);
+		if (!p->thread[i])
+			break;
+	}
+	p->nthreads = i;
+	if (!i) {
+		/* no worker: every call runs on its caller, as before */
+		mxfs_pal_mutex_lock(p->lock);
+		p->stop = true;
+		mxfs_pal_mutex_unlock(p->lock);
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+static void hbio_stop(struct mxfs_disklock_ctx *ctx)
+{
+	struct mxfs_disklock_hbio *p = ctx->hbio;
+	int i, had;
+
+	if (!p)
+		return;
+	had = p->nthreads;
+	mxfs_pal_mutex_lock(p->lock);
+	p->stop = true;
+	mxfs_pal_cond_broadcast(p->work);
+	mxfs_pal_cond_broadcast(p->done);
+	mxfs_pal_mutex_unlock(p->lock);
+	/* blocking: a worker may own an in-flight command (see above) */
+	for (i = 0; i < p->nthreads; i++) {
+		mxfs_pal_thread_join(p->thread[i]);
+		p->thread[i] = NULL;
+	}
+	p->nthreads = 0;
+	if (had && p->abandoned)
+		mxfs_pal_log(MXFS_LOG_INFO,
+			     "mxfs: P-HB-IO-STATS node %u slot %d abandoned=%llu "
+			     "late_beats=%llu",
+			     ctx->local_node, ctx->local_slot,
+			     (unsigned long long)p->abandoned,
+			     (unsigned long long)p->late_beats);
+}
+
+/* the context is being freed: hbio_stop has run, no worker is left */
+static void hbio_free(struct mxfs_disklock_ctx *ctx)
+{
+	struct mxfs_disklock_hbio *p = ctx->hbio;
+
+	if (!p)
+		return;
+	mxfs_pal_mutex_destroy(p->lock);
+	mxfs_pal_cond_destroy(p->work);
+	mxfs_pal_cond_destroy(p->done);
+	mxfs_pal_free(p);
+	ctx->hbio = NULL;
+}
+
+/*
+ * One heartbeat I/O, waited for at most hb_io_bound_ms.  A read lands in `buf`
+ * only when it returned 0 in time; for a beat `buf` is the compare image and
+ * `want` the new one, and `anchor_ms` its issue instant.
+ */
+static int hb_io_run(struct mxfs_disklock_ctx *ctx, int op, uint64_t off,
+		     void *buf, const void *want, uint32_t len,
+		     uint64_t anchor_ms)
+{
+	struct mxfs_disklock_hbio *p = ctx->hbio;
+	unsigned int bound = mxfs_hb_io_bound_ms;
+	struct hb_io *r;
+	uint64_t t0, waited;
+	int rc, outstanding;
+
+	if (!p || !bound)
+		return hb_io_exec(ctx, op, off, buf, want, len);
+
+	r = mxfs_pal_alloc(sizeof(*r));
+	if (!r)
+		return -ENOMEM;
+	memset(r, 0, sizeof(*r));
+	r->buf = mxfs_pal_alloc_io(len);
+	if (op == HB_IO_BEAT)
+		r->want = mxfs_pal_alloc_io(len);
+	if (!r->buf || (op == HB_IO_BEAT && !r->want)) {
+		hb_io_free(r);
+		return -ENOMEM;
+	}
+	if (op == HB_IO_BEAT) {
+		memcpy(r->buf, buf, len);
+		memcpy(r->want, want, len);
+	}
+	r->op = op;
+	r->off = off;
+	r->len = len;
+	r->anchor_ms = anchor_ms;
+	r->queued_ms = t0 = mxfs_pal_time_ms();
+
+	mxfs_pal_mutex_lock(p->lock);
+	if (p->stop) {
+		mxfs_pal_mutex_unlock(p->lock);
+		hb_io_free(r);
+		return hb_io_exec(ctx, op, off, buf, want, len);
+	}
+	if (p->outstanding >= p->nthreads) {
+		outstanding = p->outstanding;
+		mxfs_pal_mutex_unlock(p->lock);
+		hb_io_free(r);
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "mxfs: P-HB-IO-BUSY node %u slot %d op=%s off=%llu "
+			     "outstanding=%d -- every heartbeat I/O worker is still "
+			     "waiting on a command; this one is not issued",
+			     ctx->local_node, ctx->local_slot, hb_io_op_name(op),
+			     (unsigned long long)off, outstanding);
+		return -EBUSY;
+	}
+	if (p->tail)
+		p->tail->next = r;
+	else
+		p->head = r;
+	p->tail = r;
+	p->outstanding++;
+	mxfs_pal_cond_signal(p->work);
+	for (;;) {
+		if (r->done)
+			break;
+		waited = mxfs_pal_time_ms() - t0;
+		if (waited >= bound || p->stop) {
+			r->abandoned = true;
+			p->abandoned++;
+			if (op == HB_IO_BEAT)
+				p->beats_unresolved++;
+			break;
+		}
+		mxfs_pal_cond_timedwait(p->done, p->lock, bound - waited);
+	}
+	if (r->abandoned) {
+		outstanding = p->outstanding;
+		mxfs_pal_mutex_unlock(p->lock);
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "mxfs: P-HB-IO-ABANDON node %u slot %d op=%s off=%llu "
+			     "bound_ms=%u outstanding=%d -- no answer in time; the "
+			     "heartbeat goes on without it and a worker waits the "
+			     "command out",
+			     ctx->local_node, ctx->local_slot, hb_io_op_name(op),
+			     (unsigned long long)off, bound, outstanding);
+		return -ETIMEDOUT;
+	}
+	mxfs_pal_mutex_unlock(p->lock);
+	rc = r->rc;
+	if (rc == 0 && op != HB_IO_BEAT)
+		memcpy(buf, r->buf, len);
+	hb_io_free(r);
+	return rc;
+}
+
+int mxfs_disklock_beats_unresolved(struct mxfs_disklock_ctx *ctx)
+{
+	struct mxfs_disklock_hbio *p = ctx ? ctx->hbio : NULL;
+	int n;
+
+	if (!p)
+		return 0;
+	mxfs_pal_mutex_lock(p->lock);
+	n = p->beats_unresolved;
+	mxfs_pal_mutex_unlock(p->lock);
+	return n;
+}
+
+static int hb_read(struct mxfs_disklock_ctx *ctx, uint64_t off, void *buf,
+		   uint32_t len)
+{
+	return hb_io_run(ctx, HB_IO_READ, off, buf, NULL, len, 0);
+}
+
+static int hb_read_prio(struct mxfs_disklock_ctx *ctx, uint64_t off,
+			void *buf, uint32_t len)
+{
+	return hb_io_run(ctx, HB_IO_READ_PRIO, off, buf, NULL, len, 0);
+}
+
 /* the settlement vocabulary is exported (disklock.h) so the mount
  * thread can act on it; the short names stay for the monitor's arms. */
 #define HB_RETIRE_EMPTY     MXFS_DISKLOCK_RETIRE_EMPTY
@@ -1341,7 +1721,7 @@ static int hb_retire_reread(struct mxfs_disklock_ctx *ctx, uint64_t off,
 	int rc;
 
 	mxfs_pal_mutex_lock(ctx->lock);
-	rc = mxfs_pal_bdev_read_prio(ctx->dev, off, rhb, sizeof(*rhb));
+	rc = hb_read_prio(ctx, off, rhb, sizeof(*rhb));
 	mxfs_pal_mutex_unlock(ctx->lock);
 	return rc ? rc : HB_RETIRE_CHANGED;
 }
@@ -1395,7 +1775,7 @@ static int hb_retire_settle(struct mxfs_disklock_ctx *ctx, uint32_t slot,
 
 	/* FUA confirm: the plain monitor read is cacheable. */
 	mxfs_pal_mutex_lock(ctx->lock);
-	rc = mxfs_pal_bdev_read_prio(ctx->dev, off, rhb, sizeof(*rhb));
+	rc = hb_read_prio(ctx, off, rhb, sizeof(*rhb));
 	mxfs_pal_mutex_unlock(ctx->lock);
 	if (rc)
 		return rc;
@@ -2161,7 +2541,7 @@ static int fs_identity_changed(struct mxfs_disklock_ctx *ctx, void *buf)
 	const struct mxfs_ondisk_super *sup = buf;
 	int rc;
 
-	rc = mxfs_pal_bdev_read(ctx->dev, 0, buf, MXFS_DISKLOCK_RECORD_SIZE);
+	rc = hb_read(ctx, 0, buf, MXFS_DISKLOCK_RECORD_SIZE);
 	if (rc < 0)
 		return rc;
 
@@ -2333,13 +2713,14 @@ static const char *hb_foreign_kind(const struct mxfs_disklock_ctx *ctx,
  */
 static int hb_cas_own_slot(struct mxfs_disklock_ctx *ctx, uint64_t off,
 			   const struct mxfs_disklock_heartbeat *want,
-			   struct mxfs_disklock_heartbeat *scratch)
+			   struct mxfs_disklock_heartbeat *scratch,
+			   uint64_t anchor_ms)
 {
 	int rc;
 
 	/* Bootstrap / post-indeterminate: re-establish the compare source. */
 	if (!ctx->hb_img_valid) {
-		rc = mxfs_pal_bdev_read_prio(ctx->dev, off, scratch, sizeof(*scratch));
+		rc = hb_read_prio(ctx, off, scratch, sizeof(*scratch));
 		if (rc < 0)
 			return rc;
 		if (!hb_own_record(ctx, scratch))
@@ -2348,7 +2729,13 @@ static int hb_cas_own_slot(struct mxfs_disklock_ctx *ctx, uint64_t off,
 		ctx->hb_img_valid = true;
 	}
 
-	rc = hb_caw(ctx, HB_CAW_OP_HEARTBEAT, "heartbeat", off, &ctx->hb_img, want);
+	/* bounded (HEARTBEAT I/O THAT A TARGET NEVER ANSWERS): -ETIMEDOUT or
+	 * -EBUSY is outcome unknown, the indeterminate arm below */
+	if (mxfs_pal_dbg_cas_nocaw(HB_CAW_OP_HEARTBEAT, "heartbeat"))
+		rc = -EOPNOTSUPP;
+	else
+		rc = hb_io_run(ctx, HB_IO_BEAT, off, &ctx->hb_img, want,
+			       sizeof(*want), anchor_ms);
 
 	if (rc == -EOPNOTSUPP) {
 		/*
@@ -2373,8 +2760,7 @@ static int hb_cas_own_slot(struct mxfs_disklock_ctx *ctx, uint64_t off,
 
 	if (rc == -EAGAIN) {
 		/* Somebody else wrote our sector.  Who? */
-		int rrc = mxfs_pal_bdev_read_prio(ctx->dev, off, scratch,
-						  sizeof(*scratch));
+		int rrc = hb_read_prio(ctx, off, scratch, sizeof(*scratch));
 		if (rrc < 0) {
 			ctx->hb_img_valid = false;
 			return rrc;
@@ -2912,10 +3298,10 @@ static void hb_payload_fill(struct mxfs_disklock_ctx *ctx,
  * wait_ms=30241 against a 30000 ms lease.
  *
  * The proof the barrier needs does not require the beat to come from any
- * particular thread.  It goes through the same single-outstanding
- * compare-and-write under the same mutex, so it still cannot land until the
- * beat the reset stranded has been resolved, and it still renews from an
- * anchor taken before it was issued.  Issuing it here is therefore the same
+ * particular thread.  It goes through the same compare-and-write under the
+ * same mutex, and it still renews from an anchor taken before it was issued.
+ * (A beat no longer waits for a stranded one to resolve: the barrier asks
+ * that separately, mxfs_disklock_beats_unresolved.)  Issuing it here is therefore the same
  * proof with one fewer dependency — on another thread's schedule.
  *
  * WHAT THIS DELIBERATELY DOES NOT DO.  It does not drive the heartbeat stage
@@ -2965,7 +3351,7 @@ int mxfs_disklock_beat_now(struct mxfs_disklock_ctx *ctx)
 	}
 
 	mxfs_pal_mutex_lock(ctx->lock);
-	rc = hb_cas_own_slot(ctx, offset, hb, rhb);
+	rc = hb_cas_own_slot(ctx, offset, hb, rhb, t0);
 	mxfs_pal_mutex_unlock(ctx->lock);
 
 	if (rc == 0) {
@@ -3127,7 +3513,7 @@ static void disklock_hb_fn(void *arg)
 		hb_tlock = mxfs_pal_time_ms();
 		/* CAS, never a blind write — see hb_cas_own_slot.  rhb is
 		 * free again here (the identity check above finished with it). */
-		rc = hb_cas_own_slot(ctx, offset, hb, rhb);
+		rc = hb_cas_own_slot(ctx, offset, hb, rhb, hb_t0);
 		mxfs_pal_mutex_unlock(ctx->lock);
 		/*
 		 * TEST ONLY, one-shot: the beat REACHED THE TARGET and its completion
@@ -3296,7 +3682,7 @@ static void disklock_hb_fn(void *arg)
 				off = ctx->base_offset + (uint64_t)slot * MXFS_DISKLOCK_RECORD_SIZE;
 
 				mxfs_pal_mutex_lock(ctx->lock);
-				rr = mxfs_pal_bdev_read(ctx->dev, off,
+				rr = hb_read(ctx, off,
 							 rhb, sizeof(*rhb));
 				/* observe the writer's PR key while the record is
 				 * fresh; frozen per exact incarnation (see hb_ident_observe). */
@@ -3400,7 +3786,7 @@ static void disklock_hb_fn(void *arg)
 						if (rr == 0 && still_dead_stamp &&
 						    hb_clean_empty_match(ctx, rhb, pn, pe)) {
 							mxfs_pal_mutex_lock(ctx->lock);
-							crr = mxfs_pal_bdev_read_prio(ctx->dev, off,
+							crr = hb_read_prio(ctx, off,
 										      rhb, sizeof(*rhb));
 							mxfs_pal_mutex_unlock(ctx->lock);
 							if (crr == 0 &&
@@ -3548,7 +3934,7 @@ static void disklock_hb_fn(void *arg)
 
 						if (rr == 0 && !still_dead_stamp) {
 							mxfs_pal_mutex_lock(ctx->lock);
-							crr = mxfs_pal_bdev_read_prio(ctx->dev, off,
+							crr = hb_read_prio(ctx, off,
 										      rhb, sizeof(*rhb));
 							mxfs_pal_mutex_unlock(ctx->lock);
 							if (crr == 0 &&
@@ -3657,7 +4043,7 @@ static void disklock_hb_fn(void *arg)
 				    rhb->flags == MXFS_DISKLOCK_FLAG_WITHDRAWN &&
 				    !hb_gen_foreign(ctx, rhb)) {
 					mxfs_pal_mutex_lock(ctx->lock);
-					crr = mxfs_pal_bdev_read_prio(ctx->dev, off, rhb,
+					crr = hb_read_prio(ctx, off, rhb,
 								      sizeof(*rhb));
 					mxfs_pal_mutex_unlock(ctx->lock);
 					if (crr == 0 && rhb->magic == MXFS_DISKLOCK_MAGIC &&
@@ -3718,7 +4104,7 @@ static void disklock_hb_fn(void *arg)
 					}
 					if (fresh) {
 						mxfs_pal_mutex_lock(ctx->lock);
-						crr = mxfs_pal_bdev_read_prio(ctx->dev, off, rhb,
+						crr = hb_read_prio(ctx, off, rhb,
 									      sizeof(*rhb));
 						mxfs_pal_mutex_unlock(ctx->lock);
 						fd = crr == 0 ? recov_desc_of(rhb) : NULL;
@@ -3772,7 +4158,7 @@ static void disklock_hb_fn(void *arg)
 				    hb_clean_empty_match(ctx, rhb, victim_node,
 							 nt->last_epoch)) {
 					mxfs_pal_mutex_lock(ctx->lock);
-					crr = mxfs_pal_bdev_read_prio(ctx->dev, off, rhb,
+					crr = hb_read_prio(ctx, off, rhb,
 								      sizeof(*rhb));
 					mxfs_pal_mutex_unlock(ctx->lock);
 					if (crr == 0 &&
@@ -4070,7 +4456,7 @@ static void disklock_hb_fn(void *arg)
 				    rhb->node_id == excl_node && ctx->monitored[slot] &&
 				    inc_eq(rhb->epoch, nt->last_epoch)) {
 					mxfs_pal_mutex_lock(ctx->lock);
-					crr = mxfs_pal_bdev_read_prio(ctx->dev, off, rhb,
+					crr = hb_read_prio(ctx, off, rhb,
 								      sizeof(*rhb));
 					mxfs_pal_mutex_unlock(ctx->lock);
 					if (crr == 0 &&
@@ -4149,7 +4535,7 @@ static void disklock_hb_fn(void *arg)
 					int vfst;
 
 					mxfs_pal_mutex_lock(ctx->lock);
-					crr = mxfs_pal_bdev_read_prio(ctx->dev, off, rhb,
+					crr = hb_read_prio(ctx, off, rhb,
 								      sizeof(*rhb));
 					mxfs_pal_mutex_unlock(ctx->lock);
 					vfst = (crr == 0) ? hb_feature_state(rhb) : MXFS_HBFEAT_OK;
@@ -4228,7 +4614,7 @@ check_dead:
 					 * this confirm (definite restart, no false positive).
 					 */
 					mxfs_pal_mutex_lock(ctx->lock);
-					crr = mxfs_pal_bdev_read_prio(ctx->dev, off, rhb,
+					crr = hb_read_prio(ctx, off, rhb,
 								      sizeof(*rhb));
 					mxfs_pal_mutex_unlock(ctx->lock);
 					if (crr == 0 &&
@@ -4779,6 +5165,8 @@ void mxfs_disklock_destroy(struct mxfs_disklock_ctx *ctx)
 		return;
 
 	mxfs_disklock_stop_heartbeat(ctx);
+	hbio_stop(ctx);         /* no-op unless the heartbeat never stopped */
+	hbio_free(ctx);
 
 	if (ctx->shutdown_cond)
 		mxfs_pal_cond_destroy(ctx->shutdown_cond);
@@ -4822,8 +5210,16 @@ int mxfs_disklock_start_heartbeat(struct mxfs_disklock_ctx *ctx)
 
 	ctx->running = true;
 
+	/* before the first beat; without workers the heartbeat's I/O runs on its
+	 * own thread as it always did, so a failure here is reported, not fatal */
+	if (hbio_start(ctx))
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "disklock: heartbeat I/O workers failed to start; the "
+			     "heartbeat thread issues its own I/O this mount");
+
 	ctx->hb_thread = mxfs_pal_thread_create(disklock_hb_fn, ctx);
 	if (!ctx->hb_thread) {
+		hbio_stop(ctx);
 		ctx->running = false;
 		mxfs_pal_log(MXFS_LOG_ERR,
 			     "disklock: failed to start heartbeat thread");
@@ -4891,6 +5287,9 @@ void mxfs_disklock_stop_heartbeat(struct mxfs_disklock_ctx *ctx)
 		mxfs_pal_thread_join(ctx->hb_watchdog);
 		ctx->hb_watchdog = NULL;
 	}
+
+	/* after the heartbeat thread: nothing queues work for the pool now */
+	hbio_stop(ctx);
 
 	mxfs_pal_log(MXFS_LOG_DEBUG, "disklock: heartbeat stopped");
 }

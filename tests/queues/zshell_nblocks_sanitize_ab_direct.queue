@@ -1,0 +1,53 @@
+# D-CREATE-ON-ZOMBIE-SHELL-INHERITS-DEAD-LIFE-NBLOCKS, H-Z1, the 2/net/mesh/direct
+# leg: the configuration the defect was traced on (q6dc1, g2c, ino 8388736
+# 'done' home with nblocks 1 and no extents, failing xfs_dinode_verify on both
+# nodes).  The hypothesis, the guard and the instruments are those of
+# tests/queues/zshell_nblocks_sanitize_ab.queue (2/net/mesh/mpath); the H-F6
+# direct control laps q6dc1, q6dc2 and q6dc1r made 18-22 creates on mode-0
+# dead shells carrying a block count each.
+#
+# Same-build A/B of module knob deadshell_sanitize_guard (0 = control, 1 =
+# fix) on tests/peer_last_closer_ab.sh with inact_local_epoch_guard 0 in both
+# arms, setattr delay 400 ms, unlink live delay 1000 ms, every other guard at
+# its module default.  Runs from the main tree, rebuilt after hf6tdr's QUEUE
+# DONE from the sources ~/src/mxfs-c was synced from (srcversion
+# A7E5F619C93D6F05C21A1CB expected; the harness prints each lap's build and
+# refuses a node running anything else), on 2/net/mesh/direct g2c.
+#
+# THE AUDIT is the rebuilt main tree's tools/chk_mxfs, which compares every
+# live core's block count with the blocks its forks name (P-NBLOCKS-MISMATCH);
+# its first run over the 25 kept images found 0 mismatches and no other change
+# from the previous build.  Each lap's ZRESULT prints audit_nblocks_mismatch.
+#
+# VERDICT RULES (written before the first lap): those of
+# tests/queues/zshell_nblocks_sanitize_ab_caw.queue, unchanged:
+#   REACHED       every control lap reads a_stale_blocks > 0; otherwise the
+#                 window is redesigned before anything is judged.
+#   PROVEN        a reached control lap reads nblocks_inherited > 0 with a
+#                 P-CREATE-NBLOCKS-INHERITED line whose number has a
+#                 P-RECYCLE-DEADSHELL-STALE guard=0 line on the same node within
+#                 the preceding second.  A control-lap P-NBLOCKS-MISMATCH or
+#                 dinode verify failure on such a number is the defect on the
+#                 platter and judges nothing else.
+#   FIX VERIFIED  REACHED and PROVEN, and every non-vacuous fix lap
+#                 (a_sanitized > 0) reads ZPASS: nblocks_inherited 0 on both
+#                 nodes, dinode_verify_fail 0, audit CLEAN with
+#                 audit_nblocks_mismatch 0, node_failures 0.
+#   REFUTED       a non-vacuous fix lap reads nblocks_inherited > 0, a dinode
+#                 verify failure, or a P-NBLOCKS-MISMATCH: trace the instance.
+#   OTHER         an inherited create with no P-RECYCLE-DEADSHELL-STALE line
+#                 before it, or a control-lap P-NBLOCKS-MISMATCH on a number with
+#                 no inherited create: its own finding, traced; it blocks the
+#                 record's closure.
+# A lap whose audit is STALE/NONE has no verdict and is rerun; a ZVACUOUS lap
+# has no verdict.
+#
+# Bound per lap: tests/queues/hf6_peer_last_closer_tcp_ab_direct.queue's 1090 s
+# (the sum of the harness's own step bounds) plus 2x20 s for the sanitize knob
+# set/readback = 1130 s.  Its laps took 268-447 s.
+1130 PLC_SANITIZE_GUARD=0 tests/peer_last_closer_ab.sh nbdc1 0 40 2/net/mesh/direct g2c
+1130 PLC_SANITIZE_GUARD=1 tests/peer_last_closer_ab.sh nbdf1 0 40 2/net/mesh/direct g2c
+1130 PLC_SANITIZE_GUARD=0 tests/peer_last_closer_ab.sh nbdc2 0 40 2/net/mesh/direct g2c
+1130 PLC_SANITIZE_GUARD=1 tests/peer_last_closer_ab.sh nbdf2 0 40 2/net/mesh/direct g2c
+1130 PLC_SANITIZE_GUARD=1 tests/peer_last_closer_ab.sh nbdf3 0 40 2/net/mesh/direct g2c
+1130 PLC_SANITIZE_GUARD=1 tests/peer_last_closer_ab.sh nbdf4 0 40 2/net/mesh/direct g2c

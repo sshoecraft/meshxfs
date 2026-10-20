@@ -113,10 +113,14 @@ def super_fields(f):
     return base, vid
 
 
-def inode_page(vid, ino, seed, npages):
+def inode_page(vid, ino, seed, npages, hash_version):
     """The ledger page an inode's lock is routed to: mxfs_tauth_res_hash over
     the 32-byte struct mxfs_resource_id {volume, ino, offset 0, ag 0, type 1},
-    then hash % npages (mxfs_tauth_home_page)."""
+    then hash % npages (mxfs_tauth_home_page).  Routing version 2 hashes the
+    number with its low MXFS_TAUTH_INO_SHARD_BITS (3) bits cleared
+    (mxfs_tauth_route_hash)."""
+    if hash_version >= 2:
+        ino &= ~7
     res = struct.pack("<QQQIB3x", vid, ino, 0, 0, LTYPE_INODE)
     h = (2166136261 ^ (seed & 0xFFFFFFFF) ^ (seed >> 32)) & 0xFFFFFFFF
     for b in res:
@@ -128,16 +132,18 @@ def inode_page(vid, ino, seed, npages):
 
 
 def region_geometry(f, base):
-    """(npages, hash_seed) from the first sane region header copy.  The seed is
-    what a resource's page is routed by (tests/tauth/pageof takes both)."""
+    """(npages, hash_seed, hash_version) from the first sane region header
+    copy.  The seed and the routing version are what a resource's page is
+    routed by (tests/tauth/pageof takes all three)."""
     for copy in (0, 1):
         f.seek(base + copy * PAGE)
         hdr = f.read(PAGE)
         magic, _ver, _epp, npages = struct.unpack_from("<IHHI", hdr, 0)
         if magic == REGION_MAGIC and npages:
+            (hver,) = struct.unpack_from("<H", hdr, 56)
             (seed,) = struct.unpack_from("<Q", hdr, 64)
-            return npages, seed
-    return 0, 0
+            return npages, seed, hver
+    return 0, 0, 0
 
 
 ENTRY_STATE = {0: "EMPTY", 1: "ACTIVE", 2: "FREE", 3: "UNKNOWN"}
@@ -252,20 +258,20 @@ def main():
                 print("no MXFS superblock on %s; pass the region base" % a.dev,
                       file=sys.stderr)
                 return 2
-        hdr_pages, seed = region_geometry(f, a.base)
+        hdr_pages, seed, hver = region_geometry(f, a.base)
         npages = a.pages or hdr_pages
         if not npages:
             print("no valid region header at base %d" % a.base, file=sys.stderr)
             return 2
-        print("region base=%d npages=%d seed=%#018x volume=%#018x" %
-              (a.base, npages, seed, vid))
+        print("region base=%d npages=%d seed=%#018x hash_version=%d volume=%#018x" %
+              (a.base, npages, seed, hver, vid))
         route = {}
         if a.route_inodes:
             with open(a.route_inodes) as rf:
                 for line in rf:
                     line = line.strip()
                     if line.isdigit():
-                        route.setdefault(inode_page(vid, int(line), seed, npages),
+                        route.setdefault(inode_page(vid, int(line), seed, npages, hver),
                                          []).append(int(line))
         tuples = {}
         # every inode record a page carries routes to that page; a record that
@@ -319,7 +325,7 @@ def main():
                 if route:
                     for (_i, _st, rtype, _ag, ino, *_rest) in holder_records(best[2]):
                         if rtype == LTYPE_INODE and ino:
-                            if inode_page(vid, ino, seed, npages) == pid:
+                            if inode_page(vid, ino, seed, npages, hver) == pid:
                                 r_ok += 1
                             else:
                                 r_bad += 1

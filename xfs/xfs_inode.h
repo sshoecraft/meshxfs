@@ -270,6 +270,7 @@ typedef struct xfs_inode {
 	uint32_t		i_dlm_init_seq; /* interactive session 2026-07-13: diagnostic-only.  Stamped from a global atomic counter in mxfs_dlm_inode_init (true fresh xfs_inode_alloc, incl. post-eviction re-iget).  Printed alongside P15-REL-ABORT to test the hypothesis that i_dlm_orphan_since_ns/i_dlm_bast_starve_since_ns keep getting wiped by in-core inode eviction+reinstantiation (icache reclaim churn under the fence_during_write hot-dir storm) rather than by any bug in the clocks' own reset logic — a DIFFERENT value across "consecutive" P15-REL-ABORT samples for the SAME ino proves the in-core inode was recycled in between. */
 	uint16_t		i_dlm_p72_strikes; /*  a864 consecutive P72 stuck-DEMOTING orphan swallows (mode==NL, holders==0) seen while i_dlm_demoter is non-NULL.  A non-NULL demoter at work_busy==0 is a stuck INLINE bast_process (blocked at mode==NL, past its Phase-2 drain, so demoter=NULL never runs).  A LIVE inline drain completes within 1-2 peer BASTs; the wedge storms 100s+.  Once this reaches MXFS_P72_ORPHAN_STRIKES the orphan-reclaim overrides the demoter gate and force-clears the bit.  Reset on claim / when the orphan shape no longer holds. */
 	unsigned long		i_dlm_epoch;	/* v0.5.1: DLM hold-epoch.  Bumped every time this node LOSES the inode's DLM grant (mode -> NL) or marks it stale.  While i_dlm_mode != NL the on-disk grant is held, so no peer can have modified this inode/dir since the epoch last changed.  d_revalidate stamps the parent's epoch into dentry->d_time after a coordinated validation; a later cached lookup whose stamp still equals the parent's epoch (parent grant held, not stale) is provably fresh with ZERO disk I/O. */
+	unsigned long		i_mxfs_unlink_epoch; /* i_dlm_epoch when MXFS_IF_LOCAL_UNLINK was last set.  Still equal at inactivation = this node never lost the grant since its unlink, so no peer can have freed the life first and the in-core image is the authority xfs_inactive's local-unlink fast path assumes.  Moved = a peer may have been the last closer and freed it: the inactivation reads the platter instead.  0 (never stamped) never equals the epoch, which starts at 1. */
 	uint16_t		i_dlm_ex_holders; /* active IOLOCK_EXCL holders */
 	uint16_t		i_dlm_pr_holders; /* active IOLOCK_SHARED holders */
 	uint16_t		i_dlm_pin_count;  /* D9: multi-step op pins (mxfs_clayer/pinned_resource.h) */
@@ -285,6 +286,14 @@ typedef struct xfs_inode {
 	 * so di_changecount is monotonic across incarnations of an inode number —
 	 * the node-independent foreign-replay skip rule depends on that. */
 	uint64_t		i_mxfs_prev_changecount;
+	/* (D-RECYCLE-RESET-UNDER-NOINO-STRANDS-COMMITTED-DIR-CHANGE-WEDGE-
+	 * SHUTDOWN): 1 once a recycle of this reclaimable corpse was refused
+	 * because a no-inode release of its number was in flight while the
+	 * corpse still owed the platter a committed change
+	 * (mxfs_noino_recycle_must_wait).  Written under i_flags_lock with the
+	 * corpse unowned; the recycle that finally runs reads the grant the
+	 * release left behind unsampled and clears it. */
+	uint8_t			i_mxfs_noino_waited;
 	bool			i_dlm_stale;	/* needs reload from disk after BAST */ uint8_t i_dlm_stale_src; /* code of the LAST i_dlm_stale=true setter (1=readdir 2=consumer_refresh 3=modify_prelock 4=adopt_fmt 5=bast_process_rel 6=bast_notify_acq 7=ilock_slow_prereload 8=fastpath_rearm 9-13=dlm_misc 14-17=iget 18-20=inode_misc 21-23=super 24=iflush_deadincarn 25=iflush_dirvalid_epoch 26=reload_identical_keepfork 27=file_rw_bail 29=recycle_phantom) — P11-ACQSTALE-SELFBAST forensics */ uint8_t i_dlm_bastq_src; /* site that queued the last bast_work/dwork (1=ilock_end_refire 2=demwait_redrive 3=notify_idle 4=notify_orphan 5=notify_immediate 6=ilock_begin_recov 7=acq_selfbast 9=mht_arm 10=stranded_arm 11=batch_arm 12=sf_tenure_arm 13=grantwin_park 14=close_release 15=pr_idle_release 16=dir_ex_sweep) */
 	u64			i_dlm_bastq_qns; /* P296-BASTQLAT (D-503 instrumented): expected-run ktime of the last SUCCESSFUL bast work/dwork arm — queue time for the immediate work, queue time + delay for the dwork (so work-fn-entry minus this = pure queue-to-run EXCESS, not the intended MHT delay).  Stamped under m_mxfs_arm_lock only when queue(_delayed)_work returned true (a false = already pending — the earlier stamp stays authoritative).  Read+cleared locklessly at both work-fn entries; a re-arm racing that read can make the delta negative, which the probe discards. */
 	bool			i_dlm_bast_during_acq; /* a peer BAST arrived while this node was in ISTATE_ACQUIRING (slow-path DLM acquire in flight).  SEPARATE flag from i_dlm_stale: the post-acquire reload CLEARS i_dlm_stale before the post-publish reads it, so reusing i_dlm_stale to defer the BAST silently SWALLOWED the revoke — the holder kept the grant cached idle and the peer's request stalled the full 6000ms MXFS_LOCK_ACQUIRE_WAIT_MS until its retry re-fired the BAST (the dir_reuse 2/tcp ~6s handoff, PROVEN 9 ACQUIRING-EX BASTs lost/run).  Set by bast_notify's ACQUIRING branch; honored at the slow-path post-publish (-> ISTATE_BAST + drain) regardless of reload; cleared there. */
@@ -300,6 +309,11 @@ typedef struct xfs_inode {
 	bool			i_dlm_self_demote; /* the next mxfs_dlm_bast_process for this inode is a SELF-demote (the P109 EDEADLK upgrade-conflict recovery dropping our own cached PR->NL to re-request EX from a clean state), NOT a peer handoff.  No peer reads our state across a self-demote, so a clean (read-only) self-demote needs no durability drain — skipping it kills the tcp_dlm_scaling PR->EX upgrade-livelock amplifier WITHOUT removing the coherency-masking barrier on genuine peer handoffs (dir_reuse/rsync_paired).  Set in the EDEADLK recovery before queuing bast_work; read+cleared at bast_process entry. */
 	bool			i_dlm_unpublished; /* brand-new inode granted LOCALLY (i_dlm_mode=EX) with NO on-disk CAW slot yet; published lazily on a peer dir/AGI BAST or dropped silently on local eviction.  See notes/sess43_deferred_publish_design.md */
 	struct list_head	i_dlm_unpub_link;  /* linkage on mp->m_mxfs_unpub_list while i_dlm_unpublished */
+	u64			i_mxfs_unpub_seq;  /* the order this inode joined m_mxfs_unpub_list, set at each list add: an AG release's drain takes only the entries listed before it began (pub_drain_bound) */
+	struct list_head	i_mxfs_pubclaim_link; /* linkage on mp->m_mxfs_pubclaim_list from the moment a publish takes this inode off the unpublished list until its claim returns: the window in which it is neither unpublished nor granted (H-F10).  Removed by the claimant, or by reclaim before the inode is freed. */
+	u64			i_mxfs_pubclaim_seq;  /* that publish's token; the claimant removes only the entry carrying it */
+	u64			i_mxfs_pubclaim_ns;   /* ktime ns the claim began */
+	u64			i_mxfs_pubclaim_bseq; /* the ilock backstop's own token, ended by the acquiring thread when its acquire returns */
 	xfs_ino_t		i_mxfs_unpub_parent; /* v0.5.6: ino of the directory whose dirent names this unpublished inode; 0 = unknown (tmpfile/whiteout/pre-assignment window) and means "include in EVERY scoped BAST publish".  Lets the BAST-side publish drain claim slots ONLY for inodes a peer can actually reach through the lock being released (the released dir's children, or the released AG's inodes) instead of the whole list — the whole-list drain at 16 nodes claimed ~96k slots against the 65536-slot CAW table, took minutes per release, and starved EX waiters into 120s timeouts + shutdown (scaling_curve root cause 2).  Set after xfs_dir_create_child in xfs_create/xfs_symlink; a plain store suffices: a racing scoped drain that reads the pre-store 0 over-publishes (safe), never under-publishes.  Cross-dir rename/link of a still-unpublished inode force-publishes synchronously (mxfs_dlm_publish_inode) so the recorded parent can never go stale. */
 	uint32_t		i_dlm_dir_gen;	/* bumped on DLM re-acquire-after-BAST; dir-block read path forces FUA re-read when cached buf's stamp < this (read-time/lazy block-dir invalidation, deadlock-free) */
 	uint32_t		i_dlm_cached_grant_gen; /* (plan): the TCP DLM per-grant generation token cached at the last SLOW-PATH acquire of this inode.  On a dir-EX FAST-PATH serve, if mxfs_v5_dlm_inode_grant_gen != this, the lock CHANGED HANDS (a peer was granted) since we cached it -> the in-core dir base is stale -> force a reload-on-reacquire before the RMW.  This is the RELIABLE (acked-TCP grant_gen) replacement for the lossy DIR_MODIFY eviction-ring as the dir staleness signal (PROVEN root: fast-path RMW of a stale block0 clobbers peers' dirents). 0 = not yet cached. */
@@ -912,6 +926,13 @@ typedef struct xfs_inode {
 	 * a revert and not a legitimate newer incarnation.
 	 */
 	uint64_t		i_mxfs_pub_stage_ns;
+	/*
+	 * CLOCK_REALTIME at the recycle that found MXFS_IF_NOINO_RELEASED (H-NR1):
+	 * a staged image whose i_mxfs_pub_stage_ns is older was copied in under
+	 * the grant that release ended, and the cluster write names it if it
+	 * goes home.  0 = no such recycle.
+	 */
+	uint64_t		i_mxfs_relmark_ns;
 	uint8_t			i_mxfs_pipe_relog; /* the release pipeline's own
 			 * tiny re-log transaction (P146V clean-but-unlanded arm,
 			 * P182 relmerge arm) is in flight on this inode.  Gates
@@ -1894,6 +1915,21 @@ mxfs_inode_incarn_estale(struct xfs_inode *ip)
 }
 
 /*
+ * D-STALE-NAME-SETATTR-ADOPTS-PEER-REUSED-INCARNATION-CHANGES-UNRELATED-FILE:
+ * the check after the lock for a path whose first cluster acquire is inside
+ * its own xfs_ilock and which then logs or frees through the shell without
+ * one of the gated transaction helpers (truncate, the post-EOF trim, the
+ * timestamp update).  The reload under that very acquire may just have
+ * found another incarnation on the platter and poisoned the shell; going on
+ * would log the dead incarnation's core over the live one's slot or free
+ * blocks from its stale extent map.  True when the caller must refuse.
+ * Gated on incarn_poison_unexposed with the reload's poison, so the A/B
+ * control arm is the code as it was.
+ */
+extern int mxfs_incarn_poison_unexposed;
+bool mxfs_incarn_refused_locked(struct xfs_inode *ip, const char *op);
+
+/*
  * (D-QUARANTINED-DIR-NAMESPACE-OPS-PROCEED-WITHOUT-DLM-GRANT-0515):
  * the same gate for NAMESPACE operations (create/mkdir/mknod/tmpfile/link/
  * unlink/rmdir/symlink/rename/setattr/update_time/lookup/readlink).  The DLM
@@ -1958,6 +1994,18 @@ mxfs_quar_gate_op(struct xfs_inode *ip, const char *op)
  * next to XFS_IRECLAIM_RESET_FLAGS), so the denial mark takes bit 32.
  */
 #define MXFS_IF_ACQ_REFUSED	(1UL << 32)
+
+/*
+ * D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY, H-NR1: a no-inode release
+ * (xfs/xfs_mxfs_noino.c) unlocked the DLM grant this in-core inode still
+ * caches.  That release runs because the inode could not be taken in core
+ * (a reclaimable corpse), so it cannot reach the grant fields: the inode keeps
+ * the mode and the tenure epoch of a grant the DLM no longer records, and a
+ * create whose reservation re-takes the grant before the recycle reads as the
+ * same tenure (fw3c3).  Set under i_flags_lock by xfs_icache_ino_mark_released,
+ * consumed by mxfs_dlm_recycle_grant_check.  Bits 0..32 are taken.
+ */
+#define MXFS_IF_NOINO_RELEASED	(1UL << 33)
 
 /* dlm/v5_mount.h is not visible here (m_mxfs_dlm is a void pointer) and the
  * files that include this header declare the v5 predicate at block scope
@@ -2184,14 +2232,15 @@ static inline void mxfs_inc_nlink(struct xfs_inode *ip)
 	 MXFS_IF_DIR_LEAF_STALE | MXFS_IF_DIR_DATA_STALE | MXFS_IF_RMC_ACCT |	\
 	 MXFS_IF_INCARN_STALE | MXFS_IF_ACQ_REFUSED | MXFS_IF_PUB_SKIPPED |	\
 	 MXFS_IF_CLMERGE_HIT | MXFS_IF_FREE_COMMITTED | MXFS_IF_PUBOB |		\
-	 MXFS_IF_PUBOB_FLUSHED | MXFS_IF_FOREIGN_ZOMBIE)
+	 MXFS_IF_PUBOB_FLUSHED | MXFS_IF_FOREIGN_ZOMBIE | MXFS_IF_NOINO_RELEASED)
 #define MXFS_IF_ALL_FLAGS_SUM						\
 	((unsigned long)MXFS_IF_FIRST_FLUSH + MXFS_IF_DLM_RELFLUSH +		\
 	 MXFS_IF_LOCAL_UNLINK + MXFS_IF_ADOPTED_UNLINK + MXFS_IF_QUAR_EIO +	\
 	 MXFS_IF_DIR_RELOAD + MXFS_IF_DIR_LEAF_STALE + MXFS_IF_DIR_DATA_STALE +	\
 	 MXFS_IF_RMC_ACCT + MXFS_IF_INCARN_STALE + MXFS_IF_ACQ_REFUSED +	\
 	 MXFS_IF_PUB_SKIPPED + MXFS_IF_CLMERGE_HIT + MXFS_IF_FREE_COMMITTED +	\
-	 MXFS_IF_PUBOB + MXFS_IF_PUBOB_FLUSHED + MXFS_IF_FOREIGN_ZOMBIE)
+	 MXFS_IF_PUBOB + MXFS_IF_PUBOB_FLUSHED + MXFS_IF_FOREIGN_ZOMBIE +	\
+	 MXFS_IF_NOINO_RELEASED)
 #define XFS_UPSTREAM_IFLAGS						\
 	(XFS_IRECLAIM | XFS_ISTALE | XFS_IRECLAIMABLE | XFS_INEW |		\
 	 XFS_IPRESERVE_DM_FIELDS | XFS_ITRUNCATED | XFS_EOFBLOCKS_RELEASED |	\

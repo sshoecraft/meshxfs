@@ -1,0 +1,67 @@
+# The live-feed laps on the main-tree build, disk locking half:
+# 2/disk/caw/direct g2b (test15 test16), build ~/src/mxfs srcversion
+# 4C46C2DE6232F3C1F9C96CB (0.90.131: 37897D38118AD5E2FAAC4FC plus the H-WW1 fix
+# of D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-NUMBER-REUSE,
+# iwr_refuse_empty default 1, its instrument dino_clobber_check and the
+# whole-write counters, and the refusal-streak instrument P-IWR-REFUSED /
+# P-IWR-REFUSE-END; the harness prints each lap's build and refuses a node
+# running anything else).  Every lap is the fix arm of two records at once:
+#
+#   D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT: the
+#     live-feed run its record still owes on the main build -- the F arm of
+#     ~/src/mxfs-b/tests/queues/ialloc_fence_hint_caw_ab.queue (fence 1, hint
+#     exempt 1, live peer feed 300, every other setting that queue's), graded by
+#     that queue's F rules, unchanged.
+#   D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-NUMBER-REUSE: the H-WW1
+#     fix arm (NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1), graded by
+#     ~/src/mxfs-c/tests/queues/iwr_refuse_empty_ab.queue's F rules, unchanged.
+#
+# cr63_linked_defer is 1 (NG0_CR63_DEFER=1) as in both queues.
+#
+# THE RE-PUSH ATTRIBUTION (written before the first lap).  iwr_refuse_empty_ab's
+# rules hold an F lap whose refusals exceed 20 times its C laps' mean ww_empty
+# as a suspected re-push loop, to be attributed before its WPASS is accepted:
+# wrf1 refused 17467 against wrc1's ww_empty 290.  wrc1's printed why=empty
+# whole writes all named the live-feed directory's cluster (daddr 12392096,
+# logged=0x8 bli=0x0 skip=0xffffffff) and came in bursts no longer than 0.2 s
+# (9 writes in 0.19 s, 6 in 0.12 s, ... at t = 0, 54, 89, 115, 122, 227, 273 s),
+# and P187-PUB-REARM reached its 4000-line cap within 30-90 s on both busy
+# nodes in both arms with like per-inode counts (wrc1 test1 ino 133: 690 in
+# 49 s; wrf1 test1 ino 37748869: 540 in 30 s).
+# HYPOTHESIS H-WW1-R: the refusals are the empty-case iterations of the
+# existing re-push of a logged slot the cluster write may not publish (the
+# completion keeps its item dirty in the AIL, P187-PUB-REARM, and the next push
+# flushes the cluster again) -- the same bounded episodes the control writes
+# whole -- and without the I/O an iteration completes at once, so an episode
+# counts many more of them.  PREDICTION: every refusal streak closes
+# (P-IWR-REFUSE-END why=partial|whole|gap|freed), none lasts longer than 5 s
+# (streak_ms), and every P-IWR-REFUSED line carries logged != 0 with
+# logged & ~skip = 0.  REFUTED if a streak runs 30 s or more or is still open
+# at the unmount (closed only by why=freed with streak_ms >= 30000), or if
+# refusals with logged=0x0 bli=0x0 form streaks of more than 16.
+#
+# VERDICT RULES (written before the first lap):
+#   A lap with a node failure or a CORRUPT cold audit is attributed from its own
+#   lines before anything below is judged.  A lap whose audit is STALE/NONE, or
+#   an ABORT, is attributed (a stalled create sweep -- sweep_max in the hundreds
+#   and alloc_witness or chk_clean failing -- is a stall) and otherwise has no
+#   verdict and is rerun.
+#   REACH (D-FREED): punl_removed >= 100 and agbast_a >= 50.
+#   D-FREED F PASS (reached): ux_unlocks 0, dt_ag 0, pc_rel_ag 0,
+#     fn_escape_lines 0, fn_refused > 0, fh_refused 0, audit CLEAN errors=0,
+#     node_failures 0, no stall, every other harness gate holds; it REACHES
+#     H-F13b if fh_passed > 0.
+#   D-NETMESH WPASS: the harness's WRESULT WPASS (ww_refused > 0, ww_empty 0,
+#     ww_declined 0, ww_clobber_whole_dir 0, ww_clobber_partial_dir 0, audit
+#     CLEAN errors=0, node_failures 0, no P218-RECOV-REFUSED); WVACUOUS when
+#     ww_refused 0; anything else WFAIL.
+#   H-WW1-R: read from every node's whole stream after the lap's mark; a
+#     refuted lap withholds the D-NETMESH WPASS.
+#   The board for both records: three laps.  Every reached lap must PASS for
+#   D-FREED, every lap must be WPASS with H-WW1-R not refuted for D-NETMESH;
+#   any failing lap blocks its record and is attributed.
+#
+# Bound: the kw and wr laps' 1680 s per lap (they ran 472-597 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh lfb1 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh lfb2 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh lfb3 1 300 2/disk/caw/direct g2b

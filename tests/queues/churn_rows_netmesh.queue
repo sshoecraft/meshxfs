@@ -1,0 +1,29 @@
+# D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-NUMBER-REUSE: does a
+# churn file keep the inode its create was handed, on the record's own
+# configuration (8/net/mesh/mpath, g8), on the newest build of the main tree's
+# source (~/src/mxfs-c, srcversion 9E03AF016F66F5400C65EBF: every freed-inode
+# guard H-F6..H-F11 at its default, the orphan-sweep coalescing, the CAW
+# re-send backoff and the handshake log level)?
+#
+# tests/churn_rows_audit.sh runs ROWS rows of the path load with no fault on
+# one mount, each restarting at lap 0 as consecutive path rows do; the churn
+# checks every name before unlinking it (PATHLOAD_VERIFY=1), every node's
+# leftovers are looked up from another node after each row, and the lap ends
+# with the cold audit.  Its header carries the verdict rules:
+#   CORRUPT  any VERIFY_FAIL, LEFTOVER BAD/UNEXPECTED, or a CORRUPT audit;
+#   FAIL     a load error, a double grant, a load that did not report, or a
+#            check that returned nothing;
+#   CLEAN    every check passed and the audit CLEAN errors=0.
+# What these laps can and cannot settle (written before the first lap): a
+# CORRUPT lap with the record's shape is the record reproduced on the newest
+# build, with every kernel line and the creator's inode number kept, and is
+# diagnosed from there.  CLEAN laps are a rate on this build, not a
+# disposition: the record needs its mechanism shown (a reproduction with a
+# cause, then that cause's fix A/B'd) before it can leave the queue.
+#
+# Bound per lap (the harness's derivation): prep 300 + 6 rows x (start 20 +
+# ROW_S 60 + stop/report 45 + leftover check 60) + chk_clean 150 (the noino
+# laps' derivation with alloc_witness) + kernel logs 120 = 1680 s.
+1680 ROWS=6 ROW_S=60 tests/churn_rows_audit.sh cra8m1 8/net/mesh/mpath g8
+1680 ROWS=6 ROW_S=60 tests/churn_rows_audit.sh cra8m2 8/net/mesh/mpath g8
+1680 ROWS=6 ROW_S=60 tests/churn_rows_audit.sh cra8m3 8/net/mesh/mpath g8

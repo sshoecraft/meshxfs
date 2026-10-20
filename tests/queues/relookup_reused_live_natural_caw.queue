@@ -1,0 +1,40 @@
+# D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED, the stale-parent shape: a
+# lookup whose entry still names a reused number's old type (the platter and
+# the in-core inode agree on the new type, the parent is flagged out of date)
+# waited out its 201 rounds and failed the mkdir with ESTALE.  0.90.54 re-reads
+# the parent in that case too (P201-RELOOKUP why=reused-live, bounded at three).
+# The arm has been run only through a test knob that forces every type change
+# down the re-read path; this queue looks for the natural event on the shape's
+# own configuration and row (8/disk/caw/mpath path_fenced_return, where it
+# was captured 23 s before the fault, under the plain 8-node mutex churn) and
+# path_fabric, every row keeping its kernel logs (lap_chain.sh sets
+# PF_KEEP_KMSG=1).  No knob is set.
+#
+# Runs from the sibling checkout ~/src/mxfs-b (main-tree source plus the
+# D-4NODE-SHARED-DIR-EX-HANDOFF-6S-TAIL-DOZE wait report and the unbuilt
+# orphan-sweep coalescing, both inert on CAW apart from the report's lines;
+# srcversion 57C7184D46A87018889E689 at launch) on g8b, while the main tree's
+# 2-node TCP chains run.
+#
+# Bound per chain: prep_cluster 300 (manifest) + 3 laps x (path_fabric 308 s at
+# 8 nodes by its header's derivation + path_fenced_return 297 s by its header's
+# + 40 s board overhead per row) = 300 + 3 x 685 = 2355 s.
+#
+# VERDICT RULES (written before the first lap):
+#   REACHED      a kept node log of a row holds P201-RELOOKUP why=reused-live.
+#   FIX VERIFIED (stale-parent shape, disk/caw)  REACHED, and on every node
+#                whose log holds such a line: the row's 'no operation on <node>
+#                returned an error' check passed, and the node's count of
+#                P201-TYPEFLIP-UNRESOLVED-FAIL equals its count of
+#                P201-RELOOKUP (each unresolved pass is printed just before its
+#                re-read; a lookup that ended ESTALE adds an unresolved line
+#                with no re-read after it).
+#   REFUTED      a row with a why=reused-live re-read whose node logged an
+#                ESTALE operation error, or unresolved > re-read on that node:
+#                trace the lookup.
+#   VACUOUS      no why=reused-live line in any row: no verdict; the arm then
+#                needs a knob that forces its own predicate.
+#   OTHER        any P-NOINO-WAIT-REPORT line (the D-4NODE wait report) is
+#                that record's evidence and judges nothing here.
+2355 tests/mpath/lap_chain.sh laps 8/disk/caw/mpath g8b rlc1 3 --prep --rows path_fabric,path_fenced_return
+2355 tests/mpath/lap_chain.sh laps 8/disk/caw/mpath g8b rlc2 3 --prep --rows path_fabric,path_fenced_return

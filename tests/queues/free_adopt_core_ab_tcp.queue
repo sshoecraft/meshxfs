@@ -1,0 +1,53 @@
+# H-FA1 A/B for D-FREED-IMAGE-ADOPT-KEEPS-DEAD-LIFE-CORE-FIELDS-REGRESSES-FREE-
+# DINODE on 2/net/mesh/mpath g2e (test17 test18), the configuration of wtc2,
+# the record's first instance.  Same build for both arms: ~/src/mxfs-f
+# srcversion 33C47ED3E4360FC2B6CBF72, the main tree's sources (every fix at its
+# default, the deferred-free holder instrument in) plus H-FA1: when the reload
+# adopts a free dinode into a live in-core inode (xfs/xfs_mxfs_reload.c, the
+# mode-0 block after xfs_inode_from_disk), mxfs_reload_free_core prints
+# P-FREE-ADOPT-CORE for an adopt whose link count, change count, size or block
+# count differ from the dinode (applied=0|1, both arms) and, with module knob
+# free_adopt_core=1, takes the core fields from the dinode.  Run from
+# ~/src/mxfs-f.  Every other setting is exactly
+# tests/queues/rs1_skip_ab_caw.queue's (production settings: both test delays
+# off, H-RS1 at its default); NG0_FREE_ADOPT_CORE alternates 0 (control) and 1
+# (fix).
+#
+# WHY (written before the first lap).  The four H-RS1 laps of 2026-10-18 on the
+# build without H-FA1 (rk1, rk2 on 2/disk/caw/direct; rk31, rk32 on
+# 3/disk/caw/direct) each logged one or two partial-path regressions of this
+# shape, none preceded by a P219 or P-RS1 line for the slot: disk mode 00
+# nlink 0 -> mem mode 00 nlink 1, five or six change counts behind
+# (tools/free_adopt_attribution.py: free_regress 2, 1, 1, 1).  So the control
+# arm is expected to reach the shape in most laps.
+#
+# READING RULES (written before the first lap):
+#   ARESULT grades each lap (tests/noino_gen0_ab.sh, THE H-FA1 FIX).  A lap
+#   whose free_adopt_core_diff is 0 on every node is AVACUOUS and counts for
+#   neither arm.
+#   H-FA1 IS CONFIRMED AS THE CAUSE when at least one control lap is
+#   ACONTROL-SHOWS-CAUSE (a free-image regression on an inode whose latest
+#   P-FREE-ADOPT-CORE line on the same node reads applied=0).
+#   THE FIX IS VERIFIED when, in the same campaign, at least three fix laps
+#   that reached the cause (free_adopt_core_diff > 0) are APASS: no free-image
+#   regression after an adopt line, no node failure, cold audit CLEAN.
+#   H-FA1 IS REFUTED by any fix lap with regress_fa1_applied > 0 (a free-image
+#   regression on an inode whose latest adopt line reads applied=1: another
+#   writer of freed-life fields), or if no control lap with applied=0 lines
+#   ever shows the shape while laps keep showing free_unattributed
+#   regressions (then the fields do not reach a copy-in through this arm).
+#   free_unattributed regressions (no adopt line before them) are counted in
+#   both arms and are not this shape; any in a fix lap is read from its own
+#   lines before the fix is called verified.  Any node failure, other CORRUPT
+#   shape, stall or ABORT is attributed from its own lines to its own record.
+#   Also read on every lap: RRESULT (H-RS1 rides at its default 1), WRESULT.
+#
+# Bound: the freed_nodelay laps' 1680 s per lap (they ran 472-597 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_FREE_ADOPT_CORE=0 tests/noino_gen0_ab.sh fat1 1 300 2/net/mesh/mpath g2e
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_FREE_ADOPT_CORE=1 tests/noino_gen0_ab.sh fat2 1 300 2/net/mesh/mpath g2e
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_FREE_ADOPT_CORE=0 tests/noino_gen0_ab.sh fat3 1 300 2/net/mesh/mpath g2e
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_FREE_ADOPT_CORE=1 tests/noino_gen0_ab.sh fat4 1 300 2/net/mesh/mpath g2e
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_FREE_ADOPT_CORE=0 tests/noino_gen0_ab.sh fat5 1 300 2/net/mesh/mpath g2e
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_FREE_ADOPT_CORE=1 tests/noino_gen0_ab.sh fat6 1 300 2/net/mesh/mpath g2e
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_FREE_ADOPT_CORE=0 tests/noino_gen0_ab.sh fat7 1 300 2/net/mesh/mpath g2e
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_FREE_ADOPT_CORE=1 tests/noino_gen0_ab.sh fat8 1 300 2/net/mesh/mpath g2e

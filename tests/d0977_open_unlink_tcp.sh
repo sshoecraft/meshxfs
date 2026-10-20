@@ -13,9 +13,15 @@
 #       reads back through fd7 (the descriptor still names F);
 #     - B closes fd8 (one of two): 20 more creates on A still do not reuse
 #       the number (multi-opener: the mark stays until the LAST close);
-#     - B closes fd7 (the last): A's reaper frees the zombie and the number
-#       IS reused within the reap cadence (first retry 5 s, then every 30 s
-#       — bound 70 s of polling creates);
+#     - the zombie is NOT freed before B's last close (no P89-REAP-DONE for
+#       the number in A's ring);
+#     - B closes fd7 (the last): A's reaper frees the zombie within the reap
+#       cadence (first retry 5 s, then every 30 s — bound 70 s of polling
+#       creates), read from A's ring, where P89-REAP-DONE prints only after
+#       the ifree transaction committed for an inode on the reap list.  A
+#       create taking the number again is printed, not graded: once the
+#       number's inode record has filled, the allocator serves creates from
+#       another record (s102d2: the record filled 6 s before the free);
 #     - every 'G' file A created is intact afterwards (16384 bytes of 'G').
 #   Kernel evidence required: P90-OPEN-PUBLISH on B (the mark rode B's
 #   release), P87-OPEN-DEFER on A (the guard read it under EX),
@@ -156,26 +162,29 @@ value_now_into r2 "$A" 60 "$OUT/a_arm2.txt" '^ARM_A2_REUSED=' "A's 20 creates af
     echo ARM_A2_REUSED=\$reused"
 ck "arm A: ino still NOT reused after B closed one of two fds" "${r2#ARM_A2_REUSED=}" "none"
 
-# B closes fd7 (the last): the number must become reusable
+# B closes fd7 (the last): A's reaper must free the zombie
+value_now_into rd0 "$A" 20 "$OUT/a_arm3_pre.txt" '^REAPED0=[0-9]+$' "A's reap-done count before B's last close" \
+  "echo REAPED0=\$(dmesg | sed -n \"/$MARK/,\\\$p\" | grep -acw 'P89-REAP-DONE ino=$vino')"
+ck "arm A: the zombie NOT freed while B held it (P89-REAP-DONE ino=$vino before the last close)" "${rd0#REAPED0=}" "0"
 rs 20 "$B" "touch $GO.3" >/dev/null
 wait "$BPID"
 ck "arm A: B closed fd7 (last)" "$(grep -ac 'BCLOSE7=done' "$OUT/b_holder.txt")" "1"
-value_now_into r3 "$A" 110 "$OUT/a_arm3.txt" '^ARM_A3_REUSED=' "A's creates until reuse after the last close" "
-    reused=none; t=0; n=0
-    while [ \$t -lt 70 ] && [ \$reused = none ]; do
+value_now_into r3 "$A" 110 "$OUT/a_arm3.txt" '^ARM_A3_REAPED=' "A's creates until the reap after the last close" "
+    reused=none; reaped=no; t=0; n=0
+    while [ \$t -lt 70 ] && [ \$reaped = no ]; do
         k=0
         while [ \$k -lt 5 ]; do
             k=\$((k+1)); n=\$((n+1)); g=\"$D/a3_\$n.dat\"
             dd if=/dev/zero bs=4096 count=4 2>/dev/null | tr '\\0' 'G' > \"\$g\"; sync -f \"\$g\"
             [ \"\$(stat -c %i \"\$g\")\" = \"$vino\" ] && reused=\$g
         done
-        [ \$reused = none ] || break
+        dmesg | sed -n \"/$MARK/,\\\$p\" | grep -aqw 'P89-REAP-DONE ino=$vino' && reaped=yes
+        [ \$reaped = no ] || break
         sleep 5; t=\$((t+5))
     done
-    echo ARM_A3_REUSED=\$reused ARM_A3_T=\$t ARM_A3_N=\$n"
+    echo ARM_A3_REAPED=\$reaped ARM_A3_REUSED=\$reused ARM_A3_T=\$t ARM_A3_N=\$n"
 echo "  $r3"
-r3v=$(echo "$r3" | grep -ao 'ARM_A3_REUSED=[^ ]*' | cut -d= -f2)
-ck "arm A: ino reused after B's LAST close (reaper freed the zombie)" "$([ -n "$r3v" ] && [ "$r3v" != none ] && echo yes || echo no)" "yes"
+ck "arm A: A's reaper freed the zombie after B's LAST close (P89-REAP-DONE ino=$vino within 70 s)" "$(echo "$r3" | grep -ao 'ARM_A3_REAPED=[a-z]*' | cut -d= -f2)" "yes"
 
 # every 'G' file intact on A (B's write through the held fd touched only F)
 value_now_into gi "$A" 60 "$OUT/a_integrity.txt" '^GFILES=' "A's integrity sweep of the G files" "

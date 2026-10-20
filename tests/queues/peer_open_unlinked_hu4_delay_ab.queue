@@ -1,0 +1,74 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, hypothesis
+# H-U4 again, with its window held open.  H-U4 (the record, session 53; the
+# fix and the counters are described in tests/queues/peer_open_unlinked_hu4_ab.queue):
+# a mid-list unlinked remove rewrites the PREDECESSOR's di_next_unlinked under
+# the AG DLM alone, and a peer holding that predecessor's inode EX publishes the
+# slot from its own cluster buffer, whose copy of the field predates the edit,
+# so the platter reverts to a removed inode and the chain later closes into a
+# cycle (traced once, hu3f1).  Its first A/B (hu4ab/hu4ab2, build
+# E7205F34DF105614363FC7F) had no verdict, WEAK: every control lap counted 50-52
+# P-UNLPREV-NOTENURE edits and 0 P-NEXTWR-STALE, i.e. the owner edited y (the
+# member the peer holds open) without a hold on it, but never while the peer
+# held y EX with a pre-edit copy of y's slot: without a delay the owner frees z
+# right after its 'rm y', before the peer's next append takes y EX back.
+#
+# THE WINDOW, forced in both arms: test knob dbg_ifree_midlist_delay_ms=600
+# (xfs_inactive_ifree, before the free starts, no lock held) holds the owner's
+# free of z 600 ms; the peer appends to y, fdatasyncs it and pushes its AIL
+# every 0.2 s, so it re-takes y EX (reading y's cluster, whose y slot then
+# names z) before the owner edits y's next pointer to NULL, and keeps writing
+# y's cluster home after the owner's write lands.  PREDICTION IF H-U4 IS TRUE:
+# control laps (unlprev_tenure=0) count unlprev_notenure > 0 and
+# nextwr_stale > 0 (the peer's flush of y's slot carries next=z against the
+# platter's NULL) and REPRODUCE (a forced shutdown on an unlinked-list remove,
+# or a cycle/BACKREF exit); fix laps (unlprev_tenure=1: the free takes y EX
+# first, so the peer cannot hold it across the edit, and a release lands the
+# edit before the unlock) count unlprev_waits > 0 (the hold was taken), 0
+# notenure, 0 nextwr_stale, and PASS.
+#
+# Both arms: freshsrc_iunl_overlay=1 (H-U3), b6_release_drain=1 (H-U5),
+# unlprev_pin=1 (H-U1), the build defaults; no close drops (H-U1's window is
+# not wanted here); only unlprev_tenure differs.  Same build as
+# tests/queues/peer_open_unlinked_hu1_ab.queue (41D2F9237EBB21CF21E9D57, main
+# tree), 2/net/mesh/direct g2c, the reproducer's workload, 30 iterations.
+#
+# VERDICT RULES (written before the first lap; the first A/B's rules with the
+# window forced):
+#   SUPPORTED AND FIXED  at least 2 of the 3 control laps REPRODUCED, each with
+#             notenure > 0 and nextwr_stale > 0; and all 3 fix laps PASS (no
+#             'xfs_ifree returned error' and no node failure line in either
+#             node's kernel log through the post-audit capture, the workload
+#             complete, cold audit CLEAN errors=0), each with notenure 0,
+#             nextwr_stale 0 and land_fail 0; and waits > 0 over the fix laps.
+#   NOT SUPPORTED  a control lap that reproduces with notenure 0 or
+#             nextwr_stale 0: another mechanism, attributed by trace before
+#             anything else (the detector sees only xfs_iflush_cluster
+#             flushes, so a revert written by another path is attributed from
+#             the peer's P170-CLWR of y's cluster against the owner's P219 of
+#             the same slot).
+#   NOT FIXED  a fix lap that REPRODUCES, or counts notenure > 0,
+#             nextwr_stale > 0 or land_fail > 0: attributed from its kept logs
+#             and image; a P-UNLPREV-NOTENURE line names its caller.
+#   WEAK      fewer than 2 control laps reproduce: the delay does not hold the
+#             window open; not a verdict.
+#   VACUOUS   waits 0 over all three fix laps: the hold was never taken there.
+# A lap that ABORTs, or audits STALE/NONE without a reproduction, has no verdict
+# and is rerun.  A reproduction's cold audit (after the remount replays both
+# journals) is recorded either way: CORRUPT there makes the record an integrity
+# defect.  A NOPREV, BACKREF, P17B ghost loop or P-B6-RELEASE-DIRTY drained=0
+# line in any lap is attributed and recorded.
+#
+# Bound per lap (tests/peer_open_unlinked_chain.sh's derivation, as in the H-U1
+# queue less its close drops): prep 300 + srcversion 2x20 + the instr knob 2x20
+# + five PUC_KNOBS knobs 2x5x20 + the counter reset 2x20 + the mount's device
+# 2x20 + mkdir 30 + workload 30 x (3 + 5 + ceil(3 x 0.3) + 2) + 60 = 390, +10
+# for the peer + the done file on both nodes 2x20 + instr reset 2x20 + the
+# settle 7 + the counters 2x20 + stream copy 2x120 + on a failure: unmount
+# 2x(70 + 20) + snapshot 60 + image check 10 + remount 2x(110 + 20), + the cold
+# audit 150 + the post-audit stream copy 2x120 = 2357 s.
+2357 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=0" tests/peer_open_unlinked_chain.sh hu4dc1 30 2/net/mesh/direct g2c
+2357 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1" tests/peer_open_unlinked_chain.sh hu4df1 30 2/net/mesh/direct g2c
+2357 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=0" tests/peer_open_unlinked_chain.sh hu4dc2 30 2/net/mesh/direct g2c
+2357 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1" tests/peer_open_unlinked_chain.sh hu4df2 30 2/net/mesh/direct g2c
+2357 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=0" tests/peer_open_unlinked_chain.sh hu4dc3 30 2/net/mesh/direct g2c
+2357 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1" tests/peer_open_unlinked_chain.sh hu4df3 30 2/net/mesh/direct g2c

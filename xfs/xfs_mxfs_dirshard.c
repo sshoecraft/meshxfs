@@ -410,12 +410,130 @@ mxfs_dirshard_blk_read(
 				    holder->i_ino, mxfs_dirshard_igen(holder),
 				    dp->i_ino, mxfs_dirshard_igen(dp), 1, view);
 	if (c != MXFS_DSC_OK) {
+		/* which identity the block carried against the one expected: an
+		 * older incarnation's block (stale platter or stale cache) reads
+		 * as the right daddr with an older holder or parent generation */
+		if (c == MXFS_DSC_BLK_OWNER) {
+			const struct mxfs_dirshard_blk *blk = bp->b_addr;
+
+			xfs_warn_ratelimited(mp,
+				"MXFS P-DIRSHARD-BLK-OWNER daddr=%lld got[owner=%llu hgen=%u parent=%llu pgen=%u lsn=0x%llx] want[owner=%llu hgen=%u parent=%llu pgen=%u] bflags=0x%x",
+				(long long)daddr,
+				(unsigned long long)mxfs_dirshard_be64(blk->owner),
+				mxfs_dirshard_be32(blk->holder_gen),
+				(unsigned long long)mxfs_dirshard_be64(blk->parent_ino),
+				mxfs_dirshard_be32(blk->parent_gen),
+				(unsigned long long)mxfs_dirshard_be64(blk->lsn),
+				(unsigned long long)holder->i_ino,
+				mxfs_dirshard_igen(holder),
+				(unsigned long long)dp->i_ino,
+				mxfs_dirshard_igen(dp), bp->b_flags);
+		}
 		mxfs_dirshard_corrupt(dp, "manifest-block", c, daddr);
 		xfs_trans_brelse(tp, bp);
 		return -EFSCORRUPTED;
 	}
 	*bpp = bp;
 	return 0;
+}
+
+/*
+ * 0.90.131 (D-DIRSHARD-REUSE-PEER-READDIR-EUCLEAN-ON-CAW-AT-4-NODES): a
+ * parent's manifest block is its directory metadata as much as its own
+ * blocks are, so the directory lock's release fence makes it durable with
+ * them (mxfs_dir_data_owner_scan matches it through this predicate).  It
+ * lives in the HOLDER's data block, under its own buffer ops, and the fence's
+ * owner scan matched only dir3 blocks owned by the parent: the parent could
+ * be handed to a peer with its new manifest only in this node's log, and the
+ * peer, reading the platter, found the previous container's block at that
+ * address (P-DIRSHARD-BLK-OWNER, EUCLEAN).  Identified by the block's own
+ * parent_ino, so it is found whether or not this node's per-parent cache
+ * holds a view of it (the creator's cache was invalid at the failing
+ * release).  TEST ONLY knob: 0 restores the old fence (same-build control).
+ */
+int mxfs_dirshard_release_land = 1;
+module_param_named(dirshard_release_land, mxfs_dirshard_release_land, int, 0644);
+MODULE_PARM_DESC(dirshard_release_land,
+	"TEST ONLY: 1 (default) = a directory lock's release fence makes the parent's sharded-directory manifest block durable; 0 = it does not (the old behaviour)");
+
+bool
+mxfs_dirshard_buf_of_parent(
+	struct xfs_buf		*bp,
+	xfs_ino_t		ino)
+{
+	const struct mxfs_dirshard_blk *blk = bp->b_addr;
+
+	return READ_ONCE(mxfs_dirshard_release_land) &&
+	       bp->b_ops == &mxfs_dirshard_buf_ops && blk &&
+	       mxfs_dirshard_be64(blk->parent_ino) == ino;
+}
+
+/*
+ * Is the parent's manifest block, as this node last loaded it, still
+ * un-durable at the moment the parent's lock is handed to a peer?  The
+ * manifest is the holder's data block, and the parent's release fence writes
+ * back the parent's own directory blocks only.  A peer that takes the parent
+ * next reads the manifest from the platter (BLK-REFRESH), so a block still
+ * dirty, pinned or carrying an uncheckpointed change here is the stale read
+ * D-DIRSHARD-REUSE-PEER-READDIR-EUCLEAN-ON-CAW-AT-4-NODES saw.  Measurement
+ * only: trylock, never waits, changes nothing.
+ */
+void
+mxfs_dirshard_release_note(
+	struct xfs_inode	*dp)
+{
+	struct mxfs_dirshard_cache *c = READ_ONCE(dp->i_mxfs_dirshard);
+	struct xfs_mount	*mp = dp->i_mount;
+	struct xfs_buf		*bp = NULL;
+	int			busy;
+
+	if (!c)
+		return;		/* not a sharded parent on this node */
+	if (!c->valid) {
+		xfs_notice_ratelimited(mp,
+			"MXFS P-DIRSHARD-REL-MBLK parent=%llu gen=%u state=cache-invalid -- no manifest view to check at the parent's release",
+			(unsigned long long)dp->i_ino, mxfs_dirshard_igen(dp));
+		return;
+	}
+	busy = xfs_buf_incore(mp->m_ddev_targp, c->daddr, XFS_FSB_TO_BB(mp, 1),
+			      XBF_TRYLOCK, &bp);
+	if (busy == -EAGAIN) {
+		xfs_warn_ratelimited(mp,
+			"MXFS P-DIRSHARD-REL-MBLK parent=%llu holder=%llu daddr=%lld state=locked -- manifest buffer locked (in flight) at the parent's release",
+			(unsigned long long)dp->i_ino,
+			(unsigned long long)c->holder_ino,
+			(long long)c->daddr);
+		return;
+	}
+	if (busy) {
+		xfs_notice_ratelimited(mp,
+			"MXFS P-DIRSHARD-REL-MBLK parent=%llu holder=%llu daddr=%lld state=not-cached rc=%d",
+			(unsigned long long)dp->i_ino,
+			(unsigned long long)c->holder_ino,
+			(long long)c->daddr, busy);
+		return;		/* not cached here: nothing of ours to land */
+	}
+	if (mxfs_buf_has_uncheckpointed_mods(bp) ||
+	    atomic_read(&bp->b_pin_count) ||
+	    (bp->b_log_item && test_bit(XFS_LI_IN_AIL,
+					&bp->b_log_item->bli_item.li_flags)))
+		xfs_warn_ratelimited(mp,
+			"MXFS P-DIRSHARD-REL-MBLK parent=%llu holder=%llu daddr=%lld state=undurable uncheckpointed=%d pin=%d in_ail=%d flags=0x%x -- manifest block not on the platter at the parent's release",
+			(unsigned long long)dp->i_ino,
+			(unsigned long long)c->holder_ino,
+			(long long)c->daddr,
+			mxfs_buf_has_uncheckpointed_mods(bp) ? 1 : 0,
+			atomic_read(&bp->b_pin_count),
+			(bp->b_log_item && test_bit(XFS_LI_IN_AIL,
+				&bp->b_log_item->bli_item.li_flags)) ? 1 : 0,
+			bp->b_flags);
+	else
+		xfs_notice_ratelimited(mp,
+			"MXFS P-DIRSHARD-REL-MBLK parent=%llu holder=%llu daddr=%lld state=durable flags=0x%x",
+			(unsigned long long)dp->i_ino,
+			(unsigned long long)c->holder_ino,
+			(long long)c->daddr, bp->b_flags);
+	xfs_buf_relse(bp);
 }
 
 static inline struct mxfs_dirshard_manifest *
@@ -1131,6 +1249,7 @@ mxfs_dirshard_alloc_parent(
 	error = xfs_iunlink(tp, parent);
 	if (error)
 		goto out_cancel;
+	parent->i_mxfs_unlink_epoch = READ_ONCE(parent->i_dlm_epoch);
 	xfs_iflags_set(parent, MXFS_IF_LOCAL_UNLINK);
 
 	/* the holder */
@@ -1576,6 +1695,7 @@ mxfs_dirshard_free_container(
 			error = -ENOTEMPTY;
 			goto out_cancel;
 		}
+		c->i_mxfs_unlink_epoch = READ_ONCE(c->i_dlm_epoch);
 		xfs_iflags_set(c, MXFS_IF_LOCAL_UNLINK);
 		error = mxfs_dirshard_iunlink_internal(tp, c);
 		if (error)
@@ -1693,6 +1813,7 @@ mxfs_dirshard_free_holder(
 		goto out_cancel;
 	}
 	holder->i_disk_size = 0;
+	holder->i_mxfs_unlink_epoch = READ_ONCE(holder->i_dlm_epoch);
 	xfs_iflags_set(holder, MXFS_IF_LOCAL_UNLINK);
 	error = mxfs_dirshard_iunlink_internal(tp, holder);
 	if (error)

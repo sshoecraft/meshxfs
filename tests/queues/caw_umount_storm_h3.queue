@@ -1,0 +1,65 @@
+# D-CAWMPATH-UMOUNT-RELEASE-ALL-CAW-HELD-57S-BOTH-NODES, H-CAW3.  The first
+# storm queue (tests/queues/caw_umount_storm.queue, cus0-cus3, main tree
+# A7E5F619) graded H-CAW2 by its rules: baseline cus0 1.0/2.0 s; storm laps
+# cus1 5.0/8.0 s and cus2 1.0/1.0 s (unmount at 3 G dirty, 14 s into the
+# storm); cus3 4.0/60.1 s.  cus3 reproduced the incident's shape: test16's
+# release-all walk issued 198 slot-clear CAWs in 12 s (about 63 ms each), then
+# one CAW sat 46 s in blk_execute_rq (18:36:14.8Z to 18:37:00.9Z) with no
+# iSCSI, multipath or reset line on the node, and ended as the host's dirty
+# memory drained (peak 11.8 G at 18:36:23Z, 8 MB at 18:37:01.8Z), as the
+# incident's did.  But the LUN's per-initiator SCST threads were idle in 596
+# of 600 samples (busy only 18:36:03-04.9Z in test15's unregister PR OUTs'
+# PR-file fsyncs), so the held command was not being executed by a pool
+# thread, and the instruments of that queue could not see where it was.
+#
+# HYPOTHESIS H-CAW3 (written before any lap of the extended reproducer): once
+# a host write storm drives root-ext4 dirty memory past the background
+# writeback threshold (about 8 G on this host: dirty_background_ratio 10 of
+# about 80 G available), one release-all COMPARE AND WRITE is held at the
+# target, outside SCST's pool threads, until the storm's dirty pages drain;
+# what holds it is a host task blocked behind the root filesystem's writeback
+# (journal commit, writeback throttling, reclaim, or an I/O completion worker
+# waiting for a journal handle), which the extended sampler names.
+#
+# Instruments (tests/caw_umount_storm.sh, extended in session 39): the 2 Hz
+# scan of every host task in D with its stack (host_alld.txt), the 10 Hz
+# samples of the LUN's pool threads, SCST's global threads, iscsi-scst's
+# receive/send threads, kswapd and the root jbd2 thread (host_samples.txt), a
+# 1 s root fdatasync probe (fsync_probe.txt), nvme0n1 write count/ms/in-flight
+# in each MEM line, and on each node the per-path count of SCSI commands
+# dispatched and not completed, which counts a passthrough CAW, and the
+# device state (SCSI lines in <node>_inflight.txt).
+#
+# PREDICTIONS: the storm=0 lap unmounts both nodes in < 10 s.  In the storm
+# laps (unmount once Dirty >= 8 G and at least 25 s into the storm), at least
+# one unmount takes > 30 s; for most of that hold the node shows 1 SCSI
+# command outstanding on one path (the CAW reached the target), a host task
+# is in D under ext4/jbd2/writeback/reclaim frames, and the hold ends within
+# 10 s of Dirty falling below 1 G.
+#
+# VERDICT RULES (written before the first lap):
+#   BASELINE   the storm=0 lap's unmounts both < 10 s, else that is the finding.
+#   SUPPORTED  a storm lap with an unmount > 30 s in which (a) the node's
+#              SCSI line shows a command outstanding on a path for at least
+#              80% of the hold, (b) at least 80% of the 2 Hz scans inside the
+#              hold carry a host task in D whose stack has an ext4, jbd2,
+#              writeback, blk-wbt or reclaim frame, and (c) the hold ends
+#              within 10 s of Dirty < 1 G.  Then the hold is the storage
+#              target's, behind its host's filesystem.
+#   NODE-SIDE  a hold > 30 s with no SCSI command outstanding on either path
+#              for most of it: the CAW waited on the node (dm-multipath or
+#              the block layer); trace the node.
+#   TARGET-QUEUED  a hold > 30 s with a command outstanding but no host task
+#              in D for most of it: the target held it without blocking (a
+#              queue); trace SCST's device state.
+#   NOT REPRODUCED  three storm laps with every unmount < 10 s.
+#   OTHER      an unmount between 10 and 30 s is recorded with its samples and
+#              judges nothing; an ABORT has no verdict and is rerun.
+# Run with NO other lap on the host: the storm slows every LUN on it.
+#
+# Bound per lap: the script's derivation, 720 s, plus the 44 s its storm wait
+# may run beyond 46 (CUS_STORM_WAIT_S=90) = 764 s.
+764 tests/caw_umount_storm.sh cvs0 0 2/disk/caw/mpath g2b
+764 CUS_DIRTY_KB=8388608 CUS_STORM_WAIT_S=90 CUS_STORM_MIN_S=25 tests/caw_umount_storm.sh cvs1 1 2/disk/caw/mpath g2b
+764 CUS_DIRTY_KB=8388608 CUS_STORM_WAIT_S=90 CUS_STORM_MIN_S=25 tests/caw_umount_storm.sh cvs2 1 2/disk/caw/mpath g2b
+764 CUS_DIRTY_KB=8388608 CUS_STORM_WAIT_S=90 CUS_STORM_MIN_S=25 tests/caw_umount_storm.sh cvs3 1 2/disk/caw/mpath g2b

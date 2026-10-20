@@ -29,6 +29,14 @@
 set -u
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 cd "$REPO"
+# This checkout as the nodes see it: they mount this host's ~/src as /src.  A
+# checkout beside the main tree formats with its own mkfs_mxfs and loads its
+# own module (prep, below), so its audits must read the volume with its own
+# chk_mxfs too.  The node-side test scripts default to /src/mxfs's checker, and
+# a sibling whose format the main tree's binary did not know yet was graded
+# CORRUPT on a healthy volume (routing version 2 A/B, 2026-10-19: 'authority
+# ledger: no valid region header' from a checker built before the format).
+NODE_REPO="/src/$(basename "$REPO")"
 
 CONFIG_ARG="${1:?usage: run.sh <configuration> [--group <name>] [test ...]   e.g. run.sh 8/net/mesh/direct}"
 shift || true
@@ -1039,21 +1047,24 @@ prep_cluster() {
 
     # 2. Format the shared LUN once (node1).
     local out
+    # the nodes see this host's ~/src as /src, so a checkout beside the main
+    # tree formats with its own mkfs_mxfs and loads its own module:
+    # prep_fs.sh and prep_node.sh both take MXFS_REPO.  Formatting always
+    # came from /src/mxfs, so a sibling's prep wrote the main tree's on-disk
+    # format under the sibling's module, and an A/B of a format change
+    # measured one format in both arms.  NODE_REPO is set at the top.
     # sess376: let a caller ask for SPARE log slices.  The slice count is the
     # disklock slot limit, so a 32-node rig on the default 32 slices has ZERO
     # spare slots — and a terminal refusal quarantine permanently occupies one,
     # after which no node can mount at all (claim_slot -ENOSPC).  Tests that
     # need a node to rejoin after a quarantine prep with MXFS_LOG_SLICES > N.
-    out=$(ssh_node "$NODE1" "MXFS_DEV='$DEV' MXFS_LOG_SLICES='${MXFS_LOG_SLICES:-32}' MXFS_MKFS_OPTS='${MXFS_MKFS_OPTS:-}' bash /src/mxfs/tests/setup/prep_fs.sh")
+    out=$(ssh_node "$NODE1" "MXFS_DEV='$DEV' MXFS_REPO='$NODE_REPO' MXFS_LOG_SLICES='${MXFS_LOG_SLICES:-32}' MXFS_MKFS_OPTS='${MXFS_MKFS_OPTS:-}' bash $NODE_REPO/tests/setup/prep_fs.sh")
     echo "$out" | grep -q FS_PREP_OK || { echo "PREP FAIL (mkfs): $out"; return 1; }
 
     # sess10 (ccloop c7ee71c6): ship the build host's ko md5 so prep_node.sh
     # can defeat NFS stale-page module images (mixed old/new ko pages after an
     # in-place relink under clock skew — proven frankenstein module on test25).
     local KO_MD5; KO_MD5=$(md5sum "$REPO/mxfs.ko" 2>/dev/null | awk '{print $1}')
-    # the nodes see this host's ~/src as /src, so a checkout beside the main
-    # tree loads its own module: prep_node.sh takes the module from MXFS_REPO
-    local NODE_REPO="/src/$(basename "$REPO")"
 
     # 0.89.16: THE DEPLOYMENT'S TARGET-RETIREMENT CONTRACT IS WITHDRAWN.  A
     # fence kind that certifies from a registration's absence proves only that
@@ -1327,7 +1338,7 @@ run_none() {  # name cat budget
         local dl_ms=$(( $(date +%s%3N) + kill_budget * 1000 ))
         raw=$(timeout --kill-after=3 "$kill_budget" "$SSH" "$NODE1" "$PASS" \
             "MXFS_NODES=$N MXFS_RANK=1 MXFS_CONFIG=$CONFIG MXFS_CONFIG_SLUG=$CFG_SLUG MXFS_DEV='$DEV' MXFS_EXPECT_FSTYPE=$fstype MXFS_FS_LABEL=$CFG_SLUG \
-             MXFS_MARKER='$MARKER' ${MXFS_TEST_ENV:-} \
+             MXFS_MARKER='$MARKER' CHK_MXFS='$NODE_REPO/tools/chk_mxfs' ${MXFS_TEST_ENV:-} \
              MXFS_DEADLINE_MS=$dl_ms MXFS_RESERVE_MS=$reserve_ms MXFS_SPOOL='$spool' bash $script '$MNT'" \
             2>&1)
         rc=$?
@@ -1693,6 +1704,7 @@ run_coord() {  # name cat budget scale
              MXFS_EXPECT_FSTYPE=$fstype MXFS_FS_LABEL=$CFG_SLUG MXFS_MARKER='$MARKER' \
              MXFS_COORD_BROKER=$BROKER MXFS_COORD_PREFIX=$prefix COORD_TIMEOUT=$ct \
              MXFS_DEADLINE_MS=$dl_ms MXFS_RESERVE_MS=$reserve_ms MXFS_SPOOL='$spool' \
+             CHK_MXFS='$NODE_REPO/tools/chk_mxfs' \
              ${MXFS_TEST_ENV:-} \
              $runcmd" > "$tmpd/$n.raw" 2>&1 || nrc=$?
           printf '%s\n' "$nrc" > "$tmpd/$n.rc"

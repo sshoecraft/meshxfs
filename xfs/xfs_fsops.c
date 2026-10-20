@@ -515,6 +515,24 @@ xfs_do_force_shutdown(
 	int		tag;
 	const char	*why;
 
+	/*
+	 * MXFS: the cluster has fenced this node.  The fence aborted this
+	 * node's commands still queued at the target, and a target may drop
+	 * them without an answer; the initiator then holds each for three
+	 * expiries of its command timeout, and the shutdown's log waits and the
+	 * unmount wait on them.  Release them at the transport, once per mount
+	 * and whether or not an earlier error already shut the filesystem
+	 * down (pal/linux/kern.c, queued: this context must not sleep).
+	 */
+	if ((flags & SHUTDOWN_CLUSTER_FENCED) &&
+	    !test_and_set_bit(XFS_OPSTATE_MXFS_FENCED_PATHS_RESET,
+			      &mp->m_opstate)) {
+		extern void mxfs_pal_scsi_fenced_path_reset_bdev(
+				struct block_device *);
+
+		mxfs_pal_scsi_fenced_path_reset_bdev(
+				mp->m_ddev_targp->bt_bdev);
+	}
 
 	if (xfs_set_shutdown(mp)) {
 		xlog_shutdown_wait(mp->m_log);

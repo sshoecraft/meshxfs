@@ -63,9 +63,69 @@
  *      the next no-queue request on it is granted.  The physical DRBD pair's
  *      allocator trylock slept 30 s in that page lock holding a VM image's
  *      ILOCK.
+ *  19  a refused hand-off commit grants nothing: the master's own EX queued
+ *      behind a peer's EX, the commit handing it over refused once; the
+ *      master's wait reports a grant only once it holds one, and the peer's
+ *      next EX waits behind it
  */
 #define NNODES 4
 #include "dlm_mesh.h"
+#include "dlm/dlm_user_compat.h"
+
+/* dlm/dlm.c's knobs and counters; user mode has no /sys to set them through */
+extern int mxfs_dl_retry_handoff_grace_ms;
+extern int mxfs_dl_local_wait_keeps_decided;
+extern atomic_t mxfs_dl_local_wait_kept_n;
+extern int mxfs_dl_dg_purge_releases;
+extern atomic_t mxfs_dg_doublegrant_n;
+extern int mxfs_dl_local_refusal_redrives;
+extern atomic_t mxfs_dl_local_refusal_redrive_n;
+extern int mxfs_dl_local_acq_end;
+extern atomic_t mxfs_dl_local_acq_end_n;
+extern unsigned int mxfs_dl_inject_timeout_retry_delay_ms;
+
+/* an integer knob from the environment, when it is set and not empty */
+static void env_knob(const char *var, int *knob)
+{
+    const char *v = getenv(var);
+
+    if (v && *v)
+        *knob = atoi(v);
+}
+
+/* whether n still has a release of res pending (its rel_pending list): the
+ * release retry tick re-sends it, and retires it itself once res is mastered
+ * on n */
+static int rel_listed(struct vnode *n, const struct mxfs_resource_id *res)
+{
+    struct mxfs_dlm_pending_release *pr;
+    int found = 0;
+
+    mxfs_pal_mutex_lock(n->dlm->rel_lock);
+    for (pr = n->dlm->rel_pending; pr; pr = pr->next)
+        if (pr->resource.type == res->type && pr->resource.ino == res->ino &&
+            pr->resource.ag_number == res->ag_number)
+            found = 1;
+    mxfs_pal_mutex_unlock(n->dlm->rel_lock);
+    return found;
+}
+
+/* the acquisition records n holds open for res in mode: in use and not the
+ * kept record of a no-queue try that gave up.  With no request of n's for res
+ * in flight, any such record is one an answered request left behind. */
+static int acq_live(struct vnode *n, const struct mxfs_resource_id *res, uint8_t mode)
+{
+    int i, live = 0;
+
+    mxfs_pal_spinlock_lock(n->dlm->acq_lock);
+    for (i = 0; i < MXFS_DLM_ACQ_SLOTS; i++)
+        if (n->dlm->acq[i].in_use && !n->dlm->acq[i].gave_up && n->dlm->acq[i].mode == mode &&
+            n->dlm->acq[i].resource.type == res->type && n->dlm->acq[i].resource.ino == res->ino &&
+            n->dlm->acq[i].resource.ag_number == res->ag_number)
+            live++;
+    mxfs_pal_spinlock_unlock(n->dlm->acq_lock);
+    return live;
+}
 
 int main(int argc, char **argv)
 {
@@ -77,11 +137,34 @@ int main(int argc, char **argv)
     struct mxfs_tauth_entry e;
     uint8_t granted = 0;
     uint64_t auth = 0, seq = 0, lin = 0, auth1, seq1;
-    int rc;
+    int rc, case3_delay_ms = 0, retry_delay_ms = 0;
 
     (void)argc; (void)argv;
+    /* each knob's variable sets it for the run (0 = that knob's control), so
+     * one binary runs both arms of its A/B: DL_HANDOFF_GRACE_MS
+     * dl_retry_handoff_grace_ms, DL_KEEP_DECIDED dl_local_wait_keeps_decided,
+     * DL_DG_PURGE dl_dg_purge_releases, DL_LOCAL_REFUSAL
+     * dl_local_refusal_redrives, DL_LOCAL_ACQ_END dl_local_acq_end.
+     * DL_CASE3_COMMIT_DELAY_MS holds the
+     * master's ledger commit that hands case 3's R from B to A that long, so
+     * it spans A's one-second wait (0 = not held, the test as written).
+     * DL_TIMEOUT_RETRY_DELAY_MS sets dl_inject_timeout_retry_delay_ms: an
+     * acquire whose wait timed out sleeps that long before its retry, which
+     * holds open the window in which a commit decided for it lands with no
+     * waiter attached (0 = off). */
+    env_knob("DL_HANDOFF_GRACE_MS", &mxfs_dl_retry_handoff_grace_ms);
+    env_knob("DL_KEEP_DECIDED", &mxfs_dl_local_wait_keeps_decided);
+    env_knob("DL_DG_PURGE", &mxfs_dl_dg_purge_releases);
+    env_knob("DL_LOCAL_REFUSAL", &mxfs_dl_local_refusal_redrives);
+    env_knob("DL_LOCAL_ACQ_END", &mxfs_dl_local_acq_end);
+    env_knob("DL_CASE3_COMMIT_DELAY_MS", &case3_delay_ms);
+    env_knob("DL_TIMEOUT_RETRY_DELAY_MS", &retry_delay_ms);
+    mxfs_dl_inject_timeout_retry_delay_ms = (unsigned int)retry_delay_ms;
     tl_mktemp("dlm_ledger_test");
-    printf("=== dlm_ledger_test file=%s ===\n", tl_path);
+    printf("=== dlm_ledger_test file=%s handoff_grace_ms=%d keep_decided=%d dg_purge=%d local_refusal=%d local_acq_end=%d case3_delay_ms=%d timeout_retry_delay_ms=%d ===\n",
+           tl_path, mxfs_dl_retry_handoff_grace_ms, mxfs_dl_local_wait_keeps_decided,
+           mxfs_dl_dg_purge_releases, mxfs_dl_local_refusal_redrives, mxfs_dl_local_acq_end,
+           case3_delay_ms, retry_delay_ms);
     format_region(base, uuid);
     dev = mxfs_pal_bdev_open(tl_path);
     if (!dev) { perror("bdev_open"); return 2; }
@@ -152,6 +235,8 @@ int main(int argc, char **argv)
         CHECK(!lock_wait(j, 300), "3 A's EX is still blocked while B holds");
         rc = probe_lookup(&R, &e);
         CHECK(rc == 0 && e.state == MXFS_TAUTH_ST_ACTIVE && e.ex_node == 22, "3 platter still shows B");
+        if (case3_delay_ms > 0)
+            A->ledger.commit_delay_once_ms = (uint32_t)case3_delay_ms;   /* the hand-off commit */
         mxfs_dlm_unlock(B->dlm, &R);
         CHECK(lock_wait(j, 3000) && j->rc == 0 && j->granted == MXFS_LOCK_EX,
               "3 A granted after B's release rc=%d granted=%u wall=%llums", j->rc, j->granted,
@@ -163,6 +248,11 @@ int main(int argc, char **argv)
           e.grant_seq64 == 3 && e.last_grant_seq64 == 2,
           "3 platter: A holds seq=%llu (B's seq 2 retired in the same transition)",
           (unsigned long long)e.grant_seq64);
+    printf("  3: wait rounds kept for a decided grant: %d (local orphans %llu); records retired by a local answer: %d\n",
+           atomic_read(&mxfs_dl_local_wait_kept_n), (unsigned long long)A->dlm->ledger_local_orphans,
+           atomic_read(&mxfs_dl_local_acq_end_n));
+    CHECK(acq_live(A, &R, MXFS_LOCK_EX) == 0,
+          "3 A's answered EX left no acquisition record open for R (live=%d)", acq_live(A, &R, MXFS_LOCK_EX));
 
     /* 4 local master: A's own PR after EX, then release */
     rc = mxfs_dlm_unlock(A->dlm, &R);
@@ -243,11 +333,13 @@ int main(int argc, char **argv)
         lock_finish(j);
     }
 
-    /* 7 recovery purge retires a dead holder */
+    /* 7 recovery purge retires a dead holder; the survivor's EX after the
+     * purge is not reported as a double grant against the purged holder */
     {
         mxfs_node_id_t m;
         struct vnode *M, *H = C;
         struct lock_job *j;
+        int dg0;
 
         m = mxfs_dlm_resource_master(A->dlm, &R2);
         M = node_by_id(m);
@@ -258,6 +350,7 @@ int main(int argc, char **argv)
         membership(ids2, 2);
         j = lock_async(M == A ? B : A, &R2, MXFS_LOCK_EX, 10);
         CHECK(!lock_wait(j, 400), "7 W blocked by the dead holder's record");
+        dg0 = atomic_read(&mxfs_dg_doublegrant_n);
         rc = mxfs_dlm_ledger_purge_owner(A->dlm, 33, 3);
         rc |= mxfs_dlm_ledger_purge_owner(B->dlm, 33, 3) < 0 ? -1 : 0;
         mxfs_dlm_purge_node(A->dlm, 33);
@@ -269,6 +362,9 @@ int main(int argc, char **argv)
         rc = mxfs_dlm_handoff_takeover(A->dlm, 33, 3000);
         CHECK(rc > 0, "7 successor takeover of C's pages rc=%d", rc);
         CHECK(lock_wait(j, 3000) && j->rc == 0, "7 W granted after the purge rc=%d", j->rc);
+        CHECK(atomic_read(&mxfs_dg_doublegrant_n) == dg0,
+              "7 no double grant reported against the purged holder (P-DOUBLEGRANT %d)",
+              atomic_read(&mxfs_dg_doublegrant_n) - dg0);
         rc = probe_lookup(&R2, &e);
         CHECK(rc == 0 && e.ex_node == j->n->id, "7 platter: W holds (ex_node=%u)", e.ex_node);
         mxfs_dlm_unlock(j->n->dlm, &R2);
@@ -472,10 +568,11 @@ int main(int argc, char **argv)
         mxfs_node_id_t ids3c[3] = { 11, 22, 55 };
         struct mxfs_resource_id cr[6];
         struct mxfs_tauth_page_auth pa;
-        uint32_t p, left_before = 0, left_mid = 0, left_after = 0;
+        uint32_t p, left_before = 0, left_mid = 0, left_after = 0, was[64];
+        uint32_t handed = 0;
         uint64_t decert0 = A->dlm->handoff_decertified;
         uint64_t ino = 3000000;
-        int i, n = 0;
+        int i, n = 0, nwas = 0;
 
         C = node_up(2, 55, 5500, 3, 1);
         membership(ids3c, 3);
@@ -503,8 +600,11 @@ int main(int argc, char **argv)
         mxfs_pal_sleep_ms(50);
         for (p = 0; p < A->ledger.npages; p++)
             if (mxfs_tauth_ledger_page_auth(&A->ledger, p, true, &pa) == 0 &&
-                pa.auth_node == 55 && pa.auth_inc == 5500)
+                pa.auth_node == 55 && pa.auth_inc == 5500) {
+                if (nwas < 64)
+                    was[nwas++] = p;
                 left_before++;
+            }
         CHECK(left_before >= 4, "12 the dead incarnation owns %u pages (want >= 4)", left_before);
 
         bootstrap_budget = 2;           /* entry passes, the pass loses it */
@@ -512,14 +612,40 @@ int main(int argc, char **argv)
         bootstrap_budget = -1;
         for (p = 0; p < A->ledger.npages; p++)
             if (mxfs_tauth_ledger_page_auth(&A->ledger, p, true, &pa) == 0 &&
-                pa.auth_node == 55 && pa.auth_inc == 5500)
+                pa.auth_node == 55 && pa.auth_inc == 5500) {
+                printf("  INFO 12 at the count: page=%u state=%u target=%u/%llu\n",
+                       p, (unsigned)pa.state, pa.target_node,
+                       (unsigned long long)pa.target_inc);
+                /* a page the pass PREPARED to the live view owner B is the
+                 * pass's hand-off: its record names the departed authority
+                 * until B consumes it, and dlm_takeover_page counts it moved.
+                 * Counting it here read an in-flight hand-off as a pass that
+                 * moved nothing (11 of 30 d0349 runs; the page was ACTIVE
+                 * under B by the next read every time).  A page PREPARED to
+                 * anyone else is no transfer and stays counted. */
+                if (pa.state == MXFS_TAUTH_PG_PREPARED &&
+                    pa.target_node == B->id && pa.target_inc == B->inc) {
+                    handed++;
+                    continue;
+                }
                 left_mid++;
+            }
+        /* each page the dead incarnation owned, as the ledger reads right
+         * after the pass returned: a page the pass PREPARED to a peer still
+         * names the departed authority until that peer consumes it */
+        for (i = 0; i < nwas; i++)
+            if (mxfs_tauth_ledger_page_auth(&A->ledger, was[i], true, &pa) == 0)
+                printf("  INFO 12 after the pass: page=%u state=%u auth=%u/%llu target=%u/%llu\n",
+                       was[i], (unsigned)pa.state, pa.auth_node,
+                       (unsigned long long)pa.auth_inc, pa.target_node,
+                       (unsigned long long)pa.target_inc);
         CHECK(rc == -EAGAIN && A->dlm->handoff_decertified == decert0 + 1,
               "12 the pass yields when certification is lost mid-pass (rc=%d decert=%llu)",
               rc, (unsigned long long)(A->dlm->handoff_decertified - decert0));
         CHECK(left_mid > 0 && left_mid < left_before,
               "12 it stopped BETWEEN pages: %u of %u pages still under the dead "
-              "authority", left_mid, left_before);
+              "authority (%u handed to B, in flight)", left_mid, left_before,
+              handed);
 
         /* and the work it left is not lost: the certified node completes it */
         rc = mxfs_dlm_handoff_takeover(A->dlm, 55, 5500);
@@ -652,7 +778,7 @@ int main(int argc, char **argv)
         mxfs_node_id_t ids2e[2] = { 11, 77 }, ids1[1] = { 11 };
         struct mxfs_resource_id R5;
         struct vnode *E;
-        uint64_t s5 = 0, adopted0;
+        uint64_t s5 = 0, adopted0, resends0;
 
         E = node_up(1, 77, 7700, 4, 1);
         membership(ids2e, 2);
@@ -663,17 +789,38 @@ int main(int argc, char **argv)
               mxfs_dlm_grant_id(A->dlm, &R5, &auth, &s5, &lin) && s5 != 0,
               "14 A holds R5 EX from master E under seq %llu", (unsigned long long)s5);
         node_down(E);                               /* E dies holding A's record */
+        /* A's ticks are held from its release until its next EX is granted,
+         * as F's are in case 15.  The release tick re-sends the lost release
+         * about 1 s after the unlock, and once A's takeover has made R5 A's
+         * own, the re-send retires the imported record on A itself
+         * (mxfs_dlm_release_retry_tick): a takeover slower than that (one in
+         * 30 runs read listed=0 resends=+1 at its end) left the next EX a
+         * fresh grant with nothing to adopt, the other order this case does
+         * not test.  The handoff tick, held with it, moves only A's own
+         * pages; the takeover of E's pages is the synchronous pass below. */
+        tick_hold(A, 1);
         rc = mxfs_dlm_unlock(A->dlm, &R5);          /* the release E never retires */
+        resends0 = A->dlm->release_resends;
         CHECK(rc == 0 && mxfs_dlm_held_mode(A->dlm, &R5) == MXFS_LOCK_NL,
               "14 A's release leaves no entry of its own (rc=%d)", rc);
         membership(ids1, 1);
         rc = mxfs_dlm_handoff_takeover(A->dlm, 77, 7700);
+        /* where the lost release of R5 is at each step, and how many
+         * re-sends A's retry tick has made since the unlock */
+        printf("  INFO 14 after the takeover: listed=%d resends=+%llu\n",
+               rel_listed(A, &R5), (unsigned long long)(A->dlm->release_resends - resends0));
         CHECK(rc > 0, "14 A takes the dead master's pages over rc=%d", rc);
         rc = probe_lookup(&R5, &e);
         CHECK(rc == 0 && e.state == MXFS_TAUTH_ST_ACTIVE && e.ex_node == 11 && e.grant_seq64 == s5,
               "14 platter: E's page still records A under seq %llu", (unsigned long long)e.grant_seq64);
         adopted0 = A->dlm->ledger_imports_adopted;
+        printf("  INFO 14 before the EX: listed=%d resends=+%llu\n",
+               rel_listed(A, &R5), (unsigned long long)(A->dlm->release_resends - resends0));
         rc = lock_sync(A, &R5, MXFS_LOCK_EX, &granted);
+        tick_hold(A, 0);
+        printf("  INFO 14 after the EX: listed=%d resends=+%llu adopted=+%llu\n",
+               rel_listed(A, &R5), (unsigned long long)(A->dlm->release_resends - resends0),
+               (unsigned long long)(A->dlm->ledger_imports_adopted - adopted0));
         CHECK(rc == 0 && granted == MXFS_LOCK_EX &&
               A->dlm->ledger_imports_adopted == adopted0 + 1,
               "14 A's next EX adopts its imported record (rc=%d adopted +%llu)",
@@ -712,6 +859,13 @@ int main(int argc, char **argv)
               mxfs_dlm_grant_id(F->dlm, &R6, &auth, &s6, &lin) && s6 != 0,
               "15 F holds R6 EX from master G under seq %llu", (unsigned long long)s6);
         node_down(Gn);                              /* G dies holding F's record */
+        /* F's ticks are held from its release until its next EX is granted.
+         * The release tick re-sends a lost release about 1 s after the
+         * unlock, to whoever masters R6 by then, and a takeover slower than
+         * that (1079 ms on a loaded host) let A retire the record on demand
+         * before the platter was probed.  This case is the other order: the
+         * next EX reaches A while the record is still imported as F's. */
+        tick_hold(F, 1);
         rc = mxfs_dlm_unlock(F->dlm, &R6);          /* the release G never retires */
         CHECK(rc == 0 && mxfs_dlm_held_mode(F->dlm, &R6) == MXFS_LOCK_NL,
               "15 F's release leaves no entry of its own (rc=%d)", rc);
@@ -723,6 +877,7 @@ int main(int argc, char **argv)
         CHECK(rc == 0 && e.state == MXFS_TAUTH_ST_ACTIVE && e.ex_node == 88 && e.grant_seq64 == s6,
               "15 platter: G's page still records F under seq %llu", (unsigned long long)e.grant_seq64);
         rc = lock_sync(F, &R6, MXFS_LOCK_EX, &granted);
+        tick_hold(F, 0);
         CHECK(rc == 0 && granted == MXFS_LOCK_EX &&
               mxfs_dlm_grant_id(F->dlm, &R6, &auth, &fs, &lin) && fs != 0 && fs != s6,
               "15 F's next EX carries a fresh seq %llu, not the released %llu (rc=%d)",
@@ -973,6 +1128,69 @@ int main(int argc, char **argv)
         }
         mxfs_dl_noqueue_ledger_nowait = 1;
         settle(A);
+    }
+
+    /* 19 A REFUSED HAND-OFF COMMIT GRANTS NOTHING.  P holds R9 EX from master
+     * A, and A's own EX on R9 queues behind it.  The commit that would hand R9
+     * from P to A is refused once (-EUCLEAN: an UNKNOWN record, refused and not
+     * retried, no fail-stop): P's release stays pending and is re-sent, and
+     * A's queued entry is removed.  A's wait may report a grant only once A
+     * holds one, in its own table and on the platter; P's next EX then waits
+     * behind it. */
+    {
+        mxfs_node_id_t ids2p[2] = { 11, 77 }, ids1[1] = { 11 };
+        struct mxfs_resource_id R9;
+        struct vnode *P;
+        struct lock_job *j, *jp;
+        uint8_t held_at_return;
+        uint64_t tu;
+
+        P = node_up(1, 77, 7700, 9, 1);
+        membership(ids2p, 2);
+        mxfs_pal_sleep_ms(50);
+        R9 = res_mastered_by(P, 11, 12000000);
+        rc = lock_sync(P, &R9, MXFS_LOCK_EX, &granted);
+        CHECK(rc == 0 && granted == MXFS_LOCK_EX, "19 P holds R9 EX (master A) rc=%d", rc);
+        P->basts = 0;
+        j = lock_async(A, &R9, MXFS_LOCK_EX, 10);
+        CHECK(wait_until(&P->basts, 1, 2000), "19 P receives the BAST (basts=%d)", P->basts);
+        CHECK(!lock_wait(j, 300), "19 A's EX is queued behind P");
+        A->ledger.fail_commit_once_rc = -EUCLEAN;   /* the hand-off commit: refused, not retried */
+        tu = mxfs_pal_time_ms();
+        mxfs_dlm_unlock(P->dlm, &R9);
+        /* budget: P's release re-send (1 s after the refused one) + one commit */
+        lock_wait(j, 3000);
+        held_at_return = mxfs_dlm_held_mode(A->dlm, &R9);
+        rc = probe_lookup(&R9, &e);
+        printf("  INFO 19 A's wait: done=%d rc=%d granted=%u after %llums; A's table holds %u; platter ex_node=%u state=%u; knob consumed=%d; refused waits re-driven %d\n",
+               j->done, j->rc, j->granted, (unsigned long long)(j->t1 - tu), held_at_return, e.ex_node,
+               e.state, A->ledger.fail_commit_once_rc == 0, atomic_read(&mxfs_dl_local_refusal_redrive_n));
+        CHECK(A->ledger.fail_commit_once_rc == 0, "19 the hand-off commit was the refused one");
+        CHECK(j->done && j->rc == 0 && j->granted == MXFS_LOCK_EX && held_at_return == MXFS_LOCK_EX &&
+              rc == 0 && e.ex_node == 11,
+              "19 A's wait reports a grant A holds (rc=%d granted=%u held=%u platter ex_node=%u)",
+              j->rc, j->granted, held_at_return, e.ex_node);
+        {
+            uint64_t t0 = mxfs_pal_time_ms();
+
+            while (rel_pending_count(P) && mxfs_pal_time_ms() - t0 < 3000)
+                mxfs_pal_sleep_ms(5);
+        }
+        jp = lock_async(P, &R9, MXFS_LOCK_EX, 10);
+        CHECK(!lock_wait(jp, 400), "19 P's next EX waits behind A's grant (done=%d rc=%d)", jp->done,
+              jp->done ? jp->rc : 0);
+        if (j->rc == 0)
+            mxfs_dlm_unlock(A->dlm, &R9);
+        CHECK(lock_wait(jp, 3000) && jp->rc == 0 && jp->granted == MXFS_LOCK_EX,
+              "19 P granted once A releases (rc=%d)", jp->rc);
+        if (jp->done && jp->rc == 0)
+            mxfs_dlm_unlock(P->dlm, &R9);
+        lock_finish(jp);
+        lock_finish(j);
+        settle(P);
+        settle(A);
+        node_down(P);
+        membership(ids1, 1);
     }
 
     node_down(A);

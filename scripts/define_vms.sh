@@ -117,7 +117,8 @@ parse_nodes() {
 }
 
 define_one() {
-    local n="$1" vm="test$n" uuid mac boot
+    local n="$1"
+    local vm="test$n" uuid mac boot
     [[ "$n" =~ ^[0-9]+$ ]] && [ "$n" -ge 1 ] && [ "$n" -le "$MAXNODE" ] || { echo "$vm: bad node"; return 1; }
 
     # preserve identity from the existing definition where present

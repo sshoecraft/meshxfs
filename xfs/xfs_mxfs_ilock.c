@@ -1501,7 +1501,7 @@ static int mxfs_ilock_test_strand_inject(struct xfs_inode *ip, uint8_t mode)
 		}
 		wake_up_all(&ip->i_dlm_wait);
 		if (mxfs_acqfall_armed_for(ip->i_ino))
-			mxfs_acqfall_give_up_rc(ip->i_ino, -EIO);
+			mxfs_acqfall_give_up_rc(ip->i_ino, -EIO, mode);
 		{ outcome = MXFS_BLOCK_RETURN; goto mxfs_ilock_test_strand_inject_exit; }
 	}
 mxfs_ilock_test_strand_inject_exit:
@@ -1564,6 +1564,7 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 	{
 		int rc = 0;
 		int attempt;
+		bool force_eagain;
 		u64 t0, dt;
 		static atomic64_t caw_n, caw_ns, caw_new_n;
 		s64 cn;
@@ -1585,7 +1586,10 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 		 * before the caller's RMW, with no double-acquire hazard.
 		 */
 		if (ip->i_dlm_unpublished) {
-			mxfs_dlm_unpublish_drop(ip);
+			/* H-F10: taken off the list with its claim tracked;
+			 * the caller ends the tracking when this acquire
+			 * returns (i_mxfs_pubclaim_bseq) */
+			mxfs_dlm_unpublish_take(ip);
 			/* this acquire IS this inode's publish — remember
 			 * it so the creator baseline can be stamped once the
 			 * grant completes (site 4, the live path for a fresh
@@ -1628,22 +1632,42 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 		 */
 		{
 			int nino_w = 0;
+			u64 nino_t0 = 0;
+			/* noino_acq_takeover: a caller whose transaction holds
+			 * items would hold the fence's AIL target locked while it
+			 * waited, so it takes the release over instead */
+			bool nino_taken = mxfs_noino_inflight_contains(ip->i_mount,
+								       ip->i_ino) &&
+					  mxfs_noino_acq_try_takeover(ip);
 
-			while (nino_w < 2000 &&
+			while (!nino_taken && nino_w < 2000 &&
 			       mxfs_noino_inflight_contains(ip->i_mount,
 							    ip->i_ino)) {
+				if (!nino_t0)
+					nino_t0 = ktime_get_ns();
+				/* D-4NODE-SHARED-DIR-EX-HANDOFF-6S-TAIL-DOZE:
+				 * where the release is (detection only) */
+				if (nino_w == 100 || nino_w == 1000 ||
+				    nino_w == 1999)
+					mxfs_noino_wait_report(ip->i_mount,
+							       ip->i_ino,
+							       nino_w, nino_t0);
 				msleep(1);
 				nino_w++;
 			}
 			if (nino_w > 0) {
 				static atomic_t p_acqw_cap = ATOMIC_INIT(0);
 
+				/* waited_ms counts rounds of msleep(1), each
+				 * about 3 ms here; wall_ms is the wait */
 				if (atomic_inc_return(&p_acqw_cap) <= 200)
-					mxfs_probe("mxfs: P-NOINO-ACQ-WAIT ino=%llu waited_ms=%d%s -- fresh acquire serialized behind pending no-inode release\n",
+					mxfs_probe("mxfs: P-NOINO-ACQ-WAIT ino=%llu waited_ms=%d%s wall_ms=%llu -- fresh acquire serialized behind pending no-inode release\n",
 						(unsigned long long)ip->i_ino,
 						nino_w,
 						nino_w >= 2000 ?
-						" (TIMEOUT, proceeding)" : "");
+						" (TIMEOUT, proceeding)" : "",
+						(unsigned long long)((ktime_get_ns() -
+							nino_t0) / NSEC_PER_MSEC));
 			}
 		}
 
@@ -1675,6 +1699,17 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 		}
 
 		t0 = ktime_get_ns();
+		/* H-F2 test injection: this whole acquire answers -EAGAIN, as an
+		 * engine whose budget went on RETRY answers does, once */
+		force_eagain = READ_ONCE(mxfs_dbg_ilock_force_eagain_ino) ==
+				ip->i_ino &&
+			       cmpxchg(&mxfs_dbg_ilock_force_eagain_ino,
+				       (unsigned long long)ip->i_ino, 0ULL) ==
+				ip->i_ino;
+		if (force_eagain)
+			pr_warn("mxfs: P-DBG-FORCE-EAGAIN ino=%llu mode=%u comm=%s -- TEST ONLY: this acquire reports -EAGAIN for all its attempts without asking the engine\n",
+				(unsigned long long)ip->i_ino, mode,
+				current->comm);
 		for (attempt = 0; attempt < 3; attempt++) {
 			/*
 			 * break the proven dir-inode-EX <-> AG-DLM
@@ -1689,7 +1724,8 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 			 */
 			mxfs_dlm_yield_basted_cached_ags(ip->i_mount);
 
-			rc = mxfs_dlm_inode_lock_routed(ip, mode, auth_gen_snap);
+			rc = force_eagain ? -EAGAIN :
+			     mxfs_dlm_inode_lock_routed(ip, mode, auth_gen_snap);
 			if (rc == 0 || rc == -EDEADLK)
 				break;
 			/* 0.84.2: a killed task at a fallible boundary left the
@@ -2075,7 +2111,7 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 			wake_up_all(&ip->i_dlm_wait);
 			trans_laps++;
 			if (fallible) {
-				mxfs_acqfall_give_up_rc(ip->i_ino, -EAGAIN);
+				mxfs_acqfall_give_up_rc(ip->i_ino, -EAGAIN, mode);
 				pr_warn(
 				    "mxfs: P960-AUTH-TRANSITION-FAIL ino=%llu mode=%u laps=%d mounting=%d comm=%s -- the takeover this acquire waits on stalled; failing THIS OPERATION with -EAGAIN, not the mount, and not shutting down\n",
 					(unsigned long long)ip->i_ino, mode,
@@ -2113,7 +2149,7 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 				ip->i_dlm_acq_inflight--;
 			spin_unlock(&ip->i_dlm_lock);
 			wake_up_all(&ip->i_dlm_wait);
-			mxfs_acqfall_give_up_rc(ip->i_ino, -EAGAIN);
+			mxfs_acqfall_give_up_rc(ip->i_ino, -EAGAIN, mode);
 			pr_warn(
 			    "mxfs: P-MPHASE-ACQ-GIVEUP ino=%llu mode=%u rc=%d comm=%s -- a peer that died during this mount holds the grant and only the mount's barrier can replay it; failing THIS acquire with -EAGAIN so the mount re-runs its barrier, not shutting down\n",
 				(unsigned long long)ip->i_ino, mode, rc,
@@ -2148,7 +2184,7 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 			 * Same shape as the transition-stall arm above.
 			 */
 			if (mxfs_acqfall_armed_for(ip->i_ino))
-				mxfs_acqfall_give_up_rc(ip->i_ino, -EIO);
+				mxfs_acqfall_give_up_rc(ip->i_ino, -EIO, mode);
 			pr_warn_ratelimited(
 			    "mxfs: P240-RBLK-EIO-ABORT ino=%llu mode=%u comm=%s -- grant held by a dead node in RECOVERY_BLOCKED; op fails EIO, NOT shutting down, NOT parking\n",
 				(unsigned long long)ip->i_ino, mode,
@@ -2216,11 +2252,24 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 		 *     REMASTER answers and shut its filesystem down, while the
 		 *     elected replayer parked here on the same failure.  Ask the
 		 *     DLM as well: every node's monitor marks the dead slot
-		 *     recovery-pending when it declares the death.
+		 *     recovery-pending once its fence of the death is proved.
+		 *
+		 *     0.90.131 (D-CAWMPATH-FENCED-RETURN-SURVIVOR-EIO-VICTIM-
+		 *     UNFENCED): a death declared whose fence is still running
+		 *     counts too.  The pending marker is set only after the
+		 *     fence is proved and sealed (on the PR worker), while the
+		 *     holder stops counting as live the moment the death is
+		 *     declared, so in between this predicate and the live arm
+		 *     below were both false.  Measured on 2/disk/caw/mpath: the
+		 *     survivor's upgrade of the shared directory, parked three
+		 *     times behind the frozen holder, timed out 241 ms after the
+		 *     declaration and 246 ms before the marker, and shut its
+		 *     filesystem down in (3) instead of parking.
 		 */
 		if (rc && !xfs_is_shutdown(ip->i_mount) &&
 		    (!bitmap_empty(ip->i_mount->m_mxfs_foreign_dead_slots, 64) ||
-		     mxfs_v5_dlm_any_recovery_pending(ip->i_mount->m_mxfs_dlm))) {
+		     mxfs_v5_dlm_any_recovery_pending(ip->i_mount->m_mxfs_dlm) ||
+		     mxfs_v5_dlm_any_death_inflight(ip->i_mount->m_mxfs_dlm))) {
 			spin_lock(&ip->i_dlm_lock);
 			if (ip->i_dlm_state == MXFS_DLM_ISTATE_ACQUIRING)
 				{ u8 dtr_om = ip->i_dlm_mode, dtr_os = ip->i_dlm_state;
@@ -2232,10 +2281,11 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 			wake_up_all(&ip->i_dlm_wait);
 			park_laps++;
 			pr_warn_ratelimited(
-			    "mxfs: P240-QUAR-PARK ino=%llu mode=%u rc=%d laps=%d duty=%d comm=%s -- acquire timed out with peer recovery pending; parking until a verdict (replay/refusal) lands, NOT shutting down\n",
+			    "mxfs: P240-QUAR-PARK ino=%llu mode=%u rc=%d laps=%d duty=%d inflight=%d comm=%s -- acquire timed out with peer recovery pending; parking until a verdict (replay/refusal) lands, NOT shutting down\n",
 				(unsigned long long)ip->i_ino, mode, rc,
 				park_laps,
 				!bitmap_empty(ip->i_mount->m_mxfs_foreign_dead_slots, 64),
+				mxfs_v5_dlm_any_death_inflight(ip->i_mount->m_mxfs_dlm),
 				current->comm);
 			msleep(min(500 * park_laps, 5000));
 			{ block_outcome = MXFS_BLOCK_GOTO + 0; goto mxfs_ilock_acquire_from_dlm_exit; }
@@ -2282,7 +2332,7 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 				ip->i_dlm_acq_inflight--;
 			spin_unlock(&ip->i_dlm_lock);
 			wake_up_all(&ip->i_dlm_wait);
-			mxfs_acqfall_give_up(ip->i_ino);
+			mxfs_acqfall_give_up(ip->i_ino, mode);
 			pr_warn(
 			    "mxfs: P958-ACQ-KILLED ino=%llu mode=%u comm=%s -- a killed task at a fallible boundary abandons its lock wait; nothing installed, the operation returns -EINTR\n",
 				(unsigned long long)ip->i_ino, mode, current->comm);
@@ -2347,7 +2397,7 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 			wake_up_all(&ip->i_dlm_wait);
 			live_laps++;
 			if (give_up) {
-				mxfs_acqfall_give_up(ip->i_ino);
+				mxfs_acqfall_give_up(ip->i_ino, mode);
 				mxfs_probe(
 				    "mxfs: P912-ACQ-UNRECEIPTED ino=%llu mode=%u rc=%d laps=%d beyond_budget_s=%llu receipted=%d killed=%d comm=%s -- the master is a live member but has never said it has this request (or this task was killed); failing THIS OPERATION, not the mount, and not waiting further\n",
 					(unsigned long long)ip->i_ino, mode, rc,
@@ -2377,6 +2427,54 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 				receipted ? 1 : 0,
 				current->comm);
 			msleep(min(500 * live_laps, 5000));
+			{ block_outcome = MXFS_BLOCK_GOTO + 0; goto mxfs_ilock_acquire_from_dlm_exit; }
+		}
+		/*
+		 * (2c) D-FORMATION-RAMP-LOCK-REQUEST-EXHAUSTS-RETRIES-EAGAIN, H-F2:
+		 *     the engine answered -EAGAIN — every retry of the budget went
+		 *     on a RETRY answer (remaster, pend-retry, prepare,
+		 *     ledger-busy), which is the cluster reorganising its lock
+		 *     authority, as while nodes join one after another; nothing
+		 *     failed and nothing is wedged.  Measured in user mode
+		 *     (tests/tauth/formation_test): a joiner's first PR spent its
+		 *     budget while the view moved 2 -> 12.  Arm (3) below would
+		 *     shut the filesystem down for it.  Park with backoff and ask
+		 *     again, as behind a live holder; a task killed at a fallible
+		 *     boundary leaves.  Placed after every arm above so a
+		 *     quarantine, a blocked or pending recovery and a mount-phase
+		 *     death keep their own outcomes.  ilock_retry_exhaust_park 0
+		 *     is the same-build control.
+		 */
+		if (rc == -EAGAIN && !xfs_is_shutdown(ip->i_mount) &&
+		    READ_ONCE(mxfs_ilock_retry_exhaust_park)) {
+			bool killed = mxfs_acqfall_armed_for(ip->i_ino) &&
+				      fatal_signal_pending(current);
+
+			spin_lock(&ip->i_dlm_lock);
+			if (ip->i_dlm_state == MXFS_DLM_ISTATE_ACQUIRING)
+				{ u8 dtr_om = ip->i_dlm_mode, dtr_os = ip->i_dlm_state;
+				ip->i_dlm_state = MXFS_DLM_ISTATE_NONE;
+				mxfs_dlmtr_rec(ip, dtr_om, dtr_os, MXFS_SITE); }
+			if (ip->i_dlm_acq_inflight)
+				ip->i_dlm_acq_inflight--;
+			spin_unlock(&ip->i_dlm_lock);
+			wake_up_all(&ip->i_dlm_wait);
+			if (killed) {
+				mxfs_acqfall_give_up(ip->i_ino, mode);
+				pr_warn("mxfs: P-LKRETRY-KILLED ino=%llu mode=%u comm=%s -- retry budget spent on RETRY answers and this task was killed at a fallible boundary; abandoning the wait, nothing installed\n",
+					(unsigned long long)ip->i_ino, mode,
+					current->comm);
+				mxfs_v5_dlm_inode_acq_abandon(ip->i_mount->m_mxfs_dlm,
+							      ip->i_ino, mode);
+				{ block_outcome = MXFS_BLOCK_RETURN; goto mxfs_ilock_acquire_from_dlm_exit; }
+			}
+			park_laps++;
+			atomic_inc(&mxfs_ilock_retry_exhaust_parks);
+			pr_warn_ratelimited(
+			    "mxfs: P-LKRETRY-PARK ino=%llu mode=%u rc=%d laps=%d comm=%s -- retry budget spent on RETRY answers while the cluster reorganised; parking and asking again, NOT shutting down\n",
+				(unsigned long long)ip->i_ino, mode, rc, park_laps,
+				current->comm);
+			msleep(min(500 * park_laps, 5000));
 			{ block_outcome = MXFS_BLOCK_GOTO + 0; goto mxfs_ilock_acquire_from_dlm_exit; }
 		}
 		/*
@@ -4946,6 +5044,12 @@ restart:
 							    &trans_laps,
 							    &park_laps, &live_t0,
 							    &live_laps);
+		/* H-F10: the backstop's publish claim, if this acquire was
+		 * one, has returned whatever the outcome */
+		if (ip->i_mxfs_pubclaim_bseq) {
+			mxfs_pubclaim_end(ip->i_mount, ip->i_mxfs_pubclaim_bseq);
+			ip->i_mxfs_pubclaim_bseq = 0;
+		}
 		if (block_outcome == MXFS_BLOCK_RETURN)
 			return;
 		if (block_outcome == MXFS_BLOCK_GOTO + 0)
@@ -5283,6 +5387,32 @@ mxfs_dlm_ilock_end(
 	/* Reclaim path coordination ilock: see mxfs_dlm_ilock_begin comment. */
 	if (unlikely(ip->i_ino == 0))
 		return;
+
+	/*
+	 * 0.90.131: an end owed to no begin.  This task's fallible acquire of
+	 * the inode gave up in this mode and its begin counted no holder, so
+	 * the unlock of what it took must not decrement one: with a live holder
+	 * on the inode that would release a hold the holder still uses, with
+	 * none it is P71-UNDERFLOW.  The open path's ride, the page fault's
+	 * begin and the multi-inode helpers unlock a given-up member without
+	 * XFS_ILOCK_MXFS_NOEND (sav6: P71-UNDERFLOW un=mxfs_dlm_open_protect).
+	 * One atomic read while no give-up is outstanding.
+	 */
+	if (unlikely(atomic_read(&mxfs_acqfall_unowed_total)) &&
+	    READ_ONCE(mxfs_acqfall_unowed_skip) &&
+	    mxfs_acqfall_consume_unowed(ip->i_ino, mode)) {
+		static atomic_t p_ne_n = ATOMIC_INIT(0);
+
+		atomic_inc(&mxfs_acqfall_unowed_skip_n);
+		if (atomic_inc_return(&p_ne_n) <= 300)
+			mxfs_probe("mxfs: P-ACQFALL-END-NOT-OWED ino=%llu mode=%s state=%u dlm_mode=%u ex_h=%u pr_h=%u comm=%s un=%pS -- this task's acquire of the inode gave up and counted no holder; its unlock owes no DLM end\n",
+				(unsigned long long)ip->i_ino,
+				mode == MXFS_LOCK_EX ? "EX" : "PR",
+				ip->i_dlm_state, ip->i_dlm_mode,
+				ip->i_dlm_ex_holders, ip->i_dlm_pr_holders,
+				current->comm, (void *)ip->i_mxfs_ilk_un_ret);
+		return;
+	}
 
 	/* P229: a bypass grant that unlocks without logging leaves no
 	 * stale stamp behind (P230's read-then-clear covers the logged case;

@@ -152,6 +152,14 @@
 #   configuration  e.g. 8/net/mesh/direct: its node count names the nodes
 #                  (test1..testN)
 #   victims  rig nodes to power-cut; node 1 is the probe host and may not be one
+# Env: MXFS_GROUP=<g> runs on that rig group's nodes and pool LUN beside other
+#   groups' runs: the group's node count must be the configuration's, its first
+#   node is node 1, the device is read from node 1's live mount after the prep
+#   (tests/lib/rig.sh mxfs_dev_resolve), and the group's VMs are held for the
+#   lap (tests/lib/runlock.sh vmhold_take), because the kills and the restarts
+#   happen after run.sh has returned and the pool's idle sweep would shut the
+#   nodes off.  run.sh locks each configuration for one group at a time, so
+#   pick a configuration no other group is running.
 # Evidence: tests/evidence/multi_victim/<UTC>_<N-class-method-attach>_<label>/ (summary.txt
 #   holds the verdict and one line per survivor; klog_<node>.txt.gz holds
 #   every node's kernel log from the moment the cluster formed, the victims'
@@ -173,6 +181,21 @@ VCSV="${2:?usage: multi_victim_containment.sh <configuration> <victim>[,<victim>
 LABEL="${3:-mvc}"
 IFS=, read -r -a VICTIMS <<<"$VCSV"
 NV=${#VICTIMS[@]}
+# the nodes: test1..testN on the whole rig, or the group's own
+GROUPARG=()
+if [ -n "${MXFS_GROUP:-}" ]; then
+    read -r -a NODES <<<"$(tools/mxfs_lab.sh group "$MXFS_GROUP" 2>/dev/null)"
+    [ "${#NODES[@]}" = "$N" ] || { echo "group '$MXFS_GROUP' has ${#NODES[@]} nodes; $CONFIG needs $N" >&2; exit 2; }
+    GROUPARG=(--group "$MXFS_GROUP")
+    export MXFS_NODE_LIST
+    MXFS_NODE_LIST=$(IFS=,; echo "${NODES[*]}")
+else
+    NODES=()
+    for i in $(seq 1 "$N"); do NODES+=("test$i"); done
+fi
+H1=${NODES[0]}
+# a node's place in NODES, from 1: its load directory is node<place>
+nidx() { local i; for i in "${!NODES[@]}"; do [ "${NODES[$i]}" = "$1" ] && { echo $(( i + 1 )); return 0; }; done; return 1; }
 VICTIM_GAP="${VICTIM_GAP:-2}"
 # how the victims leave, and whether they reclaim until they do (the header
 # says what each is for)
@@ -230,33 +253,46 @@ on() { local h=$1 t=$2; shift 2; timeout "$t" "$SSH" "$h" "$@" </dev/null 2>/dev
 # the new loop's rsync on the same directory (queue x36b lap 2: every load
 # error was that, and four survivors could not unmount).
 stop_load() {
-    local i pids=()
-    for i in $(seq 1 "$N"); do
-        on "test$i" 20 "touch /tmp/mvc_load.stop" >/dev/null &
+    local h pids=()
+    for h in "${NODES[@]}"; do
+        on "$h" 20 "touch /tmp/mvc_load.stop" >/dev/null &
         pids+=($!)
     done
     wait "${pids[@]}"
 }
 
 SURVIVORS=()
-for i in $(seq 1 "$N"); do
-    h="test$i"
+for h in "${NODES[@]}"; do
     case ",$VCSV," in *",$h,"*) ;; *) SURVIVORS+=("$h") ;; esac
 done
 for v in "${VICTIMS[@]}"; do
-    [[ "$v" =~ ^test([0-9]+)$ ]] && [ "${BASH_REMATCH[1]}" -ge 2 ] && [ "${BASH_REMATCH[1]}" -le "$N" ] \
-        || { echo "victim '$v' is not one of test2..test$N" >&2; exit 2; }
+    vi=$(nidx "$v") && [ "$vi" -ge 2 ] \
+        || { echo "victim '$v' is not one of ${NODES[*]:1}" >&2; exit 2; }
 done
 [ "${#SURVIVORS[@]}" -ge 2 ] || { echo "fewer than two survivors: nothing to contain" >&2; exit 2; }
 say "N=$N configuration=$CONFIG victims=[${VICTIMS[*]}] survivors=[${SURVIVORS[*]}] kill_mode=$KILL_MODE victim_reclaim_ms=$VICTIM_RECLAIM_MS victim_evict=$VICTIM_EVICT acq_delay_ms=$ACQ_DELAY_MS peer_read_ms=$PEER_READ_MS write_budget=${WRITE_BUDGET_S}s load=${LOAD_S}s evidence=$EV"
 
 # --- 1. the cluster
-MXFS_FORCE_PREP=1 ./run.sh "$CONFIG" prep_cluster > "$EV/prep.log" 2>&1
+if [ -n "${MXFS_GROUP:-}" ]; then
+    . tests/lib/runlock.sh
+    vmhold_take "multi_victim_containment $LABEL" "${NODES[@]}" \
+        || { say "ABORT: could not hold [${NODES[*]}] (tests/lib/runlock.sh vmhold_take); nothing measured"; exit 2; }
+fi
+MXFS_FORCE_PREP=1 ./run.sh "$CONFIG" "${GROUPARG[@]}" prep_cluster > "$EV/prep.log" 2>&1
 prc=$?
 grep -a -E 'PREP FAIL|PREP OK|converge|srcversion' "$EV/prep.log" | tail -n 4 | cut -c1-200 | tee -a "$S"
 [ $prc = 0 ] || { say "ABORT: prep_cluster rc=$prc (see $EV/prep.log); nothing measured"; exit 2; }
+if [ -n "${MXFS_GROUP:-}" ] && [ -z "${MXFS_DEV:-}" ]; then
+    # the pool LUN run.sh borrowed for the group, read from node 1's live mount
+    export MXFS_CONFIG=$CONFIG
+    OUT=$EV
+    . tests/lib/rig.sh
+    mxfs_dev_resolve "$H1" >> "$S" || { say "ABORT: the device could not be resolved from $H1's mount; nothing measured"; exit 2; }
+    DEV=$MXFS_DEV_RESOLVED
+    say "device $DEV (from $H1's live mount)"
+fi
 T0=$(date +%s)
-say "cluster formed; module $(on test1 20 'cat /sys/module/mxfs/srcversion') T0=$T0"
+say "cluster formed; module $(on "$H1" 20 'cat /sys/module/mxfs/srcversion') T0=$T0"
 # where the panic channel's log ends now: what it receives from here on is
 # this lap's
 NETCON_OFF=$(stat -c %s "$NETCON" 2>/dev/null || echo 0)
@@ -279,8 +315,7 @@ wait
 # bound is the rest of the lap at its worst: load confirm 30 + probes 5 +
 # kills + window + read 60 + unmount 140 + chk 200.
 FOLLOW_S=$(( 30 + 5 + (VICTIM_GAP + 1) * NV + LOAD_S + 25 + 60 + 140 + 200 ))
-for i in $(seq 1 "$N"); do
-    h="test$i"
+for h in "${NODES[@]}"; do
     ( setsid timeout "$FOLLOW_S" "$SSH" "$h" "journalctl -k -f --since @$T0 -o short-unix --no-pager" </dev/null > "$EV/klog_$h.txt" 2>/dev/null &
       echo $! > "$EV/klog_$h.pid" )
 done
@@ -296,9 +331,10 @@ fi
 # --- 2. the load, on every node; an evicting victim runs its own loop instead
 PS=$(awk -v m="$VICTIM_EVICT_PAUSE_MS" 'BEGIN { printf "%.3f", m / 1000 }')
 for i in $(seq 1 "$N"); do
+    h=${NODES[$(( i - 1 ))]}
     if [ "$VICTIM_EVICT" = 1 ]; then
-        case ",$VCSV," in *",test$i,"*)
-            ( on "test$i" 30 "mkdir -p $MNT/.mvc_load/node$i $MNT/.mvc_probe; nohup bash -c '
+        case ",$VCSV," in *",$h,"*)
+            ( on "$h" 30 "mkdir -p $MNT/.mvc_load/node$i $MNT/.mvc_probe; nohup bash -c '
                 H=$MNT/.mvc_load/node$i
                 D=\$H/evict
                 L=\$(printf %0240d 0)
@@ -320,7 +356,7 @@ for i in $(seq 1 "$N"); do
             continue ;;
         esac
     fi
-    ( on "test$i" 30 "mkdir -p $MNT/.mvc_load/node$i $MNT/.mvc_probe; nohup bash -c '
+    ( on "$h" 30 "mkdir -p $MNT/.mvc_load/node$i $MNT/.mvc_probe; nohup bash -c '
         SRC=/tmp/mvc_src; D=$MNT/.mvc_load/node$i
         rm -rf \$SRC; mkdir -p \$SRC
         for d in 1 2 3 4 5 6 7 8 9 10; do
@@ -342,12 +378,12 @@ done
 wait
 cnt=0
 for t in $(seq 1 30); do
-    cnt=$(on test1 15 "find $MNT/.mvc_load -type f 2>/dev/null | wc -l" | tail -1 | tr -d '[:space:]')
+    cnt=$(on "$H1" 15 "find $MNT/.mvc_load -type f 2>/dev/null | wc -l" | tail -1 | tr -d '[:space:]')
     [ -n "$cnt" ] && [ "$cnt" -gt 100 ] && break
     sleep 1
 done
 [ "${cnt:-0}" -gt 100 ] || { say "ABORT: the load never appeared under $MNT/.mvc_load (files=${cnt:-?}); no node was killed"; stop_load; exit 2; }
-say "load confirmed: $cnt files visible from test1"
+say "load confirmed: $cnt files visible from $H1"
 
 # --- 3. the write probes, on every survivor
 for h in "${SURVIVORS[@]}"; do
@@ -369,9 +405,9 @@ wait
 if [ "$VICTIM_EVICT" = 1 ] && [ "$PEER_READ_MS" -gt 0 ]; then
     RD=$(awk -v m="$PEER_READ_MS" 'BEGIN { printf "%.3f", m / 1000 }')
     DIRS=""
-    for v in "${VICTIMS[@]}"; do DIRS="$DIRS $MNT/.mvc_load/node${v#test}/evict"; done
-    ( on test1 30 "rm -f /tmp/mvc_read.count; nohup bash -c 'end=\$((SECONDS + 120)); n=0; while [ \$SECONDS -lt \$end ]; do for d in $DIRS; do ls -la \$d >/dev/null 2>&1; done; n=\$((n+1)); echo \$n > /tmp/mvc_read.count; sleep $RD; done' >/dev/null 2>&1 &" )
-    say "peer reads started on test1: a listing of [$DIRS ] every ${PEER_READ_MS} ms for 120 s"
+    for v in "${VICTIMS[@]}"; do DIRS="$DIRS $MNT/.mvc_load/node$(nidx "$v")/evict"; done
+    ( on "$H1" 30 "rm -f /tmp/mvc_read.count; nohup bash -c 'end=\$((SECONDS + 120)); n=0; while [ \$SECONDS -lt \$end ]; do for d in $DIRS; do ls -la \$d >/dev/null 2>&1; done; n=\$((n+1)); echo \$n > /tmp/mvc_read.count; sleep $RD; done' >/dev/null 2>&1 &" )
+    say "peer reads started on $H1: a listing of [$DIRS ] every ${PEER_READ_MS} ms for 120 s"
 fi
 
 # --- 3b. the victims reclaim until they go
@@ -395,15 +431,15 @@ for v in "${VICTIMS[@]}"; do
     # a sweep of an earlier victim's bucket can be waiting behind
     if [ "$PROVER_HOLD_MS" -gt 0 ] && [ "$v" = "${VICTIMS[$(( NV - 1 ))]}" ]; then
         for h in "${SURVIVORS[@]}"; do
-            [ "$h" = test1 ] && continue
+            [ "$h" = "$H1" ] && continue
             ( on "$h" 20 "echo $PROVER_HOLD_MS > /sys/module/mxfs/parameters/dbg_fence_crash_hold_ms; echo -1 > /sys/module/mxfs/parameters/dbg_fence_crash_slot; echo 5 > /sys/module/mxfs/parameters/dbg_fence_crash_cut; echo \"$h cut=\$(cat /sys/module/mxfs/parameters/dbg_fence_crash_cut) hold_ms=\$(cat /sys/module/mxfs/parameters/dbg_fence_crash_hold_ms)\"" > "$EV/prover_hold_$h.txt" ) &
         done
         wait
-        say "prover hold set on $(cat "$EV"/prover_hold_*.txt 2>/dev/null | grep -c 'cut=5') of $(( ${#SURVIVORS[@]} - 1 )) survivors other than test1 before the kill of $v: ${PROVER_HOLD_MS} ms between the certificate and the manifest, once per node"
+        say "prover hold set on $(cat "$EV"/prover_hold_*.txt 2>/dev/null | grep -c 'cut=5') of $(( ${#SURVIVORS[@]} - 1 )) survivors other than $H1 before the kill of $v: ${PROVER_HOLD_MS} ms between the certificate and the manifest, once per node"
     fi
     if [ "$REAP_WAIT_MS" -gt 0 ] && [ "$v" = "${VICTIMS[$(( NV - 1 ))]}" ]; then
-        on test1 20 "echo $REAP_WAIT_MS > /sys/module/mxfs/parameters/dbg_reap_wait_dead_ms; echo 3000 > /sys/module/mxfs/parameters/dbg_fence_crash_hold_ms; echo -1 > /sys/module/mxfs/parameters/dbg_fence_crash_slot; echo 1 > /sys/module/mxfs/parameters/dbg_fence_crash_cut; echo \"test1 reap_wait_ms=\$(cat /sys/module/mxfs/parameters/dbg_reap_wait_dead_ms) cut=\$(cat /sys/module/mxfs/parameters/dbg_fence_crash_cut)\"" > "$EV/reap_wait_test1.txt"
-        say "reap worker wait set before the kill of $v: $(tr '\n' ' ' < "$EV/reap_wait_test1.txt")"
+        on "$H1" 20 "echo $REAP_WAIT_MS > /sys/module/mxfs/parameters/dbg_reap_wait_dead_ms; echo 3000 > /sys/module/mxfs/parameters/dbg_fence_crash_hold_ms; echo -1 > /sys/module/mxfs/parameters/dbg_fence_crash_slot; echo 1 > /sys/module/mxfs/parameters/dbg_fence_crash_cut; echo \"$H1 reap_wait_ms=\$(cat /sys/module/mxfs/parameters/dbg_reap_wait_dead_ms) cut=\$(cat /sys/module/mxfs/parameters/dbg_fence_crash_cut)\"" > "$EV/reap_wait_$H1.txt"
+        say "reap worker wait set before the kill of $v: $(tr '\n' ' ' < "$EV/reap_wait_$H1.txt")"
     fi
     if [ "$KILL_MODE" = withdraw ]; then
         # the filesystem forced down with its log unflushed; the node stays
@@ -423,7 +459,7 @@ for v in "${VICTIMS[@]}"; do
 done
 
 # --- 5. the window, then every survivor read
-[ "$PEER_READ_MS" -gt 0 ] && say "peer reads made by test1 so far: $(on test1 15 'cat /tmp/mvc_read.count 2>/dev/null' | tail -n 1)"
+[ "$PEER_READ_MS" -gt 0 ] && say "peer reads made by $H1 so far: $(on "$H1" 15 'cat /tmp/mvc_read.count 2>/dev/null' | tail -n 1)"
 say "waiting out the load window (${LOAD_S}s from the last kill)"
 sleep $(( LOAD_S - ( $(date +%s) - TK ) + 25 ))
 TE=$(date +%s)
@@ -577,7 +613,7 @@ for h in "${SURVIVORS[@]}"; do
     grep -q 'left=0' "$EV/umount_$h.txt" || { left=$(( left + 1 )); say "unmount $h: $(tr '\n' ' ' < "$EV/umount_$h.txt")"; }
 done
 if [ $left = 0 ]; then
-    on test1 200 "timeout 180 /src/mxfs/tools/chk_mxfs -v $DEV; echo CHK_RC=\$?" > "$EV/chk.txt"
+    on "$H1" 200 "timeout 180 /src/mxfs/tools/chk_mxfs -v $DEV; echo CHK_RC=\$?" > "$EV/chk.txt"
     crc=$(sed -n 's/^CHK_RC=//p' "$EV/chk.txt")
     say "chk_mxfs rc=${crc:-none} ($(grep -a -c -i error "$EV/chk.txt") line(s) naming an error; full output $EV/chk.txt)"
     [ "${crc:-x}" = 0 ] || verdict=FAIL
@@ -587,19 +623,22 @@ else
 fi
 
 # the followers ended and their logs packed, before the victims boot again
-for i in $(seq 1 "$N"); do
-    p=$(cat "$EV/klog_test$i.pid" 2>/dev/null)
+for h in "${NODES[@]}"; do
+    p=$(cat "$EV/klog_$h.pid" 2>/dev/null)
     [ -n "$p" ] && kill "$p" 2>/dev/null
-    p=$(cat "$EV/lsn_test$i.pid" 2>/dev/null)
+    p=$(cat "$EV/lsn_$h.pid" 2>/dev/null)
     [ -n "$p" ] && kill "$p" 2>/dev/null
 done
 sleep 2
 gzip -f "$EV"/klog_test*.txt
 say "kernel logs kept: $(ls "$EV"/klog_test*.txt.gz 2>/dev/null | wc -l) of $N nodes ($(du -ch "$EV"/klog_test*.txt.gz 2>/dev/null | tail -n 1 | cut -f1) packed)"
 
-# --- 7. the rig made whole
+# --- 7. the rig made whole (a group's VMs are the pool's: the restart is enough,
+# and its idle sweep powers them off once the hold ends)
 for v in "${VICTIMS[@]}"; do timeout 60 virsh -c qemu:///system start "$v" >/dev/null 2>&1; done
-scripts/lab_power.sh up "rig:$N" > "$EV/rig_up.log" 2>&1 || say "the rig did not come back whole (see $EV/rig_up.log)"
+if [ -z "${MXFS_GROUP:-}" ]; then
+    scripts/lab_power.sh up "rig:$N" > "$EV/rig_up.log" 2>&1 || say "the rig did not come back whole (see $EV/rig_up.log)"
+fi
 
 say "VERDICT $verdict ($CONFIG, ${NV} victim(s) [${VICTIMS[*]}], ${#SURVIVORS[@]} survivors, write budget ${WRITE_BUDGET_S}s)"
 # the line tests/lap_queue.sh reads back

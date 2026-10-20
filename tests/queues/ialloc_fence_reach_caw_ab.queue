@@ -1,0 +1,32 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F13, with
+# the peer-unlink reach repaired, on the disk-locking transport.  Why it
+# replaces icg, the hypothesis, build (53A7F8EBBCEC0C4B6A705D2), knob,
+# settings, measures and VERDICT RULES are those of
+# tests/queues/ialloc_fence_reach_ab.queue, written before the first lap of
+# either queue; only the configuration (2/disk/caw/direct g2b, test15 test16,
+# where pha2 and pha3 measured the exposure) and the labels differ.  The two
+# queues are judged separately, each by those rules.
+#
+# The disk-locking queue follows the TCP one through both repairs; its labels
+# are iwc1..iwf3 (iyg ran the first repair and was stopped with ixg).
+#
+# Bound: fw3's, 1680 s per lap (icg's laps about 470 s).
+#
+# RERUN WITH THE CREATE-REUSE FIX IN BOTH ARMS (labels jwc1..jwf3), for the
+# reason given in tests/queues/ialloc_fence_reach_ab.queue: iwc1 and iwc2 each
+# shut test15 down through
+# D-CREATE-REUSE-OVER-PEER-FREED-LINKED-CORPSE-SHUTS-NODE-DOWN and measured
+# nothing of H-F13.  Build ~/src/mxfs-b srcversion A97F45838280C5F3B4C352C,
+# NG0_CR63_DEFER=1 in both arms, the only knob between them ag_ialloc_fence;
+# the verdict rules are unchanged.  No control lap on this transport has yet
+# shown the cause, so the controls keep their three laps.
+# Every lap here is also an H-L1 fix lap for the create-reuse defect on this
+# transport: its CRESULT line is graded by
+# tests/queues/cr63_linked_defer_caw_ab.queue's rules, in either arm
+# (cr63_linked_defer is 1 in both; declared before the first lap).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=0 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh jwc1 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh jwf1 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=0 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh jwc2 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh jwf2 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=0 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh jwc3 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh jwf3 1 300 2/disk/caw/direct g2b

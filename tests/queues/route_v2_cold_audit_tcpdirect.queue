@@ -1,0 +1,36 @@
+# D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349: the cold audit the routing
+# version 2 A/B (tests/queues/route_v2_main_ab_tcpdirect.queue, run rv2) owed.
+# Both of rv2's audits read CORRUPT, and the only checker complaint was
+# 'authority ledger: no valid region header': tests/tooling/chk_clean.sh ran
+# the MAIN tree's chk_mxfs, built before routing version 2 existed, against a
+# sibling's version-2 volume.  run.sh now hands every node-side test
+# CHK_MXFS=<this checkout>/tools/chk_mxfs, so this queue, run from the checkout
+# that formats and loads routing version 2, audits with a checker that knows it.
+# Two volumes: each a fresh prep (mkfs's default, version 2), the rsync arm at
+# the module's defaults (tests/resv_ahead_rsync_ab.sh, RA_HASH_VERSION=2: the arm
+# ABORTs unless both nodes' P-TAUTH-OPEN read version 2), A remounted, then
+# run.sh chk_clean.  2/net/mesh/direct g2c, A=test29, B=test30.
+#
+# RULES (written before the first lap).  VALID AUDIT: the chk_clean row ran,
+# and its evidence log's 'TCP authority ledger' line reads hash_version=2 (only
+# a checker that knows version 2 prints that field; a line without it, or the
+# region-header error, means the wrong checker ran: the lap is VOID, not a
+# verdict).  PREDICTION: on both volumes verdict=CLEAN release=CLEAN errors=0,
+# rc=0.  INTEGRITY: a valid audit that is not CLEAN, bad != 0 in an arm, or a
+# shutdown, BUG, Oops, hung-task, P-TAUTH-VERIFY-FAIL or P-TAUTH-OPEN-FAIL line
+# in either node's capture stops the work and is attributed from its own lines.
+#
+# Bounds, from tests/queues/route_v2_main_ab_tcpdirect.queue's derivations:
+# prep 300 (run.sh prep_cluster, measured 38-99 s on g2c); an arm 240
+# (tests/resv_ahead_rsync_ab.sh's header with RA_HASH_VERSION; rv2's v2 arms
+# took 51-55 s); the remount 85 (tests/remount_node.sh's header); the audit 315
+# (run.sh alloc_witness 120 + chk_clean 180 + preflight and marker check; rv2's
+# took 100-102 s).
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+240 RA_HASH_VERSION=2 tests/resv_ahead_rsync_ab.sh rv2ca1 0 0 test29 test30
+85 MXFS_DEV=/dev/sda MXFS_NODE_LIST=test29,test30 tests/remount_node.sh rv2ca1 test29
+315 ./run.sh 2/net/mesh/direct --group g2c chk_clean
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+240 RA_HASH_VERSION=2 tests/resv_ahead_rsync_ab.sh rv2ca2 0 0 test29 test30
+85 MXFS_DEV=/dev/sda MXFS_NODE_LIST=test29,test30 tests/remount_node.sh rv2ca2 test29
+315 ./run.sh 2/net/mesh/direct --group g2c chk_clean

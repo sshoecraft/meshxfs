@@ -101,6 +101,18 @@ acked=$(printf '%s' "$oline" | grep -ao 'acked=[0-9]*' | cut -d= -f2)
 replay_s=$(printf '%s' "$oline" | grep -ao 'replay_s=[0-9]*' | cut -d= -f2)
 oevid=$(printf '%s' "$oline" | grep -ao 'evidence=[^ ]*' | cut -d= -f2)
 echo "  INFO oracle rc=$orc wall=$(( $(date +%s) - t0 ))s: ${oline:-<no RESULT line>}"
+# The oracle refusing to start ran nothing on the filesystem: every one of its
+# precondition checks (build identity, transport, mounted members) answers
+# "ABORT: ..." with exit 2 before its first workload line, "  INFO transport=".
+# That is a pre-assert, which the board classes as rig noise; scoring it as a
+# failed death oracle held the row FLAKY for ten runs over a mismatched build.
+# An abort after the oracle started prints a RESULT line and is scored below.
+if [ "$orc" = 2 ] && [ -z "$oline" ] && ! grep -aq '^  INFO transport=' "$OUT/oracle.log"; then
+    why="pre-assert: the death oracle refused to start: $(grep -a -m1 '^ABORT:' "$OUT/oracle.log" | cut -c1-200)"
+    echo "  FAIL $why"
+    finish FAIL "oracle=REFUSED acked=0"
+    exit 1
+fi
 ck "the death oracle passed (V's slice fenced, sealed and replayed by W, every acknowledged file verified)" "$orc:$(printf '%s' "$oline" | awk '{print $2}')" "0:PASS"
 ck "the replayed slice carried acknowledged files (acked >= 1)" "$([ "${acked:-0}" -ge 1 ] && echo yes || echo "no(${acked:-none})")" "yes"
 if [ "$orc" != 0 ] || [ "${acked:-0}" -lt 1 ]; then

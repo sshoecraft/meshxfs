@@ -1,0 +1,53 @@
+# D-NETMESH-UMOUNT-RELEASES-TO-DEPARTED-PEER-200MS-EACH: same-build A/B of
+# dl_relall_skip_unreachable on 4/net/mesh/mpath g4, main tree build
+# 311877C431E1BB444562804, with the incident's two conditions now forced
+# (tests/mpath/umount_pair_race.sh PF_HOLD_FILES and PF_GOODBYE_DELAY_MS, see
+# its header).  The first A/B (tests/queues/upr_relall_ab.queue, uprab) was
+# VACUOUS: B's release-all held 4-5 grants and no send failed.
+#
+# HYPOTHESIS (the record): when the later node's shutdown release-all meets a
+# master that has departed before the node processed its GOODBYE, every grant
+# that master holds costs three send attempts 100 ms apart, so hundreds of
+# grants hold the unmount for tens of seconds (incident: 938 held, 928 failed
+# sends, ~62 s).  The fix (since 0.90.54, knob default 1) records a master that
+# refused a release send as unreachable and sends it nothing more in that
+# release-all.  PREDICTION: control laps (dl_relall_skip_unreachable=0) report
+# send_failed in the tens or hundreds and a release-all wall over its stepping
+# plus 5 s (row FAIL); fix laps report skipped in the tens or hundreds, at most
+# one failed send per unreachable master, and a release-all within its stepping
+# plus 5 s (row PASS).
+#
+# Arms alternate, both with PF_HOLD_FILES=1000 (B holds about 1000 retained PR
+# grants at its release-all, about a quarter mastered by A on four nodes),
+# PF_GOODBYE_DELAY_MS=60000 (B processes A's GOODBYE 60 s late; B's teardown
+# joins that receive thread, so B's unmount includes the delay in both arms and
+# the row bounds it by the larger of the stepping and the delay) and the row's
+# default 20 ms release step.
+#
+# VERDICT RULES (written before the first lap):
+#   REACH      a lap reached when B's P-RELALL-WALL released >= 400 and its
+#              GOODBYE delay fired; a control lap reached the incident only with
+#              send_failed >= 20.  An unreached lap has no verdict and is rerun
+#              once; two unreached laps in an arm make the A/B VACUOUS.
+#   FIXED      both control laps reached the incident and FAIL the release-all
+#              bound; both fix laps reached, report skipped >= 20 and
+#              send_failed <= 3, and PASS (release-all within its stepping + 5 s,
+#              both unmounts rc 0 within their bounds); no node failure line
+#              (Shutting down filesystem, BUG:, Oops, blocked for more than) in
+#              any lap's kept logs.
+#   NOT FIXED  a reached fix lap with send_failed > 3, a release-all over its
+#              bound, or an unmount over its bound: attributed from its logs.
+#   REFUTED    a reached control lap whose release-all stays within its bound
+#              with send_failed >= 20 (failed sends do not cost the wall).
+#
+# Bounds: the prep line 300 s (as uprab); the row line 330 s, the row's own
+# --budget 300 (header derivation with the hold files and the delay, ~240 s)
+# plus 30 s for lap_chain.sh's own steps.
+300 MXFS_FORCE_PREP=1 ./run.sh 4/net/mesh/mpath --group g4 prep_cluster
+330 PF_HOLD_FILES=1000 PF_GOODBYE_DELAY_MS=60000 PF_KNOBS='dl_relall_skip_unreachable=0' tests/mpath/lap_chain.sh row 4/net/mesh/mpath g4 uphc1 tests/mpath/umount_pair_race.sh --budget 300
+300 MXFS_FORCE_PREP=1 ./run.sh 4/net/mesh/mpath --group g4 prep_cluster
+330 PF_HOLD_FILES=1000 PF_GOODBYE_DELAY_MS=60000 PF_KNOBS='dl_relall_skip_unreachable=1' tests/mpath/lap_chain.sh row 4/net/mesh/mpath g4 uphf1 tests/mpath/umount_pair_race.sh --budget 300
+300 MXFS_FORCE_PREP=1 ./run.sh 4/net/mesh/mpath --group g4 prep_cluster
+330 PF_HOLD_FILES=1000 PF_GOODBYE_DELAY_MS=60000 PF_KNOBS='dl_relall_skip_unreachable=0' tests/mpath/lap_chain.sh row 4/net/mesh/mpath g4 uphc2 tests/mpath/umount_pair_race.sh --budget 300
+300 MXFS_FORCE_PREP=1 ./run.sh 4/net/mesh/mpath --group g4 prep_cluster
+330 PF_HOLD_FILES=1000 PF_GOODBYE_DELAY_MS=60000 PF_KNOBS='dl_relall_skip_unreachable=1' tests/mpath/lap_chain.sh row 4/net/mesh/mpath g4 uphf2 tests/mpath/umount_pair_race.sh --budget 300

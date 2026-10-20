@@ -1,0 +1,61 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, the final
+# verification: the record's own reproducer on the build that carries every
+# fix at its production default, with no fix knob set by the harness.
+#
+# What it verifies.  Every exit the record traced has its own same-build A/B:
+#   H-U3 (fresh-source reload reverting this node's committed next pointer;
+#        puca1, puca2, puci1, cmwn1): freshsrc_iunl_overlay, default 1;
+#   H-U4 (a predecessor edited without its inode EX, reverted by a peer's
+#        slot publish; hu3f1): unlprev_tenure, default 1;
+#   H-U5 (the B6 open-holder exit releasing EX with committed state not at
+#        home; hu4f1-3): b6_release_drain, default 1;
+#   H-U1 (the predecessor reclaimed before a mid-list free; cmwd1):
+#        unlprev_pin, default 1;
+#   H-U6 (the predecessor references released inline at the end of a free,
+#        running the predecessor's whole inactivation nested inside it and
+#        deadlocking on the AGI with a create; hu4df1): unlprev_rele_defer,
+#        default 1 (its A/B, tests/queues/peer_open_unlinked_hu6_ab.queue,
+#        runs beside this queue on g2c).
+# This queue asks the record's own question on the shipping build: does the
+# reproducer that took both nodes down in 3 of 3 laps on build X
+# (tests/queues/peer_open_unlinked_repro.queue) now complete, with the two
+# test-only window openers both on in some laps (dbg_ifree_midlist_delay_ms=600
+# holds every mid-list free 600 ms; PUC_CLOSE_DROPS=20 drops the owner's caches
+# across its close of z) and off in the others.  The harness refuses a node
+# running anything but this tree's build and reads back every knob it sets.
+#
+# Build: main tree 311877C431E1BB444562804 (0.90.131; it also carries the
+# deferred-free fixes ifree_defer_drain and ifree_defer_reap of
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY at their
+# defaults).  The queue never ran on the earlier build 41D2F923.  Laps: three plain and
+# two forced on 2/net/mesh/direct (the configuration of every reproduction),
+# two plain and one forced on 2/disk/caw/direct (the record reaches every
+# 2-node configuration), all on g2d (test31 owner, test32 peer), 30 iterations.
+#
+# VERDICT RULES (written before the first lap):
+#   VERIFIED  all eight laps PASS: ok=30 (the workload complete), no 'xfs_ifree
+#             returned error' and no node failure line in either node's kernel
+#             log through the post-audit capture (late=0), cold audit CLEAN
+#             errors=0, and in every lap noprev 0, backref 0, notenure 0,
+#             nextwr_stale 0, land_fail 0, ghost_b6 0 and stale_ungrafted 0;
+#             and the forced laps reach their windows (unlprev_absent > 0 or
+#             waits > 0 over the forced TCP laps; otherwise those laps measured
+#             nothing and are VACUOUS, not passes).
+#   OPEN      any lap REPRODUCED, FAIL, or counting any of the lines above: the
+#             record stays open and the lap is attributed from its kept logs
+#             and image before anything else.
+# A lap that ABORTs, or audits STALE/NONE without a reproduction, has no verdict
+# and is rerun.
+#
+# Bounds (tests/peer_open_unlinked_chain.sh's derivation, as in
+# tests/queues/peer_open_unlinked_hu1_ab.queue): a plain lap sets no knob and
+# runs no close drops, 2417 - 5x2x20 - 60 = 2157 s; a forced lap sets one knob
+# and runs the close drops, 2157 + 2x20 + 60 = 2257 s.
+2157 MXFS_SNAPSHOT_DIR=/mxfs/snapshots tests/peer_open_unlinked_chain.sh pfd1 30 2/net/mesh/direct g2d
+2257 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600" tests/peer_open_unlinked_chain.sh pfw1 30 2/net/mesh/direct g2d
+2157 MXFS_SNAPSHOT_DIR=/mxfs/snapshots tests/peer_open_unlinked_chain.sh pfd2 30 2/net/mesh/direct g2d
+2157 MXFS_SNAPSHOT_DIR=/mxfs/snapshots tests/peer_open_unlinked_chain.sh pfc1 30 2/disk/caw/direct g2d
+2257 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600" tests/peer_open_unlinked_chain.sh pfw2 30 2/net/mesh/direct g2d
+2257 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600" tests/peer_open_unlinked_chain.sh pfcw1 30 2/disk/caw/direct g2d
+2157 MXFS_SNAPSHOT_DIR=/mxfs/snapshots tests/peer_open_unlinked_chain.sh pfd3 30 2/net/mesh/direct g2d
+2157 MXFS_SNAPSHOT_DIR=/mxfs/snapshots tests/peer_open_unlinked_chain.sh pfc2 30 2/disk/caw/direct g2d

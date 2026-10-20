@@ -1,0 +1,10 @@
+# D-INACT-DEFERRED-FREE-LOSES-TRUNCATED-CORE-AND-REAP-AUTHORITY, H-2 A/B on
+# 2/net/mesh/mpath g2, run from ~/src/mxfs-c (build 311877C431E1BB444562804):
+# ifree_defer_reap 1 (fix) vs 0 (control), ifree_defer_drain 1 in both arms,
+# every other knob as the fzm final-verification laps.  Arms alternate.  The
+# hypothesis, prediction and verdict rules are those of
+# tests/queues/ifree_defer_h2_caw.queue, applied to this configuration.
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh idrmf1 1 300 2/net/mesh/mpath g2
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=0 tests/noino_gen0_ab.sh idrmc1 1 300 2/net/mesh/mpath g2
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh idrmf2 1 300 2/net/mesh/mpath g2
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=0 tests/noino_gen0_ab.sh idrmc2 1 300 2/net/mesh/mpath g2

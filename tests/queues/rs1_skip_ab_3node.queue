@@ -1,0 +1,57 @@
+# H-RS1 A/B for D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY on 3/disk/caw/direct
+# g3 (test1 test2 test3).  Same build for both arms: ~/src/mxfs-c srcversion
+# D2472E4A4BED5A6D8DC8AF8, the main tree's sources (H-F14, H-IU1 and H-RS1 in,
+# each at its default) copied there by tools/sibling_sync.sh.  Module knob
+# stale_stage_skip_landed: 1 = a dead-tenure logged inode slot whose image
+# already landed is kept out of release-flush and demoter cluster writes, 0 =
+# the same-build control that writes it.  The P-RS1-LANDED-SKIP line and the
+# stale_stage_rf_landed count run in both settings, and the clobber check's
+# P-DINO-CLOBBER-MASKED line names every slot a mask kept off the platter while
+# its image was behind it.  Run from ~/src/mxfs-c.  Every other setting is
+# exactly tests/queues/freed_nodelay_3node.queue's (production settings: both
+# test delays off); NG0_RS1_SKIP alternates 0 (control) and 1 (fix).
+#
+# HYPOTHESIS H-RS1 (in the record before the patch): a logged slot whose last
+# copy-in was under a tenure that has since ended (stale) and whose image
+# already landed carries no change that is not at home; a cluster write in a
+# release-flush or demoter context that carries it reverts a peer's later
+# publication (lfb2 test16 ino 2097311, wrc2 test1 ino 138), and keeping it
+# out is lossless because the re-logged item stays dirty and its next copy-in
+# stages current state under the live tenure.
+#
+# READING RULES (written before the first lap; shared by the two
+# rs1_skip_ab_*.queue files, graded as one campaign):
+#   Reach is RRESULT's found: stale_stage_rf_landed summed over the nodes.  A
+#   lap without reach is RVACUOUS and counts for neither arm.
+#   SUPPORTED when at least one control lap is RCONTROL-SHOWS-CAUSE (a
+#   partial-path regression on a slot a masked=0 P-RS1-LANDED-SKIP line named
+#   just before it), every fix lap with reach is RPASS (no regression
+#   attributed rs1 or landed_unseen, no node failure, audit CLEAN), at least
+#   three fix laps reach, and the fix laps' prevented sum is above zero (slots
+#   the H-RS1 mask kept off the platter while their image was behind it).
+#   REFUTED if a fix lap shows a partial-path regression attributed rs1 or
+#   landed_unseen (the mask did not cover the shape), or if every control lap
+#   with a partial-path regression attributes it unlanded (the premise is
+#   wrong: the leak is a dead-tenure image that had not landed).
+#   Otherwise undecided: more laps on the same rules, never a disposition.
+#   A fix lap with a release drain that did not end full, or a stall dump, on
+#   an inode a masked=1 P-RS1-LANDED-SKIP line named is read first, as a
+#   possible cost of the mask (the skipped slot's change must still land).
+#   Any other CORRUPT shape, node failure, stall or ABORT is attributed from
+#   its own lines to its own record before anything else (the deferred-free
+#   shutdown, P-IFREE-DEFER-UNLANDED-FATAL:
+#   D-IFREE-DEFER-UNLANDED-FATAL-SHUTDOWN-BEHIND-LOCKED-CLUSTER-BUFFER;
+#   unattributed partial-path regressions reading mem mode 00 nlink 1:
+#   D-FREED-IMAGE-ADOPT-KEEPS-DEAD-LIFE-CORE-FIELDS-REGRESSES-FREE-DINODE).
+#   Also read on every lap: WRESULT, CRESULT, the D-FREED F fields and
+#   tests/iwr_refuse_streaks.sh.
+#
+# Bound: the freed_nodelay laps' 1680 s per lap (they ran 472-597 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=0 tests/noino_gen0_ab.sh rk31 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 tests/noino_gen0_ab.sh rk32 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=0 tests/noino_gen0_ab.sh rk33 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 tests/noino_gen0_ab.sh rk34 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=0 tests/noino_gen0_ab.sh rk35 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 tests/noino_gen0_ab.sh rk36 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=0 tests/noino_gen0_ab.sh rk37 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 tests/noino_gen0_ab.sh rk38 1 300 3/disk/caw/direct g3

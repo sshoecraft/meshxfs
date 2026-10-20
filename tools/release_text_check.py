@@ -26,14 +26,20 @@ WHAT IT CHECKS.  Derived from the data, never from a second list kept here:
   2. The README names the tree's VERSION as the current release, in the table's
      closing sentence and in its first news heading.
   3. The count in the README's "Released: <n> configurations" heading.
-  4. The README's open-defect numbers (total, and how many reach a released
-     configuration) equal what tools/defects.py reports now.
-  5. Every released platform's name is in the README.
-  6. No public file describes a released thing as unreleased: the phrases in
+  4. Every released platform's name is in the README.
+  5. No public file describes a released thing as unreleased: the phrases in
      STALE below.  Each is a statement that was true once.
-  7. No public file gives the released cluster sizes as a list that stops
+  6. No public file gives the released cluster sizes as a list that stops
      short of the largest one.
-  8. The files that state released cluster sizes name the largest one.
+  7. The files that state released cluster sizes name the largest one.
+  8. bench/README.md's results tables are what tools/bench_report.py writes from
+     the release boards.  Until 2026-10-19 that page held development notes from
+     May 2026 that no release refreshed, and readers took them for the current
+     numbers.
+
+The README no longer states how many records the defect queue holds: a count
+written at release time was wrong again as soon as a record was added or
+removed, so it points at the queue and the command that reads it instead.
 
 A phrase that is right where it stands (history that names its own version, a
 statement about something genuinely unreleased) is listed in ALLOWED with the
@@ -59,6 +65,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # prints.  Design notes, rulings and history are not release claims.
 PUBLIC = [
     "README.md",
+    "bench/README.md",
     "docs/man/man5/mxfs.5",
     "docs/man/man8/chk_mxfs.8",
     "docs/man/man8/mkfs.mxfs.8",
@@ -116,11 +123,7 @@ def attach_rule(rel: list[str]) -> tuple[str, str] | None:
 
 # (file, exact stripped line, reason).  The line must still be in the file: a
 # stale exemption fails the check, so this list cannot outlive what it excuses.
-ALLOWED = [
-    ("README.md",
-     "> the 2-, 4- and 8-node configurations and all four platforms were verified",
-     "the 0.90.42 news item: the smaller sizes re-verified when sixteen nodes shipped"),
-]
+ALLOWED: list[tuple[str, str, str]] = []
 
 
 def read(rel: str) -> str:
@@ -142,22 +145,6 @@ def released_earlier() -> dict[str, str]:
 def matrix_sizes() -> list[int]:
     d = json.loads(read("data/configurations.json"))
     return sorted({int(k.split("/")[0]) for k in d["release_matrix"]})
-
-
-def defect_counts(cfgs: list[str]) -> tuple[int, int]:
-    """(open records, records that reach at least one released configuration)."""
-    total = len(json.loads(read("data/defects.json")).get("defects", []))
-    out = subprocess.run([sys.executable, str(ROOT / "tools/defects.py")],
-                         capture_output=True, text=True).stdout
-    m = re.search(r"^Total: (\d+) open", out, re.M)
-    if m:
-        total = int(m.group(1))
-    ids: set[str] = set()
-    for c in cfgs:
-        o = subprocess.run([sys.executable, str(ROOT / "tools/defects.py"), "--at", c],
-                           capture_output=True, text=True).stdout
-        ids |= set(re.findall(r"\bD-[A-Z0-9][A-Z0-9-]+", o))
-    return total, len(ids)
 
 
 def module_text(rel: str) -> list[tuple[int, str]]:
@@ -223,22 +210,7 @@ def main() -> int:
         fails.append(f"README.md: the 'Released: <n> configurations' heading says "
                      f"{m.group(1) if m else 'nothing'}; the data has {len(rel)} ({want})")
 
-    # 4. defect numbers
-    total, reach = defect_counts(rel)
-    m = re.search(r"holds (\d+) open records", readme)
-    if not m or int(m.group(1)) != total:
-        fails.append(f"README.md: 'holds <n> open records' says {m.group(1) if m else 'nothing'}; "
-                     f"tools/defects.py counts {total}")
-    m = re.search(r"The (\d+) that reach a released\s+(?:>\s*)?configuration", readme)
-    if not m or int(m.group(1)) != reach:
-        fails.append(f"README.md: 'The <n> that reach a released configuration' says "
-                     f"{m.group(1) if m else 'nothing'}; tools/defects.py counts {reach}")
-    m = re.search(r"(\d+) of them reach only", readme)
-    if not m or int(m.group(1)) != total - reach:
-        fails.append(f"README.md: '<n> of them reach only ...' says {m.group(1) if m else 'nothing'}; "
-                     f"the data gives {total - reach}")
-
-    # 5. released platforms
+    # 4. released platforms
     plats = json.loads(read("data/platforms.json"))
     plats = plats.get("platforms", plats)
     for key, p in plats.items():
@@ -247,7 +219,7 @@ def main() -> int:
             if name and name not in readme:
                 fails.append(f"README.md: released platform '{name}' ({key}) is not named")
 
-    # 6 and 7. stale phrases
+    # 5 and 6. stale phrases
     allowed_seen = set()
     short = [n for n in sizes if n < top]
     word = lambda n: NUMBER_WORDS[n]
@@ -292,15 +264,21 @@ def main() -> int:
             fails.append(f"tools/release_text_check.py: the exemption for {f} ('{text[:60]}...') "
                          f"matches no line any more; remove it")
 
-    # 8. the largest released size is named where sizes are stated
+    # 7. the largest released size is named where sizes are stated
     for f in SIZES_STATED_IN:
         t = read(f).lower()
         if not re.search(rf"\b{top}\b|\b{word(top)}\b", t):
             fails.append(f"{f}: states released cluster sizes and never names {top}")
 
+    # 8. the benchmark page holds the release boards' numbers
+    bench = subprocess.run([sys.executable, str(ROOT / "tools/bench_report.py"), "--check"],
+                           capture_output=True, text=True)
+    if bench.returncode != 0:
+        fails.append("bench/README.md: " + (bench.stdout + bench.stderr).strip().replace("\n", "; "))
+
     if args.list:
         print("released:", " ".join(rel))
-        print("version:", version, "| open defects:", total, "| reaching a released configuration:", reach)
+        print("version:", version)
         print("files:", " ".join(f for f, _ in texts))
     for line in fails:
         print("FAIL", line)

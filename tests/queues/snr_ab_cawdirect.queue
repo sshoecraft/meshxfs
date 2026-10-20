@@ -1,0 +1,47 @@
+# D-STALE-NAME-SETATTR-ADOPTS-PEER-REUSED-INCARNATION-CHANGES-UNRELATED-FILE,
+# hypothesis H-SN1: same-build A/B of incarn_poison_unexposed on the reproducer
+# tests/stale_name_setattr_reuse.sh, 2/disk/caw/direct on g2b (test15 test16).
+# Run from ~/src/mxfs-g: the final-verification build of ~/src/mxfs-f
+# (69A9ED8E639EB2D21B613A6) plus the H-SN1 fix and its instrument and nothing
+# else (module sources differ from mxfs-f in exactly xfs/xfs_mxfs_reload.c,
+# xfs/xfs_inode.h, xfs/xfs_inode.c, xfs/xfs_bmap_util.c, pal/linux/xfs_iops.c).
+# 8 iterations a lap, SNR_DELAY_MS 4000 (the harness default), each
+# iteration's g<k> new so that it takes f's freed number.
+#
+# H-SN1: Y's setattr acquire reloads the shell of f's incarnation while the
+# platter carries g's; with no descriptor or mapping on the shell the reload
+# rebuilds it in place as g, and xfs_setattr_nonsize logs g's core with the
+# touch's time.  The instrument P-RELOAD-XINCARN-ADOPT prints at that rebuild
+# (every in-place adopt of another incarnation, with the shell's aliases); the
+# fix (arm 1) poisons such a shell instead and prints P-RELOAD-XINCARN-POISON.
+#
+# VERDICT RULES (written before the first lap):
+#   SUPPORTED   at least one control lap (arm 0) reads CONTROL-SHOWS-CAUSE
+#               (an iteration HIT and Y logged P-RELOAD-XINCARN-ADOPT
+#               comm=touch), at least three fix laps (arm 1) read PASS
+#               (reused > 0, hit = 0, y_poison_touch > 0, node_failures = 0)
+#               with a cold audit CLEAN errors=0, and no fix lap reads FAIL.
+#   REFUTED     a control lap HIT whose Y log carries no
+#               P-RELOAD-XINCARN-ADOPT comm=touch: the rebuild under the touch
+#               is on another path, and its own lines are read before anything
+#               else.
+#   FIX FAILS   any fix lap FAIL (an iteration HIT, or a node logged a
+#               failure), or a fix lap whose cold audit is not CLEAN errors=0:
+#               its own lines are attributed first.
+#   WEAK        none of the above: more laps, not a verdict.
+#   A VACUOUS lap (no iteration reused the number) measured nothing and is
+#   rerun; a NOREACH fix lap does not count toward the three; an ABORT or an
+#   overrun is read from its own lines.
+# The record closes only when this A/B is SUPPORTED and the fix also passes
+# the regression laps named on the record.
+#
+# Bound per lap, from the harness header's step bounds: prep 300 (run.sh's
+# prep_cluster row), srcversion, delay and arm read-backs 3 x 20 per node
+# (120), mkdir 20, 8 iterations x (20 + 20 + 30 + (4 + 30) + 20), Y's closing
+# reset 20, stream copy 120 per node (240), chk_clean 150: 1842 s.
+1842 SNR_POISON=0 tests/stale_name_setattr_reuse.sh snr2 8 2/disk/caw/direct g2b
+1842 SNR_POISON=1 tests/stale_name_setattr_reuse.sh snr3 8 2/disk/caw/direct g2b
+1842 SNR_POISON=1 tests/stale_name_setattr_reuse.sh snr4 8 2/disk/caw/direct g2b
+1842 SNR_POISON=0 tests/stale_name_setattr_reuse.sh snr5 8 2/disk/caw/direct g2b
+1842 SNR_POISON=1 tests/stale_name_setattr_reuse.sh snr6 8 2/disk/caw/direct g2b
+1842 SNR_POISON=1 tests/stale_name_setattr_reuse.sh snr7 8 2/disk/caw/direct g2b

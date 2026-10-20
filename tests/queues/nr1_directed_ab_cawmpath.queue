@@ -1,0 +1,57 @@
+# D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY shape (d), hypothesis H-NR1:
+# same-build A/B of noino_release_mark_honor on the directed reproducer
+# tests/noino_release_reuse_ab.sh, 2/disk/caw/mpath on g2d (test31 test32).
+# Run from ~/src/mxfs-f, srcversion 69A9ED8E639EB2D21B613A6: the build the
+# third final verification (fx*) runs, the fw build 022F8BF6763B609A9ECC7D1
+# plus the H-NR1 fix and its instrument.  8 iterations a lap, NRR_DELAY_MS
+# 4000 and NRR_PAUSE_MS 1500 (the harness defaults).
+#
+# WHAT THE REPRODUCER NOW DOES (nrx5, same build, control, the harness as
+# queued here): in 8 of 8 iterations Y's held touch adopted X's freed image
+# of N under the EX X's no-inode release left cached (P-NOINO-UNLOCK-LEFT-GRANT
+# lifecycle=RECLAIMABLE), set its times and landed them (cc 11 -> 12); X,
+# holding C through a pinned sibling it touched after the release, recycled
+# the marked corpse for its create (P-RECYCLE-RELEASED-KEEP) and its partial
+# write of C carried N's slot with the corpse's staged free image over Y's:
+# P-DINO-CLOBBER#1 path=partial regress=1 [s2 ino=8388770 disk cc=12 mode=00
+# gen=838510816 nlink=0 -> mem cc=11 mode=00 gen=838510816 nlink=0], fw3c3's
+# write; logwr_relmark_regressed=8 on X, node_failures=0, audit CLEAN
+# (tests/evidence/20261019T001119Z_noino_release_reuse_nrx5).  The development
+# laps nrx1-nrx4 ran earlier forms of the harness and count for nothing here.
+#
+# VERDICT RULES (written before the first lap):
+#   SUPPORTED   at least one control lap (honor 0) reads CONTROL-SHOWS-CAUSE,
+#               at least three fix laps (honor 1) read PASS with X's
+#               recycle_released_reset > 0 and shaped > 0 (the fix met the
+#               shape and ended the corpse's tenure), and no fix lap reads
+#               FAIL.
+#   FIX FAILS   any fix lap FAIL (X's logwr_relmark_regressed > 0, an X line
+#               P-LOGWR-RELMARK-WRITTEN reading staged=1, a P-DINO-CLOBBER
+#               regress on either node, a node failure, or a cold audit not
+#               CLEAN errors=0): its own lines are attributed before anything
+#               else.  It REFUTES H-NR1 if the regressed slot's number logged
+#               P-RECYCLE-RELEASED-RESET on X before the write (the tenure was
+#               ended and the corpse's bytes were written anyway), or if a
+#               staged=1 line names a number whose last recycle before it was a
+#               RESET (prediction P2: no slot copied in before an honoured mark
+#               is written).
+#   WEAK        neither: more laps, not a verdict.
+#   A VACUOUS lap (shaped=0) measured nothing and is rerun; an ABORT or an
+#   overrun is read from its own lines.  A PASS lap with recycle_reset=0 does
+#   not count toward the three.
+# The record's shape (d) closes only when this A/B is SUPPORTED and the third
+# final verification on this build passes by its own rules, with no landed
+# P-DINO-CLOBBER regress of any shape on any node.
+#
+# Bound per lap, from the harness header's step bounds: prep 300 (run.sh's
+# prep_cluster row), srcversion, knob and stream read-backs 3 x 20 per node
+# (120), setup 60, spacer list 20, holder 20, reclaim hold 20, 8 iterations x
+# (20 + 30 + 44 + 20 + 40 + 40), Y's and X's closing resets and the holder end
+# 3 x 20, counters and knob resets 2 x 20 per node (80), stream copy 120 per
+# node (240), chk_clean 150: 2622 s.
+2622 tests/noino_release_reuse_ab.sh nrr1 1 8 2/disk/caw/mpath g2d
+2622 tests/noino_release_reuse_ab.sh nrr2 0 8 2/disk/caw/mpath g2d
+2622 tests/noino_release_reuse_ab.sh nrr3 1 8 2/disk/caw/mpath g2d
+2622 tests/noino_release_reuse_ab.sh nrr4 1 8 2/disk/caw/mpath g2d
+2622 tests/noino_release_reuse_ab.sh nrr5 0 8 2/disk/caw/mpath g2d
+2622 tests/noino_release_reuse_ab.sh nrr6 1 8 2/disk/caw/mpath g2d

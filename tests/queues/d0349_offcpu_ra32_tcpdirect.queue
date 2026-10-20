@@ -1,0 +1,51 @@
+# D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349: where a both-mounted create
+# waits once its numbers are granted ahead.  Queue rhl
+# (tests/queues/d0349_reserve_held_local_ab_tcpdirect.queue) refuted H-1a: with
+# resv_ahead=32 the copy took 17.5-20.7 s whether the pre-granted peer-mastered
+# reserves were answered from the mirror (dl_reserve_held_local=1, 4269-4519
+# local answers a copy) or asked of the master (0); the fix arm was faster in 1
+# pair of 3.  So the master's re-affirm round trips are not what the copy waits
+# on.  The last off-CPU profile (v2off, tests/queues/d0349_offcpu_v2_tcpdirect.queue)
+# was taken with nothing granted ahead (resv_ahead=0).  This one is taken on the
+# rhl build with resv_ahead=32 and dl_reserve_held_local=1, so the next piece is
+# chosen on the shape it will act on.
+#
+# HYPOTHESIS H-P10 (written before the first lap).  With the numbers granted
+# ahead, a create's remaining off-CPU time inside xfs_create is dominated by
+# waits for a grant that is still being committed: the reserve's reply wait
+# (pending_wait <- dlm_lock_impl <- mxfs_v5_dlm_inode_reserve_try) and the
+# reserve's local durable commit (dlm_txn_commit <- ... <- the reserve), because
+# the copy outruns the pre-grant pipeline (8664 single-number grants, one durable
+# commit each at the number's master).  PREDICTION: those two families together
+# exceed the candidate-home and other platter reads (mxfs_dbg_disk_di_read_coherent,
+# the leaf rebuild's reads, xfs_dir2_data_log_entry's read) and exceed the AGI
+# buffer lock, in both passes.  If they do, the next piece is the ruling's
+# page-aligned range pre-grant (one request and one ledger commit for a shard's
+# free numbers); if the reads or the AGI lock are larger, the next piece is the
+# ruling's step 2 (the candidate-home check moved into the refill) or the AGI
+# lock, and the range pre-grant waits.  REFUTED (a new hypothesis) if the reply
+# wait plus the commit is not the largest of those families in either pass.
+# READING: tools/offcpu_families.py over each pass's offcpu.txt, the same
+# families v2off used, each as a share of create off-CPU time; plus creates,
+# the reserve's call count and time, and the knob readbacks (an arm whose
+# resv_ahead or dl_reserve_held_local did not read back on both nodes judges
+# nothing).
+#
+# Build: ~/src/mxfs-g (mxfs.ko srcversion 9165D999BCB65B8FC36F493, the rhl
+# build).  Run from ~/src/mxfs-g.  2/net/mesh/direct g2c, A=test29 copies,
+# B=test30 mounted; each pass on a fresh prep.  bpftrace inflates absolute times
+# (hp7a: ~4x), so the split is the evidence, not the walls.
+#
+# Bounds: prep 300 (run.sh prep_cluster, measured 38-99 s on g2c) + 150 for
+# 2/net/mesh/direct's run.sh lock, which g2d's queue shares
+# (MXFS_CONFIG_LOCK_WAIT_S); knobs 60 (tests/fleet_set_params.sh, one 40 s ssh
+# per node in parallel); profile 180 (tests/tcp_rsync_offcpu.sh's header:
+# bpftrace attach 30 + the bench's caller bound 120 + stop and read-back 30).
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "resv_ahead=32 dl_reserve_held_local=1" test29,test30 tests/evidence/ra32off1_knobs_before.txt
+180 tests/tcp_rsync_offcpu.sh ra32off1 test29 test30
+60 tests/fleet_set_params.sh "resv_ahead dl_reserve_held_local dl_reserve_held_local_n resv_ahead_granted resv_ahead_consumed" test29,test30 tests/evidence/ra32off1_knobs_after.txt
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "resv_ahead=32 dl_reserve_held_local=1" test29,test30 tests/evidence/ra32off2_knobs_before.txt
+180 tests/tcp_rsync_offcpu.sh ra32off2 test29 test30
+60 tests/fleet_set_params.sh "resv_ahead dl_reserve_held_local dl_reserve_held_local_n resv_ahead_granted resv_ahead_consumed" test29,test30 tests/evidence/ra32off2_knobs_after.txt

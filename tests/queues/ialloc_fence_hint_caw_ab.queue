@@ -1,0 +1,74 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, H-F13 with
+# the H-F13b revision, on disk locking (2/disk/caw/direct g2b: test15 test16).
+#
+# WHY.  On build A97F45838280C5F3B4C352C the fence (ag_ialloc_fence) passed two
+# disk-locking fix laps (jwf2, jwf3) and stalled the third (jwf1): after the
+# workload test15's creates backed off for 237 s with all five of its owned AGs
+# refused, holding their parent directories, which test16 waited up to 235 s
+# for.  Attributed from jwf1's own lines (recorded on the defect): each of AGs
+# 0 4 8 12 16 last received a BAST 1-7 ms after test15's own release COMMIT,
+# with no tenure here ('holders=0 cached=0 sched=0'); the receive handler sets
+# pag_dlm_bast_pending on it anyway (on disk locking every BAST reaches the
+# group), only a fresh grant or a BAST more than 3 s later clears it, and the
+# fence tests the flag BEFORE the acquire that would clear it.  The stale hint
+# arises in every disk-locking lap of both arms (P12-STALE-HINT 64-104 on the
+# churner per lap) and never on TCP (0 in every jz lap).
+#
+# HYPOTHESIS H-J1: the fence stalls allocation because it refuses an AG on a
+# BAST hint pending on no tenure of this node.
+# HYPOTHESIS H-F13b (the revision, written before the first lap): with the
+# fence refusing only a BAST pending on a tenure this node holds
+# (pag_dlm_cached or pag_dlm_holders > 0) -- the allocation otherwise goes on
+# to its acquire, whose fresh grant drops the hint, and a BAST landing after
+# that grant is held to the COMMIT check as before -- the fence keeps H-F13's
+# results (every ag-bast unlock listed=0 inflight=0, no AG drain timeout) and
+# no create sweep stalls.
+#
+# Build ~/src/mxfs-b with the revision (srcversion printed by each lap, whose
+# harness refuses a node running anything else).  Knobs: NG0_IALLOC_FENCE
+# (ag_ialloc_fence) and NG0_FENCE_HINT_EXEMPT (ag_fence_hint_exempt), both set
+# and read back on every node.  Three arms, every other setting the jw laps':
+#   C  fence 0                  (H-F13's control)
+#   F  fence 1, hint exempt 1   (the revision: the fix)
+#   H  fence 1, hint exempt 0   (the old fence: H-J1's control)
+# cr63_linked_defer is 1 in every lap (NG0_CR63_DEFER=1), so each lap is also
+# an H-L1 fix lap graded by its CRESULT line under
+# tests/queues/cr63_linked_defer_caw_ab.queue's rules.
+#
+# MEASURES: every RESULT field the jw laps used (punl_removed, agbast_a,
+# ux_unlocks, ux_inflight, dt_ag, stuck_chase, stuck_held, pc_rel_ag, dt_dir,
+# fn_refused, fn_held, fn_escape_lines, audit, errors, node_failures), plus
+# stale_hints, sweep_lines, sweep_max (each node's stream after the mark) and
+# fh_passed, fh_refused (the revision's counters), and the post-workload
+# alloc_witness and chk_clean gates run.sh applies.
+#
+# VERDICT RULES (written before the first lap):
+#   A lap with a node failure or a CORRUPT cold audit is attributed before
+#   anything below is judged.  A lap whose audit is STALE/NONE, or an ABORT, is
+#   attributed (a stalled create sweep -- sweep_max in the hundreds and
+#   alloc_witness or chk_clean failing -- is a stall, whichever arm it is in)
+#   and otherwise has no verdict and is rerun.
+#   REACH: punl_removed >= 100 and agbast_a >= 50 (H-F13's line, unchanged).
+#   C, reached: SHOWS H-F13's CAUSE if ux_unlocks > 0, or dt_ag > 0 with
+#     stuck_chase > 0 and stuck_held 0.
+#   H, reached: SHOWS H-J1's CAUSE if fh_refused > 0 (the fence refused an AG
+#     on a hint with no tenure here); a stall in an H lap is the full symptom
+#     and also shows it.
+#   F, reached: PASS if ux_unlocks 0, dt_ag 0, pc_rel_ag 0, fn_escape_lines 0,
+#     fn_refused > 0, fh_refused 0, audit CLEAN errors=0, node_failures 0, no
+#     stall, and every other harness gate holds.  REACHES H-F13b if
+#     fh_passed > 0 (a hint was met and let through); an F lap that passes with
+#     fh_passed 0 judges H-F13 but not the revision.
+#   REFUTED: a reached F lap with ux_unlocks > 0 or dt_ag > 0 (H-F13b loses
+#     H-F13's result), or an F lap that stalls (H-F13b does not remove it).
+#   SUPPORTED AND FIXED: at least one C lap SHOWS H-F13's CAUSE, at least one H
+#     lap SHOWS H-J1's CAUSE, and at least two reached F laps PASS, at least two
+#     of them reaching H-F13b, with no reached F lap failing.
+#
+# Bound: the jw laps', 1680 s per lap (they ran 472-597 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=0 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh kwc1 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh kwf1 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=0 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh kwh1 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh kwf2 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=0 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh kwc2 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh kwf3 1 300 2/disk/caw/direct g2b

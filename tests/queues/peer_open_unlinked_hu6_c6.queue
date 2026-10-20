@@ -1,0 +1,10 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, H-U6's
+# control lap, rerun.  Lap 7 of tests/queues/peer_open_unlinked_hu6_ab.queue
+# (u6c1) ABORTed at prep with no verdict (lapq_hu6.log in ~/src/mxfs-c,
+# 05:10:19Z): another group held run.sh's 2/net/mesh/direct configuration lock.
+# Laps 1-6 of that queue are in (u6f1-3 PASS, u4c1-3 REPRODUCED); this file
+# runs the missing lap alone, unchanged, from ~/src/mxfs-c on the same build
+# 311877C431E1BB444562804.  Its hypothesis, prediction and verdict rules are
+# that file's: H-U6 is judged over u6f1-3 and this lap.  It runs last on g2c
+# because a hang leaves both nodes wedged.  Bound: that file's 2397 s.
+2397 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_KNOBS="freshsrc_iunl_overlay=1 b6_release_drain=1 unlprev_pin=1 dbg_ifree_midlist_delay_ms=600 unlprev_tenure=1 unlprev_rele_defer=0" tests/peer_open_unlinked_chain.sh u6c1 30 2/net/mesh/direct g2c

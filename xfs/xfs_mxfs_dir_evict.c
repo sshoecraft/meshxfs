@@ -698,7 +698,8 @@ mxfs_dir_evict_data_blocks(struct xfs_inode *ip, bool rmw_base)
 						(unsigned long long)d, w);
 					mxfs_buf_report_locked(mp->m_ddev_targp, d,
 							dir_blk_bb, "P36-EVICT-LOCKED",
-							(unsigned long long)ip->i_ino);
+							(unsigned long long)ip->i_ino,
+							false);
 					continue;
 				}
 				if (w > 0)

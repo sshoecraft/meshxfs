@@ -4,6 +4,7 @@
  */
 #define MXFS_TU_ID 11	/* igrab/iput call-site file id */
 #include "xfs_mxfs_dlm_priv.h"
+#include "xfs_mxfs_dirshard.h"	/* mxfs_dirshard_release_land */
 
 /*
  * POST-RELEASE PLATTER AUDIT (instrumented).  Runs 072239Z-
@@ -463,9 +464,13 @@ mxfs_dir_data_durable(struct xfs_inode *ip)
 	 * A BTREE fork with extents not yet loaded was never RMW'd locally,
 	 * so there is nothing of ours to land.
 	 */
+	/* a local-format dir has no blocks of its own, but a sharded parent's
+	 * manifest block is its directory metadata too: the owner scan finds
+	 * it (mxfs_dirshard_buf_of_parent) */
 	if (ip->i_df.if_format != XFS_DINODE_FMT_EXTENTS &&
 	    ip->i_df.if_format != XFS_DINODE_FMT_BTREE)
-		return true;
+		return !ip->i_mxfs_dirshard || !READ_ONCE(mxfs_dirshard_release_land) ||
+		       mxfs_dir_data_owner_scan(ip, false);
 	if (ip->i_df.if_format == XFS_DINODE_FMT_BTREE &&
 	    xfs_need_iread_extents(&ip->i_df)) {
 		/* instrumented: the VACUOUS-DURABLE bail.  A BTREE dir
@@ -2111,6 +2116,9 @@ mxfs_dir_flush_data_blocks_relsafe(struct xfs_inode *ip)
 	if (ip->i_df.if_format != XFS_DINODE_FMT_EXTENTS &&
 	    ip->i_df.if_format != XFS_DINODE_FMT_BTREE) {
 		up_read(&ip->i_lock);
+		/* a local-format sharded parent: land its manifest block */
+		if (ip->i_mxfs_dirshard && READ_ONCE(mxfs_dirshard_release_land))
+			mxfs_dir_data_owner_scan(ip, true);
 		return;
 	}
 	if (ip->i_df.if_format == XFS_DINODE_FMT_BTREE) {
@@ -2516,38 +2524,260 @@ mxfs_dlm_verify_rawmode(struct mxfs_v5_dlm *dlm, uint64_t ino, bool *sampled)
  * says this node holds, the epoch moves (cached dentries and hold-epoch
  * fast paths stop trusting it) and i_dlm_stale makes xfs_iget_recycle re-read
  * the dinode right after this returns and the next lock acquire for real.
+ *
+ * H-NR1 (D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY, fw3c3): measuring the
+ * DLM's record cannot tell a grant that survived from one taken again since.
+ * A create's reservation re-takes the number's grant before xfs_iget recycles
+ * the corpse, so a corpse whose grant a no-inode release unlocked reads the
+ * reservation's EX here, no lower than its cached EX, and was kept with the
+ * dead tenure's epoch: the previous life's staged image in this node's cluster
+ * buffer then passed every dead-tenure mask and went home over a peer's newer
+ * image.  The release marks the corpse (MXFS_IF_NOINO_RELEASED); with
+ * noino_release_mark_honor the mark ends the tenure here whatever the record
+ * says: the mode drops to what the DLM records (NL when it cannot be read),
+ * and the epoch and i_dlm_stale move as for a phantom.
  */
+static void
+mxfs_recycle_released_note(
+	struct xfs_inode	*ip,
+	uint8_t			cached,
+	uint8_t			raw,
+	const char		*path,
+	bool			reset,
+	bool			noino_at_start)
+{
+	extern atomic_t		mxfs_recycle_released_reset;
+	extern atomic_t		mxfs_recycle_released_kept;
+	static atomic_t		p_rrel_n = ATOMIC_INIT(0);
+
+	atomic_inc(reset ? &mxfs_recycle_released_reset :
+			   &mxfs_recycle_released_kept);
+	if (atomic_inc_return(&p_rrel_n) <= 4000)
+		pr_warn("mxfs: P-RECYCLE-RELEASED-%s ino=%llu path=%s cached_mode=%u raw=%u gen=%u imode=0%o nlink=%u epoch=%lu stage_epoch=%lu pend=%llu flush=%llu dur=%llu at_start=%d comm=%s -- a no-inode release unlocked the grant this recycled inode caches; %s\n",
+			reset ? "RESET" : "KEEP",
+			(unsigned long long)ip->i_ino, path, cached, raw,
+			VFS_I(ip)->i_generation, VFS_I(ip)->i_mode,
+			VFS_I(ip)->i_nlink, ip->i_dlm_epoch,
+			ip->i_mxfs_pub_stage_epoch,
+			(unsigned long long)ip->i_mxfs_pub_pending_seq,
+			(unsigned long long)ip->i_mxfs_pub_flush_seq,
+			(unsigned long long)ip->i_mxfs_pub_durable_seq,
+			noino_at_start ? 1 : 0, current->comm,
+			reset ? "its tenure ends here" :
+				"kept as cached (noino_release_mark_honor 0)");
+}
+
 void
-mxfs_dlm_recycle_grant_check(struct xfs_inode *ip)
+mxfs_dlm_recycle_grant_check(struct xfs_inode *ip, bool noino_at_start)
 {
 	extern atomic_t		mxfs_recycle_grant_cached;
 	extern atomic_t		mxfs_recycle_grant_phantom;
+	extern int		mxfs_noino_release_mark_honor;
 	struct mxfs_v5_dlm	*dlm = ip->i_mount->m_mxfs_dlm;
 	uint8_t			cached, raw;
+	uint8_t			stale_src = 29;
 	bool			sampled;
+	bool			waited = ip->i_mxfs_noino_waited;
+	/* H-NR1: taken whatever follows; it describes this corpse's tenure only */
+	bool			released = xfs_iflags_test_and_clear(ip,
+						MXFS_IF_NOINO_RELEASED);
+	bool			honor = READ_ONCE(mxfs_noino_release_mark_honor) != 0;
 
+	ip->i_mxfs_noino_waited = 0;
 	if (!dlm || mxfs_v5_dlm_is_single_node(dlm))
 		return;
 	cached = READ_ONCE(ip->i_dlm_mode);
 	if (cached == MXFS_LOCK_NL)
 		return;
 	atomic_inc(&mxfs_recycle_grant_cached);
+	/* both settings: a staged image older than this was copied in under
+	 * the grant the release ended (P-LOGWR-RELMARK-WRITTEN) */
+	if (released)
+		ip->i_mxfs_relmark_ns = ktime_get_real_ns();
+	/*
+	 * H-F7 (mxfs_noino_recycle_guard, xfs/xfs_mxfs_noino.c): a no-inode
+	 * release of this number in flight will unlock the grant the corpse
+	 * caches, and its drain fence covers only what was committed before
+	 * its last log force.  Served from that grant, the recycled inode's
+	 * changes would ride the unlock to the peer unwritten.  Reset it as a
+	 * phantom is reset: the first op acquires for real, and the slow path
+	 * waits for the release first (P-NOINO-ACQ-WAIT).
+	 */
+	if (READ_ONCE(mxfs_noino_recycle_guard) &&
+	    mxfs_noino_release_may_be_inflight(ip->i_mount, ip->i_ino)) {
+		extern atomic_t mxfs_recycle_reset_noino;
+		static atomic_t p_rcrn_n = ATOMIC_INIT(0);
+		bool owes = mxfs_noino_corpse_owes_platter(ip);
+
+		/*
+		 * D-RECYCLE-RESET-UNDER-NOINO-STRANDS-COMMITTED-DIR-CHANGE-
+		 * WEDGE-SHUTDOWN: a corpse that still owes the platter a
+		 * committed change keeps its grant when the tracked release
+		 * seen now was not registered as this recycle set XFS_IRECLAIM
+		 * (noino_at_start, decided in that i_flags_lock hold).  That
+		 * release saw XFS_IRECLAIM at its lifecycle re-check and is
+		 * being re-driven through the lifecycle park: it does not
+		 * unlock, and the in-core release it becomes drains the change
+		 * under this grant.  Lowered here, the aild would skip the
+		 * change and drop it from the AIL unwritten.  The measurement
+		 * below decides the grant as for any recycle.  A release
+		 * registered before the recycle began made it wait in
+		 * xfs_iget_cache_hit; one that is here anyway met a create or
+		 * a caller holding transaction items, which cannot wait, and is
+		 * reset as before.
+		 */
+		if (owes && !noino_at_start &&
+		    READ_ONCE(mxfs_noino_recycle_dirty_wait) &&
+		    mxfs_noino_inflight_contains(ip->i_mount, ip->i_ino)) {
+			extern atomic_t mxfs_recycle_dirty_kept;
+			static atomic_t p_rcdk_n = ATOMIC_INIT(0);
+
+			atomic_inc(&mxfs_recycle_dirty_kept);
+			if (atomic_inc_return(&p_rcdk_n) <= 2000)
+				pr_warn("mxfs: P-RECYCLE-DIRTY-KEEP ino=%llu cached_mode=%u grant_gen=%u cc=%llu nlink=%u imode=0%o comm=%s -- a no-inode release registered after this recycle began and is re-driven to the in-core path; the corpse still owes the platter a committed change, so its grant is measured instead of reset\n",
+					(unsigned long long)ip->i_ino, cached,
+					mxfs_v5_dlm_inode_grant_gen(dlm, ip->i_ino),
+					(unsigned long long)inode_peek_iversion(VFS_I(ip)),
+					VFS_I(ip)->i_nlink, VFS_I(ip)->i_mode,
+					current->comm);
+			goto measure;
+		}
+		/*
+		 * A release registered before this recycle began made a lookup
+		 * wait in xfs_iget_cache_hit, so a corpse still owing the
+		 * platter here met a create or a caller holding transaction
+		 * items.  It takes the release over (noino_recycle_takeover):
+		 * the release will not unlock, so the grant is measured and
+		 * kept, and the change is written under it.  If the release has
+		 * already begun its unlock the take-over fails and the reset
+		 * below runs, as before.
+		 */
+		if (owes && noino_at_start &&
+		    READ_ONCE(mxfs_noino_recycle_dirty_wait) &&
+		    READ_ONCE(mxfs_noino_recycle_takeover) &&
+		    mxfs_noino_inflight_take(ip->i_mount, ip->i_ino)) {
+			extern atomic_t mxfs_recycle_dirty_takeover;
+			static atomic_t p_rcdt_n = ATOMIC_INIT(0);
+
+			atomic_inc(&mxfs_recycle_dirty_takeover);
+			if (atomic_inc_return(&p_rcdt_n) <= 2000)
+				pr_warn("mxfs: P-RECYCLE-DIRTY-TAKEOVER ino=%llu cached_mode=%u grant_gen=%u cc=%llu nlink=%u imode=0%o comm=%s -- a recycle that cannot wait met a corpse owing the platter a change under a no-inode release registered before it; the release is taken over and the grant measured instead of reset\n",
+					(unsigned long long)ip->i_ino, cached,
+					mxfs_v5_dlm_inode_grant_gen(dlm, ip->i_ino),
+					(unsigned long long)inode_peek_iversion(VFS_I(ip)),
+					VFS_I(ip)->i_nlink, VFS_I(ip)->i_mode,
+					current->comm);
+			goto measure;
+		}
+		if (owes) {
+			extern atomic_t mxfs_recycle_reset_dirty;
+
+			atomic_inc(&mxfs_recycle_reset_dirty);
+		}
+		atomic_inc(&mxfs_recycle_reset_noino);
+		if (atomic_inc_return(&p_rcrn_n) <= 2000)
+			pr_warn("mxfs: P-RECYCLE-RESET-UNDER-NOINO ino=%llu cached_mode=%u grant_gen=%u gen=%u cc=%llu nlink=%u imode=0%o owes=%d at_start=%d comm=%s -- a no-inode release of this inode may be in flight; the recycled inode acquires for real instead of serving the grant it will unlock\n",
+				(unsigned long long)ip->i_ino, cached,
+				mxfs_v5_dlm_inode_grant_gen(dlm, ip->i_ino),
+				VFS_I(ip)->i_generation,
+				(unsigned long long)inode_peek_iversion(VFS_I(ip)),
+				VFS_I(ip)->i_nlink, VFS_I(ip)->i_mode,
+				owes ? 1 : 0, noino_at_start ? 1 : 0,
+				current->comm);
+		raw = MXFS_LOCK_NL;
+		stale_src = 30;
+		goto reset;
+	}
+measure:
 	/*
 	 * On TCP the DLM's record is its in-memory table: no I/O, nothing for
 	 * the verify sampler's budget to bound, so every recycle asks it.  The
 	 * sampler refuses a third concurrent verify (and every verify while
 	 * its breaker is open), and a refused sample left the cached grant in
 	 * service — the phantom this check exists to reset.  CAW's record is
-	 * an on-disk slot read and stays sampled.
+	 * an on-disk slot read and stays sampled, except after a
+	 * noino_recycle_dirty_wait: that corpse waited out a release of its
+	 * grant, which has either unlocked it or been re-driven to the in-core
+	 * path, and only the DLM's record tells which.
 	 */
-	if (mxfs_v5_dlm_is_tcp(dlm)) {
+	if (mxfs_v5_dlm_is_tcp(dlm) || waited) {
 		raw = mxfs_v5_dlm_inode_held_rawmode(dlm, ip->i_ino);
 		sampled = true;
 	} else {
 		raw = mxfs_dlm_verify_rawmode(dlm, ip->i_ino, &sampled);
 	}
-	if (!sampled || raw >= cached)
+	if (!sampled) {
+		/* H-NR1: no record read, but the mark already says the cached
+		 * grant is gone */
+		if (released && honor) {
+			mxfs_recycle_released_note(ip, cached, MXFS_LOCK_NL,
+						   "unsampled", true,
+						   noino_at_start);
+			raw = MXFS_LOCK_NL;
+			stale_src = 31;
+			goto reset;
+		}
+		if (released)
+			mxfs_recycle_released_note(ip, cached, MXFS_LOCK_NL,
+						   "unsampled", false,
+						   noino_at_start);
 		return;
+	}
+	if (waited) {
+		extern atomic_t mxfs_recycle_waited_reset;
+		static atomic_t p_rcwt_n = ATOMIC_INIT(0);
+
+		if (raw < cached)
+			atomic_inc(&mxfs_recycle_waited_reset);
+		if (atomic_inc_return(&p_rcwt_n) <= 2000)
+			pr_warn("mxfs: P-RECYCLE-WAITED ino=%llu cached_mode=%u raw=%u owes=%d inflight=%d cc=%llu nlink=%u imode=0%o comm=%s -- the recycle that waited for a no-inode release measured the grant it left behind; %s\n",
+				(unsigned long long)ip->i_ino, cached, raw,
+				mxfs_noino_corpse_owes_platter(ip) ? 1 : 0,
+				mxfs_noino_inflight_contains(ip->i_mount,
+							     ip->i_ino) ? 1 : 0,
+				(unsigned long long)inode_peek_iversion(VFS_I(ip)),
+				VFS_I(ip)->i_nlink, VFS_I(ip)->i_mode,
+				current->comm,
+				raw < cached ? "lowering it" : "keeping it");
+	}
+	if (raw >= cached) {
+		/*
+		 * H-F7 instrument: the grant is kept because the DLM still
+		 * records it, but a no-inode release of this number may be
+		 * between its live check (which could not see this corpse)
+		 * and its unlock.
+		 */
+		if (mxfs_noino_inflight_contains(ip->i_mount, ip->i_ino)) {
+			extern atomic_t mxfs_recycle_keep_noino;
+			static atomic_t p_rckn_n = ATOMIC_INIT(0);
+
+			atomic_inc(&mxfs_recycle_keep_noino);
+			if (atomic_inc_return(&p_rckn_n) <= 2000)
+				pr_warn("mxfs: P-RECYCLE-KEEP-UNDER-NOINO ino=%llu cached_mode=%u raw=%u grant_gen=%u gen=%u cc=%llu nlink=%u imode=0%o comm=%s -- recycle kept a cached grant while a no-inode release of the same inode is in flight\n",
+					(unsigned long long)ip->i_ino, cached, raw,
+					mxfs_v5_dlm_inode_grant_gen(dlm, ip->i_ino),
+					VFS_I(ip)->i_generation,
+					(unsigned long long)inode_peek_iversion(VFS_I(ip)),
+					VFS_I(ip)->i_nlink, VFS_I(ip)->i_mode,
+					current->comm);
+		}
+		/*
+		 * H-NR1: the DLM records a grant at least as strong, but after
+		 * the mark it is a grant taken again (a create's reservation),
+		 * not the one this corpse's tenure held: keep the mode, end the
+		 * tenure.
+		 */
+		if (released) {
+			mxfs_recycle_released_note(ip, cached, raw, "regrant",
+						   honor, noino_at_start);
+			if (honor) {
+				raw = cached;
+				stale_src = 31;
+				goto reset;
+			}
+		}
+		return;
+	}
 	atomic_inc(&mxfs_recycle_grant_phantom);
 	{
 		static atomic_t p_rcph_n = ATOMIC_INIT(0);
@@ -2560,17 +2790,24 @@ mxfs_dlm_recycle_grant_check(struct xfs_inode *ip)
 				VFS_I(ip)->i_nlink, VFS_I(ip)->i_mode,
 				current->comm);
 	}
+reset:
 	spin_lock(&ip->i_dlm_lock);
 	if (ip->i_dlm_mode == cached) {
 		u8 om = ip->i_dlm_mode, os = ip->i_dlm_state;
 
-		ip->i_dlm_mode = raw;
-		ip->i_dlm_state = (raw == MXFS_LOCK_NL) ?
-			MXFS_DLM_ISTATE_NONE : MXFS_DLM_ISTATE_CACHED;
-		ip->i_dlm_bast_pending = false;
+		/*
+		 * H-NR1's regrant keeps the mode the DLM records, and with it a
+		 * BAST delivered for that grant: only a lowered mode drops it.
+		 */
+		if (raw != cached) {
+			ip->i_dlm_mode = raw;
+			ip->i_dlm_state = (raw == MXFS_LOCK_NL) ?
+				MXFS_DLM_ISTATE_NONE : MXFS_DLM_ISTATE_CACHED;
+			ip->i_dlm_bast_pending = false;
+		}
 		mxfs_dlmtr_rec(ip, om, os, MXFS_SITE);
 		ip->i_dlm_epoch++; ip->i_dlm_epoch_src = MXFS_SITE; mxfs_relbar_epoch_check(ip);
-		ip->i_dlm_stale = true; ip->i_dlm_stale_src = 29;
+		ip->i_dlm_stale = true; ip->i_dlm_stale_src = stale_src;
 	}
 	spin_unlock(&ip->i_dlm_lock);
 }

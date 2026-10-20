@@ -1,0 +1,50 @@
+# D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349: routing version 2 ported
+# into the main tree (include/mxfs/mxfs_tauth.h mxfs_tauth_route_hash /
+# route_index, region_valid accepting 1-2; the DLM ctx, the ledger, the store,
+# chk, mkfs -H, the tests).  Same-build A/B of the ledger routing version at the
+# module's defaults (resv_ahead 0, tauth_group_commit 0, caw_span 1): the main
+# tree's build, the version chosen by the prep's format (MXFS_MKFS_OPTS='-H 1'
+# for version 1; mkfs's default, version 2, otherwise), read back on both nodes
+# by the arm (RA_HASH_VERSION).  2/net/mesh/direct g2c, A=test29 copies its
+# 8137-file tree with B=test30 mounted (tests/lone_rsync_bench.sh through
+# tests/resv_ahead_rsync_ab.sh), every arm after a fresh prep; native line
+# first; cold audits of both version-2 arms (tests/remount_node.sh, then run.sh
+# chk_clean).  Order h1a h2a h2b h1b.
+#
+# PREDICTION (written before the first lap; the d0349 sibling measured routing
+# 2 cutting activations and bootstrap prepares about 5.7x at resv_ahead 32 and
+# group commit 1): at the defaults every grant still commits alone, but the
+# first touches of new ledger pages fall: A's P-TAUTH-STATS act and prep at
+# close are at least 3x fewer per committed grant in each version-2 arm than in
+# each version-1 arm, and each version-2 arm lands more files in the 60 s bound
+# (or finishes sooner) than either version-1 arm.
+# RULES.  VALID ARM: both nodes' P-TAUTH-OPEN read the arm's version (else the
+# arm ABORTs); files landed with bad=0.  SUPPORTED: the prediction holds in
+# both pairs.  REFUTED: a version-2 arm's activations per grant are not 3x
+# below a version-1 arm's, or a version-2 arm lands fewer files than a
+# version-1 arm (the pace step is then not where the profile put it: a new
+# hypothesis).  INTEGRITY (any arm): bad != 0, a cold audit not CLEAN errors=0,
+# or a shutdown, BUG, Oops, hung-task, P-TAUTH-VERIFY-FAIL or
+# P-TAUTH-OPEN-FAIL line in either node's capture stops the work and is
+# attributed from its own lines first.  This measures one step; the record's
+# budget (2x native) is not expected of it.
+#
+# Bounds: prep 300 (run.sh prep_cluster, measured 38-99 s on g2c); native
+# 120 (tests/lone_rsync_bench.sh's header); an arm 240
+# (tests/resv_ahead_rsync_ab.sh's header with RA_HASH_VERSION); the remount 85
+# (tests/remount_node.sh's header); the audit 315 (run.sh alloc_witness 120 +
+# chk_clean 180 + preflight and marker check).
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+120 LRB_NATIVE=1 MXFS_NODE_LIST=test29,test30 tests/lone_rsync_bench.sh rv2nat test29 2
+300 MXFS_MKFS_OPTS=-H1 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+240 RA_HASH_VERSION=1 tests/resv_ahead_rsync_ab.sh rv2h1a 0 0 test29 test30
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+240 RA_HASH_VERSION=2 tests/resv_ahead_rsync_ab.sh rv2h2a 0 0 test29 test30
+85 MXFS_DEV=/dev/sda MXFS_NODE_LIST=test29,test30 tests/remount_node.sh rv2h2a test29
+315 ./run.sh 2/net/mesh/direct --group g2c chk_clean
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+240 RA_HASH_VERSION=2 tests/resv_ahead_rsync_ab.sh rv2h2b 0 0 test29 test30
+85 MXFS_DEV=/dev/sda MXFS_NODE_LIST=test29,test30 tests/remount_node.sh rv2h2b test29
+315 ./run.sh 2/net/mesh/direct --group g2c chk_clean
+300 MXFS_MKFS_OPTS=-H1 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+240 RA_HASH_VERSION=1 tests/resv_ahead_rsync_ab.sh rv2h1b 0 0 test29 test30

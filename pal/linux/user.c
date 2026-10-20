@@ -1490,6 +1490,12 @@ int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key, int *added)
 	return 0;
 }
 
+/* user mode issues no commands that a reset could strand */
+void mxfs_pal_scsi_reset_watch(mxfs_bdev_t *dev, bool on)
+{
+	(void)dev; (void)on;
+}
+
 /* One file descriptor is one path: never a multipath map. */
 int mxfs_pal_scsi_pr_own_nexuses(mxfs_bdev_t *dev, uint64_t key, uint32_t type,
 				 int *good, int *paths)
@@ -2574,6 +2580,15 @@ int mxfs_pal_bdev_compare_and_write_span(mxfs_bdev_t *dev, uint64_t offset,
 		return -EINVAL;
 	rc = user_file_swap(dev, offset, compare_buf, write_buf, write_len);
 	return rc == 1 ? -EOPNOTSUPP : rc;     /* a device: SCSI covers one sector */
+}
+
+/* the regular file the span swap emulates; a device is SG_IO, one sector */
+bool mxfs_pal_bdev_span_swap_ok(mxfs_bdev_t *dev, uint32_t len)
+{
+	struct stat st;
+
+	return dev && dev->fd >= 0 && len >= 512 && len <= 4096 && !(len & 511) &&
+	       fstat(dev->fd, &st) == 0 && S_ISREG(st.st_mode);
 }
 
 int mxfs_pal_bdev_compare_and_write(mxfs_bdev_t *dev, uint64_t offset,

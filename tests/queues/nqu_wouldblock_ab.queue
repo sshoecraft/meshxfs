@@ -1,0 +1,15 @@
+# D-NETMESH-SURVIVOR-ILOCK-HELD-ACROSS-DEAD-MASTER-AG-RETRY-PINS-AIL-131S and
+# D-RECOVERY-FLUSH-WAITS-ON-AIL-PINNED-BY-ILOCK-HOLDER-WAITING-ON-DEAD-MASTER:
+# same-build A/B of dl_noqueue_unanswered_wouldblock (tests/noqueue_unanswered_ab.sh,
+# its header has the staging and the grades), control and production arms
+# alternating, 3 each, 3/net/mesh/direct g3b.
+# Bound per lap, the sum of the harness's sequential step bounds: prep_cluster
+# 300 + knob/mark rs 20 + staging rs 60 + candidate search 12 x (rs 15 + 3 s +
+# rs 15) = 396 + watch 190 + withdraw 30 + recovery wait 130 + rs 15 + rs 60 +
+# rs 15 + evidence rs 130 + 60 + 180 + cold audit 240 = 1826 s.
+1830 tests/noqueue_unanswered_ab.sh nquc1 0 3/net/mesh/direct g3b
+1830 tests/noqueue_unanswered_ab.sh nquf1 1 3/net/mesh/direct g3b
+1830 tests/noqueue_unanswered_ab.sh nquc2 0 3/net/mesh/direct g3b
+1830 tests/noqueue_unanswered_ab.sh nquf2 1 3/net/mesh/direct g3b
+1830 tests/noqueue_unanswered_ab.sh nquc3 0 3/net/mesh/direct g3b
+1830 tests/noqueue_unanswered_ab.sh nquf3 1 3/net/mesh/direct g3b

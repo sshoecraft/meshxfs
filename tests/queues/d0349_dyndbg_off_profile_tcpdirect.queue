@@ -1,0 +1,41 @@
+# D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349: what the rig's debug
+# printing costs the copy.  The rig's prep loads mxfs with dyndbg=+p and
+# log_repeat_limit=0 (tests/setup/prep_node.sh), so every pr_debug probe on the
+# create path prints; the packages load it with neither.  The pace record's
+# measurements (lone_rsync_bench, the off-CPU profiles) were all taken with the
+# sites on.  This queue repeats tests/queues/d0349_vfsop_profile_tcpdirect.queue's
+# passes with the sites off (tests/fleet_dyndbg.sh -p, read back on=0 on both
+# nodes before the copy) so each pass pairs with one of that queue's.  It
+# measures; it grades no change.
+#
+# Build: ~/src/mxfs-g (9165D999BCB65B8FC36F493), run from ~/src/mxfs-g;
+# 2/net/mesh/direct g2c, A=test29 copies, B=test30 mounted, each pass on a
+# fresh prep.  Pass 1 at resv_ahead=32 dl_reserve_held_local=1 (pairs with
+# vop1/vop2), pass 2 at the module defaults (pairs with vop3).
+#
+# READING RULES (written before the first pass):
+#   VALID: both nodes read on=0 after the -p step and before the copy; the
+#     bench RESULT line has files=8137 bad=0 rsync_rc=0.
+#   DEBUG COST per setting = (rsync_wall with the sites on) - (off), from the
+#     paired passes.  If the cost exceeds 10% of the on-wall, the pace record's
+#     measurements are restated with the sites off (both numbers kept) and
+#     every later 0349 bench runs with them off; under 10%, the sites stay on
+#     for the profiles (their lines are evidence) and the cost is recorded.
+#   The decision on the next piece (vop's rule) is re-read on the off passes:
+#     the largest op by wall must be the same as with the sites on, else the
+#     off passes decide.
+#   INTEGRITY: any shutdown, BUG, Oops, hung-task, P-TAUTH-VERIFY-FAIL or
+#     P-TAUTH-DOUBLE-GRANT line stops the reading (with the sites off only
+#     pr_warn and above print, so the check reads those).
+#
+# Bounds as tests/queues/d0349_vfsop_profile_tcpdirect.queue; the dyndbg step
+# 60 s (one 40 s ssh per node in parallel).
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "resv_ahead=32 dl_reserve_held_local=1" test29,test30 tests/evidence/vopq1_knobs_before.txt
+60 tests/fleet_dyndbg.sh -p test29,test30 tests/evidence/vopq1_dyndbg.txt
+180 tests/tcp_rsync_offcpu.sh vopq1 test29 test30
+60 tests/fleet_set_params.sh "resv_ahead dl_reserve_held_local dl_reserve_held_local_n resv_ahead_granted resv_ahead_consumed" test29,test30 tests/evidence/vopq1_knobs_after.txt
+450 MXFS_FORCE_PREP=1 MXFS_CONFIG_LOCK_WAIT_S=150 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+60 tests/fleet_set_params.sh "resv_ahead dl_reserve_held_local" test29,test30 tests/evidence/vopq2_knobs_before.txt
+60 tests/fleet_dyndbg.sh -p test29,test30 tests/evidence/vopq2_dyndbg.txt
+180 tests/tcp_rsync_offcpu.sh vopq2 test29 test30

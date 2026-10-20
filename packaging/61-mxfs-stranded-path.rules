@@ -1,0 +1,9 @@
+# A SCSI device reported the unit attention a reset leaves (ASC 29h).  Another
+# initiator's LOGICAL UNIT RESET may have left this node waiting on commands the
+# target aborted without answering, and the initiator would hold them, and with
+# them the whole device, for three expiries of the command timeout.  mxfs.ko
+# walks such commands down the transport's timeout ladder to an abort and retry
+# (pal/linux/kern.c, stranded_abort_ms), but it learns of the unit attention
+# only through this uevent: the path's H:C:T:L goes to scsi_reset_seen, which
+# ignores a path that carries no mounted MeshXFS device.
+ACTION=="change", SUBSYSTEM=="scsi", ENV{SDEV_UA}=="POWER_ON_RESET_OCCURRED", TEST=="/sys/module/mxfs/parameters/scsi_reset_seen", RUN+="/bin/sh -c 'echo %k > /sys/module/mxfs/parameters/scsi_reset_seen'"

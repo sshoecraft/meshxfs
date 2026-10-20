@@ -1,0 +1,57 @@
+# D-CAW-WAITER-NOTIFIES-A-DRAINING-HOLDER-13-TIMES-A-SECOND: the holder side.
+# Same-build A/B from ~/src/mxfs-b, srcversion E6A53924596B92C4BA01CCD (the
+# main tree's source: the waiter's re-send backoff, caw_bast_resend_backoff,
+# and the disk poll's re-submit backoff, caw_poll_resubmit_backoff, both
+# default 1), 4/disk/caw/direct on g4: test3 holds ino's grant with its
+# release drain paused 240 s, test4 reads it, test5 and test6 mounted and idle
+# (LHW_HOLD=test5,test6 keeps all four held for each lap: the previous queue lost its last
+# two laps to the VM pool powering unheld nodes down).
+#
+# WHAT THE FIRST A/B FOUND (tests/queues/caw_resend_backoff_ab.queue, build
+# 9E03AF016F66F5400C65EBF, RESIDUAL by its rules): the waiter's flat 100 ms
+# re-send reached only 3.9 hints/s (cbr0a, 911 in 235 s: the loop also waits
+# on its own slot poll) while the holder logged 13.17 notifications/s; with the
+# re-send backed off (cbr1a) the hints fell to 240 and the holder still logged
+# 10.43/s.  Attribution by the code: the holder's BAST disk poll runs every
+# MXFS_CAW_BAST_POLL_FAST_MS (100 ms) while it sees a waiter on a slot it holds
+# and submitted a BAST on every pass (dlm/dlm_caw.c bast_poll_fn), ~10/s.  The
+# change: past MXFS_CAW_POLL_RESUBMIT_AFTER_MS (3 s) of one conflict the poll
+# submits for that slot once per MXFS_CAW_POLL_RESUBMIT_MS (4 s); P265-BASTQ-
+# STATS now prints poll_submitted and poll_held_back.
+#
+# ARMS (one build, knobs set and read back on both nodes by the harness):
+#   X   waiter 0, poll 0: the behaviour the record was filed on
+#   P0  waiter 1, poll 0: the waiter backed off, the poll as before
+#   P1  waiter 1, poll 1: both backed off (the module defaults)
+#
+# VERDICT RULES (written before the first lap).  Every lap must first pass the
+# harness's own checks (the read returns only after the pause, md5 equal, no
+# shutdown or splat; in P0/P1 the waiter's hint checks: hint_ms=1000 and hints
+# <= el_ms/1000 + 34), else it has no verdict and is rerun.  ps = the pause in
+# seconds (240), N = the holder's P7B-BASTNOTIFY count for the target.
+#   X  REPRODUCED   N / ps >= 8.
+#   P0 ATTRIBUTED   N / ps >= 8 and the holder's poll_submitted over the lap
+#                   >= 8 per second of the P265 window: with the waiter backed
+#                   off, the poll's own submits carry the rate.
+#   P1 PASS         N <= hb + 32 + (ps - 3) / 4 + 6, where hb = el_ms/1000 + 34
+#                   is the waiter's own derived hint budget, 32 the poll's
+#                   submits in a conflict's first 3 s (30 passes plus two for
+#                   pass alignment), (ps - 3) / 4 + 1 its submits after that
+#                   at one per 4 s, and 5 for jitter; for el_ms 236000 that is
+#                   N <= 371 (1.55/s); and poll_held_back > 0 (the backoff ran).
+#   P1 FAIL         N above that bound: a source other than the two channels.
+#   FIXED AND VERIFIED (the record's notification rate) needs both X laps
+#   REPRODUCED and both P1 laps PASS, with P0 ATTRIBUTED in at least one lap;
+#   then the 2-node CAW create and rsync benches on X and P1 settings (waits
+#   under 3 s are unchanged by construction in both changes; the benches
+#   confirm it on a quiet host) before the record is removed.
+#
+# Bounds: prep_cluster 300 (tests/suite/manifest); each lap the harness's
+# derivation, setup 5 + PAUSE_MS 240 + drain 10 + captures 10, with the read's
+# own bound at PAUSE_MS/1000 + 60 = 300, so 330 s.
+300 MXFS_FORCE_PREP=1 ./run.sh 4/disk/caw/direct --group g4 prep_cluster
+330 LHW_HOLD=test5,test6 LHW_CAW_BACKOFF=0 LHW_CAW_POLLBACK=0 PAUSE_MS=240000 tests/live_holder_wait.sh cpx1 test3 test4
+330 LHW_HOLD=test5,test6 LHW_CAW_BACKOFF=1 LHW_CAW_POLLBACK=1 PAUSE_MS=240000 tests/live_holder_wait.sh cpp1a test3 test4
+330 LHW_HOLD=test5,test6 LHW_CAW_BACKOFF=1 LHW_CAW_POLLBACK=0 PAUSE_MS=240000 tests/live_holder_wait.sh cpp0a test3 test4
+330 LHW_HOLD=test5,test6 LHW_CAW_BACKOFF=1 LHW_CAW_POLLBACK=1 PAUSE_MS=240000 tests/live_holder_wait.sh cpp1b test3 test4
+330 LHW_HOLD=test5,test6 LHW_CAW_BACKOFF=0 LHW_CAW_POLLBACK=0 PAUSE_MS=240000 tests/live_holder_wait.sh cpx2 test3 test4

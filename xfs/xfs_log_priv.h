@@ -221,6 +221,9 @@ struct xlog_in_core {
 #endif
 	struct semaphore	ic_sema;
 	struct work_struct	ic_end_io_work;
+	/* MXFS: when this iclog's write was submitted, for the age of a write
+	 * still in flight at a fenced shutdown (an unmount waits for it) */
+	unsigned long		ic_mxfs_submit_jiffies;
 	struct bio		ic_bio;
 	struct bio_vec		ic_bvec[];
 };

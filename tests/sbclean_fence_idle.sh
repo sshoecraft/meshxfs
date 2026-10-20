@@ -75,7 +75,7 @@ sleep "$IDLE_WAIT"
 # 2. Suspend V past the death threshold; poll for the replay outcome.
 T0=$(date -u +%FT%TZ)
 echo "--- T0=$T0; suspending $V"
-$VIRSH suspend "$V" >/dev/null || { echo "FAIL: virsh suspend $V"; exit 1; }
+"$REPO/tools/lun_pool.sh" fault $VIRSH suspend "$V" >/dev/null || { echo "FAIL: virsh suspend $V"; exit 1; }
 SUSP_T0=$SECONDS
 
 sweep() {  # $1 = grep -E pattern, $2 = outdir prefix; scans all N except V

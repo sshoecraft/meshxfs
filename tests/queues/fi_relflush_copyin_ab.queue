@@ -1,0 +1,76 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, hypothesis
+# H-F6b, on ng0rf1 (2/net/mesh/mpath g2, ino 8388763, nlink 0), the record's
+# one corruption with no verified cause.  H-F6a's order is reached on demand
+# (tests/queues/fi_bast_lastref_ab.queue, lap lrc1, guard 0: 19 peer-freed
+# inactivations on the unlinker's BAST worker, no reload, each truncating the
+# dead life's map: P3-SKIP-DBLFREE, IFREE-REVALIDATE-SKIP, P219) and still
+# audited CLEAN, because nothing put the truncated core home: the raw EX the
+# inactivation takes leaves i_dlm_mode at NL, so xfsaild's flush 1.5 s later
+# was refused (P119-NONEX-FLUSH-SKIP incore_mode=0100644 disk_mode=00) and the
+# dead-tenure staging masked (P222-STALE-STAGE-SKIP); every P219 of the lap
+# wrote img_mode=0, the peer's free.  ng0rf1 differs in one step: its xfsaild
+# copied the core into the cluster buffer 6 ms after the grant, while the
+# truncate waited at the AG seam with MXFS_IF_DLM_RELFLUSH still set
+# (P240-COPYIN-ID at 2562.6586), and that write, staged in the current epoch,
+# went home (P219 stale=0) over the peer's free.
+#
+# HYPOTHESIS H-F6b (written before any lap): ng0rf1's live core is the dead
+# life's truncated core, copied into its cluster buffer under the
+# inactivation's RELFLUSH token after a no-reload truncate of a life the peer
+# had freed (H-F6a's order), and written home over the peer's free.  The
+# epoch guard (inact_local_epoch_guard=1, the build's default) judges such an
+# inactivation on the platter before any truncate and skips it (B1), so
+# nothing of the dead life is logged to copy in.
+#
+# The window is forced by two test knobs in this build, both arms alike:
+# dbg_bast_lastref_wait_ms=3000 (the BAST worker drops the unlinker's last
+# reference: H-F6a's order) and dbg_inact_relflush_hold_ms=500 (after a
+# local-unlink inactivation's truncate, with the token still set, the log is
+# forced and the inode drained through the AIL: P-INACT-RELFLUSH-HOLD,
+# counter inact_relflush_holds).  tests/peer_last_closer_ab.sh reports, for
+# the unlinker, bast_ctx_peerfreed, peerfreed_holds (holds of a life it had
+# just judged peer-freed) and, for both nodes, disklive (P-DIALLOC-DISKLIVE: an
+# allocator met a LIVE core on an inobt-free number, which also keeps that
+# number out of circulation so the audit sees it; the harness fails a fix lap
+# on any).  Only inact_local_epoch_guard differs.  Run from ~/src/mxfs on the
+# tree build that carries both knobs; the harness reads every knob back.
+#
+# PREDICTION IF TRUE: control laps (guard 0) drain peer-freed truncates
+# (peerfreed_holds > 0) and put the dead core home: disklive > 0 and/or a
+# CORRUPT cold audit with P-FREE-LIVE-CORE on a number whose live core carries
+# the generation the unlinker judged peer-freed.  Fix laps (guard 1) reach
+# (bast_ctx_peerfreed > 0), skip those truncates, disklive 0, audit CLEAN.
+#
+# VERDICT RULES (written before the first lap):
+#   PROVEN AND FIXED  at least 2 of the 3 control laps with disklive > 0 or a
+#             CORRUPT audit with P-FREE-LIVE-CORE, attributed from the streams
+#             (the live core's generation = a life the unlinker's kworker
+#             judged peer-freed and drained under the token); and all 3 fix
+#             laps PASS (audit CLEAN errors=0, disklive 0, no node failure
+#             line in either stream) with bast_ctx_peerfreed > 0.
+#   H-F6b REFUTED  the control laps reach (peerfreed_holds >= 20 over the
+#             three) with disklive 0 and CLEAN audits in all three: the copy-in
+#             under the token does not put the core home either, and ng0rf1
+#             needs another cause.
+#   FIX FAILS a fix lap with disklive > 0, a CORRUPT audit or a node failure:
+#             attributed from its streams (the guard's verdict for the number
+#             first: verdict=ours there means the peer's free was not on the
+#             platter when the unlinker's EX was granted).
+#   WEAK      reach in every lap but fewer than 2 control laps reproduce and
+#             not REFUTED: more laps, not a verdict.
+#   VACUOUS   graded by the harness (bast_ctx_peerfreed 0, or in a control lap
+#             peerfreed_holds 0): the lap measured nothing.
+# A lap whose audit is STALE or NONE has no verdict and is rerun.
+#
+# Bound per lap, the sum of the harness's own step bounds, every ssh step
+# counted: prep_cluster 300 + srcversion reads 2x20 + knob sets 2x20 + the
+# lastref knob set 2x20 + the relflush knob set 2x20 + mkdir 30 + workload
+# 40 x (150+1000+1500) ms + 60 = 166 + counters 2x40 + knob resets 2x20 + the
+# two injector resets 2x2x20 + chk_clean with alloc_witness 150 + stream
+# capture 2x120 = 1246 s.
+1250 PLC_LASTREF_WAIT_MS=3000 PLC_RELFLUSH_HOLD_MS=500 tests/peer_last_closer_ab.sh rhc1 0 40 2/net/mesh/mpath g2
+1250 PLC_LASTREF_WAIT_MS=3000 PLC_RELFLUSH_HOLD_MS=500 tests/peer_last_closer_ab.sh rhf1 1 40 2/net/mesh/mpath g2
+1250 PLC_LASTREF_WAIT_MS=3000 PLC_RELFLUSH_HOLD_MS=500 tests/peer_last_closer_ab.sh rhc2 0 40 2/net/mesh/mpath g2
+1250 PLC_LASTREF_WAIT_MS=3000 PLC_RELFLUSH_HOLD_MS=500 tests/peer_last_closer_ab.sh rhf2 1 40 2/net/mesh/mpath g2
+1250 PLC_LASTREF_WAIT_MS=3000 PLC_RELFLUSH_HOLD_MS=500 tests/peer_last_closer_ab.sh rhc3 0 40 2/net/mesh/mpath g2
+1250 PLC_LASTREF_WAIT_MS=3000 PLC_RELFLUSH_HOLD_MS=500 tests/peer_last_closer_ab.sh rhf3 1 40 2/net/mesh/mpath g2

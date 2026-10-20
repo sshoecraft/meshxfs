@@ -1,0 +1,39 @@
+# D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349, hypothesis H-P6: the cold
+# audits of its fix arm that tests/queues/p6_span_ab_tcpdirect.queue (run p6r,
+# 2026-10-19) could not take.  Each of that queue's `./run.sh ... chk_clean`
+# laps came straight after an arm of tests/resv_ahead_rsync_ab.sh, whose bench
+# ends with node A's own umount; run.sh refused the audit on the unmounted
+# member ("marker stale: test29 ... want='... MOUNTED'", 10 s, no RESULT line)
+# and the next prep formatted the volume, so no fix arm's platter was audited.
+#
+# Here every fix arm is the same command as p6r's (CAW_SPAN=1, resv_ahead 0,
+# group commit 0, A = test29 copies, B = test30 stays mounted), on the same
+# build (the main tree, 65863B924040AF5213F2A76) and group (2/net/mesh/direct
+# g2c), on a freshly prepped cluster; then tests/remount_node.sh mounts A again
+# on the same module without formatting, and run.sh's chk_clean (with the
+# alloc_witness row it runs first, one invocation) audits that volume cold.
+#
+# RULE (H-P6's own, unchanged): every fix arm's cold audit is CLEAN errors=0,
+# with no lost or corrupt file and no shutdown, BUG, Oops, P-TAUTH-VERIFY-FAIL,
+# P-TAUTH-PUBLISH-FAIL, P-TAUTH-TICKET-STOLEN or P-CAW-SPAN-REFUSED line; any
+# other outcome is FIX FAILS, attributed from its own lines before anything
+# else.  A remount that fails is read from its own lines and the audit after
+# it measured nothing.  The arms' copy walls are recorded beside p6r's; the
+# hypothesis's timing verdict is p6r's.
+#
+# Bounds: prep 300 and an arm 210 (as in p6_span_ab_tcpdirect.queue), the
+# remount 85 (tests/remount_node.sh's header), the audit 315 (run.sh's
+# alloc_witness 120 + chk_clean 180 from the criteria rows, + the preflight and
+# live marker check, measured 10-15 s).
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+210 CAW_SPAN=1 tests/resv_ahead_rsync_ab.sh p6fa1 0 0 test29 test30
+85 MXFS_DEV=/dev/sda MXFS_NODE_LIST=test29,test30 tests/remount_node.sh p6fa1 test29
+315 ./run.sh 2/net/mesh/direct --group g2c chk_clean
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+210 CAW_SPAN=1 tests/resv_ahead_rsync_ab.sh p6fa2 0 0 test29 test30
+85 MXFS_DEV=/dev/sda MXFS_NODE_LIST=test29,test30 tests/remount_node.sh p6fa2 test29
+315 ./run.sh 2/net/mesh/direct --group g2c chk_clean
+300 MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2c prep_cluster
+210 CAW_SPAN=1 tests/resv_ahead_rsync_ab.sh p6fa3 0 0 test29 test30
+85 MXFS_DEV=/dev/sda MXFS_NODE_LIST=test29,test30 tests/remount_node.sh p6fa3 test29
+315 ./run.sh 2/net/mesh/direct --group g2c chk_clean

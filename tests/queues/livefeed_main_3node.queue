@@ -1,0 +1,14 @@
+# The live-feed laps on the main-tree build, 3-node disk locking half, 3/disk/caw/direct g3 (test1 test2 test3), where wrf1 and wrf2 refused 17467 and 42342
+# (the sibling A/B's fix laps on this configuration).
+# Build, settings, hypothesis H-WW1-R with its prediction, and the verdict
+# rules are those of tests/queues/livefeed_main_caw.queue, written before
+# its first lap and unchanged here; every lap is the fix arm of
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT (graded by
+# ialloc_fence_hint_caw_ab.queue's F rules) and of
+# D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-NUMBER-REUSE (graded by
+# iwr_refuse_empty_ab.queue's F rules), and every node's stream is read for
+# H-WW1-R.  Two laps.
+#
+# Bound: the wr laps' 1680 s per lap (they ran 492-546 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh lf31 1 300 3/disk/caw/direct g3
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_PUBCLAIM_DELAY_MS=200 NG0_CREATE_PARENT_DELAY_MS=5 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 tests/noino_gen0_ab.sh lf32 1 300 3/disk/caw/direct g3

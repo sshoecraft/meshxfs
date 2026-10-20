@@ -4,6 +4,7 @@
  */
 #define MXFS_TU_ID 8	/* igrab/iput call-site file id */
 #include "xfs_mxfs_dlm_priv.h"
+#include "xfs_mxfs_dirshard.h"	/* mxfs_dirshard_buf_of_parent */
 
 /*
  * BMBT-block durability/flush companion for BTREE-format dir forks
@@ -514,7 +515,10 @@ mxfs_dir_data_owner_scan(struct xfs_inode *ip, bool flush)
 					continue;
 				break;
 			}
-			if (!mxfs_dir_buf_is_owned_dir3(bp, ip->i_ino))
+			/* the parent's own dir blocks, and its sharded-
+			 * directory manifest block (a holder data block) */
+			if (!mxfs_dir_buf_is_owned_dir3(bp, ip->i_ino) &&
+			    !mxfs_dirshard_buf_of_parent(bp, ip->i_ino))
 				continue;
 			seen++;
 			bip = bp->b_log_item;

@@ -1,0 +1,55 @@
+# H-NR1 A/B WITH RECLAIM HELD for D-INODE-CLUSTER-PUBLISH-WITHOUT-AUTHORITY,
+# shape (d), on 2/disk/caw/direct g2b (test15 test16).  Same build for both
+# arms as tests/queues/nr1_honor_ab_3caw.queue: ~/src/mxfs-f srcversion
+# 69A9ED8E639EB2D21B613A6 (the final-verification build 022F8BF6763B609A9ECC7D1
+# plus the H-NR1 fix and its instrument and nothing else).  Run from
+# ~/src/mxfs-f.  Settings are tests/queues/final_verify_3caw.queue's
+# (production settings: every guard at its module default, every test delay
+# off, the clobber check on) plus NG0_RECLAIM_HOLD=1: the test knob
+# dbg_reclaim_hold holds background and shrinker inode reclaim off for the
+# workload (read back before and after it, then 0 before the cold audit), so a
+# reclaimable copy of a number stays in core until the next lookup or create
+# of the number recycles it.  Without the hold the shape's window closes at
+# the 5 s reclaim tick: the first lap of the queue above (nra1, control)
+# counted 78 no-inode releases that marked a copy and 1 recycle of a marked
+# copy.  NG0_NR1_HONOR alternates 0 (control) and 1 (fix).  This queue and
+# tests/queues/nr1_hold_ab_2tcpmpath.queue run side by side and are graded as
+# one campaign; nr1_honor_ab_3caw.queue keeps its own rules.
+#
+# READING RULES (written before the first lap):
+#   NRESULT grades each lap (tests/noino_gen0_ab.sh, THE H-NR1 FIX).  A lap
+#   with no marked recycle on any node (recycle_released_reset +
+#   recycle_released_kept = 0) is NVACUOUS and counts for neither arm.  A lap
+#   whose dbg_reclaim_hold did not read 1 before and after the workload
+#   ABORTs and counts for neither arm.
+#   THE CONTROL SHOWS THE CAUSE when a control lap is NCONTROL-SHOWS-CAUSE:
+#   logwr_relmark_regressed > 0, the clobber check finding a slot copied in
+#   before a marked recycle written while the platter held a newer image (a
+#   P-DINO-CLOBBER path=partial regress=1 on a slot a P-LOGWR-RELMARK-WRITTEN
+#   line named, with that number's P-RECYCLE-RELEASED-KEEP before it on the
+#   writer).
+#   THE FIX IS SUPPORTED when, across the campaign, the control shows the
+#   cause at least once, at least three fix laps are NPASS with
+#   recycle_reset > 0, and no fix lap is NFAIL.
+#   H-NR1 IS REFUTED by a fix lap with logwr_relmark_regressed > 0, by a fix
+#   lap with a P-LOGWR-RELMARK-WRITTEN line reading staged=1 (prediction P2:
+#   every logged slot copied in before the marked recycle is kept out), or by
+#   a control-lap regression of shape (d) -- a partial-path P-DINO-CLOBBER
+#   regress=1 on a slot whose in-core inode the writer recycled after a
+#   P-NOINO-UNLOCK-LEFT-GRANT of that number -- with no
+#   P-RECYCLE-RELEASED-KEEP of that number before it on the writer
+#   (prediction P1).
+#   Any other P-DINO-CLOBBER regress, node failure, CORRUPT shape, stall or
+#   ABORT is attributed from its own lines to its own record; every other
+#   *RESULT line is read as tests/queues/final_verify_3caw.queue reads it.
+#   The hold is a test condition: no lap of this campaign counts toward the
+#   final verification.
+#
+# Bound: the freed_nodelay laps' 1680 s per lap, as in
+# tests/queues/final_verify_2cawmpath.queue (2-node laps ran 404-597 s).
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_RECLAIM_HOLD=1 NG0_NR1_HONOR=0 tests/noino_gen0_ab.sh nrc1 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_RECLAIM_HOLD=1 NG0_NR1_HONOR=1 tests/noino_gen0_ab.sh nrc2 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_RECLAIM_HOLD=1 NG0_NR1_HONOR=1 tests/noino_gen0_ab.sh nrc3 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_RECLAIM_HOLD=1 NG0_NR1_HONOR=0 tests/noino_gen0_ab.sh nrc4 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_RECLAIM_HOLD=1 NG0_NR1_HONOR=1 tests/noino_gen0_ab.sh nrc5 1 300 2/disk/caw/direct g2b
+1680 MXFS_SNAPSHOT_DIR=/mxfs/snapshots NG0_IWR_WHOLE=1 NG0_IWR_REFUSE=1 NG0_CR63_DEFER=1 NG0_IALLOC_FENCE=1 NG0_FENCE_HINT_EXEMPT=1 NG0_PEER_UNLINK=300 NG0_DRAIN_BOUND=0 NG0_PUBCLAIM_GUARD=1 NG0_SELFCLOBBER_GUARD=1 NG0_MIRROR_CHECK=1 NG0_RECYCLE_GUARD=1 NG0_FRESHSRC_GUARD=1 NG0_DELAY_MS=0 NG0_IFREE_DRAIN=1 NG0_IFREE_REAP=1 NG0_RS1_SKIP=1 NG0_RECYCLE_SIDEREAD=1 NG0_UNLPREV_VERIFY=1 NG0_FREE_ADOPT_CORE=1 NG0_IFREE_EXTEND=1 NG0_CR63_IGRAB_RETRY=1 NG0_UB1_SKIP=1 NG0_RECLAIM_HOLD=1 NG0_NR1_HONOR=0 tests/noino_gen0_ab.sh nrc6 1 300 2/disk/caw/direct g2b

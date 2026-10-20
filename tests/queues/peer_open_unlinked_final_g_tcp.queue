@@ -1,0 +1,15 @@
+# D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, the final
+# verification's five 2/net/mesh/direct laps on build F09C3FED2DB371E0D9A8BC5:
+# the header, build and rules are in
+# tests/queues/peer_open_unlinked_final_g_caw.queue (the three CAW laps), and the
+# verdict is over all eight laps.  Started only after
+# tests/queues/peer_open_unlinked_hu6_verify.queue is done, so its
+# 2/net/mesh/direct laps never meet another queue's on run.sh's configuration
+# lock; on g2d, after the CAW laps.
+#
+# Bounds: the final queue's (plain 2157 s, forced 2257 s).
+2157 MXFS_SNAPSHOT_DIR=/mxfs/snapshots tests/peer_open_unlinked_chain.sh pgd1 30 2/net/mesh/direct g2d
+2257 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600" tests/peer_open_unlinked_chain.sh pgw1 30 2/net/mesh/direct g2d
+2157 MXFS_SNAPSHOT_DIR=/mxfs/snapshots tests/peer_open_unlinked_chain.sh pgd2 30 2/net/mesh/direct g2d
+2257 MXFS_SNAPSHOT_DIR=/mxfs/snapshots PUC_CLOSE_DROPS=20 PUC_KNOBS="dbg_ifree_midlist_delay_ms=600" tests/peer_open_unlinked_chain.sh pgw2 30 2/net/mesh/direct g2d
+2157 MXFS_SNAPSHOT_DIR=/mxfs/snapshots tests/peer_open_unlinked_chain.sh pgd3 30 2/net/mesh/direct g2d

@@ -1,0 +1,37 @@
+# D-FREED-INODE-HOME-NEVER-PUBLISHED-LIVE-CORE-AFTER-CLEAN-UNMOUNT, hypothesis
+# H-F1: another node's write of an inode slot lands between the cluster merge's
+# platter read and the write that carries that read's image of the slot, and
+# the write puts the older image back (tests/clmerge_window_probe.sh header).
+# Run from ~/src/mxfs-f: build F = srcversion 4533348C8D27CA5288B31CA, the
+# main tree's build X source (C06A6D4A9AB7A357503DF51) plus the test-only
+# window check (dbg_clmerge_recheck, dbg_clmerge_write_delay_ms, counters
+# clmerge_win_writes/slots/hits/readfail; mxfs_clmerge_window_check in
+# pal/linux/xfs_buf.c, b_mxfs_clmerge_restored set at the merge's two platter
+# copies in xfs/xfs_inode.c).  Every other knob at its default.  The probe
+# refuses a node running another build.
+#
+# The laps: the window widened to 200 ms (cmwd1), then the natural window
+# (cmwn1), both on 2/net/mesh/direct g2c with 30 iterations.
+#
+# VERDICT RULES (written before the first lap):
+#   HIT       any lap with clmerge_win_hits > 0: H-F1's window is met by a real
+#             write.  Attribute every P-CLMERGE-WINDOW-HIT line (slot, inode,
+#             outgoing vs platter mode/gen/changecount: a same-generation core
+#             ahead is a lost update within one incarnation; a free image of
+#             generation+1 on the platter is this record's shape, a free
+#             reverted to a live core) and record the defect it shows.
+#   NOHIT     both laps carried merge-restored slots (clmerge_win_slots > 0) and
+#             no hit: the window was offered and never met by a write in this
+#             workload, widened or not; reported as a rate (slots carried per
+#             lap), not a disposition of anything.
+#   VACUOUS   a lap that carried no merge-restored slot measured nothing; the
+#             workload is redesigned before any claim.
+#   FAIL      a CORRUPT cold audit or any node failure line in a lap's whole
+#             kernel log: attributed before anything else.
+#
+# Bound per lap (tests/clmerge_window_probe.sh's derivation): prep 300 +
+# srcversion and knobs 2x20 + 2x20 + mkdir 30 + workload 30 x (3 + 5 +
+# ceil(3 x (0.3 + 2 x 0.2)) + 2) + 60 = 450 + counters 2x40 + knob resets 2x20
+# + chk_clean 150 + stream copy 2x120 = 1370 s.
+1370 CMW_DELAY_MS=200 tests/clmerge_window_probe.sh cmwd1 30 2/net/mesh/direct g2c
+1370 CMW_DELAY_MS=0 tests/clmerge_window_probe.sh cmwn1 30 2/net/mesh/direct g2c
