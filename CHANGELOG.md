@@ -1,4 +1,4 @@
-## 2026-10-19 — 0.90.131 — Safer Inode Reuse, Stronger Recovery, Fewer Shutdowns
+## 2026-10-20 — 0.90.131 — Safer Inode Reuse, Stronger Recovery, Proxmox VE 9.2 Support
 
 What changed for someone upgrading from 0.90.130:
 
@@ -1203,6 +1203,55 @@ words, but it tested the whole rest of the command for an `=`, so a later
 argument such as `--knobs dbg_sf_refresh_read_fail=0` made it skip the script
 and its first arguments too and refuse the queue, naming `2/net/mesh/mpath` as
 an unexecutable script. Only the leading word is tested now.
+
+**Removed from the queue, fixed and verified:
+D-FAILED-MOUNT-LEAVES-DESTAGE-AND-ALLOCLIST-RETRY-WORK-QUEUED-PAST-FREE.** A
+mount that failed after inode inactivation had run left two delayed works
+queued (the destage kick and the alloc-list retry), and they ran on the
+freed mount.  The failed mount's unwind now cancels both before it frees the
+log and the AG groups (`mountfs_unwind_quiesce`).  On the release build, with
+the works armed 20 s out and the switch off, the mount was freed with both
+pending and 20.3 s later the node oopsed in `mxfs_destage_kick_fn` →
+`xfs_log_force` and panicked; with it on, both were cancelled and the node
+mounted again (`tests/reap_inactive_mount_ab.sh` MODE=failkick, laps `rfka`
+and `rfkb`).
+
+**Removed from the queue, fixed and verified:
+D-FAILED-MOUNT-UNWIND-RACES-REAP-WORKER-FREES-AG-AND-HANGS.** The reap
+worker's mount-settle duties start 20 s after a mount begins; a mount still
+waiting on its peers then ran them inside itself, and when it failed its
+unwind freed the AG groups under them and waited for the worker forever (a
+fenced peer's rejoin on `2/net/mesh/mpath`).  The duties now run only on a
+mount the VFS has made active (`reap_active_gate`).  A/B with a mount held
+30 s and then refused: with the gate off the duties ran inside it, with it on
+they waited, and the node remounted (laps `riab`, `riac`).
+
+**Removed from the queue, fixed and verified:
+D-REAP-WORKER-QUEUES-UNINITIALISED-FOREIGN-REPLAY-WORK-INSIDE-SLOW-MOUNT.**
+The same 20 s timer could queue the foreign-replay work before the mount had
+set it up, which this kernel answers with a workqueue WARNING.  The re-drive
+now waits until the work exists (`freplay_redrive_ready_gate`); A/B lap
+`rofa`: the WARNING with the switch off, a clean mount with it on.
+
+**Removed from the queue, fixed and verified:
+D-TCP-CAPACITY-WAIT-NEVER-ENDS-HANGS-JOIN-FREEZE.** On the network lock
+manager a request refused for a full ledger page waited for a record to
+leave it, and nothing asked a holder to release one, so a page of cached
+grants stayed full and a fenced peer's rejoin hung behind the wait.  A
+refused request now asks the holders of the page's eight oldest records to
+release them (`dl_capacity_reclaim`); in the user-mode capacity test the
+request was granted in 130 ms where it had still been waiting after 1 s.
+
+**Removed from the queue, fixed and verified:
+D-TCP-NOQUEUE-TRY-ON-FULL-LEDGER-PAGE-SPENDS-RETRY-BUDGET-CREATES-CRAWL.**
+An inode reservation try on a full page spent its whole retry budget, about
+9 s, before answering "busy", and creates crawled at about 100 a second.
+Such a try is now answered at once (`dl_capacity_nq_wouldblock`): on the rig
+16384 creates on one node finished in 57-110 s where they had missed a 140 s
+bound.
+
+All five fixes are in the release build, 292B547486AE6E75317F308, on which
+every row of the ten release boards passed.
 
 **Removed from the queue, fixed and verified:
 D-PVE-GUI-MXFS-MISSING-FROM-STORAGE-ADD-AFTER-PVE-MANAGER-UPGRADE.** A Proxmox

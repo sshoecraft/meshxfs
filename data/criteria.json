@@ -854,13 +854,25 @@
         },
         "4/net/mesh/direct": {
           "status": "PASS",
-          "measured": "elapsed=39s (fresh prep)",
+          "measured": "skipped (marker matched 4/net/mesh/direct)",
           "reason": "",
-          "iso": "2026-10-20T07:21:01Z",
+          "iso": "2026-10-20T20:32:40Z",
           "recorded": "2026-10-20",
-          "elapsed_s": 39,
-          "build": "B0D2E3F5A70C96237681DF2",
+          "elapsed_s": 0,
+          "build": "292B547486AE6E75317F308",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-20T20:32:25Z",
+              "measured": "elapsed=39s (fresh prep)",
+              "reason": ""
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-20T07:21:01Z",
+              "measured": "elapsed=39s (fresh prep)",
+              "reason": ""
+            },
             {
               "status": "PASS",
               "iso": "2026-10-18T05:24:32Z",
@@ -907,18 +919,6 @@
               "status": "PASS",
               "iso": "2026-10-12T09:15:37Z",
               "measured": "skipped (marker matched 4/net/mesh/direct)",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-12T09:15:27Z",
-              "measured": "elapsed=38s (fresh prep)",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-12T06:13:17Z",
-              "measured": "elapsed=36s (fresh prep)",
               "reason": ""
             }
           ]
@@ -38478,14 +38478,20 @@
           ]
         },
         "4/net/mesh/direct": {
-          "status": "FAIL",
-          "measured": "nodes_pass=0/4 states:BUDGET_EXHAUSTED=4 hostload=2.45",
-          "reason": "test7:BUDGET_EXHAUSTED:rc=124(tail:) test8:BUDGET_EXHAUSTED:rc=124(tail:) test9:BUDGET_EXHAUSTED:rc=124(tail:) test10:BUDGET_EXHAUSTED:rc=124(tail:) last_phase_census[barrier-done-done=2,none=2]",
-          "iso": "2026-10-20T07:38:35Z",
+          "status": "PASS",
+          "measured": "nodes_pass=4/4 hostload=12.44 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261020T203225Z-g4 fsid=aaa1e443-3557-4f0f-82a4-7f23ef20578a witness=tests/evidence/alloc_witness/20261020T203225Z-g4/witness.txt",
+          "reason": "",
+          "iso": "2026-10-20T20:33:51Z",
           "recorded": "2026-10-20",
-          "elapsed_s": 120,
-          "build": "B0D2E3F5A70C96237681DF2",
+          "elapsed_s": 56,
+          "build": "292B547486AE6E75317F308",
           "history": [
+            {
+              "status": "FAIL",
+              "iso": "2026-10-20T07:38:35Z",
+              "measured": "nodes_pass=0/4 states:BUDGET_EXHAUSTED=4 hostload=2.45",
+              "reason": "test7:BUDGET_EXHAUSTED:rc=124(tail:) test8:BUDGET_EXHAUSTED:rc=124(tail:) test9:BUDGET_EXHAUSTED:rc=124(tail:) test10:BUDGET_EXHAUSTED:rc=124(tail:) last_phase_census[barrier-done-done=2,none=2]"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-16T03:22:07Z",
@@ -38538,12 +38544,6 @@
               "status": "PASS",
               "iso": "2026-10-10T07:10:22Z",
               "measured": "nodes_pass=4/4 hostload=10.76 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261010T065303Z-g4 fsid=4f5c2181-6f94-49f9-84e1-302cf047fa38 witness=tests/evidence/alloc_witness/20261010T065303Z-g4/witness.txt",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-10T05:31:47Z",
-              "measured": "nodes_pass=4/4 hostload=10.20 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261010T051330Z-g4 fsid=697bf848-9614-45c6-8580-72c97420e95f witness=tests/evidence/alloc_witness/20261010T051330Z-g4/witness.txt",
               "reason": ""
             }
           ]
@@ -39757,14 +39757,20 @@
           ]
         },
         "4/net/mesh/direct": {
-          "status": "FAIL",
-          "measured": "nodes_pass=3/4 states:FAIL=1 hostload=3.42 first_fail[test7:verdict=CLEAN release=INDETERMINATE rc=0 errors=0 remounted=1 icount=33984 ledger_holders=2362 umount_ms=5586 remount_ms=4835 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261020T073850Z.log release=INDETERMINATE coverage=? cohort=? finobt=? targets=? accounting=? witness=/src/mxfs/tests/evidence/alloc_witness/20261020T072006Z-g4c/witness.txt] rank1[verdict=CLEAN release=INDETERMINATE rc=0 errors=0 remounted=1 icount=33984 ledger_holders=2362 umount_ms=5586 remount_ms=4835 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261020T073850Z.log release=INDETERMINATE coverage=? cohort=? finobt=? targets=? accounting=? witness=/src/mxfs/tests/evidence/alloc_witness/20261020T072006Z-g4c/witness.txt]",
-          "reason": "test7:FAIL:the audit was clean but no trustworthy coverage witness exists for this run, so the CLEAN is not a release claim: no sealed witness for run 20261020T072006Z-g4c",
-          "iso": "2026-10-20T07:39:04Z",
+          "status": "PASS",
+          "measured": "nodes_pass=4/4 hostload=12.24 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=8896 ledger_holders=1486 umount_ms=1301 remount_ms=5279 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261020T203401Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261020T203225Z-g4/witness.txt",
+          "reason": "",
+          "iso": "2026-10-20T20:34:15Z",
           "recorded": "2026-10-20",
-          "elapsed_s": 18,
-          "build": "B0D2E3F5A70C96237681DF2",
+          "elapsed_s": 15,
+          "build": "292B547486AE6E75317F308",
           "history": [
+            {
+              "status": "FAIL",
+              "iso": "2026-10-20T07:39:04Z",
+              "measured": "nodes_pass=3/4 states:FAIL=1 hostload=3.42 first_fail[test7:verdict=CLEAN release=INDETERMINATE rc=0 errors=0 remounted=1 icount=33984 ledger_holders=2362 umount_ms=5586 remount_ms=4835 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261020T073850Z.log release=INDETERMINATE coverage=? cohort=? finobt=? targets=? accounting=? witness=/src/mxfs/tests/evidence/alloc_witness/20261020T072006Z-g4c/witness.txt] rank1[verdict=CLEAN release=INDETERMINATE rc=0 errors=0 remounted=1 icount=33984 ledger_holders=2362 umount_ms=5586 remount_ms=4835 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261020T073850Z.log release=INDETERMINATE coverage=? cohort=? finobt=? targets=? accounting=? witness=/src/mxfs/tests/evidence/alloc_witness/20261020T072006Z-g4c/witness.txt]",
+              "reason": "test7:FAIL:the audit was clean but no trustworthy coverage witness exists for this run, so the CLEAN is not a release claim: no sealed witness for run 20261020T072006Z-g4c"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-16T03:22:33Z",
@@ -39817,12 +39823,6 @@
               "status": "PASS",
               "iso": "2026-10-10T07:10:50Z",
               "measured": "nodes_pass=4/4 hostload=10.91 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=20032 ledger_holders=153 umount_ms=9558 remount_ms=5059 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261010T071037Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261010T065303Z-g4/witness.txt",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-10T05:32:18Z",
-              "measured": "nodes_pass=4/4 hostload=9.52 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=22080 ledger_holders=1185 umount_ms=11095 remount_ms=4786 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261010T053205Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261010T051330Z-g4/witness.txt",
               "reason": ""
             }
           ]

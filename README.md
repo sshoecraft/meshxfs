@@ -34,7 +34,7 @@ packages.
 > Everything that turns XFS into a filesystem many machines can mount at once
 > is AI-authored.
 
-> ## 0.90.131: Safer Inode Reuse, Stronger Recovery, Fewer Shutdowns
+> ## 0.90.131: Safer Inode Reuse, Stronger Recovery, Proxmox VE 9.2 Support
 >
 > What changed for someone upgrading from 0.90.130:
 >
