@@ -22,25 +22,32 @@ On a system, MeshXFS goes by its short name `mxfs`: the `mxfs.ko` module,
 `resize_mxfs` and `mxfs_admin`, and the `mxfs` and `pve-storage-mxfs`
 packages.
 
-> ## ⚠️ Advisory, 2026-10-20: a defect found in 0.90.131 after its release
+> ## ⚠️ 0.90.131 is withdrawn. Do not install it.
 >
-> Testing of the published 0.90.131 build on a two-node multipath cluster
-> (network lock manager) found one on-disk metadata error. A node had been
-> fenced and then rejoined. After the run, `chk_mxfs` reported an unlinked-inode
-> list entry that points at an inode that is already free (`AG 0 unlinked
-> bucket 1: member … has a FREE core`). The inode belonged to a file that had
-> already been deleted, and the check found no other error. It showed up in 1
-> of 12 such runs. A directed test then reproduced it on a healthy two-node
-> cluster, with no fencing and no path fault, on a single-path SAN LUN with
-> both the network lock manager and the on-disk locks. The trigger is one
-> node mounting while the other node frees a file both nodes had open.
-> Whether 0.90.130 is affected is not yet determined.
+> Checks we ran on the exact 0.90.131 build after publishing it found an on-disk
+> metadata error. When one node mounts while another node frees a file both
+> nodes had open, the mounting node can put the already-freed inode on its
+> unlinked-inode list. `chk_mxfs` reports it as `unlinked bucket N: member …
+> has a FREE core`. We reproduced it on every configuration we tested, and saw
+> it once in 12 fence-and-rejoin runs without any test aid. No damage to the
+> data of live files was observed.
 >
-> Until the fix is released: run MeshXFS on test data only and keep backups.
-> After a test, unmount the filesystem on every node and check it with
-> `chk_mxfs -v <device>`. Please report any error it shows. The cause is
-> identified, and the fix ships in the next release once it passes
-> verification.
+> The cause is a change made in 0.90.131: with that change switched back to
+> 0.90.130's behaviour, the same test left no error. We published 0.90.131
+> before its last verification runs had finished, and those runs found it. That
+> was a failure of our release process. From now on nothing is published until
+> every check on the exact build being released has finished.
+>
+> The 0.90.131 packages have been removed from this page. The fix is in
+> 0.90.132, which will be published only after its full verification passes.
+>
+> **If you installed 0.90.131:** stop new workloads, unmount the filesystem on
+> every node, and run `chk_mxfs -v <device>`. If it reports an error, do not
+> mount the filesystem read-write again: keep the output and the kernel logs
+> and open an issue. Install 0.90.132 when it is published.
+>
+> **If you run 0.90.130:** stay on it until 0.90.132 is published, and read the
+> known issues on its release page.
 
 > **A shared-LUN clustered filesystem written entirely by AI.**
 >
@@ -54,7 +61,7 @@ packages.
 > Everything that turns XFS into a filesystem many machines can mount at once
 > is AI-authored.
 
-> ## 0.90.131: Safer Inode Reuse, Stronger Recovery, Proxmox VE 9.2 Support
+> ## 0.90.131 (withdrawn): Safer Inode Reuse, Stronger Recovery, Proxmox VE 9.2 Support
 >
 > What changed for someone upgrading from 0.90.130:
 >
@@ -103,8 +110,10 @@ packages.
 >
 > ### Upgrading from 0.90.130
 >
-> Upgrade every node to 0.90.131. It fixes five issues found in 0.90.130,
-> each verified on the 0.90.131 build in the configuration where it was found:
+> 0.90.131 was withdrawn (see the notice at the top). Stay on 0.90.130 until
+> 0.90.132 is published; 0.90.132 carries these fixes for issues found in
+> 0.90.130, each verified on the 0.90.131 build in the configuration where it
+> was found:
 >
 > - **Network lock manager (`net/mesh`):** a node could shut its filesystem
 >   down after a peer was fenced and rejoined, or when its peer stopped
