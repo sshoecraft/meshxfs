@@ -30,9 +30,11 @@ packages.
 > list entry that points at an inode that is already free (`AG 0 unlinked
 > bucket 1: member … has a FREE core`). The inode belonged to a file that had
 > already been deleted, and the check found no other error. It showed up in 1
-> of the first 7 such runs. The code path is the cleanup a node runs while it
-> recovers after another node leaves or dies, so it is not specific to one
-> lock manager. Whether 0.90.130 is affected is not yet determined.
+> of 12 such runs. A directed test then reproduced it on a healthy two-node
+> cluster, with no fencing and no path fault, on a single-path SAN LUN with
+> both the network lock manager and the on-disk locks. The trigger is one
+> node mounting while the other node frees a file both nodes had open.
+> Whether 0.90.130 is affected is not yet determined.
 >
 > Until the fix is released: run MeshXFS on test data only and keep backups.
 > After a test, unmount the filesystem on every node and check it with
