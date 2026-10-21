@@ -182,6 +182,14 @@ all the forensic detail: `docs/host-safety.md`.
 
 ---
 
+### RULE: GITHUB ISSUES NEED NO APPROVAL
+
+(User directive, 2026-10-21.)
+
+- Check, fix and respond to GitHub issues without waiting for the user's approval.
+
+---
+
 ### RULE: ZERO ACCEPTED KNOWN DEFECTS
 
 MXFS's release and promotion bar is ZERO UNRESOLVED CREDIBLE DEFECTS.
