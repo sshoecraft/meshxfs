@@ -4,7 +4,7 @@
 Usage: tools/criteria_window.py CONFIGURATION [--build SRCVERSION]
        e.g. tools/criteria_window.py 8/disk/caw/direct
 
-tools/criteria.py grades a row FLAKY while a genuine FAIL sits anywhere in its
+tools/criteria.py grades a row FAIL (failed earlier) while a genuine FAIL sits anywhere in its
 11-run window (the live cell plus ten history entries).  A row whose newest
 genuine FAIL is at window index k (0 = the live cell) reads PASS again after
 11-k more runs of that row.  The board run that closes a verification is one
@@ -56,9 +56,7 @@ def main() -> int:
         newest = -1
         if rid not in criteria.NEVER_FLAKE:
             for k, r in enumerate(runs):
-                if (str(r.get("status", "")).upper().strip() == "FAIL"
-                        and not criteria.RIG_NOISE.search(str(r.get("reason", "")))
-                        and not r.get("detector_defect")):
+                if criteria.genuine_fail(r):
                     newest = k
                     break
         stale = bool(build) and str(cell.get("build", "")) != build

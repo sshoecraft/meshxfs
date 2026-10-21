@@ -1823,10 +1823,15 @@ static int mxfs_ilock_acquire_from_dlm(struct xfs_inode *ip,
 				phantom = true;
 			spin_unlock(&ip->i_dlm_lock);
 			if (phantom) {
+				/* acq= counts this node's slow-path acquires of
+				 * the inode, this one included: above 1, the
+				 * "phantom" may be another task's fresh grant */
 				pr_warn(
-				    "mxfs: P109-EDEADLK-NL ino=%llu req=%u lap=%d comm=%s -- blocked-upgrade refusal while holding NL: the table entry is a phantom; releasing it via the DLM and retrying\n",
+				    "mxfs: P109-EDEADLK-NL ino=%llu req=%u lap=%d acq=%u acq_pid=%d comm=%s realns=%llu -- blocked-upgrade refusal while holding NL: the table entry is a phantom; releasing it via the DLM and retrying\n",
 					(unsigned long long)ip->i_ino, mode,
-					relock_laps + 1, current->comm);
+					relock_laps + 1, ip->i_dlm_acq_inflight,
+					ip->i_dlm_acq_pid, current->comm,
+					(unsigned long long)ktime_get_real_ns());
 				{
 					int urc = mxfs_v5_dlm_inode_unlock_gen(
 							ip->i_mount->m_mxfs_dlm,
@@ -4998,6 +5003,23 @@ restart:
 		wait_event_timeout(ip->i_dlm_wait,
 				   !mxfs_ilock_upgrade_pending(ip), HZ / 4);
 		goto restart;
+	}
+	/* Another task of this node already has a slow-path acquire of this
+	 * inode in flight and this one is about to send its own: the wait
+	 * above exists to prevent exactly that.  A release that overwrote
+	 * ACQUIRING is one way in (P-REL-ABORT-UNDER-ACQ). */
+	if (ip->i_dlm_acq_inflight > 0 && !mxfs_is_demoter(ip) &&
+	    ip->i_mount->m_mxfs_dlm &&
+	    !mxfs_v5_dlm_is_single_node(ip->i_mount->m_mxfs_dlm)) {
+		static atomic_t acqc_n = ATOMIC_INIT(0);
+
+		if (atomic_inc_return(&acqc_n) <= 2000)
+			mxfs_probe("mxfs: P-ACQ-CONCURRENT ino=%llu req=%u inflight=%u other_pid=%d other_comm=%s state=%u mode=%u comm=%s realns=%llu -- a second slow-path acquire of this inode on this node\n",
+				(unsigned long long)ip->i_ino, mode,
+				ip->i_dlm_acq_inflight, ip->i_dlm_acq_pid,
+				ip->i_dlm_acq_comm, ip->i_dlm_state,
+				ip->i_dlm_mode, current->comm,
+				(unsigned long long)ktime_get_real_ns());
 	}
 	if (ip->i_mount->m_mxfs_dlm &&
 	    !mxfs_v5_dlm_is_single_node(ip->i_mount->m_mxfs_dlm))

@@ -99,6 +99,11 @@ NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "
 STALE = [
     (r"\btrial\b", "calls something a trial; a released attachment is not one"),
     (r"not (yet )?recommended for production", "recommends against production use"),
+    # A reader keeps "test data only" as the product's label long after the
+    # defect that prompted it is fixed: a found defect in a published release
+    # withdraws that release, it does not narrow what the product is for.
+    (r"\btest data\b|\b(for|on) testing only\b|\bnot (meant |intended )?for production\b",
+     "tells readers the product is for test data or not for production"),
     (r"(CAW|disk/caw)[^.\n]{0,60}\bin development\b|\bin development\b[^.\n]{0,60}(CAW|disk/caw)",
      "calls the disk/caw lock manager in development"),
     (r"\bthe released (transport|configuration)\b", "implies one lock manager is the released one"),

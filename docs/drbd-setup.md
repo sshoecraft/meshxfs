@@ -105,7 +105,13 @@ resource mxfs {
 MeshXFS refuses to mount unless `protocol`, `allow-two-primaries`, every
 `after-sb-*`, `fencing` and `fence-peer` are exactly as above. Do not add
 `become-primary-on`: the `mxfs-drbd@` unit promotes the node only once it is
-safe.
+safe. For the same reason, leave the resource and the mount out of Pacemaker
+(no `ocf:linbit:drbd` or `Filesystem` resource for them). A node that comes
+back has to stay Secondary until the other has replayed its journal, and
+after both nodes went down the first mount needs the other node Secondary;
+another promoter keeps it Primary, so the mount would be refused at every
+attempt. When either is set up, `mxfs-drbd@` refuses to start and its journal
+names what else manages the resource.
 
 `ping-int` decides how long the surviving node's writes stop when its peer
 dies. DRBD notices a dead peer by a keep-alive that goes unanswered, and while
@@ -154,11 +160,14 @@ A device that already holds a filesystem is refused; add `-f` to overwrite it.
 On both nodes:
 
 ```
+systemctl disable drbd
 echo MOUNTPOINT=/mnt/shared > /etc/mxfs/drbd-mxfs.conf
 systemctl enable --now mxfs-drbd@mxfs
 ```
 
-`mxfs-drbd@mxfs` brings the resource up, waits until DRBD is Connected with both
+`drbd.service` stays disabled: `mxfs-drbd@mxfs` brings the resource up itself,
+and only after it has checked that the node may, so a reboot never brings the
+resource back on its own. `mxfs-drbd@mxfs` brings the resource up, waits until DRBD is Connected with both
 disks UpToDate, promotes the node, and mounts; pve1, if it was running alone,
 gives pve2 30 s and then mounts without it (section 7). At shutdown it unmounts and
 steps down, so the other node carries on. Check it with

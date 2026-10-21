@@ -9,7 +9,15 @@
     tools/criteria.py add    -i ID -r "requirement" -d "detector" [-b BUDGET_S] [-p PHASE]
     tools/criteria.py update <id> --at 2/net/mesh/direct -s PASS -m "measured" [-e ELAPSED_S] [--build SRCVER]
     tools/criteria.py amend  <id> --at 2/net/mesh/direct --iso <run stamp> --detector-defect "what the detector got wrong, and the fix"
+    tools/criteria.py unretire <id> --at 2/net/mesh/direct --iso <run stamp> --why "the fix did not hold"
+    tools/criteria.py --unattributed      genuine failures in a window that no open defect names
     tools/criteria.py remove <id> --why "why this is no longer something we must achieve"
+
+A FAILURE A VERIFIED FIX ACCOUNTS FOR STOPS COUNTING, AND NOTHING ELSE DOES. `tools/defects.py
+remove --fixed` marks each run the record named (its `cells` and `collateral`) as retired by it,
+after the fix-off arm of its reproducer failed every lap; the run stays in the history, and only the
+flake window stops counting it. A failure after the fix is a new run with no mark, so it counts at
+once. `unretire` takes a mark back when the fix turns out not to hold.
 
 THE ONE WAY IN OR OUT. This file is the only reader and the only writer of `data/criteria.json`.
 It was read-only for its whole life as `showstat.sh`, which is why the only thing that could write
@@ -95,8 +103,8 @@ if not os.environ.get("MXFS_CRIT"):
 #: the earlier one's cell. One lock per board file, so an alternate board (`MXFS_CRIT`) does not
 #: wait on the primary.
 LOCK = CRITERIA.with_name("." + CRITERIA.name + ".lock")
-MUTATORS = ("add", "update", "amend", "remove", "move", "pending", "executing", "finalize",
-            "migrate-keys")
+MUTATORS = ("add", "update", "amend", "unamend", "unretire", "remove", "move", "pending",
+            "executing", "finalize", "migrate-keys")
 
 #: A save of the board takes milliseconds, so a holder still there after this long is wedged
 #: rather than busy, and saying so beats blocking a run forever.
@@ -106,34 +114,51 @@ LOCK_WAIT_SECONDS = 30
 lock_handle = None
 
 
-def take_lock() -> None:
-    """Hold an exclusive lock from `load` to `save`, or say who is holding it."""
-    global lock_handle
-    LOCK.parent.mkdir(parents=True, exist_ok=True)
-    lock_handle = LOCK.open("w")
+def lock_board(path: Path):
+    """Hold an exclusive lock on one board file from its read to its write, or say who is
+    holding it. Returns the open handle: the lock lasts as long as the handle does."""
+    lock = path.with_name("." + path.name + ".lock")
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock.open("w")
     deadline = time.monotonic() + LOCK_WAIT_SECONDS
     announced = False
     while True:
         try:
-            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            return
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return handle
         except OSError:
             if time.monotonic() >= deadline:
                 sys.exit("criteria: %s has been held by another criteria.py for %ds. That is far "
                          "longer than a write takes, so it is wedged rather than busy: find the "
-                         "holder before retrying." % (LOCK, LOCK_WAIT_SECONDS))
+                         "holder before retrying." % (lock, LOCK_WAIT_SECONDS))
             if not announced:
                 print("criteria: waiting for another criteria.py to finish writing the board…",
                       file=sys.stderr)
                 announced = True
             time.sleep(0.05)
 
+
+def take_lock() -> None:
+    """Hold an exclusive lock from `load` to `save`, or say who is holding it."""
+    global lock_handle
+    lock_handle = lock_board(CRITERIA)
+
+
+def board_for(config: str) -> Path:
+    """The board file a configuration's cells live in: `MXFS_CRIT` when set, the board of an
+    attachment verified by a rig of its own (drbd), or data/criteria.json -- the same choice the
+    command line makes when it is given that configuration."""
+    if os.environ.get("MXFS_CRIT"):
+        return Path(os.environ["MXFS_CRIT"])
+    match = re.match(r"^\d+/[a-z]+/[a-z]+/([a-z]+)$", config)
+    own = match and configuration.ATTACHES.get(match.group(1), {}).get("board")
+    return ROOT / own if own else ROOT / "data" / "criteria.json"
+
 #: A status this board does not recognise is NOT green. Nothing passes by typo or by inventing a
 #: label -- an unknown string paints as a warning and never as a pass.
 MARK = {
     "PASS": "32",
     "FAIL": "1;31",
-    "FLAKY": "1;33",
     "BLOCKED": "1;31",
     "ABORTED": "1;31",
     "SKIP": "33",
@@ -153,14 +178,17 @@ STATUSES = tuple(MARK)
 #: is exactly what that rule can see.
 HISTORY_DEPTH = 10
 
-#: FLAKY IS NOT A PASS. A cell that passes now but whose own test detected a fault in a recent run
-#: is a defect nobody has rooted yet, and the queue is where it belongs. It is listed here so it
-#: paints, never so it counts toward the bar.
+#: A ROW PASSES OR FAILS, AND THE REASON IT FAILS IS THE REASON. A cell that passes now but whose
+#: own test detected a fault in a recent run reads FAIL, its reason `failed earlier: <stamp>
+#: <what failed>` (FAILED_EARLIER): a fault nobody has accounted for is a defect, and a pass beside
+#: it proves nothing about a bug that shows only now and then.
 GREEN = ("PASS",)
+FAILED_EARLIER = "failed earlier:"
 
-#: FLAKY means exactly one thing: the TEST ITSELF detected a fault on a formed cluster in a recent
-#: run, and that incident has not aged out. A cell stays FLAKY until the window is clean or the
-#: defect is fixed -- a flake is a defect to fix, not a label to launder.
+#: "Failed earlier" means exactly one thing: the TEST ITSELF detected a fault on a formed cluster
+#: in a recent run, and nothing accounts for it -- no fixed and verified defect retired it, and no
+#: open record adjudicated `noblock` names it. It stands until one of those happens or the
+#: window is clean of it -- a failure is a defect to fix, not a label to launder.
 #:
 #: What it must NOT mean is "the rig broke that day". A failure whose recorded reason is
 #: rig-formation is not evidence of an MXFS fault and never enters the flake count, and the two
@@ -186,7 +214,7 @@ NEVER_FLAKE = ("prep_cluster", "open_defects")
 CONFIGS = configuration.board_configurations()
 
 #: For `lift_config` only: what a leading bare configuration must not be mistaken for.
-SUBCOMMANDS = ("show", "add", "update", "remove", "amend", "move",
+SUBCOMMANDS = ("show", "add", "update", "remove", "amend", "unamend", "unretire", "move",
                "pending", "executing", "finalize", "rows", "migrate-keys")
 VALUE_FLAGS = ("--at", "--build")
 
@@ -268,26 +296,34 @@ def lift_config(argv: list) -> list:
     return argv
 
 
-def load() -> dict:
-    if not CRITERIA.is_file():
+def read_board(path: Path) -> dict:
+    if not path.is_file():
         return {"criteria": []}
     try:
-        with CRITERIA.open() as handle:
+        with path.open() as handle:
             data = json.load(handle)
     except ValueError as exc:
-        raise SystemExit(f"criteria: {CRITERIA} is not valid JSON: {exc}")
+        raise SystemExit(f"criteria: {path} is not valid JSON: {exc}")
     data.setdefault("criteria", [])
     return data
 
 
-def save(data: dict) -> None:
+def write_board(path: Path, data: dict) -> None:
     """Atomically, because a half-written board is worse than a stale one."""
-    CRITERIA.parent.mkdir(parents=True, exist_ok=True)
-    temporary = CRITERIA.with_suffix(".json.tmp")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".json.tmp")
     with temporary.open("w") as handle:
         json.dump(data, handle, indent=2)
         handle.write("\n")
-    os.replace(temporary, CRITERIA)
+    os.replace(temporary, path)
+
+
+def load() -> dict:
+    return read_board(CRITERIA)
+
+
+def save(data: dict) -> None:
+    write_board(CRITERIA, data)
 
 
 def find(data: dict, wanted: str) -> dict:
@@ -307,6 +343,24 @@ def find(data: dict, wanted: str) -> dict:
 
 def cell_of(entry: dict, config: str) -> dict:
     return (entry.get("per_config") or {}).get(config) or {}
+
+
+def runs_of(entry: dict, config: str) -> list:
+    """The live cell and its history, newest first: every recorded run of one row at one
+    configuration."""
+    cell = cell_of(entry, config)
+    return [cell] + list(cell.get("history") or []) if cell else []
+
+
+def run_of(data: dict, row: str, config: str, iso: str) -> tuple:
+    """(criterion, run) for the one recorded run of `row` at `config` stamped `iso`, or
+    (criterion or None, None) with nothing found. The row is matched exactly: a board run named
+    by a defect record must not resolve to a different row by substring."""
+    entry = next((e for e in data["criteria"] if str(e.get("id", "")) == row), None)
+    if entry is None:
+        return None, None
+    hit = [r for r in runs_of(entry, config) if str(r.get("iso", "")) == iso]
+    return entry, (hit[0] if hit else None)
 
 
 def budget_of(entry: dict):
@@ -354,6 +408,12 @@ def push_history(cell: dict) -> None:
         #: down and then discarded.
         "reason": str(cell.get("reason") or "")[:400],
     }
+    #: The build, and every annotation the flake rule reads, go with the verdict. Dropping them
+    #: here made an `amend` of the live cell vanish at the next run, so its FAIL counted again.
+    for key in ("build", "detector_defect", "amendment_withdrawn", "retired_by",
+                "retirement_withdrawn"):
+        if cell.get(key):
+            outgoing[key] = cell[key]
     cell["history"] = ([outgoing] + list(cell.get("history") or []))[:HISTORY_DEPTH]
 
 
@@ -378,32 +438,88 @@ def write_cell(entry: dict, config: str, status: str, measured: str = "",
     return cell
 
 
-def flake_count(entry: dict, config: str) -> tuple:
+def genuine_fail(run: dict) -> bool:
+    """A recorded run in which the test detected a fault on a formed cluster that nothing has
+    yet accounted for.
+
+    FAIL only. ABORTED means the run died mid-test and the result is UNKNOWN -- counting it would
+    make "we never found out" indistinguishable from "the test detected a fault", which is the
+    same conflation the rig-noise filter exists to prevent.
+
+    A FAIL carrying `detector_defect` was produced by a detector later proved wrong about a
+    cluster that had done the right thing (`amend`): it stays in the history, annotated, and it is
+    not evidence of an MXFS fault any more than rig-formation noise is. A FAIL carrying
+    `retired_by` was caused by a defect since removed as FIXED AND VERIFIED (its reproducer failed
+    every lap with the fix off and passed with it on) or DISPROVED: it is evidence about that
+    defect, which is settled, and not about the build being asked about.
+    """
+    return (str(run.get("status", "")).upper().strip() == "FAIL"
+            and not RIG_NOISE.search(str(run.get("reason", "")))
+            and not run.get("detector_defect")
+            and not run.get("retired_by"))
+
+
+def counted_runs(entry: dict, config: str, build: str = "") -> list:
+    """The runs a row's verdict is graded on: the ones recorded on the build being graded --
+    `build`, or the build of the row's latest run when none is named. A failure on that build
+    counts, whichever run it was; a run on any other build says nothing about this one, however
+    it ended. A row whose latest run carries no build is graded on every run it has recorded."""
+    runs = runs_of(entry, config)[:FLAKE_WINDOW]
+    ref = build or cell_of(entry, config).get("build", "")
+    if not ref:
+        return runs
+    return [run for run in runs if run.get("build") == ref]
+
+
+#: (configuration, row, iso) -> the open `noblock` records that name that run, read once.
+noblock_cache = None
+
+
+def noblock_named() -> dict:
+    """The board runs named (`cells`, `collateral`) by an open defect record adjudicated
+    `noblock`: measured to neither lose data nor crash, hang or shut down a node, so by the
+    release bar not a reason to hold a release. The record stays open in the queue."""
+    global noblock_cache
+    if noblock_cache is None:
+        import defects  # noqa: E402  (imported here: only the board's verdict needs the queue)
+        noblock_cache = {}
+        for record in defects.load()["defects"]:
+            if str(record.get("impact", "")).lower() not in defects.IMPACT_CLEAR:
+                continue
+            for cell in list(record.get("cells") or []) + list(record.get("collateral") or []):
+                key = (cell.get("config"), cell.get("row"), cell.get("iso"))
+                noblock_cache.setdefault(key, []).append(record["id"])
+    return noblock_cache
+
+
+def window_noblock(entry: dict, config: str, build: str = "") -> tuple:
+    """(the noblock records behind the window's genuine FAILs, whether every one of those FAILs
+    is named by one). A FAIL no record names, or one named only by a record that crosses the
+    release bar, leaves the second False."""
+    named = noblock_named()
+    ids, covered = [], True
+    for run in counted_runs(entry, config, build):
+        if not genuine_fail(run):
+            continue
+        hit = named.get((config, entry.get("id"), run.get("iso")))
+        if not hit:
+            covered = False
+            continue
+        ids += [i for i in hit if i not in ids]
+    return ids, covered
+
+
+def flake_count(entry: dict, config: str, build: str = "") -> tuple:
     """(genuine failures, runs considered) over the recent window for one cell.
 
-    Genuine means the test detected a fault on a formed cluster: a recorded failure whose reason
-    is not rig-formation noise. The current run counts alongside its history, so a cell that just
-    failed for a real reason is not laundered by having no history yet.
+    Genuine means the test detected a fault on a formed cluster (`genuine_fail`). The current run
+    counts alongside its history, so a cell that just failed for a real reason is not laundered
+    by having no history yet.
     """
     if str(entry.get("id", "")) in NEVER_FLAKE:
         return 0, 0
-    cell = cell_of(entry, config)
-    if not cell:
-        return 0, 0
-    runs = [cell] + list(cell.get("history") or [])
-    runs = runs[:FLAKE_WINDOW]
-    #: FAIL only. ABORTED means the run died mid-test and the result is UNKNOWN -- counting it
-    #: would make "we never found out" indistinguishable from "the test detected a fault", which
-    #: is the same conflation the rig-noise filter exists to prevent.
-    #:
-    #: A FAIL carrying `detector_defect` was produced by a detector later proved wrong about a
-    #: cluster that had done the right thing (`amend`): it stays in the history, annotated, and
-    #: it is not evidence of an MXFS fault any more than rig-formation noise is.
-    genuine = sum(1 for r in runs
-                  if str(r.get("status", "")).upper().strip() == "FAIL"
-                  and not RIG_NOISE.search(str(r.get("reason", "")))
-                  and not r.get("detector_defect"))
-    return genuine, len(runs)
+    runs = counted_runs(entry, config, build)
+    return sum(1 for r in runs if genuine_fail(r)), len(runs)
 
 
 def applies(entry: dict, config: str) -> bool:
@@ -441,9 +557,10 @@ def cell_status(entry: dict, config: str, build: str = "") -> str:
     only thing that ties it to the code being asked about, and a board that reprints it against a
     newer module is asserting something nobody measured.
 
-    A cell that passes now but failed for a real reason inside the window is FLAKY, which is not
-    green. `fence_during_write` at 2/tcp passed its last run with 6 genuine failures behind it in
-    11; a board that called that PASS is the reason this rule exists.
+    A cell that passes now but failed for a real reason inside the window that nothing accounts
+    for is FAIL, its reason the earlier failure (`earlier_reason`). `fence_during_write` at 2/tcp
+    passed its last run with 6 genuine failures behind it in 11; a board that called that PASS is
+    the reason this rule exists.
     """
     cell = cell_of(entry, config)
     if not cell:
@@ -451,9 +568,41 @@ def cell_status(entry: dict, config: str, build: str = "") -> str:
     status = str(cell.get("status", "UNKNOWN")).upper().strip().replace("_", " ")
     if build and status in GREEN and cell.get("build") and cell["build"] != build:
         return "STALE"
-    if status in GREEN and flake_count(entry, config)[0] > 0:
-        return "FLAKY"
+    if status in GREEN and flake_count(entry, config, build)[0] > 0:
+        #: Every genuine FAIL in the window named by an open record adjudicated `noblock`: the
+        #: row passes the release bar, and the board says which records it carries.
+        ids, covered = window_noblock(entry, config, build)
+        if covered and ids:
+            return status
+        return "FAIL"
     return status
+
+
+def noblock_note(entry: dict, config: str, build: str = "") -> str:
+    """`  [noblock: D-...]` for a passing row whose window holds FAILs only open noblock records
+    account for, else ""."""
+    if flake_count(entry, config, build)[0] == 0:
+        return ""
+    ids, covered = window_noblock(entry, config, build)
+    return "  [noblock: %s]" % ", ".join(ids) if covered and ids else ""
+
+
+def earlier_reason(entry: dict, config: str, build: str = "") -> str:
+    """For a row whose latest run passed but which reads FAIL: `failed earlier: <stamp> <reason>
+    (<n> of the last <m> runs)`, naming the newest failure nothing accounts for; else ""."""
+    cell = cell_of(entry, config)
+    if str(cell.get("status", "")).upper().strip() not in GREEN or noblock_note(entry, config, build):
+        return ""
+    bad, seen = flake_count(entry, config, build)
+    if not bad:
+        return ""
+    named = noblock_named()
+    for run in counted_runs(entry, config, build):
+        if genuine_fail(run) and (config, entry.get("id"), run.get("iso")) not in named:
+            return "%s %s %s (%d of the last %d runs)" % (
+                FAILED_EARLIER, run.get("iso", "?"),
+                flat(run.get("reason") or run.get("measured") or "", 120), bad, seen)
+    return ""
 
 
 def roll_up(entry: dict, build: str = "") -> str:
@@ -466,7 +615,7 @@ def roll_up(entry: dict, build: str = "") -> str:
         return "PASS"
     if any(mark in ("FAIL", "BLOCKED", "ABORTED") for mark in marks):
         return "FAIL"
-    if any(mark in GREEN or mark == "FLAKY" for mark in marks):
+    if any(mark in GREEN for mark in marks):
         return "PARTIAL"
     return "UNKNOWN"
 
@@ -487,10 +636,19 @@ def show_one(entry: dict, paint: Paint, build: str) -> int:
         elapsed = cell.get("elapsed_s")
         if elapsed is not None and budget_of(entry):
             detail = "%ss/%ss  %s" % (elapsed, budget_of(entry), detail)
-        bad, seen = flake_count(entry, config)
-        if bad:
-            detail = "%s  [%d genuine FAIL(s) in last %d runs]" % (detail, bad, seen)
+        note = noblock_note(entry, config, build)
+        earlier = earlier_reason(entry, config, build)
+        if note:
+            detail = note.strip() + "  " + detail
+        elif earlier:
+            detail = earlier
         print("    %-10s %s  %s" % (config, paint("%-8s" % mark, MARK.get(mark, "33")), detail))
+        for run in runs_of(entry, config)[:FLAKE_WINDOW]:
+            mark_by = run.get("retired_by")
+            if mark_by:
+                print("    %-10s   %s FAIL retired by %s (%s, %s)"
+                      % ("", run.get("iso", "?"), mark_by.get("defect", "?"),
+                         mark_by.get("disposition", "?"), mark_by.get("date", "?")))
     skipped = [c for c in CONFIGS if c not in runnable]
     if skipped:
         print("    %-10s not runnable here: %s" % ("", ", ".join(skipped)))
@@ -525,9 +683,12 @@ def board(criteria: list, paint: Paint, verbose: bool, at: str, build: str) -> i
             status = cell_status(entry, at, build)
             cell = cell_of(entry, at)
             measured, elapsed = cell.get("measured", ""), cell.get("elapsed_s")
-            bad, seen = flake_count(entry, at)
-            if bad:
-                measured = "%s  [%d genuine FAIL(s) in last %d runs]" % (measured, bad, seen)
+            note = noblock_note(entry, at, build)
+            earlier = earlier_reason(entry, at, build)
+            if note:
+                measured = note.strip() + "  " + measured
+            elif earlier:
+                measured = earlier
         else:
             status = roll_up(entry, build)
             done = sum(1 for c in CONFIGS if cell_status(entry, c, build) in GREEN)
@@ -906,7 +1067,7 @@ def cmd_amend(data: dict, args) -> int:
     """Annotate ONE recorded FAIL as a detector defect. The run stays in the history, status FAIL,
     with the annotation beside it; only the flake rule stops counting it.
 
-    FLAKY means the TEST ITSELF detected a fault on a formed cluster. When the test's own oracle is
+    A genuine FAIL means the TEST ITSELF detected a fault on a formed cluster. When the test's own oracle is
     what was wrong -- measured 2026-09-28: the 4-node crash audit failed because the death oracle
     read only the writer's kernel log while a third node had been the prover, and every survivor's
     log showed the recovery had run exactly as designed -- the FAIL is evidence about the detector,
@@ -976,6 +1137,77 @@ def cmd_unamend(data: dict, args) -> int:
     return 0
 
 
+def cmd_unretire(data: dict, args) -> int:
+    """Take back a retirement: the run counts as a genuine FAIL again.
+
+    A retirement is the claim that a removed defect's verified fix accounts for this FAIL. When
+    the same failure comes back on a build carrying that fix, the fix did not hold, the FAIL must
+    count again, and the record of why the retirement was taken back stays beside it. The defect
+    goes back into the queue with tools/defects.py add.
+    """
+    entry = find(data, args.id)
+    config = parse_at(args.at)
+    hit = [r for r in runs_of(entry, config) if str(r.get("iso", "")) == args.iso]
+    if not hit:
+        sys.exit("criteria: %s [%s] records no run stamped %s" % (entry["id"], config, args.iso))
+    run = hit[0]
+    was = run.pop("retired_by", None)
+    if not was:
+        sys.exit("criteria: the run stamped %s carries no retirement" % args.iso)
+    run["retirement_withdrawn"] = ("%s %s | withdrawn: %s"
+                                   % (was.get("defect", "?"), was.get("date", "?"), args.why))[:600]
+    save(data)
+    genuine, seen = flake_count(entry, config)
+    print("unretired %s [%s] run %s: counts as a genuine FAIL again; genuine failures in the "
+          "window now %d of %d -> %s" % (entry["id"], config, args.iso, genuine, seen,
+                                          cell_status(entry, config)))
+    print("\nThis changes what the board says. It belongs in CHANGELOG.md:\n")
+    print("- **Board: %s at %s, the FAIL of %s counts again; %s did not hold** — %s"
+          % (entry["id"], config, args.iso, was.get("defect", "?"), args.why))
+    return 0
+
+
+def open_defect_cells() -> dict:
+    """(configuration, row, iso) -> the open defect records that name that board run, from
+    tools/defects.py's queue: its `cells` and its `collateral`."""
+    import defects  # noqa: E402  (imported here: only this listing needs the queue)
+    named: dict = {}
+    for record in defects.load()["defects"]:
+        for cell in list(record.get("cells") or []) + list(record.get("collateral") or []):
+            key = (cell.get("config"), cell.get("row"), cell.get("iso"))
+            named.setdefault(key, []).append(record["id"])
+    return named
+
+
+def cmd_unattributed(data: dict, at: str) -> int:
+    """Every genuine FAIL still inside a flake window that no open defect record names.
+
+    Each one has to be named by an open record (`tools/defects.py add|update --cell`) or retired
+    by a removal: a board whose failures nobody accounts for is one where enough passing laps
+    quietly hide a defect. Exit 1 while any is listed."""
+    named = open_defect_cells()
+    loose = []
+    for entry in data["criteria"]:
+        if str(entry.get("id", "")) in NEVER_FLAKE:
+            continue
+        for config in sorted(entry.get("per_config") or {}):
+            if at and config != at:
+                continue
+            for run in runs_of(entry, config)[:FLAKE_WINDOW]:
+                if genuine_fail(run) and (config, entry["id"], run.get("iso")) not in named:
+                    loose.append((config, entry["id"], run))
+    if not loose:
+        print("every genuine FAIL in a window%s is named by an open defect record"
+              % (" at %s" % at if at else ""))
+        return 0
+    print("%d genuine FAIL(s) in a window that no open defect record names "
+          "(name each with tools/defects.py update <id> --cell CONFIG:ROW:ISO):" % len(loose))
+    for config, row, run in loose:
+        print("  %s:%s:%s  %s" % (config, row, run.get("iso", "?"),
+                                  flat(run.get("reason") or run.get("measured") or "", 90)))
+    return 1
+
+
 def cmd_remove(data: dict, args) -> int:
     """Only for a criterion that is no longer something we must achieve.
 
@@ -1008,6 +1240,9 @@ def main() -> int:
                              "build reads STALE instead of PASS")
     parser.add_argument("--gaps", action="store_true",
                         help="criteria nobody can measure, and configurations nobody has")
+    parser.add_argument("--unattributed", action="store_true",
+                        help="genuine FAILs in a flake window that no open defect record names; "
+                             "exit 1 while any is listed")
     parser.add_argument("--no-colour", action="store_true")
 
     subs = parser.add_subparsers(dest="command")
@@ -1091,6 +1326,14 @@ def main() -> int:
     unamend.add_argument("--why", required=True,
                          help="what was measured that shows the amendment's case was wrong")
 
+    unretire = subs.add_parser("unretire",
+                               help="take back a retirement whose fix did not hold")
+    unretire.add_argument("id")
+    unretire.add_argument("--at", metavar="CONFIGURATION", required=True)
+    unretire.add_argument("--iso", required=True, help="the retired run's stamp, as `show` prints it")
+    unretire.add_argument("--why", required=True,
+                          help="what was measured that shows the fix did not hold")
+
     remove = subs.add_parser("remove", help="no longer something we must achieve")
     remove.add_argument("id")
     remove.add_argument("--why", required=True, help="why this is no longer required")
@@ -1124,7 +1367,7 @@ def main() -> int:
     migrate.add_argument("--dry-run", action="store_true")
 
     args = parser.parse_args(lift_config(sys.argv)[1:])
-    for absent in ("at", "build", "gaps", "verbose", "budget_s", "requirement",
+    for absent in ("at", "build", "gaps", "unattributed", "verbose", "budget_s", "requirement",
                    "detector", "why", "status", "measured", "elapsed_s",
                    "reason", "calibrate", "run_id"):
         if not hasattr(args, absent):
@@ -1145,6 +1388,8 @@ def main() -> int:
         return cmd_amend(data, args)
     if args.command == "unamend":
         return cmd_unamend(data, args)
+    if args.command == "unretire":
+        return cmd_unretire(data, args)
     if args.command == "remove":
         return cmd_remove(data, args)
     if args.command == "move":
@@ -1161,6 +1406,8 @@ def main() -> int:
         return cmd_migrate_keys(data, args)
     if args.gaps:
         return cmd_gaps(data["criteria"], paint, args.build or "")
+    if args.unattributed:
+        return cmd_unattributed(data, parse_at(args.at) if args.at else "")
     return board(data["criteria"], paint, args.verbose,
                  parse_at(args.at) if args.at else "", args.build or "")
 

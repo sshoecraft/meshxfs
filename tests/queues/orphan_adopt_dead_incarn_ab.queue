@@ -1,0 +1,22 @@
+# D-ORPHAN-SCAN-ADOPTS-FREED-NUMBER-LEAVES-UNLINKED-BUCKET-ON-FREE-CORE: the
+# directed A/B of the orphan scan's adopt on a healthy two-node pair
+# (2/net/mesh/mpath on g2e, test17 = A the peer, test18 = B the scanner),
+# same build, the fix switched by orphan_adopt_platter_verify on B.
+#
+# READING RULES (written before the first lap):
+#   control (=0)  reach: B logs P98-ORPHAN-ADOPT for f's number after A freed
+#                 it, and the cold chk_mxfs finds a bucket on a FREE core.
+#                 A control lap without the adopt is VACUOUS: the window was
+#                 not reached and the fix laps prove nothing until it is.
+#   fix (=1)      B logs P98-ORPHAN-ADOPT-REFUSED for f's number, no
+#                 P98-ORPHAN-ADOPT for it, and the cold check reports no
+#                 ERROR.  Any fix lap with the adopt or a FREE core: REFUTED.
+#   both          no BUG, oops, hung task or filesystem shutdown on either node.
+#   FIXED AND VERIFIED on the directed side: every control lap reaches and
+#   corrupts, every fix lap refuses and audits clean.
+300 tests/orphan_adopt_dead_incarn_ab.sh c1 control
+300 tests/orphan_adopt_dead_incarn_ab.sh f1 fix
+300 tests/orphan_adopt_dead_incarn_ab.sh c2 control
+300 tests/orphan_adopt_dead_incarn_ab.sh f2 fix
+300 tests/orphan_adopt_dead_incarn_ab.sh c3 control
+300 tests/orphan_adopt_dead_incarn_ab.sh f3 fix

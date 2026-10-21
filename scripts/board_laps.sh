@@ -6,14 +6,16 @@
 #   e.g. MXFS_CRIT=$PWD/tests/evidence/vsphere/criteria.json \
 #        MXFS_NODE_LIST=vstest1,vstest2 scripts/board_laps.sh 2/disk/caw/direct 9
 #
-# A FLAKY row reads PASS again only after its genuine FAILs leave the 11-run
+# A row whose latest run passed but that failed earlier reads FAIL with the
+# reason "failed earlier: ..." and reads PASS again only after its genuine FAILs leave the 11-run
 # window (tools/flake_laps.py says how many runs each row still needs), and a
 # platform is only shown to work by boards that keep passing.  Each lap is a
 # plain `./run.sh <configuration>` with the caller's environment (MXFS_CRIT,
 # MXFS_NODE_LIST pass through), its log kept as lap-<n>.log.  run.sh enforces
 # every row's budget itself, so nothing here adds a timeout of its own.
 #
-# The laps stop at the first board with a row that is neither PASS nor FLAKY:
+# The laps stop at the first board with a row that is neither PASS nor a FAIL
+# that only failed earlier (its latest run passed):
 # the run after a fault would be scored on whatever the fault left behind.
 # Prints one line per lap and LAPS_DONE <ran>/<laps> at the end; exit 0 when
 # every lap ran clean.
@@ -56,7 +58,7 @@ for i in $(seq 1 "$LAPS"); do
     board=$(tools/criteria.py "$CFG" 2>&1)
     echo "$board" > "$DIR/lap-$i.board"
     total=$(echo "$board" | grep -a '^Total:')
-    bad=$(echo "$board" | grep -a -E '^[0-9]+ +\|' | awk -F'|' '{gsub(/ /,"",$3); if ($3!="PASS" && $3!="FLAKY") print $2"="$3}' | tr -d ' ' | tr '\n' ' ')
+    bad=$(echo "$board" | grep -a -E '^[0-9]+ +\|' | awk -F'|' '{m=$5; sub(/^ +/, "", m); gsub(/ /,"",$3); if ($3!="PASS" && !($3=="FAIL" && index(m, "failed earlier:")==1)) print $2"="$3}' | tr -d ' ' | tr '\n' ' ')
     echo "lap $i/$LAPS rc=$rc wall=${w}s $total${bad:+ NOT-PASSING: $bad}"
     [ -z "$bad" ] || { echo "LAPS_DONE $ran/$LAPS stopped: lap $i left rows not passing (log $log)"; exit 1; }
 done

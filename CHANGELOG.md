@@ -1,4 +1,224 @@
-## 2026-10-20 — 0.90.131 — Safer Inode Reuse, Stronger Recovery, Proxmox VE 9.2 Support
+## 2026-10-21 — 0.90.132 — Cross-Node Inode Coherence and Recovery
+
+What changed for someone upgrading from 0.90.130:
+
+- **Every node works on the current copy of a file or directory after
+  another node frees and reuses its inode number.**  A stale in-memory copy
+  is no longer written over a peer's change, applied to an unrelated file
+  that took the number, or freed while a live name still points at it; a
+  path lookup through a directory another node removed and recreated finds
+  the new directory.
+- **A file created in a directory that many nodes write keeps its name.**
+  While one task of a node is acquiring a directory's lock, the node's other
+  tasks wait for it, so a create never runs on a lock the node has already
+  handed to another node, whose write of the same directory block could drop
+  the new name.
+- **The cleanup a node runs after it mounts only acts on what the disk
+  holds.**  It no longer puts an inode that another node has just freed onto
+  its list of deleted-but-open files.
+- **Fewer ways for a node to stop.**  Heavy create and delete traffic across
+  nodes no longer shuts a node's filesystem down on the paths found; a
+  fenced node shuts down without hanging on its log; unmount no longer races
+  a deferred directory cleanup.  A mount that fails, or that waits a long
+  time on its peers, no longer crashes or hangs the node.
+- **Recovery after a node is fenced, on the network lock manager.**  A node
+  that is fenced and comes back no longer finds a file locked against it:
+  lock traffic from its fenced identity is ignored, and the surviving node's
+  release of its own lock always retires the record the ledger holds for it.
+  A node never proceeds on a lock it was not granted, and a peer that left
+  cleanly is no longer declared dead 40 s later.
+- **Proxmox VE 9.2.**  Verified on Proxmox VE 9.2 with its updates
+  (pve-manager 9.2.21, kernel 7.0).  MXFS stays in Datacenter → Storage → Add
+  through pve-manager upgrades, and the storage plugin no longer prints an
+  "older storage API" notice.
+- **On DRBD, a mount that cannot happen says why.**  When Pacemaker or DRBD's
+  `become-primary-on` also promotes the resource, `mxfs-drbd@` refuses to
+  start and its journal names what else manages it, instead of retrying the
+  mount without end.  A node whose peer was made Primary by hand says so after
+  its first refused mount, with the command that lets it go ahead.
+
+**Released configurations and what 0.90.132 was validated on:**
+
+| configuration | nodes | storage | validated on 0.90.132 |
+|---|---|---|---|
+| `2/disk/caw/direct` | 2 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
+| `4/disk/caw/direct` | 4 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig |
+| `8/disk/caw/direct` | 8 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig |
+| `16/disk/caw/direct` | 16 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig |
+| `2/disk/caw/mpath` | 2 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+| `4/disk/caw/mpath` | 4 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+| `8/disk/caw/mpath` | 8 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
+| `16/disk/caw/mpath` | 16 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig; three Proxmox VE 9 hosts on two paths (path faults, live migration, datastore operations, HA power loss), kernels 6.17 and 7.0 |
+| `2/net/mesh/direct` | 2 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+| `4/net/mesh/direct` | 4 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig |
+| `8/net/mesh/direct` | 8 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig |
+| `16/net/mesh/direct` | 16 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig |
+| `2/net/mesh/mpath` | 2 | one shared iSCSI LUN over two paths, network lock manager | the 31-row suite plus eight path-fault rows on the test rig |
+| `4/net/mesh/mpath` | 4 | one shared iSCSI LUN over two paths, network lock manager | the 31-row suite plus eight path-fault rows on the test rig |
+| `2/net/mesh/drbd` | 2 | a DRBD dual-primary replica of two local disks, network lock manager | the DRBD failure tests on its own two-node rig |
+
+**Not in 0.90.132: `8/net/mesh/mpath` and `16/net/mesh/mpath`.**  On the
+0.90.132 build, with the network lock manager on multipath at 8 nodes, a node
+leaving the cluster stopped every other node's file operations for 66 to 77
+seconds, all of them waiting on one shared directory's lock, before they
+carried on.  No operation failed and no data was lost, but a pause that long is
+a defect, and it is not fixed yet.  16 nodes on multipath is left out with it
+until the fix is verified there.  Until then, run the on-disk locks
+(`force_transport=0` on every node, on storage that passes `caw_verify`) at 8
+and 16 nodes on multipath.
+
+The test rig is Ubuntu 24.04 (kernel 6.8.0-101-generic).  "Installed
+packages" means the release packages on two nodes of each supported platform:
+Proxmox VE 9.1 (kernels 6.17 and 7.0), Proxmox VE 9.2 (kernel 7.0), RHEL 9.8,
+Ubuntu 24.04, Ubuntu 26.04, Debian 12 and Debian 13.  Every host in a cluster needs the same MeshXFS
+version; hosts on different kernels are fine.
+
+**0.90.131 was withdrawn.**  Checks on the 0.90.131 build that finished after
+it was published found that the cleanup above could leave an unlinked-inode
+list entry pointing at an inode another node had just freed, which
+`chk_mxfs` reports as `unlinked bucket N: member … has a FREE core`.  The
+cause was a 0.90.131 change; 0.90.130 does not have it.  0.90.131 should not
+have been published before those checks finished, and no release is
+published now until every check on its exact build has.  0.90.132 is
+0.90.131 with the fix, verified as a release in its own right.
+
+The work this version is for: fixing and verifying the defect found in the
+published 0.90.131 build after its release,
+D-ORPHAN-SCAN-ADOPTS-FREED-NUMBER-LEAVES-UNLINKED-BUCKET-ON-FREE-CORE
+(first recorded as D-NETMESH-MPATH-FENCED-RETURN-UNLINKED-BUCKET-POINTS-AT-FREE-CORE),
+and the two DRBD defects GitHub issues #2 and #3 report
+(D-GH2-DRBD-REJOIN-WAITS-FOREVER-FOR-PEER-SECONDARY-UNDER-PACEMAKER,
+D-GH3-DRBD-SURVIVOR-REBOOT-WITH-PEER-DOWN-NEVER-MOUNTS-PVE-STORAGE-HANGS), and
+releasing the fixes.  The owner's call (2026-10-21): running MeshXFS under
+Pacemaker managing DRBD (issue #2's setup) is not slated for 0.90.132 and does
+not block it; 0.90.132 makes the boot program refuse that setup with a message
+instead of waiting without end.
+
+### 0.90.132 in detail
+
+**Removed from the queue, fixed and verified:
+D-CC-16NODE-SYNCED-CREATE-NAME-LOST-INODE-DISCONNECTED** (found by the
+0.90.132 release chain on 16/disk/caw/direct).  crash_consistency's rank 14
+created `node14_f20.md5` in the one directory 16 nodes write and synced it;
+after a cache drop no node could find the name, and `chk_mxfs` found its inode
+(17314572, nlink 1) with no directory entry naming it.  The kernel logs show
+how.  `md5sum f | awk > f.md5` runs a lookup (PR on the directory) beside the
+shell's create of `f.md5` (EX) on the same node.  The create's EX acquire set
+the inode ACQUIRING, which makes the node's other tasks wait for it; a
+release that aborted while that acquire was in flight
+(`mxfs_bast_nl_entry_cleanup`, orphan-only) set it NONE.  md5sum then sent
+its own request, met the node's fresh EX grant as a stale self-hold, and the
+P109 path released that grant as a phantom, handing the directory to test11.
+The shell added its entry under an EX it no longer held; test11 placed its own
+entry at the same offset of the same block (off 1120 of daddr 64625568), and
+its write dropped the shell's: 127 placements, 126 entries.  An aborted
+release now leaves the inode ACQUIRING while this node's acquire is in flight
+(knob `rel_abort_keeps_acquiring`, default 1; 0 is the old abort).  Probes:
+P-REL-ABORT-UNDER-ACQ, P-ACQ-CONCURRENT (a second slow-path acquire of an
+inode on a node that already has one in flight) and the in-flight count on
+P109.  `tests/acq_trample_ab.sh` (16/disk/caw/direct, one build, arms
+interleaved, every node's kernel log followed from the lap mark): with the
+knob at 0, 90 and 74 such aborts per lap overwrote ACQUIRING and 3 and 4
+second acquires followed, every one a md5sum/shell pair on the test's
+directory; with it at 1, 108, 89, 95 and 97 aborts per lap kept ACQUIRING,
+no second acquire, crash_consistency 16/16 and a cold `chk_mxfs` clean.  The
+same chain's dlm_lock_correctness and crash_audit FAILs on that board ran on
+test1 after chk_clean had left it unmounted to keep the image: an unmounted
+node holds no registration, and its raw FUA write returns RESERVATION
+CONFLICT (measured).
+
+**Removed from the queue, fixed and verified:
+D-GH2-DRBD-REJOIN-WAITS-FOREVER-FOR-PEER-SECONDARY-UNDER-PACEMAKER**
+(GitHub issue #2).  After both nodes of a DRBD pair went down, the first
+mount proves every old incarnation ended by its peer being DRBD Secondary on
+a connected link, and the boot program keeps a node Secondary until its peer
+has recovered it.  On the tester's pair Pacemaker's promotable
+`ocf:linbit:drbd` clone kept the peer Primary, so every mount was refused
+("the peer is 'Primary', not Secondary") and the boot program stepped down
+and retried without end, with nothing saying why.  `mxfs-drbd@` now refuses to
+start when Pacemaker manages the resource (an `ocf:linbit:drbd` resource for
+it, or a `Filesystem` resource for its device, read from the running cluster
+or its configuration on disk) or the resource has `become-primary-on`, and
+its journal names which.  When the peer is Primary with nothing mounted and
+no `mxfs-drbd@` running there, as after a `drbdadm primary` by hand, the boot
+program says so after the first refused mount, with the command that lets it
+go ahead.  `scripts/drbd_rig.sh promoter-test <pacemaker|become|manual>`
+takes the pair down at once, has the promoter make participant 1 Primary, and
+runs participant 0's boot program alone.  With the program as it was before
+(its sha256 checked on the node after the outage) participant 0 never
+mounted in 420 s, refused 4 attempts and named nothing, for each promoter.
+With 0.90.132's it named Pacemaker's resource 2 s after starting,
+`become-primary-on` after 1 s, and the hand promotion after its first refused
+mount (192 s).  In each lap, once the promoter was gone and participant 1
+demoted, both nodes mounted within 24 s with every fsynced file intact and a
+cold `chk_mxfs` clean.  docs/drbd-setup.md now says to leave the resource and
+the mount out of Pacemaker, and to disable `drbd.service` (every DRBD test
+runs with it disabled, `scripts/drbd_rig.sh`; the guide had not said so, and
+issue #3's tester asked).
+
+**Removed from the queue, fixed and verified:
+D-ORPHAN-SCAN-ADOPTS-FREED-NUMBER-LEAVES-UNLINKED-BUCKET-ON-FREE-CORE.**
+About 20 s after a node mounts, and after it recovers a peer, it scans for
+inodes that are allocated, have no links and sit on no unlinked list, and
+puts each one on its own list so it gets freed.  The scan lists them from an
+unlocked read of the disk, and then decided on each from the node's
+in-memory copy.  Since 0.90.131 a stale in-memory copy whose number the disk
+now gives to another incarnation is marked dead instead of being refreshed,
+and it keeps the dead file's mode and link count.  So when the peer freed a
+listed inode in between, and this node still held a copy of an older
+incarnation of that number, the copy passed the test and a free inode went
+onto the list.  In lap 7 of 12 kept-log fenced-return laps on 2/net/mesh/mpath
+(0.90.131 build 292B547486AE6E75317F308, run 20261020T230954Z-g2e) the
+rejoined node did exactly that with inode 15530 (`P98-ORPHAN-ADOPT
+gen=3463200463`, the disk's generation 837697099), and the cold check read
+`AG 0 unlinked bucket 1: member agino 15530 has a FREE core`: board cell
+2/net/mesh/mpath chk_clean FAIL 2026-10-20T23:15Z.  The adopt now re-reads
+the inode on disk under the locks it already holds and refuses unless it is
+allocated, has no links, carries the copy's generation and the copy is not
+a dead incarnation (`orphan_adopt_platter_verify`, 1 by default; 0 is the
+same-build control).  `tests/orphan_adopt_dead_incarn_ab.sh` parks the scan
+after it lists its candidates while the peer frees one of them, on a healthy
+pair with no fencing and no path fault.  On the release build
+C17A8788E8DA81D7CA5C333 the control corrupted every lap (2/net/mesh/mpath 4
+of 4, 2/net/mesh/direct and 2/disk/caw/direct one each) and the fix refused
+the adopt and checked clean every lap (2/net/mesh/mpath 3 of 3,
+2/net/mesh/direct and 2/disk/caw/direct one each).  With the fix off and
+only the 0.90.131 reload change set back to 0.90.130's behaviour, the same
+test left no error in 3 of 3, which is why 0.90.130 does not have this
+defect.  On the release build, 12 kept-log fenced-return laps on
+2/net/mesh/mpath (runs 20261021T000731Z to 20261021T012511Z) all passed with
+chk_clean CLEAN, no shutdown on the surviving node and no BUG, oops or hung
+task.  A probe of the related path, where a dead peer's list holds a reused
+number this node has a stale copy of (`tests/reap_reused_number_dead_shell_probe.sh`),
+reached it once and the disk checked clean.
+
+**Opened in the queue on the 0.90.132 build, and why 8 and 16/net/mesh/mpath
+are not claimed: D-NETMESH-SHARED-DIR-LOCK-QUEUE-JAMS-60S-AFTER-PEER-WITHDRAWS.**
+The 8/net/mesh/mpath board (run 20261021T134613Z-g8b) failed path_peer_withdrawn:
+after test28 withdrew with path a down on every survivor, all seven survivors
+waited 66-77 s on the shared directory's inode lock, whose mastership had moved
+to a live survivor during the recovery; every request ran out its 60-retry
+acquire ladder (rc=-110) and all of them resumed together, with no error
+returned and no full-ledger-page line on any node.  Also opened from the
+0.90.131 candidate's boards: D-NETMESH-MPATH-CRASH-AUDIT-PEER-UMOUNT-BUSY-ON-0.90.131-CANDIDATE
+and D-16NETMESH-MPATH-PATH-FABRIC-LOAD-STALL-30181MS-OVER-30S-BOUND.
+D-TCP-4NODE-NOQUEUE-TRY-WAITS-9S-ON-FULL-LEDGER-PAGE-CREATES-STALL stays open:
+its stall reproduced on every 4-, 8- and 16-node net/mesh board of the
+0.90.131 candidate and on no board of the 0.90.132 build, and neither change
+made since (`dl_capacity_reclaim=0`, `dl_capacity_nq_wouldblock=0`, each a
+whole 4/net/mesh/direct board on the release build) brings it back, so what
+ended it is not yet known.  It is verified on the release build at
+4/net/mesh/direct, 8/net/mesh/direct, 16/net/mesh/direct and 4/net/mesh/mpath.
+
+**Release tooling.**  `tools/criteria.py` grades a board row only on the runs
+recorded on the build being graded: a failure on that build fails the row,
+whichever run it was, and a failure on another build no longer does.
+`tools/release_status.py` shows a configuration the release leaves out as
+"Not in <version>" with the records that hold it out, instead of Not ready.
+`scripts/release.sh --publish` titles the GitHub release with the banner of
+the version's CHANGELOG.md heading.
+
+## 2026-10-20 — 0.90.131 — WITHDRAWN 2026-10-21 (see 0.90.132) — Safer Inode Reuse, Stronger Recovery, Proxmox VE 9.2 Support
 
 What changed for someone upgrading from 0.90.130:
 
@@ -95,7 +315,14 @@ Its cold audit was CLEAN, and across its 264 kernel logs no directory was
 written without exclusive authority (P58-DIRPIN-NONEX 0, P146V-UNLANDED 0),
 while 385 such re-logs were refused, 376 of them from a shared holder.  No
 BUG, oops, hung task or corruption line appeared.  The 4/disk/caw/mpath board
-of the same wave passed all 40 rows.  The board cells were all on 8DAEC6B8:
+of the same wave passed all 40 rows.  On the build 0.90.131 shipped,
+292B547486AE6E75317F308, the 8/disk/caw/mpath board was run again with every
+row's kernel logs kept (run 20261020T222123Z-g8b) and passed all 40 rows, its
+cold audit CLEAN.  Across its 264 kernel logs no directory was written
+without exclusive authority (P58-DIRPIN-NONEX 0, P146V-UNLANDED 0), 347
+re-logs were refused, and no BUG, oops, hung task or corruption line
+appeared; the one filesystem shutdown is the one `path_peer_withdrawn` asks
+of test28 by design.  The board cells were all on 8DAEC6B8:
 8/disk/caw/mpath path_flap FAIL 2026-10-19T14:58:16Z (test28's rmdir of the
 re-logged `LOCK` directory failed ENOTEMPTY), chk_clean FAIL
 2026-10-19T15:20:43Z (CORRUPT), and dlm_lock_correctness FAIL
@@ -125,7 +352,19 @@ with kernel logs kept all passed (runs 20261020T000553Z to 004946Z).  Full
 pages were reached and waited out, with no error and no shutdown.  In the
 release chain, 2/net/mesh/direct passed all 31 rows, and 2/net/mesh/mpath
 passed path_fenced_return (2026-10-20T10:36:20Z) with no page-full error in
-any of its kernel logs.  At 4, 8 and 16 nodes the wait can last without end
+any of its kernel logs.  On the build 0.90.131 shipped,
+292B547486AE6E75317F308, 12 more path_fenced_return laps on 2/net/mesh/mpath
+kept both nodes' kernel logs (`tests/queues/fence_return_kept_logs_netmesh_mpath.queue`,
+runs 20261020T222308Z to 20261020T234522Z on g2e) and passed path_fenced_return
+in all 12.  Every lap reached full ledger pages (P-TAUTH-PAGE-FULL 1 to 35 a
+lap) and waited them out: the surviving node logged no `rc=-122`, no
+unrecoverable lock and no shutdown in any lap, and every unrecoverable lock
+on the fenced node was its own fence (`rc=-108`).  chk_clean passed in 11 of
+the 12; lap 7's found a different defect, an unlinked-bucket entry left on a
+free inode by the rejoined node's orphan scan
+(D-ORPHAN-SCAN-ADOPTS-FREED-NUMBER-LEAVES-UNLINKED-BUCKET-ON-FREE-CORE,
+fixed in 0.90.132).
+At 4, 8 and 16 nodes the wait can last without end
 (D-TCP-4NODE-NOQUEUE-TRY-WAITS-9S-ON-FULL-LEDGER-PAGE-CREATES-STALL, open),
 which is why 0.90.131 does not claim those configurations.
 

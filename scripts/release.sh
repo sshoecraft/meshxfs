@@ -166,6 +166,10 @@ if [ -z "$notes" ]; then
     fi
 fi
 
+# The title carries the version's banner, the third field of its CHANGELOG.md
+# heading ("## <date> — <version> — <banner>"), which GPT writes from that section.
+banner=$(awk -v v="$VERSION" '/^## / && index($0, "— " v " —") { sub(/^## [^—]*— [^—]*— /, ""); print; exit }' "$SRCDIR/CHANGELOG.md")
+[ -n "$banner" ] || { echo "ERROR: CHANGELOG.md's heading for $VERSION has no banner" >&2; exit 1; }
 gh release create "v$VERSION" -R "$REPO" --target "$target" \
-    --title "MeshXFS $VERSION" --notes-file "$notes" \
+    --title "MeshXFS $VERSION — $banner" --notes-file "$notes" \
     "$OUT"/*.deb "$OUT"/*.rpm "$OUT/SHA256SUMS"

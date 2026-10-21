@@ -12,7 +12,13 @@
           "what": "tests/drbd_release_verify.sh",
           "glob": "tests/evidence/drbd_release_verify_{version}.out",
           "pass": "^DRBD_RELEASE_VERIFY PASS ",
-          "build": "srcversion=([0-9A-F]{23})"
+          "build": "srcversion=([0-9A-F]{23})",
+          "live": {
+            "comm": "drbd_release_ve",
+            "glob": "tests/evidence/drbd_release_verify_*.out",
+            "select": "drbd_release_verify version={version} ",
+            "terminal": "^DRBD_RELEASE_VERIFY "
+          }
         }
       ],
       "platform": "ubuntu2404"
@@ -137,7 +143,13 @@
           "pass": "^SUITE: PASS ",
           "host_build": "^192\\.\\S+ (?:[0-9.]+ )?([0-9A-F]{23}) ",
           "kernel": "6.17.2-1-pve",
-          "terminal": "^SUITE: "
+          "terminal": "^SUITE: ",
+          "live": {
+            "comm": "pve_suite_on_ke",
+            "glob": "tests/evidence/pve_suite_on_kernel_*.log",
+            "select": "=== pve_suite_on_kernel kernel={kernel} label=\\S+ tree={version} ===",
+            "terminal": "SUITE_RC=|FAIL:|TREE_RC=[1-9]|JOIN_RC=[1-9]"
+          }
         }
       ],
       "platform": "pve9"
@@ -158,7 +170,13 @@
           "pass": "^SUITE: PASS ",
           "host_build": "^192\\.\\S+ (?:[0-9.]+ )?([0-9A-F]{23}) ",
           "kernel": "7.0.14-24-pve",
-          "terminal": "^SUITE: "
+          "terminal": "^SUITE: ",
+          "live": {
+            "comm": "pve_suite_on_ke",
+            "glob": "tests/evidence/pve_suite_on_kernel_*.log",
+            "select": "=== pve_suite_on_kernel kernel={kernel} label=\\S+ tree={version} ===",
+            "terminal": "SUITE_RC=|FAIL:|TREE_RC=[1-9]|JOIN_RC=[1-9]"
+          }
         }
       ],
       "platform": "pve9"

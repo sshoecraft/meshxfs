@@ -192,6 +192,15 @@ else
             # /proc/mounts, not mountpoint(1): a fenced node's withdrawn mount
             # answers stat() with EIO, so mountpoint calls it unmounted
             grep -q \" $MNT mxfs \" /proc/mounts && timeout 30 umount $MNT
+            # what holds a mount the umount left in place: every task with an
+            # fd or cwd under it, with its state and where it sleeps
+            if grep -q \" $MNT mxfs \" /proc/mounts; then
+                for p in /proc/[0-9]*; do
+                    h=\$( { readlink \$p/cwd; ls -l \$p/fd 2>/dev/null | sed 's/.*-> //'; } 2>/dev/null | grep -m1 \"^$MNT\")
+                    [ -n \"\$h\" ] && echo \"HOLDER pid=\${p#/proc/} comm=\$(cat \$p/comm) state=\$(cut -d' ' -f3 \$p/stat) ppid=\$(cut -d' ' -f4 \$p/stat) wchan=\$(cat \$p/wchan) holds=\$h stack=\$(tr '\n' ' ' < \$p/stack 2>/dev/null | cut -c1-300)\"
+                done
+                echo still_mounted_after_umount
+            fi
             iscsiadm -m session 2>/dev/null | grep -qF $TGT || iscsiadm -m node -T $TGT -p $PORTAL --login >/dev/null 2>&1 || { iscsiadm -m discovery -t st -p $PORTAL >/dev/null && iscsiadm -m node -T $TGT -p $PORTAL --login >/dev/null; }
             for i in 1 2 3 4 5 6 7 8 9 10; do [ -b $LUN ] && break; sleep 1; done
             [ -b $LUN ] && echo lun_ok
@@ -200,6 +209,8 @@ else
             cat /sys/module/mxfs/version /sys/module/mxfs/srcversion; uname -r
         " | tee "$EV/prep_$h.txt"
         grep -q lun_ok "$EV/prep_$h.txt" || fail "$h: the shared LUN is not present"
+        # the LUN is formatted next: never under a node that still mounts it
+        grep -q still_mounted_after_umount "$EV/prep_$h.txt" && fail "$h still has $MNT mounted after its umount; HOLDER lines in prep_$h.txt"
     done
     on $S 120 "mkfs.mxfs -f $LUN 2>&1 | tail -2; echo mkfs_rc=\${PIPESTATUS[0]}" | tee "$EV/format.txt"
     grep -q 'mkfs_rc=0' "$EV/format.txt" || fail "mkfs.mxfs"
@@ -220,7 +231,11 @@ done
 on $V 60 "mkdir -p $MNT/freeze && for i in \$(seq 1 20); do dd if=/dev/urandom of=$MNT/freeze/v\$i bs=64k count=4 conv=fsync status=none; done; echo victim_writes_ok" | tee "$EV/victim_writes.txt"
 on $S 60 "for i in \$(seq 1 20); do dd if=/dev/urandom of=$MNT/freeze/s\$i bs=64k count=4 conv=fsync status=none; done; ls $MNT/freeze | wc -l" | tee "$EV/survivor_writes.txt"
 # the victim keeps a write in flight when it freezes: an open EX it never releases
-on $V 10 "nohup setsid bash -c 'while :; do dd if=/dev/urandom of=$MNT/freeze/busy bs=64k count=16 conv=fsync status=none; done' >/dev/null 2>&1 < /dev/null & echo \$! > /root/freeze_busy.pid; echo busy_started"
+# The loop records its own pid: it leads its own process group (setsid), and
+# the kill at the end takes the group, the dd it is running included.  $! here
+# is nohup's pid, which is the loop's only when setsid did not fork.
+on $V 10 "rm -f /root/freeze_busy.pid; nohup setsid bash -c 'echo \$\$ > /root/freeze_busy.pid; while :; do dd if=/dev/urandom of=$MNT/freeze/busy bs=64k count=16 conv=fsync status=none; done' >/dev/null 2>&1 < /dev/null & for i in 1 2 3 4 5; do [ -s /root/freeze_busy.pid ] && break; sleep 1; done; [ -s /root/freeze_busy.pid ] && echo busy_started" | tee "$EV/busy_started.txt"
+grep -q busy_started "$EV/busy_started.txt" || fail "the busy writer on $V did not record its pid"
 
 # --- 3. survivor instruments
 BG=""
@@ -301,8 +316,23 @@ if [ "${REMOUNT_ON_RESUME:-0}" = 1 ]; then
     [ "$(echo $BUSY_BEFORE)" = "$(echo $BUSY_AFTER)" ] && say "REMOUNT-CHECK busy file UNCHANGED" || say "REMOUNT-CHECK busy file CHANGED — an old write may have landed"
 fi
 sleep 20
-# the busy writer outlives the fence and would hold the victim's mount busy
-on $V 20 "kill \$(cat /root/freeze_busy.pid) 2>/dev/null; rm -f /root/freeze_busy.pid" >/dev/null
+# The busy writer outlives the fence and would hold the victim's mount busy:
+# its whole process group goes, then the mount must have no holder.  The next
+# step of tests/full_verify.sh unmounts it a second after this lap returns,
+# and a mount still held there failed that step's prep (pve92 for 0.90.131,
+# ubuntu2404 and rhel9 for 0.90.132).  A task still holding the fenced mount
+# 30 s after its writer was killed is listed and fails the lap: a task stuck
+# on a fenced mount is a finding, not the next step's problem.
+on $V 45 "p=\$(cat /root/freeze_busy.pid 2>/dev/null); [ -n \"\$p\" ] && kill -- -\$p 2>/dev/null; rm -f /root/freeze_busy.pid
+    for i in \$(seq 1 30); do
+        hl=\$(for q in /proc/[0-9]*; do x=\$( { readlink \$q/cwd; ls -l \$q/fd 2>/dev/null | sed 's/.*-> //'; } 2>/dev/null | grep -m1 '^$MNT'); [ -n \"\$x\" ] && echo \"HOLDER pid=\${q#/proc/} comm=\$(cat \$q/comm) state=\$(cut -d' ' -f3 \$q/stat) wchan=\$(cat \$q/wchan) holds=\$x stack=\$(tr '\n' ' ' < \$q/stack 2>/dev/null | cut -c1-400)\"; done)
+        [ -z \"\$hl\" ] && { echo holders_clear_after_s=\$i; break; }
+        sleep 1
+    done
+    [ -n \"\$hl\" ] && echo \"\$hl\"; true" | tee "$EV/victim_holders.txt"
+holders_ok=1
+grep -q '^holders_clear_after_s=' "$EV/victim_holders.txt" || holders_ok=0
+[ "$holders_ok" = 1 ] || say "the victim's mount is still held 30 s after its writer was killed (victim_holders.txt)"
 # Each background instrument is a subshell running timeout | grep; killing the
 # subshell alone left timeout -> sshpass -> ssh running to their own timeout,
 # ~95 s into whatever test ran next (a PR-IN on the LUN every 2 s among them).
@@ -338,6 +368,7 @@ v=PASS
 [ -n "$death_at" ] && [ "$death_at" -le "$DEATH_BUDGET_S" ] || v=FAIL
 [ -n "$write_at" ] && [ "$write_at" -le "$WRITE_BUDGET_S" ] || v=FAIL
 [ "$others_ok" = 1 ] || v=FAIL
-say "VERDICT $v ($TRANSPORT, $NN members): death declared at +${death_at:-never}s (budget ${DEATH_BUDGET_S}s), survivor wrote at +${write_at:-never}s (budget ${WRITE_BUDGET_S}s), other survivors writing: $([ $others_ok = 1 ] && echo yes || echo no)"
+[ "$holders_ok" = 1 ] || v=FAIL
+say "VERDICT $v ($TRANSPORT, $NN members): death declared at +${death_at:-never}s (budget ${DEATH_BUDGET_S}s), survivor wrote at +${write_at:-never}s (budget ${WRITE_BUDGET_S}s), other survivors writing: $([ $others_ok = 1 ] && echo yes || echo no), victim's mount free: $([ $holders_ok = 1 ] && echo yes || echo no)"
 say "done: $EV"
 [ "$v" = PASS ]

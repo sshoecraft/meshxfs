@@ -1,0 +1,38 @@
+# D-GH2-DRBD-REJOIN-WAITS-FOREVER-FOR-PEER-SECONDARY-UNDER-PACEMAKER: the
+# boot program after a pair outage with participant 1 promoted by something
+# other than MeshXFS (scripts/drbd_rig.sh promoter-test), on the DRBD pair g2
+# (test1/test2), each promoter with this tree's program (fix) and with the
+# program as it was before the fix (control, PROMOTER_CONTROL).
+#
+# READING RULES (written before the first lap):
+#   control  reach: participant 0 never mounts across the 420 s window, its boot
+#            program reports at least one refused attempt, the module reports
+#            "the peer is 'Primary'", and nothing names the promoter.  A control
+#            lap where participant 1 was not Primary under the promoter, or that
+#            mounted, dies with that reason: it reached nothing.
+#   fix      pacemaker/become: the boot program stops "refused" within 30 s with
+#            a line naming Pacemaker's resource p_drbd / become-primary-on;
+#            manual: after the first refused mount (<= 240 s) a line saying
+#            something other than MeshXFS promoted the peer.  A fix lap that
+#            mounts while the peer is Primary, or never names it: REFUTED.
+#   both     with the promoter removed and participant 1 demoted, both nodes
+#            mount within 480 s, every fsynced file reads back on both, and a
+#            cold chk_mxfs is clean.  No BUG, oops or hung task (the step dies
+#            on a mount that never comes; the dmesg streams are kept).
+#
+# BOUNDS, each from the steps the lap runs (scripts/drbd_rig.sh budgets):
+#   up        power-on ~60 s, LUN binds ~30 s, DRBD up and connect ~30 s, the
+#             initial sync's SYNC_BUDGET 240 s: 360, plus margin -> 480
+#   common    step_mxfs (mkfs and two mounts) ~90, files 10, destroy and boot
+#             ~60, prep <= 150, participant 1 Primary <= 150, the removal's
+#             recovery <= 480 (SELF_OUTAGE_BUDGET), read-back 60, chk 120,
+#             fence reinstall 30: 1150
+#   pacemaker + PCMK_APT_BUDGET 240 and the cluster's setup ~60: 1450
+#   window    fix 30 (become/pacemaker) or 240 (manual); control 420
+480 DRBD_RIG_NO_BASELINE=1 scripts/drbd_rig.sh up
+1480 scripts/drbd_rig.sh promoter-test pacemaker
+1870 PROMOTER_CONTROL=tests/evidence/drbd_rig/control_mxfs_drbd_fence_self_pre_promoter_fix.py scripts/drbd_rig.sh promoter-test pacemaker
+1180 scripts/drbd_rig.sh promoter-test become
+1570 PROMOTER_CONTROL=tests/evidence/drbd_rig/control_mxfs_drbd_fence_self_pre_promoter_fix.py scripts/drbd_rig.sh promoter-test become
+1390 scripts/drbd_rig.sh promoter-test manual
+1570 PROMOTER_CONTROL=tests/evidence/drbd_rig/control_mxfs_drbd_fence_self_pre_promoter_fix.py scripts/drbd_rig.sh promoter-test manual

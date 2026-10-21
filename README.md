@@ -22,33 +22,6 @@ On a system, MeshXFS goes by its short name `mxfs`: the `mxfs.ko` module,
 `resize_mxfs` and `mxfs_admin`, and the `mxfs` and `pve-storage-mxfs`
 packages.
 
-> ## ⚠️ 0.90.131 is withdrawn. Do not install it.
->
-> Checks we ran on the exact 0.90.131 build after publishing it found an on-disk
-> metadata error. When one node mounts while another node frees a file both
-> nodes had open, the mounting node can put the already-freed inode on its
-> unlinked-inode list. `chk_mxfs` reports it as `unlinked bucket N: member …
-> has a FREE core`. We reproduced it on every configuration we tested, and saw
-> it once in 12 fence-and-rejoin runs without any test aid. No damage to the
-> data of live files was observed.
->
-> The cause is a change made in 0.90.131: with that change switched back to
-> 0.90.130's behaviour, the same test left no error. We published 0.90.131
-> before its last verification runs had finished, and those runs found it. That
-> was a failure of our release process. From now on nothing is published until
-> every check on the exact build being released has finished.
->
-> The 0.90.131 packages have been removed from this page. The fix is in
-> 0.90.132, which will be published only after its full verification passes.
->
-> **If you installed 0.90.131:** stop new workloads, unmount the filesystem on
-> every node, and run `chk_mxfs -v <device>`. If it reports an error, do not
-> mount the filesystem read-write again: keep the output and the kernel logs
-> and open an issue. Install 0.90.132 when it is published.
->
-> **If you run 0.90.130:** stay on it until 0.90.132 is published, and read the
-> known issues on its release page.
-
 > **A shared-LUN clustered filesystem written entirely by AI.**
 >
 > Every line of the clustering, coordination, distributed-lock, fencing, and
@@ -61,31 +34,48 @@ packages.
 > Everything that turns XFS into a filesystem many machines can mount at once
 > is AI-authored.
 
-> ## 0.90.131 (withdrawn): Safer Inode Reuse, Stronger Recovery, Proxmox VE 9.2 Support
+> ## 0.90.132: Cross-Node Inode Coherence and Recovery
 >
 > What changed for someone upgrading from 0.90.130:
 >
 > - **Every node works on the current copy of a file or directory after
->   another node frees and reuses its inode number** (0.90.131).  A stale
->   in-memory copy is no longer written over a peer's change, applied to an
->   unrelated file that took the number, or freed while a live name still
->   points at it; a path lookup through a directory another node removed and
->   recreated finds the new directory.
-> - **Fewer ways for a node to stop** (0.90.131).  Heavy create and delete
->   traffic across nodes no longer shuts a node's filesystem down on the paths
->   found; a fenced node shuts down without hanging on its log; unmount no
->   longer races a deferred directory cleanup.
-> - **Recovery after a node is fenced, on the network lock manager**
->   (0.90.131).  A node that is fenced and comes back no longer finds a file
->   locked against it: lock traffic from its fenced identity is ignored, and
->   the surviving node's release of its own lock always retires the record
->   the ledger holds for it.  A node never proceeds on a lock it was not
->   granted, and a peer that left cleanly is no longer declared dead 40 s
->   later.
+>   another node frees and reuses its inode number.**  A stale in-memory copy
+>   is no longer written over a peer's change, applied to an unrelated file
+>   that took the number, or freed while a live name still points at it; a
+>   path lookup through a directory another node removed and recreated finds
+>   the new directory.
+> - **A file created in a directory that many nodes write keeps its name.**
+>   While one task of a node is acquiring a directory's lock, the node's other
+>   tasks wait for it, so a create never runs on a lock the node has already
+>   handed to another node, whose write of the same directory block could drop
+>   the new name.
+> - **The cleanup a node runs after it mounts only acts on what the disk
+>   holds.**  It no longer puts an inode that another node has just freed onto
+>   its list of deleted-but-open files.
+> - **Fewer ways for a node to stop.**  Heavy create and delete traffic across
+>   nodes no longer shuts a node's filesystem down on the paths found; a
+>   fenced node shuts down without hanging on its log; unmount no longer races
+>   a deferred directory cleanup.  A mount that fails, or that waits a long
+>   time on its peers, no longer crashes or hangs the node.
+> - **Recovery after a node is fenced, on the network lock manager.**  A node
+>   that is fenced and comes back no longer finds a file locked against it:
+>   lock traffic from its fenced identity is ignored, and the surviving node's
+>   release of its own lock always retires the record the ledger holds for it.
+>   A node never proceeds on a lock it was not granted, and a peer that left
+>   cleanly is no longer declared dead 40 s later.
+> - **Proxmox VE 9.2.**  Verified on Proxmox VE 9.2 with its updates
+>   (pve-manager 9.2.21, kernel 7.0).  MXFS stays in Datacenter → Storage → Add
+>   through pve-manager upgrades, and the storage plugin no longer prints an
+>   "older storage API" notice.
+> - **On DRBD, a mount that cannot happen says why.**  When Pacemaker or DRBD's
+>   `become-primary-on` also promotes the resource, `mxfs-drbd@` refuses to
+>   start and its journal names what else manages it, instead of retrying the
+>   mount without end.  A node whose peer was made Primary by hand says so after
+>   its first refused mount, with the command that lets it go ahead.
 >
-> **Released configurations and what 0.90.131 was validated on:**
+> **Released configurations and what 0.90.132 was validated on:**
 >
-> | configuration | nodes | storage | validated on 0.90.131 |
+> | configuration | nodes | storage | validated on 0.90.132 |
 > |---|---|---|---|
 > | `2/disk/caw/direct` | 2 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig; installed packages |
 > | `4/disk/caw/direct` | 4 | one shared iSCSI LUN, on-disk locks | the 31-row suite on the test rig |
@@ -96,24 +86,42 @@ packages.
 > | `8/disk/caw/mpath` | 8 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig |
 > | `16/disk/caw/mpath` | 16 | one shared iSCSI LUN over two paths, on-disk locks | the 31-row suite plus nine path-fault rows on the test rig; three Proxmox VE 9 hosts on two paths (path faults, live migration, datastore operations, HA power loss), kernels 6.17 and 7.0 |
 > | `2/net/mesh/direct` | 2 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig; installed packages |
+> | `4/net/mesh/direct` | 4 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig |
+> | `8/net/mesh/direct` | 8 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig |
+> | `16/net/mesh/direct` | 16 | one shared iSCSI LUN, network lock manager | the 31-row suite on the test rig |
 > | `2/net/mesh/mpath` | 2 | one shared iSCSI LUN over two paths, network lock manager | the 31-row suite plus eight path-fault rows on the test rig |
+> | `4/net/mesh/mpath` | 4 | one shared iSCSI LUN over two paths, network lock manager | the 31-row suite plus eight path-fault rows on the test rig |
 > | `2/net/mesh/drbd` | 2 | a DRBD dual-primary replica of two local disks, network lock manager | the DRBD failure tests on its own two-node rig |
 >
-> The other `net/mesh` configurations, last verified on 0.90.130, are listed
-> under "Released in an earlier version" below.
+> **Not in 0.90.132: `8/net/mesh/mpath` and `16/net/mesh/mpath`.**  On the
+> 0.90.132 build, with the network lock manager on multipath at 8 nodes, a node
+> leaving the cluster stopped every other node's file operations for 66 to 77
+> seconds, all of them waiting on one shared directory's lock, before they
+> carried on.  No operation failed and no data was lost, but a pause that long
+> is a defect, and it is not fixed yet.  16 nodes on multipath is left out with
+> it until the fix is verified there.  Until then, run the on-disk locks
+> (`force_transport=0` on every node, on storage that passes `caw_verify`) at 8
+> and 16 nodes on multipath.
 >
 > The test rig is Ubuntu 24.04 (kernel 6.8.0-101-generic).  "Installed
-> packages" means the release packages on two nodes of each supported
-> platform: Proxmox VE 9.1 (kernels 6.17 and 7.0), Proxmox VE 9.2 (kernel 7.0), RHEL 9.8, Ubuntu 24.04,
-> Ubuntu 26.04, Debian 12 and Debian 13.  Every host in a cluster needs the
-> same MeshXFS version; hosts on different kernels are fine.
+> packages" means the release packages on two nodes of each supported platform:
+> Proxmox VE 9.1 (kernels 6.17 and 7.0), Proxmox VE 9.2 (kernel 7.0), RHEL 9.8,
+> Ubuntu 24.04, Ubuntu 26.04, Debian 12 and Debian 13.  Every host in a cluster needs the same MeshXFS
+> version; hosts on different kernels are fine.
+>
+> **0.90.131 was withdrawn.**  Checks on the 0.90.131 build that finished after
+> it was published found that the cleanup above could leave an unlinked-inode
+> list entry pointing at an inode another node had just freed, which
+> `chk_mxfs` reports as `unlinked bucket N: member … has a FREE core`.  The
+> cause was a 0.90.131 change; 0.90.130 does not have it.  0.90.131 should not
+> have been published before those checks finished, and no release is
+> published now until every check on its exact build has.  0.90.132 is
+> 0.90.131 with the fix, verified as a release in its own right.
 >
 > ### Upgrading from 0.90.130
 >
-> 0.90.131 was withdrawn (see the notice at the top). Stay on 0.90.130 until
-> 0.90.132 is published; 0.90.132 carries these fixes for issues found in
-> 0.90.130, each verified on the 0.90.131 build in the configuration where it
-> was found:
+> Upgrade every node to 0.90.132. It fixes these issues found in 0.90.130,
+> each verified on the 0.90.132 build in the configuration where it was found:
 >
 > - **Network lock manager (`net/mesh`):** a node could shut its filesystem
 >   down after a peer was fenced and rejoined, or when its peer stopped
@@ -124,11 +132,12 @@ packages.
 >   on its peers, could crash or hang the node.
 > - **Proxmox VE:** MXFS left Datacenter → Storage → Add after a pve-manager
 >   upgrade. On 0.90.130, `apt install --reinstall pve-storage-mxfs` brings it
->   back; 0.90.131 keeps it there by itself.
+>   back; 0.90.132 keeps it there by itself.
 >
-> At 4, 8 and 16 nodes, run the on-disk locks (`force_transport=0` on every
-> node, on storage that passes `caw_verify`): 0.90.131 claims the network lock
-> manager at two nodes. The details are in [`CHANGELOG.md`](CHANGELOG.md).
+> At 8 and 16 nodes on multipath, run the on-disk locks (see "Not in 0.90.132"
+> above): 0.90.132 claims the network lock manager on a single path at 2, 4, 8
+> and 16 nodes and on multipath at 2 and 4. The details are in
+> [`CHANGELOG.md`](CHANGELOG.md).
 > Please report anything unexpected at
 > <https://github.com/sshoecraft/meshxfs/issues> with every node's `dmesg`
 > and the `chk_mxfs` output.
@@ -136,7 +145,7 @@ packages.
 > Earlier releases are described in [`CHANGELOG.md`](CHANGELOG.md) and on the
 > [Releases page](https://github.com/sshoecraft/meshxfs/releases).
 
-> ## Released: eleven configurations, on the `direct`, `mpath` and `drbd` attachments
+> ## Released: fifteen configurations, on the `direct`, `mpath` and `drbd` attachments
 >
 > A configuration is four fields, `<nodes>/<class>/<method>/<attach>`, for
 > example `8/net/mesh/direct`. Each field is explained in the tables below and in
@@ -155,10 +164,14 @@ packages.
 > | `8/disk/caw/mpath` | 0.90.51, again in 0.90.124 | Ubuntu 24.04 |
 > | `16/disk/caw/mpath` | 0.90.51, again in 0.90.124 | Ubuntu 24.04; Proxmox VE 9 (kernels 6.17 and 7.0, three hosts) |
 > | `2/net/mesh/direct` | 0.89.77 | Ubuntu 24.04 from 0.89.77, Proxmox VE 9 from 0.89.78, RHEL 9.8 from 0.89.84, Debian 13 from 0.90.0, Ubuntu 26.04 and Debian 12 from 0.90.130 |
+> | `4/net/mesh/direct` | 0.90.24, again in 0.90.132 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Ubuntu 26.04, Debian 12, Debian 13 |
+> | `8/net/mesh/direct` | 0.90.51, again in 0.90.132 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Ubuntu 26.04, Debian 12, Debian 13 |
+> | `16/net/mesh/direct` | 0.90.51, again in 0.90.132 | Proxmox VE 9, RHEL 9.8, Ubuntu 24.04, Ubuntu 26.04, Debian 12, Debian 13 |
 > | `2/net/mesh/mpath` | 0.90.51, again in 0.90.130 | Ubuntu 24.04 |
+> | `4/net/mesh/mpath` | 0.90.51, again in 0.90.132 | Ubuntu 24.04 |
 > | `2/net/mesh/drbd` | 0.90.41, again in 0.90.107 | Ubuntu 24.04 |
 >
-> All eleven were verified on the current release, 0.90.131: each `direct`
+> All fifteen were verified on the current release, 0.90.132: each `direct`
 > configuration's suite on the test rig at its node count, and the installed
 > packages on two nodes of each released platform; each `mpath`
 > configuration's suite and path-fault rows on the test rig at its node
@@ -170,16 +183,13 @@ packages.
 >
 > | configuration | last verified in |
 > |---|---|
-> | `4/net/mesh/direct` | 0.90.130 |
-> | `8/net/mesh/direct` | 0.90.130 |
-> | `16/net/mesh/direct` | 0.90.130 |
-> | `4/net/mesh/mpath` | 0.90.130 |
 > | `8/net/mesh/mpath` | 0.90.130 |
 > | `16/net/mesh/mpath` | 0.90.130 |
 >
-> 0.90.131 claims the `disk/caw` configurations above and the two-node
-> `net/mesh` ones, `2/net/mesh/direct`, `2/net/mesh/mpath` and
-> `2/net/mesh/drbd`. Each configuration here was verified on the version it
+> 0.90.132 claims every configuration in the Released table above, and not
+> these two: on its build, a node leaving an 8-node multipath cluster on the
+> network lock manager stopped the other nodes for 66 to 77 seconds (see "Not
+> in 0.90.132" at the top of this page). Each configuration here was verified on the version it
 > names, and the first release that verifies it again under the release bar
 > (`tools/defects.py <configuration> --release`) claims it again. The
 > `net/mesh/mpath` configurations were verified on the test rig, which runs
@@ -231,7 +241,7 @@ packages.
 > | attach | implemented | released | the node's path to the LUN |
 > |---|---|---|---|
 > | `direct` | yes | yes | its own initiator, one path: bare metal, or an in-guest iSCSI login |
-> | `mpath` | yes | at 2, 4, 8 and 16 nodes: `disk/caw` released in 0.90.51, not claimed from 0.90.107, released again in 0.90.124; `net/mesh` released in 0.90.51, not claimed from 0.90.107, released again in 0.90.130, verified at 2 nodes in 0.90.131 and at 4, 8 and 16 last in 0.90.130 | its own initiator over two or more paths, assembled by dm-multipath |
+> | `mpath` | yes | at 2, 4, 8 and 16 nodes: `disk/caw` released in 0.90.51, not claimed from 0.90.107, released again in 0.90.124; `net/mesh` released in 0.90.51, not claimed from 0.90.107, released again in 0.90.130, verified at 2 and 4 nodes in 0.90.132 and at 8 and 16 last in 0.90.130 | its own initiator over two or more paths, assembled by dm-multipath |
 > | `pass` | yes | no | the hypervisor's initiator: the LUN is passed into the VM (QEMU SCSI passthrough). A VMware RDM mounts as `shared` instead: ESXi drops a VM's reservation key when the VM is powered off |
 > | `drbd` | yes | at 2 nodes (released in 0.90.41, withdrawn on 2026-10-06, released again in 0.90.107) | a DRBD dual-primary replica of two local disks: no shared storage at all |
 > | `shared` | yes | no | a disk two VMs share through the hypervisor with no reservation fence MeshXFS can use (a vSphere multi-writer VMDK or physical-mode RDM): two nodes, `net/mesh`, a dead node fenced by vCenter powering its VM off or by an operator's confirmation ([`docs/shared-disk-attachment.md`](docs/shared-disk-attachment.md)) |
@@ -264,7 +274,7 @@ packages.
 > `mpath` each node reached it through a dm-multipath map over two paths to
 > the same target (Ubuntu 24.04, multipath-tools 0.9.4, the settings of
 > `tools/mpath_settings.sh`), with paths taken away under load as
-> `docs/mpath-verification.md` describes; 0.90.131 claims it for `disk/caw`
+> `docs/mpath-verification.md` describes; 0.90.132 claims it for `disk/caw`
 > at 2, 4, 8 and 16 nodes and for `net/mesh` at 2 nodes. `pass` is not
 > verified with either method: it carries the fencing reservations and, for
 > `disk/caw`, the COMPARE AND WRITE lock commands through a layer no release
@@ -273,7 +283,7 @@ packages.
 >
 > **Without shared storage: `drbd`.** Two nodes, each with a local disk,
 > replicated by DRBD dual-primary and fenced without SCSI reservations
-> (`2/net/mesh/drbd`, `docs/attachment-methods.md`), verified on 0.90.131
+> (`2/net/mesh/drbd`, `docs/attachment-methods.md`), verified on 0.90.132
 > with DRBD 8.4.11 on Ubuntu 24.04.  It is installed
 > from the release package on both hosts
 > ([`docs/drbd-setup.md`](docs/drbd-setup.md)).
@@ -323,7 +333,7 @@ packages.
 > `/etc/modprobe.d/mxfs.conf` sets `options mxfs force_transport=1`
 > (`net/mesh`) and `options mxfs target_cache_protected=1` (the storage
 > declaration above); without the second a clustered mount is refused. A new cluster forms on `net/mesh` by default; `disk/caw` has to be
-> asked for with `force_transport=0` (see "Choosing the transport"). 0.90.131
+> asked for with `force_transport=0` (see "Choosing the transport"). 0.90.132
 > claims `net/mesh` at two nodes; at 4, 8 and 16 nodes the configurations it
 > claims run `disk/caw`: set `force_transport=0` on every node, on storage that
 > passes `caw_verify`. To see what still blocks each configuration:

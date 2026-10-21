@@ -27,6 +27,11 @@
 #   reboot     participant 1 is rebooted cleanly (systemctl reboot): its unit
 #              unmounts and steps down, the survivor's load carries on without
 #              a fence, and the host mounts again after its boot.
+#   p0-poweroff
+#              participant 0 is shut down cleanly (systemctl poweroff) and stays
+#              off for a minute: participant 1 must carry on without a fence or
+#              a restart, its load error-free, and participant 0 must mount
+#              again once it is powered on (GitHub issue #3's first step)
 #   survivor-restart
 #              participant 1 is powered off and stays off; participant 0
 #              excludes it and carries on, then is itself reset.  It must
@@ -704,6 +709,52 @@ step_reboot() {
     verify_sets reboot
 }
 
+# p0-poweroff: participant 0 is shut down on purpose and stays off, as
+# proxmox01 was in GitHub issue #3.  docs/drbd-setup.md says participant 1
+# carries on: participant 0's unit unmounts, steps down and takes DRBD down
+# before the network goes, DRBD disconnects gracefully and runs no handler.  A
+# participant 1 that treats it as a loss loses the tie-break, freezes and
+# restarts itself, and then waits for participant 0 without mounting, which is
+# what the issue's log shows.
+# From `systemctl poweroff` to the host off: the guests' stop, the unit's
+# unmount, step-down and `drbdadm down` (seconds on an idle pair, the unit's
+# own bound is 180 s), and the host's shutdown (~20 s): ~60 s, twice over.
+POWEROFF_BUDGET=120
+# How long participant 0 stays off while participant 1 is watched: a loss is
+# noticed within 2 x ping-int + ping-timeout (~7 s) and a lost tie-break
+# restarts the host RESTART_DELAY_S (10 s) after it; three times that.
+HOLD_OFF_S=60
+step_p0_poweroff() {
+    local b0 b1 t0 s out i st
+    write_sets p0-poweroff; start_loads p0-poweroff
+    sleep 10
+    b0=$(boot_id "$P0"); b1=$(boot_id "$P1")
+    say "p0-poweroff: shutting $P0 (participant 0) down cleanly under load on both; $P1 must carry on"
+    t0=$(date +%s)
+    vm_only "$P0" "power off"
+    on "$P0" "nohup setsid sh -c 'sleep 1; systemctl poweroff' >/dev/null 2>&1 < /dev/null & echo POWERING_OFF" 15 | grep -q POWERING_OFF || die "could not power $P0 off"
+    s=$(wait_down "$P0" "$POWEROFF_BUDGET") || die "$P0 still answers ${POWEROFF_BUDGET}s after systemctl poweroff"
+    say "  $P0 off $s s after the poweroff began"
+    for i in $(seq 1 $((HOLD_OFF_S / 5))); do
+        st=$(state "$P1")
+        [ "$(field "$st" boot)" = "$b1" ] || die "$P1 restarted after $P0's clean shutdown: ${st:-no answer}"
+        mounted_ok "$st" || die "$P1 is not mounted after $P0's clean shutdown: ${st:-no answer}"
+        sleep 5
+    done
+    out=$(on "$P1" "journalctl -k --no-pager -o cat --since @$t0 | grep -aoE 'P238-DRBD-FENCE-WITNESSED|P236-FENCE-CERTIFIED|P-RBLK-[A-Z-]+|P240-RBLK-[A-Z-]+|helper command: /sbin/drbdadm fence-peer' | sort | uniq -c | tr '\n' ' '" 30)
+    [ -z "$out" ] || die "a clean shutdown of $P0 was handled as a loss on $P1: $out"
+    say "  $P1 carried on for ${HOLD_OFF_S}s with $P0 off, no fence handler run, same boot: $st"
+    out=$(load_result "$P1")
+    [ "$(sed -n 's/.*err=\([0-9]*\).*/\1/p' <<<"$out")" = 0 ] || die "the survivor's load saw an error: ${out:-no result}"
+    say "  survivor $P1: $out"
+    power_on_host "$P0"
+    s=$(wait_rebooted "$P0" "$b0" "$BOOT_BUDGET") || die "$P0 did not answer within ${BOOT_BUDGET}s of its power-on"
+    s=$(wait_mounted "$P0" "$REJOIN_BUDGET") || die "$P0 did not mount again within ${REJOIN_BUDGET}s of answering"
+    say "  $P0 mounted again $s s after answering"
+    collect p0-poweroff "$t0"
+    verify_sets p0-poweroff
+}
+
 # The first half of both survivor steps: participant 1 is powered off under
 # load and stays off; participant 0 recovers it with its load error-free.
 p1_off_survivor_recovers() {  # <step>
@@ -1223,7 +1274,7 @@ STEPS=("$@")
 for s in "${STEPS[@]}"; do
     case "$s" in
         p1-crash|p0-crash|power-cut|reboot|promotion-race|withdraw-both|withdraw-p1|withdraw-p0|withdraw-held|withdraw-guests|answering-restart|alone-restart|slow-beat) ;;
-        survivor-restart|released-restart|stale-promotion)
+        survivor-restart|released-restart|stale-promotion|p0-poweroff)
             [ -n "${PVE_POWER_ON:-}" ] || { echo "$s keeps a host powered off: set PVE_POWER_ON to the command that powers one on"; exit 2; } ;;
         *) echo "unknown step: $s"; exit 2 ;;
     esac

@@ -1,0 +1,16 @@
+# D-GH2-DRBD-REJOIN-WAITS-FOREVER-FOR-PEER-SECONDARY-UNDER-PACEMAKER: the arms
+# of tests/queues/drbd_promoter_ab.queue still unmeasured after
+# drbd_promoter_ab_rerun.queue, with the same reading rules and bounds.
+#   pacemaker/fix: measured (drbdprom lap 2).  pacemaker/control: measured
+#     twice (drbdprom lap 3, drbdprom2 lap 2, the second with the program
+#     verified by sha256 after the outage); both died after the measurement in
+#     the harness's own teardown, whose SIGKILL bound did not cover the
+#     bootstrap scan's 62 s that checks no signal (now 140 s, derived).
+#   drbdprom2 lap 3's `up` then failed in drbdmeta on the pair that teardown
+#     left, and every later lap refused the resyncing pair, so `up` runs first.
+180 scripts/drbd_rig.sh down
+480 DRBD_RIG_NO_BASELINE=1 scripts/drbd_rig.sh up
+1180 scripts/drbd_rig.sh promoter-test become
+1570 PROMOTER_CONTROL=tests/evidence/drbd_rig/control_mxfs_drbd_fence_self_pre_promoter_fix.py scripts/drbd_rig.sh promoter-test become
+1390 scripts/drbd_rig.sh promoter-test manual
+1570 PROMOTER_CONTROL=tests/evidence/drbd_rig/control_mxfs_drbd_fence_self_pre_promoter_fix.py scripts/drbd_rig.sh promoter-test manual

@@ -1,0 +1,10 @@
+# D-CC-16NODE-SYNCED-CREATE-NAME-LOST-INODE-DISCONNECTED: an aborted release
+# must leave an inode ACQUIRING while this node's acquire is in flight.
+# Arms interleaved (control 0 / fix 1 of rel_abort_keeps_acquiring, one build),
+# bound 300 s per lap as tests/acq_trample_ab.sh's header derives it.
+300 tests/acq_trample_ab.sh c1 control
+300 tests/acq_trample_ab.sh f1 fix
+300 tests/acq_trample_ab.sh c2 control
+300 tests/acq_trample_ab.sh f2 fix
+300 tests/acq_trample_ab.sh f3 fix
+300 tests/acq_trample_ab.sh f4 fix

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""How many more runs each FLAKY cell of the board needs before it reads PASS.
+"""How many more runs each failed-earlier cell of the board needs before it reads PASS.
 
-A cell reads FLAKY while a genuine FAIL sits in its 11-run window
+A cell reads FAIL ("failed earlier: ...") while a genuine FAIL sits in its 11-run window
 (tools/criteria.py flake_count: a FAIL whose reason is not rig noise and that
 carries no detector-defect amendment).  With the newest such FAIL at window
 index k (0 = the live run), the cell needs 11-k further runs of that row, and
@@ -32,10 +32,7 @@ def main():
             if want and cfg not in want:
                 continue
             runs = ([cell] + list(cell.get("history") or []))[:criteria.FLAKE_WINDOW]
-            ks = [i for i, r in enumerate(runs)
-                  if str(r.get("status", "")).upper().strip() == "FAIL"
-                  and not criteria.RIG_NOISE.search(str(r.get("reason", "")))
-                  and not r.get("detector_defect")]
+            ks = [i for i, r in enumerate(runs) if criteria.genuine_fail(r)]
             if not ks:
                 continue
             k = ks[0]

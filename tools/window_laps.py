@@ -2,10 +2,10 @@
 """window_laps.py — the window laps a configuration's board still needs, derived
 from the board itself, in the LAPS form tests/release_verify_chain.sh takes.
 
-A row reads FLAKY while a genuine FAIL sits in its 11-run window
+A row reads FAIL ("failed earlier: ...") while a genuine FAIL sits in its 11-run window
 (tools/criteria.py flake_count: the live cell plus ten past verdicts; a FAIL
-whose reason is rig formation, or that carries a detector_defect amendment,
-does not count).  A row whose newest genuine FAIL is at window index k (0 = the
+whose reason is rig formation, that carries a detector_defect amendment, or that
+a removed defect retired, does not count).  A row whose newest genuine FAIL is at window index k (0 = the
 live cell) reads PASS again only after 11-k more runs of it, the board run that
 ends the chain being one of them, so it needs 10-k laps before that board.  The
 chain's header derives these by hand; this reads them off the board so a count
@@ -31,11 +31,13 @@ def newest_genuine_fail(entry: dict, config: str):
     cell = criteria.cell_of(entry, config)
     if not cell:
         return None, None
+    #: a row the board already passes owes no laps: its window's FAILs are all named by open
+    #: records adjudicated noblock
+    if criteria.cell_status(entry, config) in criteria.GREEN:
+        return None, None
     runs = ([cell] + list(cell.get("history") or []))[:criteria.FLAKE_WINDOW]
     for k, run in enumerate(runs):
-        if (str(run.get("status", "")).upper().strip() == "FAIL"
-                and not criteria.RIG_NOISE.search(str(run.get("reason", "")))
-                and not run.get("detector_defect")):
+        if criteria.genuine_fail(run):
             return k, run
     return None, None
 

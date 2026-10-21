@@ -57,7 +57,27 @@ DISPOSES OF NOTHING: the defect stays open, stays in the queue, and still has to
     tools/defects.py add     -s high -m "..." [-N 2] [-C net/mesh] [-n "next step"] [-w "how it shows"]
     tools/defects.py update  <id> [-s ...] [-m ...] [-N ...] [-C ...] [-n ...] [-w ...]
     tools/defects.py update  <id> -I noblock --impact-why "what was measured"
-    tools/defects.py remove  <id> --why "what was measured and what it said"
+    tools/defects.py update  <id> --cell 4/net/mesh/direct:alloc_witness:2026-10-20T07:38:35Z
+    tools/defects.py update  <id> --collateral "4/net/mesh/direct:chk_clean:<iso>=the log line"
+    tools/defects.py update  <id> --reproducer "command, and how it reaches the cause"
+    tools/defects.py update  <id> --ab "off=10/10 on=0/10 build=<srcversion> evidence=<path>"
+    tools/defects.py remove  <id> --fixed     --why "what was measured and what it said"
+    tools/defects.py remove  <id> --disproved --why "what was measured and what it said"
+
+EVERY BOARD FAILURE A RECORD ACCOUNTS FOR IS NAMED, NOT DESCRIBED. `--cell CONFIG:ROW:ISO` is
+one recorded run of a board row (its stamp exactly as `tools/criteria.py show <row>` prints it),
+checked against the board when it is given; `--collateral CONFIG:ROW:ISO=<evidence>` is a run
+that failed because of this defect without measuring it (a node that could not unmount behind the
+hung creates), with the log line that shows the dependency. `tools/criteria.py --unattributed`
+lists every genuine failure in a window that no open record names.
+
+FIXED AND VERIFIED NEEDS A REPRODUCER THAT FAILS EVERY TIME WITHOUT THE FIX. `remove --fixed`
+refuses a record with no `--reproducer`, or whose `--ab` does not show the fix-off arm failing
+every lap and the fix-on arm passing every lap on one build. A defect seen only now and then with
+no reproducer like that stays open: passing laps cannot close it. It also refuses while any row
+the record names, its own failures retired, does not PASS on this tree's build. Then each named
+run is marked as retired by the record on the board, and only the flake window stops counting it.
+`--disproved` retires them the same way, with no reproducer and no pass required.
     tools/defects.py rename  <id> D-NEW-SHORTER-ID-0962   a new id, nothing else changes
 
 AN ID IS AT MOST 80 CHARACTERS. It is minted from the summary, so a summary that opens with a
@@ -146,18 +166,22 @@ FIELDS = {"severity": "s", "summary": "m", "next": "n", "evidence": "w",
 #: out -- both reporting success, in a file that carries no dates, so nothing afterwards shows it
 #: happened. Measured 2026-09-17 on a copy of the real ledger.
 LOCK = ROOT / "data" / ".defects.lock"
-MUTATORS = ("add", "update", "remove", "rename", "migrate-config")
+MUTATORS = ("add", "update", "remove", "verify", "rename", "migrate-config")
 
 #: A save measures ~6 ms on the real 858 KB ledger, so anything still holding the lock after this
 #: long is wedged rather than busy, and saying so beats blocking a session forever.
 LOCK_WAIT_SECONDS = 30
 
 #: For `lift_config` only: what a leading bare configuration must not be mistaken for.
-SUBCOMMANDS = ("show", "add", "update", "remove", "rename", "migrate-config")
+SUBCOMMANDS = ("show", "add", "update", "remove", "verify", "rename", "migrate-config")
 VALUE_FLAGS = ("-s", "--severity", "--at")
 
 ORDERED = ("id", "severity", "nodes", "config", "platform", "opened", "updated", "summary",
-           "evidence", "next")
+           "evidence", "next", "cells", "collateral", "reproducer", "ab", "reproducible",
+           "verified_at")
+
+#: `--ab`: the fix-off and fix-on arms of the reproducer on one build, as counts of laps.
+AB_FORM = re.compile(r"^off=(\d+)/(\d+)\s+on=(\d+)/(\d+)\s+build=([0-9A-F]{23})\s+evidence=(\S+)$")
 
 
 #: The open lock file, kept for the process's lifetime so the lock is held until it exits. Nothing
@@ -277,7 +301,28 @@ def blocks(entry: dict, nodes: int, selector: tuple, platform=None) -> bool:
         return False
     if platform is not None and platform_of(entry) not in ("any", platform):
         return False
+    #: A reproducible defect `verify` found passing at exactly this configuration, on this tree's
+    #: build, has nothing left to say about it: the board there passes with its failures retired.
+    #: It still blocks every configuration it reaches and was not verified at.
+    if verified_here(entry, configuration.selector_label(nodes, selector)):
+        return False
     return configuration.overlaps(pattern, selector)
+
+
+#: This tree's mxfs.ko srcversion, read once per process.
+build_cache = None
+
+
+def verified_here(entry: dict, config: str) -> bool:
+    """Was this record verified (`defects.py verify`) at exactly `config`, on this tree's build?"""
+    marks = [v for v in entry.get("verified_at") or []
+             if isinstance(v, dict) and v.get("config") == config]
+    if not marks:
+        return False
+    global build_cache
+    if build_cache is None:
+        build_cache = tree_build()
+    return bool(build_cache) and any(v.get("build") == build_cache for v in marks)
 
 
 def parse_at(text: str) -> tuple:
@@ -465,6 +510,24 @@ def show_one(entry: dict) -> None:
     for key in ("summary", "evidence", "next"):
         if entry.get(key):
             print("  %-10s %s" % (key, wrap(entry[key], 88, " " * 13)))
+    for cell in entry.get("cells") or []:
+        print("  %-10s %s:%s:%s" % ("cell", cell["config"], cell["row"], cell["iso"]))
+    for cell in entry.get("collateral") or []:
+        print("  %-10s %s:%s:%s — %s" % ("collateral", cell["config"], cell["row"], cell["iso"],
+                                         wrap(cell.get("why", ""), 70, " " * 13)))
+    if entry.get("reproducer"):
+        print("  %-10s %s" % ("reproducer", wrap(entry["reproducer"], 88, " " * 13)))
+    if entry.get("ab"):
+        ab = entry["ab"]
+        print("  %-10s fix off failed %d/%d, fix on failed %d/%d, build %s, evidence %s"
+              % ("ab", ab["off_fail"], ab["off_laps"], ab["on_fail"], ab["on_laps"],
+                 ab["build"], ab["evidence"]))
+    if entry.get("reproducible"):
+        print("  %-10s %s" % ("reproduces", wrap(entry["reproducible"], 88, " " * 13)))
+    for mark in entry.get("verified_at") or []:
+        if isinstance(mark, dict):
+            print("  %-10s %s on build %s (%s): passes there, does not block it"
+                  % ("verified", mark.get("config"), mark.get("build"), mark.get("date")))
     for key, value in entry.items():
         if key not in ORDERED:
             print("  %-10s %s" % (key, wrap(value, 88, " " * 13)))
@@ -574,6 +637,236 @@ def check_impact(value, why) -> None:
                  "said. A bar recorded without one is a relabel, not an adjudication.")
 
 
+def board_tool():
+    """tools/criteria.py as a module, for the board runs a record names. Imported only by the
+    commands that touch the board, so listing the queue never depends on it."""
+    import criteria  # noqa: E402
+    return criteria
+
+
+def parse_cell(text: str, collateral: bool) -> dict:
+    """`CONFIG:ROW:ISO`, or `CONFIG:ROW:ISO=<evidence>` for a collateral run. The stamp has
+    colons of its own, so the configuration and the row are the first two fields and the stamp is
+    the rest."""
+    why = ""
+    if collateral:
+        text, sep, why = text.partition("=")
+        if not sep or not why.strip():
+            sys.exit("defects: --collateral needs CONFIG:ROW:ISO=<the log evidence that this run "
+                     "failed because of the defect>; a run that only failed at the same time is "
+                     "not collateral")
+    config, _, rest = text.strip().partition(":")
+    row, _, iso = rest.partition(":")
+    if not (config and row and iso):
+        sys.exit(f"defects: {text!r}: a board run is CONFIG:ROW:ISO, e.g. "
+                 "4/net/mesh/direct:alloc_witness:2026-10-20T07:38:35Z")
+    cell = {"config": board_tool().parse_at(config), "row": row, "iso": iso}
+    if collateral:
+        cell["why"] = why.strip()
+    return cell
+
+
+def check_cells(cells: list) -> None:
+    """Every named run exists on its board and did not pass. A record that names a run nobody
+    recorded, or a passing one, accounts for nothing."""
+    criteria = board_tool()
+    for cell in cells:
+        board = criteria.read_board(criteria.board_for(cell["config"]))
+        row, run = criteria.run_of(board, cell["row"], cell["config"], cell["iso"])
+        if row is None:
+            sys.exit(f"defects: no board row {cell['row']!r}")
+        if run is None:
+            sys.exit("defects: %s at %s records no run stamped %s (recorded: %s)"
+                     % (cell["row"], cell["config"], cell["iso"],
+                        ", ".join(str(r.get("iso", "?"))
+                                  for r in criteria.runs_of(row, cell["config"]))))
+        if str(run.get("status", "")).upper().strip() == "PASS":
+            sys.exit("defects: %s at %s run %s PASSED; a record names the runs that failed"
+                     % (cell["row"], cell["config"], cell["iso"]))
+
+
+def add_cells(entry: dict, args) -> list:
+    """Append the runs named by --cell and --collateral to the record, once each."""
+    changed = []
+    for key, given in (("cells", args.cell or []), ("collateral", args.collateral or [])):
+        new = [parse_cell(text, key == "collateral") for text in given]
+        if not new:
+            continue
+        check_cells(new)
+        have = entry.setdefault(key, [])
+        seen = {(c["config"], c["row"], c["iso"]) for c in have}
+        for cell in new:
+            if (cell["config"], cell["row"], cell["iso"]) not in seen:
+                have.append(cell)
+                seen.add((cell["config"], cell["row"], cell["iso"]))
+        changed.append(key)
+    return changed
+
+
+def parse_ab(text: str) -> dict:
+    match = AB_FORM.match(text.strip())
+    if not match:
+        sys.exit("defects: --ab is \"off=<failed>/<laps> on=<failed>/<laps> build=<srcversion> "
+                 "evidence=<path>[,<path>]\": the reproducer's laps with the fix off and on, on "
+                 "one build")
+    off_fail, off_laps, on_fail, on_laps = (int(match.group(i)) for i in range(1, 5))
+    if off_fail > off_laps or on_fail > on_laps:
+        sys.exit("defects: --ab counts more failed laps than laps")
+    missing = [p for p in match.group(6).split(",") if not (ROOT / p).exists()]
+    if missing:
+        sys.exit("defects: --ab evidence not in the tree: %s" % ", ".join(missing))
+    return {"off_fail": off_fail, "off_laps": off_laps, "on_fail": on_fail, "on_laps": on_laps,
+            "build": match.group(5), "evidence": match.group(6)}
+
+
+def fixed_gaps(entry: dict) -> list:
+    """What a record still lacks to be removed as FIXED AND VERIFIED."""
+    gaps = []
+    if not str(entry.get("reproducer") or "").strip():
+        gaps.append("no reproducer: name the test that reaches the cause (update --reproducer)")
+    ab = entry.get("ab")
+    if not ab:
+        gaps.append("no fix-off/fix-on result on one build (update --ab)")
+    else:
+        if ab["off_laps"] < 1 or ab["off_fail"] != ab["off_laps"]:
+            gaps.append("the fix-off arm failed %d of %d laps; it must fail every lap, or the "
+                        "reproducer does not reach the cause reliably enough to prove the fix"
+                        % (ab["off_fail"], ab["off_laps"]))
+        if ab["on_laps"] < 1 or ab["on_fail"] != 0:
+            gaps.append("the fix-on arm failed %d of %d laps; it must pass every lap"
+                        % (ab["on_fail"], ab["on_laps"]))
+    return gaps
+
+
+def tree_build() -> str:
+    """This tree's mxfs.ko srcversion: the build the named rows must pass on."""
+    import subprocess
+    try:
+        out = subprocess.run(["modinfo", "-F", "srcversion", str(ROOT / "mxfs.ko")],
+                             capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return out.stdout.strip() if out.returncode == 0 else ""
+
+
+def retire_cells(entry: dict, disposition: str, why: str) -> list:
+    """Mark every board run the record names as retired by it, on every board they live on.
+
+    For FIXED the rows it names must then PASS on this tree's build -- the record's own failures
+    no longer counted, and nothing else in their windows -- or nothing is written at all. Returns
+    the lines to report: each run retired, and each one that has already aged off its board."""
+    criteria = board_tool()
+    cells = list(entry.get("cells") or []) + list(entry.get("collateral") or [])
+    by_board: dict = {}
+    for cell in cells:
+        by_board.setdefault(criteria.board_for(cell["config"]), []).append(cell)
+    build = tree_build() if disposition == "fixed" else ""
+    if disposition == "fixed" and cells and not build:
+        sys.exit("defects: cannot read this tree's mxfs.ko srcversion; the rows the record names "
+                 "must pass on the build being released, so build the module first")
+    mark = {"defect": entry["id"], "disposition": disposition, "date": date.today().isoformat(),
+            "why": why[:400]}
+    handles, boards, report, refused = [], {}, [], []
+    for path, named in by_board.items():
+        handles.append(criteria.lock_board(path))
+        board = boards[path] = criteria.read_board(path)
+        for cell in named:
+            row, run = criteria.run_of(board, cell["row"], cell["config"], cell["iso"])
+            if run is None:
+                report.append("%s:%s:%s has aged off the board; nothing to retire"
+                              % (cell["config"], cell["row"], cell["iso"]))
+                continue
+            run["retired_by"] = mark
+            report.append("retired %s:%s:%s" % (cell["config"], cell["row"], cell["iso"]))
+        if disposition == "fixed":
+            for config, row_id in sorted({(c["config"], c["row"]) for c in named}):
+                row = next((e for e in board["criteria"] if e.get("id") == row_id), None)
+                status = criteria.cell_status(row, config, build) if row else "UNKNOWN"
+                if status != "PASS":
+                    window = criteria.runs_of(row or {}, config)[:criteria.FLAKE_WINDOW]
+                    left = [r.get("iso", "?") for r in window if criteria.genuine_fail(r)]
+                    refused.append("%s at %s reads %s on build %s%s"
+                                   % (row_id, config, status, build,
+                                      "; genuine FAILs still in its window, which another record "
+                                      "or this one must name: " + ", ".join(left) if left else ""))
+    if refused:
+        sys.exit("defects: not removed, and nothing written. Every row the record names must "
+                 "PASS on this tree's build once its own failures are retired:\n  "
+                 + "\n  ".join(refused))
+    for path, board in boards.items():
+        criteria.write_board(path, board)
+    del handles
+    return report
+
+
+def cmd_verify(data: dict, args) -> int:
+    """A configuration whose rows pass again after a reproducible defect's fix reads PASS again.
+
+    The question a board answers is whether THAT configuration passes. A defect that failed every
+    run of a row before its fix and whose row now passes on this tree's build has nothing left to
+    say about that configuration, so its named failures there are retired now -- not after the
+    flake window ages them out, and whatever the same defect still does elsewhere. An intermittent
+    defect is not marked reproducible, so its failures keep counting for the whole window: one
+    pass proves nothing about a bug that only shows now and then. The record stays open; `remove`
+    is the disposition of the defect itself."""
+    entry = find(data, args.id)
+    if not str(entry.get("reproducible") or "").strip():
+        sys.exit("defects: %s is not marked reproducible (update --reproducible \"how every run of "
+                 "the row failed before the fix\"); an intermittent defect's failures count for "
+                 "the whole flake window" % entry["id"])
+    criteria = board_tool()
+    config = criteria.parse_at(args.verify_at)
+    named = [c for c in list(entry.get("cells") or []) + list(entry.get("collateral") or [])
+             if c["config"] == config]
+    if not named:
+        sys.exit("defects: %s names no board run at %s (update --cell)" % (entry["id"], config))
+    build = tree_build()
+    if not build:
+        sys.exit("defects: cannot read this tree's mxfs.ko srcversion; build the module first")
+    path = criteria.board_for(config)
+    handle = criteria.lock_board(path)
+    board = criteria.read_board(path)
+    mark = {"defect": entry["id"], "disposition": "verified at " + config,
+            "date": date.today().isoformat(), "why": entry["reproducible"][:400]}
+    retired, refused = [], []
+    for row_id in sorted({c["row"] for c in named}):
+        row = next((e for e in board["criteria"] if e.get("id") == row_id), None)
+        cell = criteria.cell_of(row or {}, config)
+        if not row or str(cell.get("status", "")).upper().strip() != "PASS" \
+                or (cell.get("build") and cell["build"] != build):
+            refused.append("%s at %s: its latest run is %s on build %s, not PASS on %s"
+                           % (row_id, config, cell.get("status", "none"),
+                              cell.get("build", "?"), build))
+            continue
+        for c in named:
+            if c["row"] != row_id:
+                continue
+            _, run = criteria.run_of(board, row_id, config, c["iso"])
+            if run is not None:
+                run["retired_by"] = mark
+                retired.append("%s:%s:%s" % (config, row_id, c["iso"]))
+    if refused:
+        sys.exit("defects: nothing retired at %s:\n  %s" % (config, "\n  ".join(refused)))
+    criteria.write_board(path, board)
+    del handle
+    #: One mark per configuration, naming the build its board passed on: a later build has to
+    #: pass there again before the record stops blocking it.
+    entry["verified_at"] = [v for v in entry.get("verified_at") or []
+                            if isinstance(v, dict) and v.get("config") != config]
+    entry["verified_at"].append({"config": config, "build": build,
+                                 "date": date.today().isoformat()})
+    entry["updated"] = date.today().isoformat()
+    save(data)
+    print("verified %s at %s on build %s; retired %d run(s):" % (entry["id"], config, build,
+                                                                  len(retired)))
+    for line in retired:
+        print("  " + line)
+    for row_id in sorted({c["row"] for c in named}):
+        row = next(e for e in board["criteria"] if e.get("id") == row_id)
+        print("  %s at %s now reads %s" % (row_id, config, criteria.cell_status(row, config, build)))
+    return 0
+
+
 def cmd_add(data: dict, args) -> int:
     if not args.summary:
         sys.exit("defects: add needs -m/--summary saying what is broken")
@@ -602,6 +895,9 @@ def cmd_add(data: dict, args) -> int:
         entry["impact_why"] = args.impact_why
     if args.platform:
         entry["platform"] = args.platform.lower()
+    if args.reproducer:
+        entry["reproducer"] = args.reproducer
+    add_cells(entry, args)
 
     data["defects"].append(entry)
     save(data)
@@ -636,8 +932,19 @@ def cmd_update(data: dict, args) -> int:
         have = entry.get("evidence") or ""
         entry["evidence"] = (have + " ===== " if have else "") + appended
         changed.append("evidence")
+    changed += add_cells(entry, args)
+    if args.reproducible:
+        entry["reproducible"] = args.reproducible
+        changed.append("reproducible")
+    if args.reproducer:
+        entry["reproducer"] = args.reproducer
+        changed.append("reproducer")
+    if args.ab:
+        entry["ab"] = parse_ab(args.ab)
+        changed.append("ab")
     if not changed:
-        sys.exit("defects: update needs at least one of -s/-m/-n/-a/-w/-W/-N/-C/-P/-I")
+        sys.exit("defects: update needs at least one of -s/-m/-n/-a/-w/-W/-N/-C/-P/-I/"
+                 "--cell/--collateral/--reproducer/--ab")
     #: Checked against what the record will HOLD, not only against what this call passed, so that
     #: `-I noblock` on a record whose reason was written earlier is accepted while `-I noblock` with
     #: no reason anywhere is not.
@@ -670,10 +977,21 @@ def cmd_remove(data: dict, args) -> int:
     entry = find(data, args.id)
     if not args.why:
         sys.exit("defects: remove needs --why saying what was measured and what it said")
+    disposition = "fixed" if args.fixed else "disproved"
+    if disposition == "fixed":
+        gaps = fixed_gaps(entry)
+        if gaps:
+            sys.exit("defects: %s cannot be removed as FIXED AND VERIFIED yet:\n  %s"
+                     % (entry["id"], "\n  ".join(gaps)))
+    #: The board first: it is the step that can refuse, and a record removed from the queue
+    #: whose failures were never retired would leave its rows yellow with nothing open to own them.
+    report = retire_cells(entry, disposition, args.why)
     data["defects"] = [e for e in data["defects"] if e is not entry]
     save(data)
 
-    print(f"removed {entry['id']}")
+    print(f"removed {entry['id']} ({'FIXED AND VERIFIED' if disposition == 'fixed' else 'DISPROVED'})")
+    for line in report:
+        print("  " + line)
     print("\nThe fix belongs in CHANGELOG.md. Paste this under today's version:\n")
     print(f"- **{entry.get('summary', entry['id'])}** — {args.why}")
     return 0
@@ -794,6 +1112,12 @@ def main() -> int:
                      help="what was measured that establishes that bar; required with -I")
     add.add_argument("--id", help="override the generated id; at most %d characters. "
                      "Required when the summary is too long to name itself." % MAX_ID)
+    add.add_argument("--cell", action="append", metavar="CONFIG:ROW:ISO",
+                     help="a board run this record accounts for (repeat for each)")
+    add.add_argument("--collateral", action="append", metavar="CONFIG:ROW:ISO=EVIDENCE",
+                     help="a board run that failed because of this defect, with the log "
+                          "evidence of the dependency (repeat for each)")
+    add.add_argument("--reproducer", help="the test that reaches the cause, and how")
 
     update = subs.add_parser("update", help="change an entry")
     update.add_argument("id")
@@ -818,11 +1142,36 @@ def main() -> int:
                              "takes a record out of --release" % IMPACT_CLEAR[0])
     update.add_argument("--impact-why", dest="impact_why",
                         help="what was measured that establishes that bar; required with -I")
+    update.add_argument("--cell", action="append", metavar="CONFIG:ROW:ISO",
+                        help="add a board run this record accounts for (repeat for each)")
+    update.add_argument("--collateral", action="append", metavar="CONFIG:ROW:ISO=EVIDENCE",
+                        help="add a board run that failed because of this defect, with the log "
+                             "evidence of the dependency (repeat for each)")
+    update.add_argument("--reproducer", help="the test that reaches the cause, and how")
+    update.add_argument("--reproducible", metavar="EVIDENCE",
+                        help="mark it reproducible: how every run of its rows failed before the "
+                             "fix. Lets `verify` retire its failures at a configuration that "
+                             "passes again")
+    update.add_argument("--ab", metavar="'off=F/L on=F/L build=SRCVERSION evidence=PATH'",
+                        help="the reproducer's failed/total laps with the fix off and on, on one "
+                             "build; FIXED needs every fix-off lap failed and no fix-on lap")
 
     remove = subs.add_parser("remove", help="it is fixed or it was never real")
     remove.add_argument("id")
+    disposition = remove.add_mutually_exclusive_group(required=True)
+    disposition.add_argument("--fixed", action="store_true",
+                             help="FIXED AND VERIFIED: needs --reproducer and an --ab whose fix-off "
+                                  "arm failed every lap, and every named row passing on this build")
+    disposition.add_argument("--disproved", action="store_true",
+                             help="DISPROVED: direct evidence that it was not an MXFS defect")
     remove.add_argument("--why", required=True,
                         help="what was measured and what it said")
+
+    verify = subs.add_parser("verify", help="a reproducible defect's rows pass again at one "
+                                            "configuration: retire its failures there")
+    verify.add_argument("id")
+    verify.add_argument("--at", dest="verify_at", metavar="CONFIGURATION", required=True,
+                        help="the configuration whose board passes again, e.g. 4/net/mesh/direct")
 
     rename = subs.add_parser("rename", help="give an entry a new id; nothing else changes")
     rename.add_argument("id")
@@ -835,7 +1184,8 @@ def main() -> int:
 
     args = parser.parse_args(lift_config(sys.argv)[1:])
     for missing in ("at", "release", "gate", "nodes", "config", "platform", "next_step", "summary",
-                    "evidence", "id", "next", "impact", "impact_why"):
+                    "evidence", "id", "next", "impact", "impact_why", "cell", "collateral",
+                    "reproducer", "ab", "fixed", "disproved", "reproducible"):
         if not hasattr(args, missing):
             setattr(args, missing, None)
     #: BEFORE `load`, because the window that loses a record spans the read as well as the write.
@@ -856,6 +1206,8 @@ def main() -> int:
         return cmd_remove(data, args)
     if args.command == "rename":
         return cmd_rename(data, args)
+    if args.command == "verify":
+        return cmd_verify(data, args)
     if args.command == "migrate-config":
         return cmd_migrate_config(data, args)
     return cmd_list(data, args)

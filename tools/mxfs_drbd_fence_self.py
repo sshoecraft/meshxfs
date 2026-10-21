@@ -69,10 +69,12 @@ import json
 import os
 import re
 import secrets
+import shutil
 import socket
 import subprocess
 import sys
 import time
+import xml.etree.ElementTree as ET
 
 STATE_DIR = "/var/lib/mxfs"
 RECORD_FMT = os.path.join(STATE_DIR, "drbd-fence.%s")      # shared with the handler
@@ -168,6 +170,9 @@ EXCLUSION_NOTICE = ("m=$(drbdadm sh-minor %s 2>/dev/null) && "
                     "[ -w /proc/fs/mxfs/drbd_excluded ] && "
                     "echo \"$m\" > /proc/fs/mxfs/drbd_excluded")
 FENCE_CONF = "/etc/mxfs/drbd-fence.conf"
+# Pacemaker's configuration on disk, read when its daemons are not running yet
+# (this unit starts before or beside pacemaker.service at boot).
+PCMK_CIB = "/var/lib/pacemaker/cib/cib.xml"
 # authority=quorum (docs/quorum-takeover.md): corosync's votequorum with a
 # QDevice decides a lost link instead of the fixed tie-break.  Asked through
 # the quorum reporter's one-shot `vote` report.
@@ -342,6 +347,61 @@ def mxfs_module_refs():
             return int(fh.read().strip() or 0)
     except (OSError, ValueError):
         return 0
+
+
+def outside_promoters(res):
+    """What else is set up to promote the resource or to mount its device, one
+    phrase each; empty when nothing is.
+
+    This program has to be the only one.  It keeps a node that comes back
+    Secondary until its peer has recovered the node's previous incarnation,
+    and after both nodes went down the first mount proves every recorded
+    incarnation ended by its peer being Secondary on a Connected link.  A
+    second promoter keeps the peer Primary, so that proof never comes and the
+    mount is refused at every attempt (GitHub issue #2: Pacemaker's
+    promotable DRBD clone had both nodes Primary).  DRBD's own service
+    promotes a resource with `become-primary-on` at boot; Pacemaker promotes
+    an ocf:linbit:drbd resource and mounts with ocf:heartbeat:Filesystem.
+    Pacemaker's configuration is read from the running cluster, or from its
+    copy on disk while its daemons are not up yet."""
+    found = []
+    rc, out = run(["drbdadm", "dump", res], timeout=10)
+    if rc == 0 and re.search(r"\bbecome-primary-on\b", out):
+        found.append("DRBD's own service, from `become-primary-on` in the resource's "
+                     "startup section")
+    cib = ""
+    if shutil.which("cibadmin"):
+        try:
+            rc, cib = run(["cibadmin", "--query", "--scope", "resources"], timeout=15)
+        except subprocess.SubprocessError:
+            rc = 1
+        if rc != 0:
+            cib = ""
+    if not cib and os.path.exists(PCMK_CIB):
+        try:
+            with open(PCMK_CIB) as fh:
+                cib = fh.read()
+        except OSError:
+            cib = ""
+    if not cib:
+        return found
+    try:
+        root = ET.fromstring(cib)
+    except ET.ParseError:
+        return found
+    dev = os.path.realpath(drbd_device(res) or "/nonexistent")
+    for p in root.iter("primitive"):
+        params = {nv.get("name"): nv.get("value", "")
+                  for ia in p.iter("instance_attributes") for nv in ia.iter("nvpair")}
+        agent = "%s:%s:%s" % (p.get("class", ""), p.get("provider", ""), p.get("type", ""))
+        if p.get("type") == "drbd" and params.get("drbd_resource") == res:
+            found.append("Pacemaker, through its resource %s (%s, drbd_resource=%s)"
+                         % (p.get("id"), agent, res))
+        elif (p.get("type") == "Filesystem" and params.get("device")
+              and os.path.realpath(params["device"]) == dev):
+            found.append("Pacemaker, which mounts %s through its resource %s (%s)"
+                         % (params["device"], p.get("id"), agent))
+    return found
 
 
 # ------------------------------------------------------------ isolation (nft)
@@ -883,6 +943,40 @@ def peer_evidence(res, peer, peer_addr):
         return False, "%s still holds an MXFS superblock of %s" % (peer, res)
     return True, "%s answers: DRBD %s, no MXFS superblock of %s, module refcnt %s, boot %s" % (
         peer, f["ROLE"], res, f["REFCNT"], f["BOOT"][:8])
+
+
+def peer_primary_without_us(res):
+    """After a refused mount: a sentence naming the cause when the peer is DRBD
+    Primary with no MXFS of this resource and no boot program of ours running
+    there, else "".  Nothing of MeshXFS leaves a node like that for long: the
+    boot program steps down after a refused attempt and the stop after the
+    unmount.  So either the peer's boot program gave up (its state says
+    failed or refused, and its journal says why), or something else promoted
+    it -- Pacemaker, `become-primary-on`, a `drbdadm primary` by hand -- and
+    this node's mount, which needs the peer Secondary, is refused until it
+    steps down."""
+    ep = drbd_endpoints(res)
+    if not ep:
+        return ""
+    _, _, _, peer, peer_addr, _ = ep
+    f, _ = peer_facts(res, peer, peer_addr)
+    if (f is None or not f["ROLE"].startswith("Primary") or f["MOUNTS"] != "0"
+            or f["SB"] != "0" or f["BOOTLIVE"] == "1"):
+        return ""
+    state = f["BOOTSTATE"].split()[0]
+    if state in ("failed", "refused"):
+        return ("%s is DRBD Primary with nothing mounted, and its mxfs-drbd@%s %s "
+                "(`journalctl -u mxfs-drbd@%s` on %s says why). This node mounts once "
+                "%s is Secondary: `drbdadm secondary %s` there, or restart mxfs-drbd@%s "
+                "there once the cause is fixed." % (peer, res, "gave up" if state == "failed"
+                                                    else "refused to start", res, peer, peer,
+                                                    res, res))
+    return ("%s is DRBD Primary with nothing mounted, and no mxfs-drbd@%s is running "
+            "there: something other than MeshXFS promoted it (Pacemaker, "
+            "`become-primary-on`, a `drbdadm primary` by hand). This node needs it "
+            "Secondary to recover the pair, and mounts once it is: run `drbdadm "
+            "secondary %s` on %s, and leave DRBD's roles to mxfs-drbd@%s on both nodes "
+            "(docs/drbd-setup.md)." % (peer, res, res, peer, res))
 
 
 def release(inh, why):
@@ -1531,6 +1625,20 @@ def cmd_boot(res, mountpoint):
     if mxfs_mounted_on(dev):
         sd_notify("READY=1\nSTATUS=%s mounted" % mountpoint)
         return 0
+    promoters = outside_promoters(res)
+    if promoters:
+        write_boot_state(res, "refused")
+        log("%s: not mounting %s: besides MeshXFS, %s %s DRBD %s or its device. MeshXFS "
+            "has to be the only thing that promotes it and mounts it: a node that comes "
+            "back stays Secondary until its peer has recovered it, and after both nodes "
+            "went down the first mount needs its peer Secondary, which another promoter "
+            "never allows, so the mount would be refused at every attempt. Take DRBD "
+            "and the mount out of that (docs/drbd-setup.md), then `systemctl restart "
+            "mxfs-drbd@%s`." % (res, mountpoint, "; and ".join(promoters),
+                                "manage" if len(promoters) > 1 else "manages", res, res),
+            crit=True)
+        sd_notify("STATUS=refused: something besides MeshXFS manages DRBD %s" % res)
+        return 1
     write_boot_state(res, "starting")
     inh = read_inhibit(res)
     ep = drbd_endpoints(res)
@@ -1611,6 +1719,9 @@ def cmd_boot(res, mountpoint):
         log("%s: %s failed (rc=%d, attempt %d of %d): %s"
             % (res, what, rc, attempt, MOUNT_ATTEMPTS,
                err or "the reason is in the kernel log (dmesg | grep -E 'mxfs|drbd')"), crit=True)
+        cause = peer_primary_without_us(res)
+        if cause:
+            log("%s: %s" % (res, cause), crit=True)
         if inh or attempt == MOUNT_ATTEMPTS:
             write_boot_state(res, "failed")
             return 1

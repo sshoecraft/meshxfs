@@ -382,6 +382,26 @@ MODULE_PARM_DESC(rel_dio_wait,
 atomic_t mxfs_rel_dio_inflight = ATOMIC_INIT(0);
 
 /*
+ * A release that aborts while a slow-path acquire of this node is in flight
+ * must leave the inode ACQUIRING.  That state is what makes this node's other
+ * tasks wait for the acquire instead of sending their own request for the
+ * same lock (ilock_begin's wait); an abort that set NONE over it let a second
+ * task in.  Measured on 16/disk/caw/direct (crash_consistency, test14,
+ * directory 83901385): md5sum's PR request then met the node's own fresh EX
+ * grant as a "stale self-hold", P109 released that grant as a phantom and
+ * handed the directory to test11, and the shell went on adding its entry
+ * under an EX it no longer held; test11's write of the same block lost it.
+ * 0 restores the abort that overwrote ACQUIRING (A/B control on this build);
+ * P-REL-ABORT-UNDER-ACQ counts the case either way.
+ */
+int mxfs_rel_abort_keeps_acquiring = 1;
+module_param_named(rel_abort_keeps_acquiring, mxfs_rel_abort_keeps_acquiring,
+		   int, 0644);
+MODULE_PARM_DESC(rel_abort_keeps_acquiring,
+		 "an aborted release leaves an inode ACQUIRING while this node's acquire is in flight; 0=off (control: the abort overwrites it), 1=on (default)");
+atomic_t mxfs_rel_abort_under_acq = ATOMIC_INIT(0);
+
+/*
  * Releases that did not commit because a slow-path acquire of this node was
  * in flight on the inode (P15-REL-ACQ-INFLIGHT), and EX acquires that
  * returned to their caller on a published inode with no proving certificate
@@ -3679,11 +3699,34 @@ static int mxfs_bast_nl_entry_cleanup(uint8_t p_held_mode, uint32_t p_rel_gen,
 		 * for a moved generation does: the grant is ours and live, and
 		 * the acquirer's install and the holders that follow it must
 		 * find the fast path open. */
-		ip->i_dlm_state = orphan_only ? MXFS_DLM_ISTATE_NONE :
-				  (gen_moved || pin_only || obligation_only ||
-				   acq_only || drain_hard || drain_retry) ?
-					MXFS_DLM_ISTATE_CACHED :
-					MXFS_DLM_ISTATE_BAST;
+		u8 next = orphan_only ? MXFS_DLM_ISTATE_NONE :
+			  (gen_moved || pin_only || obligation_only ||
+			   acq_only || drain_hard || drain_retry) ?
+				MXFS_DLM_ISTATE_CACHED :
+				MXFS_DLM_ISTATE_BAST;
+
+		/* The acquire that set ACQUIRING is still in flight: it
+		 * installs its own state when it returns, and until then this
+		 * node's other tasks must keep waiting for it (see
+		 * mxfs_rel_abort_keeps_acquiring). */
+		if (dtr_os == MXFS_DLM_ISTATE_ACQUIRING &&
+		    ip->i_dlm_acq_inflight > 0) {
+			static atomic_t raua_n = ATOMIC_INIT(0);
+			int keep = READ_ONCE(mxfs_rel_abort_keeps_acquiring);
+
+			atomic_inc(&mxfs_rel_abort_under_acq);
+			if (atomic_inc_return(&raua_n) <= 2000)
+				mxfs_probe("mxfs: P-REL-ABORT-UNDER-ACQ ino=%llu acq=%u acq_pid=%d acq_comm=%s mode=%u orph=%d gen_moved=%d next=%u keep=%d comm=%s realns=%llu -- a release aborted while this node's acquire is in flight\n",
+					(unsigned long long)ip->i_ino,
+					ip->i_dlm_acq_inflight, ip->i_dlm_acq_pid,
+					ip->i_dlm_acq_comm, ip->i_dlm_mode,
+					orphan_live ? 1 : 0, gen_moved ? 1 : 0,
+					next, keep, current->comm,
+					(unsigned long long)ktime_get_real_ns());
+			if (keep)
+				next = MXFS_DLM_ISTATE_ACQUIRING;
+		}
+		ip->i_dlm_state = next;
 		mxfs_dlmtr_rec(ip, dtr_om, dtr_os, MXFS_SITE); }
 		/*
 		 * v3 (tds pace: node1 18/150 rounds, ~3.3s/handoff):

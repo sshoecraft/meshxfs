@@ -1,0 +1,12 @@
+# D-GH2-DRBD-REJOIN-WAITS-FOREVER-FOR-PEER-SECONDARY-UNDER-PACEMAKER: the arms
+# still unmeasured after drbdprom5, same reading rules and bounds as
+# tests/queues/drbd_promoter_ab.queue.
+#   measured: pacemaker/fix (drbdprom lap 2), pacemaker/control (drbdprom lap 3,
+#     drbdprom2 lap 2), become/fix (drbdprom5 lap 3), become/control (drbdprom5
+#     lap 4, the program verified by sha256 after the outage; reach as the rules
+#     say, then the harness's SIGKILL wait read `deactivating` as ended).
+#   drbdprom5 lap 5 (manual/fix) ran on the become-primary-on line lap 4 left,
+#     and the fix refused for it: no measurement of the manual arm.
+480 DRBD_RIG_NO_BASELINE=1 scripts/drbd_rig.sh up
+1390 scripts/drbd_rig.sh promoter-test manual
+1570 PROMOTER_CONTROL=tests/evidence/drbd_rig/control_mxfs_drbd_fence_self_pre_promoter_fix.py scripts/drbd_rig.sh promoter-test manual

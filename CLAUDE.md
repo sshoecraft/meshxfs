@@ -187,6 +187,7 @@ all the forensic detail: `docs/host-safety.md`.
 (User directive, 2026-10-21.)
 
 - Check, fix and respond to GitHub issues without waiting for the user's approval.
+- Never talk in the third person in a GitHub issue: no "we", "us", "our" or the like.
 
 ---
 

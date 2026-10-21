@@ -98,22 +98,14 @@
     "8/disk/caw/mpath",
     "16/disk/caw/mpath",
     "2/net/mesh/direct",
-    "2/net/mesh/mpath"
+    "4/net/mesh/direct",
+    "8/net/mesh/direct",
+    "16/net/mesh/direct",
+    "2/net/mesh/mpath",
+    "4/net/mesh/mpath"
   ],
   "released_earlier": {
-    "_": "Configurations an earlier release claimed that the current one does not: each was verified on the version named, and open records in the defect queue that cross the release bar reach it now (tools/defects.py <configuration> --release), so it is not re-verified or claimed until they are fixed. tools/release_text_check.py requires the README to list exactly these, with that version. 8/16 net/mesh/direct and 2-16 net/mesh/mpath were here from 0.90.51 until 0.90.130 verified them again. 2/net/mesh/direct and 2/net/mesh/mpath are claimed again by 0.90.131 (the packaged default is the network lock manager, and every platform row is graded on 2/net/mesh/direct); a net/mesh configuration still listed here is one an open record that crosses the release bar reaches.",
-    "4/net/mesh/direct": {
-      "verified_in": "0.90.130"
-    },
-    "8/net/mesh/direct": {
-      "verified_in": "0.90.130"
-    },
-    "16/net/mesh/direct": {
-      "verified_in": "0.90.130"
-    },
-    "4/net/mesh/mpath": {
-      "verified_in": "0.90.130"
-    },
+    "_": "Configurations an earlier release claimed that the current one does not: each was verified on the version named, and open records in the defect queue that cross the release bar reach it now (tools/defects.py <configuration> --release), so it is not re-verified or claimed until they are fixed. tools/release_text_check.py requires the README to list exactly these, with that version. 8/16 net/mesh/direct and 2-16 net/mesh/mpath were here from 0.90.51 until 0.90.130 verified them again. 2/net/mesh/direct and 2/net/mesh/mpath are claimed again by 0.90.131 (the packaged default is the network lock manager, and every platform row is graded on 2/net/mesh/direct); 4, 8 and 16/net/mesh/direct and 4/net/mesh/mpath are claimed again by 0.90.132. A net/mesh configuration still listed here is one an open record that crosses the release bar reaches.",
     "8/net/mesh/mpath": {
       "verified_in": "0.90.130"
     },

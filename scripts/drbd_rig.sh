@@ -62,6 +62,13 @@
 #                                           (authority=quorum, a QDevice on QUORUM_QNETD): participant 0
 #                                           dies and participant 1 takes over; a split the vote gives to
 #                                           participant 1; a DRBD-only link loss the tie-break decides
+#   scripts/drbd_rig.sh promoter-test <pacemaker|become|manual>
+#                                           a pair outage with participant 1 promoted by something other
+#                                           than MeshXFS: participant 0's boot program must name it (at
+#                                           its start, or after its first refused mount) instead of
+#                                           retrying without end; with the promoter removed both mount
+#                                           (PROMOTER_CONTROL=<program>: that program instead, which
+#                                           must never mount nor name the promoter)
 #   scripts/drbd_rig.sh remount-test        clean unmount/remount cycles, a crash-cut retirement and a
 #                                              whole-cluster restart, all on one filesystem
 #   scripts/drbd_rig.sh resolve-test        passthrough never resolves /dev/drbd0 (or dm on it) to its
@@ -2089,6 +2096,304 @@ step_self_outage_test() {
     say "self outage test: passed (the rig's node fence is configured again; MXFS left unmounted)"
 }
 
+# Something other than MeshXFS promotes DRBD (GitHub issue #2: Pacemaker's
+# promotable DRBD clone had both nodes Primary).  After a pair outage the
+# first mount proves every recorded incarnation ended by its peer being
+# Secondary on a Connected link; a peer some other promoter keeps Primary never
+# gives that proof, so participant 0's mount is refused at every attempt.  Its
+# boot program must say so: at its start when it can see the other promoter
+# (`become-primary-on`, or a Pacemaker resource for the DRBD resource or its
+# device), else after the first refused attempt (a `drbdadm primary` by hand).
+#   promoter-test pacemaker  corosync + Pacemaker on the pair, a promotable
+#                            ocf:linbit:drbd clone with promoted-max=2
+#   promoter-test become     `become-primary-on both` in the resource, which
+#                            DRBD's own service (drbdadm sh-b-pri) acts on
+#   promoter-test manual     `drbdadm primary` on participant 1 by hand
+# The pair outage, then participant 1 promoted by that promoter, then the boot
+# program on participant 0 alone, as on the tester's proxmox01.
+# PROMOTER_CONTROL=<file>: the boot program run is that file instead of this
+# tree's (the control arm: the program before the fix), and the test asserts
+# that it never mounts and never names the cause in PROMOTER_CONTROL_WINDOW.
+# Either way the promoter is then removed as the message says, participant 1
+# demoted, and both boot programs of this tree must mount with every fsynced
+# file intact and a cold chk_mxfs clean.
+PCMK_PKGS="pacemaker resource-agents-base"
+# apt: Pacemaker and its libraries (~15 MB) from the Ubuntu mirror, and dpkg
+PCMK_APT_BUDGET=240
+# From power-on to Pacemaker holding both nodes Primary: the boot (~30 s),
+# corosync's membership (seconds), Pacemaker's DC election (dc-deadtime 20 s),
+# DRBD connecting and resyncing two crashed primaries' activity-log extents,
+# and the clone's probe and promotions: ~75 s, twice over.
+PCMK_PROMOTE_BUDGET=150
+# The boot program refuses before it touches DRBD: its config checks and
+# one cibadmin query, seconds.
+PROMOTER_REFUSE_BUDGET=30
+# The module's refusal comes after the scan window (~64 s) and its 120 s
+# startup-fence bound (self-outage-test, SELF_OUTAGE_PEER_PRIMARY=1); the
+# boot program's own report of the cause follows at once.
+PROMOTER_MANUAL_BUDGET=240
+# The control arm is watched across two refused attempts: 184 s each and the
+# 15 s backoff between them, with margin.
+PROMOTER_CONTROL_WINDOW=420
+pacemaker_up() {  # <p0> <p1>: Pacemaker on both nodes, promoting DRBD $RES on both
+    local n out
+    both pcmkpkg "dpkg -s $PCMK_PKGS >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive timeout $PCMK_APT_BUDGET apt-get -y -q install $PCMK_PKGS >/dev/null 2>&1; dpkg-query -W pacemaker && command -v cibadmin >/dev/null && echo PCMK_PKG_OK" $((PCMK_APT_BUDGET + 30))
+    for n in "${NODES[@]}"; do grep -aq '^PCMK_PKG_OK' "$EVID/pcmkpkg.$n" || die "pacemaker packages on $n: $(tail -2 "$EVID/pcmkpkg.$n" | tr '\n' ' ')"; done
+    local conf; conf=$(base64 -w0 <<EOF
+# written by scripts/drbd_rig.sh promoter-test
+totem {
+    version: 2
+    cluster_name: mxfs-promoter-test
+    transport: knet
+    crypto_cipher: aes256
+    crypto_hash: sha256
+}
+nodelist {
+    node {
+        name: $N1
+        nodeid: 1
+        ring0_addr: $(lab_addr "$N1")
+    }
+    node {
+        name: $N2
+        nodeid: 2
+        ring0_addr: $(lab_addr "$N2")
+    }
+}
+quorum {
+    provider: corosync_votequorum
+    two_node: 1
+}
+logging {
+    to_syslog: yes
+}
+EOF
+)
+    both pcmkconf "systemctl stop pacemaker corosync-qdevice corosync 2>/dev/null
+        [ -e /etc/corosync/corosync.conf.promoter-test ] || cp -p /etc/corosync/corosync.conf /etc/corosync/corosync.conf.promoter-test 2>/dev/null
+        [ -e /etc/corosync/authkey.promoter-test ] || cp -p /etc/corosync/authkey /etc/corosync/authkey.promoter-test 2>/dev/null
+        echo $conf | base64 -d > /etc/corosync/corosync.conf && rm -f /var/lib/pacemaker/cib/cib* && echo PCMK_CONF_OK" 60
+    for n in "${NODES[@]}"; do grep -aq '^PCMK_CONF_OK' "$EVID/pcmkconf.$n" || die "corosync.conf on $n: $(tail -1 "$EVID/pcmkconf.$n")"; done
+    out=$(ssh_n "$N1" "corosync-keygen -l >/dev/null 2>&1; base64 -w0 /etc/corosync/authkey" 30)
+    [ ${#out} -gt 100 ] || die "corosync authkey on $N1: $out"
+    ssh_n "$N2" "umask 077; echo $out | base64 -d > /etc/corosync/authkey && chmod 400 /etc/corosync/authkey && echo KEY_OK" 20 | grep -q KEY_OK || die "corosync authkey on $N2"
+    both pcmkstart "systemctl enable -q corosync pacemaker && systemctl restart corosync && systemctl restart pacemaker && echo PCMK_STARTED" 90
+    for n in "${NODES[@]}"; do grep -aq '^PCMK_STARTED' "$EVID/pcmkstart.$n" || die "pacemaker start on $n: $(tail -2 "$EVID/pcmkstart.$n" | tr '\n' ' ')"; done
+    # the cluster's properties and the clone, once both nodes are online
+    out=$(ssh_n "$N1" "for i in \$(seq 1 60); do crm_mon -1 2>/dev/null | grep -q 'Online: \[ $N1 $N2 \]\|Online: \[ $N2 $N1 \]' && break; sleep 2; done
+        crm_mon -1 2>&1 | grep -a 'Online:'
+        crm_attribute -t crm_config -n stonith-enabled -v false && crm_attribute -t crm_config -n no-quorum-policy -v ignore &&
+        crm_attribute -t crm_config -n start-failure-is-fatal -v false && crm_attribute -t crm_config -n cluster-recheck-interval -v 10s &&
+        cibadmin --create --scope resources --xml-text '<clone id=\"p_drbd-clone\"><meta_attributes id=\"p_drbd-clone-meta\"><nvpair id=\"p_drbd-clone-promotable\" name=\"promotable\" value=\"true\"/><nvpair id=\"p_drbd-clone-pmax\" name=\"promoted-max\" value=\"2\"/><nvpair id=\"p_drbd-clone-pnmax\" name=\"promoted-node-max\" value=\"1\"/><nvpair id=\"p_drbd-clone-cmax\" name=\"clone-max\" value=\"2\"/><nvpair id=\"p_drbd-clone-cnmax\" name=\"clone-node-max\" value=\"1\"/><nvpair id=\"p_drbd-clone-notify\" name=\"notify\" value=\"true\"/><nvpair id=\"p_drbd-clone-ftimeout\" name=\"failure-timeout\" value=\"10s\"/></meta_attributes><primitive id=\"p_drbd\" class=\"ocf\" provider=\"linbit\" type=\"drbd\"><instance_attributes id=\"p_drbd-params\"><nvpair id=\"p_drbd-res\" name=\"drbd_resource\" value=\"$RES\"/></instance_attributes><operations><op id=\"p_drbd-mon-p\" name=\"monitor\" interval=\"29s\" role=\"Promoted\"/><op id=\"p_drbd-mon-u\" name=\"monitor\" interval=\"31s\" role=\"Unpromoted\"/></operations></primitive></clone>' && echo PCMK_RES_OK" 180)
+    echo "$out" > "$EVID/pcmk_resources"
+    grep -q PCMK_RES_OK <<<"$out" || die "pacemaker resources: $(tail -3 <<<"$out" | tr '\n' ' ')"
+    say "  Pacemaker on both ($(grep -a 'Online:' <<<"$out" | head -1 | tr -s ' ')): promotable clone p_drbd-clone of ocf:linbit:drbd, promoted-max=2"
+}
+pacemaker_down() {  # Pacemaker stopped without touching DRBD, its configuration gone, corosync's restored
+    both pcmkdown "crm_attribute -t crm_config -n maintenance-mode -v true >/dev/null 2>&1; sleep 2
+        systemctl disable -q --now pacemaker 2>/dev/null; systemctl disable -q --now corosync 2>/dev/null
+        rm -f /var/lib/pacemaker/cib/cib*
+        [ -e /etc/corosync/corosync.conf.promoter-test ] && mv /etc/corosync/corosync.conf.promoter-test /etc/corosync/corosync.conf
+        [ -e /etc/corosync/authkey.promoter-test ] && mv /etc/corosync/authkey.promoter-test /etc/corosync/authkey
+        systemctl is-active -q pacemaker && echo PCMK_STILL_UP || echo PCMK_DOWN" 90
+    local n
+    for n in "${NODES[@]}"; do grep -aq '^PCMK_DOWN' "$EVID/pcmkdown.$n" || die "pacemaker teardown on $n: $(tail -1 "$EVID/pcmkdown.$n")"; done
+}
+step_promoter_test() {
+    local how=${1:-} out n p0 p1 a1 a2 n1sum n2sum t0 i ctl=${PROMOTER_CONTROL:-} want st
+    case "$how" in pacemaker|become|manual) ;; *) die "promoter-test <pacemaker|become|manual>" ;; esac
+    [ -z "$ctl" ] || [ -s "$ctl" ] || die "promoter test: PROMOTER_CONTROL=$ctl is not a file"
+    # A lap that died after pacemaker_up left Pacemaker promoting DRBD, which
+    # re-promoted the pair under the next `down`/`up` (drbdprom3, 2026-10-21).
+    both pcmkleft "systemctl is-active -q pacemaker && echo PCMK_LEFT || echo PCMK_NONE" 15
+    if grep -aqh '^PCMK_LEFT' "$EVID"/pcmkleft.*; then
+        say "  Pacemaker left running by an earlier lap; taking it down first"
+        pacemaker_down
+    fi
+    # and a become-primary-on line one left in the resource (drbdprom5 lap 5)
+    both becomeleft "grep -q become-primary-on /etc/drbd.d/$RES.res && sed -i '/become-primary-on/d' /etc/drbd.d/$RES.res && sync && echo BECOME_LEFT; true" 15
+    grep -aqh '^BECOME_LEFT' "$EVID"/becomeleft.* && say "  become-primary-on left in the resource by an earlier lap; removed"
+    need_dual_primary
+    a1=$(lab_addr "$N1"); a2=$(lab_addr "$N2")
+    if python3 -I -c 'import ipaddress, sys; sys.exit(0 if ipaddress.ip_address(sys.argv[1]) < ipaddress.ip_address(sys.argv[2]) else 1)' "$a1" "$a2"; then
+        p0=$N1; p1=$N2
+    else
+        p0=$N2; p1=$N1
+    fi
+    step_mxfs
+    install_self_authority
+    if [ -n "$ctl" ]; then
+        cp "$ctl" "$EVID/control_program"
+        for n in "${NODES[@]}"; do
+            # synced: the pair outage below cuts the power seconds later, inside
+            # ext4's 5 s commit, and an unsynced rename came back as the program
+            # it replaced (lap 7 of drbd_promoter_ab.queue ran this tree's)
+            timeout 30 "$SSH" "$(lab_addr "$n")" "cat > /usr/sbin/mxfs-drbd-fence-self.new && chmod 755 /usr/sbin/mxfs-drbd-fence-self.new && mv /usr/sbin/mxfs-drbd-fence-self.new /usr/sbin/mxfs-drbd-fence-self && sync" < "$ctl" \
+                || die "promoter test: installing the control program on $n failed"
+        done
+        say "  CONTROL ARM: the boot program is $ctl (sha256 $(sha256sum "$ctl" | cut -c1-16))"
+    fi
+    say "promoter test ($how$([ -n "$ctl" ] && echo ", control")): participant 0 $p0, participant 1 $p1"
+    case "$how" in
+        pacemaker) pacemaker_up "$p0" "$p1" ;;
+        become)
+            both become "sed -i '/become-primary-on/d; 0,/^resource $RES {/s//resource $RES {\n    startup { become-primary-on both; }/' /etc/drbd.d/$RES.res && drbdadm dump $RES | grep -c become-primary-on" 20
+            for n in "${NODES[@]}"; do [ "$(tail -1 "$EVID/become.$n")" -ge 1 ] 2>/dev/null || die "promoter test: become-primary-on not in $n's resource: $(cat "$EVID/become.$n")"; done
+            say "  become-primary-on both in the resource on both nodes" ;;
+    esac
+    out=$(ssh_n "$N1" "mkdir -p $MNT/prom/n1 && for i in \$(seq 1 64); do head -c 65536 /dev/urandom > $MNT/prom/n1/f\$i; done && sync -f $MNT && cd $MNT/prom/n1 && md5sum f* | sort -k2 | md5sum | cut -c1-32" 60)
+    n1sum=$(tail -1 <<<"$out")
+    out=$(ssh_n "$N2" "mkdir -p $MNT/prom/n2 && for i in \$(seq 1 64); do head -c 65536 /dev/urandom > $MNT/prom/n2/f\$i; done && sync -f $MNT && cd $MNT/prom/n2 && md5sum f* | sort -k2 | md5sum | cut -c1-32" 60)
+    n2sum=$(tail -1 <<<"$out")
+    [ ${#n1sum} = 32 ] && [ ${#n2sum} = 32 ] || die "promoter test: could not record checksums ($n1sum / $n2sum)"
+    # Everything this test changed on the nodes' root filesystems (the
+    # program, the resource file) synced before the power cut: an edit made
+    # 34 s before the cut came back as the file it replaced (drbdprom4 lap 3).
+    both presync "sync && echo SYNCED" 60
+    for n in "${NODES[@]}"; do grep -aq '^SYNCED' "$EVID/presync.$n" || die "promoter test: sync on $n: $(tail -1 "$EVID/presync.$n")"; done
+    say "  sets $n1sum / $n2sum fsynced; destroying both nodes at once"
+    local dpids=()
+    for n in "${NODES[@]}"; do timeout 60 virsh -c qemu:///system destroy "$n" >/dev/null 2>&1 & dpids+=($!); done
+    wait "${dpids[@]}"
+    for n in "${NODES[@]}"; do
+        [ "$(timeout 20 virsh -c qemu:///system domstate "$n")" = "shut off" ] || die "promoter test: $n is not off"
+    done
+    "$REPO/scripts/lab_power.sh" up "${NODES[@]}" > "$EVID/prom_power" 2>&1 || die "promoter test: boot: $(tail -1 "$EVID/prom_power")"
+    if [ "$how" = become ]; then
+        out=$(ssh_n "$p1" "drbdadm dump $RES | grep -c become-primary-on" 15)
+        [ "${out:-0}" -ge 1 ] 2>/dev/null || die "promoter test: become-primary-on is not in $p1's resource after the outage (${out:-no answer})"
+    fi
+    local KO_MD5; KO_MD5=$(md5sum "$REPO/mxfs.ko" | awk '{print $1}')
+    both promprep "$NODE_DRBD_UP
+        mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }
+        MXFS_NO_MOUNT=1 MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1 | grep -a NODE_PREP" 150
+    for n in "${NODES[@]}"; do
+        grep -aq '^NODE_PREP_OK' "$EVID/promprep.$n" || die "promoter test: $n: $(tail -1 "$EVID/promprep.$n")"
+        self_dyndbg "$n" narrow || die "promoter test: cannot narrow the debug sites on $n"
+    done
+    # the boot program the outage left on participant 0 is the one this arm measures
+    want=$(sha256sum "${ctl:-$REPO/tools/mxfs_drbd_fence_self.py}" | cut -c1-64)
+    out=$(ssh_n "$p0" "sha256sum /usr/sbin/mxfs-drbd-fence-self | cut -c1-64" 15)
+    [ "$out" = "$want" ] || die "promoter test: $p0 runs a boot program with sha256 ${out:-none} after the outage, not the $([ -n "$ctl" ] && echo control || echo tree) program's $want"
+    say "  $p0's boot program after the outage is the $([ -n "$ctl" ] && echo control || echo tree) program (sha256 ${want:0:16})"
+    # participant 1 Primary, by the promoter under test
+    case "$how" in
+        pacemaker)
+            out=$(ssh_n "$p1" "for i in \$(seq 1 $((PCMK_PROMOTE_BUDGET / 2))); do case \"\$(drbdadm role $RES)\" in Primary/*) break ;; esac; sleep 2; done; drbdadm role $RES; crm_mon -1 2>&1 | grep -aE 'Promoted|Unpromoted|Masters|Slaves' | tr -s ' '" $((PCMK_PROMOTE_BUDGET + 20))) ;;
+        become)
+            out=$(ssh_n "$p1" "for i in \$(seq 1 60); do [ \"\$(drbdadm cstate $RES)\" = Connected ] && [ \"\$(drbdadm dstate $RES)\" = UpToDate/UpToDate ] && break; sleep 2; done
+                drbdadm sh-b-pri $RES 2>&1 | tail -1; drbdadm role $RES" 150) ;;
+        manual)
+            out=$(ssh_n "$p1" "for i in \$(seq 1 60); do [ \"\$(drbdadm cstate $RES)\" = Connected ] && [ \"\$(drbdadm dstate $RES)\" = UpToDate/UpToDate ] && break; sleep 2; done
+                drbdadm primary $RES 2>&1 | tail -1; drbdadm role $RES" 150) ;;
+    esac
+    echo "$out" > "$EVID/prom_p1_role"
+    grep -q '^Primary/' <<<"$out" || die "promoter test: $p1 is not Primary under the $how promoter: $(tr '\n' ' ' <<<"$out")"
+    say "  $p1 (participant 1) Primary under the $how promoter: $(tr '\n' ' ' <<<"$out" | cut -c1-200)"
+    out=$(ssh_n "$p0" "echo '<5>mxfs-test: promoter-test boot' > /dev/kmsg
+        systemctl reset-failed mxfs-rig-boot 2>/dev/null
+        systemd-run --unit=mxfs-rig-boot --property=RemainAfterExit=yes --setenv=GUEST_WAIT=0 /usr/sbin/mxfs-drbd-fence-self boot $RES $MNT 2>&1 | tail -1
+        echo \"BOOT_STARTED \$(drbdadm cstate $RES) \$(drbdadm dstate $RES) \$(drbdadm role $RES)\"" 30)
+    grep -aq '^BOOT_STARTED' <<<"$out" || die "promoter test: $p0: the boot program did not start: $out"
+    t0=$(date +%s)
+    local bootlog="journalctl -b 0 --no-pager -o cat -u mxfs-rig-boot | grep -aE 'not mounting|failed \\(rc=|stepped down|mounted $DRBD_DEV|promoted it|besides MeshXFS' | cut -c1-600"
+    if [ -n "$ctl" ]; then
+        for i in $(seq 1 $((PROMOTER_CONTROL_WINDOW / 10))); do
+            out=$(ssh_n "$p0" "$bootlog" 20)
+            grep -q "mounted $DRBD_DEV" <<<"$out" && die "promoter test (control): $p0 mounted while $p1 was Primary under the $how promoter: $out"
+            sleep 10
+        done
+        out=$(ssh_n "$p0" "$bootlog" 20)
+        echo "$out" > "$EVID/prom_bootlog.$p0"
+        ssh_n "$p0" "grep -aE 'mxfs-test|P-BOOT-SCAN|P-DRBD-STARTUP|mxfs-drbd-fence' /root/dmesg.stream | cut -c1-400" 30 > "$EVID/prom_kernlog.$p0"
+        local refused; refused=$(grep -c 'failed (rc=' <<<"$out")
+        [ "$refused" -ge 1 ] || die "promoter test (control): $p0's boot program reported no refused attempt in ${PROMOTER_CONTROL_WINDOW}s: $(tail -3 <<<"$out" | tr '\n' ' ')"
+        grep -qE 'promoted it|besides MeshXFS' <<<"$out" && die "promoter test (control): the control program named the outside promoter: $out"
+        grep -q "peer is 'Primary'" "$EVID/prom_kernlog.$p0" || die "promoter test (control): the module never reported the peer Primary: $(grep -aoE 'P-DRBD-STARTUP-[A-Z-]+' "$EVID/prom_kernlog.$p0" | sort | uniq -c | tr '\n' ' ')"
+        out=$(ssh_n "$p1" "drbdadm role $RES" 15)
+        say "  CONTROL: $p0 not mounted after ${PROMOTER_CONTROL_WINDOW}s, $refused refused attempt(s), the module waiting on \"the peer is 'Primary'\", nothing naming the promoter; $p1 still $out"
+        # The control program is still retrying, its mount inside the module's
+        # waits: a SIGTERM stop waits out systemd's 90 s escalation.  SIGKILL
+        # ends the startup-fence wait at its next 2 s poll, but the bootstrap
+        # scan before it (the heartbeat table read twice a 62 s dead window
+        # apart, dlm/bootstrap.c) checks no signal, so ~64 s plus the poll:
+        # ~70 s, twice over.
+        out=$(ssh_n "$p0" "systemctl kill --signal=KILL mxfs-rig-boot 2>/dev/null; t=\$(date +%s)
+            for i in \$(seq 1 140); do case \"\$(systemctl is-active mxfs-rig-boot)\" in inactive|failed) break ;; esac; sleep 1; done
+            systemctl is-active mxfs-rig-boot; echo ended_after=\$(( \$(date +%s) - t ))s; drbdadm role $RES" 150)
+        grep -q '^inactive\|^failed' <<<"$out" || die "promoter test (control): the control boot program on $p0 did not end within 140 s of SIGKILL: $(tr '\n' ' ' <<<"$out")"
+        say "  control boot program on $p0 ended: $(tr '\n' ' ' <<<"$out")"
+    else
+        case "$how" in
+            pacemaker) want="besides MeshXFS, Pacemaker, through its resource p_drbd" ;;
+            become) want="besides MeshXFS, DRBD's own service, from \`become-primary-on\`" ;;
+            manual) want="something other than MeshXFS promoted it" ;;
+        esac
+        local budget=$PROMOTER_REFUSE_BUDGET
+        [ "$how" = manual ] && budget=$PROMOTER_MANUAL_BUDGET
+        for i in $(seq 1 $((budget / 5))); do
+            out=$(ssh_n "$p0" "$bootlog" 20)
+            grep -qF "$want" <<<"$out" && break
+            grep -q "mounted $DRBD_DEV" <<<"$out" && die "promoter test: $p0 mounted while $p1 was Primary under the $how promoter: $out"
+            sleep 5
+        done
+        echo "$out" > "$EVID/prom_bootlog.$p0"
+        ssh_n "$p0" "grep -aE 'mxfs-test|P-BOOT-SCAN|P-DRBD-STARTUP|mxfs-drbd-fence' /root/dmesg.stream | cut -c1-400" 30 > "$EVID/prom_kernlog.$p0"
+        grep -qF "$want" <<<"$out" || die "promoter test: $p0's boot program did not name the $how promoter within ${budget}s: $(ssh_n "$p0" "systemctl is-active mxfs-rig-boot; journalctl -b 0 --no-pager -o cat -u mxfs-rig-boot | tail -3" 20 | tr '\n' ' ')"
+        if [ "$how" != manual ]; then
+            st=$(ssh_n "$p0" "systemctl is-failed mxfs-rig-boot; cat /run/mxfs/drbd-boot.$RES" 15 | tr '\n' ' ')
+            grep -q '^failed refused' <<<"$st" || die "promoter test: $p0's boot program named the promoter but did not stop refused: $st"
+        fi
+        say "  $p0 named it at +$(( $(date +%s) - t0 )) s: $(grep -F "$want" <<<"$out" | head -1 | cut -c1-400)"
+    fi
+    # The remedy the message gives: the promoter gone, participant 1 Secondary,
+    # then the boot programs of this tree on both nodes.
+    case "$how" in
+        pacemaker) pacemaker_down ;;
+        become) both unbecome "sed -i '/become-primary-on/d' /etc/drbd.d/$RES.res && drbdadm dump $RES | grep -c become-primary-on" 20 ;;
+    esac
+    install_self_authority
+    out=$(ssh_n "$p1" "drbdadm secondary $RES 2>&1 | tail -1; drbdadm role $RES" 30)
+    grep -q '^Secondary/' <<<"$out" || die "promoter test: could not demote $p1: $out"
+    both prombootb "systemctl stop mxfs-rig-boot 2>/dev/null; systemctl reset-failed mxfs-rig-boot 2>/dev/null
+        systemd-run --unit=mxfs-rig-boot --property=RemainAfterExit=yes --setenv=GUEST_WAIT=0 /usr/sbin/mxfs-drbd-fence-self boot $RES $MNT 2>&1 | tail -1; echo BOOT_STARTED" 30
+    for n in "${NODES[@]}"; do grep -aq '^BOOT_STARTED' "$EVID/prombootb.$n" || die "promoter test: $n: the boot program did not start: $(tail -1 "$EVID/prombootb.$n")"; done
+    say "  promoter removed, $p1 demoted, this tree's boot program started on both"
+    local done_n
+    t0=$(date +%s)
+    for i in $(seq 1 $((SELF_OUTAGE_BUDGET / 5))); do
+        both promstate "echo \"\$(systemctl is-active mxfs-rig-boot 2>/dev/null) \$(drbdadm cstate $RES 2>/dev/null) \$(drbdadm dstate $RES 2>/dev/null) \$(drbdadm role $RES 2>/dev/null) MNT=\$(awk '\$3 == \"mxfs\" && \$1 == \"$DRBD_DEV\" {print \$2}' /proc/mounts | head -1)\"" 15
+        done_n=0
+        for n in "${NODES[@]}"; do
+            case "$(cat "$EVID/promstate.$n")" in *" MNT=$MNT"|failed*|inactive*) done_n=$((done_n + 1)) ;; esac
+        done
+        [ "$done_n" = 2 ] && break
+        sleep 5
+    done
+    for n in "${NODES[@]}"; do
+        ssh_n "$n" "journalctl -b 0 --no-pager -o short-iso -u mxfs-rig-boot -t mxfs-drbd-fence | cut -c1-400 | tail -60" 30 > "$EVID/prom_bootlog_after.$n"
+        ssh_n "$n" "gzip -c /root/dmesg.stream | base64 -w 76" 60 | base64 -d > "$EVID/prom_dmesg_stream.$n.gz"
+        grep -q " MNT=$MNT\$" "$EVID/promstate.$n" \
+            || die "promoter test: $n did not mount within ${SELF_OUTAGE_BUDGET}s of the promoter's removal: $(cat "$EVID/promstate.$n") (evidence $EVID)"
+    done
+    say "  both mounted $(( $(date +%s) - t0 )) s after the promoter's removal"
+    for n in "${NODES[@]}"; do
+        out=$(ssh_n "$n" "cd $MNT/prom/n1 && md5sum f* | sort -k2 | md5sum | cut -c1-32; cd $MNT/prom/n2 && md5sum f* | sort -k2 | md5sum | cut -c1-32; touch $MNT/prom/after.$n && rm $MNT/prom/after.$n && echo FS_OK" 60)
+        [ "$(sed -n 1p <<<"$out")" = "$n1sum" ] && [ "$(sed -n 2p <<<"$out")" = "$n2sum" ] \
+            || die "promoter test: $n reads different data after the outage: $out"
+        grep -q FS_OK <<<"$out" || die "promoter test: $n cannot write after the outage: $out"
+    done
+    say "  every fsynced file of both nodes intact on both, and both write"
+    both promstop "systemctl stop mxfs-rig-boot 2>/dev/null; systemctl reset-failed mxfs-rig-boot 2>/dev/null; $NODE_UNMOUNT; echo STOP_OK" 120
+    for n in "${NODES[@]}"; do grep -aq '^STOP_OK' "$EVID/promstop.$n" || die "promoter test: $n would not release mxfs: $(tail -1 "$EVID/promstop.$n")"; done
+    out=$(ssh_n "$N1" "$NODE_REPO/tools/chk_mxfs $DRBD_DEV 2>&1 | tail -3; echo CHK_RC=\${PIPESTATUS[0]}" 120)
+    echo "$out" > "$EVID/prom_chk"
+    grep -q 'CHK_RC=0' <<<"$out" || die "promoter test: chk_mxfs after the recovery: $(tail -3 <<<"$out" | tr '\n' ' ')"
+    say "  cold chk_mxfs clean"
+    install_fencing
+    say "promoter test ($how$([ -n "$ctl" ] && echo ", control")): passed (the rig's node fence is configured again; MXFS left unmounted)"
+}
+
 # The survivor of a built-in exclusion restarts while its peer is still down,
 # as the physical pair did on 2026-10-06: pve2's hardware dead, pve1 reset, and
 # pve1 never mounted again.  The victim is destroyed and the survivor recovers
@@ -2970,6 +3275,7 @@ case "$CMD" in
     self-restart-test) evid; take_locks; hold_luns adopt; step_self_restart_test ;;
     takeover-test) evid; take_locks; hold_luns adopt; step_takeover_test "$@" ;;
     quorum-test) evid; take_locks; hold_luns adopt; step_quorum_test "$@" ;;
+    promoter-test) evid; take_locks; hold_luns adopt; step_promoter_test "$@" ;;
     rejoin)      # [node]: the node to bring back (default $N2); the other is its survivor
         evid; take_locks; hold_luns adopt
         rj=${1:-$N2}; [ "$rj" = "$N1" ] && rs=$N2 || rs=$N1

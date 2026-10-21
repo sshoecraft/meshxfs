@@ -1,0 +1,21 @@
+# D-GH2-DRBD-REJOIN-WAITS-FOREVER-FOR-PEER-SECONDARY-UNDER-PACEMAKER: the laps
+# of tests/queues/drbd_promoter_ab.queue that did not measure, run again with
+# the same reading rules and bounds (see that file).
+#   lap 3 (pacemaker, control) reached the defect (4 refused attempts in 420 s,
+#     the module waiting on "the peer is 'Primary'", nothing naming the
+#     promoter) and then failed in the harness: `systemctl stop` of the control
+#     boot program waited out systemd's 90 s escalation while its mount sat in
+#     the module's startup-fence wait, which only a fatal signal ends.  The
+#     harness now SIGKILLs it after the window.
+#   laps 4 and 5 refused the pair lap 3 left (participant 1 demoted, the other
+#     Primary), so `up` runs first.
+#   lap 6 ran while drbd_rig.sh was edited under it (bash reads a script as it
+#     runs), so its verdict does not count either way.
+#   lap 7 ran after lap 6 on whatever lap 6 left.
+480 DRBD_RIG_NO_BASELINE=1 scripts/drbd_rig.sh up
+1870 PROMOTER_CONTROL=tests/evidence/drbd_rig/control_mxfs_drbd_fence_self_pre_promoter_fix.py scripts/drbd_rig.sh promoter-test pacemaker
+480 DRBD_RIG_NO_BASELINE=1 scripts/drbd_rig.sh up
+1180 scripts/drbd_rig.sh promoter-test become
+1570 PROMOTER_CONTROL=tests/evidence/drbd_rig/control_mxfs_drbd_fence_self_pre_promoter_fix.py scripts/drbd_rig.sh promoter-test become
+1390 scripts/drbd_rig.sh promoter-test manual
+1570 PROMOTER_CONTROL=tests/evidence/drbd_rig/control_mxfs_drbd_fence_self_pre_promoter_fix.py scripts/drbd_rig.sh promoter-test manual

@@ -78,6 +78,15 @@
 #   D-ALLOC-WITNESS-PEER-MKDIR-ESTALE-ON-POISONED-CACHED-DIR-4CAW
 #     PASS (per lap)  no 'Stale file handle' in any row output; recorded per
 #                     node: P-LKUP-POISON-RETIRE, P-LKUP-POISON-RETURNED (0).
+#   From 0.90.132, with orphan_adopt_platter_verify (laps frkg*):
+#   D-ORPHAN-SCAN-ADOPTS-FREED-NUMBER-LEAVES-UNLINKED-BUCKET-ON-FREE-CORE
+#     PASS (per lap)  chk_clean verdict=CLEAN with no 'has a FREE core' line
+#                     in its chk log, and no P98-ORPHAN-ADOPT on either node
+#                     whose gen differs from the platter's; recorded per node:
+#                     P98-ORPHAN-ADOPT, P98-ORPHAN-ADOPT-REFUSED (reach: a lap
+#                     with a refusal is the fixed path working).
+#     FIXED AND VERIFIED on the rig side: every lap PASS.  Any FREE core:
+#     REFUTED, a new hypothesis first.
 #   Any shutdown, BUG, Oops, hung task or chk_clean not CLEAN is attributed
 #   from its own lines first.
 #
@@ -85,15 +94,15 @@
 # rows and prep (path_fenced_return 400 s + chk_clean 180 s + the chain's
 # overhead outside the rows, measured 130-160 s = 730 s, plus prep_cluster
 # 300 s) = 1030 s.
-1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf1 1 --prep --rows path_fenced_return,chk_clean
-1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf2 1 --prep --rows path_fenced_return,chk_clean
-1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf3 1 --prep --rows path_fenced_return,chk_clean
-1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf4 1 --prep --rows path_fenced_return,chk_clean
-1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf5 1 --prep --rows path_fenced_return,chk_clean
-1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf6 1 --prep --rows path_fenced_return,chk_clean
-1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf7 1 --prep --rows path_fenced_return,chk_clean
-1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf8 1 --prep --rows path_fenced_return,chk_clean
-1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf9 1 --prep --rows path_fenced_return,chk_clean
-1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf10 1 --prep --rows path_fenced_return,chk_clean
-1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf11 1 --prep --rows path_fenced_return,chk_clean
-1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkf12 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkg1 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkg2 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkg3 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkg4 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkg5 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkg6 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkg7 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkg8 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkg9 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkg10 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkg11 1 --prep --rows path_fenced_return,chk_clean
+1030 tests/mpath/lap_chain.sh laps 2/net/mesh/mpath g2e frkg12 1 --prep --rows path_fenced_return,chk_clean

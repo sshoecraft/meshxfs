@@ -8,16 +8,19 @@ ready, computed from the evidence each row names in data/release_table.json.
 
 A row is one of:
     ✅ Ready             every source passes on the release build and nothing blocks it
-    ⏳ In progress       a board of the row has cells marked PENDING (a run is filling them)
+    ⏳ In progress       a board of the row has cells marked PENDING (a run is filling them),
+                         or one of its runs is live and has not printed its verdict
     ❌ Not ready: ...    the first thing in the way
 
 Every row is a configuration the release is meant to ship.  A ❌ row holds the
-release until it is Ready.
+release until it is Ready.  A row whose testing is in progress reads In progress whatever
+else it waits on; -v still lists every reason, and once the run ends the row reads the
+first of them.
 
 What stands in the way, in the order it is reported:
   1. a release-blocking defect open for any of the row's configurations (tools/defects.py's
      own test: reaches the configuration, and its impact is not `noblock`);
-  2. a board cell that is not PASS (FAIL, FLAKY, UNKNOWN, ...) or that was earned on another
+  2. a board cell that is not PASS (FAIL, UNKNOWN, ...) or that was earned on another
      build (criteria.py calls that STALE);
   3. a run whose newest evidence file does not end in PASS on the release build.
 
@@ -108,7 +111,40 @@ def release_builds(version: str) -> dict:
         return {}
 
 
+def live_comms() -> set:
+    """Every live process's comm. /proc/<pid>/comm never blocks on a task wedged holding its
+    mmap_lock, which cmdline and ps do."""
+    comms = set()
+    for p in glob.glob("/proc/[0-9]*/comm"):
+        try:
+            comms.add(Path(p).read_text().strip())
+        except OSError:
+            pass
+    return comms
+
+
+def run_live(run: dict, version: str) -> str:
+    """The log of a run of this source that is going now, or "": its process is live (by
+    comm) and the newest log naming this version (and kernel) has no verdict line yet."""
+    live = run.get("live")
+    if not live or live["comm"] not in live_comms():
+        return ""
+    select = live["select"].replace("{version}", re.escape(version)).replace(
+        "{kernel}", re.escape(run.get("kernel", "")))
+    files = [f for f in glob.glob(str(REPO / live["glob"]))
+             if re.search(select, Path(f).read_text(errors="replace"), re.M)]
+    if not files:
+        return ""
+    newest = max(files, key=os.path.getmtime)
+    if re.search(live["terminal"], Path(newest).read_text(errors="replace"), re.M):
+        return ""
+    return os.path.relpath(newest, REPO)
+
+
 def run_problem(run: dict, version: str, srcv: str) -> tuple:
+    going = run_live(run, version)
+    if going:
+        return "progress", f"{run['what']}: running ({going})"
     globs = run["glob"] if isinstance(run["glob"], list) else [run["glob"]]
     files = []
     for g in globs:
@@ -205,10 +241,11 @@ def reaching(rows: list, queue: list) -> dict:
     return hits
 
 
-#: what a row's status is when its sources disagree, worst first: an open defect or a real
-#: failure is Not ready whatever else is running; a run still filling cells is In progress;
-#: a source with nothing on the release build yet is Not ready
-ORDER = ("bad", "fail", "progress", "unrun", "ok")
+#: what a row's status is when its sources disagree: a run still filling cells is In
+#: progress whatever else the row is waiting on (an open defect stays among its reasons
+#: and is what it reads once the run ends); otherwise an open defect or a real failure is
+#: Not ready, and a source with nothing on the release build yet is Not ready
+ORDER = ("progress", "bad", "fail", "unrun", "ok")
 
 
 def row_status(row: dict, version: str, srcv: str, queue: list, crit_cache: dict) -> tuple:
@@ -231,16 +268,10 @@ def table(rows: list) -> str:
     widths = [max(len(head[i]), *(len(r[i]) for r in rows)) for i in range(3)]
 
     def line(cells):
-        return "│ " + " │ ".join(c.ljust(w) for c, w in zip(cells, widths)) + " │"
+        return "| " + " | ".join(c.ljust(w) for c, w in zip(cells, widths)) + " |"
 
-    def rule(left, mid, right):
-        return left + mid.join("─" * (w + 2) for w in widths) + right
-
-    out = [rule("┌", "┬", "┐"), line(head), rule("├", "┼", "┤")]
-    for i, r in enumerate(rows):
-        out.append(line(r))
-        out.append(rule("├", "┼", "┤") if i < len(rows) - 1 else rule("└", "┴", "┘"))
-    return "\n".join(out)
+    rule = "+" + "+".join("-" * (w + 2) for w in widths) + "+"
+    return "\n".join([rule, line(head), rule] + [line(r) for r in rows] + [rule])
 
 
 def main() -> int:
@@ -288,7 +319,19 @@ def main() -> int:
         print(f"Total: {len(hits)} records reach a released configuration: "
               f"{len(hits) - len(noblock)} block a release, {len(noblock)} marked noblock")
         return 0
+    #: configurations this release leaves out (data/configurations.json released_earlier): a row
+    #: made only of those is not part of the release, and says so instead of reading Not ready
+    left_out = {k for k in json.loads((REPO / "data" / "configurations.json").read_text())
+                .get("released_earlier", {}) if k != "_"}
     for row in rows:
+        if row.get("configs") and set(row["configs"]) <= left_out:
+            hits = [e["id"] for e in queue if str(e.get("impact", "")).lower() != "noblock"
+                    and any(defects.blocks(e, *defects.parse_at(c)) for c in row["configs"])]
+            out.append((row["nodes"], row["attachment"],
+                        f"➖ Not in {version}: {len(hits)} open release-blocking defect(s)"))
+            if args.verbose and hits:
+                notes.append(f"{row['nodes']} {row['attachment']}:\n  " + "\n  ".join(hits))
+            continue
         state, reasons = row_status(row, version, srcv, queue, crit_cache)
         if row.get("_platform_round"):
             s, r = platform_problem(row["platform"], version, rounds, row.get("_kernel", ""))

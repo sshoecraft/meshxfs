@@ -640,6 +640,74 @@ mxfs_orphan_on_any_bucket(
 	return 0;
 }
 
+/*
+ * D-NETMESH-MPATH-FENCED-RETURN-UNLINKED-BUCKET-POINTS-AT-FREE-CORE: an adopt
+ * is judged on the platter, read under the ILOCK and AG EX the adopt holds,
+ * never on the in-core copy alone.  The collect pass reads the platter
+ * unlocked, so a peer can free the zombie it listed before the adopt runs,
+ * and the copy the iget returns can then be this node's cached shell of an
+ * OLDER incarnation of the number, which the reload has just poisoned and
+ * which still carries that dead file's mode and nlink 0.  Measured
+ * (2/net/mesh/mpath, 0.90.131): the in-core test passed on such a shell and
+ * the adopt stamped a free inode onto this node's bucket; the cold check
+ * found the bucket pointing at a FREE core.  0 restores the in-core-only
+ * test, the same-build control.
+ */
+int mxfs_orphan_adopt_platter_verify = 1;
+module_param_named(orphan_adopt_platter_verify, mxfs_orphan_adopt_platter_verify,
+		   int, 0644);
+MODULE_PARM_DESC(orphan_adopt_platter_verify,
+	"the orphan scan adopts a bucketless zombie only if the platter, read under the adopt's locks, holds that copy's incarnation allocated with no links (1, default); 0 = the in-core mode/nlink test alone (test control)");
+static atomic_t mxfs_orphan_adopt_refused_n = ATOMIC_INIT(0);
+module_param_named(orphan_adopt_refused_n, mxfs_orphan_adopt_refused_n.counter,
+		   int, 0444);
+MODULE_PARM_DESC(orphan_adopt_refused_n,
+	"count of orphan-scan adopts refused because the platter does not hold the copy's incarnation as a zombie (P98-ORPHAN-ADOPT-REFUSED)");
+
+/*
+ * Test-only window: after the collect pass, park the scan while this is
+ * nonzero (re-read every 100 ms, so writing 0 releases it at once), bounded
+ * by its own value in ms.  Lets a harness free a listed zombie on the peer
+ * between the collect pass and the adopt.  Default 0 = off.
+ */
+static int mxfs_dbg_orphan_scan_hold_ms;
+module_param_named(dbg_orphan_scan_hold_ms, mxfs_dbg_orphan_scan_hold_ms, int,
+		   0644);
+MODULE_PARM_DESC(dbg_orphan_scan_hold_ms,
+	"debug: park the orphan scan after its collect pass until this is 0 or this many ms pass (default 0 = off)");
+
+/* The platter's dinode core for `ino`: mode, link count and generation. */
+static int
+mxfs_orphan_read_core(
+	struct xfs_perag	*pag,
+	xfs_ino_t		ino,
+	uint16_t		*mode,
+	uint32_t		*nlink,
+	uint32_t		*gen)
+{
+	extern int xfs_imap(struct xfs_perag *, struct xfs_trans *,
+			    xfs_ino_t, struct xfs_imap *, uint);
+	struct xfs_mount	*mp = pag_mount(pag);
+	struct xfs_imap		imap;
+	struct xfs_buf		*bp;
+	struct xfs_dinode	*dip;
+	int			error;
+
+	memset(&imap, 0, sizeof(imap));
+	error = xfs_imap(pag, NULL, ino, &imap, 0);
+	if (error)
+		return error;
+	error = xfs_imap_to_bp(mp, NULL, &imap, &bp);
+	if (error)
+		return error;
+	dip = xfs_buf_offset(bp, imap.im_boffset);
+	*mode = be16_to_cpu(dip->di_mode);
+	*nlink = be32_to_cpu(dip->di_nlink);
+	*gen = be32_to_cpu(dip->di_gen);
+	xfs_buf_relse(bp);
+	return 0;
+}
+
 int
 mxfs_orphan_scan(
 	struct xfs_mount	*mp)
@@ -666,6 +734,18 @@ mxfs_orphan_scan(
 	if (ctx.overflow)
 		pr_warn("mxfs: P98-ORPHAN-OVERFLOW cand>%u -- scan truncated, rerun at next recovery\n",
 			MXFS_ORPHAN_MAX_CAND);
+	if (READ_ONCE(mxfs_dbg_orphan_scan_hold_ms) > 0 && ctx.n) {
+		int	held = 0;
+
+		pr_warn("mxfs: P98-ORPHAN-SCAN-HOLD cand=%u ms=%d -- TEST: scan parked after its collect pass\n",
+			ctx.n, READ_ONCE(mxfs_dbg_orphan_scan_hold_ms));
+		while (held < READ_ONCE(mxfs_dbg_orphan_scan_hold_ms) &&
+		       !xfs_is_shutdown(mp)) {
+			msleep(100);
+			held += 100;
+		}
+		pr_warn("mxfs: P98-ORPHAN-SCAN-HOLD-END held_ms=%d\n", held);
+	}
 
 	for (i = 0; i < ctx.n; i++) {
 		xfs_ino_t		ino = ctx.cand[i];
@@ -738,6 +818,28 @@ mxfs_orphan_scan(
 		if (VFS_I(ip)->i_mode == 0 || VFS_I(ip)->i_nlink != 0) {
 			changed++;
 			goto next_cancel;
+		}
+		if (READ_ONCE(mxfs_orphan_adopt_platter_verify)) {
+			uint16_t	dmode = 0;
+			uint32_t	dnlink = 0, dgen = 0;
+			bool		stale = xfs_iflags_test(ip,
+						MXFS_IF_INCARN_STALE) ||
+					ip->i_mxfs_dead_incarn_gen != 0;
+
+			error = mxfs_orphan_read_core(pag, ino, &dmode,
+						      &dnlink, &dgen);
+			if (error || stale || dmode == 0 || dnlink != 0 ||
+			    dgen != VFS_I(ip)->i_generation) {
+				atomic_inc(&mxfs_orphan_adopt_refused_n);
+				pr_warn("mxfs: P98-ORPHAN-ADOPT-REFUSED ino=%llu gen=%u incore_mode=0%o stale=%d dead_gen=%u disk_mode=0%o disk_nlink=%u disk_gen=%u rc=%d -- the platter does not hold this copy's incarnation as a zombie; not adopting\n",
+					(unsigned long long)ino,
+					VFS_I(ip)->i_generation,
+					VFS_I(ip)->i_mode, stale ? 1 : 0,
+					ip->i_mxfs_dead_incarn_gen, dmode,
+					dnlink, dgen, error);
+				changed++;
+				goto next_cancel;
+			}
 		}
 		error = mxfs_orphan_on_any_bucket(pag,
 				XFS_INO_TO_AGINO(mp, ino), &memb);
