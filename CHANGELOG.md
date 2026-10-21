@@ -1,4 +1,4 @@
-## 2026-10-21 — 0.90.132 — Cross-Node Inode Coherence and Recovery
+## 2026-10-21 — 0.90.132 — Proxmox VE 9.2 Support and Cluster Reliability
 
 What changed for someone upgrading from 0.90.130:
 

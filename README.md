@@ -34,7 +34,7 @@ packages.
 > Everything that turns XFS into a filesystem many machines can mount at once
 > is AI-authored.
 
-> ## 0.90.132: Cross-Node Inode Coherence and Recovery
+> ## 0.90.132: Proxmox VE 9.2 Support and Cluster Reliability
 >
 > What changed for someone upgrading from 0.90.130:
 >
