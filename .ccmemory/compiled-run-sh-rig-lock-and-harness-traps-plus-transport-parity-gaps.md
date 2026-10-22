@@ -1,14 +1,14 @@
 ---
 name: compiled-run-sh-rig-lock-and-harness-traps-plus-transport-parity-gaps
-description: run.sh/drbd_rig.sh rig-lock and wait/fd traps, harness coverage gaps, plus init-order, flag-bit and TCP-vs-CAW parity traps in the code.
+description: run.sh/drbd_rig.sh rig-lock and wait/fd traps, coverage gaps, 1/xfs /dev/sda boot-disk default, plus init-order, flag-bit and TCP-vs-CAW parity traps
 metadata:
   type: feedback
-tags: [compiled, rig, run.sh, drbd, harness, tcp, caw, trap]
+tags: [compiled, rig, run.sh, drbd, harness, tcp, caw, trap, vsphere, safety, mkfs, MXFS_DEV, 1/xfs]
 ---
 
 # run.sh / drbd_rig.sh rig-lock traps, harness coverage gaps, and silent transport/ordering traps
 
-Topic group: mostly the `/tmp/mxfs_run.lock` rig lock and harness scripts (run.sh, drbd_rig.sh), plus four code-level traps with the same shape (state or behaviour silently absent on one path). Cluster boundary is loose; grouped by what each note teaches.
+Topic group: mostly the `/tmp/mxfs_run.lock` rig lock and harness scripts (run.sh, drbd_rig.sh), plus four code-level traps with the same shape (state or behaviour silently absent on one path). Cluster boundary is loose; grouped by what each note teaches. Also absorbs `compiled-run-sh-1-xfs-baseline-defaults-to-dev-sda-boot-disk-off-qemu-rig` (a one-note assorted group: the `run.sh 1/xfs` baseline's default device is the boot disk off the qemu rig), in section B.
 
 ## A. The rig lock (`/tmp/mxfs_run.lock`) and who holds it
 
@@ -21,6 +21,12 @@ Topic group: mostly the `/tmp/mxfs_run.lock` rig lock and harness scripts (run.s
 
 - **Bare `wait` in a script that keeps LUN-holder background processes never returns** (`tail --pid=$$ -f /dev/null &` per allocation lives until the script exits; drbd_rig.sh `up` sat in `wait` from 20 s to its 620 s budget). Collect `$!` per job and `wait "${pids[@]}"`; kill holders in an EXIT trap (tail notices pid death only on a ~1 s poll, so an immediate re-invocation saw "test1 is held by lun03's allocation"); spawn holders with lock fds closed or they keep the node/config flocks. Also never edit a bash script while an invocation is live: bash resumes at a byte offset and re-reads the new text. `trap-a-bare-wait-in-a-script-that-keeps-a-lun-holder-process-never-returns`
 - **A rig that reformats before every mount never exercises remount or retirement.** On the DRBD attachment a clean unmount leaves the heartbeat slot RETIRE_PENDING with key 0 (settled only by SCSI PR evidence): remount hung in admission (P-ADMIT-RETIRE-PENDING-HELD), whole-cluster restart was refused (P304-RETIRE-UNKNOWN-STALLED). Two sessions passed because `drbd_rig.sh mxfs` and run.sh prep both mkfs first. For any new attachment/transport/retirement path test: one node unmount+remount with peer up (several cycles), and all-nodes clean unmount then mount without mkfs. Now covered by `scripts/drbd_rig.sh remount-test`. `trap-a-rig-that-reformats-before-every-mount-never-exercises-remount-or-retirement`
+- **`run.sh 1/xfs` defaults `MXFS_DEV` to `/dev/sda`, which is the boot disk off the qemu rig** (source: `compiled-run-sh-1-xfs-baseline-defaults-to-dev-sda-boot-disk-off-qemu-rig`, a safety trap on any platform other than the qemu rig). `run.sh` takes the `1/xfs` native-XFS baseline's device from `data/configurations.json`, and that default is `/dev/sda`. It means "whatever LUN the live rig presents at sda", which is true only on the qemu rig. Multi-node configurations borrow a pool LUN instead, so they never hit this. On 2026-10-13, `MXFS_NODE_LIST=vstest1 ./run.sh 1/xfs prep_cluster` on a vSphere guest sent `sg_persist --clear` to the boot disk and ran `mkfs.xfs -f /dev/sda`. The kernel refused the exclusive open ("/dev/sda: Can't open blockdev") because sda's partitions were mounted; that is the only reason the root filesystem survived.
+  - Guard: `tests/setup/refuse_inuse_dev.sh` now guards both preps: it refuses a device with partitions, holders, mounts, or swap/LVM/RAID signatures. Still:
+  - Off the qemu rig, ALWAYS pass `MXFS_DEV` as the shared LUN's stable by-path link, e.g. `MXFS_DEV=/dev/disk/by-path/ip-192.168.120.1:3260-iscsi-iqn.2026-05.local.mxfs:pool-10-lun-0` on vstest1.
+  - `1/xfs` also needs `MXFS_NODE_LIST` with exactly one node, and its own `prep_cluster` before `fio_perf`.
+  - On vSphere the shared LUN is sdb; sda is the VMware boot disk.
+  - Never trust a harness's default device on a platform it was not written for. Read `lsblk` on the node first. Provenance: ccloop run 8bd0eed0, session 3. `trap-1-xfs-baseline-default-dev-sda-is-the-boot-disk-off-the-qemu-rig`
 
 ## C. Code-level traps (state or behaviour silently missing on one path)
 
@@ -31,4 +37,4 @@ Topic group: mostly the `/tmp/mxfs_run.lock` rig lock and harness scripts (run.s
 
 ## Recurring shape
 
-A path nobody exercises (other transport, remount, the in-barrier case, an orphan-only lock holder) hides the defect; each of these was found only after a harness or reading checked the path explicitly.
+A path nobody exercises (other transport, remount, the in-barrier case, an orphan-only lock holder, a platform the harness default was never written for) hides the defect; each of these was found only after a harness or reading checked the path explicitly.

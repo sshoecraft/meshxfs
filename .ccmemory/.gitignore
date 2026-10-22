@@ -11,3 +11,7 @@ index.db-wal
 index.db-shm
 ._*
 .DS_Store
+
+# ccmemory: required ignore patterns
+compaction-plan.json*
+compaction-claims/

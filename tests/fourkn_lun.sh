@@ -16,6 +16,16 @@
 # as tools/lun_pool.sh does: a run's host preflight samples the host kernel
 # log's rate under that lock, and a login's ~20 lines must not land in it.
 #
+# LOGGED OUT BEFORE THE NETWORK GOES.  `down` deletes the node's record, so the
+# node's next boot finds none and skips open-iscsi.service, whose stop is what
+# logs every session out ahead of the network at shutdown.  A login by hand
+# with that unit inactive left the session up when systemd took the network
+# down; lvm2-monitor's stop (vgchange --monitor n) then read the LUN for its
+# label scan through the dead path and waited on the session's 120 s
+# replacement timeout, so both nodes overran lab_power.sh's 90 s shutdown
+# bound and were destroyed, with or without mxfs ever loaded
+# (tests/fourkn_lun_shutdown_probe.sh).  So a login starts the unit too.
+#
 # Usage:
 #   tests/fourkn_lun.sh up <size> <node1> <node2>   create, export, bind; prints MXFS_DEV=<path>
 #   tests/fourkn_lun.sh down <node1> <node2>        unbind the nodes, remove the target, device and image
@@ -59,7 +69,8 @@ NODE_LOGIN=$NODE_UNMOUNT'
         sleep 2
         d=$(readlink -f DEVPATH 2>/dev/null)
         if [ -b "$d" ]; then
-            echo "LOGIN_OK dev=$d logical=$(blockdev --getss $d) physical=$(blockdev --getpbsz $d) wwid=$(cat /sys/block/$(basename $d)/device/wwid 2>/dev/null | tr -d " ")"
+            systemctl start open-iscsi.service >/dev/null 2>&1
+            echo "LOGIN_OK dev=$d logical=$(blockdev --getss $d) physical=$(blockdev --getpbsz $d) wwid=$(cat /sys/block/$(basename $d)/device/wwid 2>/dev/null | tr -d " ") open_iscsi=$(systemctl is-active open-iscsi.service)"
             exit 0
         fi
         sleep 3
@@ -96,7 +107,7 @@ up)
     for n in "$N1" "$N2"; do
         r=$(ssh_n "$n" "$(fill "$NODE_LOGIN")" 120)
         echo "$n: $r"
-        case $r in *LOGIN_OK*logical=4096*) ;; *) die "$n did not log in to a 4096-byte LUN" ;; esac
+        case $r in *LOGIN_OK*logical=4096*open_iscsi=active*) ;; *) die "$n did not log in to a 4096-byte LUN with open-iscsi.service active" ;; esac
     done
     echo "MXFS_DEV=$DEVPATH"
     ;;

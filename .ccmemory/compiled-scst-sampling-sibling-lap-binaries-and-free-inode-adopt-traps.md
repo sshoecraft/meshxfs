@@ -1,12 +1,12 @@
 ---
 name: compiled-scst-sampling-sibling-lap-binaries-and-free-inode-adopt-traps
-description: Lap/rig traps: SCST target + sd-inflight sampling blind spots, main-tree make clean aborts sibling laps, free-image adopt keeps dead-life nblocks
+description: Lap/rig traps: SCST/sd-inflight blind spots, make clean kills sibling laps, free-image adopt keeps dead nblocks, peer last-close B4 no-authority.
 metadata:
   type: feedback
-tags: [compiled, scst, caw, lap, sampling, sibling-checkout, reload, adopt, icache, nblocks, verifier, chk_mxfs]
+tags: [compiled, scst, caw, lap, sampling, sibling-checkout, reload, adopt, icache, nblocks, verifier, chk_mxfs, inactivation, unlinked-list, repro-design, vacuous-lap, B4]
 ---
 
-Assorted group: the tail the clusterer could not fit to one topic, organised by area. Three MXFS lap/rig traps from sessions 37-39. Common thread: the real state sits behind something that looks authoritative and is not. Probes read idle / `0:0` / CLEAN while a command is held or a block count is corrupt (sections 1 and 3), and a sibling-checkout lap depends on the main tree's `tools/` binaries without announcing it (section 2).
+Assorted group: the tail the clusterer could not fit to one topic, organised by area. Four MXFS lap/rig traps (sessions 37-39 and 86), four notes folded in. Common thread: the real state sits behind something that looks authoritative and is not. Probes read idle / `0:0` / CLEAN while a command is held or a block count is corrupt (sections 1 and 3), a sibling-checkout lap depends on the main tree's `tools/` binaries without announcing it (section 2), and a repro built around a peer freeing an inode it did not unlink passes structurally vacuous because the peer lacks authority at its last close (section 4, absorbed from `compiled-peer-last-close-b4-no-authority`).
 
 ## 1. SCST target-side and node-side sampling blind spots
 
@@ -37,3 +37,19 @@ Source: `trap-xfs-inode-from-disk-free-image-adopts-only-gen-and-mode`. Upstream
   - Any code that adopts a free image into an existing in-core inode must reset the in-core fields itself (the `P-RECYCLE-SANITIZE` arm / `mxfs_dlm_reset_inode_for_create` are the existing resets); never assume `xfs_inode_from_disk` did.
   - A cold audit reading CLEAN said nothing about block counts until `chk_mxfs` gained the `P-NBLOCKS-MISMATCH` check (session 37 source): CAW laps pwc1/pwc2 carried this corruption and were judged CLEAN.
   - `+0x80a` of `xfs_dinode_verify.part.0` is the nblocks-without-extents check only for builds of that source; resolve offsets with `nm mxfs.ko | grep 'xfs_dinode_verify\.part\.0$'` then `gdb -batch -ex 'info line *(0x<addr>+0x80a)' mxfs.ko` (gdb cannot parse the `.part.0` name directly).
+
+## 4. A peer's last close does not free an inode another node unlinked (B4 no-authority)
+
+Absorbed from `compiled-peer-last-close-b4-no-authority` (a single-note group the clusterer could not fit to a sibling topic). Its subject is the MXFS authority check that decides which node frees an unlinked inode at inactivation (B4 no-authority), and the repro-design failure that follows from it. Source: `trap-peer-last-close-never-frees-an-inode-it-did-not-unlink-b4-skip`.
+
+**The trap.** A node frees an unlinked inode only if it unlinked it itself (`MXFS_IF_LOCAL_UNLINK` / adopted unlink) or holds it EX in `i_dlm_mode`. The inactivation's own raw EX (`P-INACT-EX gmode=5`) does NOT set `i_dlm_mode`, and the last close publishes its open-clear by riding a demote first.
+
+So when node B holds a file open that node A unlinked, B's last close logs `P19-B3DEC ... b4_noauth=1` and `INACT-SKIP-STALE reason=no-authority-unlocked-not-unlinked`, and the free is left to A (its reaper, or A's next drop of a pinned reference).
+
+**What it broke.** Session 86: the directed H-IU1 queue (`tests/peer_open_unlinked_chain.sh`, owner rm z then y, peer holds y and closes it inside z's widened predecessor wait) ran six laps, all PASS, all `held_moved=0`. The peer never freed y, so the race the queue was built to force never happened; the queue measured nothing for its hypothesis.
+
+**How a peer does get authority.** Through EX taken by an operation, then the last reference dropping while that EX is still cached.
+- fn32's test1 took the peer's zombie's EX through `touch` (`P6H-ADOPT comm=touch`, then `P9-NLEDGE from_disk old=1 new=0`) and its next iput ran the inactivation with EX held.
+- The noino_gen0 workload's lookup/stat loops produce this naturally (lap ifd2: `P-UNLPREV-MOVED ... comm=stat`).
+
+**How to apply.** Before building a repro where one node must free an inode another node unlinked, check that the freeing node will hold `i_dlm_mode == EX` at the inactivation, not just an open file it closes. Grade reach in the harness with a counter that must be > 0, so a structurally vacuous lap reads VACUOUS instead of PASS.

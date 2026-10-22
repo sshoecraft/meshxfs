@@ -29,7 +29,11 @@ tests/**/*.log.*
 # tests/evidence/ is raw rig capture (dmesg, traces, disk images): 22 GB and
 # 107k files by 2026-09, past what a git host accepts in one push. Defect
 # records still cite paths under it; those files exist on the rig host only.
-tests/evidence/
+# On the rig host it is a symlink to /mxfs/evidence, the disk added for rig
+# data, so captures stay off the root filesystem the guests and LUN images
+# share.  No trailing slash: the pattern must match the link as well as a
+# directory.
+tests/evidence
 
 # ---- Rig run state written at the repo root by run.sh and the harnesses ----
 # Cluster markers, last-run records, throughput yardsticks, crash latches, the

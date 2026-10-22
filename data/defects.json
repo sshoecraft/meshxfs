@@ -2588,6 +2588,28 @@
       "impact_why": "Read from the code: the rebuilt BNO/CNT leaves name blocks the AG still owns as free, and the allocator hands a free block to a new owner, so two owners end up holding one block.",
       "reproducer": "chk_mxfs repair on an image whose AG has damaged BNO/CNT btrees and agi_count 0 (to be written as a test under tests/)",
       "updated": "2026-10-22"
+    },
+    {
+      "id": "D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS",
+      "severity": "medium",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-22",
+      "summary": "tests/fourkn_merge_2node.sh holds each node's first 64 merged inode-block writes 20 ms between the read and the COMPARE AND WRITE so a peer's write of the same block lands in between, but it lands only in most laps: of 4 held laps on the 4K-native LUN, 1 saw no MISCOMPARE and exited VACUOUS, so one lap does not reliably exercise the merged write's retry",
+      "evidence": "Held laps (HOLD_N=64 HOLD_MS=20), module 2666D8544F367E3B7424B60, test31/test32: tests/evidence/20261022T135408Z_fourkn_merge_2-net-mesh-direct miscompares 1 (PASS); 20261022T135619Z_fourkn_merge_2-disk-caw-direct 1 (PASS); 20261022T145928Z_fourkn_merge_2-disk-caw-direct 0 (VACUOUS: iwr_merge_blocks 247 and 221, dbg_iwr_merge_hold_left=0 on both, so every hold was spent with no peer write inside it); 20261022T154721Z_fourkn_merge_2-disk-caw-direct 2 (PASS). Unheld, 0 MISCOMPAREs in ~480 merged writes a lap (20261022T133714Z, 134001Z, 134249Z). Every VACUOUS lap passed every correctness check; the lap never reads one as PASS.",
+      "next": "Make the overlap certain instead of likely: have the hold wait for the peer's swap of the same block (or land a scripted peer write of it) inside the window, or measure the MISCOMPARE rate against HOLD_MS and HOLD_N and size the hold so a lap without one is rare enough to grade; until then rerun a VACUOUS lap, never count it.",
+      "reproducer": "tests/fourkn_merge_2node.sh <4Kn dev> test31 test32 with the default hold; count laps whose iwr_merge_miscompares is 0 on both nodes (exit 3)"
+    },
+    {
+      "id": "D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT-IS-NEVER-LOGGED-OUT-AT-SHUTDOWN",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-22",
+      "summary": "tools/lun_pool.sh binds a node by logging it in by hand (iscsiadm -o new, --login); on a node whose boot found no iSCSI node record open-iscsi.service is inactive, so nothing logs the pool session out before systemd stops the network at shutdown, and the node can hang past scripts/lab_power.sh's 90 s bound and be destroyed, as the 4K-native LUN's nodes did",
+      "evidence": "Mechanism measured with the same hand login on the 4K-native LUN (tests/fourkn_lun.sh), test31/test32: tests/evidence/20261022T150025Z_fourkn_shutdown_bare (after a merge lap) and 20261022T150432Z_fourkn_shutdown_bare (mxfs never loaded), both nodes HUNG: network down with the session up, lvm2-monitor's vgchange --monitor n opened the LUN for its label scan and its read was never answered (iSCSI ping timeout 9 s later, 120 s replacement timeout); starting open-iscsi.service after the login (20261022T154826Z_fourkn_shutdown_bare) logged the session out before the network and both nodes were off in 2 s. tools/lun_pool.sh:297-302 (single path) and :359-363 (multipath) delete every node record and log in by hand with node.startup=automatic, so a node is exposed until its next boot: a freshly built VM, or one whose records another tool removed (tests/fourkn_lun.sh's login deletes them all), in the boot of its first bind. Not yet observed on a pool LUN: at 2026-10-22 14:23 UTC every pool VM shut down with its session logged out (host kernel log logout_exec for test1, test2, test15, test16).",
+      "next": "Start open-iscsi.service after the bind's login in both lun_pool.sh paths and require it active, as tests/fourkn_lun.sh now does; verify with tests/fourkn_lun_shutdown_probe.sh on a pool LUN bound to nodes booted with no node record: unfixed both nodes hang, fixed both off in seconds.",
+      "reproducer": "boot two pool nodes with no iSCSI node record, tools/lun_pool.sh alloc them, then tests/fourkn_lun_shutdown_probe.sh <node1> <node2>"
     }
   ]
 }

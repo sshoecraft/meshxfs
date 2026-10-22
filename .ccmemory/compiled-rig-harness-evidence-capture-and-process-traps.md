@@ -1,12 +1,12 @@
 ---
 name: compiled-rig-harness-evidence-capture-and-process-traps
-description: Rig/harness traps: failed captures read as verdicts, kmsg/journald/netconsole loss, lap design, PID/ssh/stdio hangs, boot/SELinux state, 256KB docs
+description: Rig traps: failed captures as verdicts, kmsg/journald/netconsole loss, lap design, ssh/PID hangs, SELinux boot, 256KB docs; PVE pair disk/iSCSI rules
 metadata:
   type: feedback
-tags: [compiled, harness, rig, kmsg, journald, process, forensics, ssh, evidence-integrity, selinux]
+tags: [compiled, harness, rig, kmsg, journald, process, forensics, ssh, evidence-integrity, selinux, proxmox, pve, iscsi, test-hardware]
 ---
 
-Topic: how test harnesses on the MXFS rig lose, pollute or fabricate evidence (an instrument that failed silently, or whose output was polluted, produced a number later reported as a statement about MXFS) and the kernel-log, lap-design, process, ssh and boot mechanics that cause or hide it. Folds in `compiled-harness-capture-and-remote-shell-traps` (12 harness and rig-plumbing traps) beside the earlier kernel-log, lap-design and process-handling traps.
+Topic: how test harnesses on the MXFS rig lose, pollute or fabricate evidence (an instrument that failed silently, or whose output was polluted, produced a number later reported as a statement about MXFS) and the kernel-log, lap-design, process, ssh and boot mechanics that cause or hide it. Folds in `compiled-harness-capture-and-remote-shell-traps` (12 harness and rig-plumbing traps) beside the earlier kernel-log, lap-design and process-handling traps. Also absorbs `compiled-proxmox-pair-disk-and-iscsi-helper-rules`, a loose fit under the same lab hygiene: the rules for the physical Proxmox pair (pve1, pve2) test hardware, in the section "Physical Proxmox pair" below.
 
 ## A failed or polluted capture becomes a verdict
 
@@ -76,6 +76,19 @@ Source: `compiled-harness-capture-and-remote-shell-traps`.
 
 - A root-owned `/tmp/.mxfs_pass` (left by any sudo'd harness such as mpath_up.sh) makes sshpass 1.09 print "Failed to open password file" and then HANG on the prompt: rc=124, zero output, while `ssh -o BatchMode=yes` answers instantly, ping and port 22 fine. `[ -s ]` passed for the unprivileged caller. Fixed in tooling: mxfs_sshpass.sh tests readability and refuses with exit 96; mxfs_secrets.sh falls back to `${path}.uid$(id -u)`. When fleet ssh hangs after a subagent sweep, `ls -l /tmp/.mxfs_pass*` FIRST; unblock with `sudo -n chown steve:steve` (`trap-sudo-mpath-up-leaves-root-owned-passfile`).
 - `sed -i` on a clone image mounted on clyde (Ubuntu, no SELinux policy loaded) creates a new inode with no `security.selinux` xattr; the enforcing Alma clone booted with `/etc/hosts` and `initiatorname.iscsi` as `unlabeled_t`, 9 AVC denials, and iscsid answering "No initiator name set" (it reads the name once, so it stays broken until restarted). Rewrite through the existing inode (`sudo sed expr file | sudo tee file`, the `inplace` helper in scripts/lab_clone_node.sh; also read root-only files with sudo, an unprivileged `sed -n` failed silently). Booted clone: `restorecon -v` the files then `systemctl restart iscsid`. General: any file created from outside the guest's policy is unlabeled until restorecon or /.autorelabel. Diagnose with `ls -Z`, `ausearch -m avc --input-logs -ts boot`, `journalctl -u iscsid` (`trap-a-guest-file-rewritten-with-sed-i-from-a-host-without-selinux-boots-unlabeled-and-iscsid-caches-no-initiator-name`).
+
+## Physical Proxmox pair (pve1, pve2): test disks and iSCSI helpers
+
+Source: `compiled-proxmox-pair-disk-and-iscsi-helper-rules`, itself an assorted loose-fit group of two notes. Both concern the physical Proxmox pair, pve1 192.168.1.80 and pve2 192.168.1.81, and what must not be done to it.
+
+- **Disks: never the Kingstons.** After about a week of pair legs on the spare Kingston SSDNow V+ (SVP100S, 2011 SATA, QD1, ~1 s flush stalls), the user directed (2026-10-10) that no test, leg, A/B or measurement runs on them again; they are being removed. Fewer than 1% of users run SSDs that old. The reference disks are the Samsung 850 EVOs (pve1 250 GB, pve2 500 GB); wiping them for legs is authorized. Select by model ("850 EVO"), never by /dev name, since names shift when drives are removed.
+  - Failure mode: the D-REMOTE-NOQUEUE family reproduced only on the slow Kingstons, so every fix demanded a Kingston leg and a week was tuned to worst-case hardware. Defects seen only on such hardware stay in the queue but rank below anything seen on ordinary disks.
+  - "Working perfectly" meant the DRBD pair worked at 0.90.116 (released, failover suite green, no integrity/stability record), not every open slowdown record closed; do not inflate a criterion into an endless queue drain (`feedback-never-test-on-the-2011-kingston-ssds-the-samsungs-are-the-pve-pair-reference-disks`).
+- **iSCSI helpers: never the rig ones on the pair.** The pair runs other work concurrently (DRBD legs on sdb, guests).
+  - `tools/lun_pool.sh alloc` logs the node out of every target, deletes all node records, fuser -km and umounts every mxfs, rmmods mxfs and rewrites multipath config; it also hands pool LUNs to rig runs that format them, and any image dropped in `/home/steve/disks/pool/` becomes allocatable.
+  - `scripts/pve_iscsi_login.sh` does `iscsiadm -m node -u` plus `-o delete` for ALL records.
+  - Both are for disposable rig VMs only.
+  - On the pair use `scripts/pve_caw_lun.sh` (setup/login/status/logout/teardown): image `/home/steve/disks/pve/pvecaw01.img` (outside the pool), target `iqn.2026-05.local.mxfs:pve-caw-01`, portal 192.168.1.166 only, LUN 0 in ini_group `pve`, targeted login with node.startup=automatic. SCST objects are runtime-only: rerun `setup` after a clyde restart. Verified 2026-10-10: both hosts /dev/sdd, same WWID, CAW cross-host, miscompare refused, PR key visible across hosts (`trap-lun-pool-alloc-and-pve-iscsi-login-log-out-every-session-so-never-use-them-on-the-proxmox-pair`).
 
 ## Tooling quirk
 
