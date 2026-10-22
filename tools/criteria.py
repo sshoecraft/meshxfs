@@ -370,7 +370,9 @@ def lift_config(argv: list) -> list:
             #: A flag that takes a value would otherwise have its value read as a node count.
             skip = token in VALUE_FLAGS
             continue
-        if not re.fullmatch(r"\d+(?:/[A-Za-z*]+)*", token):
+        #: a field after the node count starts with a letter or `*` and may carry digits after
+        #: it: the 4K-native attachment is `direct4k`
+        if not re.fullmatch(r"\d+(?:/[A-Za-z*][A-Za-z0-9*]*)*", token):
             break
         if index + 1 < len(rest) and re.fullmatch(r"[A-Za-z]+", rest[index + 1]) \
                 and rest[index + 1] not in SUBCOMMANDS:

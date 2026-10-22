@@ -2030,7 +2030,27 @@
           "row": "path_peer_withdrawn",
           "iso": "2026-10-20T06:46:44Z"
         }
-      ]
+      ],
+      "batches": [
+        {
+          "id": "b20261022-cd722e",
+          "kind": "calibrate",
+          "row": "path_peer_withdrawn",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": true,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "does the shared directory's lock queue still jam after a peer withdraws on the 0.90.134 development build (seen on B0D2 and on the 0.90.132 release build 71AC)? Its rate decides between a fix (it reproduces) and a verification sized from a bad build's rate (it does not)"
+        }
+      ],
+      "updated": "2026-10-22"
     },
     {
       "id": "D-NETMESH-MPATH-CRASH-AUDIT-PEER-UMOUNT-BUSY-ON-0.90.131-CANDIDATE",
@@ -2217,8 +2237,8 @@
       "config": "*/*/*",
       "opened": "2026-10-21",
       "summary": "tests/suite/fsx.sh draws its seed from 4 random bytes (0..2^32-1), but the vendored fsx stores -S in an int and calls usage() when it is negative, so about half of all runs exit 90 at once and record a FAIL that exercised nothing; and fsx.sh writes fsx's output to /tmp/fsx.$$.*.log on the node and deletes it in its EXIT trap, so no failing run keeps its evidence.",
-      "evidence": "2/net/mesh/drbd fsx 2026-10-21T19:36:37Z (dry-run candidate 0.90.133-2, build 71AC6107043DD5BE3D9181A): FAIL checks=2 passed=0 failed=2 seed=3832054505, both checks in 2 s of an 88 s budget (tests/evidence/drbd_rig/criteria.runs.jsonl). Code: tests/suite/fsx.sh:27 SEED=$(od -An -N4 -tu4 /dev/urandom); tests/suite/tools/fsx.c:186 'int seed = 1;', :3397 'seed = getnum(optarg, &endp);', :3402-3403 'if (seed < 0) usage();'; tests/suite/fsx.sh:22 trap 'rm -rf \"$W\" /tmp/fsx.$$.*'. Reproduced on clyde 2026-10-21 with the vendored binary: 'tests/suite/tools/fsx -S 3832054505 -N 200 <file>' rc=90 'usage: fsx ...'; -S 2147483648 rc=90; -S 2147483647 rc=0 'Seed set to 2147483647'.",
-      "next": "Draw the seed in 1..2^31-1 in tests/suite/fsx.sh, and keep fsx's output (print the tail of a failing check's log into the row's output, and write the logs under the run's evidence instead of /tmp). Then settle the 19:36:37Z run through a reviewed detector-defect proposal, with the reproduction above as its evidence. ===== 2026-10-21: the seed is 1..2^31-1 and a failing check's log is kept on the node (tests/evidence/fsx_seed_fix_20261021.diff); the fixed row passed on 2/net/mesh/drbd at 20:57:33Z (seed 1472941388); the 19:36:37Z run is settled as a detector defect by reviewed approval P20261021-676432. STILL OPEN: run.sh does not copy a failing fsx log from the node into the run's evidence directory (it stays at /root/fsx.<seed>.<ops>.log on the node), and the record's disposition (FIXED AND VERIFIED) needs its control and verification batches.",
+      "evidence": "2/net/mesh/drbd fsx 2026-10-21T19:36:37Z (dry-run candidate 0.90.133-2, build 71AC6107043DD5BE3D9181A): FAIL checks=2 passed=0 failed=2 seed=3832054505, both checks in 2 s of an 88 s budget (tests/evidence/drbd_rig/criteria.runs.jsonl). Code: tests/suite/fsx.sh:27 SEED=$(od -An -N4 -tu4 /dev/urandom); tests/suite/tools/fsx.c:186 'int seed = 1;', :3397 'seed = getnum(optarg, &endp);', :3402-3403 'if (seed < 0) usage();'; tests/suite/fsx.sh:22 trap 'rm -rf \"$W\" /tmp/fsx.$$.*'. Reproduced on clyde 2026-10-21 with the vendored binary: 'tests/suite/tools/fsx -S 3832054505 -N 200 <file>' rc=90 'usage: fsx ...'; -S 2147483648 rc=90; -S 2147483647 rc=0 'Seed set to 2147483647'. ===== ===== 2026-10-22, the rest of the fix: run.sh's artifact pull for a row that did not pass (the one that already brings /root/drc_* from every node) now takes /root/fsx.<seed>.<ops>.log too, so a failing fsx check's log lands in tests/evidence/run_fsx_<run id>/ as <node>_fsx.<seed>.<ops>.log. Exercised on the host with the same remote command: a /root holding fsx.123.100000.log came back as test1_fsx.123.100000.log; a /root holding neither drc_* nor fsx logs sends nothing (rc 1, as before). The seed range (1..2^31-1) and the kept log were already in the tree.",
+      "next": "control batch of fsx laps at 2/net/mesh/direct with the fix taken out (tests/suite/fsx.sh drawing 4 random bytes again and deleting its logs, run.sh's pull without fsx logs): about half its laps must fail with fsx's usage; then the verification batch on the candidate, sized from it, and remove --fixed",
       "reproducer": "tests/suite/tools/fsx -S 2147483648 -N 200 <scratch file>: rc=90 usage (host-local, no rig)",
       "cells": [
         {
@@ -2227,7 +2247,7 @@
           "iso": "2026-10-21T19:36:37Z"
         }
       ],
-      "updated": "2026-10-21"
+      "updated": "2026-10-22"
     },
     {
       "id": "D-2NETMESH-DRBD-NODE-SYNC-WEDGED-AFTER-FIO-PERF-OVERRAN-RECORDED-AS-INFRA",
@@ -2802,14 +2822,78 @@
           "candidate": "",
           "build": "9594B08726D6732D2ED5E87",
           "variant": "HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
           "why": "the hold that waits for the peer's swap switched off: laps with no MISCOMPARE (VACUOUS) must come back"
         }
       ],
-      "updated": "2026-10-22"
+      "updated": "2026-10-22",
+      "rates": [
+        {
+          "row": "fourkn_merge",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-02b816",
+          "k": 9,
+          "n": 20,
+          "candidate": "",
+          "variant": "HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0",
+          "builds": [
+            "9594B08726D6732D2ED5E87"
+          ],
+          "date": "2026-10-22"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-22T19:02:22Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-22T19:01:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-22T18:59:35Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-22T18:58:53Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-22T18:56:48Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-22T18:56:07Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-22T18:54:42Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-22T18:50:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-22T18:49:56Z"
+        }
+      ]
     },
     {
       "id": "D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT-IS-NEVER-LOGGED-OUT-AT-SHUTDOWN",

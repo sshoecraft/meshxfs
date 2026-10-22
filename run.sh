@@ -2179,9 +2179,11 @@ run_coord() {  # name cat budget scale
         # recycle wipes them — the iter4 round-3 forensics were lost exactly
         # this way (journald also rotates in ~85s under probe volume, so the
         # kernlog pull above misses early rounds).  base64 shields the tar
-        # stream from ssh_node's line filter.
+        # stream from ssh_node's line filter.  A failing fsx check keeps its
+        # log as /root/fsx.<seed>.<ops>.log (tests/suite/fsx.sh), and only this
+        # pull brings it into the run's evidence.
         for cn in "${NODES[@]}"; do
-            ssh_node "$cn" "cd /root 2>/dev/null && ls -d drc_* >/dev/null 2>&1 && tar -cf - drc_* 2>/dev/null | base64" \
+            ssh_node "$cn" "cd /root 2>/dev/null && { f=\$(ls -d drc_* fsx.*.log 2>/dev/null); [ -n \"\$f\" ]; } && tar -cf - \$f 2>/dev/null | base64" \
                 | base64 -d 2>/dev/null | tar -xf - -C "$tmpd" --transform "s,^,${cn}_," 2>/dev/null &
         done
         wait
