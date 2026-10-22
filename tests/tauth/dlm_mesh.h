@@ -63,6 +63,9 @@ struct vnode {
     volatile int     basts;
     struct mxfs_resource_id last_bast_res;
     int              msgs_rx;
+    volatile int     lockreq_rx;        /* inbound LOCK_REQs: requests this
+                                         * node was asked to master */
+    volatile int     handoff_rx[8];     /* inbound PAGE_HANDOFFs, by kind */
 };
 
 static struct vnode nodes[NNODES];
@@ -163,6 +166,7 @@ static void vrx_fn(void *arg)
         if (me->dlm) {
             switch (hdr->type) {
             case MXFS_MSG_LOCK_REQ:
+                me->lockreq_rx++;
                 if (m->len >= sizeof(struct mxfs_dlm_lock_req))
                     mxfs_dlm_process_remote_request(me->dlm, hdr->sender,
                                                     (const struct mxfs_dlm_lock_req *)m->buf);
@@ -210,9 +214,13 @@ static void vrx_fn(void *arg)
                                                     (const struct mxfs_dlm_owner_seal *)m->buf);
                 break;
             case MXFS_MSG_PAGE_HANDOFF:
-                if (m->len >= sizeof(struct mxfs_dlm_page_handoff))
-                    mxfs_dlm_process_page_handoff(me->dlm, hdr->sender,
-                                                  (const struct mxfs_dlm_page_handoff *)m->buf);
+                if (m->len >= sizeof(struct mxfs_dlm_page_handoff)) {
+                    const struct mxfs_dlm_page_handoff *h =
+                        (const struct mxfs_dlm_page_handoff *)m->buf;
+
+                    me->handoff_rx[h->kind & 7]++;
+                    mxfs_dlm_process_page_handoff(me->dlm, hdr->sender, h);
+                }
                 break;
             case MXFS_MSG_LOCK_BAST: {
                 const struct mxfs_dlm_bast *b = (const struct mxfs_dlm_bast *)m->buf;

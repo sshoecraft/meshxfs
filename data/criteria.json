@@ -16,15 +16,74 @@
           "status": "PASS",
           "measured": "skipped (marker matched 1/xfs)",
           "reason": "",
-          "iso": "2026-10-22T18:08:15Z",
+          "iso": "2026-10-22T20:34:52Z",
           "recorded": "2026-10-22",
           "elapsed_s": 0,
           "build": "xfs-no-module",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261022T180808Z",
-          "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run5.json",
+          "run_id": "20261022T203445Z",
+          "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_drbd_idle2_net-mesh-drbd.run5.json",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T20:33:15Z",
+              "measured": "skipped (marker matched 1/xfs)",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T203308Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_drbd_idle2_net-mesh-drbd.run4.json"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T20:31:36Z",
+              "measured": "skipped (marker matched 1/xfs)",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T203129Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_drbd_idle2_net-mesh-drbd.run3.json"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T20:29:55Z",
+              "measured": "skipped (marker matched 1/xfs)",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T202948Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_drbd_idle2_net-mesh-drbd.run2.json"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T20:28:01Z",
+              "measured": "skipped (marker matched 1/xfs)",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T202754Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_drbd_idle2_net-mesh-drbd.run1.json"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T20:27:54Z",
+              "measured": "elapsed=2s (fresh prep)",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T202745Z"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:08:15Z",
+              "measured": "skipped (marker matched 1/xfs)",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T180808Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run5.json"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-22T18:06:53Z",
@@ -64,65 +123,6 @@
               "outcome": "PASS",
               "run_id": "20261022T180241Z",
               "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run1.json"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T18:01:26Z",
-              "measured": "skipped (marker matched 1/xfs)",
-              "reason": "",
-              "build": "xfs-no-module",
-              "outcome": "PASS",
-              "run_id": "20261022T180119Z",
-              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run5.json"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T18:00:05Z",
-              "measured": "skipped (marker matched 1/xfs)",
-              "reason": "",
-              "build": "xfs-no-module",
-              "outcome": "PASS",
-              "run_id": "20261022T175958Z",
-              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run4.json"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T17:58:44Z",
-              "measured": "skipped (marker matched 1/xfs)",
-              "reason": "",
-              "build": "xfs-no-module",
-              "outcome": "PASS",
-              "run_id": "20261022T175838Z",
-              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run3.json"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T17:57:11Z",
-              "measured": "skipped (marker matched 1/xfs)",
-              "reason": "",
-              "build": "xfs-no-module",
-              "outcome": "PASS",
-              "run_id": "20261022T175704Z",
-              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run2.json"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T17:55:48Z",
-              "measured": "skipped (marker matched 1/xfs)",
-              "reason": "",
-              "build": "xfs-no-module",
-              "outcome": "PASS",
-              "run_id": "20261022T175541Z",
-              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run1.json"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T17:55:41Z",
-              "measured": "elapsed=1s (fresh prep)",
-              "reason": "",
-              "build": "xfs-no-module",
-              "outcome": "PASS",
-              "run_id": "20261022T175532Z"
             }
           ]
         },
@@ -3939,17 +3939,67 @@
         },
         "1/xfs": {
           "status": "PASS",
-          "measured": "nodes_pass=1/1 hostload=1.91 host_disk[sda wms_p95=30.6 wms_max=30.7 MiBs_max=512] host_mem[dirty_max=2MiB writeback_max=0MiB avail_min=86612MiB] seqW=511MiB/s seqR=539MiB/s randW=52345iops randR=47906iops passes seqW=511/511/510/511 randW=48981/52345/48762/50490 seqR=454/494/539/538 randR=47697/47906/47836/47353",
+          "measured": "nodes_pass=1/1 hostload=2.81 host_disk[sda wms_p95=26.2 wms_max=27.8 MiBs_max=512] host_mem[dirty_max=4MiB writeback_max=0MiB avail_min=84937MiB] seqW=254MiB/s seqR=538MiB/s randW=26362iops randR=32703iops passes seqW=254/254/239/254 randW=24006/25052/26362/25802 seqR=365/538/490/536 randR=20583/32703/28694/28820",
           "reason": "",
-          "iso": "2026-10-22T18:09:29Z",
+          "iso": "2026-10-22T20:36:27Z",
           "recorded": "2026-10-22",
-          "elapsed_s": 39,
+          "elapsed_s": 60,
           "build": "xfs-no-module",
           "outcome": "PASS",
           "budget_s": 120,
-          "run_id": "20261022T180808Z",
-          "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run5.json",
+          "run_id": "20261022T203445Z",
+          "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_drbd_idle2_net-mesh-drbd.run5.json",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T20:34:45Z",
+              "measured": "nodes_pass=1/1 hostload=2.94 host_disk[sda wms_p95=24.2 wms_max=27.8 MiBs_max=512] host_mem[dirty_max=0MiB writeback_max=0MiB avail_min=85037MiB] seqW=255MiB/s seqR=538MiB/s randW=26235iops randR=45574iops passes seqW=255/255/254/254 randW=24490/26235/24619/20128 seqR=538/493/538/491 randR=45322/44643/43925/45574",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T203308Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_drbd_idle2_net-mesh-drbd.run4.json"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T20:33:07Z",
+              "measured": "nodes_pass=1/1 hostload=2.91 host_disk[sda wms_p95=24.2 wms_max=38.7 MiBs_max=512] host_mem[dirty_max=1MiB writeback_max=0MiB avail_min=84997MiB] seqW=255MiB/s seqR=539MiB/s randW=25206iops randR=44643iops passes seqW=255/237/254/237 randW=24454/25110/25206/21141 seqR=451/485/535/539 randR=29521/44643/31387/31357",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T203129Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_drbd_idle2_net-mesh-drbd.run3.json"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T20:31:28Z",
+              "measured": "nodes_pass=1/1 hostload=3.16 host_disk[sda wms_p95=25.1 wms_max=34.0 MiBs_max=513] host_mem[dirty_max=2MiB writeback_max=0MiB avail_min=84785MiB] seqW=255MiB/s seqR=539MiB/s randW=24509iops randR=26881iops passes seqW=254/255/238/255 randW=23523/24041/23256/24509 seqR=538/489/539/539 randR=26881/21802/20700/21168",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T202948Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_drbd_idle2_net-mesh-drbd.run2.json"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T20:29:48Z",
+              "measured": "nodes_pass=1/1 hostload=3.18 host_disk[sda wms_p95=23.6 wms_max=43.5 MiBs_max=512] host_mem[dirty_max=4MiB writeback_max=0MiB avail_min=85078MiB] seqW=254MiB/s seqR=313MiB/s randW=24824iops randR=45448iops passes seqW=254/254/254/254 randW=20951/23625/23814/24824 seqR=313/268/143/109 randR=45448/44341/44582/44582",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T202754Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_drbd_idle2_net-mesh-drbd.run1.json"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:09:29Z",
+              "measured": "nodes_pass=1/1 hostload=1.91 host_disk[sda wms_p95=30.6 wms_max=30.7 MiBs_max=512] host_mem[dirty_max=2MiB writeback_max=0MiB avail_min=86612MiB] seqW=511MiB/s seqR=539MiB/s randW=52345iops randR=47906iops passes seqW=511/511/510/511 randW=48981/52345/48762/50490 seqR=454/494/539/538 randR=47697/47906/47836/47353",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T180808Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run5.json"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-22T18:08:07Z",
@@ -3999,56 +4049,6 @@
               "outcome": "PASS",
               "run_id": "20261022T180119Z",
               "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run5.json"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T18:01:19Z",
-              "measured": "nodes_pass=1/1 hostload=1.88 host_disk[sda wms_p95=30.7 wms_max=47.9 MiBs_max=512] host_mem[dirty_max=0MiB writeback_max=0MiB avail_min=86611MiB] seqW=511MiB/s seqR=539MiB/s randW=52178iops randR=45322iops passes seqW=510/511/509/510 randW=45322/49724/51685/52178 seqR=539/530/533/528 randR=32157/45322/32670/33643",
-              "reason": "",
-              "build": "xfs-no-module",
-              "outcome": "PASS",
-              "run_id": "20261022T175958Z",
-              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run4.json"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T17:59:57Z",
-              "measured": "nodes_pass=1/1 hostload=1.89 host_disk[sda wms_p95=30.6 wms_max=30.9 MiBs_max=512] host_mem[dirty_max=1MiB writeback_max=0MiB avail_min=86664MiB] seqW=511MiB/s seqR=538MiB/s randW=51120iops randR=48188iops passes seqW=510/511/510/510 randW=51120/48047/47697/50490 seqR=538/538/492/450 randR=47421/47836/47148/48188",
-              "reason": "",
-              "build": "xfs-no-module",
-              "outcome": "PASS",
-              "run_id": "20261022T175838Z",
-              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run3.json"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T17:58:37Z",
-              "measured": "nodes_pass=1/1 hostload=1.33 host_disk[sda wms_p95=30.6 wms_max=30.6 MiBs_max=512] host_mem[dirty_max=0MiB writeback_max=0MiB avail_min=86596MiB] seqW=511MiB/s seqR=492MiB/s randW=51280iops randR=39196iops passes seqW=510/511/511/511 randW=50961/51280/48259/50181 seqR=130/246/492/358 randR=32284/34638/35387/39196",
-              "reason": "",
-              "build": "xfs-no-module",
-              "outcome": "PASS",
-              "run_id": "20261022T175704Z",
-              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run2.json"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T17:57:03Z",
-              "measured": "nodes_pass=1/1 hostload=1.97 host_disk[sda wms_p95=30.6 wms_max=30.7 MiBs_max=512] host_mem[dirty_max=3MiB writeback_max=0MiB avail_min=86714MiB] seqW=510MiB/s seqR=539MiB/s randW=46414iops randR=37364iops passes seqW=509/509/510/510 randW=45829/46152/44643/46414 seqR=536/539/539/533 randR=29627/23306/37364/23306",
-              "reason": "",
-              "build": "xfs-no-module",
-              "outcome": "PASS",
-              "run_id": "20261022T175541Z",
-              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run1.json"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T17:48:02Z",
-              "measured": "nodes_pass=1/1 hostload=1.60 host_disk[sda wms_p95=30.9 wms_max=31.0 MiBs_max=510] host_mem[dirty_max=1MiB writeback_max=0MiB avail_min=86637MiB] seqW=509MiB/s seqR=492MiB/s randW=51120iops randR=44949iops passes seqW=506/506/509/502 randW=47284/51120/47767/49127 seqR=196/420/492/337 randR=31907/44704/44102/44949",
-              "reason": "",
-              "build": "xfs-no-module",
-              "outcome": "PASS",
-              "run_id": "20261022T174633Z",
-              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/src/mxfs/tests/evidence/xfs_baseline_4kn_20261022T173344Z_runs/disk-caw-direct4k.run5.json"
             }
           ]
         },

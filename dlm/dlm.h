@@ -755,6 +755,11 @@ struct mxfs_dlm_ctx {
 							handoff_refused_leaving,      /* D-0953: FROZEN hand-offs
 														   * to a leaving mount, left
 														   * PREPARED for the successor */
+							handoff_auth_closed,     /* pages neither prepared,
+													  * activated nor decided on
+													  * because this incarnation's
+													  * authority over the LUN has
+													  * closed */
 							handoff_self_consumed,   /* takeovers that activated a
 													  * page a departed authority
 													  * had prepared to this mount

@@ -4941,6 +4941,26 @@ static int dlm_page_ensure_mine(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_
 {
 	if (!ctx->page_state || page >= ctx->page_count)
 		return 0;
+	/*
+	 * A node whose authority over the LUN has closed decides nothing on a
+	 * page and moves none to itself.  The target refuses each ledger write it
+	 * issues; a refused activation poisons the page, the next request on it
+	 * reconciles from the platter and activates again, and the page's FREEZE_REQ
+	 * brings a FROZEN answer that activates it once more.  Measured on
+	 * 8/net/mesh/mpath (test21, fenced after its filesystem shut down, its
+	 * peers still routing to it): 31,510 refused page publishes in five
+	 * minutes, one RESERVATION CONFLICT each, until the node was powered off.
+	 * The request parks as one on a page in transition does, and the requester
+	 * re-routes once the view no longer names this node.
+	 */
+	if (dlm_authority_lost(ctx)) {
+		ctx->handoff_auth_closed++;
+		mxfs_probe_ratelimited(
+		    "mxfs: P-TAUTH-PAGE-AUTH-CLOSED page=%u state=%u total=%llu -- parked: this incarnation's authority over the LUN is closed, so the page is neither activated nor decided on here\n",
+		    page, ctx->page_state[page],
+		    (unsigned long long)ctx->handoff_auth_closed);
+		return -EAGAIN;
+	}
 	if (ctx->page_state[page] == DLM_PS_MINE &&
 	    mxfs_tauth_ledger_page_mine(ctx->ledger, page))
 		return 0;
@@ -5134,6 +5154,24 @@ int mxfs_dlm_process_page_handoff(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t sende
 	page = msg->page;
 	if (page >= ctx->page_count)
 		return -EINVAL;
+	/*
+	 * A FREEZE_REQ prepares a page away and a FROZEN activates one here, and
+	 * each is a ledger write the target refuses once this incarnation's
+	 * authority over the LUN has closed (see dlm_page_ensure_mine).  Neither
+	 * is answered: the asker asks again on its cadence until the view no
+	 * longer names this node, and a page handed here stays PREPARED to this
+	 * incarnation for the successor's takeover, as one handed to a leaving
+	 * mount does.
+	 */
+	if ((msg->kind == MXFS_HANDOFF_FREEZE_REQ || msg->kind == MXFS_HANDOFF_FROZEN) &&
+	    dlm_authority_lost(ctx)) {
+		ctx->handoff_auth_closed++;
+		pr_warn_ratelimited(
+		    "mxfs: P-TAUTH-HANDOFF-AUTH-CLOSED kind=%u page=%u from=%u total=%llu -- this incarnation's authority over the LUN is closed: no page is prepared or activated here\n",
+		    msg->kind, page, sender,
+		    (unsigned long long)ctx->handoff_auth_closed);
+		return -ESHUTDOWN;
+	}
 
 	switch (msg->kind) {
 	case MXFS_HANDOFF_FREEZE_REQ: {

@@ -4018,6 +4018,143 @@
           "config": "8/net/mesh/mpath",
           "row": "path_peer_withdrawn",
           "iso": "2026-10-22T19:58:42Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:46:09Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:45:59Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:45:49Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:45:40Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:45:31Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:45:22Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:45:15Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:45:07Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:44:59Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:44:51Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:44:43Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:44:34Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:44:24Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:44:14Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:44:05Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:43:55Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:43:46Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:43:37Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:43:29Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-22T20:43:21Z"
+        }
+      ],
+      "batches": [
+        {
+          "id": "b20261022-1bb8dc",
+          "kind": "control",
+          "row": "lap:fenced_node_ledger",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 20,
+          "probe": "^  PASS 3 exposure: ",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "fix reverted: tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff sha256=87b95c6e8dea4dcb261e667db107bd90f7023aa34b17d4518c8816f7c0a73521",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix taken out: dlm_page_ensure_mine and the FREEZE_REQ and FROZEN arms of mxfs_dlm_process_page_handoff do not ask dlm_authority_lost, so a node whose authority over the LUN closed activates, prepares and decides on the pages its peers hand it, ask it for and send it requests on, each a ledger write the target refuses"
+        }
+      ],
+      "updated": "2026-10-22",
+      "rates": [
+        {
+          "row": "lap:fenced_node_ledger",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-1bb8dc",
+          "k": 20,
+          "n": 20,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff sha256=87b95c6e8dea4dcb261e667db107bd90f7023aa34b17d4518c8816f7c0a73521",
+          "builds": [
+            "9594B08726D6732D2ED5E87"
+          ],
+          "date": "2026-10-22"
         }
       ]
     }
