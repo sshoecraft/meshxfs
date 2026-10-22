@@ -161,6 +161,21 @@ def step_freeze(run: Run) -> tuple:
 PRESTEP_GROUP, PRESTEP_CONFIG = "g2", "2/net/mesh/direct"
 
 
+def presteps_env(group: str) -> dict:
+    """What the self-tests are told about the pair the presteps formed under `group`.
+
+    The pool lends the pair its LUN by node set: a harness resolves its device from the nodes it
+    is told (tests/lib/rig.sh), and without them it stops INFRA at stage=device. They are told the
+    group the pair was formed under as well. run.sh keeps a group's cluster marker apart
+    (.cluster_marker.<group>.json), and a tool that is not told reads the default marker, which
+    describes whatever ran there last; a prep a harness starts itself re-forms the pair outside
+    the group and rewrites that default one. MXFS_GROUP carries the group into those preps
+    (run.sh), and MXFS_MARKER names its marker to every tool (tools/mxfs_rig_tag.sh,
+    tests/lib/rig.sh). tests/presteps_env_lap.py checks it against the markers on disk."""
+    return {"MXFS_NODE_LIST": ",".join(lab("group", group).split()), "MXFS_GROUP": group,
+            "MXFS_MARKER": str(ROOT / f".cluster_marker.{group}.json")}
+
+
 def step_presteps(run: Run) -> tuple:
     """The instruments are checked before anything is graded with them. The lint and the checker
     calibration are host-local; the rig-library contract and the capture fault gate need the pair
@@ -191,17 +206,7 @@ def step_presteps(run: Run) -> tuple:
                                                   f"{PRESTEP_GROUP} did not pass for {run.cid}: "
                                                   f"{prep.get('outcome')} {prep.get('reason', '')}"]),
                 str(log.relative_to(ROOT)), "1/any")
-    # The pool lends the pair its LUN by node set: a harness resolves its device from the
-    # nodes it is told (tests/lib/rig.sh), and without them it stops INFRA at stage=device.
-    # They are told the group the pair was formed under as well. run.sh keeps a group's cluster
-    # marker apart (.cluster_marker.<group>.json), and a tool that is not told reads the default
-    # marker, which describes whatever ran there last; a prep a harness starts itself re-forms
-    # the pair outside the group and rewrites that default one. MXFS_GROUP carries the group into
-    # those preps (run.sh), and MXFS_MARKER names its marker to every tool (tools/mxfs_rig_tag.sh,
-    # tests/lib/rig.sh).
-    nodes = ",".join(lab("group", PRESTEP_GROUP).split())
-    pair = {"MXFS_NODE_LIST": nodes, "MXFS_GROUP": PRESTEP_GROUP,
-            "MXFS_MARKER": str(ROOT / f".cluster_marker.{PRESTEP_GROUP}.json")}
+    pair = presteps_env(PRESTEP_GROUP)
     rc = run.sh(["timeout", "300", "tests/rig_lib_contract.sh", run.tag], log, **pair)
     if rc != 0:
         failed.append(f"rig library contract rc={rc}")
