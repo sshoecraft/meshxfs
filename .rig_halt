@@ -1,0 +1,8 @@
+RIG HALTED 2026-10-22T19:57:21Z
+reason:   FLOOD
+trigger:  kernel log above 60 lines/s for 60s (12 consecutive hot windows, last ~89 lines/s over 5s) — last: [3345486]: scst: scst_set_cmd_error_status:1758:Reservation conflict (dev mxfspool04, initiator iqn.2004-10.com.ubuntu:01:test21-mxfs-node, tgt_id 4)
+evidence: /src/mxfs/.evidence/guard_20261022_195717_34475
+
+The host reported damage.  Do NOT start a fleet run until the
+cause is understood.  the never-reboot-the-host rule: only the user reboots clyde.
+Clear deliberately with: tools/clyde_kmsg_guard.sh clear

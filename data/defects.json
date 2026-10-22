@@ -2556,9 +2556,145 @@
           "config": "1/any",
           "row": "release:presteps",
           "iso": "2026-10-21T23:22:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:20Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:18Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:17Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:16Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:15Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:14Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:13Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:12Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:11Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:10Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:09Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:08Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:07Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:06Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:05Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:04Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:03Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:02Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_tag_dev_host",
+          "iso": "2026-10-22T19:59:01Z"
         }
       ],
-      "updated": "2026-10-21"
+      "updated": "2026-10-22",
+      "batches": [
+        {
+          "id": "b20261022-ba4c55",
+          "kind": "control",
+          "row": "lap:rig_tag_dev_host",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 20,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "fix reverted: tests/evidence/controls/D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK.fix.diff sha256=ceb7e822f9f19cdb2e879620c2cbb764a2fc6838bed120349aaabed2becacef6",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix taken out: the dev host reads a node device path locally again; every exposed lap must tag the dev host's own disk"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:rig_tag_dev_host",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-ba4c55",
+          "k": 20,
+          "n": 20,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK.fix.diff sha256=ceb7e822f9f19cdb2e879620c2cbb764a2fc6838bed120349aaabed2becacef6",
+          "builds": [
+            "9594B08726D6732D2ED5E87"
+          ],
+          "date": "2026-10-22"
+        }
+      ]
     },
     {
       "id": "D-PRESTEPS-FORM-PAIR-UNDER-G2-MARKER-BUT-SELF-TESTS-READ-DEFAULT-MARKER",
