@@ -3447,7 +3447,26 @@
       "impact": "integrity",
       "impact_why": "Read from the code: the rebuilt BNO/CNT leaves name blocks the AG still owns as free, and the allocator hands a free block to a new owner, so two owners end up holding one block.",
       "reproducer": "tests/chk_freespace_rebuild_controls.sh <label> <chk_mxfs binary> (host only, no rig): exit 1 with the rebuilt BNO records differing from mkfs's on any AG with no inodes",
-      "updated": "2026-10-22"
+      "updated": "2026-10-22",
+      "batches": [
+        {
+          "id": "b20261022-dcc377",
+          "kind": "control",
+          "row": "lap:chk_freespace_rebuild",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "holding [0-9]+ blocks of a file whose inode is in another AG",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "fix reverted: tests/evidence/controls/D-CHK-FREESPACE-REBUILD-DECLARES-OWNED-BLOCKS-FREE.fix.diff sha256=72994279ef5e167700d5cc2676b15ecbe77f659a48d24dd860f0f8e55d9438b0",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix taken out: the rebuild trusts that nothing but the AG headers is allocated, so it declares the blocks of a file whose inode is in another AG free"
+        }
+      ]
     },
     {
       "id": "D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS",
