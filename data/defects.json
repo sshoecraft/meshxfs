@@ -2669,7 +2669,26 @@
           "iso": "2026-10-21T23:22:19Z"
         }
       ],
-      "updated": "2026-10-21"
+      "updated": "2026-10-22",
+      "batches": [
+        {
+          "id": "b20261022-bf8f03",
+          "kind": "control",
+          "row": "lap:rig_eui64_resolve",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 20,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "fix reverted: tests/evidence/controls/D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E.fix.diff sha256=62c688f79bff83a4525b140807cc3f5b222a0ab436a1ef2e1466dea7370332cf",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix taken out: the WWID normaliser keeps the e of eui. and the no-mount fallback looks only for wwn-0x<id>, which udev never makes for an EUI-64 LUN; every exposed lap must abort with no MXFS device basis"
+        }
+      ]
     },
     {
       "id": "D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK-FOR-A-NODE-DEVICE-PATH",
@@ -3460,11 +3479,80 @@
           "candidate": "",
           "build": "9594B08726D6732D2ED5E87",
           "variant": "fix reverted: tests/evidence/controls/D-CHK-FREESPACE-REBUILD-DECLARES-OWNED-BLOCKS-FREE.fix.diff sha256=72994279ef5e167700d5cc2676b15ecbe77f659a48d24dd860f0f8e55d9438b0",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: the rebuild trusts that nothing but the AG headers is allocated, so it declares the blocks of a file whose inode is in another AG free"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:chk_freespace_rebuild",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-dcc377",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-CHK-FREESPACE-REBUILD-DECLARES-OWNED-BLOCKS-FREE.fix.diff sha256=72994279ef5e167700d5cc2676b15ecbe77f659a48d24dd860f0f8e55d9438b0",
+          "builds": [
+            "9594B08726D6732D2ED5E87"
+          ],
+          "date": "2026-10-22"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:chk_freespace_rebuild",
+          "iso": "2026-10-22T20:20:48Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:chk_freespace_rebuild",
+          "iso": "2026-10-22T20:20:39Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:chk_freespace_rebuild",
+          "iso": "2026-10-22T20:20:30Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:chk_freespace_rebuild",
+          "iso": "2026-10-22T20:20:21Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:chk_freespace_rebuild",
+          "iso": "2026-10-22T20:20:13Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:chk_freespace_rebuild",
+          "iso": "2026-10-22T20:20:03Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:chk_freespace_rebuild",
+          "iso": "2026-10-22T20:19:55Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:chk_freespace_rebuild",
+          "iso": "2026-10-22T20:19:46Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:chk_freespace_rebuild",
+          "iso": "2026-10-22T20:19:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:chk_freespace_rebuild",
+          "iso": "2026-10-22T20:19:28Z"
         }
       ]
     },
