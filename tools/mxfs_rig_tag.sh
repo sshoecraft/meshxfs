@@ -111,22 +111,41 @@ drives_nodes() {  # this host holds the lab's node credentials (as tools/mxfs_ss
     "$REPO/tools/mxfs_secrets.sh" get node >/dev/null 2>&1
 }
 
-vendor_of() {  # vendor_of <device> — the SCSI vendor of a device on THIS host
-    local d b
-    d=$(readlink -f "$1" 2>/dev/null) || return 1
-    [ -b "$d" ] || return 1
-    b=$(basename "$d")
-    # A partition has no `device` link of its own; fall back to the disk it
-    # sits on so a device named with a partition suffix still resolves.  A
-    # device-mapper node (the dm-multipath map) has none either: its paths
-    # are its slaves, and every path of one map is the same LUN, so the first
-    # slave's vendor is the array's.
-    [ -r "/sys/block/$b/device/vendor" ] || b=$(echo "$b" | sed 's/[0-9]*$//')
-    case "$b" in
-        dm-*) b=$(ls "/sys/block/$(basename "$d")/slaves" 2>/dev/null | head -1) ;;
-    esac
-    cat "/sys/block/$b/device/vendor" 2>/dev/null
-}
+# What the host holding the device reads about it, run where the device is: by
+# bash locally on a node, and on a node over ssh from the dev host (sent
+# base64-encoded, so neither side quotes it).  $1 is the device.  Prints
+# RIGVENDOR (the array's SCSI vendor), RIGDMI (the host's DMI sys_vendor) and,
+# for a DRBD device, RIGDRBD=1.
+#   - A partition has no `device` link of its own; the disk it sits on has.
+#   - A device-mapper node (the dm-multipath map) has none either: its paths
+#     are its slaves, and every path of one map is the same LUN, so the first
+#     slave's vendor is the array's.
+#   - A DRBD device has neither a `device` link nor slaves.  Its array is the
+#     one under its backing disk, which drbdsetup's configuration names
+#     (`device minor N;`, then `disk "<path>";` in the same volume), and a
+#     replicated device is a rig of its own: every write it acknowledges has
+#     reached both nodes' disks, so native XFS on it is not native XFS on the
+#     LUN beneath it.
+NODE_PROBE='
+d=$(readlink -f "$1" 2>/dev/null) || exit 1
+b=$(basename "$d")
+case "$b" in
+    drbd[0-9]*)
+        m=${b#drbd}
+        k=$(drbdsetup show 2>/dev/null | awk -v m="$m" '"'"'
+            $1 == "device" && $2 == "minor" { gsub(/;/, "", $3); cur = $3 }
+            $1 == "disk" && $2 ~ /^"\// && cur == m { gsub(/[";]/, "", $2); print $2; exit }'"'"')
+        d=$(readlink -f "$k" 2>/dev/null) || exit 1
+        b=$(basename "$d")
+        echo RIGDRBD=1 ;;
+esac
+[ -r /sys/block/$b/device/vendor ] || b=$(echo "$b" | sed "s/[0-9]*\$//")
+case "$b" in
+    dm-*) b=$(ls /sys/block/$(basename "$d")/slaves 2>/dev/null | head -1) ;;
+esac
+echo "RIGVENDOR=$(cat /sys/block/$b/device/vendor 2>/dev/null)"
+echo "RIGDMI=$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)"
+'
 
 # 5. ...and the path to it, when the path is a different machine.  The vSphere
 #    guests reach the very same SCST LUN as the qemu rig, so the array's vendor
@@ -143,27 +162,19 @@ platform_suffix() {  # platform_suffix <dmi sys_vendor>
 }
 
 if ! drives_nodes; then
-    vendor=$(vendor_of "$DEV")
-    [ -n "${vendor:-}" ] && suffix=$(platform_suffix "$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)")
+    [ -b "$(readlink -f "$DEV" 2>/dev/null)" ] || exit 1
+    answer=$(bash -c "$NODE_PROBE" probe "$DEV" 2>/dev/null)
 else
     # MXFS_RIG_NODE first: the prep that establishes the identity may be
     # writing a marker for the first time (a new rig group's), and a marker
     # that does not exist yet names no node to ask.
     NODE=${MXFS_RIG_NODE:-$(mk node_list | cut -d, -f1)}
     [ -n "$NODE" ] && [ -x "$REPO/tools/mxfs_sshpass.sh" ] || exit 1
-    answer=$(timeout 25 "$REPO/tools/mxfs_sshpass.sh" "$NODE" "
-        d=\$(readlink -f '$DEV' 2>/dev/null) || exit 1
-        b=\$(basename \"\$d\")
-        [ -r /sys/block/\$b/device/vendor ] || b=\$(echo \"\$b\" | sed 's/[0-9]*\$//')
-        case \"\$b\" in
-            dm-*) b=\$(ls /sys/block/\$(basename \"\$d\")/slaves 2>/dev/null | head -1) ;;
-        esac
-        echo \"RIGVENDOR=\$(cat /sys/block/\$b/device/vendor 2>/dev/null)\"
-        echo \"RIGDMI=\$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)\"
-      " 2>/dev/null)
-    vendor=$(printf '%s\n' "$answer" | sed -n 's/^RIGVENDOR=//p' | head -1)
-    suffix=$(platform_suffix "$(printf '%s\n' "$answer" | sed -n 's/^RIGDMI=//p' | head -1)")
+    answer=$(timeout 25 "$REPO/tools/mxfs_sshpass.sh" "$NODE" \
+        "echo $(printf '%s' "$NODE_PROBE" | base64 -w0) | base64 -d | bash -s -- '$DEV'" 2>/dev/null)
 fi
+vendor=$(printf '%s\n' "$answer" | sed -n 's/^RIGVENDOR=//p' | head -1)
 vendor=$(sanitise "${vendor:-}")
 [ -n "$vendor" ] || exit 1
-echo "$vendor${suffix:-}"
+grep -q '^RIGDRBD=1' <<<"$answer" && vendor="$vendor-drbd"
+echo "$vendor$(platform_suffix "$(printf '%s\n' "$answer" | sed -n 's/^RIGDMI=//p' | head -1)")"

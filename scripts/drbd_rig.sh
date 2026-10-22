@@ -3467,7 +3467,39 @@ step_fourkn_test() {
     fourkn_down_or_die "the 512 arm's"
     ( fourkn_arm 4096 ); rc4096=$?
     say "fourkn-test: arm 512 rc=$rc512, arm 4096 rc=$rc4096 (0 pass, 1 a check failed, 2 only the pace); evidence $EVID"
-    [ "$rc512" = 0 ] && [ "$rc4096" = 0 ]
+    case "$rc512:$rc4096" in
+        0:0) return 0 ;;
+        0:2|2:0|2:2) ;;
+        *) return 1 ;;
+    esac
+    # Only the pace missed, every correctness check passed.  A board row's FAIL
+    # named only by open noblock records does not fail its cell
+    # (tools/criteria.py grade), and the pace of this workload on DRBD is such a
+    # record's: each peer-file stat is a PR grant and a release, each a ledger
+    # page commit, and on DRBD each commit is emulated swaps of replicated
+    # writes.  So a pace miss passes the step while that record is in the queue,
+    # rated noblock and reaching 2/net/mesh/drbd, and fails it again once the
+    # record is removed or rated anything else.
+    local why
+    why=$(fourkn_pace_record) || { say "fourkn-test: FAIL on the pace alone: $why"; return 1; }
+    say "fourkn-test: the pace missed, every correctness check passed; the pace is $why"
+}
+FOURKN_PACE_RECORD=D-DRBD-PAIR-NEW-FILES-COST-A-LEDGER-COMMIT-TO-CREATE-AND-TO-STAT-FROM-THE-PEER
+fourkn_pace_record() {  # prints how the record covers the pace; 1 when it does not
+    python3 - "$REPO" "$FOURKN_PACE_RECORD" <<'PYEOF'
+import sys
+sys.path.insert(0, sys.argv[1] + "/tools")
+import defects
+rec = next((e for e in defects.load()["defects"] if e.get("id") == sys.argv[2]), None)
+if rec is None:
+    sys.exit(print(f"{sys.argv[2]} is not in the defect queue") or 1)
+if str(rec.get("impact") or "").lower() != "noblock":
+    sys.exit(print(f"{sys.argv[2]} is rated {rec.get('impact') or 'unadjudicated'}, not noblock") or 1)
+nodes, selector, platform = defects.parse_at("2/net/mesh/drbd")
+if not defects.blocks(rec, nodes, selector, platform):
+    sys.exit(print(f"{sys.argv[2]} does not reach 2/net/mesh/drbd") or 1)
+print(f"graded by {sys.argv[2]} (open, noblock, reaches 2/net/mesh/drbd)")
+PYEOF
 }
 fourkn_down_or_die() {  # <whose>
     local n

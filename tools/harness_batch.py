@@ -22,8 +22,9 @@ control  declares the batch (tools/defects.py batch --kind control) with the fix
          and a failure no record names is an incident. The tree is restored on any exit, a signal
          included; nothing else may use the reverted files while the laps run.
 verify   declares the verification batch sized from that control (defects.py plan-verify
-         --control) on the tree's build and runs its laps, stopping at the first failure, which
-         ends a verification batch for good.
+         --control) on the tree's build, and on the frozen candidate MXFS_CANDIDATE names (the
+         only batch `defects.py verify` applies), and runs its laps, stopping at the first
+         failure, which ends a verification batch for good.
 
 DIFF is the fix as `diff -u` output with a/ and b/ prefixes (patch -p1), kept under tests/evidence
 so the reviewer reads the same bytes the variant names. `{lap}` in the command is replaced by the
@@ -289,9 +290,14 @@ def cmd_control(args) -> int:
 
 
 def cmd_verify(args) -> int:
+    # A verification batch is applied (defects.py verify) only for the frozen candidate its laps
+    # ran on; batch_lap.py and run.sh stamp each lap with MXFS_CANDIDATE, and the batch must name
+    # the same candidate, or no lap of it counts and the review refuses it.
+    candidate = os.environ.get("MXFS_CANDIDATE", "")
     planned = run(DEFECTS + ["plan-verify", args.record, "--row", args.row, "--at", args.at,
                              "--probe", args.probe, "--build", tree_build(),
-                             "--control", args.control])
+                             "--control", args.control]
+                  + (["--candidate", candidate] if candidate else []))
     match = BATCH_ID.search(planned.stdout)
     count = re.search(r", (\d+) clean laps", planned.stdout)
     if not match or not count:
