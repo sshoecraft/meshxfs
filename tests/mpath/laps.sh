@@ -24,9 +24,19 @@ pass=0; fail=0
 for i in $(seq 1 "$LAPS"); do
     L0=$(date '+%Y-%m-%d %H:%M:%S')
     for r in $ROWS; do
+        # harness-lint: ok - taken only to be compared with the newest directory after the run
+        D0=$(ls -dt tests/evidence/board_*"${G}_$r" 2>/dev/null | head -1)
         ./run.sh "$CFG" --group "$G" "$r" 2>&1 | grep -aE "(PASS|FAIL|SKIP|UNKNOWN)  $r" | cut -c1-80
+        # harness-lint: ok - refused below when it is the directory that was newest before the run
         D=$(ls -dt tests/evidence/board_*"${G}_$r" 2>/dev/null | head -1)
-        res=$(grep -aE '^RESULT' "$D/row.log" 2>/dev/null | tail -1)
+        # a run that left no new directory (refused at its lock, preflight or
+        # VM start) did not run: re-reading the previous lap's row.log scored
+        # it as that lap's verdict
+        if [ "$D" = "$D0" ]; then
+            res="RESULT: NO-NEW-EVIDENCE (run.sh left no evidence directory for $r; not a pass)"
+        else
+            res=$(grep -aE '^RESULT' "$D/row.log" 2>/dev/null | tail -1)
+        fi
         echo "lap $i $r: ${res:0:260}"
         case "$res" in "RESULT: PASS"*) pass=$((pass + 1)) ;; *) fail=$((fail + 1)); grep -a '  FAIL' "$D/row.log" 2>/dev/null | head -6 | cut -c1-220 ;; esac
     done

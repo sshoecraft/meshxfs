@@ -263,7 +263,8 @@ chk_stage() { # <tag>
     # peers must fence/recover the retained slot
     T0=$(date +%s); got=no
     while [ $(( $(date +%s) - T0 )) -lt "$RECOVER_S" ]; do
-      for n in $(fleet_minus "$X"); do rs 15 "$n" "dmesg | sed -n \"/$MK/,\\\$p\" | grep -ac 'P163-RECOVERY-COMPLETE.*slot=${xs:-NONE}\b\|P163-RECOVERY-COMPLETE.*slot ${xs:-NONE}\b'" | grep -qv '^0$' && { got=yes; break 2; }; done; sleep 5; done
+      # the count must be a number above zero: an error line from rs is not a recovery
+      for n in $(fleet_minus "$X"); do c=$(rs 15 "$n" "dmesg | sed -n \"/$MK/,\\\$p\" | grep -ac 'P163-RECOVERY-COMPLETE.*slot=${xs:-NONE}\b\|P163-RECOVERY-COMPLETE.*slot ${xs:-NONE}\b'" | tail -1); [[ "$c" =~ ^[0-9]+$ ]] && [ "$c" -gt 0 ] && { got=yes; break 2; }; done; sleep 5; done
     echo "  LATEDIRTY $tag X=$X slot=$xs recovered_by_peer=$got after=$(( $(date +%s) - T0 ))s"
     ck "$tag: a peer recovered $X's retained slot within ${RECOVER_S}s" "$got" "yes"
     capture "${tag}peers" "$MK" $(fleet_minus "$X")

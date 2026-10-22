@@ -101,14 +101,20 @@
 #include <stdbool.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <linux/fs.h>
 #include <scsi/sg.h>
 
 #include <mxfs/mxfs_super.h>
 
-#define SECTOR_SIZE     512
 #define TIMEOUT_MS      30000
 #define HB_SLOTS        64
 #define HB_RECORD_SIZE  512
+
+/* The logical block size every command and image offset is in: the device's
+ * (BLKSSZGET), or an image's from its envelope.  On a volume formatted for
+ * larger blocks (docs/4kn-support.md) a heartbeat record is the first 512
+ * bytes of a block of its own (mxfs_rec_phys), its tail zero. */
+static uint32_t lbs = 512;
 
 #define DL_MAGIC            0x4D584C4Bu   /* "MXLK" */
 #define DL_FLAG_EMPTY       0u
@@ -293,9 +299,9 @@ static int sg_rw(int fd, int write, uint64_t lba, void *buf, uint32_t blocks)
 	/* An image file has no target to serve a stale copy and no SCSI to
 	 * ask: plain reads and writes, the write flushed. */
 	if (fstat(fd, &st) == 0 && S_ISREG(st.st_mode)) {
-		size_t len = (size_t)blocks * SECTOR_SIZE;
-		ssize_t n = write ? pwrite(fd, buf, len, (off_t)(lba * SECTOR_SIZE))
-				  : pread(fd, buf, len, (off_t)(lba * SECTOR_SIZE));
+		size_t len = (size_t)blocks * lbs;
+		ssize_t n = write ? pwrite(fd, buf, len, (off_t)(lba * lbs))
+				  : pread(fd, buf, len, (off_t)(lba * lbs));
 
 		if (n != (ssize_t)len || (write && fsync(fd) != 0)) {
 			fprintf(stderr, "image %s at lba %llu failed\n",
@@ -328,7 +334,7 @@ static int sg_rw(int fd, int write, uint64_t lba, void *buf, uint32_t blocks)
 		hdr.cmd_len = sizeof(cdb);
 		hdr.cmdp = cdb;
 		hdr.dxferp = buf;
-		hdr.dxfer_len = blocks * SECTOR_SIZE;
+		hdr.dxfer_len = blocks * lbs;
 		hdr.dxfer_direction = write ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
 		hdr.sbp = sense;
 		hdr.mx_sb_len = sizeof(sense);
@@ -366,16 +372,31 @@ static int sg_rw(int fd, int write, uint64_t lba, void *buf, uint32_t blocks)
 
 static uint64_t hb_base;        /* byte offset of slot 0 */
 
-static int slot_read(int fd, int slot, struct hb_rec *hb)
+/* the block heartbeat slot `slot` is in, and its first 512 bytes */
+static uint64_t slot_lba(int slot)
 {
-	return sg_rw(fd, 0, (hb_base + (uint64_t)slot * HB_RECORD_SIZE) /
-			 SECTOR_SIZE, hb, 1);
+	return mxfs_rec_phys(hb_base, hb_base + (uint64_t)slot * HB_RECORD_SIZE,
+			     lbs) / lbs;
 }
 
+static int slot_read(int fd, int slot, struct hb_rec *hb)
+{
+	static uint8_t blk[MXFS_LBS_MAX];
+
+	if (sg_rw(fd, 0, slot_lba(slot), blk, 1) < 0)
+		return -1;
+	memcpy(hb, blk, HB_RECORD_SIZE);
+	return 0;
+}
+
+/* the whole block, the record over a zero tail, as the module writes it */
 static int slot_write(int fd, int slot, const struct hb_rec *hb)
 {
-	return sg_rw(fd, 1, (hb_base + (uint64_t)slot * HB_RECORD_SIZE) /
-			 SECTOR_SIZE, (void *)hb, 1);
+	static uint8_t blk[MXFS_LBS_MAX];
+
+	memset(blk, 0, lbs);
+	memcpy(blk, hb, HB_RECORD_SIZE);
+	return sg_rw(fd, 1, slot_lba(slot), blk, 1);
 }
 
 /* ── decode ───────────────────────────────────────────────────────────────── */
@@ -518,12 +539,39 @@ int main(int argc, char **argv)
 		fprintf(stderr, "open %s: %s\n", dev, strerror(errno));
 		return 1;
 	}
-	if (sg_rw(fd, 0, 0, sbuf, MXFS_SUPER_SIZE / SECTOR_SIZE) < 0)
+	{
+		struct stat st;
+		int v = 0;
+
+		/* a device answers in its own blocks; an image says in its envelope */
+		if (fstat(fd, &st) == 0 && !S_ISREG(st.st_mode)) {
+			if (ioctl(fd, BLKSSZGET, &v) < 0 || v < 512 ||
+			    v > (int)MXFS_LBS_MAX || (v & (v - 1))) {
+				fprintf(stderr, "%s: cannot get a logical block size "
+					"(BLKSSZGET: %s, %d)\n", dev, strerror(errno), v);
+				return 1;
+			}
+			lbs = (uint32_t)v;
+		}
+	}
+	if (sg_rw(fd, 0, 0, sbuf, MXFS_SUPER_SIZE / lbs) < 0)
 		return 1;
 	sb = (struct mxfs_ondisk_super *)sbuf;
 	if (sb->magic != MXFS_FORMAT_MAGIC) {
 		fprintf(stderr, "not an MXFS device (magic 0x%08x)\n", sb->magic);
 		return 1;
+	}
+	{
+		struct stat st;
+
+		if (fstat(fd, &st) == 0 && S_ISREG(st.st_mode))
+			lbs = mxfs_super_lbs(sb);
+		else if (mxfs_super_lbs(sb) != lbs) {
+			fprintf(stderr, "%s: the volume was formatted for %u-byte "
+				"logical blocks and the device has %u-byte ones\n",
+				dev, mxfs_super_lbs(sb), lbs);
+			return 1;
+		}
 	}
 	hb_base = sb->disklock_offset;
 

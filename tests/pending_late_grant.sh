@@ -30,11 +30,14 @@
 # doubted, with this same knob.
 #
 # THE WORKLOAD.  Both nodes append, with fsync, to the SAME eight files in
-# turn for WORK_S seconds: every append needs the inode's EX, the other node
-# holds it or wants it, and mastership is page-aligned over the two node ids,
-# so from each node about half the files are remotely mastered (a grant on
-# the wire) and half locally (a promotion) — both completion paths carry the
-# knob.  Each node's lines carry its name and a sequence number, so the
+# turn for WORK_S seconds: every append needs the inode's EX, and the other
+# node holds it or wants it.  Each file is mastered by one of the two nodes,
+# decided per routing shard (eight consecutive inode numbers,
+# include/mxfs/mxfs_tauth.h), so the eight files made in a row usually share
+# one master.  Both nodes append to every file, so whichever node masters a
+# file completes its own appends by a promotion and the other node completes
+# its by a grant on the wire: both completion paths carry the knob, whatever
+# the draw.  Each node's lines carry its name and a sequence number, so the
 # integrity check is a count: every line each node reports having written
 # must be in the file.
 #

@@ -8,8 +8,7 @@
 # module, so they are NOT part of the N-node FS battery. Run once / per-host.
 # BUDGET_S: see tests/suite/manifest header — same the budget rule semantics.
 #
-# Run:   tests/tooling/run_tooling.sh <N> [nodes]
-# View:  jq . .tooling_results.json   (not on the board; tools/criteria.py reads data/criteria.json only)
+# Run:   ./run.sh <configuration> <row>   (each row here is a board row; run.sh records it)
 
 # mkfs_timing/chk_clean/online_resize/cluster_ops_timing: REAL budget numbers,
 # measured against native XFS via `./run.sh 1 xfs` (2026-07-14): mkfs.xfs=62ms,

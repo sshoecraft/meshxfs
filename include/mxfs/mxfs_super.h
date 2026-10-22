@@ -143,10 +143,28 @@
  * volume that has one.  A name is an agreement check, not a secret.
  */
 #define MXFS_FORMAT_F_CLUSTER_NAME 0x00000080u
+/*
+ * (docs/4kn-support.md): the volume was formatted for a device whose logical
+ * block is larger than 512 bytes; logical_block_size below is valid.  Every
+ * 512-byte unit of a RECORD REGION (journal, disklock, PR registrant ledger,
+ * bootstrap, slice lifecycle) then sits in a logical block of its own, its
+ * tail zero (mxfs_rec_phys); the XFS sector size is the logical block size.
+ * Absent, the logical block size is 512 and the layout is the one every
+ * volume had before.  Incompatible on purpose: a kernel that does not
+ * translate record regions would read and write the wrong blocks.
+ */
+#define MXFS_FORMAT_F_LBS       0x00000100u
 #define MXFS_FORMAT_F_KNOWN     (MXFS_FORMAT_F_PROTOGATE | MXFS_FORMAT_F_RMAN | \
 								 MXFS_FORMAT_F_TAUTH | MXFS_FORMAT_F_PRKEY64 | \
 								 MXFS_FORMAT_F_BOOTSTRAP | MXFS_FORMAT_F_DIRSHARD_VALUE | \
-								 MXFS_FORMAT_F_SLIFE | MXFS_FORMAT_F_CLUSTER_NAME)
+								 MXFS_FORMAT_F_SLIFE | MXFS_FORMAT_F_CLUSTER_NAME | \
+								 MXFS_FORMAT_F_LBS)
+
+/* The unit a record region is addressed in, whatever the device's block. */
+#define MXFS_REC_UNIT           512u
+/* The logical block sizes a volume may be formatted for. */
+#define MXFS_LBS_MIN            512u
+#define MXFS_LBS_MAX            4096u
 
 /* A cluster name: 1..63 of [A-Za-z0-9._-], NUL-terminated in 64 bytes.
  * The character set keeps it safe in a mount option string (no ',' or '=')
@@ -492,8 +510,46 @@ struct mxfs_ondisk_super {
 									 * xfs_log_node_count records are live) */
 	char        cluster_name[MXFS_CLUSTER_NAME_LEN]; /* valid iff flags has
 									 * MXFS_FORMAT_F_CLUSTER_NAME; else zero */
-	uint8_t     reserved[3840];     /* pad to 4096 bytes */
+	uint32_t    logical_block_size; /* valid iff flags has MXFS_FORMAT_F_LBS;
+									 * else zero, meaning 512.  Region sizes
+									 * above are the bytes each region spans
+									 * on the device. */
+	uint32_t    pad1;
+	uint8_t     reserved[3832];     /* pad to 4096 bytes */
 };
+
+/* The logical block size a volume was formatted for: 512 unless it says. */
+static inline uint32_t mxfs_super_lbs(const struct mxfs_ondisk_super *s)
+{
+	return (s->flags & MXFS_FORMAT_F_LBS) && s->logical_block_size ?
+		s->logical_block_size : MXFS_REC_UNIT;
+}
+
+/*
+ * Where a byte of a record region lives (docs/4kn-support.md).  A record
+ * region is addressed as on a 512-byte device: unit k is [start + 512k,
+ * start + 512(k+1)).  On a device of lbs-byte blocks unit k is the first 512
+ * bytes of the block at start + k * lbs, so no two units -- no two records
+ * that two nodes may write -- ever share a block.  lbs 512 is the identity.
+ */
+static inline uint64_t mxfs_rec_phys(uint64_t start, uint64_t off, uint32_t lbs)
+{
+	uint64_t rel = off - start;
+
+	return start + (rel / MXFS_REC_UNIT) * lbs + rel % MXFS_REC_UNIT;
+}
+
+/* The bytes a record region spans on the device for a size in units of 512. */
+static inline uint64_t mxfs_rec_span(uint64_t unit_bytes, uint32_t lbs)
+{
+	return (unit_bytes + MXFS_REC_UNIT - 1) / MXFS_REC_UNIT * lbs;
+}
+
+/* The inverse: a record region's size in 512-byte units' bytes, from its span. */
+static inline uint64_t mxfs_rec_units(uint64_t span_bytes, uint32_t lbs)
+{
+	return span_bytes / lbs * MXFS_REC_UNIT;
+}
 
 #ifdef __KERNEL__
 #define MXFS_BUILD_CHECK_SLIFE() \

@@ -40,6 +40,8 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <linux/fs.h>
 
 #include <mxfs/mxfs_super.h>
 #include <mxfs/mxfs_dirshard.h>
@@ -135,7 +137,9 @@ struct admin_dev {
     const char *path;
     int fd;                         /* O_RDONLY, or O_RDWR|O_EXCL to change */
     struct mxfs_ondisk_super sup;
-    uint8_t sb[512];                /* the primary XFS superblock sector */
+    /* the primary XFS superblock sector: sectsize bytes, the volume's logical
+     * block size (docs/4kn-support.md), so at most MXFS_LBS_MAX */
+    uint8_t sb[MXFS_LBS_MAX];
     uint32_t blocksize, agblocks, agcount, sectsize;
 };
 
@@ -203,13 +207,30 @@ static int dev_open(struct admin_dev *d, const char *path, bool change)
     d->agblocks = get_be32(d->sb + XFS_SB_OFF_AGBLOCKS);
     d->agcount = get_be32(d->sb + XFS_SB_OFF_AGCOUNT);
     d->sectsize = get_be16(d->sb + XFS_SB_OFF_SECTSIZE);
-    if (d->sectsize != 512 || !d->blocksize || !d->agblocks || !d->agcount) {
-        fprintf(stderr, "mxfs_admin: unexpected XFS geometry (sectsize %u "
-                "blocksize %u agblocks %u agcount %u)\n", d->sectsize,
-                d->blocksize, d->agblocks, d->agcount);
+    /* the XFS sector is the logical block the volume was formatted for */
+    if (d->sectsize != mxfs_super_lbs(&d->sup) || !d->blocksize ||
+        !d->agblocks || !d->agcount) {
+        fprintf(stderr, "mxfs_admin: unexpected XFS geometry (sectsize %u, the "
+                "envelope's logical block %u, blocksize %u agblocks %u agcount "
+                "%u)\n", d->sectsize, mxfs_super_lbs(&d->sup), d->blocksize,
+                d->agblocks, d->agcount);
         return -1;
     }
-    if (!xfs_crc_ok(d->sb, sizeof(d->sb))) {
+    /* ... and still the device's: an image moved between a 512-byte and a
+     * 4K-native device would have its regions read at the wrong places */
+    {
+        struct stat st;
+        int lbs = 0;
+
+        if (fstat(d->fd, &st) == 0 && S_ISBLK(st.st_mode) &&
+            ioctl(d->fd, BLKSSZGET, &lbs) == 0 && (uint32_t)lbs != d->sectsize) {
+            fprintf(stderr, "mxfs_admin: this volume was formatted for %u-byte "
+                    "logical blocks and %s has %d-byte ones\n", d->sectsize,
+                    path, lbs);
+            return -1;
+        }
+    }
+    if (!xfs_crc_ok(d->sb, d->sectsize)) {
         fprintf(stderr, "mxfs_admin: the primary XFS superblock CRC does not "
                 "match; run chk_mxfs\n");
         return -1;
@@ -229,7 +250,8 @@ static int dev_prove_offline(struct admin_dev *d)
         return -1;
     }
     printf("proving no node can write %s:\n", d->path);
-    rc = mxfs_off_prove_no_writer(d->fd, dfd, d->sup.disklock_offset);
+    rc = mxfs_off_prove_no_writer(d->fd, dfd, d->sup.disklock_offset,
+                                  mxfs_super_lbs(&d->sup));
     close(dfd);
     if (rc < 0)
         fprintf(stderr, "mxfs_admin: refusing to change %s\n", d->path);
@@ -258,28 +280,28 @@ static int for_each_sb(struct admin_dev *d,
                        void (*edit)(uint8_t *sec, const void *arg),
                        const void *arg)
 {
-    uint8_t sec[512];
+    uint8_t sec[MXFS_LBS_MAX];      /* one sector: d->sectsize bytes */
     uint32_t agno, bad = 0;
 
     for (agno = 0; agno < d->agcount; agno++) {
         uint64_t off = ag_sb_offset(d, agno);
 
-        if (read_full(d->fd, sec, sizeof(sec), off) < 0 ||
-            get_be32(sec) != MXFS_SB_MAGIC || !xfs_crc_ok(sec, sizeof(sec))) {
+        if (read_full(d->fd, sec, d->sectsize, off) < 0 ||
+            get_be32(sec) != MXFS_SB_MAGIC || !xfs_crc_ok(sec, d->sectsize)) {
             fprintf(stderr, "mxfs_admin: AG %u superblock does not validate; "
                     "left unchanged (run chk_mxfs)\n", agno);
             bad++;
             continue;
         }
         edit(sec, arg);
-        xfs_set_crc(sec, sizeof(sec));
-        if (write_full(d->fd, sec, sizeof(sec), off) < 0) {
+        xfs_set_crc(sec, d->sectsize);
+        if (write_full(d->fd, sec, d->sectsize, off) < 0) {
             fprintf(stderr, "mxfs_admin: writing AG %u superblock failed: "
                     "%s\n", agno, strerror(errno));
             return -1;
         }
         if (agno == 0)
-            memcpy(d->sb, sec, sizeof(sec));
+            memcpy(d->sb, sec, d->sectsize);
     }
     if (fsync(d->fd)) {
         fprintf(stderr, "mxfs_admin: fsync failed: %s\n", strerror(errno));

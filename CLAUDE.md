@@ -191,6 +191,24 @@ all the forensic detail: `docs/host-safety.md`.
 
 ---
 
+### RULE: COMMIT, PUSH AND RELEASE NEED NO APPROVAL
+
+(User directive, 2026-10-22.)
+
+- Commit, push and release, versions included, without asking the user or waiting for approval;
+  the git commands a commit or a push takes need no direction in the turn.
+
+---
+
+### RULE: COMPACT CCMEMORY BEFORE A PUSH
+
+(User directive, 2026-10-22.)
+
+- Before a commit that is pushed to GitHub, run ccmemory compaction until `memory_compaction_plan`
+  reports `backlog: 0`, so anyone cloning or pulling does not have to compact it.
+
+---
+
 ### RULE: ZERO ACCEPTED KNOWN DEFECTS
 
 MXFS's release and promotion bar is ZERO UNRESOLVED CREDIBLE DEFECTS.
@@ -244,7 +262,15 @@ tools/defects.py show <id>          one full entry (id or unique substring)
 tools/defects.py 2 tcp              what blocks a 2-node TCP release
 tools/defects.py 2 tcp --release    narrowed to integrity + stability only
 tools/defects.py add|update|remove  the ONLY writer — never hand-edit the JSON
+tools/defects.py batch|measure        declare a calibration or control batch; record its rate
+tools/defects.py plan-verify|verify   a verification batch sized from that rate; its verdict
+tools/defects.py propose|review       a decision that stops something blocking, and its review
+tools/criteria.py incidents           every failure nothing accounts for (exit 1 while any)
 ```
+
+A noblock rating, a narrower reach, a verify, a removal, and a detector-defect
+or infra finding apply only with an approval from the release-reviewer agent.
+The numbers in data/release_policy.json change only with the owner's approval.
 
 Every record carries `nodes` (the smallest cluster it has been observed
 on) and `dlm` (the transport).  **Both default fail-closed** — `1`/`any`
@@ -276,6 +302,8 @@ nothing may crash, hang, or shut down a node.  A defect that does neither
 does not block that release.  It stays in the queue; it is not a gate.
 This takes the entire pace/timeout axis off the release path, and it is a
 scoping decision, not a disposition — it closes nothing.
+A file operation stalled longer than 30 s (data/release_policy.json) is a
+stability defect, not a pace one.
 
 ---
 
@@ -322,7 +350,9 @@ widens a timeout to make a run finish launders a defect away. Those two are
 worth the duplication whatever the inheritance rules say.
 
 **Subagents return RAW EVIDENCE — `file:line`, exit codes, verbatim lines
-— never conclusions.**
+— never conclusions.** The one exception is the release-reviewer agent: its
+job is a verdict on evidence another agent assembled, and its review file is
+the record.
 
 **The cap is itself a hazard.** Capping the report makes the *weaker* model
 choose which evidence survives, and selection is a conclusion wearing

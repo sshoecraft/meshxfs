@@ -1,6 +1,6 @@
 ---
 name: compiled-release-procedure-banner-table-and-ship-on-pass
-description: Release rules: ship a gated version before further changes; GPT writes the banner from the changelog section; configurations table; no "and nothing else".
+description: Release rules: ship a gated version before further changes; GPT writes the banner from the changelog section; config table; no "and nothing else".
 metadata:
   type: feedback
 tags: [compiled, release, changelog, readme, feedback]

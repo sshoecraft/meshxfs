@@ -61,6 +61,12 @@ wait_ssh() {	# <host> <bound-s> [<kernel>] -> 0 once it answers (on <kernel>)
 }
 
 : > "$L"
+# The rig's run lock, taken shared as a group run takes it: a whole-rig run.sh
+# then waits for this suite, and this suite does not start under one.  It used
+# to take nothing, and its SCST target changes landed beside running boards.
+runlock_take "$RUNLOCK" shared "pve_suite_on_kernel $LABEL" 0 \
+    || { say "FAIL: the rig's run lock is held exclusively: $(runlock_holder "$RUNLOCK")"; exit 1; }
+scripts/clyde_preflight.sh >> "$L" 2>&1 || { say "FAIL: the host-safety preflight failed (scripts/clyde_preflight.sh; the lines above)"; exit 3; }
 vmhold_take "pve_suite_on_kernel $LABEL" $VMS || { say "FAIL: could not hold [$VMS] in the VM pool"; exit 1; }
 say "=== pve_suite_on_kernel kernel=$K label=$LABEL tree=$(cat VERSION) ==="
 for v in $VMS; do
@@ -84,9 +90,15 @@ done
 # every mount failed "Can't lookup blockdev"); setup reuses the image and the
 # same names, so the WWID the suite names comes back.  Idempotent.
 s=$SECONDS
+# The target is reconfigured under the LUN pool's SCST lock, as every pool
+# reconfiguration is (tools/lun_pool.sh): an injector cutting a path for a board
+# must not land in the middle of it.  Bound 90 s: the longest a fault injector
+# holds it shared, as lun_pool.sh's own waits.
+. tools/mxfs_lab.sh
+SCSTLOCK="$(lab_need paths pool)/.scst.lock"
 IMG=/home/steve/disks/pve/pvecaw02.img SIZE=30G DEV=pvecaw02 TGT=iqn.2026-05.local.mxfs:pve-caw-02 \
     PORTALS="192.168.121.1 192.168.123.1" PVE_PAIR="$HOSTS" \
-    timeout 900 scripts/pve_caw_lun.sh setup >> "$L" 2>&1
+    flock -w 90 "$SCSTLOCK" timeout 900 scripts/pve_caw_lun.sh setup >> "$L" 2>&1
 rc=$?; say "LUN_RC=$rc wall=$((SECONDS - s))s"
 grep -q "PVE_CAW_LUN_OK .* dev=$SAN_DEV" "$L" || { say "FAIL: the SAN LUN is not $SAN_DEV on every host"; exit 1; }
 s=$SECONDS

@@ -77,11 +77,11 @@ echo "prun: marker $MARKER: $CONFIG on $nl, build $build, rig $RIG"
 if [ "$#" -gt 0 ]; then
     TESTS=("$@")
 else
-    # every row the board grades for this configuration, as the board itself
-    # lists them: the manifest alone leaves out the rows run.sh adds after
-    # it (alloc_witness, chk_clean, crash_audit, ...)
-    mapfile -t TESTS < <(MXFS_OWN_RIG=1 MXFS_CRIT="$CRIT" python3 "$REPO/tools/criteria.py" "$CONFIG" 2>/dev/null \
-        | awk -F'|' '$1 ~ /^[0-9]+ *$/ {gsub(/ /, "", $2); if ($2 != "prep_cluster") print $2}')
+    # every row the specification applies to this configuration: the manifest
+    # alone leaves out the rows run.sh adds after it (alloc_witness, chk_clean,
+    # crash_audit, ...)
+    mapfile -t TESTS < <(python3 "$REPO/tools/criteria.py" rows --at "$CONFIG" 2>/dev/null \
+        | cut -f3 | grep -vx prep_cluster)
     [ "${#TESTS[@]}" -gt 0 ] || die "the board lists no rows for $CONFIG"
 fi
 echo "prun: ${#TESTS[@]} row(s): ${TESTS[*]}"

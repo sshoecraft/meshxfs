@@ -302,9 +302,17 @@ verify "$GIP" "after the resize" running
 sleep "$SETTLE_S"
 img=$(on "$B" "pvesm path \$(qm config $VMID | sed -n 's/^virtio0: \([^,]*\).*/\1/p')" 30)
 iused=$(on "$B" "du -B1 $img | cut -f1" 30)
+# harness-lint: ok - taken only to be compared with the archive found after the backup
+arch0=$(on "$B" "ls -t $MNT/dump/vzdump-qemu-$VMID-*.vma.zst 2>/dev/null | head -1" 20)
 timed backup "$B" "$(mv_budget $(( iused * 2 )))" "vzdump $VMID --storage $SHARED --mode snapshot --compress zstd 2>&1 | tail -8" 'Finished Backup of VM' || exit 1
 arch=$(grep -aoE "creating vzdump archive '[^']+'" "$EVID/backup.txt" | sed "s/.*'\(.*\)'/\1/" | tail -1)
-[ -n "$arch" ] || arch=$(on "$B" "ls -t $MNT/dump/vzdump-qemu-$VMID-*.vma.zst | head -1" 20)
+if [ -z "$arch" ]; then
+    # The newest archive of this VM, unless it is the one that was newest before
+    # the backup: that is a previous run's, and restoring it tests nothing here.
+    # harness-lint: ok - refused below when it is the archive that was newest before this backup
+    arch=$(on "$B" "ls -t $MNT/dump/vzdump-qemu-$VMID-*.vma.zst | head -1" 20)
+    [ -n "$arch" ] && [ "$arch" != "$arch0" ] || { fail "the backup left no new archive in $MNT/dump (newest: ${arch:-none})"; exit 1; }
+fi
 say "  archive $arch"
 declare -A ASUM
 for n in "${NODES[@]}"; do ( on "${ADDR[$n]}" "sha256sum $arch" 120 | awk '{print $1}' > "$EVID/asum-$n" ) & done

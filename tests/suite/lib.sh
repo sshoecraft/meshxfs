@@ -234,6 +234,7 @@ suite_measured() {
     if [ -n "${SUITE_MEASURED_EXTRA:-}" ]; then
         m="$m ${SUITE_MEASURED_EXTRA//|/_}"
     fi
+    [ "${SUITE_MAX_OP_MS:-0}" -gt 0 ] && m="$m max_stall_ms=$SUITE_MAX_OP_MS"
     printf '%s' "$m"
 }
 
@@ -340,8 +341,12 @@ finish_aborted() {
 # (broadcast an abort, degrade gracefully, etc.) instead of blocking on the
 # same hang itself.  Generalizes the drop_caches bounded-wait idiom
 # introduced in dir_reuse_coherency.sh (sess14/a9a03929).
+#: The longest a bounded op took on this node, in ms; suite_measured reports it as
+#: max_stall_ms so tools/criteria.py can hold it to the release policy's stall limit.
+SUITE_MAX_OP_MS=0
 run_bounded() {
     local label="$1" threshold="$2"; shift 2
+    local started; started=$(date +%s%3N)
     "$@" 2>/dev/null &
     # sess10 (ccloop 72513a13): poll at 100ms, not 1s.  The 1s lap quantized
     # every bounded op UP to the next whole second (drc rank1 paid a constant
@@ -353,6 +358,8 @@ run_bounded() {
         kill -0 "$pid" 2>/dev/null || { ok=1; break; }
         sleep 0.1; i=$((i + 1))
     done
+    local took=$(( $(date +%s%3N) - started ))
+    [ "$took" -gt "$SUITE_MAX_OP_MS" ] && SUITE_MAX_OP_MS=$took
     if [ "$ok" != 1 ]; then
         echo "mxfs-HANG label=$label pid=$pid threshold=${threshold}s wchan=[$(cat /proc/$pid/wchan 2>/dev/null)] comm=[$(cat /proc/$pid/comm 2>/dev/null)]" > /dev/kmsg 2>/dev/null
         while IFS= read -r stackln; do

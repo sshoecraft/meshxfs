@@ -18,7 +18,7 @@ facts live," compiled because these notes were reference-only and aging
 
 ### Machines
 
-`Network topology` + [[test-environment]]: clyde is the dev host, two
+`Network topology` + `test-environment`: clyde is the dev host, two
 NICs — `192.168.1.166` (main LAN, physical nodes' iSCSI path) and
 `192.168.120.1` (lab/VM bridge, `br0`, dnsmasq DNS+DHCP, test VMs' iSCSI
 path). Same box, same underlying LUN reachable both ways. ~94G RAM — the
@@ -39,7 +39,7 @@ never in the repo), resolved by `tools/mxfs_secrets.sh` /
 
 ### Shared-LUN stack: superseded, do not follow the old recovery steps literally
 
-[[test-environment]] and `env-cluster-bringup-after-host-reboot` both
+`test-environment` and `env-cluster-bringup-after-host-reboot` both
 document an EARLIER rig generation: a single shared LUN via **LIO
 fileio + tcm_loop, no iSCSI** (`/home/steve/disk.img` → `/dev/mxfs-shared`
 → `/dev/sda` in guests), rebuilt post-reboot with
@@ -61,7 +61,7 @@ as dead.
 
 ### VM stability fixes (still current)
 
-[[env-test1-dhcp-reservation-fix-sess29]]: test1/test2 IPs come from a
+`env-test1-dhcp-reservation-fix-sess29`: test1/test2 IPs come from a
 system dnsmasq on `br0:67` (`/etc/dnsmasq.d/lab.conf`), not libvirt's
 default network — originally a bare dynamic range with no reservations, so
 a lease could silently move (test1 .186→.114) and strand any script that
@@ -88,7 +88,7 @@ cached srcversion after a clean; verify with `ls -la mxfs.ko` instead.
 
 ### Ship-gate and status tooling (still current)
 
-[[criteria-ship-gate]]: `SUCCESS_CRITERIA.md` (copied from mxfs.1) is the
+`criteria-ship-gate`: `SUCCESS_CRITERIA.md` (copied from mxfs.1) is the
 spec; verifiers live in `tests/criteria/`, each prints `RESULT: PASS|FAIL`
 and persists to `.criteria_results.json`. Run the whole gate via
 `tests/criteria/verify_ship.sh` (stops at first FAIL, or `--keep-going`),
@@ -99,7 +99,7 @@ partitioned — all of test1-32 available), mount syntax changed (v5 has no
 param, plumbed through `MXFS_MOUNT_OPTS`), and a real bug in
 `verify_ship.sh` where an unsplit `"script.sh --flag val"` string was
 passed straight to `bash` as one filename (fixed with `read -ra`).
-[[test-status-showstat]]: `tools/criteria.py <N> <dlm>` (e.g. `tools/criteria.py 2
+`test-status-showstat`: `tools/criteria.py <N> <dlm>` (e.g. `tools/criteria.py 2
 tcp`; the retired `showstat.sh` did this before it) reads `data/criteria.json` (its only writer,
 called by `run.sh`) and prints the PASS/FAIL/PENDING
 matrix keyed by `<nodes>/<dlm>`. Coordinated multi-node tests were, as of
@@ -109,7 +109,7 @@ runner.
 
 ### End-user deployment requirements (still current)
 
-[[doc-enduser-iscsi-caw-setup]]: `docs/iscsi_setup.md` is the end-user-facing
+`doc-enduser-iscsi-caw-setup`: `docs/iscsi_setup.md` is the end-user-facing
 "what a real shared LUN must provide" doc, distinct from the clyde-specific
 test-rig doc. Core requirements for CAW: SCSI COMPARE AND WRITE (0x89)
 honored atomically (not faked), SCSI PR type 5 (WRITE-EXCL
@@ -136,7 +136,7 @@ own AG-DLM anti-starvation work has repeatedly drawn on).
 
 ### Prior MXFS iterations — why they matter, and what they showed
 
-[[Prior mxfs version directories — load-bearing context for v5 work]]:
+`Prior mxfs version directories — load-bearing context for v5 work`:
 `~/src/mxfs.{1,2,3}` hold earlier full implementations with their own
 populated awareness docs, bug journals and scaling benchmarks that v5
 (this repo) started fresh without inheriting — noted because sess20-27
@@ -152,7 +152,7 @@ this corpus first, bootstrap v5's own awareness system later with
 carry-forward facts (that bootstrap has since happened — see this
 project's `.claude/awareness/`).
 
-[[reference_mxfs1_sess74_results]]: sess74 (2026-05-07) resurrected and
+`reference_mxfs1_sess74_results`: sess74 (2026-05-07) resurrected and
 benchmarked mxfs.1 v0.14.0 on the SAME hardware v5 uses. Morning numbers
 looked like a clean win for mxfs.1 (fio ~1.00-1.03x XFS single-node, 100%
 on 5×256/15×256/15×512 cross-node dd stress vs v5's 80% / mixed / mixed)

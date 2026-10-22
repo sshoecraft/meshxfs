@@ -495,10 +495,12 @@ of configurations a release must have green is its release matrix
 carried over from an earlier version: when a larger cluster size is
 released, the smaller ones are run again on the same build, and a
 configuration that is not run again is not claimed (it is listed under
-"Released in an earlier version", with the version that verified it). One script
-drives the whole sequence and logs every step with its exit code
-(`tests/release_verify_chain.sh`, which calls `tests/full_verify.sh`); their
-headers are the reference for what follows.
+"Released in an earlier version", with the version that verified it). Each
+release is qualified on one frozen release candidate: every source, test, tool
+and policy file is hashed when the candidate is made, a change to any of them
+voids it, and one orchestrator (`tools/release_run.py`) runs every step below
+on it, in order. [`docs/release-process.md`](docs/release-process.md)
+describes the whole process.
 
 ### What a build must pass
 
@@ -531,16 +533,20 @@ headers are the reference for what follows.
      multipath map with at least two active paths when the board started and
      when it ended, and a board that ends otherwise fails.
 
-   The manifest lists every row with its budget.  Every row must read PASS on the board (`tools/criteria.py
-   <configuration>`). The board keeps each row's last eleven runs, and a row
-   with a genuine failure anywhere in that window does not read PASS: it
-   has to pass lap after lap until the failure has left the window. A row
-   that was skipped is not a pass either.
+   The manifest lists every row with its budget.  Every row must read PASS on
+   the board for the release candidate (`tools/criteria.py <configuration>
+   --candidate <id>`), from runs on that candidate only. A row that was
+   skipped is not a pass. Every run is kept in the board's run ledger, and a
+   failure on any build counts until a defect record names it: passing runs
+   never make it go away. A defect is cleared on a configuration only by a
+   batch of runs fixed in advance from its measured failure rate, sized for
+   99% confidence.
 
    Every row also has a time budget, derived from twice what the same work
    takes on native XFS plus the measured cost of forming the cluster
    (`tests/criteria/TIMEOUT_BUDGETS.md`). Running over it is a failure, even
-   when every byte is right.
+   when every byte is right, and so is any file operation that stalls for
+   more than 30 seconds.
 3. **The packages, installed as a user installs them, on every released
    platform.** On a set of nodes of that platform with a LUN of its own, as
    many nodes as the release claims: the package installs and DKMS builds
@@ -556,10 +562,10 @@ headers are the reference for what follows.
    and closes nothing. The others have 120 s to declare it dead and 180 s
    to have fenced it, replayed its journal and written again
    (`tests/tcp_peer_freeze_death.sh`).
-5. **The platform ledger.** `scripts/release.sh` runs each released
-   platform's kernel build check and refuses to publish unless
-   `data/platforms.json` holds a recorded verification of that exact version
-   on every released platform (`tools/platforms.py check`).
+5. **Every released platform's kernel compiles the module before any
+   package is built** (`tools/platforms.py build-checks`), and the packages
+   are built once, before any of the steps above runs on them: what was
+   verified is what is published.
 6. **The text agrees with the data.** `tools/release_text_check.py` derives
    what is released from the release data (the release matrix, the
    configurations verified by a rig of their own, the platform ledger, the
@@ -574,9 +580,15 @@ headers are the reference for what follows.
 7. **The configurations with a rig of their own.** `2/net/mesh/drbd` is
    verified by `tests/drbd_release_verify.sh` (the suite on `/dev/drbd0`, then
    the remount, node-death, fence, split, device-resolution, pair-outage and
-   takeover tests), not by a board column, so nothing would go red if its run
-   were left out. `scripts/release.sh --publish` refuses a version that
-   claims it without that script's PASS for it.
+   takeover tests) on its own rig, as a step of the candidate's
+   qualification: the step passes only when that script's verdict is PASS
+   and every row of the DRBD rig's board reads PASS for the candidate.
+8. **Publication.** `scripts/release.sh --publish` publishes only a candidate
+   that passed every step, with nothing frozen changed since and its
+   packages byte for byte the ones the steps ran on. Before that, every
+   failure recorded on any build must be named by a defect record, and a
+   defect that reaches a configuration a default install runs holds the
+   whole release.
 
 ### The defect bar
 

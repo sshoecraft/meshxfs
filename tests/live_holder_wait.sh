@@ -14,12 +14,16 @@
 # own clock; md5_W == md5_H; W logged P-LKWAIT-LIVE (TCP at PAUSE_MS > 180 s;
 # CAW only at PAUSE_MS > 480 s); zero shutdowns/splats on either node.
 #
-# the budget rule (derived): setup ~5 s + PAUSE_MS + drain (< 10 s) + captures ~10 s.
+# the budget rule (derived): setup (H's candidates, bound 13 s, then the
+# locality probes, ~5.5 s each until one matches: ~11 s expected on two nodes,
+# 88 s for all 16) + PAUSE_MS + drain (< 10 s) + captures ~10 s.
 # The read bound is PAUSE_MS/1000 + 60: a read still outstanding 60 s after
 # the pause end is a FAIL, never a reason to wait longer.
 #
 # WHICH NODE MASTERS THE TARGET IS NOT A DETAIL.  Which node masters a
-# resource is a hash of its resource id, so the inode this harness happens to
+# resource is a hash of its resource id (for an inode, of its routing shard:
+# the inode number with its low three bits cleared), re-decided whenever the
+# cluster forms, so the inode this harness happens to
 # create decides whether W's acquire is a REMOTE request over the wire or a
 # purely LOCAL queue insertion.  Those are different code paths with different
 # waiter handling, and a lap that silently got the other one is not a
@@ -298,51 +302,60 @@ DM="dmesg | awk '/$MARK/{f=1} f'"
 disarm_drop() { timeout 20 $SSH "$W" "echo 0 > $P/dl_drop_lockreq_ino" >/dev/null 2>&1; }
 
 # 1. Pick a target whose master is the one this lap means to measure.  H writes
-#    eight candidates; W probes each with the request-drop knob, which sits on
-#    the REMOTE-master send path only, so the probe firing is the proof that
-#    the inode is remotely mastered from W and its silence is the proof that it
-#    is not.  Counts are scoped to this run's kernel-log mark: an unscoped
+#    one candidate in each of NSHARD routing shards; W probes them in turn, and
+#    the node that fires the blocking notification for a candidate is its
+#    master.  Counts are scoped to this run's kernel-log mark: an unscoped
 #    count inherits the previous lap's hits and picks the wrong file.
+#
+#    The master is decided per SHARD, not per inode: routing hash v2 clears an
+#    inode number's low three bits before hashing it (include/mxfs/mxfs_tauth.h
+#    mxfs_tauth_route_hash), so eight inodes created in a row are one or two
+#    draws, not eight.  On the 0.90.134 capture gate all eight (8389321-
+#    8389328) came back local, and the lap could not run on that formation.  H
+#    therefore creates objects until NSHARD distinct shards are represented,
+#    keeps the first object in each as its candidate and removes the rest.
+#    Each shard is its own draw, so on two nodes none of 16 is remote-mastered
+#    with probability 2^-16.  The spares stay until every candidate exists: a
+#    freed inode number is taken by the next create (measured: 160 creates in
+#    0.6 s, and one of them reused a freed number), which would draw the same
+#    shard again.
 # The digest a node reports for the target: the file's bytes, or the sorted
 # names of the directory.  Both sides of every comparison use this.
 dgst() { if [ "$TARGET" = dir ]; then echo "ls -1A '$1' | sort | md5sum | cut -d' ' -f1"; else echo "md5sum '$1' | cut -d' ' -f1"; fi; }
 # H's re-dirty of a target (takes EX): a rewrite of the file, or a new entry
 # in the directory.  $2 names the entry so repeated re-dirties are distinct.
 redirty() { if [ "$TARGET" = dir ]; then echo ": > '$1/$2'"; elif [ "$RW" = dio_unaligned ]; then echo "dd if=/dev/urandom of='$1' bs=4096 count=1 conv=notrunc status=none"; else echo "dd if=/dev/urandom of='$1' bs=4096 count=8 status=none"; fi; }
+NSHARD=16; NMAKE=160
 if [ "$RW" = dio_unaligned ]; then
-# 64 KiB fallocated, first block written: the region past it stays unwritten
-# so W's unaligned overwrite-only attempt answers -EAGAIN and retries EX.
-timeout 45 $SSH "$H" "
-    for i in 1 2 3 4 5 6 7 8; do
-        f='$MNT/.livewait_${LABEL}_'\$i
-        rm -f \"\$f\"; fallocate -l 65536 \"\$f\" || exit 1
-        dd if=/dev/urandom of=\"\$f\" bs=4096 count=1 conv=notrunc status=none || exit 1
-        echo \$i \$(stat -c %i \"\$f\")
-    done
-    sync
-  " 2>"$OUT/h_setup.err" | filt > "$OUT/h_cands.txt"
+    # 64 KiB fallocated, first block written: the region past it stays unwritten
+    # so W's unaligned overwrite-only attempt answers -EAGAIN and retries EX.
+    mk='rm -f "$f"; fallocate -l 65536 "$f" && dd if=/dev/urandom of="$f" bs=4096 count=1 conv=notrunc status=none'
 elif [ "$TARGET" = dir ]; then
-timeout 45 $SSH "$H" "
-    for i in 1 2 3 4 5 6 7 8; do
-        f='$MNT/.livewait_${LABEL}_'\$i
-        mkdir -p \"\$f\" && : > \"\$f/seed\" || exit 1
-        echo \$i \$(stat -c %i \"\$f\")
-    done
-    sync
-  " 2>"$OUT/h_setup.err" | filt > "$OUT/h_cands.txt"
+    mk='mkdir -p "$f" && : > "$f/seed"'
 else
-timeout 45 $SSH "$H" "
-    for i in 1 2 3 4 5 6 7 8; do
-        f='$MNT/.livewait_${LABEL}_'\$i
-        dd if=/dev/urandom of=\"\$f\" bs=4096 count=8 status=none || exit 1
-        echo \$i \$(stat -c %i \"\$f\")
+    mk='dd if=/dev/urandom of="$f" bs=4096 count=8 status=none'
+fi
+# bound: ssh connect (ConnectTimeout 10 s) + 2x the measured 0.9-1.2 s for 160 creates, the
+# removal and the sync (file, dio_unaligned and dir modes, test1, 2026-10-22)
+timeout 13 $SSH "$H" "
+    seen=' '; n=0; i=0; spare=
+    while [ \$n -lt $NSHARD ] && [ \$i -lt $NMAKE ]; do
+        i=\$((i+1)); f='$MNT/.livewait_${LABEL}_'\$i
+        $mk || exit 1
+        ino=\$(stat -c %i \"\$f\") || exit 1; s=\$((ino >> 3))
+        case \"\$seen\" in *\" \$s \"*) spare=\"\$spare \$f\"; continue ;; esac
+        seen=\"\$seen\$s \"; n=\$((n+1)); echo \$i \$ino
     done
+    [ -z \"\$spare\" ] || rm -rf \$spare
     sync
   " 2>"$OUT/h_setup.err" | filt > "$OUT/h_cands.txt"
-fi
-[ "$(grep -ac . "$OUT/h_cands.txt")" = "8" ] || {
-    echo "ABORT: H wrote $(grep -ac . "$OUT/h_cands.txt")/8 candidates: [$(filt < "$OUT/h_setup.err" | tail -3 | tr '\n' ' ')]"
-    clear_knobs; exit 2; }
+# the candidates H made, removed at the end of the lap or when it cannot run
+rm_cands() {
+    timeout 20 $SSH "$H" "rm -rf $(awk -v p="$MNT/.livewait_${LABEL}_" '{printf " %s%s", p, $1}' "$OUT/h_cands.txt")" >/dev/null 2>&1
+}
+[ "$(grep -ac . "$OUT/h_cands.txt")" = "$NSHARD" ] || {
+    echo "ABORT: H made candidates in $(grep -ac . "$OUT/h_cands.txt") of $NSHARD distinct shards from $NMAKE objects: [$(filt < "$OUT/h_setup.err" | tail -3 | tr '\n' ' ')]"
+    rm_cands; clear_knobs; exit 2; }
 
 ino=""; CAND=""; MLOC=""
 if [ "$CAW" = 1 ]; then
@@ -380,8 +393,8 @@ fi
     fi
 done 3< "$OUT/h_cands.txt"
 [ -n "$ino" ] || {
-    echo "ABORT: none of the eight candidates is $MASTER-mastered from $W — this lap cannot measure the path it names"
-    disarm_drop; clear_knobs; exit 2; }
+    echo "ABORT: none of the $NSHARD candidates (one per routing shard) is $MASTER-mastered from $W — this lap cannot measure the path it names"
+    rm_cands; disarm_drop; clear_knobs; exit 2; }
 F="$MNT/.livewait_${LABEL}_$CAND"
 probe_ino "$ino"
 echo "  INFO target ino=$ino file=$F master=$MLOC (wanted $MASTER) at +$(el)s"
@@ -983,7 +996,6 @@ for n in "$H" "$W"; do
 done
 clear_knobs
 disarm_drop
-RMF=$([ "$TARGET" = dir ] && echo "rm -rf" || echo "rm -f")
-timeout 20 $SSH "$H" "$RMF '$MNT'/.livewait_${LABEL}_1 '$MNT'/.livewait_${LABEL}_2 '$MNT'/.livewait_${LABEL}_3 '$MNT'/.livewait_${LABEL}_4 '$MNT'/.livewait_${LABEL}_5 '$MNT'/.livewait_${LABEL}_6 '$MNT'/.livewait_${LABEL}_7 '$MNT'/.livewait_${LABEL}_8" >/dev/null 2>&1
+rm_cands
 echo "=== live_holder_wait $LABEL: fails=$fails wall=$(el)s out=$OUT $(date -u +%FT%TZ) ==="
 [ "$fails" -eq 0 ]

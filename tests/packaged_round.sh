@@ -88,7 +88,9 @@ case "$TRANSPORT" in
     tcp) FT=1; TNAME=TCP ;;
     caw) FT=0; TNAME=CAW ;;
 esac
-DIST="$HERE/dist/$V"
+# A release candidate's packages are in dist/<version>/<n>/ (tools/release_run.py
+# passes MXFS_DIST): the version number alone names every rebuild of it.
+DIST="$HERE/${MXFS_DIST:-dist/$V}"
 SSH="$HERE/tools/mxfs_sshpass.sh"
 MNT=/mnt/mxfs
 . "$HERE/tools/mxfs_lab.sh"
@@ -225,6 +227,13 @@ done
 # its reboot check found both on 7.0.
 if [ -n "$KERNEL" ]; then
     [ $FAM = pve ] || die "KERNEL= selects a kernel only on Proxmox (proxmox-boot-tool)"
+    # The claimed kernels come from data/platforms.json (kernel_releases), the
+    # one list every harness reads; a set that has not got one yet installs it
+    # with its headers (DKMS builds against them), as
+    # scripts/pve_suite_on_kernel.sh does.  Bound: an apt download of ~150 MB,
+    # measured there, 600 s.
+    every install 600 "dpkg -s proxmox-kernel-$KERNEL-signed >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y proxmox-kernel-$KERNEL-signed proxmox-headers-$KERNEL >/root/pve_kernel_$KERNEL.log 2>&1" \
+        || die "installing kernel $KERNEL"
     PINNED=1
     every pin 30 "proxmox-boot-tool kernel pin $KERNEL" || die "pinning $KERNEL"
 fi

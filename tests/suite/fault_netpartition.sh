@@ -22,24 +22,31 @@ MARK="MXFS_NETPART_$(date +%s)_${R}"
 echo "$MARK" > /dev/kmsg 2>/dev/null
 FPAT='Shutting down|shutting down|SHUTDOWN|Corruption|Internal error|split.?brain'
 
+# A partition that was never applied measures nothing.  Until 2026-10-21 a node
+# without iptables skipped the block silently and the row passed on a cluster
+# that had never been partitioned.  Every node checks before the barrier, so all
+# of them stop together, as INFRA: positive evidence that the rig, not MXFS,
+# could not run the test.
+command -v iptables >/dev/null 2>&1 || { finish_state INFRA "iptables missing on rank $R: the partition cannot be applied"; exit 0; }
+
 ck "np barrier ready" coord_barrier "np_ready"
 
 if [ "$R" = "$T" ] && [ "$T" -ge 2 ]; then
-    have_ipt=0; command -v iptables >/dev/null 2>&1 && have_ipt=1
-    if [ "$have_ipt" = 1 ]; then
-        iptables -I INPUT  -p tcp --dport 7600 -j DROP 2>/dev/null
-        iptables -I OUTPUT -p tcp --dport 7600 -j DROP 2>/dev/null
-        iptables -I INPUT  -p tcp --sport 7600 -j DROP 2>/dev/null
-        iptables -I OUTPUT -p tcp --sport 7600 -j DROP 2>/dev/null
-    fi
+    iptables -I INPUT  -p tcp --dport 7600 -j DROP 2>/dev/null
+    iptables -I OUTPUT -p tcp --dport 7600 -j DROP 2>/dev/null
+    iptables -I INPUT  -p tcp --sport 7600 -j DROP 2>/dev/null
+    iptables -I OUTPUT -p tcp --sport 7600 -j DROP 2>/dev/null
+    # the block is in effect, not just asked for
+    ck "np partition applied (DROP rules present)" bash -c \
+        "iptables -C INPUT -p tcp --dport 7600 -j DROP && iptables -C OUTPUT -p tcp --sport 7600 -j DROP"
     coord_signal "np_blocked"
     sleep "$BLOCK_S"
-    if [ "$have_ipt" = 1 ]; then
-        iptables -D INPUT  -p tcp --dport 7600 -j DROP 2>/dev/null
-        iptables -D OUTPUT -p tcp --dport 7600 -j DROP 2>/dev/null
-        iptables -D INPUT  -p tcp --sport 7600 -j DROP 2>/dev/null
-        iptables -D OUTPUT -p tcp --sport 7600 -j DROP 2>/dev/null
-    fi
+    dropped=$(iptables -L INPUT -v -n -x 2>/dev/null | awk '/DROP/ && /7600/ {s += $1} END {print s + 0}')
+    SUITE_MEASURED_EXTRA="${SUITE_MEASURED_EXTRA:+$SUITE_MEASURED_EXTRA }dropped_pkts=${dropped:-0}"
+    iptables -D INPUT  -p tcp --dport 7600 -j DROP 2>/dev/null
+    iptables -D OUTPUT -p tcp --dport 7600 -j DROP 2>/dev/null
+    iptables -D INPUT  -p tcp --sport 7600 -j DROP 2>/dev/null
+    iptables -D OUTPUT -p tcp --sport 7600 -j DROP 2>/dev/null
     coord_signal "np_healed"
 elif [ "$R" = 1 ]; then
     # During the partition, write into the FS; after heal the peer must see it.

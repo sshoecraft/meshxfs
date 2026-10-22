@@ -70,12 +70,37 @@ def release_of_build() -> dict[str, str]:
     return out
 
 
-def tables() -> str:
+def candidate_runs(candidate: str, row: str) -> tuple[dict, str]:
+    """{configuration: the newest PASS of `row` on the release candidate} from the board's run
+    ledger, and the candidate's version. A release is published with the numbers its own
+    candidate measured, never with an earlier build's."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import criteria  # noqa: E402
+    manifest = load(f"data/candidates/{candidate}.json")
+    found = {}
+    for (config, rid), runs in criteria.read_ledger(criteria.SPEC).runs.items():
+        if rid != row:
+            continue
+        # the candidate's current attempt only: an earlier attempt at the version ran another tree
+        mine = [r for r in runs if r.get("candidate") == candidate and not r.get("variant")
+                and str(r.get("iso", "")) >= manifest["created"]]
+        if mine:
+            found[config] = mine[0]
+    return found, manifest["version"]
+
+
+def tables(candidate: str = "") -> str:
     rows = [r for r in load("data/release_table.json")["rows"] if r.get("boards")]
-    crit = {c["id"]: c for c in load("data/criteria.json")["criteria"]}
-    perf = crit["fio_perf"].get("per_config", {})
-    vsxfs = crit["fio_perf_vs_xfs"].get("per_config", {})
     releases = release_of_build()
+    if candidate:
+        perf, version = candidate_runs(candidate, "fio_perf")
+        vsxfs, _ = candidate_runs(candidate, "fio_perf_vs_xfs")
+        for run in list(perf.values()) + list(vsxfs.values()):
+            releases.setdefault(str(run.get("build") or ""), version)
+    else:
+        crit = {c["id"]: c for c in load("data/criteria.json")["criteria"]}
+        perf = crit["fio_perf"].get("per_config", {})
+        vsxfs = crit["fio_perf_vs_xfs"].get("per_config", {})
     groups: dict[str, list[tuple[int, str]]] = {}
     for r in rows:
         for board in r["boards"]:
@@ -111,9 +136,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--check", action="store_true", help="exit 1 if the page is not what the boards hold")
     ap.add_argument("--print", action="store_true", help="print the tables, change nothing")
+    ap.add_argument("--candidate", default="",
+                    help="the release candidate whose own runs the page publishes")
     args = ap.parse_args()
 
-    body = tables()
+    body = tables(args.candidate)
     if args.print:
         sys.stdout.write(body)
         return 0

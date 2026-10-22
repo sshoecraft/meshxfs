@@ -82,6 +82,31 @@ hdm() { measure "$1" 20 "$2" '^DMESG_END$' "the kernel log on $1 from the lap ma
 cnt() { rs 15 "$1" "cat $P/$2 2>/dev/null || echo na"; }
 t0=$(date +%s)
 el() { echo $(( $(date +%s) - t0 )); }
+# A lap that ended between the kill and V's rejoin (an ABORT at any capture
+# after the destroy) left V powered off, and every harness after it found
+# test2 down (the 0.90.134 capture gate: tcp_death_replay, then
+# lone_mount_crash_replay).  As fence_lost_response's flr_cleanup does, the
+# trap gives back what the lap took: V is started and /src mounted on it once
+# it answers (bounded as the lap's own restart is: 120 s to ssh).  The flag is
+# set before the destroy and cleared once V has rejoined.
+RESTORE_V=0
+rbr_cleanup() {
+    [ "$RESTORE_V" = 1 ] || return 0
+    local i
+    echo "CLEANUP: starting $V, which this lap destroyed and did not get back"
+    $VIRSH start "$V" > /dev/null 2>&1
+    for i in $(seq 1 24); do
+        rs 8 "$V" "echo SSH_UP" | grep -q SSH_UP && break
+        sleep 5
+    done
+    if rs 60 "$V" "mountpoint -q /src || mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; mountpoint -q /src && echo SRC_OK" | grep -q SRC_OK; then
+        echo "CLEANUP: $V is up with /src"
+    else
+        echo "CLEANUP: $V did not come back with /src"
+    fi
+    return 0
+}
+trap rbr_cleanup EXIT
 
 echo "=== recov_bmbt_reuse label=$LABEL S=$S V=$V out=$OUT $(date -u +%FT%TZ) ==="
 TREESV=$(modinfo mxfs.ko 2>/dev/null | sed -n 's/^srcversion: *//p')
@@ -131,6 +156,7 @@ ino1=$(sed -n 's/.*ino=\([0-9]*\).*/\1/p' "$OUT/v_build.txt" | head -1)
 sleep 10
 
 # 2. Kill V mid-write; S recovers.
+RESTORE_V=1
 $VIRSH destroy "$V" >/dev/null 2>&1; echo "  INFO virsh destroy $V rc=$? at +$(el)s $(date -u +%T)"
 tkill=$(date +%s)
 rec=0; i=0
@@ -168,6 +194,7 @@ done
 [ "$up" = 1 ] || { echo "RESULT INCONCLUSIVE recovreuse: $V not back on ssh within 120 s out=$OUT"; exit 3; }
 rsx 90 "$V" "mountpoint -q /src || mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; MXFS_DEV='$DEV' MXFS_KO_MD5='$KO_MD5' bash /src/mxfs/tests/setup/prep_node.sh tcp 2>&1" > "$OUT/v_rejoin.txt"
 prep_require "$OUT/v_rejoin.txt" "the rejoin preparation on $V"
+RESTORE_V=0
 echo "  INFO $V rejoined at +$(el)s"
 rs 12 "$V" "echo '$MARK' > /dev/kmsg" >/dev/null
 F2=$MNT/.recovreuse_${LABEL}_2.dat

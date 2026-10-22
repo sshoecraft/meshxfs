@@ -108,6 +108,6 @@ btmp=$(mktemp 2>/dev/null) && jq \
             xfs:{seq_write_1m:{bw_mib:$xsw}, seq_read_1m:{bw_mib:$xsr}, rand_write_4k:{iops:$xrw}, rand_read_4k:{iops:$xrr}},
             mxfs:{seq_write_1m:{bw_mib:$msw}, seq_read_1m:{bw_mib:$msr}, rand_write_4k:{iops:$mrw}, rand_read_4k:{iops:$mrr}},
             ratio_pct:{seqW:$psw, seqR:$psr, randW:$prw, randR:$prr}}' \
-  "$BENCH" > "$btmp" 2>/dev/null && mv "$btmp" "$BENCH" 2>/dev/null
+  "$BENCH" > "$btmp" 2>/dev/null && chmod 0644 "$btmp" && mv "$btmp" "$BENCH" 2>/dev/null
 
 { [ "${worst_w:-0}" -ge "$MIN_PCT" ]; } && emit PASS "$measured" || emit FAIL "$measured" "mxfs write worst ${worst_w}% < ${MIN_PCT}% of XFS"

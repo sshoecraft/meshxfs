@@ -179,10 +179,13 @@ if [ "$R" = 1 ]; then
         # new temp file + mv instead -- rename only needs dir write, which
         # isn't squashed, matching the workaround already used for bench.json
         # below.
+        # mktemp makes the file 0600 and mv keeps that, so the yardstick landed
+        # in the tree readable by root only, where the host's tools (a release
+        # candidate hashes every yardstick) could not read it: 0644 first.
         bstmp=$(mktemp 2>/dev/null)
         if [ -n "$bstmp" ]; then
             printf '{"seq_write_1m":{"bw_mib":%s},"seq_read_1m":{"bw_mib":%s},"rand_write_4k":{"iops":%s},"rand_read_4k":{"iops":%s},"size":"%s"}\n' \
-                "$sw_bw" "$sr_bw" "$rw_io" "$rr_io" "$SIZE" > "$bstmp" && mv "$bstmp" "$BASE" 2>/dev/null
+                "$sw_bw" "$sr_bw" "$rw_io" "$rr_io" "$SIZE" > "$bstmp" && chmod 0644 "$bstmp" && mv "$bstmp" "$BASE" 2>/dev/null
         fi
     fi
 
@@ -197,7 +200,7 @@ if [ "$R" = 1 ]; then
       '.[$l] = {ts:$ts, test:"fio_perf", nodes:$n, configuration:$d, fs:$fs, size:$sz,
                 fio:{seq_write_1m:{bw_mib:$sw}, seq_read_1m:{bw_mib:$sr},
                      rand_write_4k:{iops:$rw}, rand_read_4k:{iops:$rr}}}' \
-      "$BENCH" > "$btmp" 2>/dev/null && mv "$btmp" "$BENCH" 2>/dev/null
+      "$BENCH" > "$btmp" 2>/dev/null && chmod 0644 "$btmp" && mv "$btmp" "$BENCH" 2>/dev/null
 fi
 
 emit PASS "$measured"

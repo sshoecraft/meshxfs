@@ -4860,6 +4860,12 @@ extern atomic_t mxfs_iwr_whole_empty;
 extern atomic_t mxfs_iwr_whole_declined;
 extern int mxfs_iwr_refuse_empty;
 extern atomic_t mxfs_iwr_empty_refused;
+extern atomic_t mxfs_iwr_merge_blocks;
+extern atomic_t mxfs_iwr_merge_miscompares;
+extern atomic_t mxfs_iwr_merge_failed;
+extern atomic_t mxfs_iwr_merge_empty;
+extern atomic_t mxfs_dbg_iwr_merge_hold_n;
+extern int mxfs_dbg_iwr_merge_hold_ms;
 
 /*
  * H-WW1 instrument (D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-
@@ -5371,6 +5377,130 @@ mxfs_dino_clobber_probe(
 	kfree(tmp);
 }
 
+/*
+ * An inode-cluster write on a volume whose sector holds several inodes that
+ * cannot be merged (docs/4kn-support.md): such a volume has no safe whole
+ * write, so the write fails, the buffer stays dirty for the AIL to retry, and
+ * the reason is printed.  Never expected; each reason names the guard above it.
+ */
+static bool
+mxfs_merged_refuse(
+	struct xfs_buf		*bp,
+	const char		*why)
+{
+	int			n = atomic_inc_return(&mxfs_iwr_merge_failed);
+
+	if (n <= 1000)
+		pr_err("mxfs: P-IWR-MERGE-REFUSED#%d daddr=%lld why=%s comm=%s -- an inode-cluster write on a volume whose sector holds several inodes could not be merged; failing it rather than writing peers' slots from this node's copy\n",
+		       n, (long long)bp->b_maps[0].bm_bn, why, current->comm);
+	xfs_buf_ioerror(bp, -EIO);
+	xfs_buf_ioend(bp);
+	return true;
+}
+
+/*
+ * THE MERGED WRITE (docs/4kn-support.md, "The inode cluster").  On a volume
+ * whose sector holds several inodes the partial write below cannot write one
+ * slot by itself: the device moves whole blocks.  For each block holding a
+ * slot this node must write (`dirty`, one bit a slot), read the block from the
+ * device past every cache, copy this node's slots into that image from the
+ * buffer, and COMPARE AND WRITE the block: compare the image as read, write
+ * the merged one.  A MISCOMPARE means a peer landed one of its own slots in
+ * the block since the read, so read and merge again.  A peer's slot is never
+ * written from this node's copy, so no stale inode can land; each dinode
+ * carries its own CRC, so a merged block verifies as its parts do.
+ *
+ * The retries are bounded.  Between one read and its swap, at most the
+ * block's other spb - 1 slot owners can each land a write of their own; four
+ * such rounds is the bound.  A block still miscomparing past it means a peer
+ * rewrites it without pause, which nothing in the protocol does: the write
+ * fails -EIO, the buffer stays dirty for the AIL to retry, and the failure is
+ * printed.  It never falls back to a whole write.
+ *
+ * Synchronous, as the surgical write is, and inside a no-I/O allocation scope:
+ * the swap allocates its pages, and this runs in inode writeback.  It
+ * completes the buffer itself.
+ */
+static void
+mxfs_merged_inode_write(
+	struct xfs_buf		*bp,
+	u64			dirty,
+	unsigned int		inodesize,
+	unsigned int		sectsize)
+{
+	struct xfs_mount	*mp = bp->b_mount;
+	unsigned int		spb = sectsize / inodesize;	/* slots per block */
+	unsigned int		nblk = BBTOB(bp->b_length) / sectsize;
+	unsigned int		bound = 4 * (spb - 1);
+	u64			bmask = (1ULL << spb) - 1;
+	u64			base = BBTOB(bp->b_maps[0].bm_bn +
+					     bp->b_target->bt_sector_offset);
+	unsigned int		noio, b, k, tries = 0, failed_blk = 0;
+	u8			*img;
+	int			rc = 0;
+
+	img = kmalloc(2 * sectsize, GFP_NOIO);
+	if (!img) {
+		rc = -ENOMEM;
+		goto out;
+	}
+	noio = memalloc_noio_save();
+	for (b = 0; b < nblk; b++) {
+		u64	off = base + (u64)b * sectsize;
+
+		if (!(dirty & (bmask << (b * spb))))
+			continue;
+		for (tries = 0; ; tries++) {
+			rc = mxfs_pal_scsi_read_fua_bdev(bp->b_target->bt_bdev,
+							 off >> BBSHIFT, img,
+							 sectsize);
+			if (rc)
+				break;
+			memcpy(img + sectsize, img, sectsize);
+			for (k = 0; k < spb; k++)
+				if (dirty & (1ULL << (b * spb + k)))
+					memcpy(img + sectsize + k * inodesize,
+					       (char *)bp->b_addr +
+						(size_t)b * sectsize + k * inodesize,
+					       inodesize);
+			/* DEBUG: a test widens the window a peer's write lands in */
+			if (unlikely(!tries && atomic_read(&mxfs_dbg_iwr_merge_hold_n) > 0) &&
+			    atomic_dec_if_positive(&mxfs_dbg_iwr_merge_hold_n) >= 0)
+				msleep(READ_ONCE(mxfs_dbg_iwr_merge_hold_ms));
+			rc = mxfs_pal_bdev_compare_and_write_block(
+					mp->m_mxfs_merge_dev, off, img,
+					img + sectsize);
+			if (rc != -EAGAIN)
+				break;
+			atomic_inc(&mxfs_iwr_merge_miscompares);
+			if (tries + 1 >= bound)
+				break;
+		}
+		if (rc) {
+			failed_blk = b;
+			break;
+		}
+		atomic_inc(&mxfs_iwr_merge_blocks);
+	}
+	memalloc_noio_restore(noio);
+	kfree(img);
+out:
+	if (rc) {
+		int	n = atomic_inc_return(&mxfs_iwr_merge_failed);
+
+		if (n <= 1000)
+			pr_err("mxfs: P-IWR-MERGE-FAILED#%d daddr=%lld block=%u rc=%d tries=%u bound=%u dirty=0x%llx comm=%s -- a merged inode-cluster write failed; the buffer stays dirty and is retried, never written whole\n",
+			       n, (long long)bp->b_maps[0].bm_bn, failed_blk, rc,
+			       tries + 1, bound, (unsigned long long)dirty,
+			       current->comm);
+		xfs_buf_ioerror(bp, rc == -EAGAIN ? -EIO : rc);
+	} else {
+		bp->b_error = 0;
+		bp->b_flags |= XBF_DONE;
+	}
+	xfs_buf_ioend(bp);
+}
+
 static bool
 mxfs_submit_partial_inode_write(
 	struct xfs_buf		*bp)
@@ -5379,6 +5509,10 @@ mxfs_submit_partial_inode_write(
 	struct xfs_perag	*pag;
 	struct xfs_log_item	*lip;
 	unsigned int		inodelog, sectsize, inodesize, len, ni;
+	/* the masks' unit: the sector, or the slot where a sector holds
+	 * several inodes and the write is the merged one */
+	unsigned int		unit;
+	bool			merged;
 	unsigned int		total_sects, spi, nslots = 0, nskip = 0;
 	u64			logged = 0, bli_dirty = 0, skip = 0, dirty = 0, all;
 	/* H-UB1: logged slots never copied in, masked or not, for the
@@ -5447,13 +5581,26 @@ mxfs_submit_partial_inode_write(
 	}
 	if (!(bp->b_flags & XBF_WRITE))
 		return false;
-	if (bp->b_ops != &xfs_inode_buf_ops) {
+	/*
+	 * docs/4kn-support.md: on a volume whose sector holds several inodes,
+	 * in a mount that has had a peer, no inode-cluster write may go out
+	 * whole: a block carries peers' slots as this node last saw them.  Its
+	 * writes are merged (mxfs_merged_inode_write), and every fallback to a
+	 * whole write below becomes a merge or a refusal, except a brand-new
+	 * chunk's (allocbuf), which no peer can hold a slot of yet.  A buffer
+	 * still carrying the readahead ops is an inode cluster like any other.
+	 */
+	merged = mp->m_sb.sb_sectsize > mp->m_sb.sb_inodesize;
+	if (bp->b_ops != &xfs_inode_buf_ops &&
+	    !(merged && bp->b_ops == &xfs_inode_buf_ra_ops)) {
 		if (bp->b_ops == &xfs_inode_buf_ra_ops)
 			mxfs_iwr_whole_note(bp, "ops-ra", &mxfs_iwr_whole_early,
 					    0, 0, 0, 0);
 		return false;
 	}
 	if (bp->b_map_count != 1 || !bp->b_addr) {
+		if (merged)
+			return mxfs_merged_refuse(bp, "maps");
 		mxfs_iwr_dir_probe(bp, "WHOLE-maps");
 		mxfs_iwr_whole_note(bp, "maps", &mxfs_iwr_whole_early,
 				    0, 0, 0, 0);
@@ -5495,6 +5642,8 @@ mxfs_submit_partial_inode_write(
 	 * sound) while the stale slot is not reverted.
 	 */
 	pag = bp->b_pag;
+	if (!pag && merged)
+		return mxfs_merged_refuse(bp, "nopag");
 	if (!pag) {
 		extern int mxfs_iwr_enabled;
 		if (unlikely(mxfs_iwr_enabled))
@@ -5512,15 +5661,22 @@ mxfs_submit_partial_inode_write(
 	sectsize  = mp->m_sb.sb_sectsize;
 	len = BBTOB(bp->b_length);
 	ni  = len >> inodelog;
-	if (ni == 0 || ni > 64 || sectsize == 0 || (inodesize % sectsize) != 0) {
+	/* merged, every mask below counts slots: one bit an inode, spi 1 */
+	unit = merged ? inodesize : sectsize;
+	if (ni == 0 || ni > 64 || unit == 0 || (inodesize % unit) != 0 ||
+	    (merged && (sectsize % inodesize || len % sectsize))) {
+		if (merged)
+			return mxfs_merged_refuse(bp, "geom");
 		mxfs_iwr_dir_probe(bp, "WHOLE-geom");
 		mxfs_iwr_whole_note(bp, "geom", &mxfs_iwr_whole_early,
 				    0, 0, 0, 0);
 		return false;
 	}
-	spi = inodesize / sectsize;		/* sectors per inode */
-	total_sects = len / sectsize;
+	spi = inodesize / unit;			/* units per inode */
+	total_sects = len / unit;
 	if (total_sects == 0 || total_sects > 64) {
+		if (merged)
+			return mxfs_merged_refuse(bp, "geom");
 		mxfs_iwr_dir_probe(bp, "WHOLE-geom");
 		mxfs_iwr_whole_note(bp, "geom", &mxfs_iwr_whole_early,
 				    0, 0, 0, 0);
@@ -7106,7 +7262,8 @@ mxfs_submit_partial_inode_write(
 	 * usually nonzero — free/NL slots are common — but that is luck, not
 	 * design.)
 	 */
-	if (nskip == 0 && n_pr_skip == 0) {
+	/* merged, nothing skipped is a merge of every slot, never a whole bio */
+	if (!merged && nskip == 0 && n_pr_skip == 0) {
 		atomic_inc(&mxfs_iwr_whole_noskip);
 		return false;		/* nothing to skip -> whole-buffer write */
 	}
@@ -7126,6 +7283,21 @@ mxfs_submit_partial_inode_write(
 		xfs_buf_ioerror(bp, -EIO);
 		xfs_buf_ioend(bp);
 		return true;
+	}
+	if (dirty == 0 && merged) {
+		/*
+		 * The refusals below, without their fallback: merged, there is
+		 * no whole write to fall back to.  Nothing owed outside `skip`
+		 * completes with no I/O, as those refusals do; an owed slot
+		 * outside it with nothing to write is their should-never-happen
+		 * case, and fails instead of publishing peers' slots.
+		 */
+		if (((logged | bli_dirty) & ~skip) == 0) {
+			atomic_inc(&mxfs_iwr_merge_empty);
+			xfs_buf_ioend(bp);
+			return true;	/* we own completion; no I/O issued */
+		}
+		return mxfs_merged_refuse(bp, "owed-but-empty");
 	}
 	if (dirty == 0) {
 		/*
@@ -7213,6 +7385,13 @@ mxfs_submit_partial_inode_write(
 					    logged, bli_dirty, skip, pr_skip);
 		}
 		return false;		/* would write nothing -> whole write */
+	}
+
+	if (merged) {
+		mxfs_iwr_refuse_streak_end(bp, "merged");
+		mxfs_dino_clobber_probe(bp, dirty, "merged", ub1_found, nr1_written);
+		mxfs_merged_inode_write(bp, dirty, inodesize, sectsize);
+		return true;		/* it completed the buffer */
 	}
 
 	base_512 = bp->b_maps[0].bm_bn + bp->b_target->bt_sector_offset;
@@ -13551,7 +13730,10 @@ xfs_buf_submit_ex(
 	       bp->b_ops == &xfs_inode_buf_ra_ops)) {
 		uint32_t isize = bp->b_mount->m_sb.sb_inodesize;
 
-		if (isize >= 512 && (isize & 511) == 0) {
+		/* a sector holding several inodes cannot be written an inode
+		 * at a time: those clusters take the merged write */
+		if (isize >= 512 && (isize & 511) == 0 &&
+		    isize % bp->b_mount->m_sb.sb_sectsize == 0) {
 			struct xfs_log_item *lip;
 			uint64_t base = (uint64_t)bp->b_maps[0].bm_bn +
 				bp->b_target->bt_sector_offset;

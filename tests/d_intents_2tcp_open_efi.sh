@@ -35,8 +35,9 @@
 #      in V's directory (V's allocation group, inside the mask) and a create at
 #      the root (outside it) are each timed under a 20 s alarm and their rc
 #      recorded.  FIX build: both must succeed.  The extents the open EFI named
-#      are queried on the platter (chk_mxfs --free-query, read-only, on the
-#      LUN's backing image on clyde): FIX build with CHURN=0 asserts FREE.
+#      are queried on the platter (chk_mxfs --query-only --free-query on the
+#      resolved LUN, from the node that completed the case; no host-side image
+#      is read): FIX build with CHURN=0 asserts FREE.
 #   5. V is virsh-started and mounts again; the mount's outcome and its kernel
 #      lines are recorded.  FIX build: the mount must succeed (prep_rc=0,
 #      mounted=1) and V must create in its former directory.  CONTROL: the LUN
@@ -158,7 +159,6 @@ if [ "$MODE" = terminal_rejoin ]; then
     FIX=0
     echo "  INFO $W completion switched OFF for this lap (obl_complete_enable=0): the replay will be terminally refused; expect=$EXPECT"
 fi
-[ -r "$IMG" ] || { echo "ABORT: LUN backing image $IMG not readable on this host"; exit 2; }
 for n in $W $V; do rs 12 "$n" "echo '$MARK' > /dev/kmsg" >/dev/null; done
 capture() {
     rs 40 "$W" "dmesg | sed -n \"/$MARK/,\\\$p\"" > "$OUT/dmesg_${W}.txt" 2>/dev/null

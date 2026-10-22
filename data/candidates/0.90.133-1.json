@@ -1,0 +1,35 @@
+{
+  "candidate": "0.90.133-1",
+  "version": "0.90.133",
+  "created": "2026-10-21T18:45:43Z",
+  "state": "ABANDONED",
+  "dry_run": true,
+  "srcversion": "71AC6107043DD5BE3D9181A",
+  "module_sha256": "815374803f59639fa9e0ed7fa15444edf88b646ab661003d448cf1004bd650ed",
+  "files": "tests/evidence/candidates/0.90.133-1.files.json",
+  "files_count": 2506,
+  "files_digest": "ac4fdfe0ab4a87f4de795a3c84482f419af79cc452f3c3a8564c4589fbfada2d",
+  "spec": "06d06380a988d7c3511f28156c729a28fd548441b51dc4edbb37220d5f932108",
+  "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
+  "kernels": {},
+  "packages": {},
+  "dist": "",
+  "steps": {},
+  "history": [
+    {
+      "state": "RUNNING",
+      "at": "2026-10-21T18:45:43Z",
+      "why": "created"
+    },
+    {
+      "state": "INVALID",
+      "at": "2026-10-21T18:45:57Z",
+      "why": "1 frozen file(s) changed: touched (content restored after a change, or rewritten): docs/man/man5/mxfs.5"
+    },
+    {
+      "state": "ABANDONED",
+      "at": "2026-10-21T18:46:26Z",
+      "why": "machinery check done: the edit hook refused a frozen file, a touch set INVALID, the publisher refused"
+    }
+  ]
+}

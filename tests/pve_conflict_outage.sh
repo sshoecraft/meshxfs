@@ -81,6 +81,7 @@ pin_set() {  # PIN=1: hold participant 0's log tail on a fresh file's inode (0 r
     if [ "$ino" = new ]; then
         ino=$(on "$P0" "mkdir -p $MNT/conflict-pin && f=$MNT/conflict-pin/p.\$(date +%s) && echo pin > \$f && stat -c %i \$f" 30 | tail -1)
         [[ "$ino" =~ ^[0-9]+$ ]] || { say "ABORT: no pin inode ($ino)"; exit 1; }
+        # harness-lint: ok - selects the pin file the line above just created, to dirty it; no verdict reads it
         on "$P0" "echo $ino > /sys/module/mxfs/parameters/dbg_ail_pin_ino; echo again >> \$(ls -t $MNT/conflict-pin/p.* | head -1)" 30
     else
         on "$P0" "echo 0 > /sys/module/mxfs/parameters/dbg_ail_pin_ino" 30

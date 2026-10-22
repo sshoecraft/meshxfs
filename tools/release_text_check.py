@@ -45,9 +45,13 @@ A phrase that is right where it stands (history that names its own version, a
 statement about something genuinely unreleased) is listed in ALLOWED with the
 reason, by file and by the exact text of its line.  Nothing else is exempt.
 
-WHERE IT RUNS.  scripts/release.sh runs it before it builds a package and again
-before it publishes, and stops on a failure; tests/full_verify.sh records its
-result with the build's other audits.  It reads the tree only.
+WHERE IT RUNS.  Before a release candidate's packages are built, with
+--before-build: checks 5-7, over the text the packages ship.  Checks 1-4 (the
+README's release claims) and 8 (the benchmark page) ship in no package and are
+written when the version is released, so they run at the candidate's sealing
+step and again when scripts/release.sh publishes it; both stop on a failure.
+tests/full_verify.sh records its result with the build's other audits.  It
+reads the tree only.
 """
 from __future__ import annotations
 
@@ -168,6 +172,18 @@ def module_text(rel: str) -> list[tuple[int, str]]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--list", action="store_true", help="print the files and the derived claims")
+    #: The packages are built from a frozen release candidate BEFORE anything is verified on them.
+    #: What they ship (the manual pages, the module-options file, the storage plugin, the module's
+    #: own text) is checked then: checks 5-7. The README's release claims (checks 1-4) and the
+    #: benchmark page (check 8) ship in no package; they are written when the version is
+    #: released, from what qualification found, and checked at sealing and at publication. Asking
+    #: for them before the build made every candidate fail until its README claimed a release
+    #: nothing had verified yet.
+    ap.add_argument("--before-build", action="store_true",
+                    help="checks 5-7 only: the text the packages ship (before a candidate's "
+                         "packages are built)")
+    ap.add_argument("--candidate", default="",
+                    help="check 8 against this release candidate's runs")
     args = ap.parse_args()
 
     fails: list[str] = []
@@ -177,52 +193,8 @@ def main() -> int:
     version = read("VERSION").strip()
     readme = read("README.md")
 
-    # 1. the Released table
-    section = readme.split("### Released", 1)[1].split("###", 1)[0] if "### Released" in readme else ""
-    rows = re.findall(r"^> \| `(\d+/[a-z]+/[a-z]+/[a-z]+)` \|", section, re.M)
-    for c in rel:
-        if c not in rows:
-            fails.append(f"README.md: the Released table has no row for {c}")
-    for c in rows:
-        if c not in rel:
-            fails.append(f"README.md: the Released table lists {c}, which the release data does not")
-    earlier = released_earlier()
-    head = "### Released in an earlier version"
-    section = readme.split(head, 1)[1].split("###", 1)[0] if head in readme else ""
-    rows = dict(re.findall(r"^> \| `(\d+/[a-z]+/[a-z]+/[a-z]+)` \| ([0-9]+\.[0-9]+\.[0-9]+) \|", section, re.M))
-    for c, v in earlier.items():
-        if rows.get(c) != v:
-            fails.append(f"README.md: the '{head[4:]}' table gives {c} as {rows.get(c, 'nothing')}; "
-                         f"the release data says {v}")
-    for c in rows:
-        if c not in earlier:
-            fails.append(f"README.md: the '{head[4:]}' table lists {c}, which the release data does not")
-
-    # 2. the current release
-    m = re.search(r"verified on the current release, ([0-9.]+[0-9])", readme)
-    if not m or m.group(1) != version:
-        fails.append(f"README.md: 'verified on the current release, <v>' says "
-                     f"{m.group(1) if m else 'nothing'}; VERSION is {version}")
-    m = re.search(r"^> ## ([0-9]+\.[0-9]+\.[0-9]+):", readme, re.M)
-    if not m or m.group(1) != version:
-        fails.append(f"README.md: the first news heading is for {m.group(1) if m else 'no version'}; "
-                     f"VERSION is {version}")
-
-    # 3. the count in the heading
-    m = re.search(r"^> ## .*Released: ([a-z-]+|\d+) configurations", readme, re.M)
-    want = NUMBER_WORDS[len(rel)] if len(rel) < len(NUMBER_WORDS) else str(len(rel))
-    if not m or m.group(1) not in (want, str(len(rel))):
-        fails.append(f"README.md: the 'Released: <n> configurations' heading says "
-                     f"{m.group(1) if m else 'nothing'}; the data has {len(rel)} ({want})")
-
-    # 4. released platforms
-    plats = json.loads(read("data/platforms.json"))
-    plats = plats.get("platforms", plats)
-    for key, p in plats.items():
-        if isinstance(p, dict) and p.get("status") == "released":
-            name = re.split(r"\s*\(", p.get("name", key))[0].split(" / ")[0].strip()
-            if name and name not in readme:
-                fails.append(f"README.md: released platform '{name}' ({key}) is not named")
+    if not args.before_build:
+        readme_claims(readme, rel, version, fails)
 
     # 5 and 6. stale phrases
     allowed_seen = set()
@@ -276,10 +248,12 @@ def main() -> int:
             fails.append(f"{f}: states released cluster sizes and never names {top}")
 
     # 8. the benchmark page holds the release boards' numbers
-    bench = subprocess.run([sys.executable, str(ROOT / "tools/bench_report.py"), "--check"],
-                           capture_output=True, text=True)
-    if bench.returncode != 0:
-        fails.append("bench/README.md: " + (bench.stdout + bench.stderr).strip().replace("\n", "; "))
+    if not args.before_build:
+        bench = subprocess.run([sys.executable, str(ROOT / "tools/bench_report.py"), "--check"]
+                               + (["--candidate", args.candidate] if args.candidate else []),
+                               capture_output=True, text=True)
+        if bench.returncode != 0:
+            fails.append("bench/README.md: " + (bench.stdout + bench.stderr).strip().replace("\n", "; "))
 
     if args.list:
         print("released:", " ".join(rel))
@@ -288,8 +262,59 @@ def main() -> int:
     for line in fails:
         print("FAIL", line)
     print(f"release_text_check: {len(fails)} failure(s) over {len(texts)} files, "
-          f"{len(rel)} released configurations, version {version}")
+          f"{len(rel)} released configurations, version {version}"
+          f"{' (before the build: checks 5-7)' if args.before_build else ''}")
     return 1 if fails else 0
+
+
+def readme_claims(readme: str, rel: list, version: str, fails: list) -> None:
+    """Checks 1-4: what the README claims for this release."""
+    # 1. the Released table
+    section = readme.split("### Released", 1)[1].split("###", 1)[0] if "### Released" in readme else ""
+    rows = re.findall(r"^> \| `(\d+/[a-z]+/[a-z]+/[a-z]+)` \|", section, re.M)
+    for c in rel:
+        if c not in rows:
+            fails.append(f"README.md: the Released table has no row for {c}")
+    for c in rows:
+        if c not in rel:
+            fails.append(f"README.md: the Released table lists {c}, which the release data does not")
+    earlier = released_earlier()
+    head = "### Released in an earlier version"
+    section = readme.split(head, 1)[1].split("###", 1)[0] if head in readme else ""
+    rows = dict(re.findall(r"^> \| `(\d+/[a-z]+/[a-z]+/[a-z]+)` \| ([0-9]+\.[0-9]+\.[0-9]+) \|", section, re.M))
+    for c, v in earlier.items():
+        if rows.get(c) != v:
+            fails.append(f"README.md: the '{head[4:]}' table gives {c} as {rows.get(c, 'nothing')}; "
+                         f"the release data says {v}")
+    for c in rows:
+        if c not in earlier:
+            fails.append(f"README.md: the '{head[4:]}' table lists {c}, which the release data does not")
+
+    # 2. the current release
+    m = re.search(r"verified on the current release, ([0-9.]+[0-9])", readme)
+    if not m or m.group(1) != version:
+        fails.append(f"README.md: 'verified on the current release, <v>' says "
+                     f"{m.group(1) if m else 'nothing'}; VERSION is {version}")
+    m = re.search(r"^> ## ([0-9]+\.[0-9]+\.[0-9]+):", readme, re.M)
+    if not m or m.group(1) != version:
+        fails.append(f"README.md: the first news heading is for {m.group(1) if m else 'no version'}; "
+                     f"VERSION is {version}")
+
+    # 3. the count in the heading
+    m = re.search(r"^> ## .*Released: ([a-z-]+|\d+) configurations", readme, re.M)
+    want = NUMBER_WORDS[len(rel)] if len(rel) < len(NUMBER_WORDS) else str(len(rel))
+    if not m or m.group(1) not in (want, str(len(rel))):
+        fails.append(f"README.md: the 'Released: <n> configurations' heading says "
+                     f"{m.group(1) if m else 'nothing'}; the data has {len(rel)} ({want})")
+
+    # 4. released platforms
+    plats = json.loads(read("data/platforms.json"))
+    plats = plats.get("platforms", plats)
+    for key, p in plats.items():
+        if isinstance(p, dict) and p.get("status") == "released":
+            name = re.split(r"\s*\(", p.get("name", key))[0].split(" / ")[0].strip()
+            if name and name not in readme:
+                fails.append(f"README.md: released platform '{name}' ({key}) is not named")
 
 
 if __name__ == "__main__":

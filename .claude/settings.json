@@ -77,5 +77,18 @@
   },
   "env": {
     "CCMEMORY_LIST_TOKEN_BUDGET": "20000"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/candidate_freeze_hook.py\""
+          }
+        ]
+      }
+    ]
   }
 }

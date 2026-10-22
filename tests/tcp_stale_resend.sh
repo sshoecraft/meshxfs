@@ -27,8 +27,9 @@
 # outcome is measured on the same build: the fresh entry, the second grant and
 # W's bounce.
 #
-# the budget rule (derived): preflight ~10 s + 8 candidates ~5 s + search
-# <= 8 x 13 s + the read/rewrite ~5 s + an 8 s settle + captures ~10 s = 140 s.
+# the budget rule (derived): preflight ~10 s + the candidates (bound 13 s) +
+# search <= 16 x 13 s + the read/rewrite ~5 s + an 8 s settle + captures ~10 s
+# = 254 s.
 #
 # Usage: tests/tcp_stale_resend.sh <label> [W=test2] [H=test1]
 # Env:   MXFS_MNT (default /mnt/shared), CONTROL=0|1 (default 0).
@@ -72,19 +73,43 @@ MARK="STALERESEND-$LABEL-$$"
 for n in "$W" "$H"; do timeout 15 $SSH "$n" "echo '$MARK' > /dev/kmsg" >/dev/null 2>&1; done
 DM="dmesg | awk '/$MARK/{f=1} f'"
 
-# 1. H writes eight candidates; W finds one remotely mastered from W with the
-#    request-drop probe (its firing is the proof), exactly as the black-hole
-#    harness does.  Counts are read from the knob's own per-arm counter.
-timeout 40 $SSH "$H" "
-    for i in 1 2 3 4 5 6 7 8; do
-        f='$MNT/.staleresend_${LABEL}_'\$i
+# 1. H writes one candidate in each of NSHARD routing shards; W finds one
+#    remotely mastered from W with the request-drop probe (its firing is the
+#    proof), exactly as the black-hole harness does.  Counts are read from the
+#    knob's own per-arm counter.
+#
+#    The master is decided per SHARD, not per inode: routing hash v2 clears an
+#    inode number's low three bits before hashing it (include/mxfs/mxfs_tauth.h
+#    mxfs_tauth_route_hash), so eight files written back to back are one draw.
+#    On the 0.90.134 capture gate all eight (8388736-8388743) were local to W
+#    and the lap ABORTed.  H therefore creates files until NSHARD distinct
+#    shards are represented, keeps the first file in each as its candidate and
+#    removes the rest once every candidate exists, so a freed inode number is
+#    not drawn again.  None of 16 is remote from W with probability 2^-16.
+NSHARD=16; NMAKE=160
+# bound: ssh connect (ConnectTimeout 10 s) + 2x the measured 0.9-1.2 s for 160
+# creates of 32 KiB, the removal and the sync (live_holder_wait.sh, test1,
+# 2026-10-22); these files are 16 KiB
+timeout 13 $SSH "$H" "
+    seen=' '; n=0; i=0; spare=
+    while [ \$n -lt $NSHARD ] && [ \$i -lt $NMAKE ]; do
+        i=\$((i+1)); f='$MNT/.staleresend_${LABEL}_'\$i
         dd if=/dev/urandom of=\"\$f\" bs=4096 count=4 status=none || exit 1
-        echo \$i \$(stat -c %i \"\$f\") \$(md5sum \"\$f\" | cut -d' ' -f1)
+        ino=\$(stat -c %i \"\$f\") || exit 1; s=\$((ino >> 3))
+        case \"\$seen\" in *\" \$s \"*) spare=\"\$spare \$f\"; continue ;; esac
+        seen=\"\$seen\$s \"; n=\$((n+1)); echo \$i \$ino \$(md5sum \"\$f\" | cut -d' ' -f1)
     done
+    [ -z \"\$spare\" ] || rm -f \$spare
     sync
   " 2>"$OUT/h_setup.err" | filt > "$OUT/h_setup.txt"
-[ "$(grep -ac . "$OUT/h_setup.txt")" = "8" ] || {
-    echo "ABORT: H setup wrote $(grep -ac . "$OUT/h_setup.txt")/8 candidates: [$(filt < "$OUT/h_setup.err" | tail -3 | tr '\n' ' ')]"; exit 2; }
+# the candidates H made, removed at the end of the lap or when it cannot run
+rm_cands() {
+    timeout 20 $SSH "$H" "rm -f $(awk -v p="$MNT/.staleresend_${LABEL}_" '{printf " %s%s", p, $1}' "$OUT/h_setup.txt")" >/dev/null 2>&1
+}
+[ "$(grep -ac . "$OUT/h_setup.txt")" = "$NSHARD" ] || {
+    echo "ABORT: H made candidates in $(grep -ac . "$OUT/h_setup.txt") of $NSHARD distinct shards from $NMAKE files: [$(filt < "$OUT/h_setup.err" | tail -3 | tr '\n' ' ')]"
+    rm_cands; exit 2; }
+echo "  INFO $NSHARD candidates in distinct shards at +$(el)s"
 TARGET=""; CAND=""
 while read -r idx ino md5 <&3; do
     [ -n "$ino" ] || continue
@@ -98,7 +123,7 @@ while read -r idx ino md5 <&3; do
     sleep 4
     if [ "${got:-0}" -ge 1 ]; then TARGET=$ino; CAND=$idx; break; fi
 done 3< "$OUT/h_setup.txt"
-[ -n "$TARGET" ] || { echo "ABORT: no candidate inode is remotely mastered from $W"; disarm; exit 2; }
+[ -n "$TARGET" ] || { echo "ABORT: none of the $NSHARD candidates (one per routing shard) is remotely mastered from $W"; disarm; rm_cands; exit 2; }
 F="$MNT/.staleresend_${LABEL}_$CAND"
 echo "  INFO target ino=$TARGET file=$F at +$(el)s"
 
@@ -152,6 +177,6 @@ fi
 for n in "$W" "$H"; do
     s=$(grep -aEc 'BUG:|Oops|Shutting down filesystem|Corruption of in-memory' "$OUT/dmesg_$n.txt"); ck "zero splats/shutdowns on $n" "$s" "0"
 done
-timeout 20 $SSH "$H" "rm -f '$MNT'/.staleresend_${LABEL}_1 '$MNT'/.staleresend_${LABEL}_2 '$MNT'/.staleresend_${LABEL}_3 '$MNT'/.staleresend_${LABEL}_4 '$MNT'/.staleresend_${LABEL}_5 '$MNT'/.staleresend_${LABEL}_6 '$MNT'/.staleresend_${LABEL}_7 '$MNT'/.staleresend_${LABEL}_8" >/dev/null 2>&1
+rm_cands
 echo "=== tcp_stale_resend $LABEL: fails=$fails wall=$(el)s out=$OUT $(date -u +%FT%TZ) ==="
 [ "$fails" -eq 0 ]

@@ -92,13 +92,25 @@ done
 PLATFORM_GROUPS="${PLATFORM_GROUPS:-$(echo $PLATFORMS | tr ' ' ',')}"
 [ "$(echo "$PLATFORM_GROUPS" | tr ', ' '\n\n' | awk 'NF' | sort | tr '\n' ' ')" = "$(echo $PLATFORMS | tr ' ' '\n' | sort | tr '\n' ' ')" ] \
     || { echo "PLATFORM_GROUPS must name each of [$PLATFORMS] exactly once (got '$PLATFORM_GROUPS')" >&2; exit 2; }
-for k in $ALL_PLATFORMS; do
-    [ -s "$(dirname "$0")/evidence/full_verify_${V}_$k.log" ] || case " $PLATFORMS " in *" $k "*) ;; *)
-        echo "PLATFORMS leaves out $k, which has no run of $V to be graded on" >&2; exit 2 ;; esac
+# Every log is named by TAG: the version, or the release candidate this runs
+# for (tools/release_run.py sets MXFS_LOGTAG), so one candidate's platform
+# rounds are never graded on another's run of the same version.
+TAG="${MXFS_LOGTAG:-$V}"
+# GRADED is what the verdict reads: every released platform, except for a
+# dry-run candidate (tools/release_candidate.py create --dry-run), which can
+# never be qualified and may exercise a subset; it is graded on that subset.
+GRADED="$ALL_PLATFORMS"
+if [ -n "${MXFS_CANDIDATE:-}" ] && python3 -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("dry_run") else 1)' \
+        "$(dirname "$0")/../data/candidates/$MXFS_CANDIDATE.json" 2>/dev/null; then
+    GRADED="$PLATFORMS"
+fi
+for k in $GRADED; do
+    [ -s "$(dirname "$0")/evidence/full_verify_${TAG}_$k.log" ] || case " $PLATFORMS " in *" $k "*) ;; *)
+        echo "PLATFORMS leaves out $k, which has no run of $TAG to be graded on" >&2; exit 2 ;; esac
 done
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$HERE" || exit 1
-L="$HERE/tests/evidence/full_verify_$V.log"
+L="$HERE/tests/evidence/full_verify_$TAG.log"
 # a run that resumes after the build keeps the log of the run it continues
 case ",${STEPS:-build}," in *,build,*) : > "$L" ;; esac
 SSH="$HERE/tools/mxfs_sshpass.sh"
@@ -159,7 +171,7 @@ pool_lab() {
 # platform <key> <steps...>: one platform's steps in order against its own
 # lab file, logged to its own file.  A step is "[VAR=value ...] command args".
 platform() {
-    local key=$1 lab="$HOME/.config/mxfslab/lab.$1" pl="$HERE/tests/evidence/full_verify_${V}_$1.log" pair step
+    local key=$1 lab="$HOME/.config/mxfslab/lab.$1" pl="$HERE/tests/evidence/full_verify_${TAG}_$1.log" pair step
     shift
     : > "$pl"
     pool_lab "$key" "$lab" >> "$pl" 2>&1 || { echo "=== rc=2: $key: no pool LUN for its verification set ===" >> "$pl"; return; }
@@ -196,7 +208,10 @@ timeout 120 python3 scripts/extern_decl_audit.py >> "$L" 2>&1; echo "extern_audi
 timeout 60 python3 scripts/inode_flag_bits_audit.py >> "$L" 2>&1; echo "inode_flag_audit_rc=$?" | tee -a "$L"
 # the public text against the release data (scripts/release.sh stops on this;
 # here it is recorded with the build's other audits)
-timeout 120 python3 tools/release_text_check.py >> "$L" 2>&1; echo "release_text_check_rc=$?" | tee -a "$L"
+timeout 120 python3 tools/release_text_check.py ${MXFS_CANDIDATE:+--before-build} >> "$L" 2>&1; echo "release_text_check_rc=$?" | tee -a "$L"
+# the clean copy has served its purpose: the tree's own module is what the
+# later steps deploy, and its srcversion is checked against this one's
+rm -rf "$B"
 fi
 
 # --- 2. the release matrix's suites on the rig at the claimed node count
@@ -233,7 +248,7 @@ for gi in "${!sgroups[@]}"; do
         for cfg in $MATRIX; do
             if [ $((i % ${#sgroups[@]})) = "$gi" ]; then
                 slug=${cfg//\//-}
-                sl="$HERE/tests/evidence/full_verify_${V}_suite_$slug.log"
+                sl="$HERE/tests/evidence/full_verify_${TAG}_suite_$slug.log"
                 ./run.sh "$cfg" --group "$g" > "$sl" 2>&1
                 echo "=== rc=$?: ./run.sh $cfg --group $g ===" >> "$sl"
             fi
@@ -245,14 +260,25 @@ done
 for p in "${pids[@]}"; do wait "$p"; done
 for cfg in $MATRIX; do
     slug=${cfg//\//-}
-    sl="$HERE/tests/evidence/full_verify_${V}_suite_$slug.log"
+    sl="$HERE/tests/evidence/full_verify_${TAG}_suite_$slug.log"
     cat "$sl" >> "$L"
     grep -a '^=== rc=' "$sl"
     echo "suite_${slug}_pass=$(grep -cE '^\s+PASS' "$sl") suite_${slug}_fail=$(grep -cE '^\s+(FAIL|TIMEOUT)' "$sl")" | tee -a "$L"
 done
-# the board is the verdict, not the run's own PASS lines: a row FLAKY or SKIP
-# on the board is not a pass, and the board is what tools/criteria.py reads
-for cfg in $MATRIX; do run python3 tools/criteria.py "$cfg"; done
+# the board is the verdict, not the run's own PASS lines: run.sh exits 0 with
+# rows failed, so each board is read back, graded for the candidate when there
+# is one, and a board that does not read green is a failed step
+for cfg in $MATRIX; do
+    echo "=== board $cfg ===" >> "$L"
+    # harness-lint: ok - graded for the candidate, a board this run did not record reads NOT RUN, never a previous run's PASS
+    python3 tools/criteria.py "$cfg" ${MXFS_CANDIDATE:+--candidate "$MXFS_CANDIDATE"} >> "$L" 2>&1
+    # harness-lint: ok - the same graded read-back, as the step's verdict
+    if python3 tools/criteria.py "$cfg" ${MXFS_CANDIDATE:+--candidate "$MXFS_CANDIDATE"} | grep -q 'VERDICT: every criterion green'; then
+        echo "=== rc=0: board $cfg ===" >> "$L"
+    else
+        echo "=== rc=1: board $cfg ===" | tee -a "$L"
+    fi
+done
 fi
 
 # --- 3. packages
@@ -260,7 +286,8 @@ fi
 # writes that file last.  The directory alone is not one -- a release.sh
 # stopped part way leaves it behind, and 0.90.39's chain found it empty, built
 # nothing, and failed every packaged round on a missing .deb.
-if want packages && ! { [ -f "dist/$V/SHA256SUMS" ] && (cd "dist/$V" && sha256sum --quiet -c SHA256SUMS); }; then
+D="${MXFS_DIST:-dist/$V}"
+if want packages && ! { [ -f "$D/SHA256SUMS" ] && (cd "$D" && sha256sum --quiet -c SHA256SUMS); }; then
     run scripts/release.sh || { echo "release.sh failed; stopping" | tee -a "$L"; exit 1; }
 fi
 want platforms || { echo "=== full_verify $V done (steps:${STEPS//,/ }) ===" | tee -a "$L"; exit 0; }
@@ -277,7 +304,11 @@ PMATRIX=$(python3 tools/configuration.py release-matrix --nodes "$PLATFORM_NODES
 [ -n "$PMATRIX" ] || { echo "the release matrix has no configuration at $PLATFORM_NODES nodes" | tee -a "$L"; exit 2; }
 steps_of() {  # <platform>: that platform's steps, in order
     local s=() cfg kernels=("") k
-    [ "$1" = pve9 ] && kernels=("KERNEL=6.17.2-1-pve " "KERNEL=7.0.14-19-pve ")
+    # a platform verified on several kernels runs its rounds on each, the
+    # kernels read from data/platforms.json: a list kept here drifted from it
+    # (7.0.14-19 here, 7.0.14-24 in the release table)
+    mapfile -t pk < <(python3 -c 'import json, sys; d = json.load(open(sys.argv[1]))["platforms"].get(sys.argv[2], {}); ks = d.get("kernel_releases") or []; print("\n".join(ks) if len(ks) > 1 else "")' data/platforms.json "$1")
+    if [ -n "${pk[0]:-}" ]; then kernels=(); for k in "${pk[@]}"; do kernels+=("KERNEL=$k "); done; fi
     for k in "${kernels[@]}"; do
         for cfg in $PMATRIX; do s+=("${k}CONFIG=$cfg $PR $1 $V"); done
     done
@@ -328,14 +359,16 @@ done
 # shellcheck disable=SC2046
 [ "$POWER" = 1 ] && run scripts/lab_power.sh up $(for g in $SUITE_GROUPS; do echo "group:$g"; done)
 failed=0
-for k in $ALL_PLATFORMS; do
-    cat "$HERE/tests/evidence/full_verify_${V}_$k.log" >> "$L"
-    grep -a '^=== rc=' "$HERE/tests/evidence/full_verify_${V}_$k.log"
-    failed=$((failed + $(grep -ac '^=== rc=[1-9]' "$HERE/tests/evidence/full_verify_${V}_$k.log")))
+for k in $GRADED; do
+    cat "$HERE/tests/evidence/full_verify_${TAG}_$k.log" >> "$L"
+    grep -a '^=== rc=' "$HERE/tests/evidence/full_verify_${TAG}_$k.log"
+    failed=$((failed + $(grep -ac '^=== rc=[1-9]' "$HERE/tests/evidence/full_verify_${TAG}_$k.log")))
 done
 
 grep -E "=== rc=|RESULT|VERDICT|both nodes on kernel|suite_[0-9]+-|clean_build_rc|tools_rc|tauth_rc|extern_audit_rc|inode_flag_audit_rc|release_text_check_rc|all .* laps passed|STALL|STOP" "$L" | cut -c1-200
-# The exit status is the platforms' verdict.  It used to be the grep's above,
-# so 0.90.39's chain read rc=0 over twelve failed packaged rounds.
-echo "=== full_verify $V platform steps failed: $failed ===" | tee -a "$L"
-[ "$failed" = 0 ]
+# The exit status covers every step this run made: the build's own audits and
+# user-mode tests, every suite's run and board, and every platform step.  It
+# used to be the platforms' alone, so a failed tauth or a red board exited 0.
+others=$(grep -acE '^(tools_rc|tauth_rc|extern_audit_rc|inode_flag_audit_rc|release_text_check_rc)=[1-9]|^=== rc=[1-9]+: (\./run\.sh|board) ' "$L")
+echo "=== full_verify $TAG failed: platform steps $failed, other steps $others ===" | tee -a "$L"
+[ "$failed" = 0 ] && [ "$others" = 0 ]

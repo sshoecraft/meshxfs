@@ -117,6 +117,9 @@
  * foreign replay of the transitioning node's slice.  Stock mkfs.xfs presets
  * this bit; so do we.  The kernel refuses a cluster mount without it. */
 #define XFS_SB_VERSIONNUM      0xB4B5
+/* the sector and log sector sizes are larger than 512 (xfs_validate_sb_common
+ * refuses a log sector size without it) */
+#define XFS_SB_VERSION_SECTORBIT 0x0800
 #define XFS_SB_FEATURES2       0x018A  /* LAZYSBCOUNT|ATTR2|PROJID32|CRC */
 #define XFS_SB_FEAT_RO_COMPAT_FINOBT  (1 << 0)  /* free inode btree */
 /* C7: FTYPE|SPINODES + MXFS_PROTOGATE (bit 30).  The PROTOGATE
@@ -303,6 +306,40 @@ static const char *format_cluster_name;
  * version 2 groups eight consecutive inode numbers per page. */
 static uint16_t format_tauth_hash_version = MXFS_TAUTH_HASH_VERSION;
 
+/* SOURCE_DATE_EPOCH, as for a reproducible build: the time every timestamp this
+ * tool writes carries (the authority ledger's stamps, the first inodes' times)
+ * instead of the clock's.  With it, and /dev/urandom bound to a file of fixed
+ * bytes (the filesystem uuid and the ledger's seed), two formats of one device
+ * size are byte-identical, which is how tests/mkfs_layout_identity.py shows a
+ * change to this tool leaves a layout as it was. */
+static bool format_epoch_set;
+static time_t format_epoch;
+
+static time_t format_time(void)
+{
+    return format_epoch_set ? format_epoch : time(NULL);
+}
+
+/* The device's logical block size (BLKSSZGET; docs/4kn-support.md): 512, or 4096
+ * for a 4K-native device formatted with -L.  It is the XFS sector size, and on a
+ * larger block every 512-byte unit of a record region (journal, disklock, PR
+ * registrants, bootstrap, slice lifecycle) gets a block of its own
+ * (mxfs_rec_phys).  At 512 every layout below is the one this tool always wrote. */
+static uint32_t dev_lbs = MXFS_REC_UNIT;
+
+/* TEST ONLY (-L): format a device with 4096-byte logical blocks.  4K-native
+ * support is not complete: the module mounts such a volume only with
+ * mxfs.dbg_lbs_mount=1, and only on one node. */
+static bool format_4kn;
+
+/* The filesystem blocks the four AG header sectors take: one at 512 (they share
+ * block 0), four at 4096 (each a sector, and a sector is a block).  Everything
+ * this tool places after the headers in an AG starts that much later. */
+static uint32_t hdr_blocks(void)
+{
+    return (4 * dev_lbs + XFS_BLOCKSIZE - 1) / XFS_BLOCKSIZE;
+}
+
 /*
  * Write a buffer to fd at the given offset.
  * Uses pwrite with O_DIRECT alignment via posix_memalign.
@@ -338,6 +375,36 @@ static int write_sectors(int fd, uint64_t offset, const void *buf, uint64_t len)
 
     free(aligned);
     return 0;
+}
+
+/*
+ * Write len bytes (whole 512-byte units) of a record region that starts at
+ * start, at off: the offset the unit has in the region's 512-byte addressing.
+ * At 512 that is the bytes themselves.  On a larger logical block each unit is
+ * the first 512 bytes of the block mxfs_rec_phys names, the rest of the block
+ * zero, as the module's PAL writes and compares it.
+ */
+static int write_record(int fd, uint64_t start, uint64_t off, const void *buf,
+                        uint64_t len)
+{
+    uint8_t *blk;
+    uint64_t k;
+    int rc = 0;
+
+    if (dev_lbs == MXFS_REC_UNIT)
+        return write_sectors(fd, off, buf, len);
+    blk = malloc(dev_lbs);
+    if (!blk) {
+        pr_err("mkfs.mxfs: out of memory\n");
+        return -1;
+    }
+    for (k = 0; k < len && !rc; k += MXFS_REC_UNIT) {
+        memset(blk, 0, dev_lbs);
+        memcpy(blk, (const uint8_t *)buf + k, MXFS_REC_UNIT);
+        rc = write_sectors(fd, mxfs_rec_phys(start, off + k, dev_lbs), blk, dev_lbs);
+    }
+    free(blk);
+    return rc;
 }
 
 /*
@@ -561,7 +628,7 @@ static int format_journal(int fd, uint64_t journal_offset,
     jsup.crc = 0;
     jsup.crc = crc32c(~0U, &jsup, sizeof(jsup));
 
-    if (write_sectors(fd, journal_offset, &jsup, 512) < 0)
+    if (write_record(fd, journal_offset, journal_offset, &jsup, 512) < 0)
         return -1;
 
     /* Write slot headers — each slot is SLOT_SIZE_SECTORS * 512 bytes.
@@ -583,11 +650,12 @@ static int format_journal(int fd, uint64_t journal_offset,
         shdr.crc = 0;
         shdr.crc = crc32c(~0U, &shdr, sizeof(shdr));
 
-        if (write_sectors(fd, slot_offset, &shdr, 512) < 0)
+        if (write_record(fd, journal_offset, slot_offset, &shdr, 512) < 0)
             return -1;
 
         pr_verbose("    Slot %u at offset %llu\n", i,
-                   (unsigned long long)slot_offset);
+                   (unsigned long long)mxfs_rec_phys(journal_offset, slot_offset,
+                                                     dev_lbs));
     }
 
     return 0;
@@ -628,6 +696,12 @@ static int write_mxfs_super(int fd, uint64_t super_offset,
                  format_cluster_name);
     }
     sup.cluster_proto_gen = MXFS_PROTO_GEN;
+    /* docs/4kn-support.md: a device of larger logical blocks.  The region sizes
+     * below are then the bytes each region spans on it. */
+    if (dev_lbs > MXFS_REC_UNIT) {
+        sup.flags |= MXFS_FORMAT_F_LBS;
+        sup.logical_block_size = dev_lbs;
+    }
     /* 0.88.0: the slice lifecycle region (mxfs_super.h, MXFS_FORMAT_F_SLIFE). */
     sup.slife_offset = slife_offset;
     sup.slife_size = slife_size;
@@ -709,7 +783,7 @@ static int write_bootstrap_record(int fd, uint64_t offset, const uint8_t *uuid)
     r.crc32c = crc32c(~0U, &r, sizeof(r));
     pr_verbose("  Writing bootstrap record at offset %llu (CRC=0x%08x)\n",
                (unsigned long long)offset, r.crc32c);
-    return write_sectors(fd, offset, &r, sizeof(r));
+    return write_record(fd, offset, offset, &r, sizeof(r));
 }
 
 /* ─── Slice lifecycle records (0.88.0) ───
@@ -728,7 +802,8 @@ static int write_slife_records(int fd, uint64_t offset, uint64_t size,
     struct mxfs_slife_record r;
     uint32_t i;
 
-    if ((uint64_t)count * MXFS_SLIFE_RECORD_SIZE > size) {
+    /* size is the region's span on the device: one record per 512-byte unit */
+    if ((uint64_t)count * MXFS_SLIFE_RECORD_SIZE > mxfs_rec_units(size, dev_lbs)) {
         pr_err("mkfs.mxfs: %u log slices do not fit the %llu-byte lifecycle region\n",
                count, (unsigned long long)size);
         return -1;
@@ -742,10 +817,12 @@ static int write_slife_records(int fd, uint64_t offset, uint64_t size,
         memcpy(r.fs_uuid, uuid, 16);
         r.crc = crc32c(~0U, &r, sizeof(r));
         pr_verbose("  Writing slice lifecycle record %u at offset %llu (INIT_REQUIRED, CRC=0x%08x)\n",
-                   i, (unsigned long long)(offset + (uint64_t)i * sizeof(r)),
+                   i, (unsigned long long)mxfs_rec_phys(offset,
+                                                        offset + (uint64_t)i * sizeof(r),
+                                                        dev_lbs),
                    r.crc);
-        if (write_sectors(fd, offset + (uint64_t)i * sizeof(r), &r,
-                          sizeof(r)) < 0)
+        if (write_record(fd, offset, offset + (uint64_t)i * sizeof(r), &r,
+                         sizeof(r)) < 0)
             return -1;
     }
     return 0;
@@ -785,7 +862,7 @@ static int format_tauth_region(int fd, uint64_t tauth_offset, uint64_t tauth_siz
     struct mxfs_tauth_region_hdr *rh;
     struct mxfs_tauth_page *pg;
     uint32_t fs_gen = mxfs_tauth_fs_gen(uuid);
-    uint64_t stamp = (uint64_t)time(NULL) * 1000ULL;
+    uint64_t stamp = (uint64_t)format_time() * 1000ULL;
     uint32_t p;
 
     if (tauth_size < MXFS_TAUTH_REGION_BYTES_FOR(npages)) {
@@ -913,9 +990,14 @@ static void calc_ag_layout(const struct xfs_geom *geom, uint32_t agno,
     *out_free2_start = 0;
     *out_free2_len = 0;
 
+    /* the headers, then the BNO, CNT, INO and FINO btree roots: blocks 0-4 at
+     * 512, 0-7 at 4096 (each header a sector of its own, docs/4kn-support.md) */
+    uint32_t meta = hdr_blocks() + 4;
+
     if (agno == 0) {
         /*
-         * AG 0 layout:
+         * AG 0 layout (at 512; at 4096 the headers take blocks 0-3 and
+         * everything up to the inode chunk moves down by three):
          *   0:     SB+AGF+AGI+AGFL (1 block)
          *   1-4:   BNO, CNT, INO, FINO btree roots
          *   5-8:   AGFL blocks
@@ -923,38 +1005,38 @@ static void calc_ag_layout(const struct xfs_geom *geom, uint32_t agno,
          *   16-23: inode chunk (8 blocks, aligned to INOALIGNMT=8)
          *   24+:   main free space
          */
-        agfl_blocks[0] = 5;
-        agfl_blocks[1] = 6;
-        agfl_blocks[2] = 7;
-        agfl_blocks[3] = 8;
+        agfl_blocks[0] = meta;
+        agfl_blocks[1] = meta + 1;
+        agfl_blocks[2] = meta + 2;
+        agfl_blocks[3] = meta + 3;
 
-        /* Two free extents */
-        *out_free_start = 9;
-        *out_free_len = 7;   /* blocks 9-15 */
+        /* Two free extents: the gap up to the inode chunk, and after it */
+        *out_free_start = meta + 4;
+        *out_free_len = 16 - (meta + 4);
         *out_free2_start = 24;
         *out_free2_len = aglen - 24;
-        *out_freeblks = 7 + (aglen - 24);
+        *out_freeblks = *out_free_len + (aglen - 24);
     } else if (agno == geom->log_ag) {
-        /* Log AG: log starts at block 5, AGFL blocks after log */
+        /* Log AG: the log starts after the btree roots, AGFL blocks after log */
         log_in_ag = geom->logblocks;
-        uint32_t after_log = 5 + log_in_ag;
+        uint32_t after_log = meta + log_in_ag;
         agfl_blocks[0] = after_log;
         agfl_blocks[1] = after_log + 1;
         agfl_blocks[2] = after_log + 2;
         agfl_blocks[3] = after_log + 3;
 
-        uint32_t used = 5 + log_in_ag + 4;
+        uint32_t used = meta + log_in_ag + 4;
         *out_free_start = used;
         *out_free_len = aglen - used;
         *out_freeblks = aglen - used;
     } else {
-        /* Normal AG: AGFL blocks 5-8 */
-        agfl_blocks[0] = 5;
-        agfl_blocks[1] = 6;
-        agfl_blocks[2] = 7;
-        agfl_blocks[3] = 8;
+        /* Normal AG: AGFL blocks right after the btree roots */
+        agfl_blocks[0] = meta;
+        agfl_blocks[1] = meta + 1;
+        agfl_blocks[2] = meta + 2;
+        agfl_blocks[3] = meta + 3;
 
-        uint32_t used = 5 + 4;  /* 5 metadata + 4 AGFL */
+        uint32_t used = meta + 4;  /* headers, roots and 4 AGFL */
         *out_free_start = used;
         *out_free_len = aglen - used;
         *out_freeblks = aglen - used;
@@ -962,14 +1044,15 @@ static void calc_ag_layout(const struct xfs_geom *geom, uint32_t agno,
 }
 
 /*
- * Write the superblock sector (512 bytes) for one AG.
+ * Write the superblock sector (one sector, dev_lbs bytes) for one AG.
  */
 static void write_sb_sector(uint8_t *sec, const struct xfs_geom *geom,
                             uint32_t agno)
 {
     bool primary = (agno == 0);
+    bool big = dev_lbs > MXFS_REC_UNIT;
 
-    memset(sec, 0, 512);
+    memset(sec, 0, dev_lbs);
 
     /* [0] magic */
     put_be32(sec + 0, MXFS_SB_MAGIC);
@@ -999,9 +1082,9 @@ static void write_sb_sector(uint8_t *sec, const struct xfs_geom *geom,
     /* [96] logblocks */
     put_be32(sec + 96, geom->logblocks);
     /* [100] versionnum */
-    put_be16(sec + 100, XFS_SB_VERSIONNUM);
+    put_be16(sec + 100, XFS_SB_VERSIONNUM | (big ? XFS_SB_VERSION_SECTORBIT : 0));
     /* [102] sectsize */
-    put_be16(sec + 102, XFS_SECTSIZE);
+    put_be16(sec + 102, (uint16_t)dev_lbs);
     /* [104] inodesize */
     put_be16(sec + 104, XFS_INODESIZE);
     /* [106] inopblock */
@@ -1010,7 +1093,7 @@ static void write_sb_sector(uint8_t *sec, const struct xfs_geom *geom,
     /* [120] blocklog */
     sec[120] = XFS_BLOCKLOG;
     /* [121] sectlog */
-    sec[121] = XFS_SECTLOG;
+    sec[121] = (uint8_t)ceil_log2(dev_lbs);
     /* [122] inodelog */
     sec[122] = XFS_INODELOG;
     /* [123] inopblog */
@@ -1048,10 +1131,10 @@ static void write_sb_sector(uint8_t *sec, const struct xfs_geom *geom,
     put_be32(sec + 188, 0);
     /* [192] dirblklog */
     sec[192] = XFS_DIRBLKLOG;
-    /* [193] logsectlog = 0 */
-    sec[193] = 0;
-    /* [194] logsectsize = 0 */
-    put_be16(sec + 194, 0);
+    /* [193] logsectlog, [194] logsectsize: 0 at 512, the sector size above it
+     * (docs/4kn-support.md: the log writes in L units) */
+    sec[193] = big ? (uint8_t)ceil_log2(dev_lbs) : 0;
+    put_be16(sec + 194, big ? (uint16_t)dev_lbs : 0);
     /* [196] logsunit = 1 */
     put_be32(sec + 196, 1);
     /* [200] features2 */
@@ -1076,18 +1159,20 @@ static void write_sb_sector(uint8_t *sec, const struct xfs_geom *geom,
     put_be64(sec + 240, 0);
     /* [248] meta_uuid = all zeros */
 
-    /* Compute CRC — native uint32_t at offset 224 */
-    xfs_set_crc(sec, 512, 224);
+    /* Compute CRC — native uint32_t at offset 224, over the whole sector */
+    xfs_set_crc(sec, dev_lbs, 224);
 }
 
 /*
- * Write the AGF sector (512 bytes).
+ * Write the AGF sector (one sector, dev_lbs bytes).
  */
 static void write_agf_sector(uint8_t *sec, const struct xfs_geom *geom,
                              uint32_t agno, uint32_t aglen,
                              uint32_t freeblks, uint32_t longest)
 {
-    memset(sec, 0, 512);
+    uint32_t h = hdr_blocks();
+
+    memset(sec, 0, dev_lbs);
 
     /* Layout verified against mkfs.xfs reference image:
      * roots[3] at 0x10, levels[3] at 0x1C — NO spare between them.
@@ -1101,10 +1186,10 @@ static void write_agf_sector(uint8_t *sec, const struct xfs_geom *geom,
     put_be32(sec + 0x08, agno);
     /* [0x0C] length */
     put_be32(sec + 0x0C, aglen);
-    /* [0x10] roots[0] = bnoroot = 1 */
-    put_be32(sec + 0x10, 1);
-    /* [0x14] roots[1] = cntroot = 2 */
-    put_be32(sec + 0x14, 2);
+    /* [0x10] roots[0] = bnoroot, the first block after the headers */
+    put_be32(sec + 0x10, h);
+    /* [0x14] roots[1] = cntroot */
+    put_be32(sec + 0x14, h + 1);
     /* [0x18] roots[2] = rmaproot = 0 (disabled) */
     put_be32(sec + 0x18, 0);
     /* [0x1C] levels[0] = bnolevel = 1 */
@@ -1134,20 +1219,21 @@ static void write_agf_sector(uint8_t *sec, const struct xfs_geom *geom,
     /* [0x60-0xCF] spare64[14] = zeros */
     /* [0xD0] lsn = 0 */
 
-    /* [0xD8] crc — native uint32_t */
-    xfs_set_crc(sec, 512, 0xD8);
+    /* [0xD8] crc — native uint32_t, over the whole sector */
+    xfs_set_crc(sec, dev_lbs, 0xD8);
 }
 
 /*
- * Write the AGI sector (512 bytes).
+ * Write the AGI sector (one sector, dev_lbs bytes).
  */
 static void write_agi_sector(uint8_t *sec, const struct xfs_geom *geom,
                              uint32_t agno, uint32_t aglen)
 {
     bool ag0 = (agno == 0);
+    uint32_t h = hdr_blocks();
     int i;
 
-    memset(sec, 0, 512);
+    memset(sec, 0, dev_lbs);
 
     /* [0x00] magic */
     put_be32(sec + 0x00, MXFS_AGI_MAGIC);
@@ -1159,8 +1245,8 @@ static void write_agi_sector(uint8_t *sec, const struct xfs_geom *geom,
     put_be32(sec + 0x0C, aglen);
     /* [0x10] count */
     put_be32(sec + 0x10, ag0 ? 64 : 0);
-    /* [0x14] root = 3 (inobt root block) */
-    put_be32(sec + 0x14, 3);
+    /* [0x14] root: the inobt root, two blocks after the headers */
+    put_be32(sec + 0x14, h + 2);
     /* [0x18] level = 1 */
     put_be32(sec + 0x18, 1);
     /* [0x1C] freecount */
@@ -1178,26 +1264,29 @@ static void write_agi_sector(uint8_t *sec, const struct xfs_geom *geom,
     /* [0x13C] pad32 = 0 */
     /* [0x140] lsn = 0 */
 
-    /* [0x148] free_root = 4 (finobt root block, one after inobt at block 3) */
-    put_be32(sec + 0x148, 4);
+    /* [0x148] free_root: the finobt root, one after the inobt's */
+    put_be32(sec + 0x148, h + 3);
     /* [0x14C] free_level = 1 */
     put_be32(sec + 0x14C, 1);
     /* [0x150] ino_blocks = 0 */
     /* [0x154] fino_blocks = 0 */
 
-    /* [0x138] crc — native uint32_t (must be computed after all fields are set) */
-    xfs_set_crc(sec, 512, 0x138);
+    /* [0x138] crc — native uint32_t (must be computed after all fields are set),
+     * over the whole sector */
+    xfs_set_crc(sec, dev_lbs, 0x138);
 }
 
 /*
- * Write the AGFL sector (512 bytes).
+ * Write the AGFL sector (one sector, dev_lbs bytes).
  */
 static void write_agfl_sector(uint8_t *sec, const struct xfs_geom *geom,
                               uint32_t agno, const uint32_t agfl_blocks[4])
 {
+    /* the sector holds (sectsize - 36) / 4 entries: 119 at 512, 1015 at 4096 */
+    int nbno = (int)((dev_lbs - 0x24) / 4);
     int i;
 
-    memset(sec, 0, 512);
+    memset(sec, 0, dev_lbs);
 
     /* [0x00] magic */
     put_be32(sec + 0x00, MXFS_AGFL_MAGIC);
@@ -1215,12 +1304,12 @@ static void write_agfl_sector(uint8_t *sec, const struct xfs_geom *geom,
     put_be32(sec + 0x2C, agfl_blocks[1]);
     put_be32(sec + 0x30, agfl_blocks[2]);
     put_be32(sec + 0x34, agfl_blocks[3]);
-    /* [0x38+] bno[5-118] = all 0xFFFFFFFF */
-    for (i = 5; i < 119; i++)
+    /* [0x38+] bno[5..nbno-1] = all 0xFFFFFFFF */
+    for (i = 5; i < nbno; i++)
         put_be32(sec + 0x24 + i * 4, 0xFFFFFFFF);
 
-    /* [0x20] crc — native uint32_t */
-    xfs_set_crc(sec, 512, 0x20);
+    /* [0x20] crc — native uint32_t, over the whole sector */
+    xfs_set_crc(sec, dev_lbs, 0x20);
 }
 
 /*
@@ -1374,7 +1463,9 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
                              uint32_t *logblocks_out)
 {
     uint32_t log_node_count = *log_node_count_io;   /* 0 = auto-size */
+    uint32_t h = hdr_blocks();  /* blocks the AG headers take: 1 at 512, 4 at 4096 */
     struct xfs_geom geom;
+    uint8_t *hdr = NULL;    /* the AG headers, a sector each */
     uint8_t *block;     /* 4KB working buffer */
     uint8_t *ichunk;    /* 32KB inode chunk buffer */
     uint32_t agno;
@@ -1460,7 +1551,7 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
      */
     geom.agcount = (uint32_t)((geom.dblocks + 262143) / 262144);
     {
-        uint64_t log_ag_need = (uint64_t)geom.logblocks + 5 + 4 + 16;
+        uint64_t log_ag_need = (uint64_t)geom.logblocks + h + 4 + 4 + 16;
         uint64_t max_agcount = geom.dblocks / log_ag_need;
 
         if (max_agcount < 2) {
@@ -1506,7 +1597,7 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
      * on this — say so loudly and compute the minimum size that fixes it.
      */
     if (log_node_count > 0 && geom.agcount < log_node_count) {
-        uint64_t log_ag_need = (uint64_t)geom.logblocks + 5 + 4 + 16;
+        uint64_t log_ag_need = (uint64_t)geom.logblocks + h + 4 + 4 + 16;
         uint64_t need_blocks = log_ag_need * (uint64_t)log_node_count;
         uint32_t shared = log_node_count - geom.agcount;
 
@@ -1532,15 +1623,16 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
     /* Log placement: middle AG */
     geom.log_ag = geom.agcount / 2;
 
-    /* Verify the log fits its AG (log starts at block 5 of the log AG,
-     * after SB+AGF+AGI+AGFL, BNO, CNT, INO, FINO; +4 AGFL +16 slack).
+    /* Verify the log fits its AG (log starts at block h + 4 of the log AG,
+     * after SB+AGF+AGI+AGFL, BNO, CNT, INO, FINO: block 5 at 512, 8 at 4096;
+     * +4 AGFL +16 slack).
      * With multiple slices this must never shrink — a shrunken slice is
      * the wedge — so a misfit is a hard error.  A single legacy
      * slice may still shrink to fit tiny devices. */
     {
         uint32_t log_ag_len = (geom.log_ag == geom.agcount - 1) ?
                                geom.last_agblocks : geom.agblocks;
-        if (5 + geom.logblocks + 4 + 16 > log_ag_len) {
+        if (h + 4 + geom.logblocks + 4 + 16 > log_ag_len) {
             if (log_node_count > 1) {
                 pr_err("mkfs.mxfs: internal error: %u-slice log (%u blocks) "
                        "does not fit AG %u (%u blocks) — AG sizing should "
@@ -1549,15 +1641,15 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
                        log_ag_len);
                 return -1;
             }
-            geom.logblocks = log_ag_len - 5 - 4 - 16;
+            geom.logblocks = log_ag_len - (h + 4) - 4 - 16;
         }
     }
 
-    /* Log start: block 5 of the log AG.
+    /* Log start: block h + 4 of the log AG (5 at 512, 8 at 4096).
      * XFS encodes absolute FSBs as (agno << agblklog) | agbno — a packed
      * bitfield, NOT agno * agblocks + agbno.  The kernel's XFS_FSB_TO_AGNO
      * macro uses >> agblklog to extract the AG number. */
-    geom.logstart = ((uint64_t)geom.log_ag << geom.agblklog) | 5;
+    geom.logstart = ((uint64_t)geom.log_ag << geom.agblklog) | (h + 4);
 
     /* Inode numbers: inode chunk at block 16 (8-aligned), 8 inodes/block = startino 128 */
     geom.rootino = 128;
@@ -1596,14 +1688,15 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
                geom.uuid[12], geom.uuid[13], geom.uuid[14], geom.uuid[15]);
 
     /* Allocate working buffers */
+    hdr = calloc(h, XFS_BLOCKSIZE);
     block = calloc(1, XFS_BLOCKSIZE);
     ichunk = calloc(1, XFS_INODE_CHUNK_BLOCKS * XFS_BLOCKSIZE);
-    if (!block || !ichunk) {
+    if (!hdr || !block || !ichunk) {
         pr_err("mkfs.mxfs: failed to allocate format buffers\n");
         goto out;
     }
 
-    now = time(NULL);
+    now = format_time();
 
     /* ─── Write per-AG structures ─── */
 
@@ -1621,24 +1714,25 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
             pr_verbose(" [%u+%u]", free2_start, free2_len);
         pr_verbose("\n");
 
-        /* ─── Block 0: SB + AGF + AGI + AGFL (4 sectors in one 4KB block) ─── */
-        memset(block, 0, XFS_BLOCKSIZE);
+        /* ─── The headers: SB, AGF, AGI, AGFL, a sector each (four sectors in
+         * block 0 at 512; blocks 0-3 at 4096) ─── */
+        memset(hdr, 0, (size_t)h * XFS_BLOCKSIZE);
 
-        write_sb_sector(block + 0, &geom, agno);
+        write_sb_sector(hdr + 0, &geom, agno);
         /* longest = the larger free extent; if two extents, free2_len is the bigger one */
         {
             uint32_t longest = free_len;
             if (free2_len > longest)
                 longest = free2_len;
-            write_agf_sector(block + 512, &geom, agno, aglen, freeblks, longest);
+            write_agf_sector(hdr + dev_lbs, &geom, agno, aglen, freeblks, longest);
         }
-        write_agi_sector(block + 1024, &geom, agno, aglen);
-        write_agfl_sector(block + 1536, &geom, agno, agfl);
+        write_agi_sector(hdr + 2 * dev_lbs, &geom, agno, aglen);
+        write_agfl_sector(hdr + 3 * dev_lbs, &geom, agno, agfl);
 
-        if (write_sectors(fd, ag_byte_offset, block, XFS_BLOCKSIZE) < 0)
+        if (write_sectors(fd, ag_byte_offset, hdr, (uint64_t)h * XFS_BLOCKSIZE) < 0)
             goto out;
 
-        /* ─── Block 1: BNO btree root ─── */
+        /* ─── Block h: BNO btree root, the first block after the headers ─── */
         if (free2_len > 0) {
             /* AG 0: two free extents (gap before inode chunk + main free space) */
             uint8_t rec2[16];
@@ -1651,7 +1745,7 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
             put_be32(rec2 + 12, free2_len);    /* extent 2: blockcount */
 
             write_btree_block(block, MXFS_ABTB_CRC_MAGIC, agno,
-                              (uint64_t)agno * geom.agblocks + 1,
+                              (uint64_t)agno * geom.agblocks + h,
                               2, rec2, 16, geom.uuid);
         } else {
             /* Single free extent */
@@ -1661,14 +1755,15 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
             put_be32(rec + 4, free_len);       /* blockcount */
 
             write_btree_block(block, MXFS_ABTB_CRC_MAGIC, agno,
-                              (uint64_t)agno * geom.agblocks + 1,
+                              (uint64_t)agno * geom.agblocks + h,
                               1, rec, 8, geom.uuid);
         }
 
-        if (write_sectors(fd, ag_byte_offset + XFS_BLOCKSIZE, block, XFS_BLOCKSIZE) < 0)
+        if (write_sectors(fd, ag_byte_offset + (uint64_t)h * XFS_BLOCKSIZE, block,
+                          XFS_BLOCKSIZE) < 0)
             goto out;
 
-        /* ─── Block 2: CNT btree root ─── */
+        /* ─── Block h + 1: CNT btree root ─── */
         if (free2_len > 0) {
             /* AG 0: two free extents, CNT btree sorted by blockcount (ascending) */
             uint8_t rec2[16];
@@ -1681,7 +1776,7 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
             put_be32(rec2 + 12, free2_len);    /* extent 2: blockcount */
 
             write_btree_block(block, MXFS_ABTC_CRC_MAGIC, agno,
-                              (uint64_t)agno * geom.agblocks + 2,
+                              (uint64_t)agno * geom.agblocks + h + 1,
                               2, rec2, 16, geom.uuid);
         } else {
             /* Single free extent */
@@ -1691,14 +1786,15 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
             put_be32(rec + 4, free_len);       /* blockcount */
 
             write_btree_block(block, MXFS_ABTC_CRC_MAGIC, agno,
-                              (uint64_t)agno * geom.agblocks + 2,
+                              (uint64_t)agno * geom.agblocks + h + 1,
                               1, rec, 8, geom.uuid);
         }
 
-        if (write_sectors(fd, ag_byte_offset + 2 * XFS_BLOCKSIZE, block, XFS_BLOCKSIZE) < 0)
+        if (write_sectors(fd, ag_byte_offset + (uint64_t)(h + 1) * XFS_BLOCKSIZE, block,
+                          XFS_BLOCKSIZE) < 0)
             goto out;
 
-        /* ─── Block 3: INO btree root ─── */
+        /* ─── Block h + 2: INO btree root ─── */
         if (agno == 0) {
             /* AG 0: one inobt record for the inode chunk at block 16 */
             uint8_t ino_rec[16];
@@ -1715,19 +1811,20 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
             put_be64(ino_rec + 8, 0xFFFFFFFFFFFFFFF8ULL);
 
             write_btree_block(block, MXFS_IBT_CRC_MAGIC, agno,
-                              (uint64_t)agno * geom.agblocks + 3,
+                              (uint64_t)agno * geom.agblocks + h + 2,
                               1, ino_rec, 16, geom.uuid);
         } else {
             /* Other AGs: empty inobt */
             write_btree_block(block, MXFS_IBT_CRC_MAGIC, agno,
-                              (uint64_t)agno * geom.agblocks + 3,
+                              (uint64_t)agno * geom.agblocks + h + 2,
                               0, NULL, 0, geom.uuid);
         }
 
-        if (write_sectors(fd, ag_byte_offset + 3 * XFS_BLOCKSIZE, block, XFS_BLOCKSIZE) < 0)
+        if (write_sectors(fd, ag_byte_offset + (uint64_t)(h + 2) * XFS_BLOCKSIZE, block,
+                          XFS_BLOCKSIZE) < 0)
             goto out;
 
-        /* ─── Block 4: FINO btree root (free inode btree) ─── */
+        /* ─── Block h + 3: FINO btree root (free inode btree) ─── */
         if (agno == 0) {
             /* AG 0: finobt has same record as inobt (the chunk has 61 free inodes) */
             uint8_t fino_rec[16];
@@ -1744,16 +1841,17 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
             put_be64(fino_rec + 8, 0xFFFFFFFFFFFFFFF8ULL);
 
             write_btree_block(block, MXFS_FIBT_CRC_MAGIC, agno,
-                              (uint64_t)agno * geom.agblocks + 4,
+                              (uint64_t)agno * geom.agblocks + h + 3,
                               1, fino_rec, 16, geom.uuid);
         } else {
             /* Other AGs: empty finobt (no inode chunks, so no free inodes) */
             write_btree_block(block, MXFS_FIBT_CRC_MAGIC, agno,
-                              (uint64_t)agno * geom.agblocks + 4,
+                              (uint64_t)agno * geom.agblocks + h + 3,
                               0, NULL, 0, geom.uuid);
         }
 
-        if (write_sectors(fd, ag_byte_offset + 4 * XFS_BLOCKSIZE, block, XFS_BLOCKSIZE) < 0)
+        if (write_sectors(fd, ag_byte_offset + (uint64_t)(h + 3) * XFS_BLOCKSIZE, block,
+                          XFS_BLOCKSIZE) < 0)
             goto out;
 
         /* ─── Inode chunk (AG 0, blocks 16-23) ─── */
@@ -1787,10 +1885,10 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
      * These differ when agblocks != 2^agblklog. */
     {
         uint64_t log_phys_byte = base_offset +
-            ((uint64_t)geom.log_ag * geom.agblocks + 5) * XFS_BLOCKSIZE;
+            ((uint64_t)geom.log_ag * geom.agblocks + h + 4) * XFS_BLOCKSIZE;
 
-        pr_verbose("  Zeroing log: %u blocks at AG %u block 5 (byte offset %llu)\n",
-                   geom.logblocks, geom.log_ag,
+        pr_verbose("  Zeroing log: %u blocks at AG %u block %u (byte offset %llu)\n",
+                   geom.logblocks, geom.log_ag, h + 4,
                    (unsigned long long)log_phys_byte);
 
         if (skip_log_zero) {
@@ -1813,6 +1911,7 @@ static int format_xfs_native(int fd, uint64_t data_size, uint64_t base_offset,
     pr_verbose("  XFS format complete\n");
 
 out:
+    free(hdr);
     free(block);
     free(ichunk);
     return rc;
@@ -1871,7 +1970,7 @@ static const char *existing_signature(const char *device, char *buf, size_t bufl
 static void usage(const char *prog)
 {
     fprintf(stderr,
-            "Usage: %s [-f] [-c name] [-D] [-n count] [-d size] [-t entries] [-H version] [-v] [-V] [-Z] DEVICE\n"
+            "Usage: %s [-f] [-c name] [-D] [-n count] [-d size] [-t entries] [-H version] [-L] [-v] [-V] [-Z] DEVICE\n"
             "\n"
             "Format a block device for MXFS (Multinode XFS).\n"
             "\n"
@@ -1891,6 +1990,9 @@ static void usage(const char *prog)
             "              on a larger LUN.\n"
             "  -H VERSION  TEST ONLY: write authority-ledger routing VERSION\n"
             "              (1 or 2; default 2), to measure one module on both\n"
+            "  -L          TEST ONLY: format a device with 4096-byte logical\n"
+            "              blocks (4K-native support is not complete: the module\n"
+            "              mounts the volume only with dbg_lbs_mount=1, one node)\n"
             "  -v          Verbose output\n"
             "  -V          Print version and exit\n"
             "  -Z          TEST ONLY: do not zero the XFS log region (keeps a\n"
@@ -1929,10 +2031,13 @@ int main(int argc, char *argv[])
     uint32_t tauth_npages = 0;          /* -t: authority-ledger records, 0 = derive */
     uint64_t tauth_seed = 0;            /* per-format routing-hash seed */
 
-    while ((opt = getopt(argc, argv, "fc:Dn:d:t:H:vVZ")) != -1) {
+    while ((opt = getopt(argc, argv, "fc:Dn:d:t:H:LvVZ")) != -1) {
         switch (opt) {
         case 'f':
             force = true;
+            break;
+        case 'L':
+            format_4kn = true;
             break;
         case 'H':
             if (strcmp(optarg, "1") == 0) {
@@ -2032,6 +2137,24 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    {
+        const char *e = getenv("SOURCE_DATE_EPOCH");
+
+        if (e && *e) {
+            char *end = NULL;
+            unsigned long long v;
+
+            errno = 0;
+            v = strtoull(e, &end, 10);
+            if (errno || end == e || *end != '\0' || v > INT32_MAX) {
+                pr_err("mkfs.mxfs: SOURCE_DATE_EPOCH='%s' is not a time in seconds\n", e);
+                return 1;
+            }
+            format_epoch = (time_t)v;
+            format_epoch_set = true;
+        }
+    }
+
     device = argv[optind];
 
     /* Validate device exists and is a block device */
@@ -2059,6 +2182,33 @@ int main(int argc, char *argv[])
                device, strerror(errno));
         close(fd);
         return 1;
+    }
+
+    /*
+     * The device's logical block size decides the layout (docs/4kn-support.md).
+     * A volume is formatted for 512-byte blocks, or, TEST ONLY with -L until
+     * the module's 4K-native support is complete, for 4096-byte ones.  Any
+     * other device is refused before anything is written: on one the first
+     * write would fail (pwrite ... Invalid argument) and name no cause.
+     */
+    {
+        int lbs = 0;
+
+        if (ioctl(fd, BLKSSZGET, &lbs) < 0) {
+            pr_err("mkfs.mxfs: %s: cannot get the logical block size: %s\n",
+                   device, strerror(errno));
+            close(fd);
+            return 1;
+        }
+        if (lbs == 4096 && format_4kn) {
+            dev_lbs = 4096;
+        } else if (lbs != 512) {
+            pr_err("mkfs.mxfs: %s has %d-byte logical blocks; this version formats "
+                   "devices with 512-byte logical blocks only (512e devices included)\n",
+                   device, lbs);
+            close(fd);
+            return 1;
+        }
     }
 
     close(fd);
@@ -2092,6 +2242,12 @@ int main(int argc, char *argv[])
                    MXFS_JOURNAL_SECTOR_SIZE;
 
     disklock_size = MXFS_DISKLOCK_REGION_SIZE;
+    /* docs/4kn-support.md: the record regions (journal, disklock, PR
+     * registrants, bootstrap, slice lifecycle) put each 512-byte unit in a
+     * logical block of its own, so each spans units x lbs / 512 bytes, which is
+     * what the envelope records (the identity at 512). */
+    journal_size = mxfs_rec_span(journal_size, dev_lbs);
+    disklock_size = mxfs_rec_span(disklock_size, dev_lbs);
 
     /* New layout: [MXFS super 4KB] [journal] [disklock] [rman] [XFS data to end]
      * the recovery manifest region — one 2 MiB + 64 KiB slot per
@@ -2108,23 +2264,27 @@ int main(int argc, char *argv[])
         return 1;
     }
     journal_offset = MXFS_SUPER_SIZE;
-    disklock_offset = ALIGN_UP_4K(journal_offset + journal_size);
+    /* at 512 the 4 KiB alignment gap after the journal holds the transport
+     * self-test scratch sector (step 3b); a larger block's journal span is a
+     * whole number of blocks and leaves no gap, so it gets a block of its own */
+    disklock_offset = ALIGN_UP_4K(journal_offset + journal_size) +
+                      (dev_lbs > MXFS_REC_UNIT ? dev_lbs : 0);
     rman_offset = ALIGN_UP_4K(disklock_offset + disklock_size);
     tauth_offset = ALIGN_UP_4K(rman_offset + rman_size);
     /* the PR registrant ledger (docs/whole-cluster-restart.md
      * item 2): 256 x 512 B CAW-written entries, zero-filled (FREE). */
-    prkey_size = MXFS_PRLEDGER_BYTES;
+    prkey_size = mxfs_rec_span(MXFS_PRLEDGER_BYTES, dev_lbs);
     prkey_offset = ALIGN_UP_4K(tauth_offset + tauth_size);
     /* the whole-cluster bootstrap record (§5): one CAW sector in a
      * 4 KiB region, written IDLE (an all-zero sector is UNFORMATTED and the
      * kernel fails closed on it). */
-    bootstrap_size = MXFS_BOOTSTRAP_BYTES;
+    bootstrap_size = mxfs_rec_span(MXFS_BOOTSTRAP_BYTES, dev_lbs);
     bootstrap_offset = ALIGN_UP_4K(prkey_offset + prkey_size);
     /* 0.88.0: the slice lifecycle records (D-SLICE-CLAIM-TIME-INIT-UNTRUSTED-
      * ZERO-531): one 512 B record per log slice, written INIT_REQUIRED once
      * the native format has settled the slice count (step 4a).  The region
      * is sized for every heartbeat slot so its offset is known here. */
-    slife_size = MXFS_SLIFE_BYTES;
+    slife_size = mxfs_rec_span(MXFS_SLIFE_BYTES, dev_lbs);
     slife_offset = ALIGN_UP_4K(bootstrap_offset + bootstrap_size);
     xfs_data_offset = ALIGN_UP_4K(slife_offset + slife_size);
     xfs_data_size = device_size - xfs_data_offset;
@@ -2153,6 +2313,9 @@ int main(int argc, char *argv[])
     pr_info("\nmkfs.mxfs %s\n\n", MKFS_MXFS_VERSION);
     pr_info("  Device:     %s (%s)\n",
             device, human_size(device_size, hbuf, sizeof(hbuf)));
+    if (dev_lbs > MXFS_REC_UNIT)
+        pr_info("  Logical blocks: %u bytes (TEST ONLY -L: each 512-byte record "
+                "unit in a block of its own, XFS sectors of %u)\n", dev_lbs, dev_lbs);
     pr_info("  MXFS super: 0 - %llu (4 KB)\n",
             (unsigned long long)(MXFS_SUPER_SIZE - 1));
     pr_info("  Journal:    %llu - %llu (%s, %u slots)\n",
@@ -2297,19 +2460,20 @@ int main(int argc, char *argv[])
     /* ─── Step 3b: Zero the transport self-test scratch sector ───
      *
      * The 4K-alignment gap between the end of the journal region and
-     * disklock_offset is dead space no reader ever touches (journal_size is
-     * always ≡ 4608 mod 4096, so the gap is always 3584 bytes).  Its LAST
-     * sector (disklock_offset - 512) is reserved as a scratch LBA for raw
-     * SG_IO transport verification (tests/caw/dlm_lock_correctness.sh:
+     * disklock_offset is dead space no reader ever touches (at 512
+     * journal_size is always ≡ 4608 mod 4096, so the gap is always 3584
+     * bytes; on a larger block it is the one block left for this).  Its LAST
+     * logical block (disklock_offset - lbs) is reserved as a scratch LBA for
+     * raw SG_IO transport verification (tests/caw/dlm_lock_correctness.sh:
      * fua_verify / caw_verify), so capability probes never have to write
      * into the journal, disklock, or XFS regions of a live device.  Zero it
      * so the reservation starts defined rather than as stale disk garbage.
      */
-    if (disklock_offset - (journal_offset + journal_size) >= 512) {
-        static const uint8_t zsec[512];
+    if (disklock_offset - (journal_offset + journal_size) >= dev_lbs) {
+        static const uint8_t zsec[MXFS_LBS_MAX];
         pr_verbose("  Scratch sector (transport self-test) at offset %llu\n",
-                   (unsigned long long)(disklock_offset - 512));
-        if (write_sectors(fd, disklock_offset - 512, zsec, 512) < 0) {
+                   (unsigned long long)(disklock_offset - dev_lbs));
+        if (write_sectors(fd, disklock_offset - dev_lbs, zsec, dev_lbs) < 0) {
             close(fd);
             return 1;
         }

@@ -105,6 +105,16 @@ struct mxfs_v5_dlm_opts {
 	uint64_t        slife_offset;       /* 0.88.0: slice lifecycle region (0 = none) */
 	uint64_t        slife_size;
 	uint64_t        disklock_offset;    /* from MXFS on-disk super */
+	/*
+	 * The device's logical block size as the volume records it (0 or 512:
+	 * a 512-byte layout), and the journal's and disklock region's sizes in
+	 * 512-byte units' bytes.  Above 512 the journal, disklock, PR ledger,
+	 * bootstrap and slice lifecycle regions are record regions
+	 * (docs/4kn-support.md); every *_size above is then in units too.
+	 */
+	uint32_t        lbs;
+	uint64_t        journal_size;
+	uint64_t        disklock_size;
 	uint32_t        max_nodes;          /* from MXFS on-disk super */
 	void            *bdev;              /* struct block_device * (kernel) */
 	uint8_t         volume_uuid[16];    /* XFS superblock UUID */

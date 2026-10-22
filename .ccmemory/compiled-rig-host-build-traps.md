@@ -15,7 +15,7 @@ the rig, the build, or clyde itself that destroy evidence, wedge state,
 corrupt a verdict, or fabricate a false MXFS finding. Chronological.
 
 ### sess377 (2026-08-19) — clyde HOST kernel memory corruption, not MXFS
-[[clyde-host-ext4-slab-corruption-kills-rig-nodes-sess377]]: three oopses in
+`clyde-host-ext4-slab-corruption-kills-rig-nodes-sess377`: three oopses in
 clyde's own ext4/jbd2 page-cache path in under an hour. The smoking gun:
 oops #2's faulting `buffer_head*` decoded to ASCII `"2004-10."` — the middle
 of an iSCSI IQN (`iqn.2004-10.com.ubuntu:01:testN-mxfs-node`). A folio's
@@ -41,7 +41,7 @@ XML. ~3 min/node. Standing rule: corroborate any rig corruption-family
 finding against clyde's oops count before it goes on the RULE: ZERO ACCEPTED KNOWN DEFECTS ledger.
 
 ### 2026-08-20 — 32/caw board timing: the harness-overhead constant and two verdict traps
-[[board-32caw-chunking-measured-walls-and-harness-overhead]]: `wrapper =
+`board-32caw-chunking-measured-walls-and-harness-overhead`: `wrapper =
 sum(measured test walls) + 12s × n_tests + 15s startup`. The `12s × n_tests`
 term is ssh fan-out + MQTT coord-broker sweep + criteria.json record — it's
 invisible in the `elapsed` column of `tools/criteria.py` and is exactly what a naive
@@ -139,7 +139,7 @@ rather than on the prior chain's DONE line. Also noted: `mxfs_pgrep.sh
 at runtime rather than as a literal that could echo back.
 
 ### 2026-09-02 — clyde takes a silent reset with ZERO fault record
-[[clyde-0902-silent-reset-no-fault-record-not-scst-instrumentation-gap]]:
+`clyde-0902-silent-reset-no-fault-record-not-scst-instrumentation-gap`:
 distinguishes two prior incidents wrongly merged into "SCST rebooted the box
 two days running." 2026-09-01's double crash (07:15, 08:45) was already
 DISPROVED as GPU/PCIe-P2P memory corruption surfacing in unrelated

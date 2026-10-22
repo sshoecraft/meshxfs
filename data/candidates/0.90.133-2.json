@@ -1,0 +1,115 @@
+{
+  "candidate": "0.90.133-2",
+  "version": "0.90.133",
+  "created": "2026-10-21T18:46:27Z",
+  "state": "ABANDONED",
+  "dry_run": true,
+  "srcversion": "71AC6107043DD5BE3D9181A",
+  "module_sha256": "815374803f59639fa9e0ed7fa15444edf88b646ab661003d448cf1004bd650ed",
+  "files": "tests/evidence/candidates/0.90.133-2.files.json",
+  "files_count": 2506,
+  "files_digest": "fe86f47b2c105ca5f1c4d6258cb018625daf07cda78f576c129e875692c6f7d5",
+  "spec": "06d06380a988d7c3511f28156c729a28fd548441b51dc4edbb37220d5f932108",
+  "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
+  "kernels": {},
+  "packages": {},
+  "dist": "",
+  "steps": {
+    "freeze": {
+      "state": "done",
+      "outcome": "PASS",
+      "detail": "every frozen file unchanged",
+      "evidence": "tests/evidence/candidates/0.90.133-2.files.json",
+      "ended": "2026-10-21T18:46:28Z"
+    },
+    "presteps": {
+      "state": "failed",
+      "outcome": "FAIL",
+      "detail": "self-tests failed: rig library contract rc=2; capture fault gate rc=1: RESULT: FAIL label=0.90.133-2 entries=60 broken=18 vacuous=0 wall=1059s evidence=tests/evidence/20261021T184808Z_capture_gate_0.90.133-2",
+      "evidence": "tests/evidence/candidates/0.90.133-2.presteps.log",
+      "ended": "2026-10-21T19:05:47Z"
+    },
+    "build": {
+      "state": "failed",
+      "outcome": "FAIL",
+      "detail": "could not copy the tree",
+      "evidence": "tests/evidence/candidates/0.90.133-2.build.log",
+      "ended": "2026-10-21T19:05:48Z"
+    },
+    "textcheck": {
+      "state": "done",
+      "outcome": "PASS",
+      "detail": "release_text_check checks 5-7 (packaged text) rc=0",
+      "evidence": "tests/evidence/candidates/0.90.133-2.textcheck.log",
+      "ended": "2026-10-21T19:05:49Z"
+    },
+    "packages": {
+      "state": "failed",
+      "outcome": "FAIL",
+      "detail": "scripts/release.sh rc=1",
+      "evidence": "tests/evidence/candidates/0.90.133-2.packages.log",
+      "ended": "2026-10-21T19:08:29Z"
+    },
+    "boards": {
+      "state": "failed",
+      "outcome": "FAIL",
+      "detail": "2/net/mesh/direct: alloc_witness=FAIL, chk_clean=FAIL",
+      "evidence": "tests/evidence/candidates/0.90.133-2.boards.log",
+      "ended": "2026-10-21T19:29:49Z"
+    },
+    "drbd": {
+      "state": "failed",
+      "outcome": "FAIL",
+      "detail": "DRBD_RELEASE_VERIFY FAIL version=0.90.133 srcversion=71AC6107043DD5BE3D9181A failed=[suite-board]",
+      "evidence": "tests/evidence/drbd_release_verify_0.90.133-2.out",
+      "ended": "2026-10-21T20:12:33Z"
+    },
+    "platforms": {
+      "state": "failed",
+      "outcome": "FAIL",
+      "detail": "full_verify platforms rc=2, -1 failed step(s)",
+      "evidence": "tests/evidence/candidates/0.90.133-2.platforms.log",
+      "ended": "2026-10-21T20:12:33Z"
+    },
+    "guards": {
+      "state": "done",
+      "outcome": "PASS",
+      "detail": "0 guard test(s)",
+      "evidence": "tests/evidence/candidates/0.90.133-2.guards.log",
+      "ended": "2026-10-21T20:12:33Z"
+    },
+    "batches": {
+      "state": "done",
+      "outcome": "PASS",
+      "detail": "no open batch for this candidate",
+      "evidence": "tests/evidence/candidates/0.90.133-2.batches.log",
+      "ended": "2026-10-21T20:12:33Z"
+    },
+    "repeats": {
+      "state": "failed",
+      "outcome": "FAIL",
+      "detail": "2/net/mesh/direct: alloc_witness=FAIL, chk_clean=FAIL",
+      "evidence": "tests/evidence/candidates/0.90.133-2.repeats.log",
+      "ended": "2026-10-21T20:21:15Z"
+    },
+    "seal": {
+      "state": "failed",
+      "outcome": "FAIL",
+      "detail": "not sealed: bench page; public text; incidents nothing accounts for; release table / default install path; step presteps FAIL; step build FAIL; step packages FAIL; step boards FAIL; step drbd FAIL; step platforms FAIL; step repeats FAIL",
+      "evidence": "tests/evidence/candidates/0.90.133-2.seal.log",
+      "ended": "2026-10-21T20:21:17Z"
+    }
+  },
+  "history": [
+    {
+      "state": "RUNNING",
+      "at": "2026-10-21T18:46:28Z",
+      "why": "created"
+    },
+    {
+      "state": "ABANDONED",
+      "at": "2026-10-21T20:25:07Z",
+      "why": "dry run read 2026-10-21: findings in the 0.90.133 CHANGELOG entry and the defect queue (fsx seed, alloc_witness second sighting)"
+    }
+  ]
+}

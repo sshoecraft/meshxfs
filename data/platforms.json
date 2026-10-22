@@ -8,11 +8,15 @@
         "6.17.2-1-pve (PVE 9.1 install)",
         "7.0.x-pve (proxmox-default-kernel)"
       ],
+      "kernel_releases": [
+        "6.17.2-1-pve",
+        "7.0.14-24-pve"
+      ],
       "packages": [
         "mxfs_<v>_amd64.deb",
         "pve-storage-mxfs_<v>_all.deb"
       ],
-      "build_check": "scripts/vm_kbuild_check.sh pve9 6.17.2-1-pve 7.0.14-19-pve",
+      "build_check": "scripts/vm_kbuild_check.sh pve9 6.17.2-1-pve 7.0.14-24-pve",
       "verify_env": "two Proxmox VE 9 nodes built as lab/vms.md describes (pve9-1, pve9-2), sharing one iSCSI LUN that supports SCSI persistent reservations and COMPARE AND WRITE (clyde's SCST target since 2026-09-26), attached in-guest; which nodes and which LUN come from this site's lab file (tools/mxfs_lab.sh nodes pve9). Platform rounds run on two nodes, the node and a peer to fence: every fault a platform VM has caught (a kernel API, the fence on that kernel, packaging) shows at two, and scale is verified on the development rig (test1..testN for N nodes) by the release boards. Releases up to 0.90.41 were verified on N nodes of an eight-node set; from 0.90.42 the set is two nodes.",
       "verify_tests": "install both .debs from the built packages on every node of the set; DKMS builds on every installed PVE kernel; for EACH claimed kernel (pinned with proxmox-boot-tool, rebooted into) and EACH configuration of the release matrix: mount with no options on every node, transport announced by every mount; cross-node checksums (each node's data read on every other); create/remote-delete counts; chk_mxfs clean; peer= between two nodes and peers= across the set with multicast blocked; pvesm add/status/remove holds one mount; O_DIRECT read on a stable-writes device; every node rebooted on that kernel, module auto-loaded with the configured transport, remount, earlier data intact (CONFIG=<configuration> KERNEL=<krel> tests/packaged_round.sh pve9, once per claimed kernel per configuration); hung-node freeze on each configuration (CONFIG=<configuration> PREP=pve9 tests/tcp_peer_freeze_death.sh: the set's second node frozen, the first measured): death declared, fence certified, replay, survivor writing",
       "verified": {

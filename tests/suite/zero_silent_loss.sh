@@ -18,11 +18,24 @@ FPN=10
 
 ck "zsl barrier ready" coord_barrier "zsl_ready"
 
+# THE ORACLE IS OFF THE FILESYSTEM UNDER TEST.  Each file's content is derived
+# from (this run, writer rank, file index), so every reader regenerates what the
+# file must hold and needs nothing the filesystem stored.  The md5 sidecars this
+# used to write beside each file were themselves on the filesystem under test: a
+# fault that lost or replaced a file and its sidecar together read as clean.
+# The run is named by the coordination prefix run.sh hands every node.
+RUNTAG="${MXFS_COORD_PREFIX:-zsl}"
+expected() {  # <rank> <index> -> the bytes that file must hold, on stdout
+    python3 -c 'import hashlib, sys
+seed, size = sys.argv[1].encode(), int(sys.argv[2])
+out, block = bytearray(), hashlib.sha256(seed).digest()
+while len(out) < size:
+    block = hashlib.sha256(block + seed).digest()
+    out += block
+sys.stdout.buffer.write(bytes(out[:size]))' "$RUNTAG/$1/$2" "$FSIZE"
+}
 for i in $(seq 1 "$FPN"); do
-    dd if=/dev/urandom of="/tmp/zsl_${R}_${i}" bs="$FSIZE" count=1 2>/dev/null
-    cp "/tmp/zsl_${R}_${i}" "$D/node${R}_data${i}"
-    md5sum "/tmp/zsl_${R}_${i}" | awk '{print $1}' > "$D/node${R}_data${i}.md5"
-    rm -f "/tmp/zsl_${R}_${i}"
+    expected "$R" "$i" > "$D/node${R}_data${i}"
 done
 sync
 
@@ -32,7 +45,7 @@ ck "zsl barrier write-done" coord_barrier "zsl_write_done"
 for n in $(seq 1 "$T"); do
     for i in $(seq 1 "$FPN"); do
         ckeq "zsl r${R} md5 node${n}_data${i}" \
-             "$(cat "$D/node${n}_data${i}.md5" 2>/dev/null)" \
+             "$(expected "$n" "$i" | md5sum | awk '{print $1}')" \
              "$(md5sum "$D/node${n}_data${i}" 2>/dev/null | awk '{print $1}')"
         ckeq "zsl r${R} size node${n}_data${i}" "$FSIZE" \
              "$(stat -c%s "$D/node${n}_data${i}" 2>/dev/null)"

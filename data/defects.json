@@ -1276,12 +1276,13 @@
       "config": "net/mesh/drbd",
       "opened": "2026-10-06",
       "summary": "on the physical DRBD pair (0.90.81) a new file costs ~150-230 ms to create (p50, one host alone, p90 ~1 s), and a stat of a file the OTHER host just created costs ~170 ms with both hosts walking: du over 795 entries took 15.5 s on one host and did not finish in 190 s on both at once; once both hosts have read the tree the same walk takes 0.5 s",
-      "evidence": "2026-10-06 21:29-21:47 CDT, pve1/pve2 0.90.81 (36AE66BA919CE8EC9AC9894), tests/pve_tree_walk.sh. (1) du -sh /mnt/shared (795 entries, files the failover tests' loads had written on both hosts): both hosts at once, killed at 190 s unfinished; then pve1 alone 15.5 s. (2) Warm (evidence 20261007T023543Z-192.168.1.80): p0, p0, p1 and both-at-once walks of the same 795 entries 509-515 ms each. (3) Cold (20261007T024425Z-192.168.1.80): seed0 (pve1 alone creates 50 x 4 KiB files, each fsynced): create p50 234 ms p90 926 ms max 1.48 s, total 18.6 s of 23 s; seed1 (pve2 alone): create p50 145 ms p90 1.06 s max 2.81 s; fsync p50 11-12 ms. Then both hosts walking /mnt/shared at once: 359 and 350 entries in 60 s (killed), progress per 5 s 2-62 entries, never stopped for longer than ~15 s. Sampled stacks: creates wait in mxfs_v5_dlm_inode_reserve_try -> mxfs_dlm_lock -> dlm_lock_impl pending_wait, msleep inside mxfs_dlm_lock_retries, and mxfs_tauth_ledger_commit page write/flush/read; the walkers in mxfs_v5_dlm_inode_lock pending_wait and the ledger commit (mxfs_tauth_page_write -> mxfs_pal_bdev_compare_and_write -> mxfs_pal_drbd_cas_emulate -> register writes waiting on both disks). The same cost as D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349 (a durable ledger page per grant), multiplied by DRBD: each ledger page commit is several synchronous writes that wait for both hosts' SATA disks, and the compare-and-swap is a bakery lock over DRBD.",
+      "evidence": "2026-10-06 21:29-21:47 CDT, pve1/pve2 0.90.81 (36AE66BA919CE8EC9AC9894), tests/pve_tree_walk.sh. (1) du -sh /mnt/shared (795 entries, files the failover tests' loads had written on both hosts): both hosts at once, killed at 190 s unfinished; then pve1 alone 15.5 s. (2) Warm (evidence 20261007T023543Z-192.168.1.80): p0, p0, p1 and both-at-once walks of the same 795 entries 509-515 ms each. (3) Cold (20261007T024425Z-192.168.1.80): seed0 (pve1 alone creates 50 x 4 KiB files, each fsynced): create p50 234 ms p90 926 ms max 1.48 s, total 18.6 s of 23 s; seed1 (pve2 alone): create p50 145 ms p90 1.06 s max 2.81 s; fsync p50 11-12 ms. Then both hosts walking /mnt/shared at once: 359 and 350 entries in 60 s (killed), progress per 5 s 2-62 entries, never stopped for longer than ~15 s. Sampled stacks: creates wait in mxfs_v5_dlm_inode_reserve_try -> mxfs_dlm_lock -> dlm_lock_impl pending_wait, msleep inside mxfs_dlm_lock_retries, and mxfs_tauth_ledger_commit page write/flush/read; the walkers in mxfs_v5_dlm_inode_lock pending_wait and the ledger commit (mxfs_tauth_page_write -> mxfs_pal_bdev_compare_and_write -> mxfs_pal_drbd_cas_emulate -> register writes waiting on both disks). The same cost as D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349 (a durable ledger page per grant), multiplied by DRBD: each ledger page commit is several synchronous writes that wait for both hosts' SATA disks, and the compare-and-swap is a bakery lock over DRBD. ===== CLYDE KVM PAIR, 0.90.134 (2666D8544F367E3B7424B60), 2026-10-22, scripts/drbd_rig.sh fourkn-test on test1/test2: DRBD 8.4.11 resources over loop devices (images on each guest's root fs), TCP lock network, tests/fourkn_merge_worker.sh (64 files; each node, a pair at a time, changes the mode of its file and stats the peer's; 20 rounds = 1280 ops a node). (1) 512-byte arm with no bound on the node (tests/evidence/drbd_rig/20261022T140512Z-fourkn-test, live_after_overrun.*, salvage_512_*): the 20 rounds took ~91-96 s a node (first chmod 55.2 s, last 146.5 / 151.3 s node uptime) against 5.9-7.9 s for the same workload on the iSCSI 4K-native LUN (tests/fourkn_merge_2node.sh). Correct: after both remounted every file read its writer's last mode, both 64 MiB files intact, chk_mxfs clean. P-DRBD-CAS-STATS: one swap a batch (swaps=512 batches=509-512), per batch enter 3.0-4.5 ms, wait 1.4-3.1 ms, crit 9.6-11.2 ms, rel 3.8-7.1 ms, ~20-23 ms a swap; test1 served 512 swaps in 12 s. (2) Both arms bounded at the workload's derived 9 s on the node (tests/evidence/drbd_rig/20261022T141610Z-fourkn-test/fourkn-test.log): each node ran 3-4 of its 20 rounds at 512 and 2-3 at 4096, every correctness check passing on both. The same cost as this record's peer-file stat on the physical pair: a stat of a file the peer holds is a PR grant and the peer's release, each a ledger page commit, and on DRBD each commit is emulated swaps of several replicated writes.",
       "next": "Profile one cold create and one cold peer-file stat on the pair with tests/pve_pair_profile.sh (mxfs_tauth_ledger_commit, mxfs_pal_drbd_cas_emulate, dlm_lock_impl, mxfs_dlm_lock_retries) to split the per-op time into ledger commits, CAS emulation and lock round trips; then design against the measured split (a PR grant that no replay needs should not cost a durable commit; batch ledger commits) ===== ===== RE-SEND VOLUME (physical pair 0.90.95, tests/evidence/pve_release_ack_trace/20261007T154703Z-192.168.1.80, seed + both-host walk + touch): pve2 received 1282 release acks that matched a pending release and 1250 that matched none (a duplicate's ack after the first retired it, or a not-yet answer), pve1 410 / 8; nested 1211/585 and 878/408. About half of pve2's releases were re-sent at least once, i.e. its master's release commit took over a second; the same per-commit cost as this record's creates and stats. ===== FLUSHES REMOVED, physical pair 2026-10-08 (tests/pve_ledger_commit_profile.sh: pve1 creates 100 x 4 KiB files each fsynced, peer idle, ftrace profile on both hosts). A ledger page commit on DRBD issued three empty flushes after writes that were already FUA; on DRBD an empty flush is a local flush plus a P_BARRIER the peer drains and flushes at. Baseline FFC718B71C6154E025033BC (clean runs 20261008T045113Z, base3, base4): 100 creates total 7.5/6.3/5.2 s, p50 32-34 ms, p90 49-212 ms, max 0.8-1.05 s; pve1 42 commits at 36-77 ms, pve2 61-63 at 54-69 ms; 3 flushes per commit at 1.9-2.7 ms; swaps 13-38 ms. 0.90.103 E51E9BB7579D782BE30A226 (store fua_durable on DRBD: no flush after a FUA write or swap; batched bodies FUA), clean runs phys-fua5/6: total 2.6/2.5 s, p50 23.8/24.4 ms, p90 34.1/31.7 ms, max 42/41 ms; commits 20-27 ms; swaps 11-17 ms; 0 flushes. (Runs fua1-4 carried the post-remount ledger takeover's 600-1200 page writes and are not comparable.) Still open: the peer-file stat cost (both hosts walking), a native-XFS-on-DRBD create yardstick for the 2x bar, and the two swaps per commit (a DRBD page could commit under ONE emulator lock acquisition: compare sector 0, FUA the whole page). ===== WALK ON 0.90.103 (E51E9BB7579D782BE30A226, flushes removed), physical pair 2026-10-08 00:39-00:42 CDT, tests/pve_tree_walk.sh seed both (evidence tests/evidence/pve_tree_walk/20261008T053915Z-192.168.1.80): seed, both hosts at once 400 files each fsynced: create p50 25-26 ms, p90 61-67 ms, max 0.3-0.57 s. Both hosts walking /mnt/shared at once: killed at 120 s with 2544 / 2604 entries done (~21 per s; budget 5 s): FAIL. Walker stack samples (233/235): 106/113 waiting on a remote inode lock (mxfs_dlm_lock_retries cond wait: the peer master's ledger commit), ~100 in this host's own ledger commits as master (emulated swaps, register writes, the body FUA write, the page reads), 12/7 reloading inodes from disk. A stat of a file the peer holds is a PR grant and the peer's release, each a durable ledger page commit. Next: one swap per single-page commit on DRBD (span commit) and remeasure; the remaining step is the design question whether a shared grant needs a durable record at all. ===== 0.90.103 SPAN COMMIT + SWEEP OFF ON TCP (D704B7503855CAE6A0F4F46, physical pair 2026-10-08 02:07-02:10 CDT): one-host creates (100 fsynced) 1.2-1.5 s total, p50 12 ms, p90 16-18 ms, commits 8.5-12 ms (phys-span1-3). Both hosts seeding 400 each: create p50 14.6 ms, p90 32 ms. Cold walk, both hosts at once over 3456 entries: 62.4 / 70.5 s (FAIL, budget 5 s), 4654/4776 ledger page commits per host at 15-17 ms: exactly one durable grant commit per host per entry. Warm repeat walk: 2646 entries in 1.0 / 0.5 s, 7 commits (PASS) -- before this build every walk was cold because dir_ex_bast_sweep dropped every idle read grant (interleaved A/B, tests/evidence/pve_knob_ab/20261008T063116Z). What remains is the cold read: a read grant is a durable ledger page commit before the stat can return (~19 ms an entry with both hosts walking). Removing it means a read grant whose record is not on the critical path (the takeover import installs holders only from platter records, so a new master's own unrecorded reads would have to be re-asserted), a design change across every takeover path. ===== 0.90.107 (36AE6F621EFE1608895C6C3, released), physical pair 2026-10-08 17:53-17:58 CDT, tests/pve_tree_walk.sh seed both p0 (tests/evidence/pve_tree_walk/20261008T225352Z-192.168.1.80): seed 400 fsynced 4 KiB files per host at once in 55.1 / 42.4 s (create p50 78.8 / 49.4 ms, p90 268 / 179 ms; fsync p50 11-14 ms). Both hosts walking /mnt/shared (3464 entries) at once: pve1 2432 entries when killed at 120 s, pve2 done in 110.9 s (FAIL, budget 5 s); pve1 alone afterwards 21.1 s (2685 entries in the first 5 s from cache, then ~50/s). WORSE than 0.90.103's 62.4 / 70.5 s for the same shape. The budget is ~1.4 ms an entry; one replicated durable write on this pair costs more, so the per-entry durable read-grant commit has to go (read holds re-asserted to a new master at takeover instead of read from the platter), or be amortised over a directory's entries.",
       "impact": "noblock",
       "impact_why": "every walk and create progressed and returned without error; no module line, shutdown, hung task or I/O error in either host's kernel log over the runs (tests/evidence/pve_tree_walk/20261007T024425Z-192.168.1.80/*.klog_tags empty); pace only",
-      "platform": "pve9",
-      "updated": "2026-10-08"
+      "platform": "any",
+      "updated": "2026-10-22",
+      "reach_source": "evidence"
     },
     {
       "id": "D-DRBD-PAIR-SHARED-DIR-CHURN-STARVES-PARTICIPANT-1",
@@ -1700,9 +1701,11 @@
       "opened": "2026-10-19",
       "summary": "Two lap compositions ran dirent_type_integrity without dirent_durability, the row that stamps the MXFS_DIRENT_WINDOW marker it scopes its kernel-log scan to (tests/suite/manifest P6 before P8), so every node FAILed 'no MXFS_DIRENT_WINDOW marker on this node'.",
       "evidence": "BOARD CELLS: 4/disk/caw/mpath dirent_type_integrity FAIL 2026-10-19T18:54:14Z (run 20261019T185347Z-g4, board_4-disk-caw-mpath_dirent_type_integrity_path_failover_..._g4_qw4m1_0.90.131.log:74 row list without dirent_durability, :126 FAIL 0/4); 4/disk/caw/mpath dirent_type_integrity FAIL 2026-10-19T21:30:37Z (run 20261019T213009Z-g4b, lap 1 of tests/window_laps_parallel.sh r131a, board_4-disk-caw-mpath_alloc_witness_..._g4b_w4-disk-caw-mpath1_r131a.log:142, rows from tools/window_laps.py without dirent_durability). FIXES: tests/queues/window_laps_4-disk-caw-mpath_0.90.131.queue from qw4m2 on lists dirent_durability,dirent_publish_integrity before dirent_type_integrity; tests/window_laps_parallel.sh now adds dirent_durability to any lap that runs dirent_type_integrity.",
-      "next": "Verify: a lap of the corrected tests/window_laps_parallel.sh on 4/disk/caw/mpath whose dirent_type_integrity reads the marker and passes; then remove FIXED AND VERIFIED.",
+      "next": "Verify on the rig: in_only() in run.sh now asks for dirent_durability whenever dirent_type_integrity is asked for, as chk_clean asks for alloc_witness (0.90.133). Control: a batch of './run.sh 4/disk/caw/mpath dirent_type_integrity' laps on the tree with only that in_only() change reverted (a variant, with the diff's hash), expected to FAIL every lap; fix-on: a plan-verify batch sized from that control, each lap reading the marker and passing; then propose remove-fixed.",
       "impact": "noblock",
-      "impact_why": "A harness composition error: the row judged nothing (no workload ran in the boot it scans); no filesystem behaviour was measured."
+      "impact_why": "A harness composition error: the row judged nothing (no workload ran in the boot it scans); no filesystem behaviour was measured.",
+      "reproducer": "./run.sh 4/disk/caw/mpath dirent_type_integrity on a freshly prepared cluster, with run.sh's in_only() not pulling dirent_durability in: the row runs without the MXFS_DIRENT_WINDOW marker dirent_durability stamps and FAILs 0/4 ('no MXFS_DIRENT_WINDOW marker', tests/suite/dirent_type_integrity.sh:99). The deleted window-lap tool hit it first; any filtered run.sh of the row alone, including a verification-batch lap, reached the same gap.",
+      "updated": "2026-10-21"
     },
     {
       "id": "D-8CAWMPATH-PATH-FAILOVER-READBACK-OF-A-PEERS-FILES-OVERRAN-ITS-BOUND",
@@ -2062,6 +2065,529 @@
           "iso": "2026-10-20T13:30:56Z"
         }
       ]
+    },
+    {
+      "id": "D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION",
+      "severity": "major",
+      "nodes": 2,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "On 2/net/mesh/direct (candidate 0.90.133-2, module 71AC6107043DD5BE3D9181A, the 0.90.132 release build) alloc_witness rank 2 (test16) made 26944 creates in 60 s in its AG partition and the witness saw no inode chunk carved there, so it aborted its fill; the filesystem's inode count grew by about that much (chk_clean icount=35584), so chunks were allocated somewhere the witness did not see or count.",
+      "evidence": "BOARD CELL 2/net/mesh/direct alloc_witness FAIL 2026-10-21T19:27:26Z (run 20261021T190943Z-g2b, board tests/evidence/board_2-net-mesh-direct_g2b_0.90.133-2_w1.log:96, both ranks rc=124 at 120 s). tests/evidence/alloc_witness/20261021T190943Z-g2b/rank2.txt:1 'ABORT 26944 creates in 60 s in the node's AG partition never carved a chunk; the free reserve outlasted the time the row's budget leaves the fill' (19:26:15Z); rank1.txt (test15) FILL affine_ag=0 stride=4 files=1322 carved=1 topup=42 wall_ms=2326, SNAP S0 with carves=0 in every AG, NODE ... multi=1, no PHASE1 line. Kernel logs tests/evidence/run_alloc_witness_20261021T190943Z-g2b/kernlog_test1{5,6}.gz, 19:24-19:28Z: no hung_task, 'blocked for more than', BUG, WARNING, Oops, shutdown or fence on either node; test16 wrote steadily until 19:26:26 (buf_io W), then only scsipr read_keys; five P-CAP-RECLAIM 'a grant refused for a full ledger page' lines on test16 19:25:54-19:26:09 (pages 1982, 3054 x2, 5706; ag=0) and one on test15 19:26:08 (page 8959, ag=0). chk_clean afterwards: audit CLEAN, icount=35584. test16's kernel log is missing 19:24:00-19:25:22 (capture starts 19:25:22). The open D-4CAW-DIRECT-ALLOC-WITNESS-... record is a different shape (ranks reached PHASE1-3 slowly). ===== SECOND SIGHTING 2026-10-21, 2/net/mesh/drbd (DRBD rig test1/test2, same build 71AC6107043DD5BE3D9181A, dry-run candidate 0.90.133-2): alloc_witness FAIL 19:50:44Z (run 20261021T193546Z-g2), both ranks rc=124; tests/evidence/alloc_witness/20261021T193546Z-g2/rank2.txt: 'ABORT 13440 creates in 60 s in the node's AG partition never carved a chunk; the free reserve outlasted the time the row's budget leaves the fill'; rank1.txt FILL carved=1 files=998 then SNAP S0, no PHASE1. chk_clean 19:51:20Z CLEAN, release=INDETERMINATE for want of the witness. ===== Also on 2/net/mesh/drbd, candidate 0.90.134 (module 0988C50EC610F82EE08D135), run 20261021T221943Z-g2: tests/evidence/alloc_witness/20261021T221943Z-g2/rank2.txt:1 ABORT 14336 creates in 60 s in the node AG partition never carved a chunk; rank1 FILL carved=1. Board 2/net/mesh/drbd alloc_witness FAIL 2026-10-21T22:35:00Z.",
+      "next": "Establish where rank 2's inodes were allocated: per-AG chunk carves and inode counts during the fill (the module's carve counters the witness reads versus the AGIs on disk), and whether the allocator placed rank 2's chunks outside its affine partition while ledger grants were refused on full pages (P-CAP-RECLAIM). Re-run 2/net/mesh/direct alloc_witness on the same build with the full kernel log captured from before the fill.",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "alloc_witness",
+          "iso": "2026-10-21T19:27:26Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "alloc_witness",
+          "iso": "2026-10-21T19:50:44Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "alloc_witness",
+          "iso": "2026-10-21T22:35:00Z"
+        }
+      ],
+      "collateral": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "chk_clean",
+          "iso": "2026-10-21T19:27:59Z",
+          "why": "board_2-net-mesh-direct_g2b_0.90.133-2_w1.log:98 chk_clean audit CLEAN, release=INDETERMINATE: no sealed witness for run 20261021T190943Z-g2b (alloc_witness never sealed it)"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "chk_clean",
+          "iso": "2026-10-21T19:51:20Z",
+          "why": "drbd_rig board chk_clean audit CLEAN, release=INDETERMINATE: no sealed witness for run 20261021T193546Z-g2 (alloc_witness rank 2 aborted its fill, tests/evidence/alloc_witness/20261021T193546Z-g2/rank2.txt)"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "chk_clean",
+          "iso": "2026-10-21T22:35:36Z",
+          "why": "chk_clean FAIL: no sealed witness for run 20261021T221943Z-g2 (the coverage witness alloc_witness seals was never written because its fill aborted)"
+        }
+      ],
+      "updated": "2026-10-21",
+      "batches": [
+        {
+          "id": "b20261021-570500",
+          "kind": "calibrate",
+          "row": "alloc_witness",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 2,
+          "probe": "",
+          "candidate": "0.90.134",
+          "build": "",
+          "variant": "",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-21",
+          "why": ""
+        },
+        {
+          "id": "b20261021-33e191",
+          "kind": "calibrate",
+          "row": "alloc_witness",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 2,
+          "probe": "",
+          "candidate": "0.90.134",
+          "build": "",
+          "variant": "",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-21",
+          "why": "rate of the rank-fill fault at 2/net/mesh/direct on this attempt; also the calibration batch the batches step must leave alone (it runs verification batches only)"
+        }
+      ],
+      "rates": [
+        {
+          "row": "alloc_witness",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "calibrate",
+          "batch": "b20261021-570500",
+          "k": 0,
+          "n": 2,
+          "candidate": "0.90.134",
+          "variant": "",
+          "builds": [
+            "0988C50EC610F82EE08D135"
+          ],
+          "date": "2026-10-21"
+        },
+        {
+          "row": "alloc_witness",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "calibrate",
+          "batch": "b20261021-33e191",
+          "k": 0,
+          "n": 2,
+          "candidate": "0.90.134",
+          "variant": "",
+          "builds": [
+            "0988C50EC610F82EE08D135"
+          ],
+          "date": "2026-10-21"
+        }
+      ]
+    },
+    {
+      "id": "D-ALLOC-WITNESS-RANK-ABORT-RECORDED-AS-BUDGET-EXHAUSTED",
+      "severity": "medium",
+      "nodes": 2,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "tests/tooling/alloc_witness.sh: when one rank aborts its own precondition (fail_out writes ABORT to its rank file), the other rank waits for it until the row's 120 s budget kills both, and the board records FAIL BUDGET_EXHAUSTED with last_phase_census none=N instead of the abort; the census greps dmesg for mxfs-CCph markers this script never emits, so it reads none on every run.",
+      "evidence": "Run 20261021T190943Z-g2b (2/net/mesh/direct): rank2.txt ABORT at 19:26:15Z, rank1 waited without a PHASE1 line, both rc=124 at 120 s, board line 96 'FAIL alloc_witness (nodes_pass=0/2 states:BUDGET_EXHAUSTED=2)'. run.sh:2061 greps 'mxfs-CCph rank=[0-9]* PHASE=' and run.sh:2070-2071 turn an empty result into none; tests/tooling/alloc_witness.sh records its phases with rec() into rank<N>.txt (lines 143, 326-417) and contains no CCph and no PHASE= (grep -c 0 each). ===== Again on 2/net/mesh/drbd, candidate 0.90.134, run 20261021T221943Z-g2: rank2 ABORT at its fill, both ranks recorded BUDGET_EXHAUSTED rc=124 with last_phase_census[none=2] (DRBD board ledger 2026-10-21T22:35:00Z).",
+      "next": "Make a rank's ABORT end the lap for every rank at once (a coord abort the peer's barrier wait sees) and record it as the abort it is, not a budget overrun; have the census read the rank files' PHASE lines, or emit the markers it greps for.",
+      "cells": [
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "alloc_witness",
+          "iso": "2026-10-21T22:35:00Z"
+        }
+      ],
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "tools/release_run.py records each step's outcome as a ledger run keyed config '1/any' (or the step's configuration) and row 'release:<step>'; no disposition can settle a failed one, so the first step that fails on any candidate leaves an incident the gate can never clear.",
+      "evidence": "Read 2026-10-21: (1) criteria.parse_at('1/any') exits \"wanted <nodes>/<class>/<method>/<attach>\", so criteria.py amend/infra/incidents --at and defects.py propose --target refuse it; (2) the row contains a colon, and tools/defects.py parse_cell (lines 714-726) and propose --target (1241-1242) split CONFIG:ROW:ISO at the first two colons, reading row 'release' and iso 'presteps:2026-...'; (3) criteria.py cmd_amend/cmd_infra/withdraw (1427-1489) start with find(data, args.id), which needs a board criterion of that name, and release:* rows exist only in the ledger. The ledger already holds four such FAILs from dry-run candidate 0.90.133-2: release:presteps 2026-10-21T19:05:47Z, release:build 19:05:48Z, release:packages 19:08:29Z, release:boards 19:29:49Z (data/criteria.runs.jsonl), and later steps of that run will add more. The ledger is append-only, so the fix must make these existing keys settleable.",
+      "next": "Give step runs a key every parser accepts (a configuration parse_at takes and a row without a colon), parse cells with the ISO stamp anchored at the end, let amend/infra take a ledger-only row, and settle the 0.90.133-2 dry-run step FAILs through the reviewer path once the cause of each is fixed (missing MXFS_NODE_LIST in presteps; the clean-build copy of a root-only bench.json; pve9-1 without 7.0.14-24-pve headers)."
+    },
+    {
+      "id": "D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "tests/suite/fsx.sh draws its seed from 4 random bytes (0..2^32-1), but the vendored fsx stores -S in an int and calls usage() when it is negative, so about half of all runs exit 90 at once and record a FAIL that exercised nothing; and fsx.sh writes fsx's output to /tmp/fsx.$$.*.log on the node and deletes it in its EXIT trap, so no failing run keeps its evidence.",
+      "evidence": "2/net/mesh/drbd fsx 2026-10-21T19:36:37Z (dry-run candidate 0.90.133-2, build 71AC6107043DD5BE3D9181A): FAIL checks=2 passed=0 failed=2 seed=3832054505, both checks in 2 s of an 88 s budget (tests/evidence/drbd_rig/criteria.runs.jsonl). Code: tests/suite/fsx.sh:27 SEED=$(od -An -N4 -tu4 /dev/urandom); tests/suite/tools/fsx.c:186 'int seed = 1;', :3397 'seed = getnum(optarg, &endp);', :3402-3403 'if (seed < 0) usage();'; tests/suite/fsx.sh:22 trap 'rm -rf \"$W\" /tmp/fsx.$$.*'. Reproduced on clyde 2026-10-21 with the vendored binary: 'tests/suite/tools/fsx -S 3832054505 -N 200 <file>' rc=90 'usage: fsx ...'; -S 2147483648 rc=90; -S 2147483647 rc=0 'Seed set to 2147483647'.",
+      "next": "Draw the seed in 1..2^31-1 in tests/suite/fsx.sh, and keep fsx's output (print the tail of a failing check's log into the row's output, and write the logs under the run's evidence instead of /tmp). Then settle the 19:36:37Z run through a reviewed detector-defect proposal, with the reproduction above as its evidence. ===== 2026-10-21: the seed is 1..2^31-1 and a failing check's log is kept on the node (tests/evidence/fsx_seed_fix_20261021.diff); the fixed row passed on 2/net/mesh/drbd at 20:57:33Z (seed 1472941388); the 19:36:37Z run is settled as a detector defect by reviewed approval P20261021-676432. STILL OPEN: run.sh does not copy a failing fsx log from the node into the run's evidence directory (it stays at /root/fsx.<seed>.<ops>.log on the node), and the record's disposition (FIXED AND VERIFIED) needs its control and verification batches.",
+      "reproducer": "tests/suite/tools/fsx -S 2147483648 -N 200 <scratch file>: rc=90 usage (host-local, no rig)",
+      "cells": [
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "fsx",
+          "iso": "2026-10-21T19:36:37Z"
+        }
+      ],
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "D-2NETMESH-DRBD-NODE-SYNC-WEDGED-AFTER-FIO-PERF-OVERRAN-RECORDED-AS-INFRA",
+      "severity": "high",
+      "nodes": 2,
+      "config": "net/mesh/drbd",
+      "opened": "2026-10-21",
+      "summary": "On 2/net/mesh/drbd on 2026-10-13, fio_perf ran out its 115 s budget on both nodes (16:52:16Z) and the pre-assert probe then found test2 unable to complete sync or holding a task in D state (sync-wedged, no diagnostic captured); the next ten rows were recorded BLOCKED with 'NODE FAULT (not a filesystem verdict)', which the ledger migration carried as INFRA, so until the INFRA gate fix of 0.90.133 no gate ever counted them. Whether the wedge was in MeshXFS, DRBD or the node's root disk is not established.",
+      "evidence": "tests/evidence/drbd_rig/criteria.runs.jsonl: fio_perf FAIL 2026-10-13T16:52:16Z 'test1:BUDGET_EXHAUSTED:step=unknown report_s=115 elapsed_s=116 test2:BUDGET_EXHAUSTED'; then cache_coherency 16:52:33Z, strong_consistency 16:52:46Z, posix_multi 16:52:55Z, mmap_coherency 16:53:04Z, zero_silent_loss 16:53:13Z, dlm_fairness 16:53:22Z, dlm_membership 16:53:32Z, scaling_curve 16:54:03Z, dlm_scaling 17:03:54Z, rsync_paired 17:13:44Z, each status BLOCKED, outcome INFRA, reason 'NODE FAULT (not a filesystem verdict): test2:sync-wedged[no-diag]' (run.sh:1786 builds the tag; [no-diag] means no stack or {sub} classification was captured). The migrated lines carry no build, run id or evidence path. crash_consistency FAIL 17:23:57Z the same day ('the cluster did not reconverge to 2 members within 130s') is another unnamed incident on that board.",
+      "next": "Locate the run's evidence by time (tests/evidence/drbd_rig/20261013T16*, the DRBD verify .out of that day, netconsole.log and the nodes' kernel logs around 16:50-16:55Z) and establish where test2's sync was blocked: an MXFS writeback or log wait, DRBD (flush/ack), or the node's own root disk. Until then this blocks every release by default.",
+      "cells": [
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "fio_perf",
+          "iso": "2026-10-13T16:52:16Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "cache_coherency",
+          "iso": "2026-10-13T16:52:33Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "strong_consistency",
+          "iso": "2026-10-13T16:52:46Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "posix_multi",
+          "iso": "2026-10-13T16:52:55Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "mmap_coherency",
+          "iso": "2026-10-13T16:53:04Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "zero_silent_loss",
+          "iso": "2026-10-13T16:53:13Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "dlm_fairness",
+          "iso": "2026-10-13T16:53:22Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "dlm_membership",
+          "iso": "2026-10-13T16:53:32Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "scaling_curve",
+          "iso": "2026-10-13T16:54:03Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "dlm_scaling",
+          "iso": "2026-10-13T17:03:54Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "rsync_paired",
+          "iso": "2026-10-13T17:13:44Z"
+        }
+      ]
+    },
+    {
+      "id": "D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C-NO-PACKAGE-CAN-BE-BUILT",
+      "severity": "high",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "scripts/vm_package_build.sh:74 lists a top-level mxfs.c among the package inputs; the tree has none (Kbuild obj-m mxfs.o is built from the subdirectories), so tar refuses and no .deb or .rpm can be built",
+      "evidence": "candidate 0.90.134 packages step, tests/evidence/candidates/0.90.134_20261021T212712Z.packages.log: tar: mxfs/mxfs.c: Cannot stat: No such file or directory / PKG_BUILD_FAIL deb: could not pack the package inputs. ls mxfs.c: No such file or directory. tools/release_candidate.py FROZEN_FILES names it too (skipped there because absent).",
+      "next": "drop mxfs.c from INPUTS in scripts/vm_package_build.sh and from FROZEN_FILES; rerun the packages step on a fresh candidate",
+      "cells": [
+        {
+          "config": "1/any",
+          "row": "release:packages",
+          "iso": "2026-10-21T21:49:29Z"
+        }
+      ]
+    },
+    {
+      "id": "D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E-AND-NO-WWN-BYID-LINK",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "tests/lib/rig.sh cannot resolve an EUI-64 LUN by its identifier: mxfs_wwid_norm (rig.sh:466) strips naa., 0x and mpath- but not eui., so eui.6664363939643231 becomes e6664363939643231, and the no-mount fallback (rig.sh:542) looks for /dev/disk/by-id/wwn-0x<decl>, a link udev never makes for EUI-64 (only scsi-2<eui>); tests/rig_lib_contract.sh 11b hardcodes naa.",
+      "evidence": "pooled SCST LUNs report wwid eui.6664363939643231 (test1 /sys/block/sda/device/wwid); test1 /dev/disk/by-id has only scsi-26664363939643231 -> ../../sda. rig_lib_contract 0.90.134: FAIL 11b (wants wwid=naa.), ABORT 13b /dev/disk/by-id/wwn-0xe6664363939643231 is not a block device on test1. capture gate 0.90.134 and 0.90.133-2: d0980_barrier_killable, d0981_pending_victim_sweep, prep_heartbeat_writer_guard, chk_mounted_node_reads_platter ABORT no MXFS device basis on test1 ... no /dev/disk/by-id/wwn-0xe6664363939643231 (rig.sh:545). ===== Fix in the tree (rig.sh eui. normalisation, by-id fallback over wwn-0x/scsi-3/scsi-2, contract 11b/13b/13h) ran in the 0.90.134 dry run attempt 20261021T230333Z: contract 11b, 13b and 13h PASS; the four gate entries that aborted no MXFS device basis no longer did. Contract 13j now runs and FAILs: on the pool rig the configuration default device (/dev/disk/by-path/...:shared-lun-0, the fixed rig LUN) is not on the node, so the resolver refuses with not a block device instead of the not the declared LUN the check expects (c13j.verdict in tests/evidence/20261021T230432Z_riglib_0.90.134_20261021T230333Z). ===== ===== 2026-10-22, check 13j: tests/lib/rig.sh mxfs_dev_resolve's configuration-default candidate is, on a pool rig, the LUN the pool bound to the nodes (the allocation's dev=, as run.sh:444 takes it), not the configuration's path for the fixed rig LUN that no pool node is logged in to. Dry run attempt 20261022T031549Z: tests/rig_lib_contract.sh PASS fails=0 (11b, 13b, 13h, 13j PASS); c13j.verdict: '/dev/disk/by-path/...:pool-02-lun-0 on test2 is not the declared LUN: wwid=eui.6664363939643231, declared ...dead (source=configuration-default)'. The four gate entries that had aborted 'no MXFS device basis' (d0980_barrier_killable, d0981_pending_victim_sweep, prep_heartbeat_writer_guard, chk_mounted_node_reads_platter) reached their faults: fault laps OK.",
+      "next": "normalise eui. like naa.; resolve the no-mount fallback through the by-id links udev makes for each designator type (wwn-0x for NAA, scsi-2 for EUI-64, scsi-3 for NAA); make contract 11b/13b/13h accept either designator; rerun rig_lib_contract and the gate",
+      "cells": [
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T21:43:30Z"
+        },
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T19:05:47Z"
+        },
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T23:22:19Z"
+        }
+      ],
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK-FOR-A-NODE-DEVICE-PATH",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "tools/mxfs_rig_tag.sh step 4 reads the SCSI vendor of the device path on the host it runs on first (vendor_of, :133); on the dev host a node path such as /dev/sda names the host own disk, so the rig is tagged ata and every harness resolving its LUN aborts rig ata declares no LUN",
+      "evidence": "MXFS_MARKER=/dev/null MXFS_DEV=/dev/sda tools/mxfs_rig_tag.sh on clyde prints ata (clyde /sys/block/sda/device/vendor is ATA). The comment at :98 assumes the device is not present on the dev host. capture gate 0.90.134: d0940_unknown_blocker_probe, agmeta_shutdown_retire, ghost_slot_restart_probe, d0944_unpub_forms_probe, pr_session_drop_probe ABORT rig ata declares no LUN in data/rigs.json (rig.sh:491); 0.90.133-2 gate line 212 the same. ===== ===== 2026-10-22, fix in the tree: tools/mxfs_rig_tag.sh step 4 reads a device locally only on a host without the lab's node credentials (a node); the dev host always asks a node. Reproduced before the fix on clyde: MXFS_RIG_TAG_FRESH=1 MXFS_RIG_NODE=test1 MXFS_DEV=/dev/sda -> ata (clyde sda vendor ATA; test1's sda is SCST_FIO, wwid eui.6664363939643231). After it: the same call -> scst-fio; with no node named (MXFS_MARKER=/dev/null) -> rc=1, no tag; run on test1 (creds_rc=1, no passfile) -> scst-fio. Dry run attempt 20261022T031549Z gate (tests/evidence/20261022T031739Z_capture_gate_0.90.134_20261022T031549Z): d0521 re-prepped with MXFS_DEV=/dev/sda as on every earlier gate, both markers then recorded rig=scst-fio, and the five entries that had aborted rig 'ata' (d0940_unknown_blocker_probe, agmeta_shutdown_retire, ghost_slot_restart_probe, d0944_unpub_forms_probe, pr_session_drop_probe) each reached their injected fault: fault laps OK.",
+      "next": "on the dev host never read a node device path locally: ask the node (the ssh path) unless the path is a device of this host by identity; rerun the gate",
+      "cells": [
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T21:43:30Z"
+        },
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T19:05:47Z"
+        },
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T23:22:19Z"
+        }
+      ],
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "D-PRESTEPS-FORM-PAIR-UNDER-G2-MARKER-BUT-SELF-TESTS-READ-DEFAULT-MARKER",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "tools/release_run.py presteps form the pair with run.sh --group g2, which records .cluster_marker.g2.json (run.sh:209), then run rig_lib_contract and capture_fault_gate without MXFS_MARKER, so every harness and tools/mxfs_rig_tag.sh read the default .cluster_marker.json, whatever an earlier unrelated run left there",
+      "evidence": "release_run.py step_presteps: run.sh ... --group g2 prep_cluster, then tests/rig_lib_contract.sh and tests/capture_fault_gate.sh with only MXFS_NODE_LIST added; grep of capture_fault_gate.sh for MXFS_MARKER: none; mxfs_rig_tag.sh:45 defaults to .cluster_marker.json. The in-gate preps (d0940:114, d0944:66, fence_crash_cuts:336, ...) run run.sh without --group and rewrite the default marker mid-gate. The default marker content during the 0.90.134 gate before 21:43:22Z was not kept. ===== ===== 2026-10-22, fix in the tree: tools/release_run.py step_presteps passes MXFS_GROUP=g2 and MXFS_MARKER=<repo>/.cluster_marker.g2.json (with MXFS_NODE_LIST) to tests/rig_lib_contract.sh and tests/capture_fault_gate.sh, so an in-gate run.sh prep forms the pair under the group and every tool reads the group's marker. Dry run attempt 20261022T031549Z: .cluster_marker.g2.json went from gen 309 to 333 across the presteps, which is exactly 1 presteps prep + 15 in-gate preps + 8 gate restores; the default .cluster_marker.json stayed at gen 1042 through the gate (1043 now, from a later plain prep at 03:52:09Z). Contract PASS fails=0; gate 59/60 OK, the one broken entry a different cause (D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE).",
+      "next": "form the presteps pair the way the self-test harnesses expect it (the default marker), or export the group marker to every self-test and make the in-gate preps use it; rerun the presteps",
+      "cells": [
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T21:43:30Z"
+        },
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T19:05:47Z"
+        },
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T23:22:19Z"
+        }
+      ],
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "D-RECOV-BMBT-REUSE-ABORT-LEAVES-THE-DESTROYED-VICTIM-POWERED-OFF",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "tests/recov_bmbt_reuse.sh destroys its victim (:134) and restarts it only at :159/:162; an ABORT in between (the capture gate injected fault at :143) exits with the victim off, and the harness has no EXIT trap, so every later harness finds test2 down",
+      "evidence": "capture gate 0.90.134 recov_bmbt_reuse_fault.log: INFO virsh destroy test2 rc=0 ... ABORT: the kernel log on test1 from the lap marker did not complete. Next entries: tcp_death_replay ABORT test2 srcversion != tree (INFO test2 empty), lone_mount_crash_replay ABORT /src with the tree is not reachable on test2. grep -c trap tests/recov_bmbt_reuse.sh: 0. 0.90.133-2 gate: lone_mount_crash_replay the same. ===== ===== 2026-10-22, fix in the tree: tests/recov_bmbt_reuse.sh arms an EXIT trap (rbr_cleanup) before the destroy and clears it once V has rejoined; the trap starts V and mounts /src on it. Dry run attempt 20261022T031549Z gate (tests/evidence/20261022T031739Z_capture_gate_0.90.134_20261022T031549Z/recov_bmbt_reuse_fault.log): virsh destroy test2 at +21s, STAGE FAULT at the first capture, RESULT ABORT, then 'CLEANUP: starting test2, which this lap destroyed and did not get back' and 'CLEANUP: test2 is up with /src'; the next entry, tcp_death_replay, found test2 up with /src (src=1, module not loaded: the gate re-formed the pair) and its fault lap was OK, as was lone_mount_crash_replay's.",
+      "next": "an EXIT trap that starts a destroyed victim and remounts /src on it, as fence_lost_response flr_cleanup does; rerun the gate",
+      "cells": [
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T21:43:30Z"
+        },
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T19:05:47Z"
+        },
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T23:22:19Z"
+        }
+      ],
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG-AND-DIES-BEFORE-MEASURING",
+      "severity": "medium",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "tests/d_intents_2tcp_open_efi.sh:161 tests the readability of $IMG under set -u (:110) and nothing in the script assigns IMG, so every run dies with IMG: unbound variable before it measures anything",
+      "evidence": "capture gate 0.90.134 d_intents_2tcp_open_efi_fault.log: tests/d_intents_2tcp_open_efi.sh: line 161: IMG: unbound variable (rc=1, no ABORT, no RESULT). grep -n IMG: only :161 and a comment at :317. ===== ===== 2026-10-22, fix in the tree: the IMG readability check (tests/d_intents_2tcp_open_efi.sh:161) is removed. Nothing in the harness reads a host image: since s70 its platter free-query runs chk_mxfs --query-only on the resolved LUN from the node (:317-322), so the check was a precondition for a read the harness no longer makes; the header now says so. Dry run attempt 20261022T031549Z gate: STAGE FAULT at measurement #1 (ext on test2), RESULT ABORT, fault lap OK (before: rc=1, IMG: unbound variable, no fault line). ===== ===== 2026-10-22 healthy lap through tests/capture_fault_gate.sh 0.90.134-harnessfix --healthy-only (tests/evidence/20261022T040716Z_capture_gate_0.90.134-harnessfix): the harness runs past :161 to its assertions (fragmented build, publication, EFD hold, kill, election, census) and measures; it FAILED one MXFS assertion, the fix build's replay refused terminally instead of completing the open obligation case, recorded as D-OPEN-EFI-DEATH-REPLAY-REFUSED-NOT-HELD-VICTIM-DOMAIN-QUARANTINED-2TCP.",
+      "next": "resolve the backing image through tests/lib/rig.sh mxfs_host_image as the other platter-reading harnesses do; rerun the harness and the gate entry",
+      "cells": [
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T21:43:30Z"
+        },
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T23:22:19Z"
+        }
+      ],
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "D-CAPTURE-GATE-ENTRIES-INHERIT-THE-CLUSTER-STATE-AN-EARLIER-FAULT-LEFT",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "tests/capture_fault_gate.sh runs its 60 entries back to back and never re-forms the pair; an entry that does not prep the cluster itself starts on whatever the previous injected fault left (unmounted, victim destroyed, module unloaded), so it aborts before its fault line and the gate reads it BROKEN without testing its capture handling",
+      "evidence": "grep of capture_fault_gate.sh for virsh, prep_cluster, run.sh: none. 0.90.134 gate: d0980/d0981/prep_heartbeat_writer_guard/chk_mounted_node_reads_platter found no live mount on test1; join_during_takeover ABORT test2 not mounted (sv matches, m=0); tcp_death_replay and lone_mount_crash_replay found test2 down. None of the 13 broken entries sets NOPREP=1 and none preps before resolving its device. ===== ===== 2026-10-22, fix in the tree: tests/capture_fault_gate.sh checks the pair before every lap (each node answers with /src, the tree's srcversion, the configuration's force_transport and one mxfs mount) and forms it again when it is not (power the nodes that did not answer, wait for ssh <=120 s, run.sh <marker configuration> prep_cluster); a pair it cannot form ends the gate as ABORT. Dry run attempt 20261022T031549Z gate: 8 restores, each 37-43 s (states seen before them: both nodes without /src or module 4 times, test2 alone without its module after recov_bmbt_reuse, both unmounted, test2 unmounted twice); every entry the record names as starting on a broken state reached its fault (tcp_death_replay, lone_mount_crash_replay, d0980, d0981, prep_heartbeat_writer_guard, chk_mounted_node_reads_platter OK). join_during_takeover now starts on a formed pair (PAIR formed again before it in 42s) and stops on a separate cause, D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE.",
+      "next": "give the gate a known starting state per entry (power and form the pair, verify mounted and module loaded) before each entry that does not prep itself; rerun the gate",
+      "cells": [
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T21:43:30Z"
+        },
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T19:05:47Z"
+        },
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T23:22:19Z"
+        }
+      ],
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD",
+      "severity": "high",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "tools/release_run.py board_verdict read an own-rig board (2/net/mesh/drbd) as clean: that configuration parses only with MXFS_OWN_RIG=1, which criteria.py sets only when its own argv names one, so in the orchestrator no row applied and the verdict was an empty list; the orchestrator second check on the DRBD step graded nothing",
+      "evidence": "candidate 0.90.134: board_verdict(0.90.134, 2/net/mesh/drbd, tests/evidence/drbd_rig/criteria.json) returned [] with MXFS_OWN_RIG unset and [fio_perf_vs_xfs=SKIP, alloc_witness=FAIL, chk_clean=FAIL] with it set; configuration.parse refused 2/net/mesh/drbd without it (attach drbd is verified on a rig of its own). The step still failed on the verify own verdict line, so no false PASS was recorded. Fixed in the tree: board_verdict sets the flag for an own-rig attachment and refuses a verdict that graded no row. Also found naming this run: defects.py check_cells looked for release:<step> runs in the board of the configuration they are filed under, so a release:drbd run could never be named; it now reads them from the primary ledger, where release_run.py writes them.",
+      "next": "verify on the next dry run: the drbd step detail must name the board rows that are not green",
+      "cells": [
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "release:drbd",
+          "iso": "2026-10-21T22:56:58Z"
+        }
+      ]
+    },
+    {
+      "id": "D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN",
+      "severity": "high",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "fio_perf_vs_xfs at 2/net/mesh/drbd records SKIP rig-unknown on every run since 2026-10-20 (the native-XFS yardstick is chosen by rig tag, and tools/mxfs_rig_tag.sh cannot establish one for /dev/drbd0, which has no SCSI vendor); a SKIP is not a PASS under candidate grading, so the DRBD board can never read green and the release drbd step can never pass",
+      "evidence": "tests/evidence/drbd_rig/criteria.runs.jsonl at 2/net/mesh/drbd: 11 SKIP rig-unknown (last five 2026-10-20T14:07:05Z to 2026-10-21T22:22:29Z), 2 PASS earlier. criteria.py 2/net/mesh/drbd --candidate 0.90.134: Total 35, 2 FAIL, 32 PASS, 1 SKIP; VERDICT 3 of 35 criteria are not passing. drbd_release_verify_0.90.134_20261021T212712Z.out: STEP suite-board rc=1. ===== Again in the 0.90.134 dry run attempt 20261021T230333Z: the drbd step failed with the board naming only fio_perf_vs_xfs=SKIP (every other DRBD row passed).",
+      "next": "establish the DRBD rig yardstick (a tag for the drbd attachment, or the backing LUN under DRBD) so the row measures; it must never pass without measuring",
+      "cells": [
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "release:drbd",
+          "iso": "2026-10-21T22:56:58Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "release:drbd",
+          "iso": "2026-10-22T00:35:43Z"
+        }
+      ],
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "D-LIVE-HOLDER-WAIT-FINDS-NO-REMOTE-MASTERED-INODE-AND-ABORTS-BEFORE-MEASURING",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "tests/live_holder_wait.sh aborts before measuring when none of its eight candidate inodes is remote-mastered from test2; master locality is a hash re-decided at every cluster formation, so whether the lap can run depends on the formation it lands on, and the capture gate read it BROKEN",
+      "evidence": "capture gate, 0.90.134 dry run attempt 20261021T230333Z: GATE live_holder_wait fault: rc=2 fault_line=0 -> BROKEN, ABORT: none of the eight candidates is remote-mastered from test2 - this lap cannot measure the path it names. The same entry was OK in attempt 20261021T212712Z the same evening. ===== ===== 2026-10-22, cause: routing hash v2 clears an inode number's low three bits before hashing (include/mxfs/mxfs_tauth.h:505-507, MXFS_TAUTH_INO_SHARD 8), so mastership is per eight-inode shard and the lap's eight consecutive candidates (8389321-8389328 on attempt 20261021T230333Z, all local) were two draws. Fix in the tree: H creates objects until 16 distinct shards are represented (cap 160; spares kept until all exist, then removed), one candidate per shard, so on two nodes none remote is 2^-16 per lap; candidates removed at the end and on the no-match abort; setup bound 13 s from 0.9-1.2 s measured for 160 creates + removal + sync in each mode. Dry run attempt 20261022T031549Z gate: candidates in shards 1048640..1048643 (inodes 8389121, 8389128, 8389136, 8389144): three local, the fourth remote, target chosen remote at +35s, STAGE FAULT, ABORT, fault lap OK. The old eight (8389121-8389128) span only shards 1048640 and 1048641, both local on this formation: it would have aborted again. ===== ===== 2026-10-22 healthy lap through tests/capture_fault_gate.sh 0.90.134-harnessfix --healthy-only (tests/evidence/20261022T040204Z_capture_gate_0.90.134-harnessfix): GATE live_holder_wait healthy: rc=0 wall=268s fails=0 -> OK (bound 400 s).",
+      "next": "make the lap establish a remote-mastered candidate on the formation it gets (more candidates, or create until one is remote-mastered, per its own probe) instead of depending on the hash",
+      "cells": [
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-21T23:22:19Z"
+        }
+      ],
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "tests/capture_gate.manifest runs join_during_takeover with NFILES=4000; under routing hash v2 (eight inode numbers to a ledger page) that authority is about 500 pages, the takeover pass finished in 5.1 s, inside the lap's first 5 s in-flight sample, and the lap aborted before its first measurement, so the gate read it BROKEN without testing its capture handling",
+      "evidence": "0.90.134 dry run attempt 20261022T031549Z capture gate (tests/evidence/20261022T031739Z_capture_gate_0.90.134_20261022T031549Z): GATE join_during_takeover fault: rc=2 wall=280s fault_line=0 -> BROKEN, ABORT: the takeover pass was not seen in flight (activations=502). test1 /tmp/jointk_dmesg.txt from the A2 marker: 502 P-TAUTH-PAGE-MINE via=takeover lines, the first at 154.792859, the last at 159.919506, the mount at 154.751369. The in-flight loop (tests/join_during_takeover.sh:224-231) samples every 5 s from the mount's return and needs two growing samples; its header puts the pass at ~10 ms a page and detection at ~11 s. include/mxfs/mxfs_tauth.h:505-507: the route hash clears an inode number's low three bits. The pair was formed before the lap (PAIR formed again before join_during_takeover fault in 42s, every node src=1 sv=tree ft=1 m=1), so this is not the inherited-state cause D-CAPTURE-GATE-ENTRIES-INHERIT-THE-CLUSTER-STATE-AN-EARLIER-FAULT-LEFT names; that cause hid this one on every earlier gate. ===== ===== 2026-10-22, fix in the tree: tests/capture_gate.manifest runs the entry with NFILES=32000, the harness's own default (~4000 ledger pages under routing v2), fault-lap bound 228 s from the measured lap; the harness also reads the cluster marker it is given (MXFS_MARKER) instead of .cluster_marker.json by name. Verified with the presteps' environment (MXFS_NODE_LIST=test1,test2 MXFS_GROUP=g2 MXFS_MARKER=.cluster_marker.g2.json): tests/capture_fault_gate.sh 0.90.134-jdt32k --only join_during_takeover -> GATE join_during_takeover fault: rc=2 wall=114s fault_line=1 abort=1 -> OK, RESULT PASS (tests/evidence/20261022T035659Z_capture_gate_0.90.134-jdt32k). In the lap: 32000 creates in 57 s, the pass seen in flight 11 s after the mount (452 then 916 activations), STAGE FAULT at the first measurement (mine_at_issue), ABORT.",
+      "next": "give the gate entry an authority whose pass outlasts in-flight detection and B's mount: NFILES=32000, the harness default (~4000 pages, ~40 s), with the fault-lap bound measured from a lap at that size; rerun the entry",
+      "cells": [
+        {
+          "config": "1/any",
+          "row": "release:presteps",
+          "iso": "2026-10-22T03:48:37Z"
+        }
+      ],
+      "updated": "2026-10-21"
+    },
+    {
+      "id": "D-OPEN-EFI-DEATH-REPLAY-REFUSED-NOT-HELD-VICTIM-DOMAIN-QUARANTINED-2TCP",
+      "severity": "high",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-21",
+      "summary": "A TCP node that dies holding an open EFI (rm of fragmented files, EFD held) is not recovered: the survivor's foreign replay refuses 37 of the 38 transactions in its slice as touching images the victim did not hold (not-held), the whole replay is refused (P241-RECOV-TERMINAL reason=1 POLICY_REFUSED_COMPLETE, refused=45), and the victim's domain is quarantined cluster-wide with its slot frozen until operator action, where the fix build is designed to complete the open obligation case (P226-FR-INTENTS-RECOVERABLE)",
+      "evidence": "2026-10-22 0.90.134 build 0988C50EC610F82EE08D135, test1 (W) / test2 (V), 2/net/mesh/direct pool LUN eui.6664363939643231, fix build (obl_complete_enable=1): tests/d_intents_2tcp_open_efi.sh healthy lap through tests/capture_fault_gate.sh 0.90.134-harnessfix --healthy-only (evidence tests/evidence/20261022T040719Z_intents2tcp_0.90.134-harnessfix-d_intents_2tcp_open_efi-ok): V built 8 files of 4096 extents, W listed and read them (published), V entered the EFD hold with a durable EFI (P-EFD-HOLD start=3416125), virsh destroy test2, W elected to replay slot 1, census P226-ICENSUS victim_slot=1 intents=217 dones=216 ambiguous_dones=215 open=194 extents=389; then P-FR-CANCEL-PASS1 txns=38 refused=37 cancel_kept=1, P227-FR-REFUSED-WHY why: not-held=2 / not-held=8 (images class=3 res=18874496/18874498 gepoch 8/9), P241-RECOV-TERMINAL slot=1 reason=1 domain=1 refused=45, P241-RECOV-TERMINAL-IMPORT, P240-QUAR-IMPORT; FAIL replay SUCCEEDED with an OPEN obligation case got=no. P-TAUTH-SEAL for the victim at 1799.94, the replay at 1804.53. Probe counts in dmesg_test1.txt: P226-ICENSUS-DONE-AMBIGUOUS 109, -INTENT 91, -OPEN 16. This harness had measured nothing since its IMG precondition broke (D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG-AND-DIES-BEFORE-MEASURING), so when this began is not known.",
+      "next": "establish why the victim's images read not-held at the replay gate (the authority each refused image needed, what the ledger recorded for it, and the P-TAUTH-SEAL purge ordering); rerun the lap on the last build it passed on to bound when it started; nothing is changed until the cause is proven",
+      "reproducer": "tests/d_intents_2tcp_open_efi.sh <label> test1 test2 with CHURN=0 MODE=complete on a TCP pair on the fix build; reached on its first healthy lap after the IMG fix"
+    },
+    {
+      "id": "D-TCP-STALE-RESEND-CANDIDATES-SHARE-ONE-ROUTING-SHARD-SO-ONE-MASTER-DRAW",
+      "severity": "major",
+      "nodes": 2,
+      "config": "*/*/*",
+      "opened": "2026-10-22",
+      "summary": "tests/tcp_stale_resend.sh writes its 8 candidate files back to back, so their inode numbers are consecutive. Under ledger routing version 2 an inode routes with the low three bits of its number cleared (include/mxfs/mxfs_tauth.h, MXFS_TAUTH_INO_SHARD), so all 8 share one master: the search for a candidate remotely mastered from W is one draw, not eight, and on a 2-node group it ABORTs whenever that draw is W. tests/pending_late_grant.sh has the same shape: NFILES defaults to 8 consecutive creates, and its premise that about half the files are remotely mastered from each node does not hold for one or two shards. tcp_lockreq_blackhole.sh already avoids it with seven spacer files between candidates; live_holder_wait.sh selects one candidate per distinct shard.",
+      "evidence": "Gate run tests/evidence/presteps_harnessfix_20261022.log (capture_fault_gate label 0.90.134-harnessfix-full, test1/test2, 2/net/mesh/direct, srcversion A6239940FC6B66138D10442): \"GATE tcp_stale_resend fault: rc=2 wall=121s fault_line=0 abort=0 verdicts_after_fault=0 -> BROKEN\", the only broken entry of 60. Its log tests/evidence/20261022T042630Z_capture_gate_0.90.134-harnessfix-full/tcp_stale_resend_fault.log: candidates idx=1..8 are ino 8388736..8388743 (0x800080..0x800087, one shard), every one drop_hits=0, then \"ABORT: no candidate inode is remotely mastered from test2\". pending_late_grant.sh:63 NFILES=${NFILES:-8}, line 35 states the half-remote premise; its consequence for that harness verdict is not yet measured. ===== ===== 2026-10-22, fix in the tree: tests/tcp_stale_resend.sh creates files until 16 distinct routing shards (ino >> 3) are represented, keeps the first in each as a candidate, removes the spares once every candidate exists, and removes the candidates it made at the end and on the no-candidate ABORT (rm_cands). Setup bound 13 s. Verified on g2 (test1/test2, 2/net/mesh/direct, srcversion A6239940FC6B66138D10442) through tests/capture_fault_gate.sh 0.90.134-srshard --only tcp_stale_resend: fault lap 'rc=2 wall=21s fault_line=1 abort=1 -> OK' (tests/evidence/20261022T115448Z_capture_gate_0.90.134-srshard); healthy lap 'rc=0 wall=92s fails=0 -> OK' (tests/evidence/20261022T115629Z_capture_gate_0.90.134-srshard, lap dir tests/evidence/20261022T115631Z_staleresend_0.90.134-srshard-tcp_stale_resend-ok): 16 candidates in distinct shards at +2s; the first four shards (ino 8390849, 8390857, 8390865, 8390873) were local to W (drop_hits=0) and the fifth (8390881) remote (drop_hits=10), so the old 8-consecutive-file setup, one shard, would have ABORTed on this formation; all 7 verdicts PASS. Candidate idx 58 reused a freed lower number (8388737), which is why selection is by shard and not by spacing. pending_late_grant.sh: its verdict is a late-kept total over both nodes and both nodes append to every file, so the master's own appends complete by promotion and the other node's by a wire grant whatever the shard draw; only its comment's premise was false, now corrected (comment-only change, bash -n OK). ===== ===== 2026-10-22 full presteps sequence after the fix, g2 (test1/test2, 2/net/mesh/direct, srcversion A6239940FC6B66138D10442), as tools/release_run.py runs it: harness lint rc=0; tests/chk_oracle_calibration.sh PASS 5/5; prep_cluster OK (28s); tests/rig_lib_contract.sh PASS fails=0; tests/capture_fault_gate.sh 'RESULT: PASS label=0.90.134-presteps-full2 entries=60 broken=0 vacuous=0 restores=8 wall=1621s' (tests/evidence/20261022T120001Z_capture_gate_0.90.134-presteps-full2; log tests/evidence/presteps_full_20261022b.log). The earlier full run had tcp_stale_resend as its only broken entry.",
+      "next": "Space tcp_stale_resend candidates eight inode numbers apart as tcp_lockreq_blackhole.sh does (SPACERS), check each lands in a distinct shard, and rerun its fault and healthy laps through tests/capture_fault_gate.sh --only tcp_stale_resend on g2. For pending_late_grant.sh, read how its verdict depends on remote mastering, then size NFILES in shards.",
+      "reproducer": "MXFS_NODE_LIST=test1,test2 MXFS_GROUP=g2 MXFS_MARKER=$PWD/.cluster_marker.g2.json tests/capture_fault_gate.sh <label> --only tcp_stale_resend: ABORTs whenever the one shard the 8 candidates share is mastered by W",
+      "updated": "2026-10-22"
+    },
+    {
+      "id": "D-CHK-FREESPACE-REBUILD-DECLARES-OWNED-BLOCKS-FREE-AGFL-LOG-AND-DATA",
+      "severity": "high",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-22",
+      "summary": "chk_mxfs repair rebuilds an AG free-space btrees (rebuild_freespace_btrees, called from check_freespace_btrees when the AG has btree errors and agi_count == 0) as one extent from block 8 to the end of the AG. Three kinds of owned block fall inside it: (1) block 8 is the fourth AGFL block on the layout mkfs writes at 512 (mkfs_mxfs.c calc_ag_layout: roots 1-4, AGFL 5-8, free from 9); (2) on the log AG the log starts at block 5, so the whole log is declared free; (3) agi_count == 0 means no inode chunk in the AG, not no data: extents of files whose inodes live in other AGs are declared free. Any allocation afterwards can give one of those blocks a second owner.",
+      "evidence": "Code read 2026-10-22: tools/chk_mxfs.c rebuild_freespace_btrees free_start = 8, free_len = agf_length - 8, roots at blocks 1 and 2; check_freespace_btrees calls it under (btree_errors > 0 && can_repair() && agi->agi_count == 0) with no check of the AGFL contents, the log placement or any block ownership map. tools/mkfs_mxfs.c calc_ag_layout: meta = hdr_blocks() + 4, agfl_blocks = meta..meta+3, free_start = meta + 4 (9 at 512); log AG: log at meta, AGFL after the log. Not yet reproduced on an image. ===== ===== 2026-10-22, partial change in the tree (the 4K-native chk_mxfs work, 0.90.134): rebuild_freespace_btrees now takes its positions from the layout mkfs writes, h = ag_hdr_blocks() (1 at 512, 4 at 4096): BNO root at h, CNT at h+1, free extent from h+8, and refuses an AG no longer than h+8. At 4096 this is verified by tests/chk_4kn_controls.sh (AG 3 of a 4-AG 4 GiB 4K-native image, BNO root magic broken, chk_mxfs -y: AGF bno_root=4 cnt_root=5, rebuilt record [12, agf_length-12] = 203359 blocks, recheck clean). At 512 the same expression gives roots 1 and 2 and free space from 9, which removes cause (1), the AGFL block 8 overlap; that has NOT been run at 512. Causes (2) the log AG and (3) file data in an AG with no inodes are unchanged: nothing proves the AG owns nothing past its fixed blocks before the rebuild runs. Record stays open.",
+      "next": "Reproduce on a 512-byte image: corrupt a non-log AG BNO root with no inodes, run chk_mxfs repair, then show the rebuilt BNO record starting at 8 while the AGF/AGFL still name block 8; then a log AG. Fix: the rebuild must derive free space from a complete block ownership map of the AG (headers, roots, AGFL entries, log, every fork extent from every AG inode), or refuse and leave the AG unrepaired; never from fixed block numbers.",
+      "impact": "integrity",
+      "impact_why": "Read from the code: the rebuilt BNO/CNT leaves name blocks the AG still owns as free, and the allocator hands a free block to a new owner, so two owners end up holding one block.",
+      "reproducer": "chk_mxfs repair on an image whose AG has damaged BNO/CNT btrees and agi_count 0 (to be written as a test under tests/)",
+      "updated": "2026-10-22"
     }
   ]
 }

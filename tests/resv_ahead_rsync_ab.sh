@@ -65,12 +65,16 @@ for n in $A $B; do
         [ "$hv" = "hash_version=$HV" ] || { echo "RESULT: ABORT label=$LABEL -- $n's mount opened the ledger as '${hv:-unknown}', not hash_version=$HV (was the prep formatted for it?)"; exit 2; }
     fi
 done
+# harness-lint: ok - taken only to be compared with the newest directory after the bench
+ev0=$(ls -td tests/evidence/*_lone_rsync_bench_"$LABEL" 2>/dev/null | head -1)
 out=$(MXFS_NODE_LIST=$A,$B tests/lone_rsync_bench.sh "$LABEL" "$A" 1 2>&1)
 echo "$out"
 res=$(echo "$out" | grep -a '^RESULT' | tail -1)
 cnt=$(rs 15 "$A" "for k in resv_ahead_queued resv_ahead_granted resv_ahead_denied resv_ahead_err resv_ahead_consumed resv_ahead_capped; do echo \$k=\$(cat $P/\$k); done" | tr '\n' ' ')
 echo "COUNTERS $A: $cnt"
+# harness-lint: ok - refused below when it is the directory that was newest before the bench
 ev=$(ls -td tests/evidence/*_lone_rsync_bench_"$LABEL" 2>/dev/null | head -1)
+[ "$ev" != "$ev0" ] || { echo "STATS: the bench left no evidence directory for $LABEL; a previous run's is not read"; ev=""; }
 for n in $A $B; do
     [ -n "$ev" ] && zcat "$ev/kmsg_$n.gz" 2>/dev/null | grep -a 'P-TAUTH-STATS' | tail -1 | sed "s/^/STATS $n: /" | cut -c1-400
 done

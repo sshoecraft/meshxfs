@@ -4,6 +4,11 @@ ready, computed from the evidence each row names in data/release_table.json.
 
     tools/release_status.py              the table
     tools/release_status.py -v           with the reason behind every row that is not ready
+    tools/release_status.py --details    with the records blocking each configuration a default
+                                         install can run
+    tools/release_status.py --candidate 0.90.134 --gate   graded for one release candidate;
+                                         exit 1 unless every row is Ready and nothing on the
+                                         default install path is blocked
     watch -n 10 tools/release_status.py
 
 A row is one of:
@@ -45,6 +50,7 @@ REPO = Path(__file__).resolve().parent.parent
 #: the table names configurations verified by a rig of their own (2/net/mesh/drbd)
 os.environ.setdefault("MXFS_OWN_RIG", "1")
 sys.path.insert(0, str(REPO / "tools"))
+import configuration   # noqa: E402
 import criteria   # noqa: E402
 import defects    # noqa: E402
 
@@ -62,8 +68,9 @@ def release_build() -> tuple:
     return version, srcv
 
 
-def board_problem(board: dict, srcv: str, crit_cache: dict) -> tuple:
-    """(state, reason) for one board: state is ok | progress | bad."""
+def board_problem(board: dict, srcv: str, crit_cache: dict, candidate: str = "") -> tuple:
+    """(state, reason) for one board: state is ok | progress | bad. With a candidate, every row is
+    graded on that candidate's runs; without one, on the release build."""
     config = board["config"]
     path = REPO / board.get("crit", "data/criteria.json")
     if path not in crit_cache:
@@ -85,12 +92,12 @@ def board_problem(board: dict, srcv: str, crit_cache: dict) -> tuple:
         return "bad", f"{config}: the board has no rows for it"
     pending, failed, unrun = [], [], []
     for entry in rows:
-        mark = criteria.cell_status(entry, config, want)
+        mark = criteria.cell_status(entry, config, "" if candidate else want, candidate, path)
         if mark in criteria.GREEN:
             continue
         if mark == "PENDING":
             pending.append(entry["id"])
-        elif mark in ("STALE", "UNKNOWN"):
+        elif mark in ("STALE", "UNKNOWN", "NOT RUN"):
             unrun.append(entry["id"])
         else:
             failed.append(f"{entry['id']} {mark}")
@@ -141,6 +148,12 @@ def run_live(run: dict, version: str) -> str:
     return os.path.relpath(newest, REPO)
 
 
+#: Set by main for a candidate: the tag its evidence files are named by (the candidate id) and
+#: the module build its qualification measured on each kernel (its manifest's `kernels`).
+CANDIDATE_TAG = ""
+CANDIDATE_KERNELS: dict = {}
+
+
 def run_problem(run: dict, version: str, srcv: str) -> tuple:
     going = run_live(run, version)
     if going:
@@ -148,12 +161,12 @@ def run_problem(run: dict, version: str, srcv: str) -> tuple:
     globs = run["glob"] if isinstance(run["glob"], list) else [run["glob"]]
     files = []
     for g in globs:
-        files += glob.glob(str(REPO / g.replace("{version}", version)))
+        files += glob.glob(str(REPO / g.replace("{version}", CANDIDATE_TAG or version)))
     files = sorted(set(files), key=os.path.getmtime)
     if run.get("kernel"):
         #: a run on hosts that build against their own kernel: the release's build for that
         #: kernel, and only the runs whose every host ran it
-        want = release_builds(version).get(run["kernel"])
+        want = (CANDIDATE_KERNELS if CANDIDATE_TAG else release_builds(version)).get(run["kernel"])
         if not want:
             return "unrun", f"{run['what']}: no {version} build recorded for {run['kernel']}"
         def on_release(f):
@@ -193,7 +206,7 @@ def run_problem(run: dict, version: str, srcv: str) -> tuple:
 def platform_problem(platform: str, version: str, spec: dict, kernel: str = "") -> tuple:
     """A released platform's round in full_verify's log: the last result of each of its steps.
     With `kernel`, the steps tagged KERNEL=<another kernel> belong to another row."""
-    log = REPO / spec["log"].replace("{version}", version)
+    log = REPO / spec["log"].replace("{version}", CANDIDATE_TAG or version)
     if not log.is_file():
         return "bad", f"full_verify not run on {version}"
     last = {}
@@ -212,14 +225,14 @@ def platform_problem(platform: str, version: str, spec: dict, kernel: str = "") 
     return "ok", ""
 
 
-def defect_problem(configs: list, queue: list, platform: str = "") -> tuple:
+def defect_problem(configs: list, queue: list, platform: str = "", candidate: str = "") -> tuple:
     hits = []
     for config in configs:
         nodes, selector, platform = defects.parse_at(config + (f"@{platform}" if platform else ""))
         for entry in queue:
             if str(entry.get("impact", "")).lower() == "noblock":
                 continue
-            if defects.blocks(entry, nodes, selector, platform) and entry["id"] not in hits:
+            if defects.blocks(entry, nodes, selector, platform, candidate) and entry["id"] not in hits:
                 hits.append(entry["id"])
     if not hits:
         return "ok", ""
@@ -248,11 +261,66 @@ def reaching(rows: list, queue: list) -> dict:
 ORDER = ("progress", "bad", "fail", "unrun", "ok")
 
 
-def row_status(row: dict, version: str, srcv: str, queue: list, crit_cache: dict) -> tuple:
+def default_install_configs(spec_rows: list) -> list:
+    """Every configuration a default install can run, at the node counts releases are verified
+    at: data/release_policy.json `default_install` (the packages load the network lock manager on
+    any attachment) crossed with the node counts and attachments data/release_table.json names."""
+    pattern = criteria.policy().get("default_install", {}).get("pattern", "net/mesh/*")
+    found = []
+    for row in spec_rows:
+        for config in row.get("configs", []):
+            try:
+                parsed = configuration.parse(config)
+            except configuration.ConfigurationError:
+                continue
+            if configuration.matches(pattern, parsed) and config not in found:
+                found.append(config)
+    for config in json.loads((REPO / "data" / "configurations.json").read_text()).get(
+            "released_earlier", {}):
+        if config != "_" and config not in found:
+            found.append(config)
+    return found
+
+
+def guarded(config: str, version: str, srcv: str) -> tuple:
+    """(True, how) when data/guards.json names a guard for `config` whose test passed on this
+    release: the package refuses that configuration and says what to use instead."""
+    try:
+        guards = json.loads((REPO / "data" / "guards.json").read_text()).get("guards", {})
+    except (OSError, ValueError):
+        return False, "no data/guards.json"
+    guard = guards.get(config)
+    if not guard:
+        return False, "no guard"
+    state, reason = run_problem(guard["test"], version, srcv)
+    return state == "ok", (guard.get("what", "guard") if state == "ok" else reason)
+
+
+def default_path_problems(spec_rows: list, queue: list, version: str, srcv: str,
+                          candidate: str) -> list:
+    """Release-blocking records that reach a configuration a default install can run, with no
+    tested guard there. Each one blocks the whole release (the owner's decision, 2026-10-21):
+    leaving such a configuration out of the claims does not protect the people who install the
+    package with its defaults."""
+    problems = []
+    for config in default_install_configs(spec_rows):
+        nodes, selector, platform = defects.parse_at(config)
+        hits = [e["id"] for e in queue if str(e.get("impact", "")).lower() != "noblock"
+                and defects.blocks(e, nodes, selector, platform, candidate)]
+        if not hits:
+            continue
+        safe, how = guarded(config, version, srcv)
+        if not safe:
+            problems.append((config, hits, how))
+    return problems
+
+
+def row_status(row: dict, version: str, srcv: str, queue: list, crit_cache: dict,
+               candidate: str = "") -> tuple:
     found = []   # (state, reason)
-    found.append(defect_problem(row.get("configs", []), queue, row.get("platform", "")))
+    found.append(defect_problem(row.get("configs", []), queue, row.get("platform", ""), candidate))
     for board in row.get("boards", []):
-        found.append(board_problem(board, srcv, crit_cache))
+        found.append(board_problem(board, srcv, crit_cache, candidate))
     for run in row.get("runs", []):
         found.append(run_problem(run, version, srcv))
     found = [f for f in found if f[0] != "ok"]
@@ -279,10 +347,27 @@ def main() -> int:
     ap.add_argument("-v", "--verbose", action="store_true", help="every reason behind each row")
     ap.add_argument("--defects", action="store_true",
                     help="every record that reaches a released configuration, noblock included")
+    ap.add_argument("--candidate", default="",
+                    help="grade every row for this release candidate (data/candidates/<id>.json)")
+    ap.add_argument("--details", action="store_true",
+                    help="list the release-blocking records on each configuration a default "
+                         "install can run")
+    ap.add_argument("--gate", action="store_true",
+                    help="exit 1 unless every row is Ready and no release-blocking record reaches "
+                         "a configuration a default install can run")
     args = ap.parse_args()
 
     spec = json.loads(TABLE.read_text())
     version, srcv = release_build()
+    candidate = args.candidate
+    if candidate:
+        try:
+            manifest = json.loads((REPO / "data" / "candidates" / f"{candidate}.json").read_text())
+        except (OSError, ValueError) as exc:
+            sys.exit(f"release_status: no candidate {candidate}: {exc}")
+        version, srcv = manifest["version"], manifest["srcversion"]
+        global CANDIDATE_TAG, CANDIDATE_KERNELS
+        CANDIDATE_TAG, CANDIDATE_KERNELS = candidate, dict(manifest.get("kernels") or {})
     queue = defects.load()["defects"]
     crit_cache: dict = {}
     out, notes = [], []
@@ -323,16 +408,18 @@ def main() -> int:
     #: made only of those is not part of the release, and says so instead of reading Not ready
     left_out = {k for k in json.loads((REPO / "data" / "configurations.json").read_text())
                 .get("released_earlier", {}) if k != "_"}
+    failing = 0
     for row in rows:
         if row.get("configs") and set(row["configs"]) <= left_out:
             hits = [e["id"] for e in queue if str(e.get("impact", "")).lower() != "noblock"
-                    and any(defects.blocks(e, *defects.parse_at(c)) for c in row["configs"])]
+                    and any(defects.blocks(e, *defects.parse_at(c), candidate)
+                            for c in row["configs"])]
             out.append((row["nodes"], row["attachment"],
                         f"➖ Not in {version}: {len(hits)} open release-blocking defect(s)"))
             if args.verbose and hits:
                 notes.append(f"{row['nodes']} {row['attachment']}:\n  " + "\n  ".join(hits))
             continue
-        state, reasons = row_status(row, version, srcv, queue, crit_cache)
+        state, reasons = row_status(row, version, srcv, queue, crit_cache, candidate)
         if row.get("_platform_round"):
             s, r = platform_problem(row["platform"], version, rounds, row.get("_kernel", ""))
             if s == "bad":
@@ -345,18 +432,37 @@ def main() -> int:
             status = "✅ Ready"
         elif state == "progress":
             status = "⏳ In progress"
+            failing += 1
         else:
             status = "❌ Not ready: " + (reasons[0] if reasons else "unknown")
             if len(status) > 70:
                 status = status[:67] + "..."
+            failing += 1
         out.append((row["nodes"], row["attachment"], status))
         if args.verbose and reasons:
             notes.append(f"{row['nodes']} {row['attachment']}:\n  " + "\n  ".join(reasons))
-    print(f"MeshXFS {version}  (release build {srcv or 'no mxfs.ko in the tree'})")
+    graded = f"candidate {candidate}, " if candidate else ""
+    print(f"MeshXFS {version}  ({graded}release build {srcv or 'no mxfs.ko in the tree'})")
     print(table(out))
     if notes:
         print()
         print("\n".join(notes))
+    #: THE DEFAULT INSTALL PATH. A configuration left out of the claims is still run by everyone
+    #: who installs the package with its defaults, so a release-blocking record that reaches it
+    #: holds the whole release, unless a tested guard refuses that configuration.
+    # The gate counts it either way; the list is shown only when asked for.
+    blocked = default_path_problems(list(spec["rows"]), queue, version, srcv, candidate)
+    if blocked and args.details:
+        print()
+        print("Default install path blocked (holds the whole release):")
+        for config, hits, how in blocked:
+            print(f"  {config}: {', '.join(hits)} ({how})")
+    if args.gate:
+        if failing or blocked:
+            print(f"GATE: {failing} row(s) not Ready, {len(blocked)} default-install "
+                  f"configuration(s) blocked")
+            return 1
+        print("GATE: every row Ready, and nothing blocks a default install")
     return 0
 
 

@@ -19,6 +19,10 @@ R="$RANK"; T="$NODES"
 D="$MNT/.dlm_membership"
 mkdir -p "$D" 2>/dev/null
 
+# A quiescence that cannot be applied measures nothing: every node checks for
+# iptables before the barrier, so all of them stop together, as INFRA.
+command -v iptables >/dev/null 2>&1 || { finish_state INFRA "iptables missing on rank $R: the quiescence cannot be applied"; exit 0; }
+
 ck "mem barrier ready" coord_barrier "mem_ready"
 
 # (a) membership completeness.
@@ -47,18 +51,17 @@ if [ "$R" = 1 ]; then
     coord_signal "mem_window_done"
 elif [ "$R" = "$T" ]; then
     # Highest rank quiesces: briefly drop DLM TCP traffic (well under the
-    # 62s lease), then restore = graceful leave+rejoin.
-    have_ipt=0; command -v iptables >/dev/null 2>&1 && have_ipt=1
-    if [ "$have_ipt" = 1 ]; then
-        iptables -I INPUT  -p tcp --dport 7600 -j DROP 2>/dev/null
-        iptables -I OUTPUT -p tcp --dport 7600 -j DROP 2>/dev/null
-    fi
+    # 62s lease), then restore = graceful leave+rejoin.  The rules are checked
+    # in effect: a node without iptables used to skip the quiescence silently,
+    # and the row passed without one.
+    iptables -I INPUT  -p tcp --dport 7600 -j DROP 2>/dev/null
+    iptables -I OUTPUT -p tcp --dport 7600 -j DROP 2>/dev/null
+    ck "mem quiescence applied (DROP rules present)" bash -c \
+        "iptables -C INPUT -p tcp --dport 7600 -j DROP && iptables -C OUTPUT -p tcp --dport 7600 -j DROP"
     coord_signal "mem_quiesced"
     sleep 2
-    if [ "$have_ipt" = 1 ]; then
-        iptables -D INPUT  -p tcp --dport 7600 -j DROP 2>/dev/null
-        iptables -D OUTPUT -p tcp --dport 7600 -j DROP 2>/dev/null
-    fi
+    iptables -D INPUT  -p tcp --dport 7600 -j DROP 2>/dev/null
+    iptables -D OUTPUT -p tcp --dport 7600 -j DROP 2>/dev/null
     # Rejoin: must see ALL of rank1's window writes (coherent, no stale cache).
     coord_wait "mem_window_done" 60
     cnt=$(ls "$D"/aw_* 2>/dev/null | wc -l | tr -d ' ')

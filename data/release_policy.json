@@ -1,0 +1,69 @@
+{
+  "about": "The release gate's numbers. Read by tools/criteria.py (stall limit, required runs), tools/defects.py (verification batch sizes) and tools/release_status.py (default-install reach). Every value here is the owner's decision: a change needs the owner's approval, recorded below with the date and the owner's words, and a CHANGELOG.md line. A session never edits this file on its own judgement. docs/release-process.md explains each number; docs/rulings/release-verification-rework.md has the questions as they were asked.",
+  "delta": 0.005,
+  "alpha": 0.005,
+  "stall_limit_s": 30,
+  "qualification_budget_h": 12,
+  "required_runs": {
+    "default": 1
+  },
+  "repeat_rows": [
+    "crash_audit",
+    "path_*",
+    "fence_during_write",
+    "fault_netpartition",
+    "dir_reuse_coherency",
+    "alloc_witness",
+    "chk_clean",
+    "sustained_load",
+    "soak"
+  ],
+  "default_install": {
+    "pattern": "net/mesh/*",
+    "why": "the packages load the module with force_transport=1, the TCP lock manager, on any attachment and at any node count; a release-blocking defect reaching any net/mesh configuration therefore reaches a default install"
+  },
+  "owner_approved": [
+    {
+      "date": "2026-10-21",
+      "fields": ["delta", "alpha"],
+      "question": "How strict should the run counts be when a release-blocking defect is verified as fixed?",
+      "answer": "99% overall (Recommended)"
+    },
+    {
+      "date": "2026-10-21",
+      "fields": ["default_install"],
+      "question": "When an open integrity or stability defect reaches a configuration a default install can run (the packages default to the TCP lock manager), what should a release do?",
+      "answer": "Block unless guarded (Recommended)"
+    },
+    {
+      "date": "2026-10-21",
+      "fields": ["stall_limit_s"],
+      "question": "How long may a file operation stall before the stall counts as a stability defect (blocks a release) instead of a performance one?",
+      "answer": "30 s (Recommended)"
+    },
+    {
+      "date": "2026-10-21",
+      "fields": ["qualification_budget_h"],
+      "question": "How much rig time may one release qualification use? It sets how many repeat runs of high-risk rows and how long a soak each release gets.",
+      "answer": "About 12 hours (Recommended)"
+    },
+    {
+      "date": "2026-10-21",
+      "fields": ["required_runs", "repeat_rows", "soak"],
+      "question": "(the plan the owner approved on 2026-10-21: one full coverage pass; repeats of the default-path fault and recovery rows crash_audit, path_*, fence_during_write, fault_netpartition, dir_reuse_coherency, alloc_witness and chk_clean, fitted by tools/release_plan.py inside the qualification budget; a frozen-candidate soak of sustained_load plus soak, ending before sealing. The soak length and its two configurations are the implementation's first values within that budget, to be revised with the owner after the first measured qualification)",
+      "answer": "plan approved"
+    },
+    {
+      "date": "2026-10-21",
+      "fields": ["soak", "repeat_rows"],
+      "question": "(the soak block sized the soak in seconds, 3600, and the soak row's budget followed it as SOAK_SECONDS+30; the dry run of 0.90.133-2 graded a 31 s soak PASS against 3630 s)",
+      "answer": "ANY test that takes 3600 seconds is a fail, even if it is a buffer. No test should take 3600 seconds; never use 3600 seconds as a number thrown out there. Benchmark how long a test takes and use that as the baseline, not made-up numbers: you must use actual benchmarks as baselines. (The soak is now a fixed workload with a budget of 2x its measured native-XFS time, and soak and sustained_load repeat in every repeat round.)"
+    },
+    {
+      "date": "2026-10-22",
+      "fields": ["incident gate: a dry run's seal"],
+      "question": "(a dry-run candidate is never published, so its seal refuses by construction; that refusal was recorded as a FAIL and became an incident blocking every later release until a reviewed finding settled it)",
+      "answer": "Log a dry run's seal as an expected refusal, or whatever is needed to get past it. (tools/release_run.py records a dry run's refused seal as CONTROL; the two seals recorded before, 0.90.133-2's and 0.90.134's of 2026-10-22T02:03:23Z, carry a dry_run_seal annotation, which settles them. Every other step of a dry run is still graded as usual.)"
+    }
+  ]
+}

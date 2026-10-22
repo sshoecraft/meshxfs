@@ -130,7 +130,11 @@ board() {
         ./run.sh "$cfg" $g $rows
         rrc=$?
         echo "=== rc=$rrc run.sh $cfg $g $rows ($(date -u +%FT%TZ)) ==="
-        python3 tools/criteria.py "$cfg"
+        # graded for the release candidate when the chain runs for one
+        # (tools/release_run.py exports it), else on the build just run; a
+        # run.sh that did not run is caught by its rc below, before the verdict
+        # harness-lint: ok - rrc is checked first, and graded for a candidate a board this run did not record reads NOT RUN
+        python3 tools/criteria.py "$cfg" ${MXFS_CANDIDATE:+--candidate "$MXFS_CANDIDATE"}
     } > "$L" 2>&1
     grep -E '^(Total:|VERDICT:)' "$L" | tail -2 | sed "s|^|$(date -u +%FT%TZ) $cfg: |"
     # The read-back is the STANDING board, so a run.sh that refused to start

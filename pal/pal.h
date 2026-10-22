@@ -1605,17 +1605,35 @@ int mxfs_pal_drbd_exclusion_watch(mxfs_bdev_t *dev, void (*fn)(void *data),
 /* Mark a handle as having attached the emulator, so its close detaches it. */
 void mxfs_pal_bdev_set_drbd_cas(mxfs_bdev_t *dev, bool on);
 /* The emulated swap itself, for mxfs_pal_bdev_compare_and_write on a device
- * with no SCSI underneath: -EOPNOTSUPP when nothing is attached to it. */
+ * with no SCSI underneath: compare the `len` bytes at `offset` and on a match
+ * write `len` bytes there.  `len` is the device's logical block, the unit the
+ * emulation works in (docs/4kn-support.md): the 512-byte sector, or on a
+ * device of larger blocks the block a record has already been moved into over
+ * a zero tail.  -EINVAL for any other length or an offset off a block,
+ * -EOPNOTSUPP when nothing is attached to it. */
 int mxfs_pal_drbd_cas_emulate(mxfs_bdev_t *dev, uint64_t offset,
-                              const void *compare_buf, const void *write_buf);
-/* n emulated swaps queued together (mxfs_pal_bdev_compare_and_write_many). */
+                              const void *compare_buf, const void *write_buf,
+                              uint32_t len);
+/* n emulated swaps of 512-byte sectors queued together
+ * (mxfs_pal_bdev_compare_and_write_many); -EINVAL on a device of larger blocks,
+ * whose records the caller swaps one block at a time. */
 int mxfs_pal_drbd_cas_emulate_many(mxfs_bdev_t *dev, int n, const uint64_t *offsets,
                                    const void *const *compare_bufs,
                                    const void *const *write_bufs, int *rcs);
-/* The emulated span swap (mxfs_pal_bdev_compare_and_write_span). */
+/* The emulated span swap (mxfs_pal_bdev_compare_and_write_span): the first
+ * logical block compared, write_len bytes of whole blocks written. */
 int mxfs_pal_drbd_cas_emulate_span(mxfs_bdev_t *dev, uint64_t offset,
                                    const void *compare_buf, const void *write_buf,
                                    uint32_t write_len);
+/*
+ * Where the 512-byte record unit at `off` on this handle lives on the device,
+ * as an absolute byte offset: in a record region of a device of larger blocks
+ * (mxfs_pal_bdev_set_record_regions), the first byte of the unit's own block;
+ * anywhere else, the handle's base + off.  1 = a record region holds it,
+ * 0 = none does, -EINVAL = it crosses a region's edge or is part of a unit.
+ * The emulation places its own three units with it.
+ */
+int mxfs_pal_bdev_rec_unit_abs(mxfs_bdev_t *dev, uint64_t off, uint64_t *abs);
 
 /* ─── SCSI COMPARE AND WRITE ───
  *
@@ -1639,6 +1657,23 @@ int mxfs_pal_bdev_compare_and_write(mxfs_bdev_t *dev, uint64_t offset,
                                      const void *write_buf);
 
 /*
+ * A device whose logical block is larger than 512 bytes (docs/4kn-support.md):
+ * record the block size, and the volume's record regions -- each `units[i]`
+ * bytes of 512-byte units from `start[i]`, a byte offset on the device
+ * whatever the handle's base (a clone keeps them, and matches its accesses at
+ * base + offset), addressed by every caller as on a 512-byte device.  Each
+ * start must fall on a block.  From then on the PAL puts each unit in a block of its own
+ * (mxfs_rec_phys), its tail zero: a read returns the unit, a write writes the
+ * unit over a zero tail, a COMPARE AND WRITE compares and writes the unit with
+ * a zero tail.  Outside them, a transfer must cover whole blocks; a read that
+ * does not is widened, a write that does not is refused.  lbs 512 leaves the
+ * device as it was.  -EINVAL if lbs is not the device's own block size.
+ */
+#define MXFS_PAL_MAX_REC_REGIONS 8
+int mxfs_pal_bdev_set_record_regions(mxfs_bdev_t *dev, uint32_t lbs, int n,
+                                     const uint64_t *start, const uint64_t *units);
+
+/*
  * n independent COMPARE AND WRITEs, each with the contract above and its own
  * result in rcs[i]; nothing is ordered between them but queue order.  On a
  * DRBD attachment they are queued together and served under as few
@@ -1659,7 +1694,8 @@ int mxfs_pal_bdev_compare_and_write_many(mxfs_bdev_t *dev, int n,
  * sector, with FUA, atomically with respect to every other swap on the
  * device.  Where every swap is emulated (the DRBD attachment: a whole page
  * inside one acquisition of the pair's lock; the usermode file) the compare
- * is that first sector.  A SCSI COMPARE AND WRITE compares exactly what it
+ * is that first sector, or on a device of larger blocks that first block, and
+ * write_len must then be whole blocks.  A SCSI COMPARE AND WRITE compares exactly what it
  * writes, so on a SCSI target compare_buf must hold write_len bytes, the
  * whole range as the caller read it; a target whose Block Limits page does
  * not allow that many blocks, or the caw_span knob at 0, answers -EOPNOTSUPP
@@ -1680,6 +1716,22 @@ int mxfs_pal_bdev_compare_and_write_span(mxfs_bdev_t *dev, uint64_t offset,
  * effect without a remount.
  */
 bool mxfs_pal_bdev_span_swap_ok(mxfs_bdev_t *dev, uint32_t len);
+
+/*
+ * One logical block of the device, compared and written whole with FUA: the
+ * merged inode-cluster write (docs/4kn-support.md), whose block holds slots of
+ * other nodes' inodes as well as this node's.  `offset` must start a block and
+ * lie outside every record region; compare_buf and write_buf each hold one
+ * block.  Unlike the span swap it does not depend on the ledger's caw_span
+ * knob, and unlike the sector swap it compares the whole block, tail included.
+ * Results as mxfs_pal_bdev_compare_and_write: 0 written, -EAGAIN MISCOMPARE
+ * (nothing written), -EBADE reservation conflict, -EOPNOTSUPP nothing issued
+ * (no COMPARE AND WRITE on this device), -EIO any other outcome (the block may
+ * or may not have been written).  On a 512-byte device it is the sector swap.
+ */
+int mxfs_pal_bdev_compare_and_write_block(mxfs_bdev_t *dev, uint64_t offset,
+                                          const void *compare_buf,
+                                          const void *write_buf);
 
 /*
  * Drop the cached backing-path (scsi_device) references held for stacked

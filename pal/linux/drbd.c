@@ -79,6 +79,9 @@ int mxfs_pal_bio_write_fua_sectors_bdev(struct block_device *bdev, int n,
 int mxfs_pal_bio_write_fua_spans_bdev(struct block_device *bdev, int n,
 				      const uint64_t *lbas, void *const *bufs,
 				      const uint32_t *lens, int *rcs);
+int mxfs_pal_bio_read_spans_bdev(struct block_device *bdev, int n,
+				 const uint64_t *lbas, void *const *bufs,
+				 const uint32_t *lens, int *rcs);
 
 #define MXFS_DRBDW_PROC_NAME	"fs/mxfs/drbd_report"
 #define MXFS_DRBDW_PROC_PATH	"/proc/" MXFS_DRBDW_PROC_NAME
@@ -507,6 +510,15 @@ struct mxfs_drbd_cas {
 	dev_t			devt;
 	struct block_device	*bdev;
 	u64			area_lba;	/* absolute LBA of the enrollment sector */
+	/*
+	 * THE UNIT OF EVERY SWAP: the device's logical block (docs/4kn-support.md).
+	 * 512, or on a device of larger blocks (DRBD takes the largest of its
+	 * backing disks') the block: a swap compares one block and writes whole
+	 * blocks, and each of the area's three units is the first 512 bytes of a
+	 * block of its own, its tail zero (mxfs_cas_attach places them).  LBAs
+	 * and the registers' ranges stay in 512-byte sectors.
+	 */
+	u32			lbs;
 	unsigned int		index;
 	u8			fs_uuid[16];
 	char			endpoint[MXFS_DRBD_EP_LEN];
@@ -606,12 +618,12 @@ struct mxfs_drbd_cas {
 	u8			boot[16];
 	/*
 	 * The critical section's buffers, under `lock`, kmalloc'd at attach (a
-	 * bio cannot be built on a caller's stack image): one read sector per
-	 * swap of a batch (crit_buf), one write buffer per swap of a wave, long
+	 * bio cannot be built on a caller's stack image): one read block per
+	 * swap of a batch (crit_rbuf), one write buffer per swap of a wave, long
 	 * enough for a span swap's whole range (crit_wbuf), and the vectors
 	 * handed to the PAL for a wave (mxfs_drbd_cas_serve).
 	 */
-	u8			*crit_buf;
+	void			*crit_rbuf[MXFS_DRBD_CAS_BATCH];
 	void			*crit_wbuf[MXFS_DRBD_CAS_BATCH];
 	u64			crit_lba[MXFS_DRBD_CAS_BATCH];
 	void			*crit_ptr[MXFS_DRBD_CAS_BATCH];
@@ -636,8 +648,8 @@ struct mxfs_drbd_cas {
 	u64			partial, regroups;
 };
 #define MXFS_DRBD_STATS_EVERY	512
-#define MXFS_DRBD_CRIT_BUF_BYTES	(MXFS_DRBD_CAS_BATCH * 512)
-/* the longest write a span swap makes: one ledger page (crit_wbuf's length) */
+/* the longest write a span swap makes: one ledger page (crit_wbuf's length),
+ * and so the largest block the emulation takes */
 #define MXFS_DRBD_SPAN_MAX	4096
 
 static LIST_HEAD(mxfs_drbd_cas_list);
@@ -706,14 +718,43 @@ static struct mxfs_drbd_cas *mxfs_drbd_cas_find(dev_t devt)
 	return NULL;
 }
 
-static int mxfs_drbd_sec_read(struct mxfs_drbd_cas *e, u64 lba, void *buf)
+/*
+ * The area's units: 0 the enrollment, 1 + i participant i's register, each in
+ * a block of its own on a device of larger blocks (struct mxfs_drbd_cas,
+ * lbs).  A read returns the unit's 512 bytes: the PAL widens a read of part
+ * of a block, as for every reader.  A write writes them over a zero tail,
+ * since the device takes whole blocks only; with FUA for the enrollment and
+ * a fenced peer's cleared register, without for this node's own register
+ * (mxfs_drbd_reg_put says why).
+ */
+static u64 mxfs_drbd_unit_lba(const struct mxfs_drbd_cas *e, unsigned int u)
 {
-	return mxfs_pal_bdev_read_plain_bdev(e->bdev, lba, buf, 512);
+	return e->area_lba + (u64)u * (e->lbs / 512);
 }
 
-static int mxfs_drbd_sec_write(struct mxfs_drbd_cas *e, u64 lba, const void *buf)
+static int mxfs_drbd_unit_read(struct mxfs_drbd_cas *e, unsigned int u, void *buf)
 {
-	return mxfs_pal_bio_write_fua_bdev(e->bdev, lba, buf, 512);
+	return mxfs_pal_bdev_read_plain_bdev(e->bdev, mxfs_drbd_unit_lba(e, u), buf, 512);
+}
+
+static int mxfs_drbd_unit_write(struct mxfs_drbd_cas *e, unsigned int u,
+				const void *buf, bool fua)
+{
+	u64 lba = mxfs_drbd_unit_lba(e, u);
+	u8 *blk;
+	int rc;
+
+	if (e->lbs == 512)
+		return fua ? mxfs_pal_bio_write_fua_bdev(e->bdev, lba, buf, 512) :
+			     mxfs_pal_bio_write_sync_bdev(e->bdev, lba, buf, 512);
+	blk = kzalloc(e->lbs, GFP_NOIO);
+	if (!blk)
+		return -ENOMEM;
+	memcpy(blk, buf, 512);
+	rc = fua ? mxfs_pal_bio_write_fua_bdev(e->bdev, lba, blk, e->lbs) :
+		   mxfs_pal_bio_write_sync_bdev(e->bdev, lba, blk, e->lbs);
+	kfree(blk);
+	return rc;
 }
 
 static bool mxfs_drbd_all_zero(const void *sec)
@@ -769,7 +810,7 @@ static int mxfs_drbd_reg_put(struct mxfs_drbd_cas *e, struct mxfs_drbd_reg *r,
 	 * Measured: a departure's ~6,600 serial swaps at 10-15 ms each held two
 	 * unmounts for 98 s.  The target's own write keeps FUA.
 	 */
-	return mxfs_pal_bio_write_sync_bdev(e->bdev, e->area_lba + 1 + e->index, r, 512);
+	return mxfs_drbd_unit_write(e, 1 + e->index, r, false);
 }
 
 /*
@@ -787,7 +828,7 @@ static int mxfs_drbd_reg_get_peer(struct mxfs_drbd_cas *e, struct mxfs_drbd_reg 
 				  u32 *want, u64 *raised)
 {
 	unsigned int peer = 1 - e->index;
-	int rc = mxfs_drbd_sec_read(e, e->area_lba + 1 + peer, r);
+	int rc = mxfs_drbd_unit_read(e, 1 + peer, r);
 	u16 ver, i;
 
 	e->peer_n = 0;          /* every sector, unless a valid register says less */
@@ -949,7 +990,7 @@ static int mxfs_drbd_peer_excluded_locked(struct mxfs_drbd_cas *e,
 		return 0;
 	}
 	e->membership_gen++;
-	rc = mxfs_drbd_sec_write(e, e->area_lba + 1 + (1 - e->index), zero);
+	rc = mxfs_drbd_unit_write(e, 1 + (1 - e->index), zero, true);
 	if (!rc)
 		rc = mxfs_drbd_reg_put(e, reg, mywant, myraised);
 	pr_warn("mxfs: P-DRBD-CAS-PEER-EXCLUDED minor=%u index=%u peer=%s episode=%s membership_gen=%llu rc=%d -- the peer is excluded (kind-25 evidence); its register is cleared\n",
@@ -1601,12 +1642,12 @@ static void mxfs_drbd_cas_serve(struct mxfs_drbd_cas *e)
 	spanw = READ_ONCE(mxfs_drbd_span_waves);
 	for (i = 0; i < n; i = j) {
 		/* the wave: swaps i..j-1, up to the first whose range overlaps one
-		 * already in it (for one-sector swaps: whose sector repeats).  A
-		 * span swap writes sectors past the one it compares; without
+		 * already in it (for one-block swaps: whose block repeats).  A
+		 * span swap writes blocks past the one it compares; without
 		 * drbd_span_waves it is served in a wave of its own, so no other
-		 * swap of the wave can target a sector it writes, in either order */
+		 * swap of the wave can target a block it writes, in either order */
 		for (j = i + 1; j < n; j++) {
-			if (!spanw && (batch[i]->wlen > 512 || batch[j]->wlen > 512))
+			if (!spanw && (batch[i]->wlen > e->lbs || batch[j]->wlen > e->lbs))
 				break;
 			for (k = i; k < j; k++)
 				if (batch[k]->lba < batch[j]->lba + batch[j]->wlen / 512 &&
@@ -1618,17 +1659,18 @@ static void mxfs_drbd_cas_serve(struct mxfs_drbd_cas *e)
 		e->st_waves++;
 		for (k = i; k < j; k++) {
 			e->crit_lba[k - i] = batch[k]->lba;
-			e->crit_ptr[k - i] = e->crit_buf + (k - i) * 512;
+			e->crit_ptr[k - i] = e->crit_rbuf[k - i];
+			e->crit_len[k - i] = e->lbs;
 		}
-		vrc = mxfs_pal_bio_read_sectors_bdev(e->bdev, j - i, e->crit_lba,
-						     e->crit_ptr, e->crit_rc);
+		vrc = mxfs_pal_bio_read_spans_bdev(e->bdev, j - i, e->crit_lba,
+						   e->crit_ptr, e->crit_len, e->crit_rc);
 		nw = 0;
 		for (k = i; k < j; k++) {
 			r = batch[k];
 			r->rc = vrc ? vrc : e->crit_rc[k - i];
 			if (r->rc)
 				continue;
-			if (memcmp(e->crit_buf + (k - i) * 512, r->compare_buf, 512)) {
+			if (memcmp(e->crit_rbuf[k - i], r->compare_buf, e->lbs)) {
 				e->miscompares++;
 				r->rc = -EAGAIN;
 				continue;
@@ -1721,16 +1763,22 @@ static int mxfs_drbd_cas_run(struct mxfs_drbd_cas *e, u64 lba,
 	return req.rc;
 }
 
-/* The absolute LBA a swap at `offset` on `dev` targets, or a negative errno. */
+/* Does [lba, lba + nsec) reach the lock's own three units? */
+static bool mxfs_drbd_in_area(const struct mxfs_drbd_cas *e, u64 lba, u32 nsec)
+{
+	return lba < mxfs_drbd_unit_lba(e, 3) && lba + nsec > e->area_lba;
+}
+
+/* The absolute LBA a swap at `offset` on `dev` targets, or a negative errno:
+ * it starts a block, and its first block is never one of the lock's own. */
 static int mxfs_drbd_cas_target(struct mxfs_drbd_cas *e, mxfs_bdev_t *dev,
 				uint64_t offset, u64 *lba)
 {
 	u64 abs = offset + mxfs_pal_bdev_get_base_offset(dev);
 
-	if (abs & 511)
+	if (abs % e->lbs)
 		return -EINVAL;
-	/* The lock's own sectors are never a swap target. */
-	if (abs / 512 >= e->area_lba && abs / 512 < e->area_lba + 3)
+	if (mxfs_drbd_in_area(e, abs / 512, e->lbs / 512))
 		return -EINVAL;
 	*lba = abs / 512;
 	return 0;
@@ -1749,31 +1797,44 @@ static struct mxfs_drbd_cas *mxfs_drbd_cas_of(mxfs_bdev_t *dev)
 	return e;
 }
 
-/* Called by mxfs_pal_bdev_compare_and_write for a device with no SCSI underneath. */
+/*
+ * Called by mxfs_pal_bdev_compare_and_write for a device with no SCSI
+ * underneath, and by mxfs_pal_bdev_compare_and_write_block: one block, `len`
+ * bytes, which must be the device's own block.  A caller offering a 512-byte
+ * record on a device of larger blocks has not moved it into its block, and
+ * comparing a block against it would read past its buffer.
+ */
 int mxfs_pal_drbd_cas_emulate(mxfs_bdev_t *dev, uint64_t offset,
-			      const void *compare_buf, const void *write_buf)
+			      const void *compare_buf, const void *write_buf,
+			      uint32_t len)
 {
 	struct mxfs_drbd_cas *e;
 	u64 lba;
 	int rc;
 
-	if (!mxfs_pal_bdev_get_bdev(dev))
+	if (!mxfs_pal_bdev_get_bdev(dev) || !compare_buf || !write_buf)
 		return -EINVAL;
 	e = mxfs_drbd_cas_of(dev);
 	if (!e)
 		return -EOPNOTSUPP;
+	if (len != e->lbs) {
+		pr_warn_ratelimited("mxfs: P-DRBD-CAS-UNIT-REFUSED minor=%u len=%u lbs=%u caller=%pS -- the emulation compares and writes whole blocks of this device\n",
+				    MINOR(e->devt), len, e->lbs, (void *)_RET_IP_);
+		return -EINVAL;
+	}
 	rc = mxfs_drbd_cas_target(e, dev, offset, &lba);
 	if (rc)
 		return rc;
-	return mxfs_drbd_cas_run(e, lba, compare_buf, write_buf, 512);
+	return mxfs_drbd_cas_run(e, lba, compare_buf, write_buf, len);
 }
 
 /*
  * Called by mxfs_pal_bdev_compare_and_write_span for a device with no SCSI
- * underneath: compare the sector at `offset`, and on a match write `write_len`
- * bytes from it, all inside one acquisition of the pair's lock.  Every write to
- * the range that is not a swap's is the caller's to exclude (the ledger's page
- * copies are written only by swaps on such a device).
+ * underneath: compare the block at `offset` (a sector, or the device's larger
+ * block), and on a match write `write_len` bytes of whole blocks from it, all
+ * inside one acquisition of the pair's lock.  Every write to the range that is
+ * not a swap's is the caller's to exclude (the ledger's page copies are written
+ * only by swaps on such a device).
  */
 int mxfs_pal_drbd_cas_emulate_span(mxfs_bdev_t *dev, uint64_t offset,
 				   const void *compare_buf, const void *write_buf,
@@ -1784,16 +1845,18 @@ int mxfs_pal_drbd_cas_emulate_span(mxfs_bdev_t *dev, uint64_t offset,
 	int rc;
 
 	if (!mxfs_pal_bdev_get_bdev(dev) || !compare_buf || !write_buf ||
-	    write_len < 512 || write_len > MXFS_DRBD_SPAN_MAX || (write_len & 511))
+	    write_len > MXFS_DRBD_SPAN_MAX)
 		return -EINVAL;
 	e = mxfs_drbd_cas_of(dev);
 	if (!e)
 		return -EOPNOTSUPP;
+	if (write_len < e->lbs || write_len % e->lbs)
+		return -EINVAL;
 	rc = mxfs_drbd_cas_target(e, dev, offset, &lba);
 	if (rc)
 		return rc;
-	/* nor may the range reach the lock's own sectors */
-	if (lba < e->area_lba + 3 && lba + write_len / 512 > e->area_lba)
+	/* nor may the range reach the lock's own units */
+	if (mxfs_drbd_in_area(e, lba, write_len / 512))
 		return -EINVAL;
 	return mxfs_drbd_cas_run(e, lba, compare_buf, write_buf, write_len);
 }
@@ -1821,6 +1884,10 @@ int mxfs_pal_drbd_cas_emulate_many(mxfs_bdev_t *dev, int n, const uint64_t *offs
 	e = mxfs_drbd_cas_of(dev);
 	if (!e)
 		return -EOPNOTSUPP;
+	/* sector images: a device of larger blocks has its records moved into
+	 * their blocks and swapped one at a time (mxfs_pal_drbd_cas_emulate) */
+	if (e->lbs != 512)
+		return -EINVAL;
 	reqs = kcalloc(n, sizeof(*reqs), GFP_KERNEL);
 	if (!reqs)
 		return -ENOMEM;
@@ -1867,13 +1934,13 @@ static int mxfs_drbd_cas_bufs_alloc(struct mxfs_drbd_cas *e)
 {
 	int i;
 
-	e->crit_buf = kmalloc(MXFS_DRBD_CRIT_BUF_BYTES, GFP_KERNEL);
 	e->rel_reg = kmalloc(512, GFP_KERNEL);
-	if (!e->crit_buf || !e->rel_reg)
+	if (!e->rel_reg)
 		return -ENOMEM;
 	for (i = 0; i < MXFS_DRBD_CAS_BATCH; i++) {
+		e->crit_rbuf[i] = kmalloc(e->lbs, GFP_KERNEL);
 		e->crit_wbuf[i] = kmalloc(MXFS_DRBD_SPAN_MAX, GFP_KERNEL);
-		if (!e->crit_wbuf[i])
+		if (!e->crit_rbuf[i] || !e->crit_wbuf[i])
 			return -ENOMEM;
 	}
 	return 0;
@@ -1885,9 +1952,10 @@ static void mxfs_drbd_cas_free(struct mxfs_drbd_cas *e)
 
 	if (!e)
 		return;
-	for (i = 0; i < MXFS_DRBD_CAS_BATCH; i++)
+	for (i = 0; i < MXFS_DRBD_CAS_BATCH; i++) {
+		kfree(e->crit_rbuf[i]);
 		kfree(e->crit_wbuf[i]);
-	kfree(e->crit_buf);
+	}
 	kfree(e->rel_reg);
 	kfree(e);
 }
@@ -1916,11 +1984,11 @@ static int mxfs_drbd_enroll(struct mxfs_drbd_cas *e)
 	strscpy(want->endpoint[1 - e->index], e->peer_endpoint, MXFS_DRBD_EP_LEN);
 	want->crc = cpu_to_le32(mxfs_drbd_crc(want));
 
-	rc = mxfs_drbd_sec_read(e, e->area_lba, got);
+	rc = mxfs_drbd_unit_read(e, 0, got);
 	if (!rc && mxfs_drbd_all_zero(got)) {
-		rc = mxfs_drbd_sec_write(e, e->area_lba, want);
+		rc = mxfs_drbd_unit_write(e, 0, want, true);
 		if (!rc)
-			rc = mxfs_drbd_sec_read(e, e->area_lba, got);
+			rc = mxfs_drbd_unit_read(e, 0, got);
 	}
 	if (!rc && memcmp(want, got, 512)) {
 		pr_err("mxfs: P-DRBD-CAS-ENROLL-MISMATCH minor=%u this node: index=%u endpoints=[%s,%s]; on disk: magic=0x%x endpoints=[%.48s,%.48s] -- refusing: the pair disagrees about who is participant 0\n",
@@ -1930,6 +1998,44 @@ static int mxfs_drbd_enroll(struct mxfs_drbd_cas *e)
 	}
 	kfree(want);
 	return rc;
+}
+
+/*
+ * Where the lock's three units are (struct mxfs_drbd_cas, lbs): on a 512-byte
+ * device the three sectors from `region_off`.  On a device of larger blocks
+ * each unit is the first 512 bytes of a block of its own in the volume's
+ * bootstrap record region, so the handle must carry the record regions
+ * (mxfs_pal_bdev_set_record_regions), and the three blocks follow each other
+ * as the region's units do.
+ */
+static int mxfs_cas_area(mxfs_bdev_t *dev, struct block_device *bdev,
+			 uint64_t region_off, u64 *area_lba, u32 *lbs)
+{
+	u64 a[3];
+	int u, rc;
+
+	*lbs = bdev_logical_block_size(bdev);
+	if (*lbs <= 512) {
+		*lbs = 512;
+		*area_lba = (region_off + mxfs_pal_bdev_get_base_offset(dev)) / 512;
+		return 0;
+	}
+	if (*lbs > MXFS_DRBD_SPAN_MAX) {
+		pr_err("mxfs: P-DRBD-CAS-LBS-REFUSED dev=%u:%u lbs=%u -- the emulation takes blocks of at most %u bytes\n",
+		       MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev), *lbs, MXFS_DRBD_SPAN_MAX);
+		return -EINVAL;
+	}
+	for (u = 0; u < 3; u++) {
+		rc = mxfs_pal_bdev_rec_unit_abs(dev, region_off + (u64)u * 512, &a[u]);
+		if (rc != 1 || a[u] % *lbs || a[u] != a[0] + (u64)u * *lbs) {
+			pr_err("mxfs: P-DRBD-CAS-AREA-REFUSED dev=%u:%u lbs=%u unit=%d rc=%d abs=%llu -- on a device of larger blocks each of the lock's units must be a record unit in a block of its own, the three in a row\n",
+			       MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev), *lbs, u, rc,
+			       (unsigned long long)a[u]);
+			return -EINVAL;
+		}
+	}
+	*area_lba = a[0] / 512;
+	return 0;
 }
 
 /*
@@ -1945,7 +2051,8 @@ static int mxfs_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
 	struct block_device *bdev = mxfs_pal_bdev_get_bdev(dev);
 	struct mxfs_drbd_cas *e, *have;
 	struct mxfs_drbd_reg *r;
-	u64 abs = region_off + mxfs_pal_bdev_get_base_offset(dev);
+	u64 abs = region_off + mxfs_pal_bdev_get_base_offset(dev), area_lba;
+	u32 lbs;
 	int rc;
 
 	if (!bdev || index > 1 || !fs_uuid || !endpoint || !peer_endpoint ||
@@ -1956,12 +2063,15 @@ static int mxfs_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
 	if (shared ? mxfs_pal_bdev_drbd_minor(dev) >= 0 :
 		     mxfs_pal_bdev_drbd_minor(dev) < 0)
 		return -ENODEV;
+	rc = mxfs_cas_area(dev, bdev, region_off, &area_lba, &lbs);
+	if (rc)
+		return rc;
 
 	mutex_lock(&mxfs_drbd_cas_list_lock);
 	have = mxfs_drbd_cas_find(bdev->bd_dev);
 	if (have) {
 		/* Another mount handle on this node: it must be the same pair. */
-		if (have->index != index || have->area_lba != abs / 512 ||
+		if (have->index != index || have->area_lba != area_lba ||
 		    memcmp(have->fs_uuid, fs_uuid, 16) ||
 		    strcmp(have->endpoint, endpoint) || have->shared != shared) {
 			mutex_unlock(&mxfs_drbd_cas_list_lock);
@@ -1976,6 +2086,8 @@ static int mxfs_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
 
 	e = kzalloc(sizeof(*e), GFP_KERNEL);
 	r = kmalloc(512, GFP_KERNEL);
+	if (e)
+		e->lbs = lbs;		/* the critical section's read blocks */
 	if (!e || !r || mxfs_drbd_cas_bufs_alloc(e)) {
 		mxfs_drbd_cas_free(e);
 		kfree(r);
@@ -1984,7 +2096,7 @@ static int mxfs_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
 	INIT_WORK(&e->rel_work, mxfs_drbd_rel_fn);
 	e->devt = bdev->bd_dev;
 	e->bdev = bdev;
-	e->area_lba = abs / 512;
+	e->area_lba = area_lba;
 	e->index = index;
 	e->shared = shared;
 	if (shared) {
@@ -2008,7 +2120,7 @@ static int mxfs_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
 	 * second node claiming our index, and is refused.
 	 */
 	if (!rc)
-		rc = mxfs_drbd_sec_read(e, e->area_lba + 1 + index, r);
+		rc = mxfs_drbd_unit_read(e, 1 + index, r);
 	if (!rc && !mxfs_drbd_all_zero(r) &&
 	    (le32_to_cpu(r->magic) != MXFS_DRBD_REG_MAGIC ||
 	     le32_to_cpu(r->crc) != mxfs_drbd_crc(r) ||
@@ -2032,7 +2144,7 @@ static int mxfs_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
 		if (!p) {
 			rc = -ENOMEM;
 		} else {
-			rc = mxfs_drbd_sec_read(e, e->area_lba + 1 + (1 - index), p);
+			rc = mxfs_drbd_unit_read(e, 1 + (1 - index), p);
 			if (!rc && le32_to_cpu(p->magic) == MXFS_DRBD_REG_MAGIC &&
 			    le32_to_cpu(p->crc) == mxfs_drbd_crc(p) &&
 			    !memcmp(p->fs_uuid, fs_uuid, 16) &&
@@ -2068,10 +2180,10 @@ static int mxfs_cas_attach(mxfs_bdev_t *dev, uint64_t region_off,
 		atomic_inc(&mxfs_shared_cas_count);
 	mutex_unlock(&mxfs_drbd_cas_list_lock);
 	mxfs_pal_bdev_set_drbd_cas(dev, true);
-	pr_info("mxfs: %s dev=%u:%u index=%u endpoint=%s peer=%s area_lba=%llu nonce=%016llx\n",
+	pr_info("mxfs: %s dev=%u:%u index=%u endpoint=%s peer=%s area_lba=%llu lbs=%u nonce=%016llx\n",
 		shared ? "P-SHARED-CAS-ATTACH" : "P-DRBD-CAS-ATTACH",
 		MAJOR(e->devt), MINOR(e->devt), index, endpoint, peer_endpoint,
-		(unsigned long long)e->area_lba, (unsigned long long)e->boot_nonce);
+		(unsigned long long)e->area_lba, e->lbs, (unsigned long long)e->boot_nonce);
 	return 0;
 }
 
@@ -2157,7 +2269,7 @@ int mxfs_pal_shared_cas_peer_boot(mxfs_bdev_t *dev, uint8_t host[16],
 	reg = kmalloc(sizeof(*reg), GFP_KERNEL);
 	if (!reg)
 		return -ENOMEM;
-	rc = mxfs_drbd_sec_read(e, e->area_lba + 1 + (1 - e->index), reg);
+	rc = mxfs_drbd_unit_read(e, 1 + (1 - e->index), reg);
 	if (rc) {
 		kfree(reg);
 		return rc;
@@ -2822,7 +2934,7 @@ void mxfs_pal_drbd_cas_peer_fenced(mxfs_bdev_t *dev)
 	/* no other write of our register may be in flight beside this one */
 	mxfs_drbd_rel_wait(e);
 	e->membership_gen++;
-	rc = mxfs_drbd_sec_write(e, e->area_lba + 1 + (1 - e->index), r);
+	rc = mxfs_drbd_unit_write(e, 1 + (1 - e->index), r, true);
 	if (!rc)
 		rc = mxfs_drbd_reg_put(e, r, 0, 0);
 	mutex_unlock(&e->lock);

@@ -105,13 +105,16 @@ fails=0
 t0=$(date +%s)
 el() { echo $(( $(date +%s) - t0 )); }
 TREESV=$(modinfo mxfs.ko 2>/dev/null | sed -n 's/^srcversion: *//p')
-# The device the cluster was formed on, for the lone remount of the ghost arm.
+# The device the cluster was formed on, for the lone remount of the ghost arm,
+# from the marker of the cluster this lap runs on: run.sh exports MXFS_MARKER,
+# and a rig group keeps a marker of its own.
+MARKER=${MXFS_MARKER:-.cluster_marker.json}
 DEV=${MXFS_DEV:-$(python3 -c 'import json,sys
 try:
     print(json.load(open(sys.argv[1])).get("dev",""))
 except Exception:
-    print("")' .cluster_marker.json 2>/dev/null)}
-[ -n "$DEV" ] || { echo "ABORT: no device: set MXFS_DEV or form the cluster first (.cluster_marker.json has no dev)"; exit 2; }
+    print("")' "$MARKER" 2>/dev/null)}
+[ -n "$DEV" ] || { echo "ABORT: no device: set MXFS_DEV or form the cluster first ($MARKER has no dev)"; exit 2; }
 
 echo "=== depart_takeover_unmount label=$LABEL A=$A B=$B nfiles=$NFILES death=$DEATH expect=$EXPECT out=$OUT $(date -u +%FT%TZ) ==="
 # The fleet must be on ONE build.  The clean arm must be on the tree's build;

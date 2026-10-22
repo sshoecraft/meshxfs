@@ -112,7 +112,7 @@ while :; do
     thr=\$(cat /sys/devices/system/cpu/cpu*/thermal_throttle/core_throttle_count 2>/dev/null | awk '{s+=\$1} END{print s+0}')
     pthr=\$(cat /sys/devices/system/cpu/cpu*/thermal_throttle/package_throttle_count 2>/dev/null | awk '{s+=\$1} END{print s+0}')
     smi=\$(python3 -I -c "import os,struct; f=os.open('/dev/cpu/0/msr', os.O_RDONLY); print(struct.unpack('<Q', os.pread(f, 8, 0x34))[0])" 2>/dev/null || echo -)
-    mce=\$(awk '/^ *MCE:/{s=0; for(i=2;i<=NF;i++) if (\$i ~ /^[0-9]+\$/) s+=\$i; print s}' /proc/interrupts)
+    mce=\$(awk '/^ *MCE:/{s=0; for(i=2;i<=NF;i++) if (\$i ~ /^[0-9]+\$/) s+=\$i; print s}' /proc/interrupts)  # harness-lint: ok - escaped: the remote awk receives its own field references
     mhz=\$(awk '/^cpu MHz/{s+=\$4; n++} END{if (n) printf "%d", s/n}' /proc/cpuinfo)
     echo "<5>mxfs-diag-heat:\$s throttle=\$thr/\$pthr smi=\$smi mce=\$mce mhz=\$mhz load=\$(cut -d' ' -f1 /proc/loadavg)" > /dev/kmsg
     sleep 15

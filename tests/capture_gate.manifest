@@ -7,13 +7,21 @@
 # fault lap is bounded the same way because a harness whose first measurement
 # comes late (after its own prep) spends that time before the injection.
 # NOPREP=1 reuses the live mount: the gate verifies the boundary, not the
-# preparation.  join_during_takeover runs with NFILES=4000: the gate verifies
-# its measurement discipline, not the residue magnitude its default 32000
-# exists for (per-iteration bound 4000/25+60 + 120 + 180 + 180 + 240 + 120
-# ~= 1060 s; four arms + reads + the death re-form ~= 4900 s; its first
-# measurement follows the authority build and the unmounts, so the fault
-# lap is bounded at 940 s).  A kill-arm harness leaves the fleet unmounted
-# for the next entry: run those last in a chunk, or one per chunk.  Harnesses whose first positional argument is not the label
+# preparation.  join_during_takeover runs with NFILES=32000, its own default:
+# its first measurement needs the takeover pass seen in flight, and under
+# routing hash v2 eight inode numbers share a ledger page, so the NFILES=4000
+# it ran with before made a ~500-page authority whose pass (~10 ms a page)
+# ended in 5.1 s, inside the lap's first 5 s sample, and the lap never reached
+# a measurement (D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-
+# SAMPLE).  32000 entries are ~4000 pages, a ~40 s pass.  Bounds from its
+# header: per iteration 32000/25+60 + 120 + 180 + 180 + 240 + 120 = 2180 s;
+# four arms + reads + the death re-form = 9380 s.  The fault lap ends at the
+# first measurement, after the authority build, the unmounts and the
+# in-flight detection: 114 s measured at 32000 entries on 0.90.134 (creates
+# 57 s, B's unmount 6 s, A's 33 s, the pass seen in flight 11 s after the
+# mount), bounded at twice that, 228 s.  A kill-arm harness can leave the fleet unmounted
+# or its victim off: the gate forms the pair again before the next lap, so
+# the order of the entries does not matter.  Harnesses whose first positional argument is not the label
 # (inact_cert_arms <arm> <node> [label]) are lapped by hand, not here.
 peer_truncate_under_append_2node   | 420 | 420 | NOPREP=1 |
 hot_inode_peer_rename_2node        | 420 | 420 | NOPREP=1 |
@@ -75,7 +83,7 @@ d0531_stale_slice_recovery         | 360 | 1000 | - |
 agmeta_shutdown_retire             | 360 | 320   | - |
 ghost_slot_restart_probe           | 360 | 420   | - |
 depart_takeover_unmount            | 940 | 1930 | NFILES=8000 EXPECT=clean |
-join_during_takeover               | 940 | 4900 | NFILES=4000 |
+join_during_takeover               | 228 | 9380 | NFILES=32000 |
 d0944_unpub_forms_probe            | 360 | 544   | - |
 dir_retype_authcap_probe           | 120 | 180 | - |
 # pr_retirement_probe: needs BOTH nodes unmounted with the module out (it clears the PR table and
@@ -90,5 +98,5 @@ dir_node_middle_free_2node         | 360 | 420 | PREP=1 |
 intents_classless_attribute        | 120 | 60  | - | test1
 d_intents_2tcp_open_efi            | 120 | 420 | CHURN=0 MODE=complete |
 f2_iclus_refusal                   | 120 | 90   | - | test1
-# d0964: leaves the fleet unmounted on the control arm's fixture volume — prep after it
+# d0964: leaves the fleet unmounted on the control arm's fixture volume; the gate forms the pair again after it
 d0964_chk_dangling_dirent          | 120 | 300 | - |

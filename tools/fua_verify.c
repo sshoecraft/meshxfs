@@ -9,15 +9,17 @@
  *
  * Usage on two nodes T1 and T2, sharing /dev/sda:
  *
- *   T1: ./fua_verify write /dev/sda <lba_512> <byte_pattern>
- *   T2: ./fua_verify read  /dev/sda <lba_512>
+ *   T1: ./fua_verify write /dev/sda <lba> <byte_pattern>
+ *   T2: ./fua_verify read  /dev/sda <lba>
  *
  * If FUA works, T2's read returns the written pattern.  If not,
- * T2 may see whatever was at <lba_512> previously (its own initiator
+ * T2 may see whatever was at <lba> previously (its own initiator
  * read cache, or the pre-write disk content).
  *
- * Pick a sector well outside any filesystem to avoid corruption.
- * 1 sector = 512 bytes.
+ * Pick a block well outside any filesystem to avoid corruption.  <lba> is a
+ * DEVICE LBA, in the device's own logical blocks (BLKSSZGET): 512 bytes on a
+ * 512-byte device, 4096 on a 4K-native one (docs/4kn-support.md); every
+ * command moves one whole block.
  *
  * Copyright (c) 2026
  * SPDX-License-Identifier: GPL-2.0
@@ -31,10 +33,13 @@
 #include <errno.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
+#include <linux/fs.h>
 #include <scsi/sg.h>
 
-#define SECTOR_SIZE 512
 #define TIMEOUT_MS  30000
+
+/* the device's logical block size (BLKSSZGET), set in main before any command */
+static uint32_t lbs;
 
 static int do_scsi_io(int fd, unsigned char *cdb, int cdb_len,
                       void *buf, int len, int dxfer_dir)
@@ -90,7 +95,7 @@ static int scsi_write16_fua(int fd, uint64_t lba, void *buf, uint32_t blocks)
     cdb[11] = (uint8_t)(blocks >> 16);
     cdb[12] = (uint8_t)(blocks >> 8);
     cdb[13] = (uint8_t)(blocks);
-    return do_scsi_io(fd, cdb, sizeof(cdb), buf, blocks * SECTOR_SIZE,
+    return do_scsi_io(fd, cdb, sizeof(cdb), buf, blocks * lbs,
                       SG_DXFER_TO_DEV);
 }
 
@@ -111,7 +116,7 @@ static int scsi_read16_fua(int fd, uint64_t lba, void *buf, uint32_t blocks)
     cdb[11] = (uint8_t)(blocks >> 16);
     cdb[12] = (uint8_t)(blocks >> 8);
     cdb[13] = (uint8_t)(blocks);
-    return do_scsi_io(fd, cdb, sizeof(cdb), buf, blocks * SECTOR_SIZE,
+    return do_scsi_io(fd, cdb, sizeof(cdb), buf, blocks * lbs,
                       SG_DXFER_FROM_DEV);
 }
 
@@ -128,9 +133,10 @@ int main(int argc, char **argv)
 usage:
         fprintf(stderr,
                 "usage:\n"
-                "  %s write <device> <lba_512> <byte_pattern_hex>\n"
-                "  %s read  <device> <lba_512>\n"
-                "  %s sync  <device>\n",
+                "  %s write <device> <lba> <byte_pattern_hex>\n"
+                "  %s read  <device> <lba>\n"
+                "  %s sync  <device>\n"
+                "  lba: a device LBA, in the device's own logical blocks\n",
                 argv[0], argv[0], argv[0]);
         return 2;
     }
@@ -156,10 +162,21 @@ usage:
     if (argc < 4)
         goto usage;
     uint64_t lba = strtoull(argv[3], NULL, 0);
+    {
+        int v = 0;
 
-    /* Use a 512-byte aligned buffer */
+        if (ioctl(fd, BLKSSZGET, &v) < 0 || v < 512 || v > 4096 || (v & (v - 1))) {
+            fprintf(stderr, "%s: cannot get a logical block size (BLKSSZGET: %s, %d)\n",
+                    dev, strerror(errno), v);
+            close(fd);
+            return 1;
+        }
+        lbs = (uint32_t)v;
+    }
+
+    /* one block, aligned for O_DIRECT */
     void *buf;
-    if (posix_memalign(&buf, 4096, SECTOR_SIZE) != 0) {
+    if (posix_memalign(&buf, 4096, lbs) != 0) {
         close(fd);
         return 1;
     }
@@ -167,7 +184,7 @@ usage:
     if (strcmp(op, "write") == 0) {
         if (argc < 5) goto usage;
         int pattern = strtol(argv[4], NULL, 0);
-        memset(buf, pattern & 0xff, SECTOR_SIZE);
+        memset(buf, pattern & 0xff, lbs);
         /* Stamp a header so we can identify ours */
         snprintf((char *)buf, 64, "FUATEST pattern=0x%02x lba=%llu pid=%d\n",
                  pattern & 0xff, (unsigned long long)lba, getpid());
@@ -179,7 +196,7 @@ usage:
         printf("WRITE(16) FUA: lba=%llu pattern=0x%02x OK\n",
                (unsigned long long)lba, pattern & 0xff);
     } else if (strcmp(op, "read") == 0) {
-        memset(buf, 0xCC, SECTOR_SIZE);
+        memset(buf, 0xCC, lbs);
         if (scsi_read16_fua(fd, lba, buf, 1) < 0) {
             free(buf);
             close(fd);
@@ -189,9 +206,9 @@ usage:
         char *s = buf;
         for (int i = 0; i < 64 && s[i] && s[i] != '\n'; i++)
             putchar(s[i]);
-        printf("\"\nfirst_byte=0x%02x byte_at_64=0x%02x byte_at_511=0x%02x\n",
-               ((unsigned char *)buf)[0], ((unsigned char *)buf)[64],
-               ((unsigned char *)buf)[511]);
+        printf("\"\nfirst_byte=0x%02x byte_at_64=0x%02x byte_at_%u=0x%02x\n",
+               ((unsigned char *)buf)[0], ((unsigned char *)buf)[64], lbs - 1,
+               ((unsigned char *)buf)[lbs - 1]);
     } else {
         goto usage;
     }

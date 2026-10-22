@@ -1,12 +1,31 @@
 ---
 name: compiled-rig-harness-evidence-capture-and-process-traps
-description: Rig/harness traps: kmsg capture (journald, dmesg, netconsole), detached lap and PID handling, join-lap design, iscsiadm hangs, big awareness docs.
+description: Rig/harness traps: failed captures read as verdicts, kmsg/journald/netconsole loss, lap design, PID/ssh/stdio hangs, boot/SELinux state, 256KB docs
 metadata:
   type: feedback
-tags: [compiled, harness, rig, kmsg, journald, process, forensics]
+tags: [compiled, harness, rig, kmsg, journald, process, forensics, ssh, evidence-integrity, selinux]
 ---
 
-Topic: how test harnesses on the MXFS rig lose or fabricate evidence (kernel-log capture, detached-process handling, lap design) and the tooling quirks that silently void a lap.
+Topic: how test harnesses on the MXFS rig lose, pollute or fabricate evidence (an instrument that failed silently, or whose output was polluted, produced a number later reported as a statement about MXFS) and the kernel-log, lap-design, process, ssh and boot mechanics that cause or hide it. Folds in `compiled-harness-capture-and-remote-shell-traps` (12 harness and rig-plumbing traps) beside the earlier kernel-log, lap-design and process-handling traps.
+
+## A failed or polluted capture becomes a verdict
+
+Source: `compiled-harness-capture-and-remote-shell-traps`. This is the dominant class; the shell and ssh mechanics further down are what cause or hide such failures.
+
+- A helper like `rs() { timeout N $SSH host cmd 2>/dev/null | filt; }` throws away remote stderr and returns the filter's status. A remote failure leaves an empty capture, `grep -c` reads 0, and `ck`/`ckge` prints a verdict about the filesystem. Cost one ~20 min lap that exited VACUOUS from a 0-byte platter dump (the dump tool lived on an NFS share the freshly booted judge had not mounted). A dump that prints nothing is not a platter with nothing on it. See `trap-never-derive-a-count-from-a-capture-you-have-not-proven-non-empty`.
+  - Put `2>&1` inside the remote command; assert the tool's expected SHAPE (not merely non-empty, an error message is non-empty); on failure exit ABORT/INFRA, never FAIL or VACUOUS.
+  - Branches that rest on an ABSENCE are the ones to distrust (a drop knob not firing read as "locally mastered"; an unscoped holder-side count).
+- The contract that formalised it: `technique-a-capture-must-cross-a-validity-boundary-in-the-parent-shell-before-any-count-becomes-a-verdict` (`rsx` + `capture_require` in tests/lib/rig.sh, docs/harness-capture-contract.md). Status observed by the acquirer, anchored structure present, capture belongs to this invocation; otherwise ABORT (2). Traps met building it:
+  - `exit 2` inside `$(...)` ends only the substitution, so the validator must be a statement (`capture_require file shape what`), not a counting helper.
+  - A per-call counter in the parent is lost when the acquirer runs in a subshell; name per-call stderr files with mktemp.
+  - Do not merge remote stderr into stdout class-wide (122 sites in 37 harnesses parse the last line); keep stderr in its own file and name it in the ABORT.
+  - A remote `grep -c` with zero matches exits 1; the caller states the expected non-zero (`|| true`).
+  - Verdict greps for `refus`/`mismatch` match the protocol's own stage lines and `inc_mismatch=0`; assert specific probes instead.
+  - filefrag summary counts only physically discontiguous runs, count `filefrag -v` rows; xfs_bmap/xfs_io cannot read an MXFS extent map.
+  - `make clean` removes tools/mkfs_mxfs and tools/chk_mxfs, so fleet prep aborts: `make tools` after a clean module build. A 2-node MXFS_NODE_LIST with N=1 is refused; run.sh refuses a 1-node test on a 2-prepped fleet until `./run.sh 1 tcp`.
+- Same shape on clyde: `find` is bfs, and `-newermt '3 hours ago'` is rejected with exit 1 and empty stdout; with `2>/dev/null` it read as "nothing was modified" while a file written 20 min earlier sat in tools/. Use absolute ISO timestamps, never suppress stderr where emptiness is the evidence, and run a positive control (a file known to have changed, by name) in the same command (`trap-find-on-clyde-is-bfs-and-a-relative-timestamp-returns-nothing-not-an-error-you-see`).
+- A fast nonzero exit is not a fail-fast: `stat ... >/dev/null 2>&1; echo RC=$?` keeps one bit, and ENOENT is rc=1 and instant too, meaning the probe never reached the frozen grant (lap s74j: rc=1 in 0 s with `P240-RBLK-EIO-ABORT = 0`). Keep the errno class from stderr (`e=$(cmd 2>&1 >/dev/null); rc=$?` then `case`), the verbatim stderr in the evidence dir, a corroborating kernel line, and a named outcome for "probe never reached the state" which is ABORT about the harness. Probe several targets since the master varies per lap (`trap-a-fast-nonzero-exit-is-not-a-fail-fast-unless-the-probe-keeps-the-errno-class`).
+- Tool-side corollary: before making a tool refuse a class of caller, inventory the callers (59 `chk_mxfs` sites) and split off legitimate ones. `chk_mxfs -v` became O_EXCL (0.89.6), and four harnesses that ran it on a MOUNTED node just to grep geometry got rc 4 and an empty parse, stderr to /dev/null. Fix (0.89.7): `chk_mxfs --geometry <dev>`, plain O_RDONLY, for mkfs-time constants (agcount, agblocks, agblklog, inopblog, xfs_data_offset, disklock_offset); live state stays refused on a mounted node. `--pr-keys`, `--show-quarantine`, `--ino-offset` unaffected (`technique-a-verifier-that-gains-exclusion-must-give-its-constants-their-own-mode-or-every-live-node-caller-parses-nothing`).
 
 ## Kernel-log capture: every channel loses lines
 
@@ -25,9 +44,24 @@ Topic: how test harnesses on the MXFS rig lose or fabricate evidence (kernel-log
 - **Fault-around bypasses `xfs_filemap_fault`.** A folio already in the page cache is served by `->map_pages`; `echo 3 > drop_caches` before the mmap racer makes the fault take the gated path.
 - General rule: a healthy lap that FAILs on an instrument measurement is adjudicated by reading the kernel log around the instrument (who fired it, on which release) before it is a kernel finding; a real finding (held fd read the successor file's bytes) was proven by adding the missing measurement (a digest), not by trusting `rc=0` (`trap-a-harness-that-reads-a-kernel-line-through-journalctl-can-miss-it-and-a-rider-that-frees-an-inode-between-stages-confounds-the-next-stages-instrument`).
 
+## Readiness and boot state
+
+Source: `compiled-harness-capture-and-remote-shell-traps`.
+
+- sshd answering is not boot finished. `ssh true` succeeds while systemd still holds `/run/nologin`; pam_nologin's "System is booting up" banner is prepended to the NEXT command's output, so the next prep's srcversion probe aborted on two of three preps on healthy nodes. Worse, the aborted probe is the step that proves the build under test, so a lap can go unverified. The lap owes the wait: poll `test ! -e /run/nologin` (or `systemctl is-system-running`) and log which one (`trap-sshd-answering-is-not-boot-finished-and-the-nologin-banner-lands-in-the-next-commands-captured-output`).
+- A rebooted node has no `/src` NFS mount (prep_node.sh step 1 creates it), so `insmod /src/mxfs/mxfs.ko` returns rc=1 ENOENT; with stderr discarded the lap ABORTed on an empty srcversion. A harness that restarts a node without prep (deliberately, to keep the new incarnation's recovery) must mount the export itself, idempotently, and load from a node-local copy (the object is relinked in place on the export; clients can hold mixed pages). Keep insmod's own message and the kernel's last lines (`trap-a-rebooted-victim-has-no-src-export-so-insmod-off-the-nfs-path-fails-before-any-prep-runs`).
+
 ## Bounds on remote commands
 
 - **`iscsiadm -m node --login` hangs after a healed iptables storage partition** whether or not the session survived (the comment "a surviving session makes login a no-op" is false). s123a died rc=124 at stage=capture after all MXFS verdicts had PASSed; s124a with `timeout 30` still hung, yet `DEV_READABLE=1`. Probe the LUN first (`timeout 10 dd ... iflag=direct`), log in only if it does not answer, wrap every call in a node-local `timeout`, take rc from the command not a pipeline, print `LOGIN_RC`. An outer bound (90 s `measure`) turns one node-local hang into an arm-wide ABORT discarding earned verdicts (`trap-iscsiadm-node-login-hangs-after-a-healed-storage-partition-whether-or-not-the-session-survived`).
+
+## Shell and ssh mechanics
+
+Source: `compiled-harness-capture-and-remote-shell-traps`.
+
+- `tee /dev/stderr` with stderr on a log truncates the log: `/dev/stderr` is `/proc/self/fd/2`, tee opens a new description O_TRUNC without O_APPEND, so it writes from offset 0 while the shell appends at the end. Symptom: head of the log missing lines the harness always prints, a row spliced into a summary line; relaunching with `>>` left logs empty. Use `tee -a /dev/stderr` or `tee >(cat >&2)`. Never edit a harness while a run is live (bash reads scripts incrementally) (`trap-tee-dev-stderr-into-a-log-opened-with-truncate-reopens-it-at-offset-zero-and-overwrites-the-head`).
+- A backgrounded `( umount ... ) &` inside an ssh command inherits the session's stdout/stderr, so ssh does not return when the script does; the caller's 90 s bound killed it (rc=124), the capture gate failed and the lap ended ABORT instead of a graded FAIL (0.90.22, quiesce_remount_access.sh). Cut stdio: `( ... ) > /dev/null 2>&1 < /dev/null &`, return results through a file, put a log capture on every hang-able step's failure path, and read the node's kernel ring at once on a capture-stage ABORT (about four minutes of history at this volume). rc=124 with the expected marker already in stdout means the script finished and the session did not: look for an inherited descriptor (`trap-a-backgrounded-umount-inherits-the-ssh-sessions-stdio-so-a-stuck-unmount-hangs-the-harness-into-an-abort`).
+- `ausearch` reads STDIN instead of the audit log whenever stdin is a pipe, which over ssh without `-n` is always. The "zero AVC denials" check counted an empty stream and always passed (positive control: 0 vs 73 USER_LOGIN records) and blocked as long as the caller's stdin stayed open. Every remote ausearch gets `--input-logs` and `</dev/null`; same for aureport and any tool that autodetects a pipe. Background Bash tool calls get stdin=/dev/null so they cannot trigger the blocking form (`trap-ausearch-over-ssh-reads-its-stdin-not-the-audit-log`).
 
 ## Process handling in shell
 
@@ -35,6 +69,13 @@ Topic: how test harnesses on the MXFS rig lose or fabricate evidence (kernel-log
 - **A bare `wait` after `exec > >(tee log)` waits for the tee forever.** Collect `PIDS="$PIDS $!"` and `wait $PIDS` (`trap-a-bare-wait-after-exec-tee-process-substitution-waits-forever`).
 - **A kill list from `tools/mxfs_pgrep.sh '<pattern>'` includes the Bash tool's own shell** (its command text carries the pattern), plus any older session shell that ever contained it. The self-kill returned 144, skipped the cleanup, and the harness died 2 min before its verdict. Record the PID at launch and `kill $(cat pidfile)`; or let a WANT= shape end the lap itself; put `kill` last or in its own call. See also `never-pgrep-f-on-clyde-mmap-lock-wedge`, `trap-killing-a-harness-run-midflight-leaks-the-module-refcount` (`trap-a-kill-list-from-mxfs-pgrep-includes-the-shell-that-ran-it-and-kills-the-harness-mid-lap`).
 - **A detached lap queue outlives its session.** `tests/lap_queue.sh` runs under nohup setsid; a handoff saying "7 of 11 laps done" is a snapshot. A session started `make modules` with lap 8 live 41 s earlier; each lap re-preps and deploys `/src/mxfs/mxfs.ko`, so a relink mid-queue splits the sweep across two srcversions. Before any `make`: `tail -3 tests/evidence/lapq_<label>.log` (`QUEUE lap=N starting` with no `rc=` means in flight), and scan `/proc/[0-9]*/comm` for `*lap_queue*|*run.sh*` (never `pgrep -f`/`ps aux`). Bounds: `run.sh` does not build, so un-linked recompiles are inert; the queue file is read fully before lap 1 so editing it changes nothing, but editing a running harness script is dangerous (bash re-reads by byte offset) (`trap-a-detached-lap-queue-outlives-the-session-that-launched-it-so-check-for-one-before-any-build`).
+
+## Lab and rig environment
+
+Source: `compiled-harness-capture-and-remote-shell-traps`.
+
+- A root-owned `/tmp/.mxfs_pass` (left by any sudo'd harness such as mpath_up.sh) makes sshpass 1.09 print "Failed to open password file" and then HANG on the prompt: rc=124, zero output, while `ssh -o BatchMode=yes` answers instantly, ping and port 22 fine. `[ -s ]` passed for the unprivileged caller. Fixed in tooling: mxfs_sshpass.sh tests readability and refuses with exit 96; mxfs_secrets.sh falls back to `${path}.uid$(id -u)`. When fleet ssh hangs after a subagent sweep, `ls -l /tmp/.mxfs_pass*` FIRST; unblock with `sudo -n chown steve:steve` (`trap-sudo-mpath-up-leaves-root-owned-passfile`).
+- `sed -i` on a clone image mounted on clyde (Ubuntu, no SELinux policy loaded) creates a new inode with no `security.selinux` xattr; the enforcing Alma clone booted with `/etc/hosts` and `initiatorname.iscsi` as `unlabeled_t`, 9 AVC denials, and iscsid answering "No initiator name set" (it reads the name once, so it stays broken until restarted). Rewrite through the existing inode (`sudo sed expr file | sudo tee file`, the `inplace` helper in scripts/lab_clone_node.sh; also read root-only files with sudo, an unprivileged `sed -n` failed silently). Booted clone: `restorecon -v` the files then `systemctl restart iscsid`. General: any file created from outside the guest's policy is unlabeled until restorecon or /.autorelabel. Diagnose with `ls -Z`, `ausearch -m avc --input-logs -ts boot`, `journalctl -u iscsid` (`trap-a-guest-file-rewritten-with-sed-i-from-a-host-without-selinux-boots-unlabeled-and-iscsid-caches-no-initiator-name`).
 
 ## Tooling quirk
 

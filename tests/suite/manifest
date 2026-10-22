@@ -166,13 +166,11 @@ P6  fence_during_write    fault     2   60
 P6  fault_netpartition    fault     2   60
 
 # --- P7 soak ---
-# soak's budget is NOT this static column -- run.sh computes it at runtime as
-# SOAK_SECONDS+30 (the same SOAK_SECONDS env var soak.sh itself reads, default
-# 30s for a smoke run; set SOAK_SECONDS=14400 for a real 4h ship-gate soak and
-# the budget scales with it). This 60 is just the smoke-run fallback shown
-# here for documentation / any code path that reads the manifest directly.
+# soak is a fixed workload (1112 ops, seeded sizes), never a duration.  Its
+# 40 s is 2x native XFS doing the same work: 1/xfs soak measured 20/20/19 s
+# (2026-10-21, test1).
 P6  dirent_durability     barrier   2   240
-P7  soak                  none      1   60
+P7  soak                  none      1   40
 P8  node_responsive       barrier   1   90
 P8  kernel_health         barrier   1   120
 P8  dirent_publish_integrity barrier 2   60

@@ -65,14 +65,19 @@ on() {
 STAGE=$(mktemp -d)
 trap 'rm -rf -- "$STAGE"' EXIT
 B=$(basename "$SRCDIR")
-# --ignore-failed-read: root-owned benchmark outputs in the tree's root
-# (bench.json, .xfs_fio_baseline.*) are not readable here and are no input to
-# any package; the packaging scripts name every file they need and fail on
-# a missing one
-tar -C "$SRCDIR/.." --ignore-failed-read -czf "$STAGE/tree.tgz" \
-    --exclude="$B/tests/evidence" --exclude="$B/.git" --exclude="$B/dist" --exclude="$B/.ccmemory" \
-    --exclude='*.o' --exclude='*.ko' --exclude='.*.cmd' --exclude='*.mod.c' "$B" \
-    || { echo "PKG_BUILD_FAIL $KIND: could not pack the tree"; exit 1; }
+# The packages' inputs, named: the module source DKMS builds, the tools, the
+# packaging scripts and what they install.  Packing the whole tree took in the
+# boards and their run ledgers too, which runs write while a package builds,
+# and tar fails a file that changes under it.  The packaging scripts name every
+# file they need and fail on a missing one, so a new input fails here loudly
+# rather than shipping without it.
+INPUTS=(compat include xfs dlm pal mxfs_clayer Kbuild Makefile VERSION tools packaging
+        docs/man docs/drbd-setup.md frontend/proxmox)
+tar -C "$SRCDIR/.." -czf "$STAGE/tree.tgz" \
+    --exclude='*.o' --exclude='*.ko' --exclude='.*.cmd' --exclude='*.mod.c' \
+    --exclude='__pycache__' "${INPUTS[@]/#/$B/}" \
+    || { echo "PKG_BUILD_FAIL $KIND: could not pack the package inputs"; exit 1; }
+echo "PKG_INPUTS $KIND sha256=$(sha256sum "$STAGE/tree.tgz" | awk '{print $1}') inputs=[${INPUTS[*]}]"
 on 30 "rm -rf /root/mxfs-pkg && mkdir -p /root/mxfs-pkg/out" || { echo "PKG_BUILD_FAIL $KIND: workdir"; exit 1; }
 timeout 120 "$SSH" "$H" SCP "$STAGE/tree.tgz" /root/mxfs-pkg/tree.tgz >/dev/null 2>&1 \
     || { echo "PKG_BUILD_FAIL $KIND: copying the tree to $NODE"; exit 1; }

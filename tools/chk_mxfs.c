@@ -162,6 +162,10 @@ static inline uint32_t sbtree_ptr_off(uint32_t blocksize, uint32_t keylen)
 /* FINOBT feature flag */
 #define XFS_SB_FEAT_RO_COMPAT_FINOBT  (1 << 0)
 
+/* sb_versionnum: the log sector fields (sb_logsectlog, sb_logsectsize) are
+ * valid; mkfs sets it on a volume of 4096-byte sectors only */
+#define XFS_SB_VERSION_SECTORBIT      0x0800
+
 /* Null AG block */
 #define XFS_NULLAGBLOCK  0xFFFFFFFFU
 #define XFS_NULLAGINO    0xFFFFFFFFU
@@ -271,7 +275,45 @@ struct xfs_geo {
     uint8_t     dirblklog;      /* a directory block is blocksize << dirblklog */
     uint64_t    xfs_off;        /* byte offset of XFS data on device */
     uint8_t     uuid[16];       /* filesystem UUID for btree block headers */
+    /* the XFS sector, which is the logical block the volume was formatted
+     * for (docs/4kn-support.md): 512, or 4096.  The AG headers are a sector
+     * each, at 0, 1, 2 and 3 sectors into the AG, each CRC'd whole. */
+    uint32_t    sectsize;
 };
+
+/*
+ * Where the k-th 512-byte record of a record region is on the device
+ * (docs/4kn-support.md): start + k * 512 on a volume formatted for 512-byte
+ * blocks, the first 512 bytes of a block of its own (mxfs_rec_phys) on one
+ * formatted for larger ones.  The journal, disklock, PR registrant, bootstrap
+ * and slice lifecycle regions are record regions.
+ */
+static uint64_t rec_unit(const struct mxfs_ondisk_super *s, uint64_t start,
+                         uint64_t k)
+{
+    return mxfs_rec_phys(start, start + k * 512, mxfs_super_lbs(s));
+}
+
+/*
+ * The XFS sector of a volume (docs/4kn-support.md): the logical block size
+ * its envelope records, 512 or 4096.  0 for any other value, which
+ * check_mxfs_super reports: no XFS header can then be found, and no header
+ * buffer (MXFS_LBS_MAX bytes) may be read with it.
+ */
+static uint32_t xfs_sectsize_of(const struct mxfs_ondisk_super *s)
+{
+    uint32_t lbs = mxfs_super_lbs(s);
+
+    return lbs == 512 || lbs == 4096 ? lbs : 0;
+}
+
+/* The filesystem blocks an AG's four header sectors take (docs/4kn-support.md):
+ * one at 512, where SB, AGF, AGI and AGFL share block 0; four at 4096, a sector
+ * each.  mkfs puts everything else in the AG after them (calc_ag_layout). */
+static uint32_t ag_hdr_blocks(const struct xfs_geo *geo)
+{
+    return (4 * geo->sectsize + geo->blocksize - 1) / geo->blocksize;
+}
 
 /* Per-AG collected data for cross-checks */
 struct ag_summary {
@@ -505,6 +547,26 @@ static int check_mxfs_super(int fd, struct mxfs_ondisk_super *super)
         }
     }
 
+    /* docs/4kn-support.md: the logical block size the volume was formatted
+     * for.  The record regions' sizes below are their spans on the device,
+     * each 512-byte unit in a block of its own; a block device must still
+     * have that block size, or every region would be read at the wrong place. */
+    {
+        uint32_t lbs = mxfs_super_lbs(s);
+        struct stat st;
+        int dev_lbs = 0;
+
+        if ((s->flags & MXFS_FORMAT_F_LBS) && s->logical_block_size != 4096)
+            err("envelope logical_block_size %u: a volume is formatted for 512- "
+                "or 4096-byte logical blocks", s->logical_block_size);
+        if (fstat(fd, &st) == 0 && S_ISBLK(st.st_mode) &&
+            ioctl(fd, BLKSSZGET, &dev_lbs) == 0 && (uint32_t)dev_lbs != lbs)
+            err("this volume was formatted for %u-byte logical blocks and the "
+                "device has %d-byte ones", lbs, dev_lbs);
+        info("logical block size %u%s", lbs,
+             lbs > 512 ? " (each 512-byte record unit in a block of its own)" : "");
+    }
+
     /* Offset sanity: all regions must fit within device_size */
     if (s->journal_offset + s->journal_size > s->device_size) {
         err("journal region extends past device: offset=%llu + size=%llu > device=%llu",
@@ -570,8 +632,8 @@ static int check_mxfs_super(int fd, struct mxfs_ondisk_super *super)
     }
     /* the PR registrant ledger region; gen 12 requires it. */
     if (s->flags & MXFS_FORMAT_F_PRKEY64) {
-        if (s->prkey_size < MXFS_PRLEDGER_ENTRY_BYTES ||
-            s->prkey_size % MXFS_PRLEDGER_ENTRY_BYTES)
+        if (s->prkey_size % mxfs_super_lbs(s) ||
+            mxfs_rec_units(s->prkey_size, mxfs_super_lbs(s)) < MXFS_PRLEDGER_ENTRY_BYTES)
             err("PR registrant ledger region size %llu: below one entry or not entry-aligned",
                 (unsigned long long)s->prkey_size);
         if (s->prkey_offset + s->prkey_size > s->device_size)
@@ -586,15 +648,16 @@ static int check_mxfs_super(int fd, struct mxfs_ondisk_super *super)
     }
     /* the bootstrap record region; gen 13 requires it. */
     if (s->flags & MXFS_FORMAT_F_BOOTSTRAP) {
-        if (s->bootstrap_size < MXFS_BOOTSTRAP_REC_BYTES ||
-            s->bootstrap_offset % 512)
+        if (mxfs_rec_units(s->bootstrap_size, mxfs_super_lbs(s)) < MXFS_BOOTSTRAP_REC_BYTES ||
+            s->bootstrap_offset % mxfs_super_lbs(s))
             err("bootstrap record region malformed: offset=%llu size=%llu",
                 (unsigned long long)s->bootstrap_offset,
                 (unsigned long long)s->bootstrap_size);
         /* (§6.8): gen 17 needs the 32 KiB map (banks, tombstones,
-         * lineage, takeover journal); the kernel refuses a smaller region */
+         * lineage, takeover journal), in 512-byte units; the kernel refuses
+         * a smaller region */
         if ((s->flags & MXFS_FORMAT_F_PROTOGATE) && s->cluster_proto_gen >= 17 &&
-            s->bootstrap_size < MXFS_BOOTSTRAP_BYTES)
+            mxfs_rec_units(s->bootstrap_size, mxfs_super_lbs(s)) < MXFS_BOOTSTRAP_BYTES)
             err("bootstrap region size=%llu < %u required by cluster_proto_gen=%u (re-mkfs)",
                 (unsigned long long)s->bootstrap_size, MXFS_BOOTSTRAP_BYTES,
                 s->cluster_proto_gen);
@@ -612,9 +675,10 @@ static int check_mxfs_super(int fd, struct mxfs_ondisk_super *super)
      * record per log slice, so the region must hold xfs_log_node_count of
      * them and end before the XFS data. */
     if (s->flags & MXFS_FORMAT_F_SLIFE) {
-        if (s->slife_size < (uint64_t)s->xfs_log_node_count * MXFS_SLIFE_RECORD_SIZE ||
-            s->slife_size < MXFS_SLIFE_RECORD_SIZE ||
-            s->slife_offset % 512)
+        if (mxfs_rec_units(s->slife_size, mxfs_super_lbs(s)) <
+                (uint64_t)s->xfs_log_node_count * MXFS_SLIFE_RECORD_SIZE ||
+            mxfs_rec_units(s->slife_size, mxfs_super_lbs(s)) < MXFS_SLIFE_RECORD_SIZE ||
+            s->slife_offset % mxfs_super_lbs(s))
             err("slice lifecycle region malformed: offset=%llu size=%llu for %u log slices",
                 (unsigned long long)s->slife_offset,
                 (unsigned long long)s->slife_size, s->xfs_log_node_count);
@@ -758,7 +822,8 @@ static int check_mxfs_super(int fd, struct mxfs_ondisk_super *super)
         info("prkey_offset=%llu size=%llu (%llu registrant entries)",
              (unsigned long long)s->prkey_offset,
              (unsigned long long)s->prkey_size,
-             (unsigned long long)(s->prkey_size / MXFS_PRLEDGER_ENTRY_BYTES));
+             (unsigned long long)(mxfs_rec_units(s->prkey_size, mxfs_super_lbs(s)) /
+                                  MXFS_PRLEDGER_ENTRY_BYTES));
     if (s->flags & MXFS_FORMAT_F_BOOTSTRAP)
         info("bootstrap_offset=%llu size=%llu",
              (unsigned long long)s->bootstrap_offset,
@@ -1158,8 +1223,8 @@ static void check_bootstrap(int fd, const struct mxfs_ondisk_super *s)
         unsigned int i, k, ntomb = 0, ndirect = 0, ninh = 0, nbad = 0;
 
         for (i = 0; i < r.lineage_count && i < 8; i++) {
-            if (read_at(fd, &l, sizeof(l), (off_t)(s->bootstrap_offset +
-                        (uint64_t)(CHK_BOOT_SEC_LINEAGE + i) * 512)) < 0)
+            if (read_at(fd, &l, sizeof(l), (off_t)rec_unit(s, s->bootstrap_offset,
+                        CHK_BOOT_SEC_LINEAGE + i)) < 0)
                 break;
             lt = l; lt.crc32c = 0;
             if (l.magic != CHK_BOOT_LIN_MAGIC || l.idx != i ||
@@ -1177,8 +1242,8 @@ static void check_bootstrap(int fd, const struct mxfs_ondisk_super *s)
                  bs_escrow_name(l.escrow[0]), l.escrow[2] | (l.escrow[3] << 8));
         }
         for (i = 0; i < 8; i++) {
-            if (read_at(fd, tb, sizeof(tb), (off_t)(s->bootstrap_offset +
-                        (uint64_t)(CHK_BOOT_SEC_TOMB + i) * 512)) < 0)
+            if (read_at(fd, tb, sizeof(tb), (off_t)rec_unit(s, s->bootstrap_offset,
+                        CHK_BOOT_SEC_TOMB + i)) < 0)
                 break;
             for (k = 0; k < 8; k++) {
                 struct chk_bootstrap_tomb t = tb[k];
@@ -1215,8 +1280,8 @@ static void check_bootstrap(int fd, const struct mxfs_ondisk_super *s)
                     /* every set bit needs a tombstone of this episode */
                     unsigned int si = k / 8, sk = k % 8;
 
-                    if (read_at(fd, tb, sizeof(tb), (off_t)(s->bootstrap_offset +
-                                (uint64_t)(CHK_BOOT_SEC_TOMB + si) * 512)) < 0 ||
+                    if (read_at(fd, tb, sizeof(tb), (off_t)rec_unit(s, s->bootstrap_offset,
+                                CHK_BOOT_SEC_TOMB + si)) < 0 ||
                         tb[sk].magic != CHK_BOOT_TOMB_MAGIC || tb[sk].slot != k ||
                         tb[sk].term < r.episode_term)
                         missing++;
@@ -1224,8 +1289,8 @@ static void check_bootstrap(int fd, const struct mxfs_ondisk_super *s)
             if (missing)
                 err("bootstrap: %u completion bit(s) carry no tombstone of this episode — a takeover would refuse them (INHERITANCE_UNPROVEN)", missing);
         }
-        if (read_at(fd, &tk, sizeof(tk), (off_t)(s->bootstrap_offset +
-                    (uint64_t)CHK_BOOT_SEC_TAKEOVER * 512)) == 0) {
+        if (read_at(fd, &tk, sizeof(tk), (off_t)rec_unit(s, s->bootstrap_offset,
+                    CHK_BOOT_SEC_TAKEOVER)) == 0) {
             tkt = tk; tkt.crc32c = 0;
             if (tk.magic == CHK_BOOT_TK_MAGIC &&
                 crc32c(~0U, &tkt, sizeof(tkt)) == tk.crc32c)
@@ -1295,7 +1360,7 @@ static void check_slife(int fd, const struct mxfs_ondisk_super *s)
     if (!(s->flags & MXFS_FORMAT_F_SLIFE))
         return;
     for (i = 0; i < s->xfs_log_node_count; i++) {
-        off_t off = (off_t)(s->slife_offset + (uint64_t)i * MXFS_SLIFE_RECORD_SIZE);
+        off_t off = (off_t)rec_unit(s, s->slife_offset, i);
 
         if (read_at(fd, &r, sizeof(r), off) < 0) {
             err("slice lifecycle[%u]: read failed", i);
@@ -1341,6 +1406,114 @@ static void check_slife(int fd, const struct mxfs_ondisk_super *s)
            n_init, n_zeroing, n_ready, n_bad);
     if (n_zeroing)
         info("slice lifecycle: %u slice(s) ZEROING — a claimant's zero did not reach READY; the slot's next claimant restarts it", n_zeroing);
+}
+
+/*
+ * (docs/4kn-support.md): on a volume formatted for blocks larger than 512
+ * bytes a record unit is the first 512 bytes of a block of its own, and the
+ * rest of the block is zero.  A record that is compared -- COMPARE AND WRITE
+ * of the disklock heartbeats and lock slots, the PR registrant entries, the
+ * bootstrap sectors, the journal's slot headers -- is compared as [record]
+ * [zero tail], so a nonzero tail miscompares on every attempt and that record
+ * can never be written again.  Reads take a unit's first 512 bytes and writes
+ * rewrite its tail, so the journal's data sectors, which mkfs leaves as the
+ * device held them, are not scanned.
+ *
+ * Reads [off, off + size) in whole blocks and checks each block's tail; repair
+ * zeroes a nonzero tail, which holds nothing by design.  Returns the number of
+ * blocks found with one; *blocks counts the blocks read.
+ */
+static uint64_t scan_record_tails(int fd, const char *name, uint64_t off,
+                                  uint64_t size, uint32_t lbs, uint64_t *blocks)
+{
+    static const uint8_t zero[MXFS_LBS_MAX];
+    const uint64_t chunk = 1u << 20;    /* a whole number of blocks */
+    uint64_t done = 0, bad = 0, first = 0, fixed = 0;
+    uint8_t *buf = malloc(chunk);
+
+    if (!buf) {
+        err("%s: no memory to read its block tails", name);
+        return 0;
+    }
+    while (done < size) {
+        uint64_t n = size - done < chunk ? size - done : chunk;
+        uint64_t nbad = 0;
+
+        n -= n % lbs;
+        if (n == 0)
+            break;
+        if (read_at(fd, buf, n, (off_t)(off + done)) < 0) {
+            err("%s: read failed at byte %llu", name, (unsigned long long)(off + done));
+            break;
+        }
+        for (uint64_t b = 0; b < n; b += lbs) {
+            uint8_t *t = buf + b + MXFS_REC_UNIT;
+
+            (*blocks)++;
+            if (memcmp(t, zero, lbs - MXFS_REC_UNIT) == 0)
+                continue;
+            if (bad++ == 0)
+                first = off + done + b;
+            nbad++;
+            memset(t, 0, lbs - MXFS_REC_UNIT);
+        }
+        if (nbad && can_repair() && write_at(fd, buf, n, (off_t)(off + done)) == 0)
+            fixed += nbad;
+        done += n;
+    }
+    free(buf);
+    if (bad)
+        err("%s: %llu block(s) with a nonzero tail, the first at byte %llu; every "
+            "COMPARE AND WRITE of their records miscompares", name,
+            (unsigned long long)bad, (unsigned long long)first);
+    if (fixed) {
+        printf("  REPAIRED: %s: %llu block tail(s) zeroed\n", name,
+               (unsigned long long)fixed);
+        repaired++;
+    }
+    return bad;
+}
+
+static void check_record_tails(int fd, const struct mxfs_ondisk_super *s)
+{
+    uint32_t lbs = xfs_sectsize_of(s);
+    uint64_t bad = 0, blocks = 0, joff = s->journal_offset;
+    uint8_t jsup[512];
+
+    if (lbs <= MXFS_REC_UNIT)
+        return;
+    /* the journal super, unit 0, and each slot's header, unit 1 + i * the
+     * slot's size in units (check_journal) */
+    bad += scan_record_tails(fd, "journal super", joff, lbs, lbs, &blocks);
+    if (read_at(fd, jsup, sizeof(jsup), (off_t)joff) == 0 &&
+        *(uint32_t *)jsup == MXFS_JOURNAL_MAGIC) {
+        uint32_t slot_count = *(uint32_t *)(jsup + 8);
+        uint32_t slot_size_sect = *(uint32_t *)(jsup + 12);
+
+        for (uint32_t i = 0; i < slot_count && i < MXFS_DISKLOCK_HB_SLOTS; i++) {
+            uint64_t hoff = rec_unit(s, joff, 1 + (uint64_t)i * slot_size_sect);
+            char name[48];
+
+            if (hoff + lbs > joff + s->journal_size)
+                break;
+            snprintf(name, sizeof(name), "journal slot %u header", i);
+            bad += scan_record_tails(fd, name, hoff, lbs, lbs, &blocks);
+        }
+    }
+    bad += scan_record_tails(fd, "disklock region", s->disklock_offset,
+                             s->disklock_size, lbs, &blocks);
+    if (s->flags & MXFS_FORMAT_F_PRKEY64)
+        bad += scan_record_tails(fd, "PR registrant ledger", s->prkey_offset,
+                                 s->prkey_size, lbs, &blocks);
+    if (s->flags & MXFS_FORMAT_F_BOOTSTRAP)
+        bad += scan_record_tails(fd, "bootstrap region", s->bootstrap_offset,
+                                 s->bootstrap_size, lbs, &blocks);
+    if (s->flags & MXFS_FORMAT_F_SLIFE)
+        bad += scan_record_tails(fd, "slice lifecycle region", s->slife_offset,
+                                 s->slife_size, lbs, &blocks);
+    printf("Record block tails ...... %s  (%llu blocks of %u bytes, %llu with a "
+           "nonzero tail)\n", bad == 0 ? "OK" : "ERRORS",
+           (unsigned long long)blocks, lbs, (unsigned long long)bad);
 }
 
 /*
@@ -1515,7 +1688,7 @@ static int do_clear_bootstrap(const char *device)
     }
     for (slot = 0; slot < 64; slot++) {
         hb_active[slot] = false;
-        if (read_at(fd, sec, 512, sup.disklock_offset + (uint64_t)slot * 512) < 0) {
+        if (read_at(fd, sec, 512, rec_unit(&sup, sup.disklock_offset, slot)) < 0) {
             close(fd);
             return 4;
         }
@@ -1530,7 +1703,7 @@ static int do_clear_bootstrap(const char *device)
     for (slot = 0; slot < 64; slot++) {
         if (!hb_active[slot])
             continue;
-        if (read_at(fd, sec, 512, sup.disklock_offset + (uint64_t)slot * 512) < 0) {
+        if (read_at(fd, sec, 512, rec_unit(&sup, sup.disklock_offset, slot)) < 0) {
             close(fd);
             return 4;
         }
@@ -1587,8 +1760,8 @@ static int do_clear_bootstrap(const char *device)
         struct chk_repair_journal j;
         struct chk_bootstrap_rec pre;
 
-        if (read_at(fd, &j, sizeof(j), (off_t)(sup.bootstrap_offset +
-                    (uint64_t)CHK_BOOT_SEC_REPAIR * 512)) < 0 ||
+        if (read_at(fd, &j, sizeof(j), (off_t)rec_unit(&sup, sup.bootstrap_offset,
+                    CHK_BOOT_SEC_REPAIR)) < 0 ||
             !chk_repair_journal_valid(&j, sup.fs_uuid) ||
             j.nonce != r.owner_nonce) {
             fprintf(stderr, "clear-bootstrap: the record is an operator repair "
@@ -1606,8 +1779,8 @@ static int do_clear_bootstrap(const char *device)
             close(fd);
             return 4;
         }
-        if (read_at(fd, &pre, sizeof(pre), (off_t)(sup.bootstrap_offset +
-                    (uint64_t)CHK_BOOT_SEC_REPAIR_PRE * 512)) < 0 ||
+        if (read_at(fd, &pre, sizeof(pre), (off_t)rec_unit(&sup, sup.bootstrap_offset,
+                    CHK_BOOT_SEC_REPAIR_PRE)) < 0 ||
             !chk_boot_rec_ok(&pre, &sup)) {
             fprintf(stderr, "clear-bootstrap: the record saved by the repair "
                     "does not validate; nothing written\n");
@@ -1620,8 +1793,8 @@ static int do_clear_bootstrap(const char *device)
         j.stamp_s = (uint64_t)time(NULL);
         j.crc32c = chk_repair_journal_crc(&j);
         if (write_at(fd, &pre, sizeof(pre), (off_t)sup.bootstrap_offset) < 0 ||
-            write_at(fd, &j, sizeof(j), (off_t)(sup.bootstrap_offset +
-                     (uint64_t)CHK_BOOT_SEC_REPAIR * 512)) < 0 ||
+            write_at(fd, &j, sizeof(j), (off_t)rec_unit(&sup, sup.bootstrap_offset,
+                     CHK_BOOT_SEC_REPAIR)) < 0 ||
             fsync(fd) != 0) {
             fprintf(stderr, "clear-bootstrap: write failed: %s\n",
                     strerror(errno));
@@ -1648,7 +1821,7 @@ static int do_clear_bootstrap(const char *device)
      */
     if (r.escrow.state >= 2 && r.escrow.state <= 4 && r.escrow.slot < 64) {
         if (read_at(fd, sec, 512,
-                    sup.disklock_offset + (uint64_t)r.escrow.slot * 512) < 0) {
+                    rec_unit(&sup, sup.disklock_offset, r.escrow.slot)) < 0) {
             close(fd);
             return 4;
         }
@@ -1686,7 +1859,7 @@ static int do_clear_bootstrap(const char *device)
     }
     if (r.refused_reason == 1 && r.refused_slot < 64) {
         if (read_at(fd, sec, 512,
-                    sup.disklock_offset + (uint64_t)r.refused_slot * 512) < 0) {
+                    rec_unit(&sup, sup.disklock_offset, r.refused_slot)) < 0) {
             close(fd);
             return 4;
         }
@@ -1743,8 +1916,8 @@ static int do_clear_bootstrap(const char *device)
     t.crc32c = crc32c(~0U, &t, sizeof(t));
     /* a stale takeover journal must not outlive the term it names */
     memset(sec, 0, sizeof(sec));
-    rc = write_at(fd, sec, 512, (off_t)(sup.bootstrap_offset +
-                                        (uint64_t)CHK_BOOT_SEC_TAKEOVER * 512));
+    rc = write_at(fd, sec, 512, (off_t)rec_unit(&sup, sup.bootstrap_offset,
+                                                CHK_BOOT_SEC_TAKEOVER));
     if (rc == 0)
         rc = write_at(fd, &t, sizeof(t), (off_t)sup.bootstrap_offset);
     if (rc == 0)
@@ -1774,13 +1947,13 @@ static void check_prledger(int fd, const struct mxfs_ondisk_super *s)
 
     if (!(s->flags & MXFS_FORMAT_F_PRKEY64))
         return;
-    n = (uint32_t)(s->prkey_size / MXFS_PRLEDGER_ENTRY_BYTES);
+    n = (uint32_t)(mxfs_rec_units(s->prkey_size, mxfs_super_lbs(s)) /
+                   MXFS_PRLEDGER_ENTRY_BYTES);
     for (i = 0; i < n; i++) {
         uint32_t c;
         char host[37], boot[37];
 
-        if (read_at(fd, &e, sizeof(e),
-                    s->prkey_offset + (uint64_t)i * MXFS_PRLEDGER_ENTRY_BYTES) < 0) {
+        if (read_at(fd, &e, sizeof(e), rec_unit(s, s->prkey_offset, i)) < 0) {
             err("prledger entry %u: read failed", i);
             continue;
         }
@@ -1967,10 +2140,9 @@ static void check_journal(int fd, const struct mxfs_ondisk_super *super)
 
     /* Per-slot header check */
     int dirty = 0, clean = 0;
-    uint64_t slot_bytes = (uint64_t)slot_size_sect * MXFS_JOURNAL_SECTOR_SIZE;
-
     for (uint32_t i = 0; i < slot_count; i++) {
-        uint64_t slot_off = joff + 512 + i * slot_bytes;
+        /* slot i's header is the region's unit 1 + i * slot_size_sect */
+        uint64_t slot_off = rec_unit(super, joff, 1 + (uint64_t)i * slot_size_sect);
 
         if (read_at(fd, buf, 512, slot_off) < 0) {
             err("journal slot %u: read failed", i);
@@ -3054,8 +3226,7 @@ static void scan_unreplayed(int fd, const struct mxfs_ondisk_super *super)
     const struct chk_hb_hdr *h = (const void *)sec;
 
     for (int i = 0; i < MXFS_DISKLOCK_HB_SLOTS; i++) {
-        off_t off = (off_t)(super->disklock_offset +
-                            (uint64_t)i * MXFS_DISKLOCK_RECORD_SIZE);
+        off_t off = (off_t)rec_unit(super, super->disklock_offset, i);
         const char *why;
         size_t n;
 
@@ -3139,7 +3310,7 @@ static void check_disklock(int fd, const struct mxfs_ondisk_super *super)
     int withdrawn = 0;
 
     for (int i = 0; i < MXFS_DISKLOCK_HB_SLOTS; i++) {
-        uint64_t hb_off = dloff + (uint64_t)i * MXFS_DISKLOCK_RECORD_SIZE;
+        uint64_t hb_off = rec_unit(super, dloff, i);
 
         if (read_at(fd, buf, 512, hb_off) < 0) {
             err("disklock HB slot %d: read failed", i);
@@ -3255,15 +3426,24 @@ static void check_disklock(int fd, const struct mxfs_ondisk_super *super)
 static int check_xfs_superblock(int fd, const struct mxfs_ondisk_super *super,
                                 struct xfs_geo *geo)
 {
-    uint8_t buf[512];
+    uint8_t buf[MXFS_LBS_MAX];
     uint64_t xfs_off = super->xfs_data_offset;
+    /* every XFS header is a sector, the logical block the volume was
+     * formatted for, with its CRC over the whole sector */
+    uint32_t lbs = xfs_sectsize_of(super);
     int pre_errors = errors;
 
     memset(geo, 0, sizeof(*geo));
     geo->xfs_off = xfs_off;
+    geo->sectsize = lbs;
+    if (lbs == 0) {
+        printf("XFS superblock .......... NOT CHECKED  (the envelope's logical "
+               "block size %u is not 512 or 4096)\n", mxfs_super_lbs(super));
+        return -1;
+    }
 
     /* XFS superblock is at sector 0 of the XFS data area */
-    if (read_at(fd, buf, 512, xfs_off) < 0) {
+    if (read_at(fd, buf, lbs, xfs_off) < 0) {
         printf("XFS superblock .......... READ ERROR\n");
         return -1;
     }
@@ -3293,12 +3473,12 @@ static int check_xfs_superblock(int fd, const struct mxfs_ondisk_super *super,
     }
 
     /* CRC at offset 0xE0 (224), native uint32_t (little-endian on x86) */
-    if (!xfs_verify_crc(buf, 512, 0xE0)) {
+    if (!xfs_verify_crc(buf, lbs, 0xE0)) {
         uint32_t stored = *(uint32_t *)(buf + 0xE0);
         err("XFS superblock CRC: stored=0x%08X, verification failed", stored);
 
         if (can_repair()) {
-            if (xfs_fix_crc_and_write(fd, buf, 512, 0xE0, xfs_off) == 0) {
+            if (xfs_fix_crc_and_write(fd, buf, lbs, 0xE0, xfs_off) == 0) {
                 printf("  REPAIRED: XFS superblock CRC recomputed\n");
                 repaired++;
             }
@@ -3320,8 +3500,34 @@ static int check_xfs_superblock(int fd, const struct mxfs_ondisk_super *super,
     if (agcount == 0) {
         err("XFS agcount is 0");
     }
-    if (sectsize != 512) {
-        info("XFS sectsize=%u (expected 512)", sectsize);
+    /* docs/4kn-support.md: the XFS sector is the logical block the volume was
+     * formatted for.  Above 512 the log writes whole sectors as well, which
+     * the superblock says with SECTORBIT and a log sector of the same size;
+     * without SECTORBIT both log sector fields must be 0, as mkfs writes them
+     * at 512, or the kernel refuses the superblock. */
+    {
+        uint16_t versionnum  = get_be16(buf + 0x64);
+        uint8_t  sectlog     = buf[0x79];
+        uint8_t  logsectlog  = buf[0xC1];
+        uint16_t logsectsize = get_be16(buf + 0xC2);
+        bool     sectorbit   = (versionnum & XFS_SB_VERSION_SECTORBIT) != 0;
+
+        if (sectsize != lbs || sectlog > 15 || (1u << sectlog) != sectsize)
+            err("XFS sectsize=%u sectlog=%u: the volume was formatted for %u-byte "
+                "logical blocks", sectsize, sectlog, lbs);
+        if (lbs > 512 && (!sectorbit || logsectsize != lbs || logsectlog > 15 ||
+                          (1u << logsectlog) != lbs))
+            err("XFS log sector: versionnum=0x%04X logsectsize=%u logsectlog=%u; "
+                "a volume of %u-byte sectors needs SECTORBIT and a log sector of %u",
+                versionnum, logsectsize, logsectlog, lbs, lbs);
+        if (!sectorbit && (logsectsize != 0 || logsectlog != 0))
+            err("XFS logsectsize=%u logsectlog=%u without SECTORBIT in versionnum "
+                "0x%04X: the kernel refuses the superblock",
+                logsectsize, logsectlog, versionnum);
+        /* worded so no "sectsize=" appears in it: a harness reads the
+         * sector size as the first "sectsize=" of this report */
+        info("versionnum=0x%04X, sectlog=%u, log sector: %u bytes, log2 %u",
+             versionnum, sectlog, logsectsize, logsectlog);
     }
 
     int xerrors = errors - pre_errors;
@@ -3428,17 +3634,17 @@ struct ag_info {
 static void check_xfs_ag_headers(int fd, const struct xfs_geo *geo,
                                  uint32_t agno, struct ag_info *agi_out)
 {
-    uint8_t buf[512];
+    uint8_t buf[MXFS_LBS_MAX];
     uint64_t ag_base = geo->xfs_off + (uint64_t)agno * geo->agblocks * geo->blocksize;
-    uint64_t agf_off = ag_base + 512;  /* sector 1 */
-    uint64_t agi_off = ag_base + 1024; /* sector 2 */
+    uint64_t agf_off = ag_base + geo->sectsize;  /* sector 1 */
+    uint64_t agi_off = ag_base + 2 * geo->sectsize; /* sector 2 */
     int agf_errors = 0;
     int agi_errors = 0;
 
     memset(agi_out, 0, sizeof(*agi_out));
 
     /* Check AGF */
-    if (read_at(fd, buf, 512, agf_off) < 0) {
+    if (read_at(fd, buf, geo->sectsize, agf_off) < 0) {
         err("AG %u: AGF read failed", agno);
         return;
     }
@@ -3458,13 +3664,13 @@ static void check_xfs_ag_headers(int fd, const struct xfs_geo *geo,
     }
 
     /* AGF CRC at offset 0xD8 (216) */
-    if (!xfs_verify_crc(buf, 512, 0xD8)) {
+    if (!xfs_verify_crc(buf, geo->sectsize, 0xD8)) {
         uint32_t stored = *(uint32_t *)(buf + 0xD8);
         err("AG %u: AGF CRC stored=0x%08X, verification failed", agno, stored);
         agf_errors++;
 
         if (can_repair() && agf_magic == MXFS_AGF_MAGIC) {
-            if (xfs_fix_crc_and_write(fd, buf, 512, 0xD8, agf_off) == 0) {
+            if (xfs_fix_crc_and_write(fd, buf, geo->sectsize, 0xD8, agf_off) == 0) {
                 printf("  REPAIRED: AG %u AGF CRC recomputed\n", agno);
                 repaired++;
                 agf_errors--;
@@ -3490,7 +3696,7 @@ static void check_xfs_ag_headers(int fd, const struct xfs_geo *geo,
          agi_out->agf_freeblks, agi_out->agf_longest);
 
     /* Check AGI */
-    if (read_at(fd, buf, 512, agi_off) < 0) {
+    if (read_at(fd, buf, geo->sectsize, agi_off) < 0) {
         err("AG %u: AGI read failed", agno);
         return;
     }
@@ -3510,13 +3716,13 @@ static void check_xfs_ag_headers(int fd, const struct xfs_geo *geo,
     }
 
     /* AGI CRC at offset 0x138 (312) */
-    if (!xfs_verify_crc(buf, 512, 0x138)) {
+    if (!xfs_verify_crc(buf, geo->sectsize, 0x138)) {
         uint32_t stored = *(uint32_t *)(buf + 0x138);
         err("AG %u: AGI CRC stored=0x%08X, verification failed", agno, stored);
         agi_errors++;
 
         if (can_repair() && agi_magic == MXFS_AGI_MAGIC) {
-            if (xfs_fix_crc_and_write(fd, buf, 512, 0x138, agi_off) == 0) {
+            if (xfs_fix_crc_and_write(fd, buf, geo->sectsize, 0x138, agi_off) == 0) {
                 printf("  REPAIRED: AG %u AGI CRC recomputed\n", agno);
                 repaired++;
                 agi_errors--;
@@ -3908,39 +4114,45 @@ static uint64_t walk_freespace_btree(int fd, const struct xfs_geo *geo,
  * Used when both btrees are structurally damaged and the AG has no
  * allocated inodes, so the entire AG (minus fixed metadata) is free.
  *
- * Standard XFS AG layout (blocksize=4096):
- *   block 0: SB + AGF + AGI + AGFL (4 sectors in 1 block)
- *   block 1: BNO btree root
- *   block 2: CNT btree root
- *   block 3: inobt root
- *   blocks 4-7: AGFL entries (pre-reserved for btree splits)
- *   blocks 8+: free data space
+ * The AG layout mkfs writes (calc_ag_layout), with h = ag_hdr_blocks():
+ *   blocks 0..h-1:   SB, AGF, AGI, AGFL (h = 1 at 512, 4 at 4096)
+ *   block h:         BNO btree root
+ *   block h+1:       CNT btree root
+ *   block h+2:       inobt root
+ *   block h+3:       finobt root
+ *   blocks h+4..h+7: AGFL entries (pre-reserved for btree splits)
+ *   blocks h+8+:     free data space
  *
- * Writes BNO/CNT roots at standard positions (blocks 1, 2),
- * each with a single record: [startblock=8, blockcount=agf_length-8].
- * Updates AGF: bno_root=1, cnt_root=2, levels=1, freeblks, longest.
+ * Writes BNO/CNT roots at blocks h and h+1, each with a single record:
+ * [startblock=h+8, blockcount=agf_length-(h+8)].
+ * Updates AGF: bno_root, cnt_root, levels=1, freeblks, longest.
  */
 static int rebuild_freespace_btrees(int fd, const struct xfs_geo *geo,
                                     uint32_t agno, uint32_t agf_length)
 {
-    uint32_t free_start = 8;
-    uint32_t free_len = agf_length - free_start;
+    uint32_t h = ag_hdr_blocks(geo);
+    uint32_t bno_root = h, cnt_root = h + 1;
+    uint32_t free_start = h + 8;
+    uint32_t free_len;
     uint64_t ag_base = geo->xfs_off +
                        (uint64_t)agno * geo->agblocks * geo->blocksize;
     uint8_t *blk;
     int ret;
 
+    if (agf_length <= free_start)
+        return -1;
+    free_len = agf_length - free_start;
     blk = calloc(1, geo->blocksize);
     if (!blk)
         return -1;
 
-    /* Write BNO root leaf at block 1 */
+    /* Write BNO root leaf at block h */
     put_be32(blk + 0x00, MXFS_ABTB_CRC_MAGIC);
     /* level=0, numrecs=1 */
     put_be32(blk + 0x04, 0x00000001);  /* level(be16)=0, numrecs(be16)=1 */
     put_be32(blk + 0x08, 0xFFFFFFFF);  /* leftsib = null */
     put_be32(blk + 0x0C, 0xFFFFFFFF);  /* rightsib = null */
-    put_be64(blk + 0x10, (ag_base + 1 * geo->blocksize) / 512);  /* blkno */
+    put_be64(blk + 0x10, (ag_base + (uint64_t)bno_root * geo->blocksize) / 512);  /* blkno */
     memcpy(blk + 0x20, geo->uuid, 16);
     put_be32(blk + 0x30, agno);
 
@@ -3950,19 +4162,19 @@ static int rebuild_freespace_btrees(int fd, const struct xfs_geo *geo,
 
     ret = xfs_fix_crc_and_write(fd, blk, geo->blocksize,
                                  BTREE_CRC_OFF,
-                                 ag_base + 1 * geo->blocksize);
+                                 ag_base + (uint64_t)bno_root * geo->blocksize);
     if (ret != 0) {
         free(blk);
         return -1;
     }
 
-    /* Write CNT root leaf at block 2 — same record, different magic */
+    /* Write CNT root leaf at block h+1 — same record, different magic */
     memset(blk, 0, geo->blocksize);
     put_be32(blk + 0x00, MXFS_ABTC_CRC_MAGIC);
     put_be32(blk + 0x04, 0x00000001);  /* level=0, numrecs=1 */
     put_be32(blk + 0x08, 0xFFFFFFFF);
     put_be32(blk + 0x0C, 0xFFFFFFFF);
-    put_be64(blk + 0x10, (ag_base + 2 * geo->blocksize) / 512);
+    put_be64(blk + 0x10, (ag_base + (uint64_t)cnt_root * geo->blocksize) / 512);
     memcpy(blk + 0x20, geo->uuid, 16);
     put_be32(blk + 0x30, agno);
     put_be32(blk + BTREE_REC_OFF, free_start);
@@ -3970,25 +4182,25 @@ static int rebuild_freespace_btrees(int fd, const struct xfs_geo *geo,
 
     ret = xfs_fix_crc_and_write(fd, blk, geo->blocksize,
                                  BTREE_CRC_OFF,
-                                 ag_base + 2 * geo->blocksize);
+                                 ag_base + (uint64_t)cnt_root * geo->blocksize);
     free(blk);
     if (ret != 0)
         return -1;
 
-    /* Update AGF: bno_root=1, cnt_root=2, levels=1, freeblks, longest */
-    uint64_t agf_off = ag_base + 512;
-    uint8_t agf_buf[512];
-    if (read_at(fd, agf_buf, 512, agf_off) != 0)
+    /* Update AGF: bno_root, cnt_root, levels=1, freeblks, longest */
+    uint64_t agf_off = ag_base + geo->sectsize;
+    uint8_t agf_buf[MXFS_LBS_MAX];
+    if (read_at(fd, agf_buf, geo->sectsize, agf_off) != 0)
         return -1;
 
-    put_be32(agf_buf + 0x10, 1);         /* bno_root = 1 */
-    put_be32(agf_buf + 0x14, 2);         /* cnt_root = 2 */
+    put_be32(agf_buf + 0x10, bno_root);
+    put_be32(agf_buf + 0x14, cnt_root);
     put_be32(agf_buf + 0x1C, 1);         /* bno_level = 1 */
     put_be32(agf_buf + 0x20, 1);         /* cnt_level = 1 */
     put_be32(agf_buf + 0x34, free_len);  /* freeblks */
     put_be32(agf_buf + 0x38, free_len);  /* longest */
 
-    return xfs_fix_crc_and_write(fd, agf_buf, 512, 0xD8, agf_off);
+    return xfs_fix_crc_and_write(fd, agf_buf, geo->sectsize, 0xD8, agf_off);
 }
 
 static void check_freespace_btrees(int fd, const struct xfs_geo *geo,
@@ -4043,12 +4255,12 @@ static void check_freespace_btrees(int fd, const struct xfs_geo *geo,
             /* Both btrees agree — fix the AGF header */
             uint64_t ag_base = geo->xfs_off +
                                (uint64_t)agno * geo->agblocks * geo->blocksize;
-            uint64_t agf_off = ag_base + 512;
-            uint8_t agf_buf[512];
+            uint64_t agf_off = ag_base + geo->sectsize;
+            uint8_t agf_buf[MXFS_LBS_MAX];
 
-            if (read_at(fd, agf_buf, 512, agf_off) == 0) {
+            if (read_at(fd, agf_buf, geo->sectsize, agf_off) == 0) {
                 put_be32(agf_buf + 0x34, (uint32_t)bno_total);
-                if (xfs_fix_crc_and_write(fd, agf_buf, 512, 0xD8, agf_off) == 0) {
+                if (xfs_fix_crc_and_write(fd, agf_buf, geo->sectsize, 0xD8, agf_off) == 0) {
                     printf("  REPAIRED: AG %u AGF freeblks %u -> %llu\n",
                            agno, agi->agf_freeblks, (unsigned long long)bno_total);
                     repaired++;
@@ -4069,7 +4281,7 @@ static void check_freespace_btrees(int fd, const struct xfs_geo *geo,
     bool btree_repaired = false;
     if (btree_errors > 0 && can_repair() && agi->agi_count == 0) {
         if (rebuild_freespace_btrees(fd, geo, agno, agi->agf_length) == 0) {
-            uint32_t free_len = agi->agf_length - 8;
+            uint32_t free_len = agi->agf_length - (ag_hdr_blocks(geo) + 8);
             printf("  REPAIRED: AG %u BNO/CNT btrees rebuilt (1 extent, %u free blocks)\n",
                    agno, free_len);
             repaired++;
@@ -4337,14 +4549,14 @@ static int reset_agi_level(int fd, const struct xfs_geo *geo,
 {
     uint64_t ag_base = geo->xfs_off +
                        (uint64_t)agno * geo->agblocks * geo->blocksize;
-    uint64_t agi_off = ag_base + 1024;
-    uint8_t agi_buf[512];
+    uint64_t agi_off = ag_base + 2 * geo->sectsize;
+    uint8_t agi_buf[MXFS_LBS_MAX];
 
-    if (read_at(fd, agi_buf, 512, agi_off) != 0)
+    if (read_at(fd, agi_buf, geo->sectsize, agi_off) != 0)
         return -1;
 
     put_be32(agi_buf + agi_level_off, 1);
-    return xfs_fix_crc_and_write(fd, agi_buf, 512, 0x138, agi_off);
+    return xfs_fix_crc_and_write(fd, agi_buf, geo->sectsize, 0x138, agi_off);
 }
 
 static void check_inode_btrees(int fd, const struct xfs_geo *geo,
@@ -4394,13 +4606,13 @@ static void check_inode_btrees(int fd, const struct xfs_geo *geo,
         inobt_totals.total_free <= UINT32_MAX) {
         uint64_t ag_base = geo->xfs_off +
                            (uint64_t)agno * geo->agblocks * geo->blocksize;
-        uint64_t agi_off = ag_base + 1024;
-        uint8_t agi_buf[512];
+        uint64_t agi_off = ag_base + 2 * geo->sectsize;
+        uint8_t agi_buf[MXFS_LBS_MAX];
 
-        if (read_at(fd, agi_buf, 512, agi_off) == 0) {
+        if (read_at(fd, agi_buf, geo->sectsize, agi_off) == 0) {
             put_be32(agi_buf + 0x10, (uint32_t)inobt_totals.total_inodes);
             put_be32(agi_buf + 0x1C, (uint32_t)inobt_totals.total_free);
-            if (xfs_fix_crc_and_write(fd, agi_buf, 512, 0x138, agi_off) == 0) {
+            if (xfs_fix_crc_and_write(fd, agi_buf, geo->sectsize, 0x138, agi_off) == 0) {
                 printf("  REPAIRED: AG %u AGI count %u->%llu, freecount %u->%llu\n",
                        agno, agi->agi_count,
                        (unsigned long long)inobt_totals.total_inodes,
@@ -4665,12 +4877,12 @@ static void check_inode_spotcheck(int fd, const struct xfs_geo *geo)
      * Read the inobt root block for AG 0 and check up to 8 additional inodes.
      */
     {
-        uint8_t agibuf[512];
-        uint64_t agi_off = geo->xfs_off + 1024; /* AG 0 AGI */
+        uint8_t agibuf[MXFS_LBS_MAX];
+        uint64_t agi_off = geo->xfs_off + 2 * geo->sectsize; /* AG 0 AGI */
         int max_extra = 8;
         int extra_checked = 0;
 
-        if (read_at(fd, agibuf, 512, agi_off) == 0) {
+        if (read_at(fd, agibuf, geo->sectsize, agi_off) == 0) {
             uint32_t ino_root = get_be32(agibuf + 0x14);
             uint32_t ino_level = get_be32(agibuf + 0x18);
 
@@ -4995,8 +5207,8 @@ static int orphan_repair_insert(int fd, const struct xfs_geo *geo,
     int bucket = agino % XFS_AGI_UNLINKED_BUCKETS;
     uint64_t ino_off = inode_disk_offset(geo, agno, agino);
     uint64_t agi_off = geo->xfs_off +
-                       (uint64_t)agno * geo->agblocks * geo->blocksize + 1024;
-    uint8_t agi_buf[512];
+                       (uint64_t)agno * geo->agblocks * geo->blocksize + 2 * geo->sectsize;
+    uint8_t agi_buf[MXFS_LBS_MAX];
     uint8_t *ibuf = malloc(geo->inodesize);
     int ret = -1;
 
@@ -5007,10 +5219,10 @@ static int orphan_repair_insert(int fd, const struct xfs_geo *geo,
     put_be32(ibuf + 0x60, heads[bucket]);       /* di_next_unlinked */
     if (xfs_fix_crc_and_write(fd, ibuf, geo->inodesize, 0x64, ino_off) < 0)
         goto out;
-    if (read_at(fd, agi_buf, 512, agi_off) < 0)
+    if (read_at(fd, agi_buf, geo->sectsize, agi_off) < 0)
         goto out;
     put_be32(agi_buf + 0x28 + 4 * bucket, agino);
-    if (xfs_fix_crc_and_write(fd, agi_buf, 512, 0x138, agi_off) < 0)
+    if (xfs_fix_crc_and_write(fd, agi_buf, geo->sectsize, 0x138, agi_off) < 0)
         goto out;
     heads[bucket] = agino;
     ret = 0;
@@ -5029,15 +5241,15 @@ static void check_orphan_inodes(int fd, const struct xfs_geo *geo)
     fflush(stdout);
 
     for (uint32_t agno = 0; agno < geo->agcount; agno++) {
-        uint8_t agi_buf[512];
+        uint8_t agi_buf[MXFS_LBS_MAX];
         uint64_t agi_off = geo->xfs_off +
                            (uint64_t)agno * geo->agblocks * geo->blocksize +
-                           1024;
+                           2 * geo->sectsize;
         uint32_t heads[XFS_AGI_UNLINKED_BUCKETS];
         uint32_t ino_root, ino_level;
         struct orphan_list members = { 0 }, cand = { 0 };
 
-        if (read_at(fd, agi_buf, 512, agi_off) < 0 ||
+        if (read_at(fd, agi_buf, geo->sectsize, agi_off) < 0 ||
             get_be32(agi_buf + 0x00) != MXFS_AGI_MAGIC) {
             incomplete = true;
             continue;           /* AGI errors already reported upstream */
@@ -5191,10 +5403,10 @@ static void print_summary(int fd, const struct xfs_geo *geo,
     /* Repair XFS superblock counters if they don't match btree data */
     if (sb_needs_fix && can_repair()) {
         /* Read the XFS superblock */
-        uint8_t sb_buf[512];
+        uint8_t sb_buf[MXFS_LBS_MAX];
         uint64_t sb_off = geo->xfs_off;
 
-        if (read_at(fd, sb_buf, 512, sb_off) == 0) {
+        if (read_at(fd, sb_buf, geo->sectsize, sb_off) == 0) {
             bool changed = false;
 
             /* Fix icount (offset 0x80, be64) */
@@ -5227,7 +5439,7 @@ static void print_summary(int fd, const struct xfs_geo *geo,
 
             if (changed) {
                 /* XFS sb CRC at offset 0xE0 */
-                if (xfs_fix_crc_and_write(fd, sb_buf, 512, 0xE0, sb_off) == 0)
+                if (xfs_fix_crc_and_write(fd, sb_buf, geo->sectsize, 0xE0, sb_off) == 0)
                     repaired++;
             }
         }
@@ -5828,13 +6040,13 @@ static void check_dirshard(int fd, const struct xfs_geo *geo)
     fflush(stdout);
 
     for (uint32_t agno = 0; agno < geo->agcount; agno++) {
-        uint8_t agi_buf[512];
+        uint8_t agi_buf[MXFS_LBS_MAX];
         uint64_t agi_off = geo->xfs_off +
                            (uint64_t)agno * geo->agblocks * geo->blocksize +
-                           1024;
+                           2 * geo->sectsize;
         uint32_t ino_root, ino_level;
 
-        if (read_at(fd, agi_buf, 512, agi_off) < 0 ||
+        if (read_at(fd, agi_buf, geo->sectsize, agi_off) < 0 ||
             get_be32(agi_buf + 0x00) != MXFS_AGI_MAGIC)
             continue;
         ino_root  = get_be32(agi_buf + 0x14);
@@ -6782,13 +6994,13 @@ static void check_dirents(int fd, const struct xfs_geo *geo)
         goto out;
     }
     for (uint32_t agno = 0; agno < geo->agcount; agno++) {
-        uint8_t agi_buf[512];
+        uint8_t agi_buf[MXFS_LBS_MAX];
         uint64_t agi_off = geo->xfs_off +
                            (uint64_t)agno * geo->agblocks * geo->blocksize +
-                           1024;
+                           2 * geo->sectsize;
         uint32_t ino_root, ino_level;
 
-        if (read_at(fd, agi_buf, 512, agi_off) < 0 ||
+        if (read_at(fd, agi_buf, geo->sectsize, agi_off) < 0 ||
             get_be32(agi_buf + 0x00) != MXFS_AGI_MAGIC)
             continue;
         ino_root  = get_be32(agi_buf + 0x14);
@@ -7257,15 +7469,15 @@ static int fo_repair_ag(int fd, const struct xfs_geo *geo, uint32_t agno,
 {
     uint64_t ag_base = geo->xfs_off +
                        (uint64_t)agno * geo->agblocks * geo->blocksize;
-    uint64_t agf_off = ag_base + 512;
-    uint8_t agf[512];
+    uint64_t agf_off = ag_base + geo->sectsize;
+    uint8_t agf[MXFS_LBS_MAX];
     uint32_t len, roots[2], old_free, maxrecs, n = 0, longest = 0;
     uint64_t newfree = 0, have = 0;
     struct fo_ext *ext = NULL, *cnt = NULL;
     uint8_t *blk = NULL;
     int rc = -1, t;
 
-    if (read_at(fd, agf, 512, agf_off) < 0 || get_be32(agf) != MXFS_AGF_MAGIC)
+    if (read_at(fd, agf, geo->sectsize, agf_off) < 0 || get_be32(agf) != MXFS_AGF_MAGIC)
         return -1;
     len = get_be32(agf + 0x0C);
     roots[0] = get_be32(agf + 0x10);
@@ -7343,7 +7555,7 @@ static int fo_repair_ag(int fd, const struct xfs_geo *geo, uint32_t agno,
     }
     put_be32(agf + 0x34, (uint32_t)newfree);
     put_be32(agf + 0x38, longest);
-    if (xfs_fix_crc_and_write(fd, agf, 512, 0xD8, agf_off) != 0)
+    if (xfs_fix_crc_and_write(fd, agf, geo->sectsize, 0xD8, agf_off) != 0)
         goto out;
     for (uint32_t b = 0; b < len; b++) {
         uint64_t g = (uint64_t)agno * xtree_agblocks + b;
@@ -7379,13 +7591,13 @@ static void check_fork_owners(int fd, const struct xfs_geo *geo,
     st.ag_in_free = calloc(geo->agcount, sizeof(*st.ag_in_free));
     st.ag_other = calloc(geo->agcount, 1);
     for (uint32_t agno = 0; agno < geo->agcount; agno++) {
-        uint8_t agi_buf[512];
+        uint8_t agi_buf[MXFS_LBS_MAX];
         uint64_t agi_off = geo->xfs_off +
                            (uint64_t)agno * geo->agblocks * geo->blocksize +
-                           1024;
+                           2 * geo->sectsize;
         uint32_t ino_root, ino_level;
 
-        if (read_at(fd, agi_buf, 512, agi_off) < 0 ||
+        if (read_at(fd, agi_buf, geo->sectsize, agi_off) < 0 ||
             get_be32(agi_buf + 0x00) != MXFS_AGI_MAGIC)
             continue;
         ino_root  = get_be32(agi_buf + 0x14);
@@ -7635,8 +7847,7 @@ static int do_show_quarantine(const char *device)
            slice_count, slice_count, MXFS_DISKLOCK_HB_SLOTS - 1);
 
     for (slot = 0; slot < MXFS_DISKLOCK_HB_SLOTS; slot++) {
-        uint64_t off = sup.disklock_offset +
-                       (uint64_t)slot * MXFS_DISKLOCK_RECORD_SIZE;
+        uint64_t off = rec_unit(&sup, sup.disklock_offset, slot);
         const struct chk_hb_hdr *h = (const void *)aligned;
         ssize_t got;
 
@@ -8183,8 +8394,8 @@ static int chk_repair_table_clear(int dfd, const struct mxfs_ondisk_super *sup,
 
         if (slot == keep_slot)
             continue;
-        if (mxfs_off_read_sector_direct(dfd, sup->disklock_offset +
-                                   (uint64_t)slot * 512, sec) < 0) {
+        if (mxfs_off_read_sector_direct(dfd, rec_unit(sup, sup->disklock_offset, slot),
+                                        sec) < 0) {
             fprintf(stderr, "  BLOCKED slot %2u: unreadable\n", slot);
             blocking++;
             continue;
@@ -8733,8 +8944,8 @@ static int chk_journal_put(int fd, int dfd, const struct mxfs_ondisk_super *sup,
     j->phase = phase;
     j->stamp_s = (uint64_t)time(NULL);
     j->crc32c = chk_repair_journal_crc(j);
-    if (chk_put_sector(fd, dfd, sup->bootstrap_offset +
-                       (uint64_t)CHK_BOOT_SEC_REPAIR * 512, j) < 0)
+    if (chk_put_sector(fd, dfd, rec_unit(sup, sup->bootstrap_offset,
+                                         CHK_BOOT_SEC_REPAIR), j) < 0)
         return -1;
     printf("  repair journal: %s (durable)\n", chk_rph_name(phase));
     chk_repair_crash_point(chk_rph_name(phase));
@@ -8926,7 +9137,7 @@ static int chk_slife_zeroing(int fd, int dfd, const struct mxfs_ondisk_super *su
                 "claimant re-zero the slice.  Refusing.\n");
         return -1;
     }
-    off = sup->slife_offset + (uint64_t)slice * MXFS_SLIFE_RECORD_SIZE;
+    off = rec_unit(sup, sup->slife_offset, slice);
     if (mxfs_off_read_sector_direct(dfd, off, sec) < 0)
         return -1;
     memcpy(&r, sec, sizeof(r));
@@ -9081,8 +9292,8 @@ static int chk_show_adopted(int dfd, const struct mxfs_ondisk_super *sup)
         r.escrow.slot >= MXFS_DISKLOCK_HB_SLOTS)
         return 0;
     q.slot = r.escrow.slot;
-    if (mxfs_off_read_sector_direct(dfd, sup->disklock_offset +
-                                    (uint64_t)q.slot * 512, q.sector) < 0)
+    if (mxfs_off_read_sector_direct(dfd, rec_unit(sup, sup->disklock_offset, q.slot),
+                                    q.sector) < 0)
         return -1;
     if (!chk_is_adopted_refusal(&r, q.sector, q.slot))
         return 0;
@@ -9160,8 +9371,8 @@ static void chk_repair_abandon(int fd, int dfd, const struct chk_quar_ctx *q,
         uint8_t pre[512];
         struct chk_bootstrap_rec cur, back;
 
-        if (mxfs_off_read_sector_direct(dfd, q->sup.bootstrap_offset +
-                (uint64_t)CHK_BOOT_SEC_REPAIR_PRE * 512, pre) < 0 ||
+        if (mxfs_off_read_sector_direct(dfd, rec_unit(&q->sup, q->sup.bootstrap_offset,
+                CHK_BOOT_SEC_REPAIR_PRE), pre) < 0 ||
             mxfs_off_read_sector_direct(dfd, q->sup.bootstrap_offset,
                                         (uint8_t *)&cur) < 0) {
             fprintf(stderr, "repair: cannot read the saved bootstrap record; "
@@ -9274,7 +9485,7 @@ static int do_accept_quarantine_loss(const char *device, long slice_arg,
         goto out;
     }
     if (!(q.sup.flags & MXFS_FORMAT_F_BOOTSTRAP) ||
-        q.sup.bootstrap_size < 64 * 512) {
+        mxfs_rec_units(q.sup.bootstrap_size, mxfs_super_lbs(&q.sup)) < 64 * 512) {
         fprintf(stderr, "repair: this volume has no bootstrap region, which "
                 "holds the repair's admission lock and journal.  Refusing.\n");
         goto out;
@@ -9287,7 +9498,7 @@ static int do_accept_quarantine_loss(const char *device, long slice_arg,
         goto out;
     }
     q.slot = (uint32_t)slice_arg;
-    q.sector_off = q.sup.disklock_offset + (uint64_t)q.slot * 512;
+    q.sector_off = rec_unit(&q.sup, q.sup.disklock_offset, q.slot);
 
     printf("chk_mxfs v%s -- ACCEPT QUARANTINE LOSS on %s slice %u\n",
            CHK_MXFS_VERSION, device, q.slot);
@@ -9302,8 +9513,8 @@ static int do_accept_quarantine_loss(const char *device, long slice_arg,
     /* the records the repair reads: the slot, the bootstrap record, its journal */
     if (mxfs_off_read_sector_direct(dfd, q.sector_off, q.sector) < 0 ||
         mxfs_off_read_sector_direct(dfd, q.sup.bootstrap_offset, q.bootrec) < 0 ||
-        mxfs_off_read_sector_direct(dfd, q.sup.bootstrap_offset +
-                                    (uint64_t)CHK_BOOT_SEC_REPAIR * 512, jsec) < 0) {
+        mxfs_off_read_sector_direct(dfd, rec_unit(&q.sup, q.sup.bootstrap_offset,
+                                                  CHK_BOOT_SEC_REPAIR), jsec) < 0) {
         fprintf(stderr, "repair: cannot read the slot, the bootstrap record or "
                 "the repair journal\n");
         goto out;
@@ -9350,7 +9561,8 @@ static int do_accept_quarantine_loss(const char *device, long slice_arg,
             }
             printf("  slot %u was cleared by the journalled run; finishing the "
                    "release\n", q.slot);
-            if (mxfs_off_prove_no_writer(fd, dfd, q.sup.disklock_offset) < 0)
+            if (mxfs_off_prove_no_writer(fd, dfd, q.sup.disklock_offset,
+                                         mxfs_super_lbs(&q.sup)) < 0)
                 goto out;
             repair_slot = (int)q.slot;
             if (chk_release_lock(fd, dfd, &q, &j) < 0)
@@ -9491,7 +9703,8 @@ static int do_accept_quarantine_loss(const char *device, long slice_arg,
 
     /* ── step 2, REMOTE and device halves (tools/mxfs_offline.h) ── */
     printf("\n── proving exclusion ──────────────────────────────────────────\n");
-    if (mxfs_off_prove_no_writer(fd, dfd, q.sup.disklock_offset) < 0)
+    if (mxfs_off_prove_no_writer(fd, dfd, q.sup.disklock_offset,
+                                 mxfs_super_lbs(&q.sup)) < 0)
         goto out;
 
     /* ── step 3: every other slice must be settled ── */
@@ -9564,8 +9777,8 @@ static int do_accept_quarantine_loss(const char *device, long slice_arg,
         if (need_lock) {
             struct chk_bootstrap_rec lk = br;
 
-            if (chk_put_sector(fd, dfd, q.sup.bootstrap_offset +
-                               (uint64_t)CHK_BOOT_SEC_REPAIR_PRE * 512, q.bootrec) < 0)
+            if (chk_put_sector(fd, dfd, rec_unit(&q.sup, q.sup.bootstrap_offset,
+                                                 CHK_BOOT_SEC_REPAIR_PRE), q.bootrec) < 0)
                 goto out;
             lk.state = 5;
             lk.refused_reason = CHK_BOOT_REFUSE_OPERATOR_REPAIR;
@@ -9589,7 +9802,8 @@ static int do_accept_quarantine_loss(const char *device, long slice_arg,
             /* a mount that read the record just before the lock landed is
              * caught here: it would be heartbeating within the window */
             printf("\n── proving exclusion again, under the lock ────────────────────\n");
-            if (mxfs_off_prove_no_writer(fd, dfd, q.sup.disklock_offset) < 0 ||
+            if (mxfs_off_prove_no_writer(fd, dfd, q.sup.disklock_offset,
+                                         mxfs_super_lbs(&q.sup)) < 0 ||
                 chk_repair_table_clear(dfd, &q.sup, q.slot) != 0) {
                 chk_repair_abandon(fd, dfd, &q, &j);
                 goto out;
@@ -9739,10 +9953,11 @@ static int do_upgrade_protogate(int fd)
     struct mxfs_ondisk_super sup;
     uint8_t buf[MXFS_SUPER_SIZE];
     uint8_t sec[512];
+    uint8_t sb[MXFS_LBS_MAX];   /* an XFS superblock: a sector, CRC'd whole */
     uint64_t hb_ts[64];
     uint64_t hb_epoch[64];
     bool hb_active[64];
-    uint32_t agcount, agblocks, blocksize;
+    uint32_t agcount, agblocks, blocksize, sectsize;
     uint64_t xfs_off;
     uint32_t agno, slot, nlive = 0;
 
@@ -9764,7 +9979,7 @@ static int do_upgrade_protogate(int fd)
 
         hb_active[slot] = false;
         if (read_at(fd, sec, 512,
-                    sup.disklock_offset + (uint64_t)slot * 512) < 0)
+                    rec_unit(&sup, sup.disklock_offset, slot)) < 0)
             return 4;
         if (h->magic == 0x4D584C4B /* MXLK */ && h->flags == 1 /* ACTIVE */) {
             hb_active[slot] = true;
@@ -9783,7 +9998,7 @@ static int do_upgrade_protogate(int fd)
         if (!hb_active[slot])
             continue;
         if (read_at(fd, sec, 512,
-                    sup.disklock_offset + (uint64_t)slot * 512) < 0)
+                    rec_unit(&sup, sup.disklock_offset, slot)) < 0)
             return 4;
         if (h->magic == 0x4D584C4B && h->flags == 1 &&
             (h->timestamp_ms != hb_ts[slot] || h->epoch != hb_epoch[slot])) {
@@ -9865,15 +10080,21 @@ static int do_upgrade_protogate(int fd)
 
     /* ── step 3: XFS superblocks, secondaries first, primary LAST ── */
     xfs_off = sup.xfs_data_offset;
-    if (read_at(fd, sec, 512, xfs_off) < 0)
+    sectsize = xfs_sectsize_of(&sup);
+    if (sectsize == 0) {
+        fprintf(stderr, "upgrade: the envelope's logical block size %u is not "
+                "512 or 4096 — run a full check first\n", mxfs_super_lbs(&sup));
         return 4;
-    if (get_be32(sec + 0) != MXFS_SB_MAGIC) {
+    }
+    if (read_at(fd, sb, sectsize, xfs_off) < 0)
+        return 4;
+    if (get_be32(sb + 0) != MXFS_SB_MAGIC) {
         fprintf(stderr, "upgrade: no XFS superblock at data offset\n");
         return 4;
     }
-    blocksize = get_be32(sec + 4);
-    agblocks  = get_be32(sec + 0x54);
-    agcount   = get_be32(sec + 0x58);
+    blocksize = get_be32(sb + 4);
+    agblocks  = get_be32(sb + 0x54);
+    agcount   = get_be32(sb + 0x58);
     if (!blocksize || !agblocks || !agcount || agcount > 1u << 20) {
         fprintf(stderr, "upgrade: implausible geometry\n");
         return 4;
@@ -9883,18 +10104,18 @@ static int do_upgrade_protogate(int fd)
                        (uint64_t)agno * agblocks * blocksize;
         uint32_t incompat;
 
-        if (read_at(fd, sec, 512, off) < 0)
+        if (read_at(fd, sb, sectsize, off) < 0)
             return 4;
-        if (get_be32(sec + 0) != MXFS_SB_MAGIC) {
+        if (get_be32(sb + 0) != MXFS_SB_MAGIC) {
             fprintf(stderr, "upgrade: AG %u superblock bad magic — run a "
                     "full check first\n", agno);
             return 4;
         }
-        incompat = get_be32(sec + 0xD8);
+        incompat = get_be32(sb + 0xD8);
         if (incompat & CHK_SB_INCOMPAT_MXFS_PROTOGATE)
             continue;
-        put_be32(sec + 0xD8, incompat | CHK_SB_INCOMPAT_MXFS_PROTOGATE);
-        if (xfs_fix_crc_and_write(fd, sec, 512, 0xE0, off) < 0)
+        put_be32(sb + 0xD8, incompat | CHK_SB_INCOMPAT_MXFS_PROTOGATE);
+        if (xfs_fix_crc_and_write(fd, sb, sectsize, 0xE0, off) < 0)
             return 4;
     }
     printf("upgrade: XFS INCOMPAT_MXFS_PROTOGATE set on %u superblock "
@@ -10541,6 +10762,7 @@ static int full_check(int fd)
     check_prledger(fd, &super);         /* */
     check_bootstrap(fd, &super);        /* */
     check_slife(fd, &super);            /* 0.88.0 */
+    check_record_tails(fd, &super);     /* docs/4kn-support.md */
 
     /* 4. XFS superblock */
     struct xfs_geo geo;

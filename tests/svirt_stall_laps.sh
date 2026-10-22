@@ -57,14 +57,27 @@ for i in $(seq 1 "$LAPS"); do
     tests/packaged_round.sh rhel9 "$VERSION" >> "$L" 2>&1
     rc=$?; say "lap $i round_rc=$rc"
     [ $rc = 0 ] || { say "STOP: packaged round failed on lap $i"; exit 1; }
+    # Each lap's evidence directories, compared before and after: an unchanged
+    # newest directory is a previous lap's, and its contents are not this lap's.
+    # harness-lint: ok - taken only to be compared with the newest directory after the freeze test
+    F0=$(ls -td tests/evidence/tcp_peer_freeze_death/* 2>/dev/null | head -1)
     PREP=rhel9 tests/tcp_peer_freeze_death.sh >> "$L" 2>&1
     rc=$?; say "lap $i freeze_rc=$rc"
     [ $rc = 0 ] || { say "STOP: tcp_peer_freeze_death failed on lap $i"; exit 1; }
     s=$(date +%s)
+    # harness-lint: ok - taken only to be compared with the newest directory after the svirt test
+    D0=$(ls -td tests/evidence/selinux_svirt/* 2>/dev/null | head -1)
     tests/selinux_svirt_mxfs.sh "$A" >> "$L" 2>&1
     rc=$?
-    D=$(ls -td tests/evidence/selinux_svirt/* | head -1)
-    F=$(ls -td tests/evidence/tcp_peer_freeze_death/* | head -1)
+    # harness-lint: ok - replaced below when it is the directory that was newest before this lap
+    D=$(ls -td tests/evidence/selinux_svirt/* 2>/dev/null | head -1)
+    # harness-lint: ok - replaced below when it is the directory that was newest before this lap
+    F=$(ls -td tests/evidence/tcp_peer_freeze_death/* 2>/dev/null | head -1)
+    [ "$F" != "$F0" ] || F="none this lap"
+    if [ "$D" = "$D0" ]; then
+        D="${L%.*}_lap$i"; mkdir -p "$D"
+        say "lap $i: selinux_svirt_mxfs.sh left no evidence directory; this lap's captures go to $D"
+    fi
     say "lap $i svirt_rc=$rc wall=$(( $(date +%s) - s ))s $(grep -E '^t_(start|create)=' "$D/svirt.log" 2>/dev/null | tr '\n' ' ') svirt=$D freeze=$F"
     if [ $rc != 0 ]; then
         say "STALL on lap $i: stacks.log $(stat -c %s "$D/stacks.log" 2>/dev/null || echo absent) bytes"

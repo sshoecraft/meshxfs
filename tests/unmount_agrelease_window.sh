@@ -154,7 +154,7 @@ done
 first=$(echo $NODES | cut -d' ' -f1)
 # the device run.sh used: MXFS_DEV, else the device the prep recorded in the marker
 # (never /dev/sda: which target enumerates as sda on these nodes is not fixed)
-CHKDEV=${MXFS_DEV:-$(python3 -c 'import json; print(json.load(open(".cluster_marker.json"))["dev"])')}
+CHKDEV=${MXFS_DEV:-$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["dev"])' "${MXFS_MARKER:-.cluster_marker.json}")}
 timeout 240 "$SSH" "$first" "/src/mxfs/tools/chk_mxfs $CHKDEV >/dev/null 2>&1; echo CHK_RC=\$?" </dev/null 2>/dev/null | grep -a CHK_RC > "$EV/chk.txt"
 
 FAILS=0

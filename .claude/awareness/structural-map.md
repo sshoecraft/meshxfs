@@ -8070,55 +8070,244 @@
   fn main()
 
 [tools/criteria.py]
-  fn flat(value, width: int | None = None) -> str
+  fn lock_board(path: Path)
+  fn take_lock() -> None
+  fn board_for(config: str) -> Path
+  fn outcome_of(status, reason='') -> str | None
+  fn policy() -> dict
+  fn required_runs(row: str, config: str) -> int
+  fn active_candidate() -> dict
+  fn refuse_while_qualifying(what: str) -> None
+  fn flat(value, width: int | None=None) -> str
   fn wrap(text, width: int, indent: str) -> str
-  fn __init__(self, on: bool)
-  fn __call__(self, text, code) -> str
   fn status_of(entry: dict) -> str
   fn parse_at(text: str) -> str
   fn lift_config(argv: list) -> list
+  fn read_board(path: Path) -> dict
+  fn write_board(path: Path, data: dict) -> None
   fn load() -> dict
   fn save(data: dict) -> None
   fn find(data: dict, wanted: str) -> dict
+  fn spec_rows() -> list
+  fn spec_of(entry: dict) -> dict
+  fn find_or_adopt(data: dict, wanted: str) -> dict
   fn cell_of(entry: dict, config: str) -> dict
-  fn flake_count(entry: dict, config: str) -> tuple
+  fn runs_of(entry: dict, config: str) -> list
+  fn run_of(data: dict, row: str, config: str, iso: str) -> tuple
+  fn budget_of(entry: dict)
+  fn stamp() -> str
+  fn ledger_path(board: Path) -> Path
+  fn read_ledger(board: Path | None=None) -> Ledger
+  fn append_ledger(board: Path, items: list) -> None
+  fn ledger_runs(board: Path | None, config: str, row: str) -> list
+  fn ledger_run(board: Path | None, config: str, row: str, iso: str) -> dict | None
+  fn annotations(board: Path | None, config: str, row: str, iso: str) -> dict
+  fn note(config: str, row: str, iso: str, name: str, value: dict) -> dict
+  fn run_record(config: str, row: str, cell: dict, outcome: str) -> dict
+  fn push_history(cell: dict) -> None
+  fn write_cell(entry: dict, config: str, status: str, measured: str='', reason: str='', elapsed_s=None, build: str='', **extra) -> dict
+  fn fresh_iso(entry: dict, config: str, board: Path | None=None) -> str
+  fn named_runs() -> dict
+  fn record_impacts() -> dict
+  fn settled(board: Path | None, config: str, row: str, iso: str) -> str
+  fn context_runs(runs: list, build: str, candidate: str) -> list
+  fn grade(entry: dict, config: str, build: str='', candidate: str='', board: Path | None=None) -> dict
+  fn cell_status(entry: dict, config: str, build: str='', candidate: str='', board: Path | None=None) -> str
+  fn roll_up(entry: dict, build: str='', candidate: str='') -> str
   fn applies(entry: dict, config: str) -> bool
-  fn cell_status(entry: dict, config: str, build: str = "") -> str
-  fn roll_up(entry: dict, build: str = "") -> str
-  fn show_one(entry: dict, paint: Paint, build: str) -> int
-  fn board(criteria: list, paint: Paint, verbose: bool, at: str, build: str) -> int
+  fn verdict_note(verdict: dict) -> str
+  fn latest_label(verdict: dict, build: str, candidate: str) -> str
+  fn show_one(entry: dict, paint: Paint, build: str, candidate: str) -> int
+  fn board(criteria: list, paint: Paint, verbose: bool, at: str, build: str, candidate: str) -> int
   fn detector_script(detector: str) -> str
   fn cmd_gaps(criteria: list, paint: Paint, build: str) -> int
+  fn specification_only(what: str) -> None
   fn cmd_add(data: dict, args) -> int
+  fn cmd_move(data: dict, args) -> int
+  fn stall_over_limit(measured: str) -> int
   fn cmd_update(data: dict, args) -> int
+  fn cmd_pending(data: dict, args) -> int
+  fn cmd_executing(data: dict, args) -> int
+  fn cmd_finalize(data: dict, args) -> int
+  fn cmd_rows(data: dict, args) -> int
+  fn cmd_migrate_keys(data: dict, args) -> int
+  fn cmd_migrate_ledger(data: dict, args) -> int
+  fn approval_or_exit(proposal: str, kind: str, config: str, row: str, iso: str) -> dict
+  fn cmd_amend(data: dict, args) -> int
+  fn cmd_infra(data: dict, args) -> int
+  fn withdraw(data: dict, args, of: str, verb: str) -> int
+  fn release_boards() -> list
+  fn own_attach(path: Path) -> str
+  fn incidents(at: str='', boards: list | None=None) -> list
+  fn cmd_incidents(args) -> int
+  fn cmd_lap(args) -> int
+  fn cmd_rates(args) -> int
   fn cmd_remove(data: dict, args) -> int
   fn main() -> int
+  fn __init__(self, on: bool)
+  fn __call__(self, text, code) -> str
+  fn __init__(self)
+  fn census() -> dict
+  fn retext(value)
   class Paint
+  class Ledger
 
 [tools/defects.py]
+  fn platform_keys() -> tuple
+  fn take_lock() -> None
   fn load() -> dict
   fn save(data: dict) -> None
   fn rank(entry: dict) -> tuple
   fn reach(entry: dict) -> tuple
-  fn blocks(entry: dict, nodes: int, dlm) -> bool
-    called_by: cache_flush_worker_fn, main, mxfs_alloc_file_block, mxfs_fsync, print_summary
+  fn platform_of(entry: dict) -> str
+  fn blocks(entry: dict, nodes: int, selector: tuple, platform=None, candidate: str='') -> bool
+  fn verified_here(entry: dict, config: str, platform=None, candidate: str='') -> bool
   fn parse_at(text: str) -> tuple
   fn gate_label(gate: tuple) -> str
   fn lift_config(argv: list) -> list
   fn tally(entries: list) -> str
   fn source_of(entry: dict) -> str
   fn config_of(entry: dict) -> str
+  fn check_id(new_id: str) -> str
   fn mint(summary: str, taken) -> str
-    called_by: mxfs_pal_dbg_settle_inval_after_mint_take
   fn find(data: dict, wanted: str) -> dict
   fn flat(text, width: int) -> str
   fn wrap(text: str, width: int, indent: str) -> str
   fn show_one(entry: dict) -> None
   fn cmd_list(data: dict, args) -> int
   fn cmd_show(data: dict, args) -> int
+  fn check_impact(value, why) -> None
+  fn board_tool()
+  fn parse_cell(text: str, collateral: bool) -> dict
+  fn check_cells(cells: list) -> None
+  fn add_cells(entry: dict, args) -> list
+  fn binomial_upper_tail(k: int, n: int, p: float) -> float
+  fn clopper_pearson_lower(k: int, n: int, delta: float) -> float
+  fn laps_needed(k: int, n: int, delta: float, alpha: float) -> int
+  fn policy_numbers() -> tuple
+  fn find_batch(data: dict, bid: str) -> tuple
+  fn batch_runs(batch: dict) -> list
+  fn exposed(run: dict) -> bool
+  fn check_batch_lap(bid: str, row: str, config: str, candidate: str) -> None
+  fn cmd_batch(data: dict, args) -> int
+  fn cmd_measure(data: dict, args) -> int
+  fn rate_for(entry: dict, row: str, config: str, kind: str='calibrate') -> dict
+  fn cmd_plan_verify(data: dict, args) -> int
+  fn cmd_batch_check(data: dict, args) -> int
+  fn tree_build() -> str
+  fn retire_cells(entry: dict, disposition: str, why: str, configs=None) -> list
+  fn cmd_verify(data: dict, args) -> int
+  fn load_proposals() -> dict
+  fn save_proposals(data: dict) -> None
+  fn find_proposal(proposals: dict, pid: str) -> dict
+  fn file_hash(path: Path) -> str
+  fn require_approval(pid, kind: str, record, change: dict) -> dict
+  fn approval_for(pid: str, kind: str, target: dict) -> dict
+  fn cmd_propose(args) -> int
+  fn cmd_proposal_show(args) -> int
+  fn cmd_review(args) -> int
   fn cmd_add(data: dict, args) -> int
+  fn narrowing(entry: dict, args) -> dict
   fn cmd_update(data: dict, args) -> int
   fn cmd_remove(data: dict, args) -> int
+  fn cmd_rename(data: dict, args) -> int
+  fn config_pattern(text: str) -> str
+  fn cmd_migrate_config(data: dict, args) -> int
+  fn main() -> int
+  fn batch_options(sub, sized: bool)
+
+[tools/release_status.py]
+  fn release_build() -> tuple
+  fn board_problem(board: dict, srcv: str, crit_cache: dict, candidate: str='') -> tuple
+  fn release_builds(version: str) -> dict
+  fn live_comms() -> set
+  fn run_live(run: dict, version: str) -> str
+  fn run_problem(run: dict, version: str, srcv: str) -> tuple
+  fn platform_problem(platform: str, version: str, spec: dict, kernel: str='') -> tuple
+  fn defect_problem(configs: list, queue: list, platform: str='', candidate: str='') -> tuple
+  fn reaching(rows: list, queue: list) -> dict
+  fn default_install_configs(spec_rows: list) -> list
+  fn guarded(config: str, version: str, srcv: str) -> tuple
+  fn default_path_problems(spec_rows: list, queue: list, version: str, srcv: str, candidate: str) -> list
+  fn row_status(row: dict, version: str, srcv: str, queue: list, crit_cache: dict, candidate: str='') -> tuple
+  fn table(rows: list) -> str
+  fn main() -> int
+  fn line(cells)
+  fn on_release(f)
+
+[tools/release_candidate.py]
+  fn now() -> str
+  fn sha256(path: Path) -> str
+  fn mutable(rel: str) -> bool
+  fn frozen_paths() -> list
+  fn stamp_of(rel: str) -> list
+  fn spec_projection() -> str
+  fn platforms_projection() -> str
+  fn module_build() -> str
+  fn manifest_path(cid: str) -> Path
+  fn load(cid: str) -> dict
+  fn save(manifest: dict) -> None
+  fn set_active(manifest: dict) -> None
+  fn active() -> dict
+  fn drift(manifest: dict) -> list
+  fn cmd_create(args) -> int
+  fn move(manifest: dict, state: str, why: str) -> None
+  fn cmd_check(args) -> int
+  fn cmd_state(args) -> int
+  fn cmd_abandon(args) -> int
+  fn cmd_show(args) -> int
+  fn cmd_frozen(args) -> int
+  fn main() -> int
+
+[tools/release_run.py]
+  fn now() -> str
+  fn step_freeze(run: Run) -> tuple
+  fn step_presteps(run: Run) -> tuple
+  fn step_build(run: Run) -> tuple
+  fn step_textcheck(run: Run) -> tuple
+  fn step_packages(run: Run) -> tuple
+  fn lab(*args) -> str
+  fn board_configs() -> list
+  fn groups_of(nodes: int) -> list
+  fn big_luns() -> int
+  fn waves() -> list
+  fn host_settled(run: Run, log: Path) -> bool
+  fn board_verdict(cid: str, config: str, board: Path | None=None) -> list
+  fn step_boards(run: Run) -> tuple
+  fn step_drbd(run: Run) -> tuple
+  fn pve_kernels() -> list
+  fn step_pve(run: Run, kernel: str) -> tuple
+  fn step_platforms(run: Run) -> tuple
+  fn step_guards(run: Run) -> tuple
+  fn step_batches(run: Run) -> tuple
+  fn step_repeats(run: Run) -> tuple
+  fn step_seal(run: Run) -> tuple
+  fn plan_steps() -> list
+  fn do_step(run: Run, name: str) -> tuple
+  fn cmd_run(args) -> int
+  fn cmd_start(args) -> int
+  fn cmd_status(args) -> int
+  fn main() -> int
+  fn __init__(self, cid: str)
+  fn say(self, text: str) -> None
+  fn save(self) -> None
+  fn reload(self) -> None
+  fn env(self, **extra) -> dict
+  fn sh(self, args: list, log: Path, **env) -> int
+  fn record(self, step: str, outcome: str, detail: str, evidence: str, config: str) -> None
+  fn frozen_ok(self) -> bool
+  class Run
+
+[tools/release_plan.py]
+  fn parse_time(text: str) -> float
+  fn spent_seconds(manifest: dict) -> float
+  fn wall(config: str, row: str) -> float
+  fn default_configs() -> list
+  fn repeat_rows(config: str) -> list
+  fn schedule(candidate: str) -> dict
+  fn main() -> int
+
+[scripts/candidate_freeze_hook.py]
   fn main() -> int
 
 [tools/defects_classify.py]

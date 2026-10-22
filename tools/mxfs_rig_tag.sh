@@ -90,14 +90,26 @@ esac
 #    string out of sysfs; that is a property of the array, not of the path
 #    anyone used to reach it.
 #
-#    LOCALLY FIRST, and that is not an optimisation.  The suite's detectors run
+#    WHERE it is read depends on which host this is.  The suite's detectors run
 #    ON THE NODES (their results spool through /run/mxfs-suite), and a node has
 #    no ssh credentials for its peers — the lab secrets live on the dev host
 #    only.  A resolver that could only reach the hardware over ssh therefore
 #    answered "unknown" in the one place the answer was needed, while sitting
-#    on the very device it was asking about.  On the dev host the device is not
-#    present, so the ssh path below is what runs there.
+#    on the very device it was asking about: a node reads it locally.
+#
+#    The dev host never reads it locally.  A device path here names a NODE's
+#    device, and the same path on the dev host can be one of its own disks:
+#    /dev/sda there is its boot disk, whose vendor is ATA.  The 0.90.134
+#    capture gate did exactly that — a harness re-prepped the pair with the
+#    path its node's live mount had (/dev/sda), run.sh recorded rig=ata, and
+#    every later harness aborted "rig 'ata' declares no LUN".  So the dev host
+#    always asks a node, and it is told apart by the credentials that let it.
 [ -n "$DEV" ] || exit 1
+
+drives_nodes() {  # this host holds the lab's node credentials (as tools/mxfs_sshpass.sh finds them)
+    [ -r /tmp/.mxfs_pass ] && [ -s /tmp/.mxfs_pass ] && return 0
+    "$REPO/tools/mxfs_secrets.sh" get node >/dev/null 2>&1
+}
 
 vendor_of() {  # vendor_of <device> — the SCSI vendor of a device on THIS host
     local d b
@@ -130,9 +142,9 @@ platform_suffix() {  # platform_suffix <dmi sys_vendor>
     esac
 }
 
-vendor=$(vendor_of "$DEV")
-if [ -n "${vendor:-}" ]; then
-    suffix=$(platform_suffix "$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)")
+if ! drives_nodes; then
+    vendor=$(vendor_of "$DEV")
+    [ -n "${vendor:-}" ] && suffix=$(platform_suffix "$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)")
 else
     # MXFS_RIG_NODE first: the prep that establishes the identity may be
     # writing a marker for the first time (a new rig group's), and a marker

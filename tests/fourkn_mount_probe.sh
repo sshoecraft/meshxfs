@@ -17,15 +17,24 @@
 #
 # TREE names another built tree under ~/src (a published version's source, say
 # ~/src/mxfs-v130) whose module and tools the nodes load instead; the nodes see
-# it as /src/<its name>.
+# it as /src/<its name>.  MKFS_ARGS is passed to mkfs (-L formats a 4K-native
+# volume while that is TEST ONLY; the module then needs dbg_lbs_mount=1 in
+# MODARGS).
 #
-# Usage: [MODARGS="..."] [TREE=<path>] tests/fourkn_mount_probe.sh <dev> <node1> <node2>
+# ONE=1 mounts the first node only: it writes a 64 MiB file, unmounts, mounts
+# again and reads it back (the remount 120 s, the read 60 s).  Two nodes
+# writing inodes of the same 4096-byte blocks, which the merged inode-cluster
+# write exists for (docs/4kn-support.md), is tests/fourkn_merge_2node.sh.
+#
+# Usage: [MODARGS="..."] [MKFS_ARGS="..."] [ONE=1] [TREE=<path>] tests/fourkn_mount_probe.sh <dev> <node1> <node2>
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 . "$HERE/tools/mxfs_lab.sh"
 SSH="$HERE/tools/mxfs_sshpass.sh"
 DEV=${1:?device}; N1=${2:?node1}; N2=${3:?node2}
 MODARGS=${MODARGS:-}
+MKFS_ARGS=${MKFS_ARGS:-}
+ONE=${ONE:-0}
 TREE=${TREE:-$HERE}
 NREPO=/src/$(basename "$TREE")
 MNT=/mnt/fourkn
@@ -44,8 +53,34 @@ for n in "$N1" "$N2"; do
     case $r in "$SV "*) step "OK insmod $n srcversion/logical/physical: $r" ;; *) step "FAIL insmod $n: $r (want srcversion $SV)"; exit 1 ;; esac
 done
 
-r=$(on "$N1" "$NREPO/tools/mkfs_mxfs -f $DEV 2>&1 | tail -4; echo mkfs_rc=\${PIPESTATUS[0]}" 300)
+r=$(on "$N1" "$NREPO/tools/mkfs_mxfs $MKFS_ARGS -f $DEV 2>&1 | tail -4; echo mkfs_rc=\${PIPESTATUS[0]}" 300)
 case $r in *mkfs_rc=0*) step "OK mkfs on $N1: $(echo "$r" | tr '\n' '|')" ;; *) step "FAIL mkfs on $N1: $(echo "$r" | tr '\n' '|')" ;; esac
+
+if [ "$ONE" = 1 ]; then
+    mounted=""
+    r=$(on "$N1" "mkdir -p $MNT; timeout 110 mount -t mxfs $DEV $MNT; echo mount_rc=\$?" 120)
+    case $r in *mount_rc=0*) step "OK mount $N1 (alone)"; mounted=" $N1" ;; *) step "FAIL mount $N1: $(echo "$r" | tr '\n' '|')" ;; esac
+    if [ -n "$mounted" ]; then
+        r=$(on "$N1" "dd if=/dev/urandom of=$MNT/from_$N1 bs=1M count=64 status=none && sync && md5sum < $MNT/from_$N1" 60)
+        w1=$(echo "$r" | awk '{print $1}' | tail -1)
+        r=$(on "$N1" "timeout 55 umount $MNT; echo umount_rc=\$?" 60)
+        case $r in *umount_rc=0*) step "OK umount $N1 after the write" ;; *) step "FAIL umount $N1: $(echo "$r" | tr '\n' '|')" ;; esac
+        r=$(on "$N1" "timeout 110 mount -t mxfs $DEV $MNT; echo mount_rc=\$?" 120)
+        case $r in *mount_rc=0*) step "OK remount $N1" ;; *) step "FAIL remount $N1: $(echo "$r" | tr '\n' '|')"; mounted="" ;; esac
+        if [ -n "$mounted" ]; then
+            r2=$(on "$N1" "echo 3 > /proc/sys/vm/drop_caches; md5sum < $MNT/from_$N1" 60)
+            w2=$(echo "$r2" | awk '{print $1}' | tail -1)
+            [ -n "$w1" ] && [ "$w1" = "$w2" ] && step "OK $N1 reads its 64 MiB file intact after the remount ($w1)" || step "FAIL read after remount: wrote [$w1] read [$r2]"
+        fi
+    fi
+    for n in $mounted; do
+        r=$(on "$n" "timeout 55 umount $MNT; echo umount_rc=\$?" 60)
+        case $r in *umount_rc=0*) step "OK umount $n" ;; *) step "FAIL umount $n: $(echo "$r" | tr '\n' '|')" ;; esac
+    done
+    echo "--- $N1 kernel lines since $MARK (mxfs, XFS, I/O and SCSI errors)"
+    on "$N1" "dmesg | sed -n '/$MARK/,\$p' | grep -aiE 'mxfs|xfs|blocksize|sector|i/o error|sense|caw|compare|error|fail' | tail -60" 30
+    exit 0
+fi
 
 mounted=""
 for n in "$N1" "$N2"; do

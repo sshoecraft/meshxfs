@@ -121,7 +121,7 @@ in `tests/drc_autocapture.sh`, `drc_progress_watch.sh`,
 itself, plus CLAUDE.md RULE: NEVER WEDGE THE LAB HOST, exist.
 
 ### sess400/401 — long rig-run evidence in the session scratchpad is lost to a host reboot
-[[trap-long-rig-run-evidence-in-scratchpad-lost-to-host-reboot-sess400]]: a
+`trap-long-rig-run-evidence-in-scratchpad-lost-to-host-reboot-sess400`: a
 6-lap verification board pointed its output dir (`D385_OUT`) at the session
 scratchpad (`/tmp/...`). clyde was cleanly rebooted ~15 min into the board;
 the session, its in-flight agent, the scratchpad and every lap log died with
@@ -201,7 +201,7 @@ guarantee — always confirm `/proc/<pid>` still exists before treating a pid
 as a live run.
 
 ### sess414 — cumulative/unbudgeted dmesg sweeps corrupt board verdicts three ways
-[[trap-tck-sweep-cumulative-dmesg-false-verdicts-sess414]]: `tests/tmpfile_churn_kill.sh`'s
+`trap-tck-sweep-cumulative-dmesg-false-verdicts-sess414`: `tests/tmpfile_churn_kill.sh`'s
 tck dmesg sweep produced two consecutive FALSE FAILs of the node_death_replay
 board row on 0.27.7 while the FS behaved correctly, from three compounding
 flaws. (1) Per-node `timeout 60 $SSH ...` on an ssh timeout wrote rc=124 with
@@ -284,7 +284,7 @@ session: a reproducer must verify the mxfs MOUNT before its workload — after
 directory, so `dd`/`rm` "succeed" and every dmesg assertion passes vacuously.
 
 ### sess432 — a shared shutdown-ioctl number fired on the wrong filesystem, not on mxfs
-[[trap-vergate-goingdown-ioctl-shut-down-node-root-fs-sess432]]: `vergate.sh`
+`trap-vergate-goingdown-ioctl-shut-down-node-root-fs-sess432`: `vergate.sh`
 issued `XFS_IOC_GOINGDOWN` (`0x8004587d`) on `/mnt/vgate` unconditionally
 after a loop mount, without checking the mount succeeded. The mount had
 actually failed (`P303-FENCECAP-NOCAPS` → CAW refused with `-95` → mount(2)

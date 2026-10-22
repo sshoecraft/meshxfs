@@ -2025,6 +2025,18 @@ void mxfs_pal_bdev_set_drbd_cas(mxfs_bdev_t *dev, bool on)
 	(void)on;
 }
 
+/* The user-mode PAL addresses a file or a 512-byte device directly: it has no
+ * record-region translation, so it takes only the 512-byte layout. */
+int mxfs_pal_bdev_set_record_regions(mxfs_bdev_t *dev, uint32_t lbs, int n,
+				     const uint64_t *start, const uint64_t *units)
+{
+	(void)dev;
+	(void)n;
+	(void)start;
+	(void)units;
+	return lbs == 512 ? 0 : -EOPNOTSUPP;
+}
+
 int mxfs_pal_scsi_target_id(mxfs_bdev_t *dev, struct mxfs_pal_target_id *out)
 {
 	uint8_t std[96];
@@ -2580,6 +2592,15 @@ int mxfs_pal_bdev_compare_and_write_span(mxfs_bdev_t *dev, uint64_t offset,
 		return -EINVAL;
 	rc = user_file_swap(dev, offset, compare_buf, write_buf, write_len);
 	return rc == 1 ? -EOPNOTSUPP : rc;     /* a device: SCSI covers one sector */
+}
+
+/* a user-mode device is addressed in 512-byte blocks: its block swap is the
+ * sector swap */
+int mxfs_pal_bdev_compare_and_write_block(mxfs_bdev_t *dev, uint64_t offset,
+                                          const void *compare_buf,
+                                          const void *write_buf)
+{
+	return mxfs_pal_bdev_compare_and_write(dev, offset, compare_buf, write_buf);
 }
 
 /* the regular file the span swap emulates; a device is SG_IO, one sector */

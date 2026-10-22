@@ -1317,19 +1317,21 @@ design, a queue is not an archive — and they are preserved in the archived sna
 | `open_defects` test in `criteria.json` AND `data/criteria.json` | removed from both — the board is 29 rows at 2/net/mesh/direct, was 30 |
 | `./showstat.sh` in `run.sh`, `scripts/caw_ladder_fua.sh`, `tests/suite/run_suite.sh`, `README.md` | `tools/criteria.py` |
 
-**CLOSED in 0.77.0 (sess576): the harness no longer writes a board file.** `run.sh`,
-`tests/suite/run_one.sh` and `scripts/dlm_scaling_diag.sh` all go through `tools/criteria.py`;
+**CLOSED in 0.77.0 (sess576): the harness no longer writes a board file.** `run.sh` and
+`scripts/dlm_scaling_diag.sh` go through `tools/criteria.py` (`tests/suite/run_one.sh`, which
+recorded without a build stamp, was deleted in 0.90.133 with `run_suite.sh` and its callers);
 `criteria.json`, its four rig variants, `scripts/gen_criteria.py` and `scripts/matrix_check.py`
 are archived. `criteria.py` gained the operations that made this possible:
 
 | operation | why it exists |
 |---|---|
-| `update --reason TEXT` | WHICH check failed. `flake_count` reads it to separate a real fault from the rig failing to form; the import had dropped it from the live cell. |
+| `update --reason TEXT` | WHICH check failed, kept whole in the run ledger. It never excuses a failure: the outcome (`--outcome`, or derived from the status) is decided where the run happened. |
 | `update --calibrate` | a run establishing a budget that does not exist yet records elapsed without being scored against a number nobody set. |
 | `pending <id...> --at C --run-id R` | mark what a run intends to run; pushes the outgoing verdict to history first. |
 | `executing <id> --at C --run-id R` | stamp the one test in flight, so a death can tell in-flight from never-reached. |
 | `finalize [--run-id R]` | leftover markers -> ABORTED (was executing) / NOT RUN (never reached). No id = heal every stale marker. |
-| `rows` | the matrix as TSV: phase, transport, id, coord, min_nodes, max_nodes, budget_s, budget_scale. |
+| `rows [--at C]` | the matrix as TSV: phase, applies_to, id, coord, min_nodes, max_nodes, budget_s, budget_scale; with `--at`, only the rows that apply to C (`scripts/prun.sh` takes its row list from it). |
+| `lap <run id>` | one run.sh run's own verdict from the runs it recorded: exit 0 all passed, 1 any did not, 2 none recorded (`scripts/board_laps.sh` grades each lap with it). |
 
 **Two bugs this fixed.** `run.sh`'s `finalize_pending` and `run_one.sh`'s recorder both replaced
 the cell wholesale and **dropped `history`**, so a died run or a single-test invocation erased the
@@ -1407,18 +1409,23 @@ are refused with the replacement named. `defects.py 2` alone means every configu
 size, and `2/disk` every disk one; `criteria.py 2` alone is refused, because a cell is one exact
 column and picking one silently is how a TCP green gets read as a CAW one.
 
-**`criteria.py` keeps the FLAKY rule of the retired `showstat.sh` exactly** (user directive, sess43, two
-rounds), and it must stay that way:
+**Grading is from the run ledger, and nothing ages out** (0.90.133, owner's decisions in
+`docs/rulings/release-verification-rework.md`; the design is `docs/release-process.md`). The
+FLAKY rule, its 11-run window (`FLAKE_WINDOW`), the `RIG_NOISE` reason regex and the lap tools that
+pushed failures out of the window are gone:
 
-- FLAKY = the test itself detected a fault on a formed cluster inside the last `FLAKE_WINDOW` (11)
-  runs, current cell plus its `history`. It is not green and does not count toward the bar.
-- **`FAIL` only, never `ABORTED`.** An `ABORTED` cell says the run died mid-test and the result is
-  UNKNOWN; counting it makes "we never found out" indistinguishable from "a fault was detected".
-  `ag_strand_repair` at 2/net/mesh/direct is the case that proves it — one `ABORTED` reading "run died while
-  this test was executing", and it is a PASS.
-- Failures whose `reason` matches `RIG_NOISE` (`pre-assert|NO_TERMINAL_RECORD|run was killed|prep
-  fail`) are rig formation, not MXFS faults, and never count.
-- `prep_cluster` and `open_defects` never flake at all.
+- Every run is a line in `<board>.runs.jsonl`, appended and fsynced under the board's lock before
+  the board file is rewritten; annotations (`retired_by`, `detector_defect`, `infra_proven`,
+  `withdrawn`) are separate lines. The board file is display only.
+- A run's outcome is one of PASS, FAIL, INFRA, INCOMPLETE, UNREACHED, SKIP, CONTROL, decided where
+  it happened (run.sh's split pre-assert: not mounted is INCOMPLETE, mounted but unreadable or a
+  silent node is a stability FAIL). An unknown status is recorded as FAIL, never refused. A stall
+  over the policy's `stall_limit_s` is a FAIL.
+- `--candidate C` grades on runs of C only; without one, by build. `incidents` lists every FAIL
+  and INCOMPLETE on the release boards, any build, that no open record names and no reviewed
+  disposition settles, and exits 1 while there is one.
+- A run under a module knob, a test environment or rig budgets is a `variant`: it never grades a
+  candidate, and its failures are still incidents.
 
 **`applies()` filters the board to what is runnable in a configuration**, from the criterion's
 `transport` + `min_nodes`/`max_nodes`. Without it the 2/net/mesh/direct board printed 44 rows against

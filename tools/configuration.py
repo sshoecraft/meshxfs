@@ -156,6 +156,9 @@ def parse(text: str) -> Configuration:
     if attach not in ATTACHES:
         raise ConfigurationError("%r: attach %r; expected one of %s" % (raw, attach, list(ATTACHES)))
     if not ATTACHES[attach].get("implemented") and not own_rig_allowed(attach):
+        if ATTACHES[attach].get("own_rig"):
+            raise ConfigurationError("%r: attach %r is verified on a rig of its own; name its "
+                                     "board's runs with MXFS_OWN_RIG=1 set" % (raw, attach))
         raise ConfigurationError("%r: attach %r is named in the design but not implemented"
                                  % (raw, attach))
     return Configuration(nodes, cls, method, attach)
@@ -399,11 +402,11 @@ def selftest() -> int:
     expect("translate xfs", translate_retired("1/xfs"), "1/xfs")
     expect("shape", parse("8/net/mesh/direct").shape, "net-mesh-direct")
     expect("shape xfs", parse("1/xfs").shape, "xfs")
-    expect("release matrix", len(release_matrix()), 10)
+    expect("release matrix", len(release_matrix()), 16)
     expect("release at 2", [c.key for c in release_matrix(2)],
            ["2/disk/caw/direct", "2/disk/caw/mpath", "2/net/mesh/direct", "2/net/mesh/mpath"])
     expect("release at 16", [c.key for c in release_matrix(16)],
-           ["16/disk/caw/direct", "16/disk/caw/mpath"])
+           ["16/disk/caw/direct", "16/disk/caw/mpath", "16/net/mesh/direct", "16/net/mesh/mpath"])
     expect("released earlier, not in the matrix",
            sorted(set(DEFS.get("released_earlier", {})) - {"_"} & set(DEFS["release_matrix"])), [])
 

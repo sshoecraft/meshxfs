@@ -46,6 +46,8 @@
 #include <sys/sysmacros.h>
 #include <scsi/sg.h>
 
+#include <mxfs/mxfs_super.h>    /* mxfs_rec_phys: where a record-region unit lives */
+
 /* Heartbeat table layout (dlm/disklock.h) */
 #define MXFS_OFF_HB_SLOTS        64
 #define MXFS_OFF_HB_RECORD_SIZE  512
@@ -248,13 +250,27 @@ static inline int mxfs_off_drbd_prove(int minor, int quiet)
     return -1;
 }
 
+/* Where heartbeat slot `slot`'s record is: the slot-th 512-byte unit of the
+ * disklock region, which on a volume formatted for larger logical blocks
+ * (lbs, from the envelope: docs/4kn-support.md) is the first 512 bytes of a
+ * block of its own. */
+static inline uint64_t mxfs_off_hb_offset(uint64_t disklock_offset, int slot,
+                                          uint32_t lbs)
+{
+    return mxfs_rec_phys(disklock_offset,
+                         disklock_offset + (uint64_t)slot * MXFS_OFF_HB_RECORD_SIZE,
+                         lbs);
+}
+
 /*
  * The REMOTE and LUN proofs.  fd is the caller's O_EXCL descriptor (the LOCAL
- * proof), dfd an O_DIRECT descriptor on the same device.  Prints what it
- * proved and every reason it could not; returns 0 only when all proofs hold.
+ * proof), dfd an O_DIRECT descriptor on the same device, lbs the volume's
+ * logical block size (mxfs_super_lbs).  Prints what it proved and every reason
+ * it could not; returns 0 only when all proofs hold.
  */
 static inline int mxfs_off_prove_no_writer(int fd, int dfd,
-                                           uint64_t disklock_offset)
+                                           uint64_t disklock_offset,
+                                           uint32_t lbs)
 {
     uint64_t hb_ts[MXFS_OFF_HB_SLOTS], hb_ep[MXFS_OFF_HB_SLOTS];
     uint64_t keys[MXFS_OFF_PR_MAX_KEYS];
@@ -267,8 +283,8 @@ static inline int mxfs_off_prove_no_writer(int fd, int dfd,
         const struct mxfs_off_hb_hdr *hh = (const void *)sec;
 
         hb_live[slot] = 0;
-        if (mxfs_off_read_sector_direct(dfd, disklock_offset +
-                                        (uint64_t)slot * MXFS_OFF_HB_RECORD_SIZE,
+        if (mxfs_off_read_sector_direct(dfd, mxfs_off_hb_offset(disklock_offset,
+                                                                slot, lbs),
                                         sec) < 0)
             continue;
         if (hh->magic == MXFS_OFF_HB_MAGIC &&
@@ -287,8 +303,8 @@ static inline int mxfs_off_prove_no_writer(int fd, int dfd,
 
         if (!hb_live[slot])
             continue;
-        if (mxfs_off_read_sector_direct(dfd, disklock_offset +
-                                        (uint64_t)slot * MXFS_OFF_HB_RECORD_SIZE,
+        if (mxfs_off_read_sector_direct(dfd, mxfs_off_hb_offset(disklock_offset,
+                                                                slot, lbs),
                                         sec) < 0)
             continue;
         if (hh->magic == MXFS_OFF_HB_MAGIC &&

@@ -53,10 +53,12 @@ for ARM in 1 0; do
         # one; re-reading the newest directory then scores the PREVIOUS lap's
         # artifacts again, which is how four laps in a row "reproduced" a
         # failure none of them had run.
+        # harness-lint: ok - taken only to be compared with the newest directory after the lap
         before=$(ls -dt tests/evidence/run_fence_during_write_* 2>/dev/null | head -1)
         timeout 60 ./run.sh 2/net/mesh/direct fence_during_write > "$OUT/arm${ARM}_lap$i.log" 2>&1
         rc=$?
         ran=$((ran+1))
+        # harness-lint: ok - refused below when it is the directory that was newest before the lap
         d=$(ls -dt tests/evidence/run_fence_during_write_* 2>/dev/null | head -1)
         if [ "$d" = "$before" ]; then
             echo "  ARM $ARM lap $i rc=$rc NO-NEW-EVIDENCE (run produced nothing; not counted) $(grep -am1 'ERROR' "$OUT/arm${ARM}_lap$i.log" | cut -c1-90)"

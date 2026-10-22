@@ -62,14 +62,30 @@
 #define MXFS_FIBT_CRC_MAGIC          0x4D464933  /* "MFI3" */
 
 #define XFS_BLOCKSIZE           4096
-#define XFS_SECTSIZE            512
 #define NULLFSINO               0xFFFFFFFFFFFFFFFFULL
 
 /* Minimum blocks for last AG */
 #define MIN_AG_BLOCKS           64
 
-/* New AG free-space layout: block 0=headers, 1=BNO, 2=CNT, 3=INO, 4=FINO */
-#define NEW_AG_HEADER_BLOCKS    5
+/* The XFS sector size of this volume, which is the logical block size it was
+ * formatted for (docs/4kn-support.md): 512, or 4096.  Read from the primary
+ * superblock and checked against the envelope and the device before anything
+ * is written. */
+static uint32_t sectsize = 512;
+
+/* The blocks the four AG header sectors take: 1 at 512 (they share block 0),
+ * 4 at 4096 (each its own sector, and a sector is a block). */
+static uint32_t hdr_blocks(void)
+{
+    return (4 * sectsize + XFS_BLOCKSIZE - 1) / XFS_BLOCKSIZE;
+}
+
+/* New AG free-space layout: the headers, then the BNO, CNT, INO and FINO
+ * roots (blocks 0-4 at 512, 0-7 at 4096); free space starts after them */
+static uint32_t new_ag_header_blocks(void)
+{
+    return hdr_blocks() + 4;
+}
 
 /* ─── Software CRC32C (Castagnoli polynomial 0x82F63B78) ─── */
 
@@ -341,10 +357,12 @@ struct xfs_sb_info {
     uint16_t sectsize;
     uint16_t inodesize;
     uint16_t inopblock;
+    uint8_t  logsectlog;    /* 0 at 512; the sector's log2 on a larger one */
+    uint16_t logsectsize;
 };
 
 /*
- * Parse XFS superblock from raw 512-byte sector buffer.
+ * Parse XFS superblock from its raw sector buffer.
  */
 static void parse_xfs_sb(const uint8_t *sec, struct xfs_sb_info *sb)
 {
@@ -374,6 +392,8 @@ static void parse_xfs_sb(const uint8_t *sec, struct xfs_sb_info *sb)
     sb->fdblocks    = get_be64(sec + 144);
     sb->inoalignmt  = get_be32(sec + 180);
     sb->dirblklog   = sec[192];
+    sb->logsectlog  = sec[193];
+    sb->logsectsize = get_be16(sec + 194);
     sb->logsunit    = get_be32(sec + 196);
     sb->features2   = get_be32(sec + 200);
     sb->bad_features2 = get_be32(sec + 204);
@@ -385,7 +405,7 @@ static void parse_xfs_sb(const uint8_t *sec, struct xfs_sb_info *sb)
 }
 
 /*
- * Write the full XFS superblock sector (512 bytes) from parsed fields.
+ * Write the full XFS superblock sector (sectsize bytes) from parsed fields.
  * Used for the primary SB and secondary SB copies in new AGs.
  *
  * For secondary SBs: inprogress=1, icount/ifree/fdblocks=0,
@@ -394,7 +414,7 @@ static void parse_xfs_sb(const uint8_t *sec, struct xfs_sb_info *sb)
 static void build_xfs_sb_sector(uint8_t *sec, const struct xfs_sb_info *sb,
                                 bool primary)
 {
-    memset(sec, 0, 512);
+    memset(sec, 0, sectsize);
 
     put_be32(sec + 0, MXFS_SB_MAGIC);
     put_be32(sec + 4, sb->blocksize);
@@ -436,8 +456,11 @@ static void build_xfs_sb_sector(uint8_t *sec, const struct xfs_sb_info *sb,
     put_be32(sec + 184, 0);  /* unit */
     put_be32(sec + 188, 0);  /* width */
     sec[192] = sb->dirblklog;
-    sec[193] = 0;  /* logsectlog */
-    put_be16(sec + 194, 0);  /* logsectsize */
+    /* the log sector as formatted: 0 at 512, the sector size on a larger one
+     * (writing 0 there would leave XFS_SB_VERSION_SECTORBIT with no log
+     * sector, which the kernel refuses) */
+    sec[193] = sb->logsectlog;
+    put_be16(sec + 194, sb->logsectsize);
     put_be32(sec + 196, sb->logsunit);
     put_be32(sec + 200, sb->features2);
     put_be32(sec + 204, sb->bad_features2);
@@ -451,25 +474,27 @@ static void build_xfs_sb_sector(uint8_t *sec, const struct xfs_sb_info *sb,
     put_be64(sec + 240, 0);  /* lsn */
     /* meta_uuid[248] = 0 */
 
-    xfs_set_crc(sec, 512, 224);
+    xfs_set_crc(sec, sectsize, 224);    /* over the whole sector */
 }
 
 /* ─── New AG structure writers ─── */
 
 /*
- * Write the AGF sector (512 bytes) for a new AG.
+ * Write the AGF sector (sectsize bytes) for a new AG.
  */
 static void write_agf_sector(uint8_t *sec, uint32_t agno, uint32_t aglen,
                               uint32_t freeblks, const uint8_t *uuid)
 {
-    memset(sec, 0, 512);
+    uint32_t h = hdr_blocks();
+
+    memset(sec, 0, sectsize);
 
     put_be32(sec + 0x00, MXFS_AGF_MAGIC);
     put_be32(sec + 0x04, 1);          /* versionnum */
     put_be32(sec + 0x08, agno);       /* seqno */
     put_be32(sec + 0x0C, aglen);      /* length */
-    put_be32(sec + 0x10, 1);          /* roots[0] = bnoroot */
-    put_be32(sec + 0x14, 2);          /* roots[1] = cntroot */
+    put_be32(sec + 0x10, h);          /* roots[0] = bnoroot, after the headers */
+    put_be32(sec + 0x14, h + 1);      /* roots[1] = cntroot */
     put_be32(sec + 0x18, 0);          /* roots[2] = rmaproot (disabled) */
     put_be32(sec + 0x1C, 1);          /* levels[0] = bnolevel */
     put_be32(sec + 0x20, 1);          /* levels[1] = cntlevel */
@@ -490,25 +515,26 @@ static void write_agf_sector(uint8_t *sec, uint32_t agno, uint32_t aglen,
 
     /* spare64, lsn = 0 (already zeroed by memset) */
 
-    xfs_set_crc(sec, 512, 0xD8);     /* crc */
+    xfs_set_crc(sec, sectsize, 0xD8);    /* crc, over the whole sector */
 }
 
 /*
- * Write the AGI sector (512 bytes) for a new AG (no allocated inodes).
+ * Write the AGI sector (sectsize bytes) for a new AG (no allocated inodes).
  */
 static void write_agi_sector(uint8_t *sec, uint32_t agno, uint32_t aglen,
                               const uint8_t *uuid)
 {
+    uint32_t h = hdr_blocks();
     int i;
 
-    memset(sec, 0, 512);
+    memset(sec, 0, sectsize);
 
     put_be32(sec + 0x00, MXFS_AGI_MAGIC);
     put_be32(sec + 0x04, 1);             /* versionnum */
     put_be32(sec + 0x08, agno);          /* seqno */
     put_be32(sec + 0x0C, aglen);         /* length */
     put_be32(sec + 0x10, 0);             /* count = 0 (no inodes) */
-    put_be32(sec + 0x14, 3);             /* root = inobt at block 3 */
+    put_be32(sec + 0x14, h + 2);         /* root = inobt, two after the headers */
     put_be32(sec + 0x18, 1);             /* level = 1 */
     put_be32(sec + 0x1C, 0);             /* freecount = 0 */
     put_be32(sec + 0x20, 0xFFFFFFFF);    /* newino = NULLAGINO */
@@ -521,20 +547,22 @@ static void write_agi_sector(uint8_t *sec, uint32_t agno, uint32_t aglen,
     memcpy(sec + 0x128, uuid, 16);      /* uuid */
 
     /* finobt fields */
-    put_be32(sec + 0x148, 4);           /* free_root = finobt at block 4 */
+    put_be32(sec + 0x148, h + 3);       /* free_root = finobt, after the inobt's */
     put_be32(sec + 0x14C, 1);           /* free_level = 1 */
 
-    xfs_set_crc(sec, 512, 0x138);        /* crc */
+    xfs_set_crc(sec, sectsize, 0x138);   /* crc, over the whole sector */
 }
 
 /*
- * Write the AGFL sector (512 bytes) for a new AG (empty free list).
+ * Write the AGFL sector (sectsize bytes) for a new AG (empty free list).
  */
 static void write_agfl_sector(uint8_t *sec, uint32_t agno, const uint8_t *uuid)
 {
+    /* the sector holds (sectsize - 36) / 4 entries: 119 at 512, 1015 at 4096 */
+    int nbno = (int)((sectsize - 0x24) / 4);
     int i;
 
-    memset(sec, 0, 512);
+    memset(sec, 0, sectsize);
 
     put_be32(sec + 0x00, MXFS_AGFL_MAGIC);
     put_be32(sec + 0x04, agno);          /* seqno */
@@ -543,10 +571,10 @@ static void write_agfl_sector(uint8_t *sec, uint32_t agno, const uint8_t *uuid)
     /* crc at 0x20 — computed below */
 
     /* All AGFL entries = 0xFFFFFFFF (NULLAGBLOCK) */
-    for (i = 0; i < 119; i++)
+    for (i = 0; i < nbno; i++)
         put_be32(sec + 0x24 + i * 4, 0xFFFFFFFF);
 
-    xfs_set_crc(sec, 512, 0x20);         /* crc */
+    xfs_set_crc(sec, sectsize, 0x20);    /* crc, over the whole sector */
 }
 
 /*
@@ -595,15 +623,19 @@ static int write_new_ag(int fd, uint32_t agno, uint32_t aglen,
                          const struct xfs_sb_info *sb,
                          const uint8_t *uuid)
 {
-    uint8_t *block;
+    uint8_t *block, *hdr;
+    uint32_t h = hdr_blocks();
     uint64_t ag_byte_offset;
     uint32_t free_start;
     uint32_t freeblks;
     uint8_t rec[8];
 
     block = calloc(1, XFS_BLOCKSIZE);
-    if (!block) {
+    hdr = calloc(h, XFS_BLOCKSIZE);
+    if (!block || !hdr) {
         pr_err("resize_mxfs: failed to allocate AG buffer\n");
+        free(block);
+        free(hdr);
         return -1;
     }
 
@@ -611,72 +643,79 @@ static int write_new_ag(int fd, uint32_t agno, uint32_t aglen,
                      (uint64_t)agno * sb->agblocks * XFS_BLOCKSIZE;
 
     /* Free space starts after header blocks */
-    free_start = NEW_AG_HEADER_BLOCKS;
-    freeblks = aglen - NEW_AG_HEADER_BLOCKS;
+    free_start = new_ag_header_blocks();
+    freeblks = aglen - new_ag_header_blocks();
 
     pr_verbose("  AG %u: offset=%llu aglen=%u free_start=%u freeblks=%u\n",
                agno, (unsigned long long)ag_byte_offset, aglen,
                free_start, freeblks);
 
-    /* Block 0: SB + AGF + AGI + AGFL (4 sectors in one 4KB block) */
-    memset(block, 0, XFS_BLOCKSIZE);
+    /* The headers: SB + AGF + AGI + AGFL, a sector each (four sectors in
+     * block 0 at 512; blocks 0-3 at 4096) */
+    memset(hdr, 0, (size_t)h * XFS_BLOCKSIZE);
 
     /* SB sector (secondary copy) */
-    build_xfs_sb_sector(block + 0, sb, false);
+    build_xfs_sb_sector(hdr + 0, sb, false);
 
     /* AGF sector */
-    write_agf_sector(block + 512, agno, aglen, freeblks, uuid);
+    write_agf_sector(hdr + sectsize, agno, aglen, freeblks, uuid);
 
     /* AGI sector */
-    write_agi_sector(block + 1024, agno, aglen, uuid);
+    write_agi_sector(hdr + 2 * sectsize, agno, aglen, uuid);
 
     /* AGFL sector */
-    write_agfl_sector(block + 1536, agno, uuid);
+    write_agfl_sector(hdr + 3 * sectsize, agno, uuid);
 
-    if (write_sectors(fd, ag_byte_offset, block, XFS_BLOCKSIZE) < 0)
+    if (write_sectors(fd, ag_byte_offset, hdr, (uint64_t)h * XFS_BLOCKSIZE) < 0)
         goto fail;
 
-    /* Block 1: BNO btree root — one record for all free space */
+    /* Block h: BNO btree root — one record for all free space */
     memset(rec, 0, sizeof(rec));
     put_be32(rec + 0, free_start);  /* startblock */
     put_be32(rec + 4, freeblks);    /* blockcount */
 
     write_btree_block(block, MXFS_ABTB_CRC_MAGIC, agno,
-                      (uint64_t)agno * sb->agblocks + 1,
+                      (uint64_t)agno * sb->agblocks + h,
                       1, rec, 8, uuid);
 
-    if (write_sectors(fd, ag_byte_offset + XFS_BLOCKSIZE, block, XFS_BLOCKSIZE) < 0)
+    if (write_sectors(fd, ag_byte_offset + (uint64_t)h * XFS_BLOCKSIZE, block,
+                      XFS_BLOCKSIZE) < 0)
         goto fail;
 
-    /* Block 2: CNT btree root — same single free extent record */
+    /* Block h + 1: CNT btree root — same single free extent record */
     write_btree_block(block, MXFS_ABTC_CRC_MAGIC, agno,
-                      (uint64_t)agno * sb->agblocks + 2,
+                      (uint64_t)agno * sb->agblocks + h + 1,
                       1, rec, 8, uuid);
 
-    if (write_sectors(fd, ag_byte_offset + 2 * XFS_BLOCKSIZE, block, XFS_BLOCKSIZE) < 0)
+    if (write_sectors(fd, ag_byte_offset + (uint64_t)(h + 1) * XFS_BLOCKSIZE, block,
+                      XFS_BLOCKSIZE) < 0)
         goto fail;
 
-    /* Block 3: INO btree root — empty (no inodes in new AG) */
+    /* Block h + 2: INO btree root — empty (no inodes in new AG) */
     write_btree_block(block, MXFS_IBT_CRC_MAGIC, agno,
-                      (uint64_t)agno * sb->agblocks + 3,
+                      (uint64_t)agno * sb->agblocks + h + 2,
                       0, NULL, 0, uuid);
 
-    if (write_sectors(fd, ag_byte_offset + 3 * XFS_BLOCKSIZE, block, XFS_BLOCKSIZE) < 0)
+    if (write_sectors(fd, ag_byte_offset + (uint64_t)(h + 2) * XFS_BLOCKSIZE, block,
+                      XFS_BLOCKSIZE) < 0)
         goto fail;
 
-    /* Block 4: FINO btree root — empty (no inode chunks, so no free inodes) */
+    /* Block h + 3: FINO btree root — empty (no inode chunks, so no free inodes) */
     write_btree_block(block, MXFS_FIBT_CRC_MAGIC, agno,
-                      (uint64_t)agno * sb->agblocks + 4,
+                      (uint64_t)agno * sb->agblocks + h + 3,
                       0, NULL, 0, uuid);
 
-    if (write_sectors(fd, ag_byte_offset + 4 * XFS_BLOCKSIZE, block, XFS_BLOCKSIZE) < 0)
+    if (write_sectors(fd, ag_byte_offset + (uint64_t)(h + 3) * XFS_BLOCKSIZE, block,
+                      XFS_BLOCKSIZE) < 0)
         goto fail;
 
     free(block);
+    free(hdr);
     return 0;
 
 fail:
     free(block);
+    free(hdr);
     return -1;
 }
 
@@ -723,8 +762,9 @@ int main(int argc, char *argv[])
     struct mxfs_ondisk_super msup;
     uint32_t computed_crc;
 
-    /* XFS superblock */
-    uint8_t xfs_sb_raw[512];
+    /* XFS superblock: read as a whole filesystem block, which an O_DIRECT
+     * descriptor can read on a device of either logical block size */
+    uint8_t xfs_sb_raw[XFS_BLOCKSIZE];
     struct xfs_sb_info sb;
 
     /* Resize geometry */
@@ -865,7 +905,7 @@ int main(int argc, char *argv[])
 
     /* ─── Step 4: Read existing XFS superblock ─── */
 
-    if (read_sectors(fd, msup.xfs_data_offset, xfs_sb_raw, 512) < 0) {
+    if (read_sectors(fd, msup.xfs_data_offset, xfs_sb_raw, XFS_BLOCKSIZE) < 0) {
         close(fd);
         return 1;
     }
@@ -880,6 +920,30 @@ int main(int argc, char *argv[])
         close(fd);
         return 1;
     }
+
+    /* The sector is the logical block the volume was formatted for
+     * (docs/4kn-support.md), and the device must still have it: new AG
+     * headers are placed and checksummed by it. */
+    if (sb.sectsize != mxfs_super_lbs(&msup) ||
+        (sb.sectsize != 512 && sb.sectsize != 4096)) {
+        pr_err("resize_mxfs: %s: XFS sector size %u is not the %u-byte logical "
+               "block the envelope records\n", device, sb.sectsize,
+               mxfs_super_lbs(&msup));
+        close(fd);
+        return 1;
+    }
+    if (is_blkdev) {
+        int lbs = 0;
+
+        if (ioctl(fd, BLKSSZGET, &lbs) < 0 || (uint32_t)lbs != sb.sectsize) {
+            pr_err("resize_mxfs: %s: this volume was formatted for %u-byte "
+                   "logical blocks and the device has %d-byte ones\n",
+                   device, sb.sectsize, lbs);
+            close(fd);
+            return 1;
+        }
+    }
+    sectsize = sb.sectsize;
 
     if (sb.blocksize != XFS_BLOCKSIZE) {
         pr_err("resize_mxfs: %s: unexpected XFS blocksize %u (expected %u)\n",
@@ -983,7 +1047,7 @@ int main(int argc, char *argv[])
                 this_aglen = remainder;
             else
                 this_aglen = sb.agblocks;
-            added_freeblks += this_aglen - NEW_AG_HEADER_BLOCKS;
+            added_freeblks += this_aglen - new_ag_header_blocks();
         }
     }
 
@@ -1015,7 +1079,7 @@ int main(int argc, char *argv[])
         else
             this_aglen = sb.agblocks;
         pr_info("  AG %u: %u blocks, %u free\n",
-                agno, this_aglen, this_aglen - NEW_AG_HEADER_BLOCKS);
+                agno, this_aglen, this_aglen - new_ag_header_blocks());
     }
 
     pr_info("Updating XFS superblock: dblocks %llu -> %llu\n",
@@ -1090,7 +1154,8 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        /* Rebuild just the SB sector (first 512 bytes) with updated fields */
+        /* Rebuild just the SB sector (its first sectsize bytes) with updated
+         * fields: at 4096 the sector is the whole block */
         build_xfs_sb_sector(header_block, &sb, true);
 
         if (write_sectors(fd, msup.xfs_data_offset, header_block,
@@ -1116,7 +1181,7 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        /* Rebuild just the SB sector (first 512 bytes) as secondary */
+        /* Rebuild just the SB sector (its first sectsize bytes) as secondary */
         build_xfs_sb_sector(header_block, &sb, false);
 
         if (write_sectors(fd, ag_offset, header_block, XFS_BLOCKSIZE) < 0) {

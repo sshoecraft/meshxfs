@@ -444,8 +444,9 @@ ensure_src_or_abort() {
 # log.  The candidate is, in order: MXFS_DEV when the caller set it; the
 # device of the node's live mxfs mount; the declared LUN found by its own
 # identifier (/dev/disk/by-id/wwn-0x<wwid>); the configuration's rig default
-# (tools/configuration.py: the attachment's device) only when MXFS_CONFIG is
-# set explicitly.  Whatever chose it, the
+# (tools/configuration.py: the attachment's device; on a pool rig the LUN the
+# pool bound to the nodes, as run.sh uses it) only when MXFS_CONFIG is set
+# explicitly.  Whatever chose it, the
 # candidate must be a block device on the node carrying the declared WWID,
 # and when the node has a live mxfs mount the candidate must BE that mount's
 # device (major:minor): a caller may not name another device on a node that
@@ -463,7 +464,9 @@ ensure_src_or_abort() {
 MXFS_DEV_RESOLVED=; MXFS_DEV_WWID=; MXFS_DEV_FSID=; MXFS_DEV_SOURCE=
 MXFS_RIG_LIB_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 mxfs_dev_abort() { echo "ABORT: $1"; echo "RESULT: ABORT label=${LABEL:-?} stage=device evidence=${OUT:-?}"; exit 2; }
-mxfs_wwid_norm() { printf '%s' "$1" | tr 'A-Z' 'a-z' | sed 's/^naa\.//; s/^0x//; s/^mpath-//' | tr -cd '0-9a-f'; }
+# eui. as well as naa.: the pooled SCST LUNs are EUI-64 (eui.<hex>), and the hex filter alone
+# kept the e of "eui", so the declared identifier named a by-id link that cannot exist
+mxfs_wwid_norm() { printf '%s' "$1" | tr 'A-Z' 'a-z' | sed 's/^naa\.//; s/^eui\.//; s/^0x//; s/^mpath-//' | tr -cd '0-9a-f'; }
 # A pool rig (data/rigs.json "pool": true) has no LUN of its own: the LUN is
 # whichever one tools/lun_pool.sh has bound to this harness's nodes, named by
 # MXFS_NODE_LIST exactly as the allocation recorded them.
@@ -506,7 +509,7 @@ mxfs_dev_ident() {
 }
 mxfs_dev_field() { printf '%s\n' "$1" | sed -n "s/.*[ ]$2=\([^ ]*\).*/\1/p"; }
 mxfs_dev_resolve() {
-    local n=$1 d q src decl id w f mm live
+    local n=$1 d q src decl id w f mm live tag
     # A DRBD attachment has no shared LUN: each node's /dev/drbdN sits on a
     # LUN of its own (two WWIDs), and what both nodes share is the replicated
     # filesystem.  Its identity is that filesystem's envelope fsid on a DRBD
@@ -538,12 +541,19 @@ mxfs_dev_resolve() {
         fi
         d=$(echo "$q" | head -1); src=live-mount
         if [ -z "$d" ]; then
-            # no mount: the declared LUN by its own identifier, never a spelling
-            d=/dev/disk/by-id/wwn-0x$decl; src=declared-wwid
-            q=$(rsx 20 "$n" "test -e $d && echo BYID_OK")
-            if [ "$(echo "$q" | tail -1)" != BYID_OK ]; then
-                [ -n "${MXFS_CONFIG:-}" ] || mxfs_dev_abort "no MXFS device basis on $n: no MXFS_DEV, no live mxfs mount, no /dev/disk/by-id/wwn-0x$decl, no MXFS_CONFIG"
-                d=$(python3 "$MXFS_RIG_LIB_DIR/../../tools/configuration.py" get "$MXFS_CONFIG" device) \
+            # no mount: the declared LUN by its own identifier, never a spelling. udev links an
+            # NAA LUN as wwn-0x<id> and scsi-3<id>, an EUI-64 one as scsi-2<id> only
+            q=$(rsx 20 "$n" "for p in wwn-0x$decl scsi-3$decl scsi-2$decl; do test -e /dev/disk/by-id/\$p && { echo BYID_OK /dev/disk/by-id/\$p; break; }; done")
+            d=$(echo "$q" | sed -n 's/^BYID_OK //p' | tail -1); src=declared-wwid
+            if [ -z "$d" ]; then
+                [ -n "${MXFS_CONFIG:-}" ] || mxfs_dev_abort "no MXFS device basis on $n: no MXFS_DEV, no live mxfs mount, no /dev/disk/by-id/{wwn-0x,scsi-3,scsi-2}$decl, no MXFS_CONFIG"
+                # the configuration's device as run.sh resolves it: on a pool rig that is the LUN
+                # the pool bound to these nodes (run.sh takes the allocation's dev= the same way),
+                # never the configuration's path for the fixed rig LUN, which no pool node is
+                # logged in to; the candidate is identity-checked below either way
+                tag=$("$MXFS_RIG_LIB_DIR/../../tools/mxfs_rig_tag.sh" 2>/dev/null) || tag=
+                d=$(mxfs_pool_field "$tag" dev) || { echo "$d"; exit 2; }
+                [ -n "$d" ] || d=$(python3 "$MXFS_RIG_LIB_DIR/../../tools/configuration.py" get "$MXFS_CONFIG" device) \
                     || mxfs_dev_abort "MXFS_CONFIG=$MXFS_CONFIG is not a configuration"
                 src=configuration-default
             fi

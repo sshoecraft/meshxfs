@@ -2862,8 +2862,17 @@ xlog_alloc_log(
 	log->l_mxfs_shadow_eval = NULL;
 	log->l_mxfs_shadow_missed = 0;
 
+	/*
+	 * A log write is a whole number of log sectors: on a log of 4096-byte
+	 * sectors with no stripe unit, rounding to BBSIZE made the first iclog
+	 * write a length the device refused ("request not aligned to the logical
+	 * block size") and shut the filesystem down (docs/4kn-support.md).  As
+	 * upstream does (fs/xfs/xfs_log.c xlog_alloc_log).
+	 */
 	if (xfs_has_logv2(mp) && mp->m_sb.sb_logsunit > 1)
 		log->l_iclog_roundoff = mp->m_sb.sb_logsunit;
+	else if (mp->m_sb.sb_logsectsize > 0)
+		log->l_iclog_roundoff = mp->m_sb.sb_logsectsize;
 	else
 		log->l_iclog_roundoff = BBSIZE;
 

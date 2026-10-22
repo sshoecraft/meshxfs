@@ -58,7 +58,15 @@ ck() {  # <what> <got> <want>
 cklt() {  # <what> <got> <bound>: got < bound
     if [ "${2:-x}" -lt "$3" ] 2>/dev/null; then echo "  PASS $1 ($2 < $3)"; else echo "  FAIL $1 got=$2 bound=$3"; fails=$((fails + 1)); why="${why}${why:+; }$1 (got $2)"; fi
 }
-finish() { echo "RESULT: $1 src=test | measured=$2 | reason=${why} (evidence $OUT)"; }
+# The worst operation stall any load measured in any window goes on the board as
+# max_stall_ms: tools/criteria.py records a stall longer than the release policy's
+# stall_limit_s (data/release_policy.json) as a stability FAIL, whatever this row's
+# own bound for that window was.
+finish() {
+    local worst
+    worst=$(sed -n 's/.*max_ms=\([0-9]*\).*/\1/p' "$OUT/stalls.txt" 2>/dev/null | sort -n | tail -1)
+    echo "RESULT: $1 src=test | measured=$2${worst:+ max_stall_ms=$worst} | reason=${why} (evidence $OUT)"
+}
 now_ms() { date +%s%3N; }
 # Every time a row hands to the helpers below is on THIS host's clock; a load's
 # log is stamped on its node's clock, and they translate with clock_off

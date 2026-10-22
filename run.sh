@@ -223,13 +223,20 @@ elif [ -n "${MXFS_WANT_SRCVER:-}" ]; then
 else
     WANT_SRCVER=$(modinfo "$REPO/mxfs.ko" 2>/dev/null | awk '/^srcversion:/{print $2}')
 fi
-marker_read() {  # sets MK_NODES / MK_CONFIG / MK_SRCVER / MK_NODELIST (empty if no marker file)
-    MK_NODES=""; MK_CONFIG=""; MK_SRCVER=""; MK_NODELIST=""
+marker_read() {  # sets MK_NODES / MK_CONFIG / MK_SRCVER / MK_NODELIST / MK_MODARGS (empty if no marker file)
+    MK_NODES=""; MK_CONFIG=""; MK_SRCVER=""; MK_NODELIST=""; MK_MODARGS=""
     [ -s "$MARKER" ] || return 0
     MK_NODES=$(jq -r '.nodes // empty' "$MARKER" 2>/dev/null)
     MK_CONFIG=$(jq -r '.configuration // empty' "$MARKER" 2>/dev/null)
     MK_SRCVER=$(jq -r '.srcversion // empty' "$MARKER" 2>/dev/null)
     MK_NODELIST=$(jq -r '.node_list // empty' "$MARKER" 2>/dev/null)
+    MK_MODARGS=$(jq -r '.modargs // empty' "$MARKER" 2>/dev/null)
+}
+# The module arguments the cluster was prepped with.  A knob applied at insmod
+# stays in force for every later filtered run, so a cluster prepped with one is
+# not the same cluster as one prepped without it, whatever the build says.
+prep_modargs() {
+    printf '%s' "${MXFS_EXTRA_MODARGS:-}${MXFS_RETIRE_CONTRACT:+|retire_contract=$MXFS_RETIRE_CONTRACT}"
 }
 marker_write() {  # nodes configuration srcver — node_list records WHICH hosts were prepped
     local nl; nl=$(IFS=,; echo "${NODES[*]}")
@@ -267,7 +274,8 @@ marker_write() {  # nodes configuration srcver — node_list records WHICH hosts
     jq -n --argjson n "$1" --arg d "$2" --arg s "$3" --arg nl "$nl" \
           --arg dev "${DEV:-}" --arg rig "$rig" --arg t "$(date -u +%FT%TZ)" \
           --arg wwid "${wwid:-}" --arg fsid "${fsid:-}" --argjson gen "$gen" \
-        '{nodes:$n, configuration:$d, srcversion:$s, node_list:$nl, dev:$dev, rig:$rig, wwid:$wwid, fsid:$fsid, gen:$gen, iso:$t}' > "$MARKER" 2>/dev/null
+          --arg ma "$(prep_modargs)" \
+        '{nodes:$n, configuration:$d, srcversion:$s, node_list:$nl, dev:$dev, rig:$rig, wwid:$wwid, fsid:$fsid, gen:$gen, iso:$t, modargs:$ma}' > "$MARKER" 2>/dev/null
 }
 # A marker match is a claim about LIVE cluster state, so verify it live: the
 # marker file survives reboots, other campaigns' module reloads, and rig
@@ -289,7 +297,8 @@ marker_live_ok() {
 }
 marker_matches() {
     [ "$MK_NODES" = "$N" ] && [ "$MK_CONFIG" = "$CONFIG" ] && [ "$MK_SRCVER" = "$WANT_SRCVER" ] \
-        && [ "$MK_NODELIST" = "$(IFS=,; echo "${NODES[*]}")" ] && marker_live_ok
+        && [ "$MK_NODELIST" = "$(IFS=,; echo "${NODES[*]}")" ] \
+        && [ "$MK_MODARGS" = "$(prep_modargs)" ] && marker_live_ok
 }
 BROKER="${MXFS_COORD_BROKER:-192.168.1.149}"
 # Per-test wall budget for coordinated launches (a timeout IS a FAIL).
@@ -555,6 +564,90 @@ if [ "$CFG_BASELINE" != 1 ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# WHAT THIS RUN IS, as the board records it with every result
+# (docs/release-process.md).
+#
+# A result that names no build cannot be graded against any release, so a run
+# that cannot say which module it measures does not start.  The prep checks
+# every node's loaded /sys/module/mxfs/srcversion against WANT_SRCVER, and a
+# filtered run re-checks it live (marker_live_ok), so the build each result
+# carries is the one the nodes ran.
+if [ "$CFG_BASELINE" != 1 ] && ! srcver_valid "${WANT_SRCVER:-}"; then
+    echo "ERROR: no module build to record results against (WANT_SRCVER='${WANT_SRCVER:-}')."
+    echo "  Build the module (make modules) or name the nodes' build with MXFS_WANT_SRCVER."
+    exit 1
+fi
+# A release candidate (data/candidates/<id>.json) is the frozen tree a release
+# is qualified on; every result of a run started for it carries its id.  Its
+# module must be the one this run loads.
+CANDIDATE="${MXFS_CANDIDATE:-}"
+# The native-XFS yardstick loads no module; it belongs to no candidate.
+[ "$CFG_BASELINE" = 1 ] && CANDIDATE=""
+if [ -n "$CANDIDATE" ]; then
+    cand_srcv=$(jq -r '.srcversion // empty' "$REPO/data/candidates/$CANDIDATE.json" 2>/dev/null)
+    [ -n "$cand_srcv" ] || { echo "ERROR: no release candidate $CANDIDATE (data/candidates/$CANDIDATE.json)"; exit 2; }
+    [ "$cand_srcv" = "$WANT_SRCVER" ] || {
+        echo "ERROR: candidate $CANDIDATE is build $cand_srcv; this run would load $WANT_SRCVER"; exit 2; }
+fi
+# A VARIANT is a run that changes what is measured: a module knob, a test
+# environment, a calibration, a rig's own budgets, an inter-test settle, an
+# strace.  Its results are recorded
+# and its failures stay incidents, but it never grades a release candidate.
+VARIANT=""
+for vn in MXFS_EXTRA_MODARGS MXFS_RETIRE_CONTRACT MXFS_TEST_ENV MXFS_RIG_BUDGETS MXFS_STRACE_RANK; do
+    [ -n "${!vn:-}" ] && VARIANT="$VARIANT${VARIANT:+;}$vn=${!vn}"
+done
+[ "${RULE0_CALIBRATE:-0}" = 1 ] && VARIANT="$VARIANT${VARIANT:+;}RULE0_CALIBRATE=1"
+[ "${MXFS_SETTLE_MS:-0}" -gt 0 ] 2>/dev/null && VARIANT="$VARIANT${VARIANT:+;}MXFS_SETTLE_MS=$MXFS_SETTLE_MS"
+VARIANT="${VARIANT:0:300}"
+# A VERIFICATION OR CALIBRATION BATCH (tools/defects.py batch / plan-verify)
+# runs one row per invocation, one lap at a time.  The queue says whether this
+# lap may run (the batch is declared and open, this is its row, configuration
+# and candidate, and it has laps left) and which kernel-log pattern shows the
+# lap reached the defect's trigger; the lap is counted only if it did.
+BATCH="${MXFS_BATCH:-}"
+BATCH_ROW=""
+BATCH_PROBE=""
+declare -A LAP_UP=()
+if [ -n "$BATCH" ]; then
+    batch_rows=()
+    for x in "${ONLY[@]}"; do
+        case "$x" in prep_cluster) ;; *) batch_rows+=("$x") ;; esac
+    done
+    if [ "${#batch_rows[@]}" -eq 2 ] && [[ " ${batch_rows[*]} " == *" chk_clean "* ]] \
+            && [[ " ${batch_rows[*]} " == *" alloc_witness "* ]]; then
+        batch_rows=(chk_clean)
+    fi
+    [ "${#batch_rows[@]}" -eq 1 ] || {
+        echo "ERROR: MXFS_BATCH=$BATCH runs one lap of one row; name exactly that row (got: ${ONLY[*]:-the whole board})"; exit 2; }
+    BATCH_ROW="${batch_rows[0]}"
+    batch_out=$(python3 "$REPO/tools/defects.py" batch-check "$BATCH" --row "$BATCH_ROW" --at "$CONFIG" \
+                ${CANDIDATE:+--candidate "$CANDIDATE"}) || { echo "ERROR: batch $BATCH refused this lap (above)"; exit 2; }
+    BATCH_PROBE=$(sed -n 's/^PROBE=//p' <<<"$batch_out")
+    batch_variant=$(sed -n 's/^VARIANT=//p' <<<"$batch_out")
+    [ -n "$batch_variant" ] && VARIANT="$VARIANT${VARIANT:+;}batch:$batch_variant"
+    echo "--- batch $BATCH: one lap of $BATCH_ROW at $CONFIG${BATCH_PROBE:+, exposure probe '$BATCH_PROBE'} ---"
+fi
+lap_mark_start() {  # every node's uptime as the batch row starts
+    local n
+    for n in "${NODES[@]}"; do
+        LAP_UP[$n]=$(ssh_node "$n" "cut -d' ' -f1 /proc/uptime" 2>/dev/null | tr -dc '0-9.')
+    done
+}
+exposure_count() {  # lines matching the batch's probe, on every node, since lap_mark_start
+    local n total=0 c pb
+    pb=$(printf '%s' "$BATCH_PROBE" | base64 -w0)
+    for n in "${NODES[@]}"; do
+        c=$(ssh_node "$n" "p=\$(echo $pb | base64 -d); dmesg 2>/dev/null | awk -v t0='${LAP_UP[$n]:-0}' '{ if (match(\$0, /^\[ *[0-9]+\.[0-9]+\]/)) { ts = substr(\$0, 2, RLENGTH - 2) + 0; if (ts >= t0) print } }' | grep -cE -- \"\$p\"" 2>/dev/null | tr -dc '0-9')
+        total=$(( total + ${c:-0} ))
+    done
+    echo "$total"
+}
+PREV_ROW=""
+RECORD_EVIDENCE=""
+RECORD_SEED=""
+
+# ---------------------------------------------------------------------------
 # Record one test's aggregated result into the board under "<N>/<dlm>".
 # elapsed/budget are seconds (integers; "" if not timed, e.g. SKIP markers).
 # A timeout IS a test failure, even with zero correctness
@@ -568,8 +661,8 @@ fi
 # run_none) and tag the record so it reads as unenforced calibration data, not
 # a real pass.
 # ---------------------------------------------------------------------------
-record() {  # name status measured reason [elapsed] [budget]
-    local name="$1" status="$2" measured="$3" reason="$4" elapsed="${5:-}" budget="${6:-}"
+record() {  # name status measured reason [elapsed] [budget] [outcome]
+    local name="$1" status="$2" measured="$3" reason="$4" elapsed="${5:-}" budget="${6:-}" outcome="${7:-}"
     #: The budget passed in here is the SCALED one for this node count, which criteria.py cannot
     #: derive on its own, so the scaled comparison stays here.  criteria.py checks the criterion's
     #: own budget as well; with every budget_scale currently `flat` the two numbers are the same,
@@ -614,12 +707,80 @@ record() {  # name status measured reason [elapsed] [budget]
         status=ABORTED
         reason="the test ABORTed: it could not measure, a harness gap and not a verdict on the filesystem${reason:+; }$reason"
     fi
-    local args=(update "$name" --at "$CONFIG" -s "$status" -m "$measured")
+    if [ -n "$BATCH" ] && [ "$name" = "$BATCH_ROW" ] && [ -n "$BATCH_PROBE" ]; then
+        measured="$measured exposure=$(exposure_count)"
+    fi
+    local args=(update "$name" --at "$CONFIG" -s "$status" -m "$measured" --run-id "$RUN_ID")
     [ -n "$reason" ]  && args+=(--reason "$reason")
     [ -n "$elapsed" ] && args+=(-e "$elapsed")
+    [ -n "$budget" ]  && args+=(--applied-budget "$budget")
+    # a row that takes a random seed reports it as seed=<n>, so the run can be repeated
+    [ -z "$RECORD_SEED" ] && RECORD_SEED=$(sed -n 's/.*\bseed=\([0-9][0-9]*\).*/\1/p' <<<"$measured" | head -1)
+    [ -n "$outcome" ] && args+=(--outcome "$outcome")
     [ "${RULE0_CALIBRATE:-0}" = 1 ] && args+=(--calibrate)
     [ -n "${WANT_SRCVER:-}" ] && args+=(--build "$WANT_SRCVER")
-    "$CRITPY" "${args[@]}" >/dev/null
+    [ -n "$CANDIDATE" ] && args+=(--candidate "$CANDIDATE")
+    [ -n "$BATCH" ] && [ "$name" = "$BATCH_ROW" ] && args+=(--batch "$BATCH")
+    [ -n "$VARIANT" ] && args+=(--variant "$VARIANT")
+    [ -n "$RECORD_EVIDENCE" ] && args+=(--evidence "$RECORD_EVIDENCE")
+    [ -n "$RECORD_SEED" ] && args+=(--seed "$RECORD_SEED")
+    RECORD_EVIDENCE=""; RECORD_SEED=""
+    # A result that cannot be recorded is lost, and a lost FAIL reads as nothing
+    # having happened: the run stops here, loudly, and its exit trap turns the
+    # rows it did not reach into NOT RUN.
+    "$CRITPY" "${args[@]}" >/dev/null || {
+        echo "=== run.sh ABORTED: tools/criteria.py could not record $name at $CONFIG (its error is above) ===" >&2
+        exit 5
+    }
+}
+
+# PRE-ASSERT, split by what it finds.  A node whose mount is gone measured
+# nothing: the row is INCOMPLETE, an incident until a reviewed disposition says
+# why.  A node whose mount is there but cannot be read within 10 s, or that does
+# not answer at all, is the filesystem failing: a stability FAIL, named against
+# the row that ran before it.  (Until 2026-10-21 both were recorded as one
+# "pre-assert" FAIL that the board excluded as rig noise.)
+PA_GONE=""; PA_STUCK=""
+preassert_probe() {  # <node>... -> sets PA_GONE and PA_STUCK
+    local fstype=mxfs; [ "$CFG_BASELINE" = 1 ] && fstype=xfs
+    local d n pids=() p
+    PA_GONE=""; PA_STUCK=""
+    d=$(mktemp -d)
+    for n in "$@"; do
+        ( timeout 15 "$SSH" "$n" "$PASS" \
+            "if ! mountpoint -q '$MNT' || ! mount | grep -q ' on $MNT type $fstype '; then echo PA_NOTMOUNTED; elif timeout 10 ls '$MNT'/. >/dev/null 2>&1; then echo PA_OK; else echo PA_UNREADABLE; fi" \
+            > "$d/$n" 2>/dev/null ) &
+        pids+=($!)
+    done
+    # each probe by its pid: a bare `wait` would also wait on the run's other
+    # background helpers, which do not end with the probe.
+    for p in "${pids[@]}"; do wait "$p"; done
+    for n in "$@"; do
+        case "$(grep -ao 'PA_[A-Z]*' "$d/$n" 2>/dev/null | tail -1)" in
+            PA_OK) ;;
+            PA_NOTMOUNTED) PA_GONE="$PA_GONE $n" ;;
+            *) PA_STUCK="$PA_STUCK $n" ;;
+        esac
+    done
+    rm -rf "$d"
+}
+preassert_record() {  # <name> <budget> -> 1 (and records) when the probe found a problem
+    local fstype=mxfs; [ "$CFG_BASELINE" = 1 ] && fstype=xfs
+    if [ -n "$PA_STUCK" ]; then
+        record "$1" FAIL "pre-assert" \
+            "PRE-ASSERT: $fstype is mounted but could not be read within 10 s, or the node did not answer, on$PA_STUCK${PA_GONE:+ (not mounted on$PA_GONE)}, after ${PREV_ROW:-cluster prep}: a stability failure" \
+            0 "$2" FAIL
+        echo "  FAIL  $1  (pre-assert: $fstype unreadable or node silent on$PA_STUCK)"
+        return 1
+    fi
+    if [ -n "$PA_GONE" ]; then
+        record "$1" FAIL "pre-assert" \
+            "PRE-ASSERT: $fstype not mounted on$PA_GONE after ${PREV_ROW:-cluster prep}: the cluster was not formed for this row, so it measured nothing; an incident until a reviewed disposition says why" \
+            0 "$2" INCOMPLETE
+        echo "  FAIL  $1  (pre-assert: $fstype not mounted on$PA_GONE)"
+        return 1
+    fi
+    return 0
 }
 
 
@@ -1311,6 +1472,10 @@ run_none() {  # name cat budget
     local kill_budget="$real_budget"
     [ "${RULE0_CALIBRATE:-0}" = 1 ] && kill_budget=$(( kill_budget * 20 ))
     local out raw line rc t0 t1 elapsed attempt
+    # The same pre-assert the cluster rows make, on the one node this row runs
+    # on, before t0 so it never counts against the row's budget.
+    preassert_probe "$NODE1"
+    preassert_record "$name" "$real_budget" || return
     t0=$(date +%s)
     # 2026-07-20 (proven by instrument): "out=$(timeout ... | grep ...); rc=$?" captured
     # grep's exit status, not timeout's -- a killed ssh (rc=124) with empty
@@ -1399,30 +1564,13 @@ run_host() {  # name cat budget
     # mount check before any kill, and the row recorded that as a failed
     # oracle — which the board counted as a genuine crash-recovery fault for
     # eleven runs, on a row that had measured nothing.  This is the mount and
-    # readdir probe run_coord makes, recorded with the same "pre-assert"
-    # reason, which tools/criteria.py excludes from the flake count as
-    # rig-formation noise.  Runs before t0 so it never counts against the
-    # row's budget.
+    # readdir probe run_coord makes (preassert_probe): a node not mounted makes
+    # the row INCOMPLETE, a node mounted but unreadable or silent makes it a
+    # stability FAIL.  Runs before t0 so it never counts against the row's
+    # budget.
+    preassert_probe "${NODES[@]}"
+    preassert_record "$name" "$real_budget" || return
     local fstype=mxfs; [ "$CFG_BASELINE" = 1 ] && fstype=xfs
-    local pa_bad="" pa_pids=() pa_n pa_i
-    for pa_n in "${NODES[@]}"; do
-        ( timeout 15 "$SSH" "$pa_n" "$PASS" \
-            "mountpoint -q '$MNT' && mount | grep -q ' on $MNT type $fstype ' && timeout 10 ls '$MNT'/. >/dev/null 2>&1" \
-            >/dev/null 2>&1 ) &
-        pa_pids+=($!)
-    done
-    pa_i=0
-    for pa_n in "${NODES[@]}"; do
-        wait "${pa_pids[$pa_i]}" || pa_bad="$pa_bad $pa_n"
-        pa_i=$((pa_i+1))
-    done
-    if [ -n "$pa_bad" ]; then
-        record "$name" FAIL "pre-assert" \
-            "PRE-ASSERT: $fstype not mounted/readable on$pa_bad — a prior test left the cluster unformed (unmounted or shutdown zombie); reform required" \
-            0 "$real_budget"
-        echo "  FAIL  $name  (pre-assert: $fstype not mounted/readable on$pa_bad)"
-        return
-    fi
     # The death oracle identifies the shared LUN by its WWID before it kills
     # anything.  A pool run exports the allocation's; a run on a device the
     # operator named (MXFS_DEV: a vSphere RDM, say) had only data/rigs.json to
@@ -1591,19 +1739,9 @@ run_coord() {  # name cat budget scale
     #
     # Deliberately NOT keyed on loadavg either: high load has many innocent causes
     # and would fail healthy nodes under legitimate work.
-    local pa_bad="" pa_pids=() pa_n pa_faults=""
+    local pa_faults=""
     local pa_d="/tmp/.mxfs_paf.$$"; mkdir -p "$pa_d"
-    for pa_n in "${NODES[@]}"; do
-        ( timeout 15 "$SSH" "$pa_n" "$PASS" \
-            "mountpoint -q '$MNT' && mount | grep -q ' on $MNT type $fstype ' && timeout 10 ls '$MNT'/. >/dev/null 2>&1" \
-            >/dev/null 2>&1 ) &
-        pa_pids+=($!)
-    done
-    i=0
-    for pa_n in "${NODES[@]}"; do
-        wait "${pa_pids[$i]}" || pa_bad="$pa_bad $pa_n"
-        i=$((i+1))
-    done
+    preassert_probe "${NODES[@]}"
     # SYNC-LIVENESS PASS (separate from the mount pre-assert on purpose).
     #
     # It cannot be folded into the probe above: a wedged `sync` sits in
@@ -1649,18 +1787,23 @@ run_coord() {  # name cat budget scale
     done
     rm -rf "$pa_d"
     if [ -n "$pa_faults" ]; then
+        # The wedge's own tags decide what it says about MXFS: a task wedged in
+        # MXFS is a stability FAIL; a wedge only in the node's own root disk is
+        # the rig; anything else is not known yet.
+        local pa_outcome=INCOMPLETE
+        case "$pa_faults" in
+            *"{MXFS}"*) pa_outcome=FAIL ;;
+            *"{other}"*|*no-diag*) pa_outcome=INCOMPLETE ;;
+            *"{EXT4-ROOTDISK}"*) pa_outcome=INFRA ;;
+        esac
         record "$name" BLOCKED "node-fault" \
             "NODE FAULT (not a filesystem verdict):$pa_faults — a node cannot complete sync and/or has a task wedged in D state. READ THE {sub} TAG BEFORE BLAMING MXFS: {EXT4-ROOTDISK} means the wedge is in the NODE OWN root filesystem (ext4/jbd2 on dm-0), i.e. host storage, and MXFS is not in the path at all — sess376 saw exactly that and it is the documented host-rig degradation class (see D-DIR-REUSE-COHERENCY-32-FLAKY). {MXFS} is the one that implicates the filesystem; cf. D-BAST-WRITEBACK-ABBA-DEADLOCK. Every barrier criterion would report NO_TERMINAL_RECORD on ALL nodes because one rank can never reach a barrier; BLOCKED so that is not recorded as a correctness failure. Recover the node (virsh destroy+start) and re-run." \
-            0 "$real_budget"
+            0 "$real_budget" "$pa_outcome"
         echo "  BLOCK $name  (node fault:$pa_faults)"
         rm -rf "$tmpd"
         return 1
     fi
-    if [ -n "$pa_bad" ]; then
-        record "$name" FAIL "pre-assert" \
-            "PRE-ASSERT: $fstype not mounted/readable on$pa_bad — a prior test broke cluster formation state (unmounted or shutdown zombie); reform required" \
-            0 "$real_budget"
-        echo "  FAIL  $name  (pre-assert: $fstype not mounted/readable on$pa_bad)"
+    if ! preassert_record "$name" "$real_budget"; then
         rm -rf "$tmpd"
         return 1
     fi
@@ -1722,7 +1865,7 @@ run_coord() {  # name cat budget scale
     # must not read the same as N independent correctness failures (GPT
     # consult 2026-07-11; see ccmemory
     # docs/rulings/dir-reuse-32-architectural-review.md).
-    local npass=0 fail_reason="" saw_noresult=0 n line status rank1_measured="" faildist=""
+    local npass=0 fail_reason="" saw_noresult=0 n line status rank1_measured="" faildist="" stall_max=0
     # sess23: also keep the FIRST FAILING node's measured= values.  The cell
     # used to show rank 1's numbers regardless of verdict, so a FAIL displayed a
     # PASSING node's counts (state.md: "nodes_pass=31/32 states:FAIL=1 next to
@@ -1846,6 +1989,12 @@ run_coord() {  # name cat budget scale
             # that the generic nodes_pass=N/N summary below would otherwise
             # discard entirely.
             [ "$n" = "${NODES[0]}" ] && rank1_measured=$(echo "$line" | field measured)
+            # The worst operation stall any node reported: the board holds it to
+            # the release policy's stall limit (tools/criteria.py), so it must
+            # survive the aggregation whichever node measured it.
+            local nstall
+            nstall=$(echo "$line" | field measured | sed -n 's/.*max_stall_ms=\([0-9]*\).*/\1/p')
+            [ -n "$nstall" ] && [ "$nstall" -gt "$stall_max" ] && stall_max=$nstall
             if [ "$status" != PASS ] && [ -z "$fail_measured" ]; then
                 fail_measured="$n:$(echo "$line" | field measured)"
             fi
@@ -1985,14 +2134,21 @@ run_coord() {  # name cat budget scale
     elif [ -n "$rank1_measured" ]; then
         measured="$measured $rank1_measured"
     fi
+    [ "$stall_max" -gt 0 ] && measured="$measured max_stall_ms=$stall_max"
     if [ "$npass" -eq "$N" ]; then
         agg=PASS
+    elif [ "${state_count[INFRA]:-0}" -gt 0 ] \
+            && [ $(( npass + ${state_count[INFRA]:-0} )) -eq "$N" ]; then
+        # every node that did not pass proved the rig could not run the test
+        # (tests/suite/lib.sh finish_state INFRA): not a verdict on MXFS
+        agg=INFRA
+        fail_reason="${fail_reason## }"
     else
         agg=FAIL
         fail_reason="${fail_reason## }"
     fi
-    record "$name" "$agg" "$measured" "${fail_reason:0:400}" "$elapsed" "$real_budget"
     printf "  %-5s %s  (%s) [%ss/%ss]\n" "$agg" "$name" "$measured" "$elapsed" "$real_budget"
+    local art=""
     # sess392: MXFS_KEEP_ARTIFACTS=1 keeps the per-node raw output (and the
     # kernlog pull) for PASSING rows too — the per-node walls of a passing
     # rsync_paired are the 2x shared-vs-exclusive pace evidence at 25 AGs.
@@ -2030,7 +2186,7 @@ run_coord() {  # name cat budget scale
         # copy in /tmp (378 MB for one 8-node failure; gone on a host
         # reboot).  Kernel logs are gzipped in parallel — a 32-node pull is
         # ~600 MB raw, ~35 MB compressed; everything else is copied as is.
-        local art="$REPO/tests/evidence/run_${name}_${RUN_ID}"
+        art="$REPO/tests/evidence/run_${name}_${RUN_ID}"
         mkdir -p "$art"
         for cn in "${NODES[@]}"; do
             [ -s "$tmpd/kernlog_$cn" ] && gzip -1 -c "$tmpd/kernlog_$cn" > "$art/kernlog_$cn.gz" &
@@ -2042,6 +2198,10 @@ run_coord() {  # name cat budget scale
         done
         echo "    logs: $art"
     fi
+    # Recorded after the artifact pull, so the result names the evidence
+    # directory it can be checked against.
+    [ -n "$art" ] && RECORD_EVIDENCE="${art#"$REPO"/}"
+    record "$name" "$agg" "$measured" "${fail_reason:0:400}" "$elapsed" "$real_budget"
     rm -rf "$tmpd"
 }
 
@@ -2061,6 +2221,14 @@ in_only() {
     # too; the matrix order runs it first.
     if [ "$1" = alloc_witness ]; then
         for x in "${ONLY[@]}"; do [ "$x" = chk_clean ] && return 0; done
+    fi
+    # dirent_type_integrity grades the kernel-log window dirent_durability
+    # opens (MXFS_DIRENT_WINDOW, tests/suite/dirent_type_integrity.sh): asked
+    # for alone it found no marker and FAILed 0/4, a verdict about nothing
+    # (D-WINDOW-LAPS-RAN-DIRENT-TYPE-INTEGRITY-WITHOUT-DIRENT-DURABILITY).  So
+    # asking for it asks for dirent_durability too; the matrix order runs it first.
+    if [ "$1" = dirent_durability ]; then
+        for x in "${ONLY[@]}"; do [ "$x" = dirent_type_integrity ] && return 0; done
     fi
     return 1
 }
@@ -2122,7 +2290,11 @@ reset_pending() {
     # marker.  That push is the whole reason this is not a cell deletion: this is where the
     # previous REAL verdict would otherwise be lost, and without it the history only ever recorded
     # "PENDING" so the FLAKY annotation could never fire.
-    "$CRITPY" pending "${names[@]}" --at "$cond" --run-id "$RUN_ID"
+    local marks=(--at "$cond" --run-id "$RUN_ID")
+    [ -n "${WANT_SRCVER:-}" ] && marks+=(--build "$WANT_SRCVER")
+    [ -n "$CANDIDATE" ] && marks+=(--candidate "$CANDIDATE")
+    [ -n "$VARIANT" ] && marks+=(--variant "$VARIANT")
+    "$CRITPY" pending "${names[@]}" "${marks[@]}"
 }
 # sess23 (ccloop c7ee71c6) — DO NOT SCORE UNRUN WORK AS A PRODUCT FAILURE.
 #
@@ -2554,11 +2726,6 @@ for row in "${ROWS[@]}"; do
     if [ ! -f "$script" ]; then
         printf "  PEND  %s (no script in tests/%s)\n" "$name" "$cat"; pending=$((pending+1)); continue
     fi
-    # soak's actual duration is caller-controlled (SOAK_SECONDS, default 30 for
-    # a smoke run; a real ship-gate soak sets it to hours) -- a static manifest
-    # budget can never be right for both, so compute it from the SAME env var
-    # the test itself reads, instead of a fixed guess.
-    if [ "$name" = soak ]; then budget=$(( ${SOAK_SECONDS:-30} + 30 )); fi
     # sess23: a criterion after a destructive one must not run on a cluster
     # that has not reconverged — see the wait_converged comment above.
     if [ "${BLOCK_REST:-0}" = 1 ]; then
@@ -2579,6 +2746,7 @@ for row in "${ROWS[@]}"; do
     fi
     [ $(( SECONDS - pw0 )) -gt 0 ] && echo "    (waited $(( SECONDS - pw0 ))s for $hlw)"
     [ "$hl" = host_exclusive ] && { host_quiesce; host_sample_start "$name" "$budget"; }
+    [ -n "$BATCH" ] && [ "$name" = "$BATCH_ROW" ] && lap_mark_start
     mark_executing "$name"
     case "$coord" in
         none) run_none "$name" "$cat" "$budget" ;;
@@ -2602,6 +2770,7 @@ for row in "${ROWS[@]}"; do
             fi ;;
     esac
     host_release
+    PREV_ROW="$name"
     ran=$((ran+1))
     # sess2(ccloop 26c41354): optional inter-test SETTLE — instrumented diagnostic for
     # the 16-node cumulative-degradation cascade (individual tests PASS, but the

@@ -8,10 +8,10 @@ tags: [compiled, ccloop-0220f43f, matrix, fio, rule0, rule4, methodology, host-n
 
 # Matrix enforcement + perf-measurement methodology (ccloop 0220f43f sess2)
 
-Compiled from [[ladder-rung-health-gate-and-baseline-pairing-fix]],
-[[fio-noise-pattern-and-raw-ceiling-refresh]],
-[[cawd-single-node-paired-boundary-hugging-not-regression]],
-[[ccloop-0220f43f-CRITERIA-MET-4conditions-32nodes]].
+Compiled from `ladder-rung-health-gate-and-baseline-pairing-fix`,
+`fio-noise-pattern-and-raw-ceiling-refresh`,
+`cawd-single-node-paired-boundary-hugging-not-regression`,
+`ccloop-0220f43f-CRITERIA-MET-4conditions-32nodes`.
 
 Outcome: all 4 conditions (tcp/cawp/cawd/caw) × N=1,2,4,8,16,32 at 100% PASS,
 **real-enforced**, on one build (0.11.39 / `420FBA2893A16457AEFA58C`, zero kernel
@@ -188,7 +188,7 @@ never a real functional failure).
 
 **This is a class, not a one-off.** The same "pipeline swallows the exit status
 you actually wanted" defect exists elsewhere in run.sh — see
-[[runsh-ssh-node-pipeline-swallows-remote-exit-status]] for the `ssh_node()`
+`runsh-ssh-node-pipeline-swallows-remote-exit-status` for the `ssh_node()`
 instances, where the consequence was worse (the check's verdict was decided
 entirely by whether the target host had an SSH login banner). When auditing
 run.sh, grep for `$?` after a pipeline and for any function whose body ends in a

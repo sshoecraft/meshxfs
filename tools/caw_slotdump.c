@@ -31,6 +31,10 @@
  * Layout (dlm_caw.h / disklock.h):
  *   slot table byte offset = super->disklock_offset + 64*512 (HB region)
  *   65536 slots x 512 bytes.
+ * On a volume formatted for larger logical blocks (docs/4kn-support.md) each
+ * 512-byte record is the first 512 bytes of a block of its own
+ * (mxfs_rec_phys); the commands address the device in its own blocks
+ * (BLKSSZGET), which must be the volume's.
  *
  * Copyright (c) 2026
  * SPDX-License-Identifier: GPL-2.0
@@ -45,11 +49,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/ioctl.h>
+#include <linux/fs.h>
 #include <scsi/sg.h>
 
 #include <mxfs/mxfs_super.h>
 
-#define SECTOR_SIZE          512
+#define RECORD_SIZE          512           /* a slot or heartbeat record */
 #define TIMEOUT_MS           30000
 #define CAW_MAGIC            0x4D584357u   /* "MXCW" */
 #define CAW_MAX_SLOTS        65536u
@@ -100,8 +105,11 @@ struct caw_slot {
     uint64_t resource_lineage;
     uint8_t  reserved[336];
 };
-_Static_assert(sizeof(struct caw_slot) == SECTOR_SIZE,
+_Static_assert(sizeof(struct caw_slot) == RECORD_SIZE,
                "caw_slot layout drifted from 512 bytes");
+
+/* the device's logical block size (BLKSSZGET), set in main before any command */
+static uint32_t lbs;
 
 static const char *type_name(uint8_t t)
 {
@@ -149,7 +157,7 @@ static int do_scsi_read_fua(int fd, uint64_t lba, void *buf, uint32_t blocks)
     hdr.cmd_len = sizeof(cdb);
     hdr.cmdp = cdb;
     hdr.dxferp = buf;
-    hdr.dxfer_len = blocks * SECTOR_SIZE;
+    hdr.dxfer_len = blocks * lbs;
     hdr.dxfer_direction = SG_DXFER_FROM_DEV;
     hdr.sbp = sense;
     hdr.mx_sb_len = sizeof(sense);
@@ -230,16 +238,33 @@ int main(int argc, char **argv)
         fprintf(stderr, "open %s: %s\n", dev, strerror(errno));
         return 1;
     }
+    {
+        int v = 0;
 
-    /* MXFS superblock: 4KB at byte 0 = 8 sectors at LBA 0. */
+        if (ioctl(fd, BLKSSZGET, &v) < 0 || v < 512 || v > (int)MXFS_LBS_MAX || (v & (v - 1))) {
+            fprintf(stderr, "%s: cannot get a logical block size (BLKSSZGET: %s, %d)\n",
+                    dev, strerror(errno), v);
+            return 1;
+        }
+        lbs = (uint32_t)v;
+    }
+
+    /* MXFS superblock: 4KB at byte 0 = 8 blocks of 512, or 1 of 4096. */
     uint8_t sbuf[MXFS_SUPER_SIZE];
-    if (do_scsi_read_fua(fd, 0, sbuf, MXFS_SUPER_SIZE / SECTOR_SIZE) < 0)
+    if (do_scsi_read_fua(fd, 0, sbuf, MXFS_SUPER_SIZE / lbs) < 0)
         return 1;
     struct mxfs_ondisk_super *sb = (struct mxfs_ondisk_super *)sbuf;
     if (sb->magic != MXFS_FORMAT_MAGIC) {
         fprintf(stderr, "not an MXFS device (magic 0x%08x)\n", sb->magic);
         return 1;
     }
+    if (mxfs_super_lbs(sb) != lbs) {
+        fprintf(stderr, "%s: the volume was formatted for %u-byte logical blocks "
+                "and the device has %u-byte ones\n", dev, mxfs_super_lbs(sb), lbs);
+        return 1;
+    }
+    /* one block per record read, the record its first 512 bytes */
+    static uint8_t blk[MXFS_LBS_MAX];
 
     /* volume_id = FNV-1a64 over fs_uuid — what make_ag_resource stamps. */
     uint64_t vid = 0xcbf29ce484222325ULL;
@@ -249,15 +274,17 @@ int main(int argc, char **argv)
     }
 
     uint64_t dloff = sb->disklock_offset;
+    /* in the region's 512-byte addressing; mxfs_rec_phys gives the bytes */
     uint64_t table_off = dloff + (uint64_t)HB_SLOTS * HB_RECORD_SIZE;
 
     if (only_slot >= 0) {
-        /* One sector, same FUA path the kernel's read_slot uses. */
+        /* One record, same FUA path the kernel's read_slot uses. */
         static struct caw_slot one;
-        uint64_t lba = (table_off + (uint64_t)only_slot * SECTOR_SIZE) /
-                       SECTOR_SIZE;
-        if (do_scsi_read_fua(fd, lba, &one, 1) < 0)
+        uint64_t lba = mxfs_rec_phys(dloff, table_off +
+                                     (uint64_t)only_slot * RECORD_SIZE, lbs) / lbs;
+        if (do_scsi_read_fua(fd, lba, blk, 1) < 0)
             return 1;
+        memcpy(&one, blk, RECORD_SIZE);
         printf("slot=%ld magic=0x%08x type=%s ag=%u ino=%llu gen=%u\n",
                only_slot, one.magic, type_name(one.resource.type),
                one.resource.ag_number,
@@ -266,18 +293,21 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    printf("device=%s disklock_offset=%llu slot_table_offset=%llu "
-           "volume_id=0x%016llx\n", dev,
-           (unsigned long long)dloff, (unsigned long long)table_off,
+    printf("device=%s logical_block=%u disklock_offset=%llu slot_table_offset=%llu "
+           "volume_id=0x%016llx\n", dev, lbs,
+           (unsigned long long)dloff,
+           (unsigned long long)mxfs_rec_phys(dloff, table_off, lbs),
            (unsigned long long)vid);
 
     /* Heartbeat table: map bitmap bit -> node_id. */
     printf("--- heartbeat slots (bit -> node) ---\n");
     uint8_t hb[HB_RECORD_SIZE];
     for (int i = 0; i < HB_SLOTS; i++) {
-        uint64_t lba = (dloff + (uint64_t)i * HB_RECORD_SIZE) / SECTOR_SIZE;
-        if (do_scsi_read_fua(fd, lba, hb, 1) < 0)
+        uint64_t lba = mxfs_rec_phys(dloff, dloff + (uint64_t)i * HB_RECORD_SIZE,
+                                     lbs) / lbs;
+        if (do_scsi_read_fua(fd, lba, blk, 1) < 0)
             continue;
+        memcpy(hb, blk, HB_RECORD_SIZE);
         uint32_t magic = *(uint32_t *)(hb + 0);
         uint32_t flags = *(uint32_t *)(hb + 4);
         uint32_t node_id = *(uint32_t *)(hb + 8);
@@ -353,14 +383,18 @@ int main(int argc, char **argv)
 
     printf("--- lock slots ---\n");
     static struct caw_slot span[SPAN_SLOTS];
+    /* SPAN_SLOTS consecutive records are SPAN_SLOTS consecutive blocks */
+    static uint8_t spanblk[SPAN_SLOTS * MXFS_LBS_MAX];
     long printed = 0;
     unsigned long live = 0, tomb = 0, nonempty = 0;
 
     for (uint32_t base = 0; base < CAW_MAX_SLOTS; base += SPAN_SLOTS) {
-        uint64_t lba = (table_off + (uint64_t)base * SECTOR_SIZE) /
-                       SECTOR_SIZE;
-        if (do_scsi_read_fua(fd, lba, span, SPAN_SLOTS) < 0)
+        uint64_t lba = mxfs_rec_phys(dloff, table_off +
+                                     (uint64_t)base * RECORD_SIZE, lbs) / lbs;
+        if (do_scsi_read_fua(fd, lba, spanblk, SPAN_SLOTS) < 0)
             return 1;
+        for (uint32_t k = 0; k < SPAN_SLOTS; k++)
+            memcpy(&span[k], spanblk + (size_t)k * lbs, RECORD_SIZE);
         for (uint32_t k = 0; k < SPAN_SLOTS; k++) {
             struct caw_slot *s = &span[k];
             bool is_zero = s->magic == 0 && s->resource.type == 0 &&

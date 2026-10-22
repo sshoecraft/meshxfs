@@ -84,7 +84,9 @@ rc=$(check control)
 echo "STAGE control: rc=$rc errors=$(cnt "$OUT/chk_control.txt" '^  ERROR:') at +$(el)s"
 ck "control: a fresh format is clean (rc 0)" "$rc" 0
 ck "control: zero ERROR lines" "$(cnt "$OUT/chk_control.txt" '^  ERROR:')" 0
-g() { grep -ao "$1=[0-9]*" "$OUT/chk_control.txt" | head -1 | cut -d= -f2; }
+# a field is the name at a word boundary: an unanchored "sectsize=" took the
+# first "logsectsize=0" of the report and the patches refused a zero width
+g() { grep -aoE "(^|[^A-Za-z0-9_])$1=[0-9]+" "$OUT/chk_control.txt" | head -1 | sed 's/.*=//'; }
 XOFF=$(g xfs_data_offset); BS=$(g blocksize); SS=$(g sectsize); INOPB=$(g inopblock)
 INO_ROOT=$(grep -ao 'AG 0 AGI: ino_root=[0-9]*' "$OUT/chk_control.txt" | head -1 | grep -ao '[0-9]*$')
 FINO_ROOT=$(grep -ao 'AG 0 AGI: .*fino_root=[0-9]*' "$OUT/chk_control.txt" | head -1 | grep -ao 'fino_root=[0-9]*' | cut -d= -f2)

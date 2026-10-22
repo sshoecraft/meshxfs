@@ -110,6 +110,12 @@ down)
     if [ -d "/sys/kernel/scst_tgt/devices/$DEV" ]; then
         echo "del_device $DEV" | sudo tee /sys/kernel/scst_tgt/handlers/vdisk_fileio/mgmt >/dev/null || die "del device"
     fi
+    # SCST keeps a device's persistent reservations in a file named for it and
+    # restores them when a device of that name is created again: a node that
+    # departed dirty leaves its key registered as a fence target, so the next
+    # `up` would hand back a LUN that refuses every write (reservation
+    # conflict at mkfs's first one).  The image goes with them.
+    sudo rm -f "/var/lib/scst/pr/$DEV" "/var/lib/scst/pr/$DEV.1"
     rm -f "$IMG"
     echo DOWN_OK
     ;;

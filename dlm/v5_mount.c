@@ -20233,6 +20233,59 @@ struct mxfs_v5_dlm *mxfs_v5_dlm_init(const struct mxfs_v5_dlm_opts *opts)
 		goto err_dev;
 	}
 	/*
+	 * A volume formatted for a device of larger logical blocks
+	 * (docs/4kn-support.md): its record regions -- the journal, the disklock
+	 * tables, the PR registrant ledger, the bootstrap and slice lifecycle
+	 * records -- keep each 512-byte unit in a block of its own, and this
+	 * handle moves every unit to and from its block for every caller, which
+	 * goes on addressing them as on a 512-byte device.  A DRBD device's
+	 * COMPARE AND WRITE is the PAL's emulation, which works in the device's
+	 * blocks the same way, its own three units included (pal/linux/drbd.c
+	 * mxfs_cas_area), so it needs these regions registered first.
+	 */
+	if (opts->lbs > 512) {
+		uint64_t start[5], units[5];
+		int n = 0, rc;
+
+		start[n] = opts->journal_offset;
+		units[n++] = opts->journal_size;
+		start[n] = opts->disklock_offset;
+		units[n++] = opts->disklock_size;
+		if (opts->prkey_size) {
+			start[n] = opts->prkey_offset;
+			units[n++] = opts->prkey_size;
+		}
+		if (opts->bootstrap_size) {
+			start[n] = opts->bootstrap_offset;
+			units[n++] = opts->bootstrap_size;
+		}
+		if (opts->slife_size) {
+			start[n] = opts->slife_offset;
+			units[n++] = opts->slife_size;
+		}
+		rc = mxfs_pal_bdev_set_record_regions(ctx->dev, opts->lbs, n, start,
+						      units);
+		if (rc) {
+			mxfs_pal_log(MXFS_LOG_ERR,
+				     "mxfs: P-LBS-REGIONS-REFUSED lbs=%u rc=%d journal=%llu+%llu "
+				     "disklock=%llu+%llu -- the device does not take this "
+				     "volume's record regions", opts->lbs, rc,
+				     (unsigned long long)opts->journal_offset,
+				     (unsigned long long)opts->journal_size,
+				     (unsigned long long)opts->disklock_offset,
+				     (unsigned long long)opts->disklock_size);
+			goto err_dev;
+		}
+		mxfs_pal_log(MXFS_LOG_INFO,
+			     "mxfs: P-LBS-REGIONS lbs=%u regions=%d journal=%llu+%llu "
+			     "disklock=%llu+%llu -- each 512-byte record unit in a block "
+			     "of its own", opts->lbs, n,
+			     (unsigned long long)opts->journal_offset,
+			     (unsigned long long)opts->journal_size,
+			     (unsigned long long)opts->disklock_offset,
+			     (unsigned long long)opts->disklock_size);
+	}
+	/*
 	 * A DRBD device has one transport, the network lock manager (see the
 	 * refusal below), so a mount that did not name one gets it whatever
 	 * the module default: a host whose default is COMPARE AND WRITE, for

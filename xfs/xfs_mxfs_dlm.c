@@ -2563,6 +2563,52 @@ module_param_cb(iwr_empty_refused, &mxfs_dbg_atomic_param_ops,
 MODULE_PARM_DESC(iwr_empty_refused,
 		 "count of inode-cluster writes refused because every sector was skipped (write resets)");
 /*
+ * The merged inode-cluster write (pal/linux/xfs_buf.c, docs/4kn-support.md),
+ * on a volume whose sector holds several inodes: the blocks it swapped, the
+ * MISCOMPAREs it retried (a peer landed one of its own slots in the block
+ * between this node's read and its swap), the cluster writes it failed (a
+ * swap error, a block still miscomparing at its bound, or a write it could
+ * not merge), and the cluster writes that owed nothing and completed with no
+ * I/O.  A harness writes 0 to each and reads it at the end.
+ */
+atomic_t mxfs_iwr_merge_blocks = ATOMIC_INIT(0);
+module_param_cb(iwr_merge_blocks, &mxfs_dbg_atomic_param_ops,
+		&mxfs_iwr_merge_blocks, 0644);
+MODULE_PARM_DESC(iwr_merge_blocks,
+		 "count of inode-cluster blocks the merged write swapped (write resets)");
+atomic_t mxfs_iwr_merge_miscompares = ATOMIC_INIT(0);
+module_param_cb(iwr_merge_miscompares, &mxfs_dbg_atomic_param_ops,
+		&mxfs_iwr_merge_miscompares, 0644);
+MODULE_PARM_DESC(iwr_merge_miscompares,
+		 "count of merged-write swaps that miscompared and were read and merged again (write resets)");
+atomic_t mxfs_iwr_merge_failed = ATOMIC_INIT(0);
+module_param_cb(iwr_merge_failed, &mxfs_dbg_atomic_param_ops,
+		&mxfs_iwr_merge_failed, 0644);
+MODULE_PARM_DESC(iwr_merge_failed,
+		 "count of inode-cluster writes the merged write failed, leaving the buffer dirty (write resets)");
+atomic_t mxfs_iwr_merge_empty = ATOMIC_INIT(0);
+module_param_cb(iwr_merge_empty, &mxfs_dbg_atomic_param_ops,
+		&mxfs_iwr_merge_empty, 0644);
+MODULE_PARM_DESC(iwr_merge_empty,
+		 "count of merged-mode inode-cluster writes that owed no slot and completed with no I/O (write resets)");
+/*
+ * DEBUG: the next dbg_iwr_merge_hold_n blocks the merged write swaps each wait
+ * dbg_iwr_merge_hold_ms between the block's read and its first swap, so a test
+ * can land a peer's write of the same block in between and see the swap
+ * miscompare and the block read and merged again (tests/fourkn_merge_2node.sh).
+ * Each held block takes one from the count, which reads back what is left; a
+ * retry is never held.  Never in production.
+ */
+atomic_t mxfs_dbg_iwr_merge_hold_n = ATOMIC_INIT(0);
+module_param_cb(dbg_iwr_merge_hold_n, &mxfs_dbg_atomic_param_ops,
+		&mxfs_dbg_iwr_merge_hold_n, 0644);
+MODULE_PARM_DESC(dbg_iwr_merge_hold_n,
+		 "DEBUG: the next N blocks of merged inode-cluster writes wait dbg_iwr_merge_hold_ms between their read and their swap (reads back the count left). Never enable in production.");
+int mxfs_dbg_iwr_merge_hold_ms = 20;
+module_param_named(dbg_iwr_merge_hold_ms, mxfs_dbg_iwr_merge_hold_ms, int, 0644);
+MODULE_PARM_DESC(dbg_iwr_merge_hold_ms,
+		 "DEBUG: how long a block held by dbg_iwr_merge_hold_n waits, in ms. Never enable in production.");
+/*
  * D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, H-U6:
  * xfs_inactive_ifree released its predecessor pin (H-U1) and hold (H-U4) with
  * a synchronous xfs_irele after the free committed.  When it is the

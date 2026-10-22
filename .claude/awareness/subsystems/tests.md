@@ -2038,21 +2038,15 @@ runs both boards; `2/...` configurations run the two-node ones, and
 `4/net/mesh/direct:row,row` runs one lap of those rows on a freshly forced
 cluster under one run id — the unit a flake window is cleared with.
 
-**Clearing a flake window before a release.** A row whose newest genuine
-FAIL sits at window index k (0 = the live run, 11-run window) reads PASS
-again only after 11-k more runs of that row; the board run that closes the
-verification is one of them, so it takes 10-k single-row laps first, then the
-board. `tests/release_verify_chain.sh <version>` runs the whole sequence
-detached on one module: `W4_LAPS` laps of 4/net/mesh/direct `alloc_witness,chk_clean`,
-`NODES=4 tests/full_verify.sh`, `W2TCP` laps of 2/net/mesh/direct `fio_perf,guard_census`,
-`W2CAWD` laps of 2/disk/caw/direct `alloc_witness,chk_clean,crash_audit`, then both
-two-node boards, each step to `tests/evidence/release_verify_<version>.log`
-with an `=== rc=N: <step> ===` line and `RELEASE_CHAIN_DONE` at the end. The
-lap counts are read from `data/criteria.json` (0.90.17: 4/net/mesh/direct chk_clean k=6
-with two chain laps pending -> 2; 2/net/mesh/direct fio_perf k=3 -> 7; 2/disk/caw/direct crash_audit
-k=2 -> 8). A window lap's `board_4node_chain.sh` exits 1 while the board still
-reads FLAKY; that rc says nothing about the lap's rows, which the log's
-`Total:` line does.
+**Qualifying a release (0.90.133 on).** There is no flake window to clear and
+no window lap: every run stays in the ledger, and a failure counts until a
+defect record names it. A release is qualified on a frozen candidate
+(`tools/release_candidate.py create`) by `tools/release_run.py start <id>`,
+which runs presteps, build, text check, packages, boards in waves
+(`tests/board_4node_chain.sh`), DRBD, each Proxmox kernel, platforms, guards,
+verification batches, repeats and the soak, then seals; `tools/release_run.py
+status <id>` shows each step. `tests/release_verify_chain.sh` and its wrappers
+were deleted with the window. `docs/release-process.md` is the design.
 
 **The blocked-recovery probe arm at N nodes** (`TDR_BLOCK_INJECT=1
 TDR_PROBE_NODES=<n,n>`): after FENCE_BLOCKED the probes' path operations
@@ -2089,10 +2083,13 @@ line says.
 `run.sh` `run_host` (the runner for `coord=host` rows; `crash_audit` is the
 only one) now makes the same mount-and-readdir probe on every node that
 `run_coord` makes before launching, and records `FAIL "pre-assert"` when a
-node has no readable MXFS mount.  `tools/criteria.py` excludes that reason
-from the flake window (`RIG_NOISE`), so a row that inherits an unformed fleet
-from a budget-killed row before it is not counted as a genuine fault of the
-mechanism it tests.  Measured twice at 4/net/mesh/direct before the change: `chk_clean`
+node has no readable MXFS mount.  Since 0.90.133 the probe is split by what
+it finds (`preassert_probe`/`preassert_record`): a node with no mount makes
+the row INCOMPLETE (it measured nothing, an incident until a reviewed
+disposition says why); a mount that cannot be read within 10 s, or a node
+that does not answer, is a stability FAIL naming the row that ran before it.
+Neither is excused as rig noise any more: a hung mount produced exactly the
+"pre-assert" reason the old regex excused.  Measured twice at 4/net/mesh/direct before the change: `chk_clean`
 killed at its budget with the fleet unmounted, then `crash_audit`'s oracle
 aborting at its own member mount check and the row recording a failed death
 oracle (two genuine-looking FAILs in the window, amended with
@@ -2129,12 +2126,6 @@ platform set off and the rig up before the suites (which grade pace), each
 group's sets up alone for their steps, and the rig up again at the end.  The
 defaults (one group of four, no power handling) are the 2- and 4-node
 behaviour unchanged.
-
-### `tests/release_verify_chain.sh`: `CLAIM`, `LAPS`, `LOWER`
-
-`CLAIM=8` is the node count the release claims; `LAPS` holds window laps as
-`<nodes>:<dlm>:<rows>:<count>`; `LOWER` (default: the released counts below
-the claim, `4 2`) re-earns each smaller claim's boards on the same module.
 
 ### `tests/multi_victim_containment.sh <N> <dlm> <victims> [label]`
 

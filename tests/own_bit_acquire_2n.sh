@@ -106,7 +106,7 @@ wait $UP
 for n in $A $B; do
     rsh $n 60 "journalctl -k --since=@$(( t0 - 5 )) --no-pager -o short-monotonic" | gzip > "$EV/kernlog_$n.gz"
 done
-CHKDEV=${MXFS_DEV:-$(python3 -c 'import json; print(json.load(open(".cluster_marker.json"))["dev"])')}
+CHKDEV=${MXFS_DEV:-$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["dev"])' "${MXFS_MARKER:-.cluster_marker.json}")}
 rsh $A 240 "/src/mxfs/tools/chk_mxfs $CHKDEV >/dev/null 2>&1; echo CHK_RC=\$?" | grep -a CHK_RC > "$EV/chk.txt"
 
 FAILS=0

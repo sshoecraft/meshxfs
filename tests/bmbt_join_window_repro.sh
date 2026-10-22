@@ -110,7 +110,7 @@ MK="BMBTJW-MARK-$LABEL-$$"
 cat > "$OUT/window_loop.sh" <<EOF
 r=0; w=0; end=\$((\$(date +%s) + 120))
 while [ \$(date +%s) -lt \$end ]; do
-    win=\$(dmesg | sed -n '/$MK/,\$p')
+    win=\$(dmesg | sed -n '/$MK/,\$p')  # harness-lint: ok - an unquoted heredoc: MK expands while the loop script is written
     if printf '%s' "\$win" | grep -aq P-JOIN-FLIP-DELAY; then
         if [ $MODE = 4 ]; then
             [ \$w = 0 ] && { echo 3 > /proc/sys/vm/drop_caches; cat $F > /dev/null; echo 2 > /proc/sys/vm/drop_caches; }

@@ -28,6 +28,23 @@
 # nothing fabricated): recorded as VACUOUS, counted apart, not BROKEN.
 # An entry that misses any of these is BROKEN and the gate exits 1.
 #
+# Every lap starts on the pair as it was formed: each node up with the tree on
+# /src, this tree's module loaded and the filesystem mounted.  The entries run
+# back to back, and an injected fault or an entry's own kill arm can leave a
+# node destroyed, unmounted or without its module.  The next entry that did
+# not prep itself then aborted on that before its first measurement, and the
+# gate read it BROKEN without testing its capture handling at all (0.90.134:
+# tcp_death_replay and lone_mount_crash_replay found test2 off after
+# recov_bmbt_reuse, join_during_takeover found it unmounted).  So the pair is
+# checked before every lap and formed again when it is not: the nodes that did
+# not answer are powered on, then run.sh prep_cluster forms the pair under the
+# configuration its cluster marker records (MXFS_MARKER, as run.sh exports it;
+# MXFS_GROUP carries a rig group into run.sh).  Bounds: a started VM answered
+# ssh in 40-90 s (tests/recov_bmbt_reuse.sh), so 120 s; prep_cluster bounds
+# itself with its manifest budget.  A pair that is still not formed after that
+# ends the gate as ABORT: every later lap would measure the rig, not its
+# harness.
+#
 # Manifest (tests/capture_gate.manifest): one entry per line,
 #     <harness> | <fault lap timeout s> | <healthy lap timeout s> | <env> | <args after the label>
 # The timeouts are the harness's own caller bound (its header derives it);
@@ -59,6 +76,53 @@ broken=0; vacuous=0; entries=0; s0=$(date +%s)
 # same log the harness wrote (stderr and stdout interleaved as they came)
 verdicts_after_fault() { awk '/STAGE FAULT:/{f=1; next} f && /^  (PASS|FAIL) /{n++} END{print n+0}' "$1"; }
 
+PAIR_NODES=${MXFS_NODE_LIST:-test1,test2}; PAIR_NODES=${PAIR_NODES//,/ }
+PAIR_MNT=${MXFS_MOUNT:-/mnt/shared}
+PAIR_SV=$(modinfo -F srcversion mxfs.ko 2>/dev/null)
+PAIR_CONFIG=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("configuration") or "")' "${MXFS_MARKER:-.cluster_marker.json}" 2>/dev/null)
+[ -n "$PAIR_SV" ] || { echo "ABORT: no srcversion in ./mxfs.ko, so no lap can be checked for this tree's module"; exit 2; }
+[ -n "$PAIR_CONFIG" ] || { echo "ABORT: the cluster marker ${MXFS_MARKER:-.cluster_marker.json} names no configuration, so the pair cannot be formed again between laps"; exit 2; }
+# force_transport as prep loads it for the configuration (tests/lib/rig.sh mxfs_rig_modargs)
+PAIR_FT=1; [ "$(python3 tools/configuration.py get "$PAIR_CONFIG" transport 2>/dev/null)" = caw ] && PAIR_FT=0
+restores=0
+# pair_state: one line per node that answered,
+#   "<node> src=<0|1> sv=<srcversion> ft=<force_transport> m=<mxfs mounts>"
+pair_state() {
+    local n a
+    for n in $PAIR_NODES; do
+        a=$(timeout 20 tools/mxfs_sshpass.sh "$n" "echo src=\$(mountpoint -q /src && [ -r /src/mxfs/tests/setup/prep_node.sh ] && echo 1 || echo 0) sv=\$(cat /sys/module/mxfs/srcversion 2>/dev/null) ft=\$(cat /sys/module/mxfs/parameters/force_transport 2>/dev/null) m=\$(grep -c ' $PAIR_MNT mxfs ' /proc/mounts)" < /dev/null 2>/dev/null | grep -a '^src=' | tail -1)
+        [ -n "$a" ] && echo "$n $a"
+    done
+}
+pair_formed() {  # <pair_state output>
+    local n
+    for n in $PAIR_NODES; do grep -aqx "$n src=1 sv=$PAIR_SV ft=$PAIR_FT m=1" <<<"$1" || return 1; done
+}
+# pair_ready <lap>: the pair is formed, or is formed again, or the gate ends
+pair_ready() {
+    local st n s log
+    st=$(pair_state)
+    pair_formed "$st" && return 0
+    restores=$((restores+1)); log=$OUT/pair_restore_$restores.log
+    echo "PAIR before $1: not formed [$(tr '\n' ';' <<<"$st")] -> forming it again (log $log)"
+    for n in $PAIR_NODES; do
+        grep -aq "^$n src=" <<<"$st" || tools/node_power.sh start "$n" < /dev/null >> "$log" 2>&1
+    done
+    s=$(date +%s)
+    for n in $PAIR_NODES; do
+        until timeout 10 tools/mxfs_sshpass.sh "$n" "echo SSH_UP" < /dev/null 2>/dev/null | grep -q SSH_UP; do
+            [ $(( $(date +%s) - s )) -lt 120 ] || break
+            sleep 5
+        done
+    done
+    ./run.sh "$PAIR_CONFIG" prep_cluster < /dev/null >> "$log" 2>&1
+    st=$(pair_state)
+    pair_formed "$st" && { echo "PAIR formed again before $1 in $(( $(date +%s) - s ))s"; return 0; }
+    echo "ABORT: the pair could not be formed again before $1 [$(tr '\n' ';' <<<"$st")]; $(grep -a '^ABORT\|^ERROR\|prep_cluster OK' "$log" | tail -2 | tr '\n' ' ' | cut -c1-240)"
+    echo "RESULT: ABORT label=$LABEL entries=$entries broken=$broken vacuous=$vacuous restores=$restores wall=$(( $(date +%s) - s0 ))s stage=pair evidence=$OUT"
+    exit 2
+}
+
 while IFS= read -r line; do
     case $line in ''|'#'*) continue ;; esac
     IFS='|' read -r h tf th env args <<< "$line"
@@ -75,6 +139,7 @@ while IFS= read -r line; do
     case $args in *'{label}'*) fargs=${args//\{label\}/$LABEL-$tag-fault}; hargs=${args//\{label\}/$LABEL-$tag-ok} ;; esac
     # ---- fault lap: the FIRST measurement fails ----
     if [ "$FAULT" = 1 ]; then
+    pair_ready "$h fault"
     s=$(date +%s)
     # shellcheck disable=SC2086
     # stdin closed: the harness runs inside this loop's `read` over the
@@ -93,6 +158,7 @@ while IFS= read -r line; do
     fi
     # ---- healthy lap ----
     if [ "$HEALTHY" = 1 ]; then
+        pair_ready "$h healthy"
         s=$(date +%s)
         # shellcheck disable=SC2086
         timeout "${th:-$tf}" env $env "tests/$h.sh" $hargs < /dev/null > "$OUT/${tag}_ok.log" 2>&1
@@ -116,5 +182,5 @@ while IFS= read -r line; do
         [ "$st" != BROKEN ] || { broken=$((broken+1)); grep -a '^ABORT:\|^  FAIL\|^RESULT' "$OUT/${tag}_ok.log" | head -4 | sed 's/^/      /' | cut -c1-220; }
     fi
 done < "$MANIFEST"
-echo "RESULT: $( [ "$broken" = 0 ] && echo PASS || echo FAIL ) label=$LABEL entries=$entries broken=$broken vacuous=$vacuous wall=$(( $(date +%s) - s0 ))s evidence=$OUT"
+echo "RESULT: $( [ "$broken" = 0 ] && echo PASS || echo FAIL ) label=$LABEL entries=$entries broken=$broken vacuous=$vacuous restores=$restores wall=$(( $(date +%s) - s0 ))s evidence=$OUT"
 [ "$broken" = 0 ]

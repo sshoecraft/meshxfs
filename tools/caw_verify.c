@@ -9,16 +9,20 @@
  *
  * Usage on two nodes T1 and T2 sharing /dev/sda (or another device):
  *
- *   T1: ./caw_verify write /dev/sda <lba_512> <pattern_byte>
+ *   T1: ./caw_verify write /dev/sda <lba> <pattern_byte>
  *        - Reads LBA via SCSI READ(16) FUA.
  *        - Issues SCSI COMPARE AND WRITE (opcode 0x89) with FUA:
- *            compare = current content, write = 512 bytes of <pattern_byte>.
+ *            compare = current content, write = one block of <pattern_byte>.
  *        - Re-reads LBA via SCSI READ(16) FUA.  Reports whether the disk
  *          content matches what we wrote.
  *
- *   T2: ./caw_verify read  /dev/sda <lba_512> [expected_byte]
+ *   T2: ./caw_verify read  /dev/sda <lba> [expected_byte]
  *        - Reads LBA via SCSI READ(16) FUA.
  *        - If [expected_byte] is given, reports match/mismatch.
+ *
+ * <lba> is a DEVICE LBA, in the device's own logical blocks (BLKSSZGET): 512
+ * bytes on a 512-byte device, 4096 on a 4K-native one (docs/4kn-support.md),
+ * and every command moves whole blocks of that size.
  *
  * If CAW works cross-initiator, T2's read after T1's write should see
  * the pattern byte uniformly.  If T2 sees something else, the LIO target
@@ -38,10 +42,13 @@
 #include <errno.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
+#include <linux/fs.h>
 #include <scsi/sg.h>
 
-#define SECTOR_SIZE 512
 #define TIMEOUT_MS  30000
+
+/* the device's logical block size (BLKSSZGET), set in main before any command */
+static uint32_t lbs;
 #define UA_MAX_RETRY 6           /* bounded retries on UNIT ATTENTION */
 
 /* --retry-ua: retry a command that returns UNIT ATTENTION (sense key 0x06).
@@ -126,16 +133,20 @@ static int scsi_read16_fua(int fd, uint64_t lba, void *buf, uint32_t blocks)
     cdb[12] = (uint8_t)(blocks >> 8);
     cdb[13] = (uint8_t)(blocks);
     return do_scsi_io(fd, cdb, sizeof(cdb), buf,
-                      blocks * SECTOR_SIZE, SG_DXFER_FROM_DEV, NULL);
+                      blocks * lbs, SG_DXFER_FROM_DEV, NULL);
 }
 
-/* Compare buf is sectors[0..n), write buf is sectors[n..2n). */
+/* Compare buf is blocks[0..n), write buf is blocks[n..2n). */
 static int scsi_compare_and_write(int fd, uint64_t lba,
                                   void *cmp_buf, void *write_buf,
                                   int *miscompare)
 {
     unsigned char cdb[16] = {0};
-    unsigned char data[2 * SECTOR_SIZE];
+    unsigned char *data = malloc(2 * (size_t)lbs);
+    int rc;
+
+    if (!data)
+        return -1;
     cdb[0]  = 0x89;                  /* COMPARE AND WRITE */
     cdb[1]  = 0x08;                  /* FUA */
     cdb[2]  = (uint8_t)(lba >> 56);
@@ -147,19 +158,22 @@ static int scsi_compare_and_write(int fd, uint64_t lba,
     cdb[8]  = (uint8_t)(lba >> 8);
     cdb[9]  = (uint8_t)(lba);
     cdb[13] = 0x01;                  /* number of logical blocks = 1 */
-    memcpy(data, cmp_buf, SECTOR_SIZE);
-    memcpy(data + SECTOR_SIZE, write_buf, SECTOR_SIZE);
-    return do_scsi_io(fd, cdb, sizeof(cdb), data, sizeof(data),
-                      SG_DXFER_TO_DEV, miscompare);
+    memcpy(data, cmp_buf, lbs);
+    memcpy(data + lbs, write_buf, lbs);
+    rc = do_scsi_io(fd, cdb, sizeof(cdb), data, 2 * lbs,
+                    SG_DXFER_TO_DEV, miscompare);
+    free(data);
+    return rc;
 }
 
 static void usage(const char *prog)
 {
     fprintf(stderr,
             "Usage:\n"
-            "  %s [--retry-ua] write <device> <lba_512> <pattern_byte_hex>\n"
-            "  %s [--retry-ua] read  <device> <lba_512> [expected_byte_hex]\n"
+            "  %s [--retry-ua] write <device> <lba> <pattern_byte_hex>\n"
+            "  %s [--retry-ua] read  <device> <lba> [expected_byte_hex]\n"
             "\n"
+            "  lba: a device LBA, in the device's own logical blocks\n"
             "  pattern_byte_hex / expected_byte_hex: 00..ff\n"
             "  --retry-ua: retry on UNIT ATTENTION (needed on dm-multipath)\n",
             prog, prog);
@@ -191,17 +205,29 @@ int main(int argc, char **argv)
         fprintf(stderr, "open %s: %s\n", path, strerror(errno));
         return 1;
     }
+    {
+        int v = 0;
+
+        if (ioctl(fd, BLKSSZGET, &v) < 0 || v < 512 || v > 4096 || (v & (v - 1))) {
+            fprintf(stderr, "%s: cannot get a logical block size (BLKSSZGET: %s, %d)\n",
+                    path, strerror(errno), v);
+            return 1;
+        }
+        lbs = (uint32_t)v;
+    }
 
     if (strcmp(mode, "write") == 0) {
         if (argc < 5)
             usage(argv[0]);
         unsigned int pat = strtoul(argv[4], NULL, 16) & 0xff;
-        unsigned char cur[SECTOR_SIZE];
-        unsigned char want[SECTOR_SIZE];
-        unsigned char got[SECTOR_SIZE];
+        unsigned char *cur = malloc(lbs), *want = malloc(lbs), *got = malloc(lbs);
 
-        printf("[write] LBA=%llu pattern=0x%02x\n",
-               (unsigned long long)lba, pat);
+        if (!cur || !want || !got) {
+            fprintf(stderr, "out of memory\n");
+            return 1;
+        }
+        printf("[write] LBA=%llu (%u-byte blocks) pattern=0x%02x\n",
+               (unsigned long long)lba, lbs, pat);
 
         if (scsi_read16_fua(fd, lba, cur, 1) < 0) {
             fprintf(stderr, "pre-read failed\n");
@@ -210,7 +236,7 @@ int main(int argc, char **argv)
         printf("[write] pre-read first 8 bytes: %02x %02x %02x %02x %02x %02x %02x %02x\n",
                cur[0], cur[1], cur[2], cur[3], cur[4], cur[5], cur[6], cur[7]);
 
-        memset(want, pat, SECTOR_SIZE);
+        memset(want, pat, lbs);
         int miscompare = 0;
         if (scsi_compare_and_write(fd, lba, cur, want, &miscompare) < 0) {
             fprintf(stderr, "CAW failed\n");
@@ -230,7 +256,7 @@ int main(int argc, char **argv)
                got[0], got[1], got[2], got[3], got[4], got[5], got[6], got[7]);
 
         int match = 1;
-        for (int i = 0; i < SECTOR_SIZE; i++) {
+        for (uint32_t i = 0; i < lbs; i++) {
             if (got[i] != pat) {
                 match = 0;
                 break;
@@ -244,7 +270,12 @@ int main(int argc, char **argv)
     }
 
     if (strcmp(mode, "read") == 0) {
-        unsigned char buf[SECTOR_SIZE];
+        unsigned char *buf = malloc(lbs);
+
+        if (!buf) {
+            fprintf(stderr, "out of memory\n");
+            return 1;
+        }
         if (scsi_read16_fua(fd, lba, buf, 1) < 0) {
             fprintf(stderr, "read failed\n");
             return 1;
@@ -258,7 +289,7 @@ int main(int argc, char **argv)
         if (argc >= 5) {
             unsigned int expect = strtoul(argv[4], NULL, 16) & 0xff;
             int match = 1;
-            for (int i = 0; i < SECTOR_SIZE; i++) {
+            for (uint32_t i = 0; i < lbs; i++) {
                 if (buf[i] != expect) {
                     match = 0;
                     break;

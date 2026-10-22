@@ -84,4 +84,38 @@ else
     echo "FAIL: after finalize --at ${CFGS[0]}: its markers=$n0 (want 0), ${CFGS[1]} markers=$n1 (want ${#IDS[@]})"
     fail=1
 fi
+
+# THE RUN LEDGER UNDER CONCURRENT WRITERS.  Every recorded run is appended to the
+# board's ledger (tools/criteria.py) under the same lock: one result writer per
+# configuration, all at once, must each leave exactly one run in the ledger, and
+# finalize's ABORTED/NOT RUN conversions above must be there too.  The build
+# named is this test's own marker, never a real module's.
+pids=()
+for c in "${CFGS[@]:1}"; do
+    "$CRITPY" update "${IDS[0]}" --at "$c" -s PASS -m "lockcheck" --build LOCKCHECKBUILD \
+        --run-id "lockrun-$c" > "$W/upd.$(echo "$c" | tr / -)" 2>&1 &
+    pids+=($!)
+done
+crashed=0
+for p in "${pids[@]}"; do wait "$p" || crashed=$((crashed + 1)); done
+[ "$crashed" = 0 ] || { echo "FAIL: $crashed result writer(s) exited non-zero"; cat "$W"/upd.*; fail=1; }
+ledger_ok=$(python3 - "$W/criteria.runs.jsonl" "${#CFGS[@]}" "${#IDS[@]}" <<'PY'
+import json, sys
+runs = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+results = [r for r in runs if str(r.get("run_id", "")).startswith("lockrun-")]
+healed = [r for r in runs if str(r.get("run_id", "")).startswith("lockcheck-")
+          and r.get("outcome") == "UNREACHED"]
+want_results, want_healed = int(sys.argv[2]) - 1, int(sys.argv[3])
+ok = len(results) == want_results and len({r["config"] for r in results}) == want_results \
+     and len(healed) == want_healed
+print("ok" if ok else "results=%d of %d, healed=%d of %d" % (len(results), want_results,
+                                                             len(healed), want_healed))
+PY
+)
+if [ "$ledger_ok" = ok ]; then
+    echo "PASS: every concurrent result writer's run and every finalized marker is in the run ledger"
+else
+    echo "FAIL: run ledger: $ledger_ok"
+    fail=1
+fi
 exit $fail

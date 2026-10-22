@@ -1149,6 +1149,8 @@ xfs_mount_free(
 	/* No writer is left to wait in the DRBD write bound or ask it anything. */
 	mxfs_pal_ioq_destroy(mp->m_mxfs_ioq);
 	mp->m_mxfs_ioq = NULL;
+	mxfs_pal_bdev_close_clone(mp->m_mxfs_merge_dev);
+	mp->m_mxfs_merge_dev = NULL;
 	/*
 	 * The authority object goes last.  Every producer, workqueue, timer
 	 * and I/O completion of this incarnation is gone by the time the mount
@@ -4028,6 +4030,15 @@ static unsigned int mxfs_affine_audit_pct;
 unsigned long long mxfs_dbg_dreval_trace_ino;	/* also read by xfs_vn_lookup */
 module_param_named(dbg_dreval_trace_ino, mxfs_dbg_dreval_trace_ino, ullong, 0644);
 MODULE_PARM_DESC(dbg_dreval_trace_ino, "DEBUG: print every fast-path dentry blessing (epoch or affine) and every stale-flag rejection under this parent inode (0=off)");
+/*
+ * DEBUG (docs/4kn-support.md): mount a volume on a 4096-byte-block device.
+ * Off, such a device is refused, as it is until every part of 4K-native
+ * support is in place and verified: the inode cluster's merged write and the
+ * authority ledger's whole-page swap among them.  Never enable in production.
+ */
+static int mxfs_dbg_lbs_mount;
+module_param_named(dbg_lbs_mount, mxfs_dbg_lbs_mount, int, 0644);
+MODULE_PARM_DESC(dbg_lbs_mount, "DEBUG: mount volumes on 4096-byte-block devices while 4K-native support is developed (0=refuse, the default). Never enable in production.");
 static atomic64_t mxfs_affine_audit_n = ATOMIC64_INIT(0);	/* sampled     */
 static atomic64_t mxfs_affine_audit_ok = ATOMIC64_INIT(0);	/* blessing OK */
 static atomic64_t mxfs_affine_audit_gone = ATOMIC64_INIT(0);	/* name gone   */
@@ -4855,6 +4866,22 @@ xfs_fs_fill_super(
 	{
 		struct mxfs_ondisk_super *msup;
 
+		/*
+		 * A device of logical blocks larger than 512 bytes holds a volume
+		 * only once 4K-native support is complete (docs/4kn-support.md);
+		 * until then the envelope read below would report no more than a
+		 * bad magic, so name the cause.
+		 */
+		unsigned int devlbs = bdev_logical_block_size(mp->m_ddev_targp->bt_bdev);
+
+		if (devlbs != 512 && !(devlbs == 4096 && READ_ONCE(mxfs_dbg_lbs_mount))) {
+			xfs_alert(mp,
+	"MXFS: %pg has %u-byte logical blocks; this version mounts devices with 512-byte logical blocks only; refusing mount",
+				  mp->m_ddev_targp->bt_bdev, devlbs);
+			error = -EINVAL;
+			goto out_free_scrub_stats;
+		}
+
 		msup = kmalloc(MXFS_SUPER_SIZE, GFP_KERNEL);
 		if (msup) {
 			int ret = xfs_rw_bdev(mp->m_ddev_targp->bt_bdev, 0,
@@ -4914,10 +4941,32 @@ xfs_fs_fill_super(
 						goto out_free_scrub_stats;
 					}
 				}
+				/*
+				 * The volume's logical block size is the device's,
+				 * or every record region would be read and written
+				 * at the wrong place: an image moved between a 512-
+				 * byte and a 4K-native array is refused either way.
+				 */
+				mp->m_mxfs_lbs = mxfs_super_lbs(msup);
+				if (mp->m_mxfs_lbs != devlbs) {
+					xfs_alert(mp,
+	"MXFS: this volume was formatted for %u-byte logical blocks and %pg has %u-byte ones; refusing mount",
+						  mp->m_mxfs_lbs,
+						  mp->m_ddev_targp->bt_bdev, devlbs);
+					kfree(msup);
+					error = -EINVAL;
+					goto out_free_scrub_stats;
+				}
 				mp->m_ddev_targp->bt_sector_offset = off;
 				mp->m_mxfs_has_envelope = true;
 				mp->m_mxfs_journal_offset = msup->journal_offset;
 				mp->m_mxfs_disklock_offset = msup->disklock_offset;
+				/* the record regions' sizes as the DLM addresses
+				 * them, in 512-byte units (the identity at 512) */
+				mp->m_mxfs_journal_size =
+					mxfs_rec_units(msup->journal_size, mp->m_mxfs_lbs);
+				mp->m_mxfs_disklock_size =
+					mxfs_rec_units(msup->disklock_size, mp->m_mxfs_lbs);
 				/* recovery manifest region
 				 * (docs/recovery-manifest.md).  Gen 7 requires
 				 * it; the gate below already refuses a super
@@ -4980,9 +5029,11 @@ xfs_fs_fill_super(
 				 * key has no durable owner record. */
 				if (msup->flags & MXFS_FORMAT_F_PRKEY64) {
 					mp->m_mxfs_prkey_offset = msup->prkey_offset;
-					mp->m_mxfs_prkey_size = msup->prkey_size;
-					if (msup->prkey_size < MXFS_PRLEDGER_ENTRY_BYTES ||
-					    msup->prkey_size % MXFS_PRLEDGER_ENTRY_BYTES ||
+					mp->m_mxfs_prkey_size =
+						mxfs_rec_units(msup->prkey_size, mp->m_mxfs_lbs);
+					if (mp->m_mxfs_prkey_size < MXFS_PRLEDGER_ENTRY_BYTES ||
+					    mp->m_mxfs_prkey_size % MXFS_PRLEDGER_ENTRY_BYTES ||
+					    msup->prkey_offset % mp->m_mxfs_lbs ||
 					    msup->prkey_offset + msup->prkey_size >
 					    msup->xfs_data_offset) {
 						xfs_warn(mp,
@@ -5003,9 +5054,10 @@ xfs_fs_fill_super(
 				 * requires it. */
 				if (msup->flags & MXFS_FORMAT_F_BOOTSTRAP) {
 					mp->m_mxfs_bootstrap_offset = msup->bootstrap_offset;
-					mp->m_mxfs_bootstrap_size = msup->bootstrap_size;
-					if (msup->bootstrap_size < MXFS_BOOTSTRAP_REC_BYTES ||
-					    msup->bootstrap_offset % 512 ||
+					mp->m_mxfs_bootstrap_size =
+						mxfs_rec_units(msup->bootstrap_size, mp->m_mxfs_lbs);
+					if (mp->m_mxfs_bootstrap_size < MXFS_BOOTSTRAP_REC_BYTES ||
+					    msup->bootstrap_offset % mp->m_mxfs_lbs ||
 					    msup->bootstrap_offset + msup->bootstrap_size >
 					    msup->xfs_data_offset) {
 						xfs_warn(mp,
@@ -5028,11 +5080,12 @@ xfs_fs_fill_super(
 				 * and says so at the claim (P-SLIFE-LEGACY). */
 				if (msup->flags & MXFS_FORMAT_F_SLIFE) {
 					mp->m_mxfs_slife_offset = msup->slife_offset;
-					mp->m_mxfs_slife_size = msup->slife_size;
-					if (msup->slife_size <
+					mp->m_mxfs_slife_size =
+						mxfs_rec_units(msup->slife_size, mp->m_mxfs_lbs);
+					if (mp->m_mxfs_slife_size <
 					    (uint64_t)msup->xfs_log_node_count *
 						MXFS_SLIFE_RECORD_SIZE ||
-					    msup->slife_offset % 512 ||
+					    msup->slife_offset % mp->m_mxfs_lbs ||
 					    msup->slife_offset + msup->slife_size >
 					    msup->xfs_data_offset) {
 						xfs_warn(mp,
@@ -5453,6 +5506,12 @@ xfs_fs_fill_super(
 			.bootstrap_size = mp->m_mxfs_bootstrap_size,
 			.slife_offset = mp->m_mxfs_slife_offset,
 			.slife_size = mp->m_mxfs_slife_size,
+			/* docs/4kn-support.md: above 512 the DLM's record regions
+			 * are translated by its device handle; the sizes are in
+			 * 512-byte units, as the DLM addresses them */
+			.lbs = mp->m_mxfs_lbs,
+			.journal_size = mp->m_mxfs_journal_size,
+			.disklock_size = mp->m_mxfs_disklock_size,
 			.max_nodes = mp->m_mxfs_max_nodes,
 			.peers = mp->m_mxfs_peers,
 			.bdev = mp->m_ddev_targp->bt_bdev,
@@ -5544,6 +5603,21 @@ xfs_fs_fill_super(
 			mp->m_mxfs_ioq = mxfs_pal_ioq_create(
 					mp->m_ddev_targp->bt_bdev,
 					mxfs_ioq_write_admitted, mp);
+			/*
+			 * docs/4kn-support.md: where a sector holds several
+			 * inodes, no node may write a cluster's block from its
+			 * own copy of a peer's inodes; the merged write
+			 * (xfs_buf.c) swaps each block on this handle.  Before
+			 * log recovery, whose writeback is its first user.
+			 */
+			if (mp->m_sb.sb_sectsize > mp->m_sb.sb_inodesize) {
+				mp->m_mxfs_merge_dev =
+					mxfs_pal_bdev_wrap(mp->m_ddev_targp->bt_bdev);
+				if (!mp->m_mxfs_merge_dev) {
+					error = -ENOMEM;
+					goto out_filestream_unmount;
+				}
+			}
 			/*
 			 * 0.88.0 (D-SLICE-CLAIM-TIME-INIT-UNTRUSTED-ZERO-531):
 			 * the heartbeat slot just claimed is the exclusive lease

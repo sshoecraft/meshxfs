@@ -520,6 +520,12 @@ typedef struct xfs_mount {
 	uint64_t		m_mxfs_bootstrap_size;
 	uint64_t		m_mxfs_slife_offset;	/* 0.88.0: slice lifecycle region (0 = none) */
 	uint64_t		m_mxfs_slife_size;
+	/* the logical block size the volume was formatted for (512 unless its
+	 * envelope says), and the journal's and disklock region's sizes in
+	 * 512-byte units (docs/4kn-support.md) */
+	uint32_t		m_mxfs_lbs;
+	uint64_t		m_mxfs_journal_size;
+	uint64_t		m_mxfs_disklock_size;
 	uint32_t		m_mxfs_max_nodes;
 	bool			m_mxfs_has_envelope;
 	/* C7 version gate: envelope carries MXFS_FORMAT_F_PROTOGATE +
@@ -577,6 +583,14 @@ typedef struct xfs_mount {
 	 * log recovery writes anything back; freed with the mount.
 	 */
 	struct mxfs_ioq		*m_mxfs_ioq;
+	/*
+	 * The data device's handle for the merged inode-cluster write
+	 * (pal/linux/xfs_buf.c, docs/4kn-support.md): on a volume whose sector
+	 * holds several inodes, each block of a cluster this node writes is one
+	 * COMPARE AND WRITE on it.  NULL on every other volume.  Set with
+	 * m_mxfs_ioq; freed with the mount.
+	 */
+	struct mxfs_bdev	*m_mxfs_merge_dev;
 	/*
 	 * 0.84.5 (D-...-0960): xfs_mountfs ran to completion — the mount
 	 * lifecycle mark a refused mount never reaches.  A mount refused

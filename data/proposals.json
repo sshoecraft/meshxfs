@@ -1,0 +1,57 @@
+{
+  "proposals": [
+    {
+      "id": "P20261021-4bb0fe",
+      "kind": "detector-defect",
+      "record": null,
+      "change": {
+        "config": "2/net/mesh/drbd",
+        "row": "fsx",
+        "iso": "2026-10-21T19:36:37Z"
+      },
+      "argument": "The DRBD board's fsx FAIL of 2026-10-21T19:36:37Z (dry-run candidate 0.90.133-2, build 71AC6107043DD5BE3D9181A, seed=3832054505, both checks failed in 2 s of an 88 s budget) is the detector failing, not MeshXFS. tests/suite/fsx.sh drew its seed from four random bytes (0..2^32-1); the vendored fsx keeps -S in an int (tests/suite/tools/fsx.c:186 'int seed = 1;', :3397 getnum) and calls usage() for a negative value (:3402-3403), exiting 90 before any operation, so neither check ran a single fsx operation on the filesystem. Reproduced host-local with the same binary: -S 3832054505 and -S 2147483648 exit 90 with the usage line; -S 2147483647 and -S 1 run (rc=0). The old draw put 10022 of 20000 seeds above INT_MAX. The detector fix is in the tree: tests/suite/fsx.sh now draws 1..2^31-1 (20000 draws, none outside) and keeps a failing check's fsx log on the node with its path in the record instead of deleting it. Nothing in the run is evidence about MeshXFS either way: fsx never opened its file.",
+      "evidence": [
+        "tests/evidence/fsx_seed_int_max_repro_20261021.log",
+        "tests/suite/fsx.sh",
+        "tests/suite/tools/fsx.c",
+        "tests/evidence/drbd_rig/criteria.runs.jsonl"
+      ],
+      "state": "rejected",
+      "created": "2026-10-21",
+      "review": {
+        "file": "data/reviews/P20261021-4bb0fe.md",
+        "sha256": "fdc839377bce12105304326e6dcff2f4e872a4150bca52203b00d2b2a1076e2c",
+        "verdict": "rejected",
+        "date": "2026-10-21"
+      }
+    },
+    {
+      "id": "P20261021-676432",
+      "kind": "detector-defect",
+      "record": null,
+      "change": {
+        "config": "2/net/mesh/drbd",
+        "row": "fsx",
+        "iso": "2026-10-21T19:36:37Z"
+      },
+      "argument": "Resubmission of P20261021-4bb0fe, which was rejected (data/reviews/P20261021-4bb0fe.md) on three points, answered here. The run: the DRBD board's fsx FAIL of 2026-10-21T19:36:37Z (dry-run candidate 0.90.133-2, build 71AC6107043DD5BE3D9181A, seed=3832054505, both checks failed in 2 s of 88 s) is the detector failing, not MeshXFS: tests/suite/fsx.sh drew its seed from 0..2^32-1, the vendored fsx keeps -S in an int (tests/suite/tools/fsx.c:186, :3397) and calls usage(), exit 90, for a negative value (:3402-3403) before it opens its file (:3493), so neither check ran an fsx operation. Reproduced host-local with the same binary (tests/evidence/fsx_seed_int_max_repro_20261021.log). (1) THE FIXED DETECTOR HAS PASSED THERE: tests/evidence/drbd_rig/criteria.runs.jsonl line 3230, 2/net/mesh/drbd fsx 2026-10-21T20:57:33Z PASS 'checks=2 passed=2 failed=0 seed=1472941388', 14 s of 88 s, run 20261021T205705Z-g2, same build 71AC6107043DD5BE3D9181A, on the fixed fsx.sh. (2) THE FIX, NAMED: the tree is uncommitted (the owner has not yet directed a commit; this session may not commit unasked), so the change is named by a hashed diff, tests/evidence/fsx_seed_fix_20261021.diff: the seed line becomes '% 2147483647 + 1' (1..2^31-1; 20000 draws, none outside, in the repro log), and a failing check keeps its log at /root/fsx.<seed>.<ops>.log on the node with fsx_fail_log=<host>:<path> in the run's measured field and its tail in the kernel log, instead of the old /tmp file the EXIT trap deleted. On the record's own next step (logs under the run's evidence): the node's log stays where the run names it; run.sh copying it into tests/evidence is not part of this fix. (3) THE RECORD: D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED names this run in its cells; a detector-defect proposal carries no --record (tools/defects.py takes a record only for record proposals), so it is named here.",
+      "evidence": [
+        "tests/evidence/drbd_rig/criteria.runs.jsonl",
+        "tests/evidence/fsx_seed_fix_20261021.diff",
+        "tests/evidence/fsx_seed_int_max_repro_20261021.log",
+        "tests/suite/fsx.sh",
+        "tests/suite/tools/fsx.c",
+        "data/reviews/P20261021-4bb0fe.md"
+      ],
+      "state": "applied",
+      "created": "2026-10-21",
+      "review": {
+        "file": "data/reviews/P20261021-676432.md",
+        "sha256": "1940c7e788d715e47472a4dedad2b63a371ada662ae0984f4330f0b99799a708",
+        "verdict": "approved",
+        "date": "2026-10-21"
+      },
+      "applied": "2026-10-21"
+    }
+  ]
+}

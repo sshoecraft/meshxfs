@@ -1,9 +1,13 @@
 #!/bin/bash
-# soak — mixed FS workload for a duration; no errors, FS stays healthy.
-# Agnostic. SOAK_SECONDS controls length (default 30 for a smoke run).
+# soak — a fixed mixed FS workload; no errors, FS stays healthy.
+# Agnostic. The work is fixed, never a duration: SOAK_OPS operations (1112, the
+# median op count of the 198 recorded passing runs of the old 30-second loop),
+# with file sizes drawn from a fixed seed, so native XFS and MXFS do the same
+# work and the row's budget is 2x what native XFS measured for it.
 SUITE_TEST_NAME=soak
 MNT="${1:-/mnt/shared}"; NODES="${MXFS_NODES:-1}"
-DUR="${SOAK_SECONDS:-30}"
+OPS="${SOAK_OPS:-1112}"
+RANDOM=1
 W="$MNT/.suite_soak.$(hostname).$$"
 rm -rf "$W" 2>/dev/null; mkdir -p "$W" || { echo "RESULT: FAIL | test=soak | nodes=$NODES | measured=setup | reason=mkdir"; exit 1; }
 trap 'rm -rf "$W" 2>/dev/null' EXIT
@@ -20,8 +24,8 @@ echo "$MARKER" > /dev/kmsg 2>/dev/null
 # "loops=14" field of "P-IGET-CREATE-RETRIED ... rc=0" (a create that retried
 # and succeeded), which failed 8/disk/caw/mpath on the 0.90.131 release build.
 DPAT='Internal error|Corruption|SHUTDOWN|shutting down|Free inode (0x)?[0-9a-f]+|reservation conflict|BUG:|\bOops\b|stuck for|call trace'
-end=$(( $(date +%s) + DUR )); ops=0; errs=0
-while [ "$(date +%s)" -lt "$end" ]; do
+t0=$(date +%s%3N); ops=0; errs=0
+while [ "$ops" -lt "$OPS" ]; do
   f="$W/f$((ops % 50))"
   { head -c $(( (RANDOM * 64) + 1 )) /dev/urandom > "$f" \
       && cp "$f" "$f.cp" && cmp -s "$f" "$f.cp" && rm -f "$f.cp" \
@@ -29,6 +33,7 @@ while [ "$(date +%s)" -lt "$end" ]; do
   ops=$((ops + 1))
 done
 echo ok > "$W/final" 2>/dev/null && [ "$(cat "$W/final" 2>/dev/null)" = ok ] || errs=$((errs + 1))
+wall_ms=$(( $(date +%s%3N) - t0 ))
 # dmesg hits since our marker — persist the matching lines for forensics
 # (count/threshold unchanged; a FAIL without the lines is undiagnosable
 # once the VM reboots, since virsh destroy loses the unflushed journal).
@@ -42,5 +47,5 @@ fi
 st=PASS; reason=""
 if [ "$errs" -gt 0 ]; then st=FAIL; reason="$errs op failures"; fi
 if [ "${dmesg_hits:-0}" -gt 0 ]; then st=FAIL; reason="${reason:+$reason; }$dmesg_hits dmesg error hits"; fi
-echo "RESULT: $st | test=soak | nodes=$NODES | measured=dur=${DUR}s ops=$ops errs=$errs dmesg_hits=${dmesg_hits:-0} | reason=$reason"
+echo "RESULT: $st | test=soak | nodes=$NODES | measured=ops=$ops wall_ms=$wall_ms errs=$errs dmesg_hits=${dmesg_hits:-0} | reason=$reason"
 [ "$st" = PASS ]

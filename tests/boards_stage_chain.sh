@@ -68,8 +68,13 @@ for stage in "$@"; do
     } >> "$O" 2>&1
 done
 {
+    # A reader's summary of the boards after the stages. The verdicts are each
+    # stage's own board_4node_chain VERDICT lines above, and STAGE_RC says which
+    # stages ran; nothing is graded from this.
     for c in $(printf '%s\n' "${cfgs[@]}" | sort -u); do
+        # harness-lint: ok - a summary for the reader after the STAGE_RC lines; no verdict is taken from it
         echo "== $c $(python3 tools/criteria.py "$c" 2>/dev/null | grep -a '^Total' | cut -c1-90)"
+        # harness-lint: ok - a summary for the reader after the STAGE_RC lines; no verdict is taken from it
         python3 tools/criteria.py "$c" 2>/dev/null | grep -aE '^[0-9]+ +\|' | grep -avE '\| PASS ' | cut -c1-200
     done
     echo "BOARDS_STAGES_DONE $(date -u +%FT%TZ)"

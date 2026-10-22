@@ -1,0 +1,235 @@
+{
+  "candidate": "0.90.134",
+  "version": "0.90.134",
+  "created": "2026-10-22T03:15:49Z",
+  "state": "ABANDONED",
+  "attempts": [
+    {
+      "created": "2026-10-21T21:26:41Z",
+      "state": "ABANDONED",
+      "dry_run": true,
+      "srcversion": "0988C50EC610F82EE08D135",
+      "files": "tests/evidence/candidates/0.90.134_20261021T212641Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-21T21:26:41Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-21T21:26:41Z",
+          "why": "first attempt ended at once, so the dry run exercises a second attempt at the same version"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
+    },
+    {
+      "created": "2026-10-21T21:26:43Z",
+      "state": "ABANDONED",
+      "dry_run": true,
+      "srcversion": "0988C50EC610F82EE08D135",
+      "files": "tests/evidence/candidates/0.90.134_20261021T212643Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-21T21:26:43Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-21T21:27:04Z",
+          "why": "release_run.py: the runner records its own pid, so status sees a foreground run; refrozen"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
+    },
+    {
+      "created": "2026-10-21T21:27:12Z",
+      "state": "ABANDONED",
+      "dry_run": true,
+      "srcversion": "0988C50EC610F82EE08D135",
+      "files": "tests/evidence/candidates/0.90.134_20261021T212712Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-21T21:27:13Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-21T22:26:06Z",
+          "why": "stopped to change release_status.py's display (owner); the next attempt reruns every step"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {
+        "freeze": "PASS",
+        "presteps": "FAIL",
+        "build": "PASS",
+        "textcheck": "PASS",
+        "packages": "FAIL",
+        "boards": "PASS",
+        "drbd": "FAIL"
+      }
+    },
+    {
+      "created": "2026-10-21T23:03:33Z",
+      "state": "ABANDONED",
+      "dry_run": true,
+      "srcversion": "0988C50EC610F82EE08D135",
+      "files": "tests/evidence/candidates/0.90.134_20261021T230333Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-21T23:03:34Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-22T02:03:23Z",
+          "why": "scoped dry run done; not passed: presteps, drbd, seal"
+        }
+      ],
+      "dist": "dist/0.90.134",
+      "packages": {
+        "mxfs_0.90.134_amd64.deb": "b0710fc338ad16ea0d25021b12d3b5928a2d1db17698366bad4704c028ab6046",
+        "pve-storage-mxfs_0.90.134_all.deb": "505122785ad8955bb07365387dadea7b79cd9941927dd5c209f657ad154c81bf",
+        "mxfs-0.90.134-1.el9.x86_64.rpm": "c929a373ff49b0055fffb282eecafeb9e596ef152d257cff722485f0f9eb1d9b"
+      },
+      "steps": {
+        "freeze": "PASS",
+        "presteps": "FAIL",
+        "build": "PASS",
+        "textcheck": "PASS",
+        "packages": "PASS",
+        "boards": "PASS",
+        "drbd": "FAIL",
+        "pve:7.0.14-24-pve": "PASS",
+        "platforms": "PASS",
+        "guards": "PASS",
+        "batches": "PASS",
+        "repeats": "PASS",
+        "seal": "FAIL"
+      }
+    },
+    {
+      "created": "2026-10-22T02:21:48Z",
+      "state": "INVALID",
+      "dry_run": true,
+      "srcversion": "0988C50EC610F82EE08D135",
+      "files": "tests/evidence/candidates/0.90.134_20261022T022148Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-22T02:21:49Z",
+          "why": "created"
+        },
+        {
+          "state": "INVALID",
+          "at": "2026-10-22T02:25:21Z",
+          "why": "1 frozen file(s) changed: touched (content restored after a change, or rewritten): docs/man/man8/chk_mxfs.8"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {
+        "build": "PASS"
+      }
+    },
+    {
+      "created": "2026-10-22T02:25:43Z",
+      "state": "ABANDONED",
+      "dry_run": true,
+      "srcversion": "0988C50EC610F82EE08D135",
+      "files": "tests/evidence/candidates/0.90.134_20261022T022543Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-22T02:25:44Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-22T02:29:51Z",
+          "why": "scoped dry run done; not passed: none"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {
+        "batches": "PASS"
+      }
+    },
+    {
+      "created": "2026-10-22T02:36:42Z",
+      "state": "ABANDONED",
+      "dry_run": true,
+      "srcversion": "0988C50EC610F82EE08D135",
+      "files": "tests/evidence/candidates/0.90.134_20261022T023642Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-22T02:36:42Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-22T02:36:44Z",
+          "why": "scoped dry run done; not passed: seal"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {
+        "seal": "FAIL"
+      }
+    }
+  ],
+  "dry_run": true,
+  "srcversion": "0988C50EC610F82EE08D135",
+  "module_sha256": "1a971c5c5314bc4047bbb01a82a1de99b9c5a579d931857d1b5371985602bff3",
+  "files": "tests/evidence/candidates/0.90.134_20261022T031549Z.files.json",
+  "files_count": 2506,
+  "files_digest": "67e86884e8cf78c9e1d2eb94352627983a766ed6a4436a77c06a8121e0021983",
+  "spec": "4483dc7df9c2c532fe92a12691c8c8b8f6c18b018ace1a6acf9a2348546a42da",
+  "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
+  "kernels": {},
+  "packages": {},
+  "dist": "",
+  "steps": {
+    "presteps": {
+      "state": "failed",
+      "outcome": "FAIL",
+      "detail": "self-tests failed: capture fault gate rc=1: RESULT: FAIL label=0.90.134_20261022T031549Z entries=60 broken=1 vacuous=0 restores=8 wall=1858s evidence=tests/evidence/20261022T031739Z_capture_gate_0.90.134_",
+      "evidence": "tests/evidence/candidates/0.90.134_20261022T031549Z.presteps.log",
+      "started": "2026-10-22T03:15:57Z",
+      "ended": "2026-10-22T03:48:37Z"
+    },
+    "batches": {
+      "state": "done",
+      "outcome": "PASS",
+      "detail": "no open verification batch for this candidate",
+      "evidence": "tests/evidence/candidates/0.90.134_20261022T031549Z.batches.log",
+      "started": "2026-10-22T03:48:38Z",
+      "ended": "2026-10-22T03:48:38Z"
+    }
+  },
+  "history": [
+    {
+      "state": "RUNNING",
+      "at": "2026-10-22T03:15:49Z",
+      "why": "created"
+    },
+    {
+      "state": "ABANDONED",
+      "at": "2026-10-22T03:48:38Z",
+      "why": "scoped dry run done; not passed: presteps"
+    }
+  ]
+}

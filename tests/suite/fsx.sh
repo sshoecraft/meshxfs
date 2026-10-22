@@ -19,10 +19,33 @@ FSX="$HERE/tools/fsx"
 W="$MNT/.suite_fsx.$(hostname).$$"
 rm -rf "$W" 2>/dev/null; mkdir -p "$W" || {
     echo "RESULT: FAIL | test=$SUITE_TEST_NAME | nodes=$NODES | measured=setup | reason=cannot mkdir $W"; exit 1; }
-trap 'rm -rf "$W" /tmp/fsx.$$.* 2>/dev/null' EXIT
+trap 'rm -rf "$W" 2>/dev/null' EXIT
 
-# run_fsx <ops> [extra args]  — fsx exits nonzero on any verify miscompare
-run_fsx() { "$FSX" -N "$1" ${2:-} "$W/fsxfile_$1" >/tmp/fsx.$$.$1.log 2>&1; }
+# A random seed each run (fsx's own default is always 1, so every run replayed
+# the one same operation history), reported as seed=<n> so the board records it
+# and a failing history can be replayed with FSX_SEED=<n>.  fsx keeps its seed in
+# an int and prints its usage for a negative one, so the seed is 1..2^31-1: four
+# random bytes gave a seed past INT_MAX half the time, and those runs exited 90
+# at once, a FAIL that exercised nothing (0 would make fsx use the time instead).
+SEED="${FSX_SEED:-$(( $(od -An -N4 -tu4 /dev/urandom | tr -d ' \n') % 2147483647 + 1 ))}"
+SUITE_MEASURED_EXTRA="${SUITE_MEASURED_EXTRA:+$SUITE_MEASURED_EXTRA }seed=$SEED"
+
+# run_fsx <ops> [extra args]  — fsx exits nonzero on any verify miscompare.  A
+# failing run's log stays on the node and its path goes into the record, with
+# its last lines in the kernel log the harness captures; a passing run's log is
+# removed.
+run_fsx() {
+    local log="/root/fsx.$SEED.$1.log" rc
+    "$FSX" -S "$SEED" -N "$1" ${2:-} "$W/fsxfile_$1" > "$log" 2>&1
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        SUITE_MEASURED_EXTRA="$SUITE_MEASURED_EXTRA fsx_fail_log=$(hostname):$log"
+        echo "mxfs-FSXfail seed=$SEED ops=$1 rc=$rc $(tail -n 3 "$log" | tr '\n' ' ' | cut -c1-300)" > /dev/kmsg 2>/dev/null
+    else
+        rm -f "$log"
+    fi
+    return "$rc"
+}
 
 ck "fsx 100k mixed ops"          run_fsx 100000
 ck "fsx 50k blocksize 8k -r4096" run_fsx 50000 "-r 4096 -w 4096"

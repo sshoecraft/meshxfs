@@ -51,7 +51,9 @@ cd "$HERE" || exit 1
 RIG_VMS=$(tools/mxfs_lab.sh group "${MXFS_GROUP:-g2}")
 vmhold_take "drbd_release_verify $V" $RIG_VMS || { echo "could not hold [$RIG_VMS]"; exit 1; }
 ( setsid tools/vm_pool.sh release --after $$ $RIG_VMS </dev/null >/dev/null 2>&1 & )   # never a child a bare wait would block on
-O="tests/evidence/drbd_release_verify_$V.out"
+# Named by the release candidate when this runs for one (tools/release_run.py
+# sets MXFS_LOGTAG), so one candidate is never graded on another's run.
+O="tests/evidence/drbd_release_verify_${MXFS_LOGTAG:-$V}.out"
 SV=$(modinfo -F srcversion mxfs.ko 2>/dev/null)
 MV=$(modinfo -F version mxfs.ko 2>/dev/null)
 : > "$O"
@@ -68,8 +70,27 @@ step() {  # step <label> <drbd_rig args...>
     [ "$rc" = 0 ] || failed="$failed $label"
     return $rc
 }
+# The suite step's own exit code is run.sh's, and run.sh exits 0 with rows
+# failed: this verification printed PASS over a red board.  The suite step
+# passes only when the DRBD board itself reads green, graded for the release
+# candidate when there is one.
+board_green() {
+    local out
+    # harness-lint: ok - graded for the candidate, a board this run did not record reads NOT RUN, never a previous run's PASS
+    out=$(python3 tools/criteria.py 2/net/mesh/drbd ${MXFS_CANDIDATE:+--candidate "$MXFS_CANDIDATE"} 2>&1)
+    echo "$out" | grep -E '^Total:|^VERDICT:' >> "$O"
+    if echo "$out" | grep -q 'VERDICT: every criterion green'; then
+        echo "=== STEP suite-board rc=0 ===" >> "$O"
+        return 0
+    fi
+    echo "$out" | grep -E '^[0-9]+ +\|' | grep -vE '\| PASS ' >> "$O"
+    echo "=== STEP suite-board rc=1 ===" >> "$O"
+    failed="$failed suite-board"
+    return 1
+}
 if step up up; then
     step mxfs-suite mxfs && step suite suite
+    board_green
     for t in remount-test death-test fence-test split-test resolve-test outage-test; do
         step "mxfs-$t" mxfs && step "$t" "$t"
     done

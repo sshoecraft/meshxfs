@@ -79,6 +79,11 @@
 #                                              must be refused; both then mount again with every fsynced file
 #   scripts/drbd_rig.sh misconfig-test      each wrong setting of a user's DRBD resource is refused at
 #                                              mount with a reason that names the setting
+#   scripts/drbd_rig.sh fourkn-test         DRBD over backing disks of 4096-byte blocks, and a 512-byte
+#                                              control, each on a throwaway loop-backed resource: the
+#                                              emulated swap works in the device's blocks, both nodes'
+#                                              data and inodes survive a remount, cold chk clean
+#                                              (FOURKN_HOLD_N, FOURKN_HOLD_MS: the merged-write hold)
 #   scripts/drbd_rig.sh reconfig            re-apply the resource file and fencing to the running pair
 #   scripts/drbd_rig.sh hook-setup          install the libvirt hook that refuses an inhibited start
 #   scripts/drbd_rig.sh fence-setup         authorise the rig fence key on this host (up does it)
@@ -789,7 +794,7 @@ wait_mxfs_recovered() {  # <survivor> <test name>
     # released only after that recovery, as rejoin_node expects of its callers.
     local surv=$1 what=$2 out
     out=$(ssh_n "$surv" "
-        grep -q ' $MNT mxfs ' /proc/mounts || { echo NOT_MOUNTED; exit 0; }
+        grep -q ' $MNT mxfs ' /proc/mounts || { echo NOT_MOUNTED; exit 0; }  # harness-lint: ok - a double-quoted remote script: MNT expands here, before ssh
         for i in \$(seq 1 $RECOVER_BUDGET); do
             dmesg | grep -q 'P163-RECOVERY-COMPLETE' && break
             sleep 1
@@ -1003,9 +1008,9 @@ install_self_authority() {
         [ -n "$pub" ] && [ -n "$hostkey" ] || die "self authority: no keys from $peer"
         out=$(ssh_n "$n" "
             touch /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys
-            grep -qF '$pub' /root/.ssh/authorized_keys || echo '$pub' >> /root/.ssh/authorized_keys
+            grep -qF '$pub' /root/.ssh/authorized_keys || echo '$pub' >> /root/.ssh/authorized_keys  # harness-lint: ok - a double-quoted remote script: pub expands here, before ssh
             touch /etc/ssh/ssh_known_hosts
-            { grep -v '^$peer ' /etc/ssh/ssh_known_hosts; echo '$peer $hostkey'; } > /etc/ssh/ssh_known_hosts.new
+            { grep -v '^$peer ' /etc/ssh/ssh_known_hosts; echo '$peer $hostkey'; } > /etc/ssh/ssh_known_hosts.new  # harness-lint: ok - a double-quoted remote script: peer and hostkey expand here, before ssh
             mv /etc/ssh/ssh_known_hosts.new /etc/ssh/ssh_known_hosts && echo TRUST_OK" 20)
         grep -q TRUST_OK <<<"$out" || die "ssh trust on $n: $out"
     done
@@ -3235,6 +3240,243 @@ step_takeover_test() {
     say "takeover test ($arm): passed (cold chk_mxfs clean; MXFS left unmounted)"
 }
 
+# DRBD over backing disks of 4096-byte logical blocks (docs/4kn-support.md).
+# DRBD takes the largest logical block of its backing disks, so a resource on
+# two such disks is a 4K-native device, and MXFS's COMPARE AND WRITE on it is
+# the PAL's emulation (pal/linux/drbd.c) working in the device's blocks: its
+# three lock units each the first 512 bytes of a block of its own, every swap
+# one compared block and whole blocks written.  Two arms, each on a throwaway
+# resource beside the rig's own (minor FOURKN_MINOR, port FOURKN_PORT) whose
+# disk on each node is a loop device over an image on that node's own disk:
+# `512`, the control and the 512-byte path the change also touched, and
+# `4096`, the arm under test.  Each arm, on its own resource:
+#   1. both disks of the arm's sector size and DRBD Primary/Primary
+#      UpToDate/UpToDate Connected on a device of that logical block (two
+#      fresh zeroed images are identical, so the bitmap is cleared rather than
+#      synced);
+#   2. mkfs on $N1 (-L for 4096, while 4K-native volumes are TEST ONLY) and a
+#      mount on both, each attaching the emulation with the arm's block
+#      (P-DRBD-CAS-ATTACH lbs=);
+#   3. each node writes 64 MiB the other reads back intact; then both change
+#      and stat inodes that share blocks (tests/fourkn_merge_worker.sh), the
+#      first FOURKN_HOLD_N merged blocks of each node held FOURKN_HOLD_MS
+#      between read and swap, as tests/fourkn_merge_2node.sh holds them;
+#   4. both unmount and mount again, every file reads its own writer's last
+#      mode and both 64 MiB files their sums, both unmount, chk_mxfs on $N1
+#      finds nothing;
+#   5. no swap refused for its unit, block or area (P-DRBD-CAS-UNIT-REFUSED,
+#      P-DRBD-CAS-AREA-REFUSED, P-LBS-REFUSED), no merged write failed, no
+#      corruption, shutdown, BUG or Oops; the emulation served swaps (ops in
+#      its P-DRBD-CAS-DETACH line) and, at 4096, the merged write ran.
+# Like `up`, it takes the rig's own resource down first, since the module loads
+# before any DRBD link is up, and leaves both nodes with neither resource up.
+FOURKN_MINOR=20
+FOURKN_PORT=7820
+FOURKN_RES=mxfs4kn
+FOURKN_MNT=/mnt/fourkn_drbd
+FOURKN_SIZE=4G
+FOURKN_ROUNDS=20
+FOURKN_NF=64
+FOURKN_HOLD_N=${FOURKN_HOLD_N:-64}
+FOURKN_HOLD_MS=${FOURKN_HOLD_MS:-20}
+fourkn_teardown() {  # every arm's resource, loop and image, on both nodes
+    # A worker still running holds the mount between its steps, where fuser
+    # finds nothing open: it is stopped by its pid (a timeout(1) that execs
+    # it; a pid reused by anything else is left alone).  drbdadm's exit is not
+    # read: the minor leaving /proc/drbd is what says the resource is down,
+    # and a loop device DRBD still holds cannot be detached.
+    both fkdown "w=\$(cat /root/fourkn_worker.pid 2>/dev/null)
+        if [ -n \"\$w\" ] && [ \"\$(cat /proc/\$w/comm 2>/dev/null)\" = timeout ]; then
+            kill \$w
+            for t in \$(seq 1 30); do [ -e /proc/\$w ] || break; sleep 1; done
+            [ -e /proc/\$w ] && { echo \"FKDOWN_FAIL worker \$w still running\"; exit 1; }
+        fi
+        rm -f /root/fourkn_worker.pid
+        for m in \$(awk '\$2 == \"$FOURKN_MNT\" {print \$2}' /proc/mounts); do fuser -km \$m 2>/dev/null; timeout 30 umount \$m; done
+        for t in 1 2 3; do
+            grep -q '^ *$FOURKN_MINOR: ' /proc/drbd 2>/dev/null || break
+            [ -e /etc/drbd.d/$FOURKN_RES.res ] && timeout 30 drbdadm down $FOURKN_RES >/dev/null 2>&1
+            grep -q '^ *$FOURKN_MINOR: ' /proc/drbd 2>/dev/null && sleep 1
+        done
+        if grep -q '^ *$FOURKN_MINOR: ' /proc/drbd 2>/dev/null; then echo \"FKDOWN_FAIL minor $FOURKN_MINOR still up: \$(grep '^ *$FOURKN_MINOR: ' /proc/drbd)\"; exit 1; fi
+        rm -f /etc/drbd.d/$FOURKN_RES.res
+        for img in /root/mxfs_4kn_512.img /root/mxfs_4kn_4096.img; do
+            for l in \$(losetup -j \$img 2>/dev/null | cut -d: -f1); do losetup -d \$l; done
+            rm -f \$img
+        done
+        grep -q ' $FOURKN_MNT ' /proc/mounts && echo FKDOWN_FAIL mounted || echo FKDOWN_OK" 90
+}
+fourkn_arm() {  # <sector size>
+    local ss=$1 n w out mark t0 m1 m2 p1 p2 rc1 rc2 bad mis ops wbound stall fails=0 pace=0
+    declare -A LOOP
+    local dev=/dev/drbd$FOURKN_MINOR dir=$FOURKN_MNT/merge tag="fourkn_$ss"
+    local P=/sys/module/mxfs/parameters ctrs="iwr_merge_blocks iwr_merge_miscompares iwr_merge_failed iwr_merge_empty"
+    ck() { if [ "$2" = "$3" ]; then say "  PASS $1 ($2)"; else say "  FAIL $1 got=$2 want=$3"; fails=$((fails + 1)); fi; }
+    mark="FOURKN-DRBD-$ss-$(date -u +%Y%m%dT%H%M%SZ)"
+    say "fourkn-test arm $ss: resource $FOURKN_RES on loop devices of $ss-byte sectors ($mark)"
+    for n in "${NODES[@]}"; do
+        out=$(ssh_n "$n" "echo $mark > /dev/kmsg; truncate -s $FOURKN_SIZE /root/mxfs_4kn_$ss.img && l=\$(losetup --sector-size $ss -f --show /root/mxfs_4kn_$ss.img) && echo LOOP_OK \$l \$(blockdev --getss \$l)" 20)
+        echo "$out" > "$EVID/${tag}_loop.$n"
+        [ "$(grep -c "^LOOP_OK /dev/loop[0-9]* $ss$" <<<"$out")" = 1 ] || die "fourkn-test $ss: $n has no loop device of $ss-byte sectors: $out"
+        LOOP[$n]=$(awk '$1 == "LOOP_OK" {print $2}' <<<"$out")
+    done
+    out=$(drbd_res "$FOURKN_RES" "$FOURKN_MINOR" "$FOURKN_PORT" "${LOOP[$N1]}" "${LOOP[$N2]}")
+    echo "$out" > "$EVID/${tag}.res"
+    both "${tag}_md" "
+        echo '$(base64 -w0 <<<"$out")' | base64 -d > /etc/drbd.d/$FOURKN_RES.res
+        drbdadm -- --force create-md $FOURKN_RES </dev/null >/tmp/drbd_rig_fk_md.log 2>&1 || { echo \"MD_FAIL \$(tail -1 /tmp/drbd_rig_fk_md.log)\"; exit 1; }
+        drbdadm up $FOURKN_RES >/tmp/drbd_rig_fk_up.log 2>&1 || { echo \"MD_FAIL up: \$(tail -1 /tmp/drbd_rig_fk_up.log)\"; exit 1; }
+        echo MD_OK" 60
+    for n in "${NODES[@]}"; do grep -aq '^MD_OK' "$EVID/${tag}_md.$n" || die "fourkn-test $ss: $n: $(tail -1 "$EVID/${tag}_md.$n")"; done
+    out=$(ssh_n "$N1" "for i in \$(seq 1 $CONNECT_BUDGET); do [ \"\$(drbdadm cstate $FOURKN_RES)\" = Connected ] && break; sleep 1; done
+        drbdadm -- --clear-bitmap new-current-uuid $FOURKN_RES 2>&1 | tail -1
+        for i in \$(seq 1 10); do [ \"\$(drbdadm dstate $FOURKN_RES)\" = UpToDate/UpToDate ] && break; sleep 1; done
+        drbdadm primary $FOURKN_RES 2>&1 | tail -1; echo \"STATE \$(drbdadm cstate $FOURKN_RES) \$(drbdadm dstate $FOURKN_RES)\"" $((CONNECT_BUDGET + 30)))
+    echo "$out" > "$EVID/${tag}_connect"
+    grep -q '^STATE Connected UpToDate/UpToDate$' <<<"$out" || die "fourkn-test $ss: the fresh pair did not connect UpToDate: $(tail -2 <<<"$out" | tr '\n' ' ')"
+    ssh_n "$N2" "drbdadm primary $FOURKN_RES 2>&1 | tail -1" 20 > "$EVID/${tag}_primary2"
+    both "${tag}_role" "drbdadm role $FOURKN_RES; drbdadm dstate $FOURKN_RES; drbdadm cstate $FOURKN_RES; blockdev --getss $dev" 20
+    for n in "${NODES[@]}"; do
+        [ "$(tr '\n' ' ' < "$EVID/${tag}_role.$n")" = "Primary/Primary UpToDate/UpToDate Connected $ss " ] \
+            || die "fourkn-test $ss: $n is [$(tr '\n' ' ' < "$EVID/${tag}_role.$n")], not Primary/Primary UpToDate/UpToDate Connected on a $ss-byte device"
+    done
+    say "  DRBD Primary/Primary UpToDate/UpToDate Connected on $dev, logical block $ss on both"
+
+    out=$(ssh_n "$N1" "$NODE_REPO/tools/mkfs_mxfs $([ "$ss" = 512 ] || echo -L) -f -n $LOG_SLICES $dev 2>&1 | tail -2; echo MKFS_RC=\${PIPESTATUS[0]}" 120)
+    echo "$out" > "$EVID/${tag}_mkfs"
+    grep -q '^MKFS_RC=0$' <<<"$out" || die "fourkn-test $ss: mkfs on $N1: $(tr '\n' ' ' <<<"$out")"
+    for n in "${NODES[@]}"; do
+        out=$(ssh_n "$n" "mkdir -p $FOURKN_MNT; timeout 110 mount -t mxfs $dev $FOURKN_MNT; echo MOUNT_RC=\$?" 120)
+        echo "$out" > "$EVID/${tag}_mount.$n"
+        grep -q '^MOUNT_RC=0$' <<<"$out" || die "fourkn-test $ss: mount on $n: $(tr '\n' ' ' <<<"$out")"
+    done
+    say "  mkfs on $N1, mounted on both"
+
+    # 64 MiB each way
+    out=$(ssh_n "$N1" "dd if=/dev/urandom of=$FOURKN_MNT/from_$N1 bs=1M count=64 status=none && sync && md5sum < $FOURKN_MNT/from_$N1" 60)
+    m1=$(awk 'NF {print $1}' <<<"$out" | tail -1)
+    ck "$N2 reads $N1's 64 MiB file intact" "$(ssh_n "$N2" "md5sum < $FOURKN_MNT/from_$N1" 60 | awk 'NF {print $1}' | tail -1)" "${m1:-none}"
+    out=$(ssh_n "$N2" "dd if=/dev/urandom of=$FOURKN_MNT/from_$N2 bs=1M count=64 status=none && sync && md5sum < $FOURKN_MNT/from_$N2" 60)
+    m2=$(awk 'NF {print $1}' <<<"$out" | tail -1)
+    ck "$N1 reads $N2's 64 MiB file intact" "$(ssh_n "$N1" "md5sum < $FOURKN_MNT/from_$N2" 60 | awk 'NF {print $1}' | tail -1)" "${m2:-none}"
+
+    # inodes that share blocks, both nodes at once; each file's mode as made,
+    # which it keeps if its writer is stopped before reaching it
+    ssh_n "$N1" "mkdir -p $dir && for i in \$(seq 1 $FOURKN_NF); do : > $dir/f\$i; done && sync && for i in \$(seq 1 $FOURKN_NF); do echo \$i \$(stat -c '%i %a' $dir/f\$i); done" 20 > "$EVID/${tag}_inodes"
+    [ "$(grep -cE '^[0-9]+ [0-9]+ [0-9]+$' "$EVID/${tag}_inodes")" = "$FOURKN_NF" ] || die "fourkn-test $ss: $N1 made $(grep -cE '^[0-9]+ [0-9]+ [0-9]+$' "$EVID/${tag}_inodes")/$FOURKN_NF files"
+    both "${tag}_arm" "for c in $ctrs; do echo 0 > $P/\$c; done; echo $FOURKN_HOLD_MS > $P/dbg_iwr_merge_hold_ms; echo $FOURKN_HOLD_N > $P/dbg_iwr_merge_hold_n; cat $P/dbg_iwr_merge_hold_n" 20
+    for n in "${NODES[@]}"; do [ "$(cat "$EVID/${tag}_arm.$n")" = "$FOURKN_HOLD_N" ] || die "fourkn-test $ss: $n did not arm the hold: $(cat "$EVID/${tag}_arm.$n")"; done
+    # The workload's bound, kept on the node so that a stop leaves its state
+    # known: tests/fourkn_merge_2node.sh's derivation of this workload (~6 s,
+    # twice 20 rounds of lock round trips and merged writes) plus every held
+    # block's wait.  At the bound the worker stops after the step in hand;
+    # waiting longer than the release policy's stall limit for that is a stall.
+    # ssh connects in well under 10 s.
+    wbound=$(( 6 + (2 * FOURKN_HOLD_N * FOURKN_HOLD_MS + 999) / 1000 ))
+    stall=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["stall_limit_s"])' "$REPO/data/release_policy.json") \
+        || die "fourkn-test $ss: no stall_limit_s in data/release_policy.json"
+    t0=$(date +%s%N)
+    ssh_n "$N1" "echo \$\$ > /root/fourkn_worker.pid; exec timeout --foreground $wbound $NODE_REPO/tests/fourkn_merge_worker.sh $dir 1 $FOURKN_ROUNDS $FOURKN_NF" $((wbound + stall + 10)) > "$EVID/${tag}_w1" & p1=$!
+    ssh_n "$N2" "echo \$\$ > /root/fourkn_worker.pid; exec timeout --foreground $wbound $NODE_REPO/tests/fourkn_merge_worker.sh $dir 0 $FOURKN_ROUNDS $FOURKN_NF" $((wbound + stall + 10)) > "$EVID/${tag}_w2" & p2=$!
+    wait "$p1"; rc1=$?; wait "$p2"; rc2=$?
+    say "  workload ${wbound}s bound on each node, wall $(( ($(date +%s%N) - t0) / 1000000 )) ms; $N1 rc=$rc1 $(grep -a '^WORKER' "$EVID/${tag}_w1" | tail -1); $N2 rc=$rc2 $(grep -a '^WORKER' "$EVID/${tag}_w2" | tail -1)"
+    for w in 1 2; do
+        [ "$w" = 1 ] && n=$N1 || n=$N2
+        ck "$n's worker ended within its bound and the ${stall}s stall limit" "$(grep -acE '^WORKER_(DONE|STOPPED) ' "$EVID/${tag}_w$w")" 1
+        ck "every chmod and stat on $n returned without error" "$(sed -n 's/^WORKER_[A-Z]* .*errors=\([0-9]*\) .*/\1/p' "$EVID/${tag}_w$w")" 0
+        # pace is counted apart: on DRBD a peer-file stat costs ledger commits
+        # (D-DRBD-PAIR-NEW-FILES-COST-A-LEDGER-COMMIT-TO-CREATE-AND-TO-STAT-FROM-THE-PEER)
+        if grep -aq "^WORKER_DONE rounds=$FOURKN_ROUNDS " "$EVID/${tag}_w$w"; then
+            say "  PASS $n's half ran its $FOURKN_ROUNDS rounds within ${wbound}s"
+        else
+            say "  FAIL (pace) $n's half did not run its $FOURKN_ROUNDS rounds within ${wbound}s: $(grep -a '^WORKER' "$EVID/${tag}_w$w" | tail -1)"
+            pace=$((pace + 1))
+        fi
+    done
+    # what each file must read: the mode its writer last set, else as made
+    awk 'FNR == NR {want[$1] = $3; next} $1 == "MODE" {want[$2] = $3} END {for (i in want) print i, want[i]}' \
+        "$EVID/${tag}_inodes" "$EVID/${tag}_w1" "$EVID/${tag}_w2" | sort -n > "$EVID/${tag}_want"
+    ck "each worker reported only its own files" "$(awk '$1 == "MODE" && $2 % 2 != 1' "$EVID/${tag}_w1" | wc -l):$(awk '$1 == "MODE" && $2 % 2 != 0' "$EVID/${tag}_w2" | wc -l)" 0:0
+    both "${tag}_ctr" "echo dbg_iwr_merge_hold_left=\$(cat $P/dbg_iwr_merge_hold_n); echo 0 > $P/dbg_iwr_merge_hold_n; for c in $ctrs; do echo \$c=\$(cat $P/\$c); done" 20
+    for n in "${NODES[@]}"; do say "  $n: $(tr '\n' ' ' < "$EVID/${tag}_ctr.$n")"; done
+
+    # both unmount, both mount again: what each wrote is what both read
+    both "${tag}_um1" "timeout 55 umount $FOURKN_MNT; echo UMOUNT_RC=\$?" 60
+    for n in "${NODES[@]}"; do ck "$n unmounts" "$(grep -c '^UMOUNT_RC=0$' "$EVID/${tag}_um1.$n")" 1; done
+    for n in "${NODES[@]}"; do
+        out=$(ssh_n "$n" "timeout 110 mount -t mxfs $dev $FOURKN_MNT; echo MOUNT_RC=\$?" 120)
+        grep -q '^MOUNT_RC=0$' <<<"$out" || die "fourkn-test $ss: remount on $n: $(tr '\n' ' ' <<<"$out")"
+    done
+    for n in "${NODES[@]}"; do
+        ssh_n "$n" "echo 3 > /proc/sys/vm/drop_caches; for i in \$(seq 1 $FOURKN_NF); do echo \$i \$(stat -c %a $dir/f\$i); done; md5sum < $FOURKN_MNT/from_$N1; md5sum < $FOURKN_MNT/from_$N2" 60 > "$EVID/${tag}_modes.$n"
+        bad=$(awk 'FNR == NR {want[$1] = $2; next} /^[0-9]+ [0-9]+$/ {n++; if (!($1 in want) || $2 != want[$1]) b++} END {print n + 0 ":" b + 0}' "$EVID/${tag}_want" "$EVID/${tag}_modes.$n")
+        ck "every file reads the mode its writer last set, on $n after the remount" "$bad" "$FOURKN_NF:0"
+        ck "both 64 MiB files read intact on $n after the remount" "$(grep -cE "^($m1|$m2)  -\$" "$EVID/${tag}_modes.$n")" 2
+    done
+    both "${tag}_um2" "timeout 55 umount $FOURKN_MNT; echo UMOUNT_RC=\$?" 60
+    for n in "${NODES[@]}"; do ck "$n unmounts again" "$(grep -c '^UMOUNT_RC=0$' "$EVID/${tag}_um2.$n")" 1; done
+    out=$(ssh_n "$N1" "$NODE_REPO/tools/chk_mxfs $dev 2>&1 | tail -3; echo CHK_RC=\${PIPESTATUS[0]}" 120)
+    echo "$out" > "$EVID/${tag}_chk"
+    ck "chk_mxfs finds nothing on $dev" "$(grep -c '^CHK_RC=0$' <<<"$out")" 1
+
+    for n in "${NODES[@]}"; do
+        ssh_n "$n" "dmesg | sed -n '/$mark/,\$p'" 30 > "$EVID/${tag}_dmesg.$n"
+        [ "$(head -1 "$EVID/${tag}_dmesg.$n" | grep -ac "$mark")" = 1 ] || die "fourkn-test $ss: $n's kernel ring no longer holds $mark: the log checks would read nothing"
+        ck "$n attached the emulation in $ss-byte blocks" "$(grep -ac "P-DRBD-CAS-ATTACH dev=[0-9]*:$FOURKN_MINOR .* lbs=$ss " "$EVID/${tag}_dmesg.$n")" 2
+        ck "no swap refused for its unit, block or area on $n" "$(grep -acE 'P-DRBD-CAS-UNIT-REFUSED|P-DRBD-CAS-AREA-REFUSED|P-DRBD-CAS-LBS-REFUSED|P-LBS-REFUSED' "$EVID/${tag}_dmesg.$n")" 0
+        ck "no merged write failed or was refused on $n" "$(grep -acE 'P-IWR-MERGE-FAILED|P-IWR-MERGE-REFUSED' "$EVID/${tag}_dmesg.$n")" 0
+        ck "no corruption, shutdown, BUG or Oops on $n" "$(grep -acE 'BUG:|Oops|Shutting down filesystem|Corruption|corruption detected' "$EVID/${tag}_dmesg.$n")" 0
+        ops=$(grep -a "P-DRBD-CAS-DETACH minor=$FOURKN_MINOR " "$EVID/${tag}_dmesg.$n" | sed -n 's/.* ops=\([0-9]*\) .*/\1/p' | awk '{s += $1} END {print s + 0}')
+        mis=$(grep -a "P-DRBD-CAS-DETACH minor=$FOURKN_MINOR " "$EVID/${tag}_dmesg.$n" | sed -n 's/.* miscompares=\([0-9]*\) .*/\1/p' | awk '{s += $1} END {print s + 0}')
+        say "  $n: the emulation served $ops swaps over both mounts, $mis of them miscompared"
+        ck "the emulation served swaps on $n" "$([ "$ops" -gt 0 ] && echo yes || echo no)" yes
+        [ "$ss" = 512 ] || ck "the merged write ran on $n" "$(awk -F= '$1 == "iwr_merge_blocks" {print ($2 > 0) ? "yes" : "no"}' "$EVID/${tag}_ctr.$n")" yes
+        ck "iwr_merge_failed is 0 on $n" "$(awk -F= '$1 == "iwr_merge_failed" {print $2}' "$EVID/${tag}_ctr.$n")" 0
+    done
+    fourkn_teardown
+    for n in "${NODES[@]}"; do grep -aq '^FKDOWN_OK' "$EVID/fkdown.$n" || die "fourkn-test $ss: $n did not tear the arm down: $(tail -1 "$EVID/fkdown.$n")"; done
+    say "fourkn-test arm $ss: fails=$fails, pace=$pace"
+    # 1: a check failed; 2: only the pace did
+    [ "$fails" = 0 ] || return 1
+    [ "$pace" = 0 ] || return 2
+}
+step_fourkn_test() {
+    local n rc512 rc4096
+    "$REPO/scripts/clyde_preflight.sh" > "$EVID/preflight" 2>&1 || die "host preflight: $(tail -1 "$EVID/preflight")"
+    say "fourkn-test on $N1 $N2 (build $(modinfo -F srcversion "$REPO/mxfs.ko")); $(tail -1 "$EVID/preflight")"
+    "$REPO/scripts/lab_power.sh" up "${NODES[@]}" > "$EVID/power" 2>&1 || die "power up: $(tail -1 "$EVID/power")"
+    # an earlier run's resource first: the module is unloaded and loaded
+    # below, and never with a DRBD link up (a load holds a CPU past DRBD's
+    # ping timeout, and the peer is fenced)
+    trap 'fourkn_teardown; end_holders' EXIT
+    fourkn_down_or_die "an earlier run's"
+    stop_nodes
+    both install "$DRBD_INSTALL" "$APT_BUDGET"
+    for n in "${NODES[@]}"; do grep -aq '^INSTALL_OK' "$EVID/install.$n" || die "$n: $(tail -1 "$EVID/install.$n")"; done
+    install_fencing
+    for n in "${NODES[@]}"; do load_mxfs_node "$n" /dev/null; done
+    both lbs "echo 1 > /sys/module/mxfs/parameters/dbg_lbs_mount; cat /sys/module/mxfs/parameters/dbg_lbs_mount /sys/module/mxfs/srcversion" 20
+    for n in "${NODES[@]}"; do
+        [ "$(tr '\n' ' ' < "$EVID/lbs.$n")" = "1 $(modinfo -F srcversion "$REPO/mxfs.ko") " ] || die "$n: module not loaded as built, or dbg_lbs_mount not set: $(tr '\n' ' ' < "$EVID/lbs.$n")"
+    done
+    # each arm in a subshell, so a refusal in the control still runs the arm
+    # under test; a subshell runs no EXIT trap, so whatever an arm that died
+    # left up is torn down here, and the next arm starts only on nodes that
+    # hold neither its resource nor a worker
+    ( fourkn_arm 512 ); rc512=$?
+    fourkn_down_or_die "the 512 arm's"
+    ( fourkn_arm 4096 ); rc4096=$?
+    say "fourkn-test: arm 512 rc=$rc512, arm 4096 rc=$rc4096 (0 pass, 1 a check failed, 2 only the pace); evidence $EVID"
+    [ "$rc512" = 0 ] && [ "$rc4096" = 0 ]
+}
+fourkn_down_or_die() {  # <whose>
+    local n
+    fourkn_teardown
+    for n in "${NODES[@]}"; do
+        grep -aq '^FKDOWN_OK' "$EVID/fkdown.$n" || die "fourkn-test: $1 resource or worker is still up on $n: $(tail -1 "$EVID/fkdown.$n")"
+    done
+}
+
 step_status() {
     local n
     "$POOL" status | grep -E "^LUN|[ ,]($N1|$N2)[ ,]"
@@ -3268,6 +3510,7 @@ case "$CMD" in
     multi-death-test) evid; take_locks; step_multi_death_test ;;
     resolve-test) evid; take_locks; hold_luns adopt; step_resolve_test ;;
     misconfig-test) evid; take_locks; hold_luns adopt; step_misconfig_test ;;
+    fourkn-test) evid; exec > >(tee -a "$EVID/fourkn-test.log") 2>&1; take_locks; step_fourkn_test ;;
     promotion-race-test) evid; take_locks; hold_luns adopt; step_promotion_race_test ;;
     remount-test) evid; take_locks; hold_luns adopt; step_remount_test ;;
     outage-test) evid; take_locks; hold_luns adopt; step_outage_test ;;

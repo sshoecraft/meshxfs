@@ -60,24 +60,46 @@ DISPOSES OF NOTHING: the defect stays open, stays in the queue, and still has to
     tools/defects.py update  <id> --cell 4/net/mesh/direct:alloc_witness:2026-10-20T07:38:35Z
     tools/defects.py update  <id> --collateral "4/net/mesh/direct:chk_clean:<iso>=the log line"
     tools/defects.py update  <id> --reproducer "command, and how it reaches the cause"
-    tools/defects.py update  <id> --ab "off=10/10 on=0/10 build=<srcversion> evidence=<path>"
-    tools/defects.py remove  <id> --fixed     --why "what was measured and what it said"
-    tools/defects.py remove  <id> --disproved --why "what was measured and what it said"
+    tools/defects.py batch   <id> --kind calibrate|control|verify --row R --at C --runs N --probe RE
+    tools/defects.py measure <id> --batch <bid>          close a calibration or control batch
+    tools/defects.py plan-verify <id> --row R --at C --candidate <cand>   size a verification batch
+    tools/defects.py verify  <id> --batch <bid> --approval <proposal>
+    tools/defects.py propose <kind> ... ; tools/defects.py review <proposal> --approve|--reject --file F
+    tools/defects.py remove  <id> --fixed --control <bid> --fixon <bid> --cause "..." --why "..." --approval <p>
+    tools/defects.py remove  <id> --disproved --why "what was measured and what it said" --approval <p>
 
 EVERY BOARD FAILURE A RECORD ACCOUNTS FOR IS NAMED, NOT DESCRIBED. `--cell CONFIG:ROW:ISO` is
 one recorded run of a board row (its stamp exactly as `tools/criteria.py show <row>` prints it),
-checked against the board when it is given; `--collateral CONFIG:ROW:ISO=<evidence>` is a run
-that failed because of this defect without measuring it (a node that could not unmount behind the
-hung creates), with the log line that shows the dependency. `tools/criteria.py --unattributed`
-lists every genuine failure in a window that no open record names.
+checked against the board's run ledger when it is given; `--collateral CONFIG:ROW:ISO=<evidence>`
+is a run that failed because of this defect without measuring it (a node that could not unmount
+behind the hung creates), with the log line that shows the dependency. `tools/criteria.py
+incidents` lists every failure on the release boards that no open record names -- from any build,
+for as long as it is unnamed.
 
-FIXED AND VERIFIED NEEDS A REPRODUCER THAT FAILS EVERY TIME WITHOUT THE FIX. `remove --fixed`
-refuses a record with no `--reproducer`, or whose `--ab` does not show the fix-off arm failing
-every lap and the fix-on arm passing every lap on one build. A defect seen only now and then with
-no reproducer like that stays open: passing laps cannot close it. It also refuses while any row
-the record names, its own failures retired, does not PASS on this tree's build. Then each named
-run is marked as retired by the record on the board, and only the flake window stops counting it.
-`--disproved` retires them the same way, with no reproducer and no pass required.
+A DEFECT IS CLEARED BY A RUN COUNT DERIVED FROM ITS MEASURED RATE, NEVER BY A GUESS. A record
+carries the failure rate its reproducer was measured at: k failures in n laps of a declared
+calibration batch (`batch --kind calibrate`, then `measure`), read from the board's run ledger,
+never typed. From it, `plan-verify` sizes a verification batch: L is the one-sided Clopper-Pearson
+lower bound of k/n at the policy's delta, and N = ceil(ln alpha / ln(1 - L)) clean laps
+(data/release_policy.json: delta = alpha = 0.005, a 1% chance overall of clearing a defect that is
+still there). 7 of 7 needs 9 clean laps; 20 of 20 needs 4; a single sighting needs about 1,058,
+which is the arithmetic telling you to build a better reproducer first. Every lap of a declared
+batch counts: a failure ends the batch for good, and a new one needs a new finding. A lap counts
+toward N only if its exposure probe shows the defect's trigger was reached.
+
+FIXED AND VERIFIED NEEDS A POSITIVE CONTROL. `remove --fixed` needs a control batch with the fix
+taken out (the candidate's source with only the fix reverted, or its knob turned off) that
+reproduces the failure, a fix-on batch sized from that control's rate that passes every lap with
+exposure, and the proven cause. A defect that no control can reproduce can be neither verified nor
+removed: passing laps cannot close it. `--disproved` needs direct evidence and no batch.
+
+DECISIONS THAT STOP A DEFECT BLOCKING ARE REVIEWED. A `noblock` impact, a narrower reach (more
+nodes, another config or platform), a `verify`, a removal, and the board's detector-defect and
+infra annotations each need an approved proposal: `propose` records what is asked and why, the
+release-reviewer agent (.claude/agents/release-reviewer.md) checks the evidence and records its
+verdict with `review`, and the command that makes the change names the approval. Decisions that
+make a record block MORE need nothing. The owner decided this on 2026-10-21
+(docs/rulings/release-verification-rework.md).
     tools/defects.py rename  <id> D-NEW-SHORTER-ID-0962   a new id, nothing else changes
 
 AN ID IS AT MOST 80 CHARACTERS. It is minted from the summary, so a summary that opens with a
@@ -90,12 +112,15 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import hashlib
 import json
+import math
 import os
 import re
 import signal
 import sys
 import time
+import uuid
 from datetime import date
 from pathlib import Path
 
@@ -111,7 +136,14 @@ except (AttributeError, ValueError):
     pass
 
 ROOT = Path(__file__).resolve().parents[1]
-LEDGER = ROOT / "data" / "defects.json"
+#: `MXFS_DEFECTS` points at another queue file, for replaying recorded queues
+#: (tests/release_gate/replay.sh) without touching the live one.
+LEDGER = Path(os.environ["MXFS_DEFECTS"]) if os.environ.get("MXFS_DEFECTS") \
+    else ROOT / "data" / "defects.json"
+#: The proposals the reviewer rules on, kept beside the queue they change.
+PROPOSALS = LEDGER.with_name("proposals.json") if os.environ.get("MXFS_DEFECTS") \
+    else ROOT / "data" / "proposals.json"
+REVIEWS = ROOT / "data" / "reviews"
 
 #: Ordered worst-first. Anything else sorts last rather than being dropped -- an unfamiliar severity
 #: must never make a defect vanish out of the queue.
@@ -165,23 +197,31 @@ FIELDS = {"severity": "s", "summary": "m", "next": "n", "evidence": "w",
 #: each write their own, and the later write silently resurrects the record the earlier one took
 #: out -- both reporting success, in a file that carries no dates, so nothing afterwards shows it
 #: happened. Measured 2026-09-17 on a copy of the real ledger.
-LOCK = ROOT / "data" / ".defects.lock"
-MUTATORS = ("add", "update", "remove", "verify", "rename", "migrate-config")
+LOCK = LEDGER.with_name(".defects.lock")
+MUTATORS = ("add", "update", "remove", "verify", "rename", "migrate-config", "batch", "measure",
+            "plan-verify", "propose", "review")
 
 #: A save measures ~6 ms on the real 858 KB ledger, so anything still holding the lock after this
 #: long is wedged rather than busy, and saying so beats blocking a session forever.
 LOCK_WAIT_SECONDS = 30
 
 #: For `lift_config` only: what a leading bare configuration must not be mistaken for.
-SUBCOMMANDS = ("show", "add", "update", "remove", "verify", "rename", "migrate-config")
-VALUE_FLAGS = ("-s", "--severity", "--at")
+SUBCOMMANDS = ("show", "add", "update", "remove", "verify", "rename", "migrate-config", "batch",
+               "measure", "plan-verify", "batch-check", "propose", "review", "proposal")
+VALUE_FLAGS = ("-s", "--severity", "--at", "--candidate")
 
 ORDERED = ("id", "severity", "nodes", "config", "platform", "opened", "updated", "summary",
            "evidence", "next", "cells", "collateral", "reproducer", "ab", "reproducible",
-           "verified_at")
+           "verified_at", "batches", "rates")
 
-#: `--ab`: the fix-off and fix-on arms of the reproducer on one build, as counts of laps.
-AB_FORM = re.compile(r"^off=(\d+)/(\d+)\s+on=(\d+)/(\d+)\s+build=([0-9A-F]{23})\s+evidence=(\S+)$")
+#: What a declared batch of laps is for. A calibration measures the defect's rate on the build
+#: that has it; a control measures it with the fix taken out of the candidate; a verification
+#: runs the planned number of laps with the fix in.
+BATCH_KINDS = ("calibrate", "control", "verify")
+
+#: What a proposal can ask for. Each is a decision that stops a defect, or a failure, blocking.
+PROPOSAL_KINDS = ("noblock", "narrow", "verify", "remove-fixed", "remove-disproved",
+                  "detector-defect", "infra-proven")
 
 
 #: The open lock file, kept for the process's lifetime so the lock is held until it exits. Nothing
@@ -287,7 +327,7 @@ def platform_of(entry: dict) -> str:
     return value if value in PLATFORMS else DEFAULT_PLATFORM
 
 
-def blocks(entry: dict, nodes: int, selector: tuple, platform=None) -> bool:
+def blocks(entry: dict, nodes: int, selector: tuple, platform=None, candidate: str = "") -> bool:
     """Does this defect block a release of the configuration(s) `nodes`/`selector` on `platform`?
 
     It does if one of those configurations can exercise it: the cluster is at least as large as
@@ -301,10 +341,11 @@ def blocks(entry: dict, nodes: int, selector: tuple, platform=None) -> bool:
         return False
     if platform is not None and platform_of(entry) not in ("any", platform):
         return False
-    #: A reproducible defect `verify` found passing at exactly this configuration, on this tree's
-    #: build, has nothing left to say about it: the board there passes with its failures retired.
-    #: It still blocks every configuration it reaches and was not verified at.
-    if verified_here(entry, configuration.selector_label(nodes, selector)):
+    #: A defect whose declared verification batch passed at exactly this configuration, on the
+    #: candidate being released (or, with no candidate named, on this tree's build), has nothing
+    #: left to say about it there. It still blocks every configuration it reaches and was not
+    #: verified at.
+    if verified_here(entry, configuration.selector_label(nodes, selector), platform, candidate):
         return False
     return configuration.overlaps(pattern, selector)
 
@@ -313,12 +354,20 @@ def blocks(entry: dict, nodes: int, selector: tuple, platform=None) -> bool:
 build_cache = None
 
 
-def verified_here(entry: dict, config: str) -> bool:
-    """Was this record verified (`defects.py verify`) at exactly `config`, on this tree's build?"""
+def verified_here(entry: dict, config: str, platform=None, candidate: str = "") -> bool:
+    """Was this record verified at exactly `config` -- by a declared batch, on `candidate` (or on
+    this tree's build when no candidate is named), for this platform or for every platform?
+
+    A mark with no batch is a single-pass `verify` from before 2026-10-21; it proves nothing about
+    a defect that showed only now and then, and it no longer counts.
+    """
     marks = [v for v in entry.get("verified_at") or []
-             if isinstance(v, dict) and v.get("config") == config]
+             if isinstance(v, dict) and v.get("config") == config and v.get("batch")
+             and v.get("platform", "any") in ("any", platform or "any")]
     if not marks:
         return False
+    if candidate:
+        return any(v.get("candidate") == candidate for v in marks)
     global build_cache
     if build_cache is None:
         build_cache = tree_build()
@@ -526,8 +575,26 @@ def show_one(entry: dict) -> None:
         print("  %-10s %s" % ("reproduces", wrap(entry["reproducible"], 88, " " * 13)))
     for mark in entry.get("verified_at") or []:
         if isinstance(mark, dict):
-            print("  %-10s %s on build %s (%s): passes there, does not block it"
-                  % ("verified", mark.get("config"), mark.get("build"), mark.get("date")))
+            if mark.get("batch"):
+                print("  %-10s %s on %s (batch %s, %s): does not block it there"
+                      % ("verified", mark.get("config"),
+                         "candidate " + mark["candidate"] if mark.get("candidate")
+                         else "build " + str(mark.get("build")), mark["batch"], mark.get("date")))
+            else:
+                print("  %-10s %s on build %s (%s): a single pass from before batches; it no "
+                      "longer clears anything" % ("verified", mark.get("config"), mark.get("build"),
+                                                  mark.get("date")))
+    for rate in entry.get("rates") or []:
+        print("  %-10s %s at %s: %d of %d laps failed (batch %s, %s %s)"
+              % ("rate", rate.get("row"), rate.get("config"), rate.get("k", 0), rate.get("n", 0),
+                 rate.get("batch"), rate.get("kind"), rate.get("date")))
+    for batch in entry.get("batches") or []:
+        print("  %-10s %s %-9s %s at %s, %s laps planned, %s, %s%s"
+              % ("batch", batch.get("id"), batch.get("kind"), batch.get("row"),
+                 batch.get("config"), batch.get("planned"), batch.get("state"),
+                 "candidate " + batch["candidate"] if batch.get("candidate")
+                 else "build " + str(batch.get("build") or "?"),
+                 " variant " + batch["variant"] if batch.get("variant") else ""))
     for key, value in entry.items():
         if key not in ORDERED:
             print("  %-10s %s" % (key, wrap(value, 88, " " * 13)))
@@ -655,32 +722,39 @@ def parse_cell(text: str, collateral: bool) -> dict:
             sys.exit("defects: --collateral needs CONFIG:ROW:ISO=<the log evidence that this run "
                      "failed because of the defect>; a run that only failed at the same time is "
                      "not collateral")
-    config, _, rest = text.strip().partition(":")
-    row, _, iso = rest.partition(":")
-    if not (config and row and iso):
+    #: The stamp is anchored at the end: a release step's row (`release:<step>`) has a colon of
+    #: its own, and splitting at the first two colons read row `release` and stamp `<step>:...`.
+    match = re.fullmatch(r"([^:]+):(.+):(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)", text.strip())
+    if not match:
         sys.exit(f"defects: {text!r}: a board run is CONFIG:ROW:ISO, e.g. "
                  "4/net/mesh/direct:alloc_witness:2026-10-20T07:38:35Z")
-    cell = {"config": board_tool().parse_at(config), "row": row, "iso": iso}
+    config, row, iso = match.groups()
+    #: A release step's run (tools/release_run.py: row `release:<step>`) is filed under the
+    #: configuration the orchestrator gave it, which may be a placeholder such as `1/any`.
+    parsed = config if row.startswith("release:") else board_tool().parse_at(config)
+    cell = {"config": parsed, "row": row, "iso": iso}
     if collateral:
         cell["why"] = why.strip()
     return cell
 
 
 def check_cells(cells: list) -> None:
-    """Every named run exists on its board and did not pass. A record that names a run nobody
-    recorded, or a passing one, accounts for nothing."""
+    """Every named run exists in its board's run ledger and did not pass. A record that names a
+    run nobody recorded, or a passing one, accounts for nothing."""
     criteria = board_tool()
     for cell in cells:
-        board = criteria.read_board(criteria.board_for(cell["config"]))
-        row, run = criteria.run_of(board, cell["row"], cell["config"], cell["iso"])
-        if row is None:
-            sys.exit(f"defects: no board row {cell['row']!r}")
+        # tools/release_run.py writes every release step's run into the primary ledger, whatever
+        # configuration it files it under: the drbd step's, under 2/net/mesh/drbd, was looked for
+        # in the DRBD board's and could never be named
+        board = criteria.SPEC if cell["row"].startswith("release:") \
+            else criteria.board_for(cell["config"])
+        run = criteria.ledger_run(board, cell["config"], cell["row"], cell["iso"])
         if run is None:
             sys.exit("defects: %s at %s records no run stamped %s (recorded: %s)"
                      % (cell["row"], cell["config"], cell["iso"],
-                        ", ".join(str(r.get("iso", "?"))
-                                  for r in criteria.runs_of(row, cell["config"]))))
-        if str(run.get("status", "")).upper().strip() == "PASS":
+                        ", ".join(str(r.get("iso", "?")) for r in
+                                  criteria.ledger_runs(board, cell["config"], cell["row"])[:12])))
+        if run.get("outcome") == "PASS":
             sys.exit("defects: %s at %s run %s PASSED; a record names the runs that failed"
                      % (cell["row"], cell["config"], cell["iso"]))
 
@@ -703,39 +777,286 @@ def add_cells(entry: dict, args) -> list:
     return changed
 
 
-def parse_ab(text: str) -> dict:
-    match = AB_FORM.match(text.strip())
-    if not match:
-        sys.exit("defects: --ab is \"off=<failed>/<laps> on=<failed>/<laps> build=<srcversion> "
-                 "evidence=<path>[,<path>]\": the reproducer's laps with the fix off and on, on "
-                 "one build")
-    off_fail, off_laps, on_fail, on_laps = (int(match.group(i)) for i in range(1, 5))
-    if off_fail > off_laps or on_fail > on_laps:
-        sys.exit("defects: --ab counts more failed laps than laps")
-    missing = [p for p in match.group(6).split(",") if not (ROOT / p).exists()]
-    if missing:
-        sys.exit("defects: --ab evidence not in the tree: %s" % ", ".join(missing))
-    return {"off_fail": off_fail, "off_laps": off_laps, "on_fail": on_fail, "on_laps": on_laps,
-            "build": match.group(5), "evidence": match.group(6)}
+# ---------------------------------------------------------------------------------------------
+# MEASURED RATES AND THE BATCHES THEY SIZE
+# ---------------------------------------------------------------------------------------------
+
+def binomial_upper_tail(k: int, n: int, p: float) -> float:
+    """P(X >= k) for X ~ Binomial(n, p), exactly."""
+    if k <= 0:
+        return 1.0
+    if p <= 0.0:
+        return 0.0
+    if p >= 1.0:
+        return 1.0
+    total = 0.0
+    for j in range(k, n + 1):
+        total += math.comb(n, j) * (p ** j) * ((1.0 - p) ** (n - j))
+    return min(total, 1.0)
 
 
-def fixed_gaps(entry: dict) -> list:
-    """What a record still lacks to be removed as FIXED AND VERIFIED."""
-    gaps = []
-    if not str(entry.get("reproducer") or "").strip():
-        gaps.append("no reproducer: name the test that reaches the cause (update --reproducer)")
-    ab = entry.get("ab")
-    if not ab:
-        gaps.append("no fix-off/fix-on result on one build (update --ab)")
+def clopper_pearson_lower(k: int, n: int, delta: float) -> float:
+    """The one-sided Clopper-Pearson lower bound of k/n at error delta: the smallest p for which
+    seeing k or more failures in n laps has probability at least delta. Zero when k is zero:
+    nothing measured, nothing to bound."""
+    if k <= 0 or n <= 0:
+        return 0.0
+    if k >= n:
+        return delta ** (1.0 / n)
+    low, high = 0.0, k / n
+    for _ in range(200):
+        mid = (low + high) / 2.0
+        if binomial_upper_tail(k, n, mid) < delta:
+            low = mid
+        else:
+            high = mid
+    return low
+
+
+def laps_needed(k: int, n: int, delta: float, alpha: float) -> int:
+    """Clean laps that leave at most alpha chance of all passing while the defect still fails at
+    its lower-bound rate: N = ceil(ln alpha / ln(1 - L)). None when the rate bounds nothing."""
+    low = clopper_pearson_lower(k, n, delta)
+    if low <= 0.0:
+        return 0
+    if low >= 1.0:
+        return 1
+    return max(1, math.ceil(math.log(alpha) / math.log(1.0 - low)))
+
+
+def policy_numbers() -> tuple:
+    rules = board_tool().policy()
+    return float(rules["delta"]), float(rules["alpha"])
+
+
+def find_batch(data: dict, bid: str) -> tuple:
+    """(record, batch) for a batch id, or exit."""
+    for entry in data["defects"]:
+        for batch in entry.get("batches") or []:
+            if batch.get("id") == bid:
+                return entry, batch
+    sys.exit(f"defects: no declared batch {bid!r}")
+
+
+def batch_runs(batch: dict) -> list:
+    """Every recorded lap of a batch, from its board's run ledger."""
+    criteria = board_tool()
+    board = criteria.board_for(batch["config"])
+    return [r for r in criteria.ledger_runs(board, batch["config"], batch["row"])
+            if r.get("batch") == batch["id"]]
+
+
+def exposed(run: dict, batch: dict | None = None) -> bool:
+    """Did the lap reach the defect's trigger? run.sh appends ` exposure=<count>` to `measured`
+    when the batch names a probe, on every outcome.
+
+    A batch with no probe cannot tell, so every lap of it counts: it is a lap of the row as run,
+    and counting only its failures read every such rate as 100% (3 failures in 30 laps measured
+    3/3, which sizes a verification batch at 28 laps instead of about 440). With a probe, a FAIL
+    counts only when the probe saw the trigger: a FAIL the defect did not cause is an incident of
+    its own, and counting it raises the rate and shrinks the verification batch."""
+    if batch is not None and not batch.get("probe"):
+        return True
+    match = re.search(r"\bexposure=(\d+)", str(run.get("measured") or ""))
+    if match:
+        return int(match.group(1)) > 0
+    # a run recorded before exposure was measured: a FAIL is the trigger firing
+    return run.get("outcome") == "FAIL" and batch is None
+
+
+def unplanned_variant(run: dict, batch: dict) -> bool:
+    """A lap run as something other than the batch declared: a module knob, a test environment
+    or another build than the batch names. A control batch takes the fix out, so its laps carry
+    the knob that does it and run.sh's `batch:<variant>`; a calibration or verification lap with
+    any variant at all measured a different build than the one it is counted for."""
+    variant = str(run.get("variant") or "")
+    if batch.get("variant"):
+        if "batch:" + batch["variant"] not in variant:
+            return True
+    elif variant:
+        return True
+    if batch.get("build") and str(run.get("build") or "") != batch["build"]:
+        return True
+    if not batch.get("candidate"):
+        return False
+    # a candidate is its version: a lap from before its current attempt was frozen ran another tree
+    return run.get("candidate") != batch["candidate"] \
+        or str(run.get("iso", "")) < board_tool().attempt_began(batch["candidate"])
+
+
+def check_batch_lap(bid: str, row: str, config: str, candidate: str) -> None:
+    """Refuse a lap that is not part of an open, declared batch: wrong row, configuration or
+    candidate, a batch already ended by a failure, or one that has used all its laps. Called by
+    tools/criteria.py before it records a lap, and by run.sh before it runs one."""
+    data = load()
+    entry, batch = find_batch(data, bid)
+    if batch.get("state") != "open":
+        sys.exit("defects: batch %s is %s; no more laps" % (bid, batch.get("state")))
+    if batch["row"] != row and row not in batch.get("support", []):
+        sys.exit("defects: batch %s is for row %s, not %s" % (bid, batch["row"], row))
+    if batch["config"] != config:
+        sys.exit("defects: batch %s is for %s, not %s" % (bid, batch["config"], config))
+    if batch.get("candidate") and batch["candidate"] != candidate:
+        sys.exit("defects: batch %s is for candidate %s, not %r"
+                 % (bid, batch["candidate"], candidate))
+    if row != batch["row"]:
+        return
+    laps = [r for r in batch_runs(batch) if r.get("outcome") in ("PASS", "FAIL", "INCOMPLETE")]
+    if any(r.get("outcome") == "FAIL" for r in laps) and batch["kind"] == "verify":
+        sys.exit("defects: batch %s already failed a lap; a verification batch ends at its first "
+                 "failure" % bid)
+    if len(laps) >= int(batch["planned"]):
+        sys.exit("defects: batch %s has run all %s of its laps" % (bid, batch["planned"]))
+
+
+def cmd_batch(data: dict, args) -> int:
+    """Declare a batch before its first lap. The number of laps is fixed here: a batch that ran
+    until it got the answer it wanted measures nothing."""
+    entry = find(data, args.id)
+    criteria = board_tool()
+    config = criteria.parse_at(args.batch_at)
+    if args.kind == "verify":
+        sys.exit("defects: a verification batch is sized from the record's measured rate; use "
+                 "plan-verify")
+    if args.runs < 1:
+        sys.exit("defects: --runs is the number of laps; at least 1")
+    if args.kind == "control" and not args.variant:
+        sys.exit("defects: a control batch takes the fix out; --variant says how (the knob, or the "
+                 "build with the fix reverted and the diff's hash)")
+    bid = "b%s-%s" % (date.today().strftime("%Y%m%d"), uuid.uuid4().hex[:6])
+    batch = {"id": bid, "kind": args.kind, "row": args.row, "config": config,
+             "platform": args.platform or "any", "planned": args.runs,
+             "probe": args.probe or "", "candidate": args.candidate or "",
+             "build": args.build or "", "variant": args.variant or "", "state": "open",
+             "leaves_cluster": bool(args.leaves_cluster), "support": args.support or [],
+             "created": date.today().isoformat(), "why": args.why or ""}
+    entry.setdefault("batches", []).append(batch)
+    entry["updated"] = date.today().isoformat()
+    save(data)
+    print("declared %s batch %s for %s: %s at %s, %d laps" % (args.kind, bid, entry["id"],
+                                                              args.row, config, args.runs))
+    print("run each lap with: MXFS_BATCH=%s%s ./run.sh %s %s"
+          % (bid, " MXFS_CANDIDATE=" + args.candidate if args.candidate else "", config, args.row))
+    return 0
+
+
+def cmd_measure(data: dict, args) -> int:
+    """Close a calibration or control batch and record its rate, read from the run ledger."""
+    entry, batch = find_batch(data, args.batch)
+    if batch["kind"] not in ("calibrate", "control"):
+        sys.exit("defects: %s is a %s batch; measure closes calibration and control batches"
+                 % (batch["id"], batch["kind"]))
+    if batch.get("state") != "open":
+        sys.exit("defects: batch %s is already %s" % (batch["id"], batch.get("state")))
+    laps = batch_runs(batch)
+    unresolved = [r for r in laps if r.get("outcome") in ("INCOMPLETE", "INFRA")
+                  and not board_tool().settled(board_tool().board_for(batch["config"]),
+                                               batch["config"], batch["row"], str(r.get("iso")))]
+    if unresolved:
+        sys.exit("defects: batch %s has %d INCOMPLETE or INFRA lap(s) (%s); a rate needs every planned lap "
+                 "to have measured something, or a reviewed infra disposition for the lap"
+                 % (batch["id"], len(unresolved), ", ".join(str(r.get("iso")) for r in unresolved)))
+    counted = [r for r in laps if r.get("outcome") in ("PASS", "FAIL") and exposed(r, batch)
+               and not unplanned_variant(r, batch)]
+    unattributed = [r for r in laps if r.get("outcome") == "FAIL" and not exposed(r, batch)]
+    if unattributed:
+        print("  %d FAIL lap(s) without exposure are not counted against %s (each is an incident "
+              "of its own until a record names it): %s"
+              % (len(unattributed), entry["id"], ", ".join(str(r.get("iso")) for r in unattributed)))
+    if len([r for r in laps if r.get("outcome") in ("PASS", "FAIL")]) != int(batch["planned"]):
+        sys.exit("defects: batch %s planned %s laps and has %d; run the rest first"
+                 % (batch["id"], batch["planned"],
+                    len([r for r in laps if r.get("outcome") in ("PASS", "FAIL")])))
+    k = sum(1 for r in counted if r.get("outcome") == "FAIL")
+    rate = {"row": batch["row"], "config": batch["config"], "platform": batch["platform"],
+            "kind": batch["kind"], "batch": batch["id"], "k": k, "n": len(counted),
+            "candidate": batch.get("candidate", ""), "variant": batch.get("variant", ""),
+            "builds": sorted({str(r.get("build")) for r in laps}), "date": date.today().isoformat()}
+    entry.setdefault("rates", []).append(rate)
+    batch["state"] = "closed"
+    entry["updated"] = date.today().isoformat()
+    save(data)
+    delta, alpha = policy_numbers()
+    print("measured %s: %s at %s failed %d of %d exposed laps (batch %s)"
+          % (entry["id"], batch["row"], batch["config"], k, len(counted), batch["id"]))
+    if k:
+        print("  lower bound %.4f at delta %s: a verification batch needs %d clean laps"
+              % (clopper_pearson_lower(k, len(counted), delta), delta,
+                 laps_needed(k, len(counted), delta, alpha)))
     else:
-        if ab["off_laps"] < 1 or ab["off_fail"] != ab["off_laps"]:
-            gaps.append("the fix-off arm failed %d of %d laps; it must fail every lap, or the "
-                        "reproducer does not reach the cause reliably enough to prove the fix"
-                        % (ab["off_fail"], ab["off_laps"]))
-        if ab["on_laps"] < 1 or ab["on_fail"] != 0:
-            gaps.append("the fix-on arm failed %d of %d laps; it must pass every lap"
-                        % (ab["on_fail"], ab["on_laps"]))
-    return gaps
+        print("  no failure: this batch bounds nothing, and nothing can be verified from it")
+    return 0
+
+
+def rate_for(entry: dict, row: str, config: str, kind: str = "calibrate") -> dict:
+    """The record's measured rate for a row: at `config` if it was measured there, else the most
+    recent one for the row at any configuration (the record must say the rate transfers)."""
+    rates = [r for r in entry.get("rates") or [] if r.get("row") == row and r.get("k", 0) > 0
+             and r.get("kind") == kind]
+    here = [r for r in rates if r.get("config") == config]
+    return (here or rates or [None])[-1]
+
+
+def cmd_plan_verify(data: dict, args) -> int:
+    """Declare a verification batch sized from the record's measured rate."""
+    entry = find(data, args.id)
+    criteria = board_tool()
+    config = criteria.parse_at(args.batch_at)
+    if args.control:
+        rate = next((r for r in entry.get("rates") or []
+                     if r.get("batch") == args.control and r.get("k", 0) > 0), None)
+        if rate is None:
+            sys.exit("defects: control batch %s has no measured failure for %s; a fix-on batch is "
+                     "sized from a control that reproduced" % (args.control, entry["id"]))
+    else:
+        rate = rate_for(entry, args.row, config)
+    if rate is None:
+        sys.exit("defects: %s has no measured rate for %s with a failure in it; declare a "
+                 "calibration batch on a build that has the defect and measure it first"
+                 % (entry["id"], args.row))
+    if rate["config"] != config and not args.transfer:
+        sys.exit("defects: the rate for %s was measured at %s, not %s. Measure it here, or pass "
+                 "--transfer \"why the rate given exposure carries over\" (the reviewer checks it)"
+                 % (args.row, rate["config"], config))
+    delta, alpha = policy_numbers()
+    planned = laps_needed(rate["k"], rate["n"], delta, alpha)
+    bid = "b%s-%s" % (date.today().strftime("%Y%m%d"), uuid.uuid4().hex[:6])
+    batch = {"id": bid, "kind": "verify", "row": args.row, "config": config,
+             "platform": args.platform or "any", "planned": planned,
+             "probe": args.probe or "", "candidate": args.candidate or "",
+             "build": args.build or "", "variant": "", "state": "open",
+             "leaves_cluster": bool(args.leaves_cluster), "support": args.support or [],
+             "created": date.today().isoformat(), "rate": rate, "transfer": args.transfer or "",
+             "lower_bound": clopper_pearson_lower(rate["k"], rate["n"], delta)}
+    if not batch["probe"]:
+        sys.exit("defects: a verification batch needs --probe, the kernel-log pattern that shows "
+                 "a lap reached the defect's trigger; an unexposed pass is not a trial")
+    if not batch["candidate"] and not batch["build"]:
+        sys.exit("defects: name the release candidate (--candidate) or the build (--build) the "
+                 "batch verifies")
+    entry.setdefault("batches", []).append(batch)
+    entry["updated"] = date.today().isoformat()
+    save(data)
+    print("declared verification batch %s for %s: %s at %s, %d clean laps "
+          "(rate %d/%d, lower bound %.4f, delta %s, alpha %s)"
+          % (bid, entry["id"], args.row, config, planned, rate["k"], rate["n"],
+             batch["lower_bound"], delta, alpha))
+    print("run each lap with: MXFS_BATCH=%s%s ./run.sh %s %s"
+          % (bid, " MXFS_CANDIDATE=" + args.candidate if args.candidate else "", config, args.row))
+    return 0
+
+
+def cmd_batch_check(data: dict, args) -> int:
+    """run.sh's question before a lap: may this lap run? Prints the batch's probe and whether the
+    row leaves the cluster down (so the next lap re-forms it)."""
+    criteria = board_tool()
+    config = criteria.parse_at(args.batch_at)
+    check_batch_lap(args.batch, args.row, config, args.candidate or "")
+    _, batch = find_batch(data, args.batch)
+    print("PROBE=%s" % batch.get("probe", ""))
+    print("LEAVES_CLUSTER=%d" % (1 if batch.get("leaves_cluster") else 0))
+    print("VARIANT=%s" % batch.get("variant", ""))
+    return 0
 
 
 def tree_build() -> str:
@@ -749,121 +1070,270 @@ def tree_build() -> str:
     return out.stdout.strip() if out.returncode == 0 else ""
 
 
-def retire_cells(entry: dict, disposition: str, why: str) -> list:
-    """Mark every board run the record names as retired by it, on every board they live on.
-
-    For FIXED the rows it names must then PASS on this tree's build -- the record's own failures
-    no longer counted, and nothing else in their windows -- or nothing is written at all. Returns
-    the lines to report: each run retired, and each one that has already aged off its board."""
+def retire_cells(entry: dict, disposition: str, why: str, configs=None) -> list:
+    """Append a `retired_by` note for every board run the record names (at `configs`, or
+    everywhere), to each board's run ledger, under each board's lock taken in path order.
+    Returns the lines to report."""
     criteria = board_tool()
-    cells = list(entry.get("cells") or []) + list(entry.get("collateral") or [])
+    cells = [c for c in list(entry.get("cells") or []) + list(entry.get("collateral") or [])
+             if configs is None or c["config"] in configs]
     by_board: dict = {}
     for cell in cells:
         by_board.setdefault(criteria.board_for(cell["config"]), []).append(cell)
-    build = tree_build() if disposition == "fixed" else ""
-    if disposition == "fixed" and cells and not build:
-        sys.exit("defects: cannot read this tree's mxfs.ko srcversion; the rows the record names "
-                 "must pass on the build being released, so build the module first")
     mark = {"defect": entry["id"], "disposition": disposition, "date": date.today().isoformat(),
             "why": why[:400]}
-    handles, boards, report, refused = [], {}, [], []
-    for path, named in by_board.items():
+    handles, report = [], []
+    for path in sorted(by_board, key=str):
         handles.append(criteria.lock_board(path))
-        board = boards[path] = criteria.read_board(path)
-        for cell in named:
-            row, run = criteria.run_of(board, cell["row"], cell["config"], cell["iso"])
-            if run is None:
-                report.append("%s:%s:%s has aged off the board; nothing to retire"
+    for path in sorted(by_board, key=str):
+        notes = []
+        for cell in by_board[path]:
+            if criteria.ledger_run(path, cell["config"], cell["row"], cell["iso"]) is None:
+                report.append("%s:%s:%s is not in the run ledger; nothing to retire"
                               % (cell["config"], cell["row"], cell["iso"]))
                 continue
-            run["retired_by"] = mark
+            notes.append(criteria.note(cell["config"], cell["row"], cell["iso"], "retired_by", mark))
             report.append("retired %s:%s:%s" % (cell["config"], cell["row"], cell["iso"]))
-        if disposition == "fixed":
-            for config, row_id in sorted({(c["config"], c["row"]) for c in named}):
-                row = next((e for e in board["criteria"] if e.get("id") == row_id), None)
-                status = criteria.cell_status(row, config, build) if row else "UNKNOWN"
-                if status != "PASS":
-                    window = criteria.runs_of(row or {}, config)[:criteria.FLAKE_WINDOW]
-                    left = [r.get("iso", "?") for r in window if criteria.genuine_fail(r)]
-                    refused.append("%s at %s reads %s on build %s%s"
-                                   % (row_id, config, status, build,
-                                      "; genuine FAILs still in its window, which another record "
-                                      "or this one must name: " + ", ".join(left) if left else ""))
-    if refused:
-        sys.exit("defects: not removed, and nothing written. Every row the record names must "
-                 "PASS on this tree's build once its own failures are retired:\n  "
-                 + "\n  ".join(refused))
-    for path, board in boards.items():
-        criteria.write_board(path, board)
+        criteria.append_ledger(path, notes)
     del handles
     return report
 
 
 def cmd_verify(data: dict, args) -> int:
-    """A configuration whose rows pass again after a reproducible defect's fix reads PASS again.
+    """A declared verification batch passed: the record stops blocking that configuration, on that
+    candidate, and its named failures there are retired.
 
-    The question a board answers is whether THAT configuration passes. A defect that failed every
-    run of a row before its fix and whose row now passes on this tree's build has nothing left to
-    say about that configuration, so its named failures there are retired now -- not after the
-    flake window ages them out, and whatever the same defect still does elsewhere. An intermittent
-    defect is not marked reproducible, so its failures keep counting for the whole window: one
-    pass proves nothing about a bug that only shows now and then. The record stays open; `remove`
-    is the disposition of the defect itself."""
-    entry = find(data, args.id)
-    if not str(entry.get("reproducible") or "").strip():
-        sys.exit("defects: %s is not marked reproducible (update --reproducible \"how every run of "
-                 "the row failed before the fix\"); an intermittent defect's failures count for "
-                 "the whole flake window" % entry["id"])
+    The batch was sized before its first lap from the record's measured rate; every lap it ran on
+    the candidate counts. It needs its planned number of exposed PASSes and no FAIL; an INCOMPLETE
+    lap needs a reviewed infra disposition first. The record stays open: `remove` is the
+    disposition of the defect itself."""
+    entry, batch = find_batch(data, args.batch)
+    if entry["id"] != find(data, args.id)["id"]:
+        sys.exit("defects: batch %s belongs to %s" % (batch["id"], entry["id"]))
+    if batch["kind"] != "verify":
+        sys.exit("defects: %s is a %s batch, not a verification batch" % (batch["id"], batch["kind"]))
+    if batch.get("state") != "open":
+        sys.exit("defects: batch %s is %s" % (batch["id"], batch.get("state")))
     criteria = board_tool()
-    config = criteria.parse_at(args.verify_at)
-    named = [c for c in list(entry.get("cells") or []) + list(entry.get("collateral") or [])
-             if c["config"] == config]
-    if not named:
-        sys.exit("defects: %s names no board run at %s (update --cell)" % (entry["id"], config))
-    build = tree_build()
-    if not build:
-        sys.exit("defects: cannot read this tree's mxfs.ko srcversion; build the module first")
-    path = criteria.board_for(config)
-    handle = criteria.lock_board(path)
-    board = criteria.read_board(path)
-    mark = {"defect": entry["id"], "disposition": "verified at " + config,
-            "date": date.today().isoformat(), "why": entry["reproducible"][:400]}
-    retired, refused = [], []
-    for row_id in sorted({c["row"] for c in named}):
-        row = next((e for e in board["criteria"] if e.get("id") == row_id), None)
-        cell = criteria.cell_of(row or {}, config)
-        if not row or str(cell.get("status", "")).upper().strip() != "PASS" \
-                or (cell.get("build") and cell["build"] != build):
-            refused.append("%s at %s: its latest run is %s on build %s, not PASS on %s"
-                           % (row_id, config, cell.get("status", "none"),
-                              cell.get("build", "?"), build))
-            continue
-        for c in named:
-            if c["row"] != row_id:
-                continue
-            _, run = criteria.run_of(board, row_id, config, c["iso"])
-            if run is not None:
-                run["retired_by"] = mark
-                retired.append("%s:%s:%s" % (config, row_id, c["iso"]))
-    if refused:
-        sys.exit("defects: nothing retired at %s:\n  %s" % (config, "\n  ".join(refused)))
-    criteria.write_board(path, board)
-    del handle
-    #: One mark per configuration, naming the build its board passed on: a later build has to
-    #: pass there again before the record stops blocking it.
+    laps = batch_runs(batch)
+    fails = [r for r in laps if r.get("outcome") == "FAIL"]
+    if fails:
+        batch["state"] = "failed"
+        for run in fails:
+            cell = {"config": batch["config"], "row": batch["row"], "iso": run["iso"]}
+            if cell not in (entry.get("cells") or []):
+                entry.setdefault("cells", []).append(cell)
+        entry["updated"] = date.today().isoformat()
+        save(data)
+        sys.exit("defects: batch %s FAILED %d lap(s) (%s): the defect is still there on this "
+                 "candidate. The batch is closed; the failing runs are now named by %s. A new "
+                 "batch needs a new finding in the record."
+                 % (batch["id"], len(fails), ", ".join(r["iso"] for r in fails), entry["id"]))
+    unsettled = [r for r in laps if r.get("outcome") in ("INCOMPLETE", "INFRA")
+                 and not criteria.settled(criteria.board_for(batch["config"]), batch["config"],
+                                          batch["row"], str(r.get("iso")))]
+    if unsettled:
+        sys.exit("defects: batch %s has %d INCOMPLETE or INFRA lap(s) with no reviewed disposition (%s)"
+                 % (batch["id"], len(unsettled), ", ".join(r["iso"] for r in unsettled)))
+    good = [r for r in laps if r.get("outcome") == "PASS" and exposed(r, batch)
+            and not unplanned_variant(r, batch)]
+    if len(good) < int(batch["planned"]):
+        sys.exit("defects: batch %s has %d exposed PASS lap(s) of the %s planned (%d PASS without "
+                 "exposure do not count); run the rest" % (batch["id"], len(good),
+                                                          batch["planned"],
+                                                          sum(1 for r in laps
+                                                              if r.get("outcome") == "PASS")
+                                                          - len(good)))
+    approval = require_approval(args.approval, "verify", entry["id"],
+                                {"batch": batch["id"]})
+    batch["state"] = "passed"
+    report = retire_cells(entry, "verified at " + batch["config"],
+                          "batch %s: %d exposed clean laps on %s" %
+                          (batch["id"], len(good), batch.get("candidate") or batch.get("build")),
+                          configs={batch["config"]})
     entry["verified_at"] = [v for v in entry.get("verified_at") or []
-                            if isinstance(v, dict) and v.get("config") != config]
-    entry["verified_at"].append({"config": config, "build": build,
+                            if not (isinstance(v, dict) and v.get("config") == batch["config"]
+                                    and v.get("candidate") == batch.get("candidate")
+                                    and v.get("platform", "any") == batch.get("platform", "any"))]
+    entry["verified_at"].append({"config": batch["config"], "platform": batch.get("platform", "any"),
+                                 "candidate": batch.get("candidate", ""),
+                                 "build": batch.get("build") or (laps[0].get("build") if laps else ""),
+                                 "batch": batch["id"], "approval": approval["proposal"],
                                  "date": date.today().isoformat()})
     entry["updated"] = date.today().isoformat()
     save(data)
-    print("verified %s at %s on build %s; retired %d run(s):" % (entry["id"], config, build,
-                                                                  len(retired)))
-    for line in retired:
+    print("verified %s at %s on %s: batch %s, %d exposed clean laps"
+          % (entry["id"], batch["config"], batch.get("candidate") or batch.get("build"),
+             batch["id"], len(good)))
+    for line in report:
         print("  " + line)
-    for row_id in sorted({c["row"] for c in named}):
-        row = next(e for e in board["criteria"] if e.get("id") == row_id)
-        print("  %s at %s now reads %s" % (row_id, config, criteria.cell_status(row, config, build)))
+    return 0
+
+
+# ---------------------------------------------------------------------------------------------
+# PROPOSALS AND REVIEWS
+# ---------------------------------------------------------------------------------------------
+
+def load_proposals() -> dict:
+    try:
+        with PROPOSALS.open() as handle:
+            data = json.load(handle)
+    except FileNotFoundError:
+        return {"proposals": []}
+    except ValueError as exc:
+        raise SystemExit(f"defects: {PROPOSALS} is not valid JSON: {exc}")
+    data.setdefault("proposals", [])
+    return data
+
+
+def save_proposals(data: dict) -> None:
+    PROPOSALS.parent.mkdir(parents=True, exist_ok=True)
+    temporary = PROPOSALS.with_suffix(".json.tmp")
+    with temporary.open("w") as handle:
+        json.dump(data, handle, indent=2)
+        handle.write("\n")
+    os.replace(temporary, PROPOSALS)
+
+
+def find_proposal(proposals: dict, pid: str) -> dict:
+    for proposal in proposals["proposals"]:
+        if proposal.get("id") == pid:
+            return proposal
+    sys.exit(f"defects: no proposal {pid!r}")
+
+
+def file_hash(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def require_approval(pid, kind: str, record, change: dict) -> dict:
+    """The approved proposal a change needs, checked against exactly what is being changed, with
+    its review file unchanged since the reviewer wrote it. Marks it applied. Called under the
+    queue's lock."""
+    if not pid:
+        sys.exit("defects: this change needs a reviewed approval (--approval <proposal>): "
+                 "tools/defects.py propose %s ..., then the release-reviewer agent" % kind)
+    proposals = load_proposals()
+    proposal = find_proposal(proposals, pid)
+    if proposal.get("kind") != kind:
+        sys.exit("defects: proposal %s is for %s, not %s" % (pid, proposal.get("kind"), kind))
+    if record and proposal.get("record") != record:
+        sys.exit("defects: proposal %s is for %s, not %s" % (pid, proposal.get("record"), record))
+    for key, value in change.items():
+        if proposal.get("change", {}).get(key) != value:
+            sys.exit("defects: proposal %s approved %s=%r; this asks for %r"
+                     % (pid, key, proposal.get("change", {}).get(key), value))
+    if proposal.get("state") != "approved":
+        sys.exit("defects: proposal %s is %s, not approved" % (pid, proposal.get("state")))
+    review = proposal.get("review") or {}
+    path = ROOT / review.get("file", "")
+    if not review.get("file") or not path.is_file() or file_hash(path) != review.get("sha256"):
+        sys.exit("defects: proposal %s's review file %s is missing or changed since the review"
+                 % (pid, review.get("file")))
+    proposal["state"] = "applied"
+    proposal["applied"] = date.today().isoformat()
+    save_proposals(proposals)
+    return {"proposal": pid, "kind": kind, "review_sha256": review.get("sha256"),
+            "date": proposal["applied"], "change": dict(proposal.get("change") or {})}
+
+
+def approval_for(pid: str, kind: str, target: dict) -> dict:
+    """For tools/criteria.py's amend and infra: the approval for one board run."""
+    take_lock()
+    return require_approval(pid, kind, None, target)
+
+
+def cmd_propose(args) -> int:
+    """Ask for a decision that stops a defect, or a failure, blocking. Nothing changes until the
+    release-reviewer agent approves it and the change is made naming the approval."""
+    data = load()
+    change: dict = {}
+    record = None
+    if args.kind in ("noblock", "narrow", "verify", "remove-fixed", "remove-disproved"):
+        if not args.record:
+            sys.exit("defects: a %s proposal names the record (--record)" % args.kind)
+        record = find(data, args.record)["id"]
+    if args.kind == "noblock":
+        limit = int(board_tool().policy().get("stall_limit_s", 30))
+        if args.max_stall_s is None or not args.objective or not args.assertions:
+            sys.exit("defects: a noblock proposal needs --objective (the performance objective it "
+                     "violates), --assertions (the correctness assertions every named run "
+                     "completed) and --max-stall-s (the worst measured operation stall)")
+        if args.max_stall_s >= limit:
+            sys.exit("defects: a %ss stall is a stability defect (data/release_policy.json "
+                     "stall_limit_s=%d); it cannot be noblock" % (args.max_stall_s, limit))
+        change = {"impact": "noblock", "objective": args.objective,
+                  "assertions": args.assertions, "max_stall_s": args.max_stall_s}
+    elif args.kind == "narrow":
+        for field, value in (("nodes", args.nodes), ("config", args.config),
+                             ("platform", args.platform)):
+            if value is not None:
+                change[field] = value
+        if not change:
+            sys.exit("defects: a narrow proposal names the new --nodes, --config or --platform")
+    elif args.kind == "verify":
+        if not args.batch:
+            sys.exit("defects: a verify proposal names the batch (--batch)")
+        change = {"batch": args.batch}
+    elif args.kind == "remove-fixed":
+        if not (args.control and args.fixon and args.cause):
+            sys.exit("defects: a remove-fixed proposal names --control, --fixon and --cause")
+        change = {"control": args.control, "fixon": args.fixon, "cause": args.cause}
+    elif args.kind in ("detector-defect", "infra-proven"):
+        if not args.target:
+            sys.exit("defects: a %s proposal names the run (--target CONFIG:ROW:ISO)" % args.kind)
+        cell = parse_cell(args.target, False)
+        check_cells([cell])
+        change = {"config": cell["config"], "row": cell["row"], "iso": cell["iso"]}
+    if not str(args.argument or "").strip() or not args.evidence:
+        sys.exit("defects: a proposal needs --argument (why) and at least one --evidence path")
+    missing = [p for p in args.evidence if not (ROOT / p).exists()]
+    if missing:
+        sys.exit("defects: evidence not in the tree: %s" % ", ".join(missing))
+    take_lock()
+    proposals = load_proposals()
+    pid = "P%s-%s" % (date.today().strftime("%Y%m%d"), uuid.uuid4().hex[:6])
+    proposals["proposals"].append({"id": pid, "kind": args.kind, "record": record,
+                                   "change": change, "argument": args.argument,
+                                   "evidence": args.evidence, "state": "pending",
+                                   "created": date.today().isoformat()})
+    save_proposals(proposals)
+    print("proposal %s (%s%s) is pending review. Have the release-reviewer agent review it:\n"
+          "  Agent(subagent_type=release-reviewer, prompt=\"Review proposal %s.\")"
+          % (pid, args.kind, " of " + record if record else "", pid))
+    return 0
+
+
+def cmd_proposal_show(args) -> int:
+    proposal = find_proposal(load_proposals(), args.pid)
+    print(json.dumps(proposal, indent=2))
+    if proposal.get("record"):
+        print()
+        show_one(find(load(), proposal["record"]))
+    return 0
+
+
+def cmd_review(args) -> int:
+    """The reviewer's verdict on a proposal, with the review file it wrote. The file's hash is
+    recorded: a change applied later checks the file has not changed since."""
+    path = Path(args.file)
+    path = path if path.is_absolute() else ROOT / path
+    if not path.is_file():
+        sys.exit("defects: review file %s does not exist" % path)
+    try:
+        relative = path.resolve().relative_to(REVIEWS.resolve())
+    except ValueError:
+        sys.exit("defects: review files live in %s" % REVIEWS)
+    proposals = load_proposals()
+    proposal = find_proposal(proposals, args.pid)
+    if proposal.get("state") != "pending":
+        sys.exit("defects: proposal %s is %s; reviewed once" % (args.pid, proposal.get("state")))
+    proposal["state"] = "approved" if args.approve else "rejected"
+    proposal["review"] = {"file": str(Path("data") / "reviews" / relative),
+                          "sha256": file_hash(path), "verdict": proposal["state"],
+                          "date": date.today().isoformat()}
+    save_proposals(proposals)
+    print("proposal %s %s (review %s)" % (args.pid, proposal["state"], proposal["review"]["file"]))
     return 0
 
 
@@ -905,9 +1375,41 @@ def cmd_add(data: dict, args) -> int:
     return 0
 
 
+def narrowing(entry: dict, args) -> dict:
+    """The reach changes in an update that would let the record block LESS: more nodes, a config
+    other than every configuration, a platform other than every platform. Widening needs no
+    review; narrowing does, because a reach comes from runs and never from reading code."""
+    narrower = {}
+    seen_nodes, pattern = reach(entry)
+    if args.nodes is not None and args.nodes > seen_nodes:
+        narrower["nodes"] = args.nodes
+    if args.config and args.config.lower() not in (DEFAULT_CONFIG, pattern):
+        narrower["config"] = args.config.lower()
+    if args.platform and args.platform.lower() not in (DEFAULT_PLATFORM, platform_of(entry)):
+        narrower["platform"] = args.platform.lower()
+    return narrower
+
+
 def cmd_update(data: dict, args) -> int:
     entry = find(data, args.id)
+    narrower = narrowing(entry, args)
+    approvals = []
+    if narrower:
+        approvals.append(require_approval(args.approval, "narrow", entry["id"], narrower))
+    if args.impact and str(args.impact).lower() == "noblock" \
+            and str(entry.get("impact", "")).lower() != "noblock":
+        granted = require_approval(args.approval, "noblock", entry["id"], {"impact": "noblock"})
+        approvals.append(granted)
+        entry["noblock"] = {k: v for k, v in granted["change"].items() if k != "impact"}
     changed = []
+    #: -w and -n replace. On a record that already holds evidence or a next step, a replace wipes
+    #: the history the record is for (2026-10-21: an -w meant to add a second sighting erased the
+    #: first's evidence), so it needs --replace; adding goes through -W and -a.
+    for field, flag, add in (("evidence", "-w", "-W"), ("next", "-n", "-a")):
+        value = getattr(args, field if field != "next" else "next_step", None)
+        if value and entry.get(field) and not getattr(args, "replace", False):
+            sys.exit(f"defects: {entry['id']} already has {field}; {flag} would replace it. "
+                     f"Add to it with {add}, or pass --replace to replace it on purpose")
     for field in FIELDS:
         value = getattr(args, field if field != "next" else "next_step", None)
         if value is not None and value != "":
@@ -933,18 +1435,15 @@ def cmd_update(data: dict, args) -> int:
         entry["evidence"] = (have + " ===== " if have else "") + appended
         changed.append("evidence")
     changed += add_cells(entry, args)
-    if args.reproducible:
-        entry["reproducible"] = args.reproducible
-        changed.append("reproducible")
     if args.reproducer:
         entry["reproducer"] = args.reproducer
         changed.append("reproducer")
-    if args.ab:
-        entry["ab"] = parse_ab(args.ab)
-        changed.append("ab")
     if not changed:
         sys.exit("defects: update needs at least one of -s/-m/-n/-a/-w/-W/-N/-C/-P/-I/"
-                 "--cell/--collateral/--reproducer/--ab")
+                 "--cell/--collateral/--reproducer")
+    for granted in approvals:
+        entry.setdefault("approvals", []).append({k: v for k, v in granted.items()
+                                                  if k != "change"})
     #: Checked against what the record will HOLD, not only against what this call passed, so that
     #: `-I noblock` on a record whose reason was written earlier is accepted while `-I noblock` with
     #: no reason anywhere is not.
@@ -979,12 +1478,36 @@ def cmd_remove(data: dict, args) -> int:
         sys.exit("defects: remove needs --why saying what was measured and what it said")
     disposition = "fixed" if args.fixed else "disproved"
     if disposition == "fixed":
-        gaps = fixed_gaps(entry)
+        gaps = []
+        if not str(entry.get("reproducer") or "").strip():
+            gaps.append("no reproducer: name the test that reaches the cause (update --reproducer)")
+        if not (args.control and args.fixon and args.cause):
+            gaps.append("--control, --fixon and --cause are all required")
+        else:
+            owner, control = find_batch(data, args.control)
+            owner2, fixon = find_batch(data, args.fixon)
+            if owner is not entry or owner2 is not entry:
+                gaps.append("both batches must belong to %s" % entry["id"])
+            if control.get("kind") != "control" or control.get("state") != "closed":
+                gaps.append("%s is not a closed control batch" % args.control)
+            rate = next((r for r in entry.get("rates") or [] if r.get("batch") == args.control), None)
+            if not rate or rate.get("k", 0) < 1:
+                gaps.append("the control batch %s did not reproduce the failure: with the fix taken "
+                            "out nothing failed, so nothing shows the fix is what ended it"
+                            % args.control)
+            if fixon.get("kind") != "verify" or fixon.get("state") != "passed":
+                gaps.append("%s is not a verification batch that passed (defects.py verify)"
+                            % args.fixon)
+            if (fixon.get("rate") or {}).get("batch") != args.control:
+                gaps.append("%s was not sized from the control %s (plan-verify --control)"
+                            % (args.fixon, args.control))
         if gaps:
             sys.exit("defects: %s cannot be removed as FIXED AND VERIFIED yet:\n  %s"
                      % (entry["id"], "\n  ".join(gaps)))
-    #: The board first: it is the step that can refuse, and a record removed from the queue
-    #: whose failures were never retired would leave its rows yellow with nothing open to own them.
+        require_approval(args.approval, "remove-fixed", entry["id"],
+                         {"control": args.control, "fixon": args.fixon, "cause": args.cause})
+    else:
+        require_approval(args.approval, "remove-disproved", entry["id"], {})
     report = retire_cells(entry, disposition, args.why)
     data["defects"] = [e for e in data["defects"] if e is not entry]
     save(data)
@@ -1123,7 +1646,10 @@ def main() -> int:
     update.add_argument("id")
     update.add_argument("-s", "--severity", choices=SEVERITIES)
     update.add_argument("-m", "--summary")
-    update.add_argument("-w", "--evidence")
+    update.add_argument("-w", "--evidence", help="replace the evidence (needs --replace when the "
+                                                 "record has some; -W adds to it)")
+    update.add_argument("--replace", action="store_true",
+                        help="let -w / -n replace a field that already holds text")
     update.add_argument("-W", "--append-evidence", dest="append_evidence",
                         help="append to the evidence after a ' ===== ' separator instead of "
                              "replacing it")
@@ -1148,30 +1674,103 @@ def main() -> int:
                         help="add a board run that failed because of this defect, with the log "
                              "evidence of the dependency (repeat for each)")
     update.add_argument("--reproducer", help="the test that reaches the cause, and how")
-    update.add_argument("--reproducible", metavar="EVIDENCE",
-                        help="mark it reproducible: how every run of its rows failed before the "
-                             "fix. Lets `verify` retire its failures at a configuration that "
-                             "passes again")
-    update.add_argument("--ab", metavar="'off=F/L on=F/L build=SRCVERSION evidence=PATH'",
-                        help="the reproducer's failed/total laps with the fix off and on, on one "
-                             "build; FIXED needs every fix-off lap failed and no fix-on lap")
+    update.add_argument("--approval", help="the approved proposal a noblock impact or a narrower "
+                                           "reach needs")
 
     remove = subs.add_parser("remove", help="it is fixed or it was never real")
     remove.add_argument("id")
     disposition = remove.add_mutually_exclusive_group(required=True)
     disposition.add_argument("--fixed", action="store_true",
-                             help="FIXED AND VERIFIED: needs --reproducer and an --ab whose fix-off "
-                                  "arm failed every lap, and every named row passing on this build")
+                             help="FIXED AND VERIFIED: needs --control, --fixon, --cause and an "
+                                  "approval")
     disposition.add_argument("--disproved", action="store_true",
                              help="DISPROVED: direct evidence that it was not an MXFS defect")
     remove.add_argument("--why", required=True,
                         help="what was measured and what it said")
+    remove.add_argument("--control", help="the closed control batch that reproduced with the fix "
+                                          "taken out")
+    remove.add_argument("--fixon", help="the passed verification batch sized from that control")
+    remove.add_argument("--cause", help="the proven cause the fix targets")
+    remove.add_argument("--approval", help="the approved proposal")
 
-    verify = subs.add_parser("verify", help="a reproducible defect's rows pass again at one "
-                                            "configuration: retire its failures there")
+    verify = subs.add_parser("verify", help="a declared verification batch passed: the record "
+                                            "stops blocking that configuration on that candidate")
     verify.add_argument("id")
-    verify.add_argument("--at", dest="verify_at", metavar="CONFIGURATION", required=True,
-                        help="the configuration whose board passes again, e.g. 4/net/mesh/direct")
+    verify.add_argument("--batch", required=True, help="the verification batch")
+    verify.add_argument("--approval", help="the approved proposal")
+
+    def batch_options(sub, sized: bool):
+        sub.add_argument("id")
+        sub.add_argument("--row", required=True, help="the board row the laps run")
+        sub.add_argument("--at", dest="batch_at", metavar="CONFIGURATION", required=True)
+        sub.add_argument("--probe", help="kernel-log pattern showing a lap reached the trigger")
+        sub.add_argument("--candidate", help="the release candidate the laps run on")
+        sub.add_argument("--build", help="the build the laps run on, when not a candidate")
+        sub.add_argument("--platform", choices=PLATFORMS, help="the platform the laps run on")
+        sub.add_argument("--leaves-cluster", dest="leaves_cluster", action="store_true",
+                         help="the row leaves the cluster down: re-form it before every lap")
+        sub.add_argument("--support", action="append",
+                         help="a row the batch row needs in the same run (alloc_witness for "
+                              "chk_clean); recorded but not counted")
+        if not sized:
+            sub.add_argument("--kind", choices=("calibrate", "control"), required=True)
+            sub.add_argument("--runs", type=int, required=True,
+                             help="the number of laps, fixed before the first one")
+            sub.add_argument("--variant", help="how a control takes the fix out")
+            sub.add_argument("--why", help="what the batch is for")
+        else:
+            sub.add_argument("--control", help="size from this control batch's rate (fix-on arm)")
+            sub.add_argument("--transfer", help="why a rate measured at another configuration "
+                                                "carries over here")
+
+    batch = subs.add_parser("batch", help="declare a calibration or control batch")
+    batch_options(batch, False)
+    plan = subs.add_parser("plan-verify", help="declare a verification batch sized from the "
+                                               "record's measured rate")
+    batch_options(plan, True)
+
+    measure = subs.add_parser("measure", help="close a calibration or control batch: its rate")
+    measure.add_argument("id")
+    measure.add_argument("--batch", required=True)
+
+    check = subs.add_parser("batch-check", help="may this lap run? (run.sh asks before a lap)")
+    check.add_argument("batch")
+    check.add_argument("--row", required=True)
+    check.add_argument("--at", dest="batch_at", metavar="CONFIGURATION", required=True)
+    check.add_argument("--candidate")
+
+    propose = subs.add_parser("propose", help="ask for a decision that stops something blocking")
+    propose.add_argument("kind", choices=PROPOSAL_KINDS)
+    propose.add_argument("--record", help="the defect record")
+    propose.add_argument("--target", metavar="CONFIG:ROW:ISO",
+                         help="the board run (detector-defect, infra-proven)")
+    propose.add_argument("--batch", help="the verification batch (verify)")
+    propose.add_argument("--control")
+    propose.add_argument("--fixon")
+    propose.add_argument("--cause")
+    propose.add_argument("--objective", help="noblock: the performance objective it violates")
+    propose.add_argument("--assertions",
+                         help="noblock: the correctness assertions every named run completed")
+    propose.add_argument("--max-stall-s", dest="max_stall_s", type=float,
+                         help="noblock: the worst measured operation stall, seconds")
+    propose.add_argument("-N", "--nodes", type=int, help="narrow: the new smallest cluster")
+    propose.add_argument("-C", "--config", type=config_pattern, help="narrow: the new pattern")
+    propose.add_argument("-P", "--platform", choices=PLATFORMS, help="narrow: the new platform")
+    propose.add_argument("--argument", required=True, help="why, in full")
+    propose.add_argument("--evidence", action="append", required=True,
+                         help="a path in the tree the reviewer must read (repeat for each)")
+
+    review = subs.add_parser("review", help="the release-reviewer agent's verdict on a proposal")
+    review.add_argument("pid")
+    verdict = review.add_mutually_exclusive_group(required=True)
+    verdict.add_argument("--approve", action="store_true")
+    verdict.add_argument("--reject", action="store_true")
+    review.add_argument("--file", required=True, help="the review it wrote, in data/reviews/")
+
+    proposal = subs.add_parser("proposal", help="show a proposal")
+    proposal_subs = proposal.add_subparsers(dest="proposal_command", required=True)
+    proposal_show = proposal_subs.add_parser("show")
+    proposal_show.add_argument("pid")
 
     rename = subs.add_parser("rename", help="give an entry a new id; nothing else changes")
     rename.add_argument("id")
@@ -1185,9 +1784,16 @@ def main() -> int:
     args = parser.parse_args(lift_config(sys.argv)[1:])
     for missing in ("at", "release", "gate", "nodes", "config", "platform", "next_step", "summary",
                     "evidence", "id", "next", "impact", "impact_why", "cell", "collateral",
-                    "reproducer", "ab", "fixed", "disproved", "reproducible"):
+                    "reproducer", "fixed", "disproved", "approval", "control", "fixon", "cause"):
         if not hasattr(args, missing):
             setattr(args, missing, None)
+    if args.command == "propose":
+        return cmd_propose(args)
+    if args.command == "review":
+        take_lock()
+        return cmd_review(args)
+    if args.command == "proposal":
+        return cmd_proposal_show(args)
     #: BEFORE `load`, because the window that loses a record spans the read as well as the write.
     #: Read-only paths do not take it: `save` is atomic, so a reader sees the before or the after
     #: state and never a torn document, and making every listing contend for a lock would make the
@@ -1208,6 +1814,14 @@ def main() -> int:
         return cmd_rename(data, args)
     if args.command == "verify":
         return cmd_verify(data, args)
+    if args.command == "batch":
+        return cmd_batch(data, args)
+    if args.command == "measure":
+        return cmd_measure(data, args)
+    if args.command == "plan-verify":
+        return cmd_plan_verify(data, args)
+    if args.command == "batch-check":
+        return cmd_batch_check(data, args)
     if args.command == "migrate-config":
         return cmd_migrate_config(data, args)
     return cmd_list(data, args)
