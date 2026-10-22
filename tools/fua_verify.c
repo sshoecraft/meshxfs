@@ -9,7 +9,7 @@
  *
  * Usage on two nodes T1 and T2, sharing /dev/sda:
  *
- *   T1: ./fua_verify write /dev/sda <lba> <byte_pattern>
+ *   T1: ./fua_verify write /dev/sda <lba> <byte_pattern_hex>
  *   T2: ./fua_verify read  /dev/sda <lba>
  *
  * If FUA works, T2's read returns the written pattern.  If not,
@@ -183,7 +183,7 @@ usage:
 
     if (strcmp(op, "write") == 0) {
         if (argc < 5) goto usage;
-        int pattern = strtol(argv[4], NULL, 0);
+        int pattern = strtol(argv[4], NULL, 16);
         memset(buf, pattern & 0xff, lbs);
         /* Stamp a header so we can identify ours */
         snprintf((char *)buf, 64, "FUATEST pattern=0x%02x lba=%llu pid=%d\n",

@@ -9,6 +9,10 @@
 #   EXPECT_CPUS (default 2)  the guest must report this many CPUs, or nothing runs
 #   RUNS (default 5)         fio_perf runs per configuration; each field of the
 #                            yardstick is the median of them
+#   BLOCK_SIZE (default 512) the pool LUN's logical block size.  512 measures the
+#                            direct configurations, 4096 the direct4k ones on a
+#                            4K-native LUN (docs/4kn-support.md): native XFS on
+#                            a 4096-byte device is a different yardstick
 #
 # One run is not a yardstick.  The 2-vCPU capture of 0.90.39 ran native XFS
 # twice on the same node, LUN and workload, once per configuration, and read
@@ -29,7 +33,12 @@ NODE="${2:-test1}"
 EXPECT_CPUS="${EXPECT_CPUS:-2}"
 RUNS="${RUNS:-5}"
 [[ "$RUNS" =~ ^[1-9][0-9]*$ ]] || { echo "RUNS must be a positive integer (got '$RUNS')"; exit 2; }
-CONFIGS="net-mesh-direct disk-caw-direct"
+BLOCK_SIZE="${BLOCK_SIZE:-512}"
+case "$BLOCK_SIZE" in
+    512)  CONFIGS="net-mesh-direct disk-caw-direct" ;;
+    4096) CONFIGS="net-mesh-direct4k disk-caw-direct4k" ;;
+    *)    echo "BLOCK_SIZE must be 512 or 4096 (got '$BLOCK_SIZE')"; exit 2 ;;
+esac
 E="tests/evidence/xfs_baseline_$TAG.log"
 RD="tests/evidence/xfs_baseline_${TAG}_runs"
 mkdir -p "$RD"
@@ -46,23 +55,37 @@ for s in $CONFIGS; do
 done
 t0=$(date +%s)
 {
-    line=$(tools/lun_pool.sh alloc --owner $$ --what "yardstick capture $TAG" --size 20G "$NODE")
+    line=$(tools/lun_pool.sh alloc --owner $$ --what "yardstick capture $TAG" --size 20G \
+        --block-size "$BLOCK_SIZE" "$NODE")
     echo "$line"
     dev=$(sed -n 's/.* dev=\([^ ]*\).*/\1/p' <<<"$line")
-    MXFS_DEV=$dev ./run.sh 1/xfs prep_cluster; echo "=== rc=$? prep 1/xfs"
+    # 1/xfs with no MXFS_DEV formats run.sh's default device, the node's own
+    # boot disk: never run without the LUN the pool bound.
+    [ -n "$dev" ] || { echo "ABORT: the pool bound no LUN to $NODE"; exit 3; }
+    # The node the LUN was bound to, not run.sh's default test1: a capture on
+    # another node ran on whatever LUN that node held, or on no node at all.
+    MXFS_NODE_LIST=$NODE MXFS_DEV=$dev ./run.sh 1/xfs prep_cluster; echo "=== rc=$? prep 1/xfs"
     for s in $CONFIGS; do
         for ((i = 1; i <= RUNS; i++)); do
-            MXFS_DEV=$dev MXFS_TEST_ENV="XFS_BASELINE=/src/mxfs/$RD/$s.run$i.json" \
+            # The node writes its run to its own /tmp and the host fetches it:
+            # tests/evidence is a link to /mxfs/evidence, a directory only the
+            # host has, so a node writing through /src/mxfs/tests/evidence wrote
+            # nothing (fio_perf's write of it is silent), and a capture of 10
+            # runs that all passed kept 0 of them.
+            nodefile=/tmp/xfs_baseline_${TAG}_$s.run$i.json
+            MXFS_NODE_LIST=$NODE MXFS_DEV=$dev MXFS_TEST_ENV="XFS_BASELINE=$nodefile" \
                 ./run.sh 1/xfs fio_perf
             echo "=== rc=$? fio_perf 1/xfs -> $s run $i/$RUNS"
+            # only the JSON line: a login banner must never reach the yardstick
+            timeout 20 "$SSH" "$NODE" cat "$nodefile" 2>/dev/null | grep '^{' >"$RD/$s.run$i.json"
+            [ -s "$RD/$s.run$i.json" ] || echo "=== run $i of $s: no $nodefile on $NODE"
         done
     done
 } >>"$E" 2>&1
-# Each run's file is written by the run as root; the median goes into the
-# yardstick the boards read.
+# The median of the runs goes into the yardstick the boards read.
 for s in $CONFIGS; do
     for ((i = 1; i <= RUNS; i++)); do
-        sudo -n cat "$RD/$s.run$i.json" 2>/dev/null || cat "$RD/$s.run$i.json" 2>/dev/null
+        cat "$RD/$s.run$i.json" 2>/dev/null
         echo
     done | python3 -c '
 import json, statistics, sys

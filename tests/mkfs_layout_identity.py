@@ -11,7 +11,7 @@ image    formats IMAGE, a sparse file of SIZE_MIB MiB, through a loop device who
          fixed bytes is bound over /dev/urandom, from which it draws the filesystem uuid and
          the authority ledger's seed.  Two images formatted so by one binary are identical,
          so between two binaries every difference is the binaries'.  Any MKFS_ARG is passed
-         to mkfs before -f and the device (-L for a 4K-native format while that is TEST ONLY).
+         to mkfs before -f and the device.
 compare  every range of bytes in which two images differ, named by the region of the
          reference's MXFS envelope it lies in (and, in the XFS data area, by allocation
          group and block).  Identical images exit 0.

@@ -2247,6 +2247,20 @@ MODULE_PARM_DESC(b6_release_kept,
  * ifree_defer_drained, those the drain landed; ifree_defer_unlanded, those
  * that failed closed.
  */
+/*
+ * D-OPEN-EFI-DEATH-REPLAY-REFUSED-NOT-HELD-VICTIM-DOMAIN-QUARANTINED-2TCP: an
+ * inactivation whose tenure stamped a token released its grant with no
+ * clean-release marker (P-RELMARK-OWED), so when a held EFI kept that tenure's
+ * transactions in the replay window and the node died, the survivor could show
+ * neither a holder at death nor a clean release and refused the replay
+ * not-held.  inact_relmark 1 (default) publishes the marker before that
+ * release, with the core home and the device flushed (P-RELMARK-INACT); 0 is
+ * the same-build control, which releases unmarked as before.
+ */
+int mxfs_inact_relmark = 1;
+module_param_named(inact_relmark, mxfs_inact_relmark, int, 0644);
+MODULE_PARM_DESC(inact_relmark,
+		 "an inactivation whose tenure stamped a token publishes its clean-release marker before releasing its grant (1=default; 0=the same-build control)");
 int mxfs_ifree_defer_drain = 1;
 module_param_named(ifree_defer_drain, mxfs_ifree_defer_drain, int, 0644);
 MODULE_PARM_DESC(ifree_defer_drain,
@@ -2608,6 +2622,25 @@ int mxfs_dbg_iwr_merge_hold_ms = 20;
 module_param_named(dbg_iwr_merge_hold_ms, mxfs_dbg_iwr_merge_hold_ms, int, 0644);
 MODULE_PARM_DESC(dbg_iwr_merge_hold_ms,
 		 "DEBUG: how long a block held by dbg_iwr_merge_hold_n waits, in ms. Never enable in production.");
+/*
+ * DEBUG (D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS): a fixed
+ * hold catches a peer's write only when the peer happens to write the block
+ * inside it.  With dbg_iwr_merge_hold_peer_ms set, a held block instead waits
+ * until the block on the device no longer matches the image it read, which is
+ * a peer's swap of that block landing, so its own swap miscompares; or until
+ * this many ms, when no peer wrote it.  iwr_merge_hold_landed counts the holds
+ * a peer's swap ended.  0, the default, keeps the fixed hold.  Never in
+ * production.
+ */
+int mxfs_dbg_iwr_merge_hold_peer_ms;
+module_param_named(dbg_iwr_merge_hold_peer_ms, mxfs_dbg_iwr_merge_hold_peer_ms, int, 0644);
+MODULE_PARM_DESC(dbg_iwr_merge_hold_peer_ms,
+		 "DEBUG: a block held by dbg_iwr_merge_hold_n waits until a peer's swap of it lands, or at most this many ms (0=the fixed dbg_iwr_merge_hold_ms hold, the default). Never enable in production.");
+atomic_t mxfs_iwr_merge_hold_landed = ATOMIC_INIT(0);
+module_param_cb(iwr_merge_hold_landed, &mxfs_dbg_atomic_param_ops,
+		&mxfs_iwr_merge_hold_landed, 0644);
+MODULE_PARM_DESC(iwr_merge_hold_landed,
+		 "count of dbg_iwr_merge_hold_peer_ms holds that a peer's swap of the held block ended (write resets)");
 /*
  * D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, H-U6:
  * xfs_inactive_ifree released its predecessor pin (H-U1) and hold (H-U4) with

@@ -51,7 +51,13 @@ PORTAL_IP="${MXFS_SCST_PORTAL_IP:-192.168.120.1}"
 # NOTE: o_direct requires async=1 (SCST vdisk_attach rejects o_direct alone with
 # "using o_direct without setting async is not supported", -EINVAL) — matches the
 # sess26 proven combo (async=1; o_direct=1).
-DEVPARAMS="${MXFS_SCST_DEVPARAMS:-filename=$IMG; blocksize=512; async=1; o_direct=1}"
+# MXFS_SCST_BLOCKSIZE is the device's logical block size: 512, or 4096 for a
+# 4K-native LUN (docs/4kn-support.md; tools/lun_pool.sh create --block-size).
+# Like o_direct it is fixed at add_device: a device already registered keeps
+# the block size it was added with, and the caller checks it.
+BLOCKSIZE="${MXFS_SCST_BLOCKSIZE:-512}"
+case "$BLOCKSIZE" in 512|4096) ;; *) echo "FAIL: MXFS_SCST_BLOCKSIZE is 512 or 4096, not $BLOCKSIZE"; exit 2 ;; esac
+DEVPARAMS="${MXFS_SCST_DEVPARAMS:-filename=$IMG; blocksize=$BLOCKSIZE; async=1; o_direct=1}"
 
 SCST_ROOT=/sys/kernel/scst_tgt
 H="$SCST_ROOT/handlers/vdisk_fileio"

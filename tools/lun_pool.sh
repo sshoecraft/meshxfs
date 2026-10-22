@@ -44,10 +44,20 @@
 # SCST objects are runtime-only: after a clyde reboot run `up`, which
 # re-registers every image already in the pool.  Idempotent.
 #
+# BLOCK SIZE.  A LUN's logical block size is fixed when it is made: 512, or
+# 4096 for a 4K-native LUN (docs/4kn-support.md), recorded in <pool dir>/
+# lunNN.bs and handed to SCST as the device's blocksize.  A LUN made before the
+# pool recorded one has no lunNN.bs and is 512.  alloc hands out a LUN of the
+# block size it is asked for, 512 unless told otherwise, so a run on a 512-byte
+# attachment never lands on a 4K-native LUN or the other way round: the volume's
+# layout follows the device's block size, and a board on one says nothing about
+# the other.
+#
 # Usage:
-#   tools/lun_pool.sh create <count> [<size>]   add <count> LUNs (default 20G)
+#   tools/lun_pool.sh create <count> [<size>] [--block-size 512|4096]
+#                                               add <count> LUNs (default 20G, 512)
 #   tools/lun_pool.sh up                        register every pool image with SCST
-#   tools/lun_pool.sh alloc [--owner <pid>] [--what <text>] [--size <min>] [--paths 1|2] <node>...
+#   tools/lun_pool.sh alloc [--owner <pid>] [--what <text>] [--size <min>] [--paths 1|2] [--block-size 512|4096] <node>...
 #       --paths 2 logs every node in on the multipath portals (storage mpath=
 #       in the lab file: one portal per path, each on a storage network of its
 #       own, scripts/san_net.sh), applies tools/mpath_settings.sh, and hands
@@ -55,7 +65,7 @@
 #       reaches each portal through a different NIC, none of them the NIC its
 #       default route uses: two portals over one NIC are one path
 #       prints: POOL_LUN id=NN size=<bytes> target=<iqn> dev=<guest path>
-#                        wwid=<id> img=<host path> nodes=<a,b,..> owner=<pid>
+#                        wwid=<id> img=<host path> nodes=<a,b,..> owner=<pid> bs=<bytes>
 #       --also binds the LUN BESIDE the ones the same owner already holds on
 #       those nodes (single path only): the nodes keep their mounts, module
 #       and sessions, so one host can mount two filesystems.  A release
@@ -103,6 +113,7 @@ scstdev_of() { echo "mxfspool$1"; }
 img_of() { echo "$POOL/lun$1.img"; }
 owner_of() { echo "$POOL/lun$1.owner"; }
 paths_of() { cat "$POOL/lun$1.paths" 2>/dev/null || echo 1; }
+bs_of() { cat "$POOL/lun$1.bs" 2>/dev/null || echo 512; }  # the LUN's logical block size
 dev_of() {  # the guest device of an allocation: the by-path node, or the multipath map
     if [ "$(paths_of "$1")" = 2 ]; then echo /dev/mapper/mpatha
     else echo "/dev/disk/by-path/ip-$PORTAL:3260-iscsi-$(tgt_of "$1")-lun-0"; fi
@@ -216,13 +227,17 @@ register() {  # <id>: the SCST device and target exist, target has no default LU
     return $rc
 }
 register_writes() {  # <id>: register's writes, under scst_quiet_begin
-    local id=$1 tgt dev img g
-    tgt=$(tgt_of "$id"); dev=$(scstdev_of "$id"); img=$(img_of "$id")
+    local id=$1 tgt dev img g bs
+    tgt=$(tgt_of "$id"); dev=$(scstdev_of "$id"); img=$(img_of "$id"); bs=$(bs_of "$id")
     MXFS_SCST_IMG=$img MXFS_SCST_DEV=$dev MXFS_SCST_TGT=$tgt MXFS_SCST_PORTAL_IP="$PORTAL${MPLIST:+ $MPLIST}" \
+        MXFS_SCST_BLOCKSIZE=$bs \
         timeout 60 "$HERE/scripts/scst_setup.sh" setup | grep -E 'SCST_SETUP|FAIL' >/dev/null || return 1
-    # scst_setup.sh reuses a device of the same name whatever file it holds.
+    # scst_setup.sh reuses a device of the same name whatever file it holds,
+    # and whatever block size it was added with.
     g=$(sudo cat "/sys/kernel/scst_tgt/devices/$dev/filename" 2>/dev/null | head -1)
     [ "$g" = "$img" ] || { echo "lun_pool: SCST device $dev holds '$g', not $img" >&2; return 1; }
+    g=$(sudo cat "/sys/kernel/scst_tgt/devices/$dev/blocksize" 2>/dev/null | head -1)
+    [ "$g" = "$bs" ] || { echo "lun_pool: SCST device $dev has blocksize '$g', not lun$id's $bs" >&2; return 1; }
     g=$T/$tgt/ini_groups
     [ -d "$g/alloc" ] || echo "create alloc" | sudo tee "$g/mgmt" >/dev/null || return 1
     [ -d "$g/alloc/luns/0" ] || echo "add $dev 0" | sudo tee "$g/alloc/luns/mgmt" >/dev/null || return 1
@@ -284,6 +299,24 @@ NODE_UNMOUNT='
     done
     if grep -q " mxfs " /proc/mounts; then echo UNMOUNT_FAIL; exit 0; fi'
 
+# A login by hand on a node that booted with no node record leaves the
+# distribution's iSCSI login unit inactive (its condition is a non-empty node
+# directory), and that unit's stop is what logs every session out before the
+# network goes at shutdown.  With the unit inactive the session stayed up when
+# systemd took the network down; lvm2-monitor's stop then read the LUN through
+# the dead path and waited out the session's 120 s replacement timeout, so the
+# node overran lab_power.sh's 90 s shutdown bound and was destroyed
+# (tests/fourkn_lun_shutdown_probe.sh, tests/fourkn_lun.sh).  So every login
+# here starts the unit, and the bind requires it active: open-iscsi.service on
+# Debian, Ubuntu and Proxmox VE, iscsi.service on RHEL and its rebuilds.
+ISCSI_UNIT='
+            u=""
+            for c in open-iscsi.service iscsi.service; do
+                systemctl cat $c >/dev/null 2>&1 && { u=$c; break; }
+            done
+            [ -n "$u" ] && systemctl start $u >/dev/null 2>&1
+            unit="${u:-none}:$([ -n "$u" ] && systemctl is-active $u 2>/dev/null)"'
+
 NODE_LOGIN=$NODE_UNMOUNT'
     for t in 1 2 3 4 5; do lsmod | grep -q "^mxfs " || break; rmmod mxfs 2>/dev/null && break; sleep 2; done
     lsmod | grep -q "^mxfs " && { echo LOGIN_FAIL mxfs still loaded; exit 0; }
@@ -302,8 +335,8 @@ NODE_LOGIN=$NODE_UNMOUNT'
         iscsiadm -m session --rescan >/dev/null 2>&1
         sleep 2
         d=$(readlink -f DEVPATH 2>/dev/null)
-        if [ -b "$d" ]; then
-            echo "LOGIN_OK sessions=$(iscsiadm -m session 2>/dev/null | grep -c iqn) wwid=$(cat /sys/block/$(basename $d)/device/wwid 2>/dev/null | tr -d " ")"
+        if [ -b "$d" ]; then'"$ISCSI_UNIT"'
+            echo "LOGIN_OK sessions=$(iscsiadm -m session 2>/dev/null | grep -c iqn) wwid=$(cat /sys/block/$(basename $d)/device/wwid 2>/dev/null | tr -d " ") iscsi_unit=$unit"
             exit 0
         fi
         sleep 3
@@ -321,8 +354,8 @@ NODE_LOGIN_ALSO='
         iscsiadm -m session --rescan >/dev/null 2>&1
         sleep 2
         d=$(readlink -f DEVPATH 2>/dev/null)
-        if [ -b "$d" ]; then
-            echo "LOGIN_OK sessions=$(iscsiadm -m session 2>/dev/null | grep -c iqn) wwid=$(cat /sys/block/$(basename $d)/device/wwid 2>/dev/null | tr -d " ")"
+        if [ -b "$d" ]; then'"$ISCSI_UNIT"'
+            echo "LOGIN_OK sessions=$(iscsiadm -m session 2>/dev/null | grep -c iqn) wwid=$(cat /sys/block/$(basename $d)/device/wwid 2>/dev/null | tr -d " ") iscsi_unit=$unit"
             exit 0
         fi
         sleep 3
@@ -385,9 +418,9 @@ NODE_LOGIN_MP=$NODE_UNMOUNT'
     for t in $(seq 1 15); do
         multipath >/dev/null 2>&1
         n=$(multipath -ll mpatha 2>/dev/null | grep -cE "[0-9]+:[0-9]+:[0-9]+:[0-9]+ +sd[a-z]+ ")
-        if [ -b /dev/mapper/mpatha ] && [ "${n:-0}" -ge NPATHS ]; then
+        if [ -b /dev/mapper/mpatha ] && [ "${n:-0}" -ge NPATHS ]; then'"$ISCSI_UNIT"'
             sd=$(ls /sys/block/$(basename $(readlink -f /dev/mapper/mpatha))/slaves | head -1)
-            echo "LOGIN_OK paths=$n nics=$(echo $nics | tr " " ,) wwid=$(cat /sys/block/$sd/device/wwid 2>/dev/null | tr -d " ")"
+            echo "LOGIN_OK paths=$n nics=$(echo $nics | tr " " ,) wwid=$(cat /sys/block/$sd/device/wwid 2>/dev/null | tr -d " ") iscsi_unit=$unit"
             exit 0
         fi
         sleep 2
@@ -446,11 +479,20 @@ reclaim_stale() {  # under the pool lock: release every allocation whose owner i
 }
 
 pool_line() {  # <id> -> the POOL_LUN line for a held LUN
-    echo "POOL_LUN id=$1 size=$(lun_size "$1") target=$(tgt_of "$1") dev=$(dev_of "$1") wwid=$(cat "$POOL/lun$1.wwid" 2>/dev/null) img=$(img_of "$1") nodes=$(owner_field "$1" 3) owner=$(owner_field "$1" 1)"
+    echo "POOL_LUN id=$1 size=$(lun_size "$1") target=$(tgt_of "$1") dev=$(dev_of "$1") wwid=$(cat "$POOL/lun$1.wwid" 2>/dev/null) img=$(img_of "$1") nodes=$(owner_field "$1" 3) owner=$(owner_field "$1" 1) bs=$(bs_of "$1")"
 }
 
 cmd_create() {
-    local count=${1:?usage: create <count> [<size>]} size=${2:-$DEFAULT_SIZE} bytes id next img
+    local bs=512 args=()
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --block-size) bs=${2:?}; shift 2 ;;
+            -*) die "unknown option $1" ;;
+            *) args+=("$1"); shift ;;
+        esac
+    done
+    case "$bs" in 512|4096) ;; *) die "--block-size is 512 or 4096" ;; esac
+    local count=${args[0]:?usage: create <count> [<size>] [--block-size 512|4096]} size=${args[1]:-$DEFAULT_SIZE} bytes id next img
     [[ "$count" =~ ^[0-9]+$ ]] && [ "$count" -ge 1 ] || die "count must be a positive integer"
     bytes=$(numfmt --from=iec "$size" 2>/dev/null) || die "bad size $size"
     [ "$bytes" -ge $((1 << 30)) ] || die "size $size is under 1G"
@@ -465,8 +507,9 @@ cmd_create() {
         [ "$(( $(stat -c %b "$img") * $(stat -c %B "$img") ))" -ge "$bytes" ] \
             || die "$img is not fully allocated after fallocate"
         : > "$(owner_of "$id")"
+        echo "$bs" > "$POOL/lun$id.bs"
         register "$id" || die "lun$id: SCST registration failed"
-        echo "created lun$id $size $(tgt_of "$id") $img"
+        echo "created lun$id $size $bs-byte blocks $(tgt_of "$id") $img"
         next=$((next + 1)); count=$((count - 1))
     done
     pool_unlock
@@ -495,7 +538,7 @@ cmd_up() {
 }
 
 cmd_alloc() {
-    local owner=$PPID what="" min=0 paths=1 also=0 nodes=() id n held best="" bestsize=0 sz
+    local owner=$PPID what="" min=0 paths=1 also=0 bs=512 nodes=() id n held best="" bestsize=0 sz
     while [ "$#" -gt 0 ]; do
         case "$1" in
             --also) also=1; shift ;;
@@ -503,11 +546,13 @@ cmd_alloc() {
             --what) what=${2:?}; shift 2 ;;
             --size) min=$(numfmt --from=iec "${2:?}") || die "bad size $2"; shift 2 ;;
             --paths) paths=${2:?}; shift 2 ;;
+            --block-size) bs=${2:?}; shift 2 ;;
             -*) die "unknown option $1" ;;
             *) nodes+=("$1"); shift ;;
         esac
     done
     [ "${#nodes[@]}" -ge 1 ] || die "alloc needs at least one node"
+    case "$bs" in 512|4096) ;; *) die "--block-size is 512 or 4096" ;; esac
     case "$paths" in 1) ;; 2) [ "$(echo $MPLIST | wc -w)" -ge 2 ] || die "--paths 2 needs a portal per path on its own storage network: storage mpath=<ip>,<ip> in $MXFS_LAB (scripts/san_net.sh)" ;;
         *) die "--paths is 1 or 2" ;; esac
     [ "$also" = 1 ] && [ "$paths" = 2 ] && die "--also binds a single-path LUN only: the multipath map is always mpatha"
@@ -521,8 +566,8 @@ cmd_alloc() {
         if [ "$(owner_field "$id" 1)" = "$owner" ]; then
             # --also: the owner's own LUNs on these nodes stay, and another is added
             [ "$also" = 1 ] && continue
-            [ "$(owner_field "$id" 3)" = "$want" ] && [ "$(paths_of "$id")" = "$paths" ] \
-                || die "owner $owner already holds lun$id for [$(owner_field "$id" 3)] on $(paths_of "$id") path(s), not [$want] on $paths"
+            [ "$(owner_field "$id" 3)" = "$want" ] && [ "$(paths_of "$id")" = "$paths" ] && [ "$(bs_of "$id")" = "$bs" ] \
+                || die "owner $owner already holds lun$id for [$(owner_field "$id" 3)] on $(paths_of "$id") path(s) of $(bs_of "$id")-byte blocks, not [$want] on $paths of $bs"
             pool_unlock
             pool_line "$id"
             return 0
@@ -543,7 +588,7 @@ cmd_alloc() {
         # nodes logs them out of every target, so its owner file can name
         # nodes that no longer see it.
         if [ "$also" = 0 ] && [ ! -e "$POOL/lun$id.also" ] && [ "$(owner_field "$id" 3)" = "$want" ] && [ "$(lun_size "$id")" -ge "$min" ] \
-           && [ "$(paths_of "$id")" = "$paths" ] \
+           && [ "$(paths_of "$id")" = "$paths" ] && [ "$(bs_of "$id")" = "$bs" ] \
            && [ "$(ls "$T/$(tgt_of "$id")/ini_groups/alloc/initiators" 2>/dev/null | grep -vc '^mgmt$')" = "${#nodes[@]}" ] \
            && [ -s "$POOL/lun$id.wwid" ]; then
             echo "$claim" > "$(owner_of "$id")"
@@ -565,6 +610,7 @@ cmd_alloc() {
         best=""; bestsize=0
         for i in $(ids); do
             [ -s "$(owner_of "$i")" ] && continue
+            [ "$(bs_of "$i")" = "$bs" ] || continue
             s=$(lun_size "$i")
             [ "$s" -ge "$min" ] || continue
             if [ -z "$best" ] || [ "$s" -lt "$bestsize" ]; then best=$i; bestsize=$s; fi
@@ -574,14 +620,14 @@ cmd_alloc() {
     if [ -z "$best" ]; then
         # No free LUN: take back finished allocations, oldest first.
         for id in $(for i in $(ids); do [ -s "$(owner_of "$i")" ] && ! owner_live "$i" && echo "$(owner_field "$i" 4) $i"; done | sort | awk '{print $2}'); do
-            [ "$(lun_size "$id")" -ge "$min" ] || continue
+            [ "$(lun_size "$id")" -ge "$min" ] && [ "$(bs_of "$id")" = "$bs" ] || continue
             echo "lun_pool: lun$id: no free LUN; releasing the finished allocation $(cut -d' ' -f3- "$(owner_of "$id")")" >&2
             release "$id" || die "lun$id: the finished allocation was not released"
             break
         done
         pick_free
     fi
-    [ -n "$best" ] || die "no LUN of at least $(numfmt --to=iec "$min") is free (tools/lun_pool.sh status; tools/lun_pool.sh create 1 <size> adds one)"
+    [ -n "$best" ] || die "no LUN of at least $(numfmt --to=iec "$min") and $bs-byte blocks is free (tools/lun_pool.sh status; tools/lun_pool.sh create 1 <size> --block-size $bs adds one)"
     id=$best
     echo "$claim" > "$(owner_of "$id")"
     echo "$paths" > "$POOL/lun$id.paths"
@@ -609,6 +655,9 @@ cmd_alloc() {
             LOGIN_OK*)
                 w=$(sed -n 's/.* wwid=\([^ ]*\).*/\1/p' <<<"$line")
                 [ -n "$w" ] || { bad="$bad $n(no wwid)"; continue; }
+                case "$line" in *" iscsi_unit="*":active"*) ;;
+                    *) bad="$bad $n(logged in by hand with $(sed -n 's/.* iscsi_unit=\([^ ]*\).*/\1/p' <<<"$line"), so nothing logs it out before the network at shutdown)"; continue ;;
+                esac
                 [ -z "$wwid" ] && wwid=$w
                 [ "$w" = "$wwid" ] || bad="$bad $n(wwid=$w!=$wwid)" ;;
             *) bad="$bad $n(${line:-unreachable})" ;;
@@ -705,7 +754,7 @@ cmd_free() {
 cmd_status() {
     local id tgt state inis sess alloc
     [ -d "$POOL" ] || { echo "no pool at $POOL"; return 0; }
-    printf '%-6s %-7s %-9s %-6s %-30s %-5s %-5s %s\n' LUN SIZE ON-DISK STATE NODES INIS SESS OWNER
+    printf '%-6s %-7s %-9s %-5s %-6s %-30s %-5s %-5s %s\n' LUN SIZE ON-DISK BS STATE NODES INIS SESS OWNER
     for id in $(ids); do
         tgt=$T/$(tgt_of "$id")
         if [ ! -s "$(owner_of "$id")" ]; then state=free
@@ -718,8 +767,8 @@ cmd_status() {
             inis=-; sess=-; state="$state/unreg"
         fi
         alloc=$(( $(stat -c %b "$(img_of "$id")") * $(stat -c %B "$(img_of "$id")") ))
-        printf '%-6s %-7s %-9s %-6s %-30s %-5s %-5s %s\n' "lun$id" "$(numfmt --to=iec "$(lun_size "$id")")" \
-            "$(numfmt --to=iec --round=nearest "$alloc")" "$state" "$(owner_field "$id" 3)" "$inis" "$sess" \
+        printf '%-6s %-7s %-9s %-5s %-6s %-30s %-5s %-5s %s\n' "lun$id" "$(numfmt --to=iec "$(lun_size "$id")")" \
+            "$(numfmt --to=iec --round=nearest "$alloc")" "$(bs_of "$id")" "$state" "$(owner_field "$id" 3)" "$inis" "$sess" \
             "$(cut -d' ' -f1,4- "$(owner_of "$id")" 2>/dev/null)"
     done
 }
@@ -747,6 +796,7 @@ cmd_destroy() {
     unlink "$(owner_of "$id")" 2>/dev/null
     unlink "$POOL/lun$id.wwid" 2>/dev/null
     unlink "$POOL/lun$id.paths" 2>/dev/null
+    unlink "$POOL/lun$id.bs" 2>/dev/null
     pool_unlock
     echo "destroyed lun$id"
 }
@@ -770,5 +820,5 @@ case "${1:-}" in
     faults)  san_faults ;;  # what would hold a reconfiguration back now
     snapshot) shift; cmd_snapshot "$@" ;;
     destroy) shift; cmd_destroy "$@" ;;
-    *) echo "usage: $0 create <count> [<size>] | up | alloc [--owner <pid>] [--what <text>] [--size <min>] <node>... | lookup --owner <pid> | lookup --nodes <a,b,..> | free <id>|--owner <pid> [--force] | status | snapshot <id> <label> | destroy <id>" >&2; exit 2 ;;
+    *) echo "usage: $0 create <count> [<size>] [--block-size 512|4096] | up | alloc [--owner <pid>] [--what <text>] [--size <min>] [--paths 1|2] [--block-size 512|4096] <node>... | lookup --owner <pid> | lookup --nodes <a,b,..> | free <id>|--owner <pid> [--force] | status | snapshot <id> <label> | destroy <id>" >&2; exit 2 ;;
 esac

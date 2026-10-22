@@ -321,16 +321,11 @@ static time_t format_time(void)
 }
 
 /* The device's logical block size (BLKSSZGET; docs/4kn-support.md): 512, or 4096
- * for a 4K-native device formatted with -L.  It is the XFS sector size, and on a
- * larger block every 512-byte unit of a record region (journal, disklock, PR
- * registrants, bootstrap, slice lifecycle) gets a block of its own
- * (mxfs_rec_phys).  At 512 every layout below is the one this tool always wrote. */
+ * for a 4K-native device.  It is the XFS sector size, and on a larger block
+ * every 512-byte unit of a record region (journal, disklock, PR registrants,
+ * bootstrap, slice lifecycle) gets a block of its own (mxfs_rec_phys).  At 512
+ * every layout below is the one this tool always wrote. */
 static uint32_t dev_lbs = MXFS_REC_UNIT;
-
-/* TEST ONLY (-L): format a device with 4096-byte logical blocks.  4K-native
- * support is not complete: the module mounts such a volume only with
- * mxfs.dbg_lbs_mount=1, and only on one node. */
-static bool format_4kn;
 
 /* The filesystem blocks the four AG header sectors take: one at 512 (they share
  * block 0), four at 4096 (each a sector, and a sector is a block).  Everything
@@ -1970,7 +1965,7 @@ static const char *existing_signature(const char *device, char *buf, size_t bufl
 static void usage(const char *prog)
 {
     fprintf(stderr,
-            "Usage: %s [-f] [-c name] [-D] [-n count] [-d size] [-t entries] [-H version] [-L] [-v] [-V] [-Z] DEVICE\n"
+            "Usage: %s [-f] [-c name] [-D] [-n count] [-d size] [-t entries] [-H version] [-v] [-V] [-Z] DEVICE\n"
             "\n"
             "Format a block device for MXFS (Multinode XFS).\n"
             "\n"
@@ -1990,9 +1985,6 @@ static void usage(const char *prog)
             "              on a larger LUN.\n"
             "  -H VERSION  TEST ONLY: write authority-ledger routing VERSION\n"
             "              (1 or 2; default 2), to measure one module on both\n"
-            "  -L          TEST ONLY: format a device with 4096-byte logical\n"
-            "              blocks (4K-native support is not complete: the module\n"
-            "              mounts the volume only with dbg_lbs_mount=1, one node)\n"
             "  -v          Verbose output\n"
             "  -V          Print version and exit\n"
             "  -Z          TEST ONLY: do not zero the XFS log region (keeps a\n"
@@ -2031,13 +2023,10 @@ int main(int argc, char *argv[])
     uint32_t tauth_npages = 0;          /* -t: authority-ledger records, 0 = derive */
     uint64_t tauth_seed = 0;            /* per-format routing-hash seed */
 
-    while ((opt = getopt(argc, argv, "fc:Dn:d:t:H:LvVZ")) != -1) {
+    while ((opt = getopt(argc, argv, "fc:Dn:d:t:H:vVZ")) != -1) {
         switch (opt) {
         case 'f':
             force = true;
-            break;
-        case 'L':
-            format_4kn = true;
             break;
         case 'H':
             if (strcmp(optarg, "1") == 0) {
@@ -2185,11 +2174,11 @@ int main(int argc, char *argv[])
     }
 
     /*
-     * The device's logical block size decides the layout (docs/4kn-support.md).
-     * A volume is formatted for 512-byte blocks, or, TEST ONLY with -L until
-     * the module's 4K-native support is complete, for 4096-byte ones.  Any
-     * other device is refused before anything is written: on one the first
-     * write would fail (pwrite ... Invalid argument) and name no cause.
+     * The device's logical block size decides the layout (docs/4kn-support.md):
+     * a volume is formatted for 512-byte blocks (512e devices included) or for
+     * 4096-byte ones.  Any other device is refused before anything is written:
+     * on one the first write would fail (pwrite ... Invalid argument) and name
+     * no cause.
      */
     {
         int lbs = 0;
@@ -2200,15 +2189,14 @@ int main(int argc, char *argv[])
             close(fd);
             return 1;
         }
-        if (lbs == 4096 && format_4kn) {
-            dev_lbs = 4096;
-        } else if (lbs != 512) {
+        if (lbs != 512 && lbs != 4096) {
             pr_err("mkfs.mxfs: %s has %d-byte logical blocks; this version formats "
-                   "devices with 512-byte logical blocks only (512e devices included)\n",
-                   device, lbs);
+                   "devices with 512- or 4096-byte logical blocks only (512e devices "
+                   "included)\n", device, lbs);
             close(fd);
             return 1;
         }
+        dev_lbs = lbs;
     }
 
     close(fd);
@@ -2314,8 +2302,8 @@ int main(int argc, char *argv[])
     pr_info("  Device:     %s (%s)\n",
             device, human_size(device_size, hbuf, sizeof(hbuf)));
     if (dev_lbs > MXFS_REC_UNIT)
-        pr_info("  Logical blocks: %u bytes (TEST ONLY -L: each 512-byte record "
-                "unit in a block of its own, XFS sectors of %u)\n", dev_lbs, dev_lbs);
+        pr_info("  Logical blocks: %u bytes (each 512-byte record unit in a block "
+                "of its own, XFS sectors of %u)\n", dev_lbs, dev_lbs);
     pr_info("  MXFS super: 0 - %llu (4 KB)\n",
             (unsigned long long)(MXFS_SUPER_SIZE - 1));
     pr_info("  Journal:    %llu - %llu (%s, %u slots)\n",

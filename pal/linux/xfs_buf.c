@@ -4866,6 +4866,8 @@ extern atomic_t mxfs_iwr_merge_failed;
 extern atomic_t mxfs_iwr_merge_empty;
 extern atomic_t mxfs_dbg_iwr_merge_hold_n;
 extern int mxfs_dbg_iwr_merge_hold_ms;
+extern int mxfs_dbg_iwr_merge_hold_peer_ms;
+extern atomic_t mxfs_iwr_merge_hold_landed;
 
 /*
  * H-WW1 instrument (D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-
@@ -5399,6 +5401,44 @@ mxfs_merged_refuse(
 }
 
 /*
+ * DEBUG (dbg_iwr_merge_hold_n): hold a block between its read and its first
+ * swap, so a test can land a peer's write of the same block in between.  With
+ * dbg_iwr_merge_hold_peer_ms the hold lasts until the block on the device no
+ * longer matches the image read, which is a peer's swap of it landing, so the
+ * swap that follows miscompares; or until that bound, when no peer wrote the
+ * block.  Without it the hold is dbg_iwr_merge_hold_ms, whether a peer wrote
+ * or not.
+ */
+static void
+mxfs_merged_hold(
+	struct block_device	*bdev,
+	u64			off,
+	const u8		*img,
+	unsigned int		sectsize)
+{
+	int			peer_ms = READ_ONCE(mxfs_dbg_iwr_merge_hold_peer_ms);
+	unsigned long		end;
+	u8			*cur;
+
+	cur = peer_ms > 0 ? kmalloc(sectsize, GFP_NOIO) : NULL;
+	if (!cur) {
+		msleep(READ_ONCE(mxfs_dbg_iwr_merge_hold_ms));
+		return;
+	}
+	end = jiffies + msecs_to_jiffies(peer_ms);
+	do {
+		usleep_range(500, 1000);
+		if (mxfs_pal_scsi_read_fua_bdev(bdev, off >> BBSHIFT, cur, sectsize))
+			break;
+		if (memcmp(cur, img, sectsize)) {
+			atomic_inc(&mxfs_iwr_merge_hold_landed);
+			break;
+		}
+	} while (time_before(jiffies, end));
+	kfree(cur);
+}
+
+/*
  * THE MERGED WRITE (docs/4kn-support.md, "The inode cluster").  On a volume
  * whose sector holds several inodes the partial write below cannot write one
  * slot by itself: the device moves whole blocks.  For each block holding a
@@ -5466,7 +5506,8 @@ mxfs_merged_inode_write(
 			/* DEBUG: a test widens the window a peer's write lands in */
 			if (unlikely(!tries && atomic_read(&mxfs_dbg_iwr_merge_hold_n) > 0) &&
 			    atomic_dec_if_positive(&mxfs_dbg_iwr_merge_hold_n) >= 0)
-				msleep(READ_ONCE(mxfs_dbg_iwr_merge_hold_ms));
+				mxfs_merged_hold(bp->b_target->bt_bdev, off, img,
+						 sectsize);
 			rc = mxfs_pal_bdev_compare_and_write_block(
 					mp->m_mxfs_merge_dev, off, img,
 					img + sectsize);

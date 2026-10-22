@@ -45,7 +45,7 @@ be32() { od -An -tu4 --endian=big -j "$1" -N4 "$IMG" | tr -d ' \n'; }
 chk() { timeout 2 "$CHK" "$@" "$IMG"; }
 
 echo "=== chk_4kn_controls label=$LABEL chk=$CHK mkfs=$MKFS image=$IMG $(date -u +%FT%TZ) ==="
-tests/mkfs_layout_identity.py image "$MKFS" "$IMG" 4096 4096 -L > "$W/format.txt" 2>&1 || {
+tests/mkfs_layout_identity.py image "$MKFS" "$IMG" 4096 4096 > "$W/format.txt" 2>&1 || {
     echo "ABORT: the 4K-native format failed: $(tail -3 "$W/format.txt" | tr '\n' ' ')"; exit 2; }
 
 chk -v > "$W/clean.txt" 2>&1; rc=$?

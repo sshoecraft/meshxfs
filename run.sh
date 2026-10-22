@@ -88,10 +88,10 @@ if [ -n "$GROUP" ]; then
     # drbd is the group's two nodes with a pool LUN each, replicated by DRBD,
     # and is built by scripts/drbd_rig.sh before this run: the run is handed
     # /dev/drbd0 in MXFS_DEV and borrows nothing.
-    case "$CFG_ATTACH" in
+    case "$CFG_RIG_MODE" in
         direct|mpath) ;;
         drbd) [ "${MXFS_DEV:-}" = "$CFG_DEV_DEFAULT" ] || { echo "ERROR: $CONFIG runs on the DRBD device scripts/drbd_rig.sh builds; start it from there (MXFS_DEV=$CFG_DEV_DEFAULT)"; exit 2; } ;;
-        *) echo "ERROR: --group runs the direct, mpath and drbd attachments only; $CONFIG is $CFG_ATTACH"; exit 2 ;;
+        *) echo "ERROR: --group runs the direct, mpath and drbd attachments only (direct4k is direct on a 4K-native LUN); $CONFIG is $CFG_ATTACH"; exit 2 ;;
     esac
     GROUP_NODES=$("$REPO/tools/mxfs_lab.sh" group "$GROUP") || exit 2
     [ "$(wc -w <<<"$GROUP_NODES")" -eq "$N" ] || {
@@ -165,14 +165,15 @@ MNT="${MXFS_MOUNT:-/mnt/shared}"
 #   mpath  -> the multipathd-assembled map (2 paths).
 #   pass   -> the XML-wired guest disk (virsh target dev=sda).
 #   1/xfs  -> whatever LUN the live rig presents at sda (baseline only).
-# The direct attachment, and every --group run, has no fixed LUN: the run
-# borrows one from the pool (tools/lun_pool.sh) once it holds its nodes, and
-# DEV is that LUN's path.  MXFS_DEV still overrides, for a device the
-# operator chose (a bench target, say), and then nothing is borrowed.
+# The direct and mpath attachments (direct4k among them), and every --group
+# run, have no fixed LUN: the run borrows one of the attachment's block size
+# from the pool (tools/lun_pool.sh) once it holds its nodes, and DEV is that
+# LUN's path.  MXFS_DEV still overrides, for a device the operator chose (a
+# bench target, say), and then nothing is borrowed.
 DEV_DEFAULT="$CFG_DEV_DEFAULT"
 DEV="${MXFS_DEV:-$DEV_DEFAULT}"
 USE_POOL=0
-if [ -z "${MXFS_DEV:-}" ] && [ "$CFG_BASELINE" = 0 ] && { [ -n "$GROUP" ] || [ "$CFG_ATTACH" = direct ] || [ "$CFG_ATTACH" = mpath ]; }; then
+if [ -z "${MXFS_DEV:-}" ] && [ "$CFG_BASELINE" = 0 ] && { [ -n "$GROUP" ] || [ "$CFG_RIG_MODE" = direct ] || [ "$CFG_RIG_MODE" = mpath ]; }; then
     USE_POOL=1
     DEV=""
 fi
@@ -435,10 +436,11 @@ if [ "$USE_POOL" = 1 ]; then
         POOL_LINE=$("$REPO/tools/lun_pool.sh" lookup --owner "$MXFS_RUNLOCK_OWNER") \
             || { echo "ERROR: run.sh $MXFS_RUNLOCK_OWNER holds no pool LUN for this nested run to use"; exit 1; }
     else
-        POOL_PATHS=1; [ "$CFG_ATTACH" = mpath ] && POOL_PATHS=2
+        POOL_PATHS=1; [ "$CFG_RIG_MODE" = mpath ] && POOL_PATHS=2
         POOL_LINE=$("$REPO/tools/lun_pool.sh" alloc --owner $$ --size "$POOL_SIZE" --paths "$POOL_PATHS" \
+                    --block-size "$CFG_BLOCK_SIZE" \
                     --what "run.sh $CONFIG${GROUP:+ --group $GROUP} run_id=$RUN_ID" "${NODES[@]}") \
-            || { echo "ERROR: no pool LUN for [${NODES[*]}] (tools/lun_pool.sh status)"; exit 1; }
+            || { echo "ERROR: no pool LUN of $CFG_BLOCK_SIZE-byte blocks for [${NODES[*]}] (tools/lun_pool.sh status)"; exit 1; }
     fi
     pool_field() { sed -n "s/.* $1=\([^ ]*\).*/\1/p" <<<"$POOL_LINE"; }
     DEV=$(pool_field dev)
@@ -451,7 +453,7 @@ if [ "$USE_POOL" = 1 ]; then
     MXFS_POOL_LUN=$(pool_field id)
     [ -n "$DEV" ] && [ -n "$MXFS_LUN_WWID" ] || { echo "ERROR: unusable pool allocation: $POOL_LINE"; exit 1; }
     export MXFS_LUN_WWID MXFS_HOST_IMAGE_PATH MXFS_POOL_LUN
-    echo "--- pool: lun$MXFS_POOL_LUN ($POOL_SIZE class, $MXFS_LOG_SLICES log slices) for [${NODES[*]}] dev=$DEV wwid=$MXFS_LUN_WWID ---"
+    echo "--- pool: lun$MXFS_POOL_LUN ($POOL_SIZE class, $CFG_BLOCK_SIZE-byte blocks, $MXFS_LOG_SLICES log slices) for [${NODES[*]}] dev=$DEV wwid=$MXFS_LUN_WWID ---"
 fi
 
 # The REMOTE command's exit status must survive.  As a bare pipeline this
@@ -1585,9 +1587,12 @@ run_host() {  # name cat budget
         case "$host_wwid" in none) host_wwid="" ;; esac
     fi
     t0=$(date +%s)
+    # MXFS_TEST_ENV reaches a host row as it reaches a node row's command: the
+    # run records it as its variant, so a host row it never reached was
+    # recorded as varied without having varied.
     out=$(MXFS_NODES=$N MXFS_CONFIG=$CONFIG MXFS_CONFIG_SLUG=$CFG_SLUG MXFS_DEV="$DEV" MXFS_MNT="$MNT" \
           MXFS_RUN_ID=$RUN_ID MXFS_LUN_WWID="$host_wwid" \
-          timeout --kill-after=5 "$kill_budget" bash "$script" 2>&1); rc=$?
+          timeout --kill-after=5 "$kill_budget" env ${MXFS_TEST_ENV:-} bash "$script" 2>&1); rc=$?
     t1=$(date +%s); elapsed=$(( t1 - t0 ))
     line=$(echo "$out" | grep -E '^RESULT:' | tail -1)
     if [ -z "$line" ] && { [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; }; then

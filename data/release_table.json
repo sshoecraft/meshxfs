@@ -37,6 +37,19 @@
       "platform": "ubuntu2404"
     },
     {
+      "nodes": "2",
+      "attachment": "Shared 4K-native SAN LUN (4096-byte blocks), single path",
+      "configs": [
+        "2/disk/caw/direct4k"
+      ],
+      "boards": [
+        {
+          "config": "2/disk/caw/direct4k"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
       "nodes": "4",
       "attachment": "Shared SAN LUN, single path",
       "configs": [
@@ -190,6 +203,19 @@
       "boards": [
         {
           "config": "2/net/mesh/direct"
+        }
+      ],
+      "platform": "ubuntu2404"
+    },
+    {
+      "nodes": "2",
+      "attachment": "Shared 4K-native LUN (4096-byte blocks) over the TCP lock network, single path",
+      "configs": [
+        "2/net/mesh/direct4k"
+      ],
+      "boards": [
+        {
+          "config": "2/net/mesh/direct4k"
         }
       ],
       "platform": "ubuntu2404"

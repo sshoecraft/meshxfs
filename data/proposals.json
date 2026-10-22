@@ -52,6 +52,52 @@
         "date": "2026-10-21"
       },
       "applied": "2026-10-21"
+    },
+    {
+      "id": "P20261022-3473e9",
+      "kind": "exception",
+      "record": "D-DRBD-PAIR-WITHOUT-QDEVICE-OR-NODE-FENCE-P1-DOES-NOT-SURVIVE-P0-DEATH",
+      "change": {
+        "config": "2/net/mesh/drbd",
+        "candidate": "0.90.134"
+      },
+      "argument": "The owner was asked (2026-10-22, recorded verbatim as the last owner_approved entry of data/release_policy.json) to choose between approving an exception for this record in data/release_policy.json and holding 0.90.134 for the IPMI fence work. The owner answered 'leave the DRBD work for .135/.136': 0.90.134 does not wait for the DRBD fence work, so the record is excepted for 0.90.134 at 2/net/mesh/drbd only, the configuration it reaches. The policy's exceptions entry names exactly this record, 2/net/mesh/drbd and release 0.90.134. Nothing else about the record changes: it stays open with impact stability, reach 2 nodes */*/drbd, its evidence and its next step, and it blocks 2/net/mesh/drbd in every other release (tools/defects.py owner_exception and excepted_here: an excepted_at mark counts only for its candidate and only while the policy still grants it).",
+      "evidence": [
+        "data/release_policy.json",
+        "tools/defects.py",
+        "docs/release-process.md"
+      ],
+      "state": "rejected",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-3473e9.md",
+        "sha256": "5c67d4b1c58cb3480d5a5541ff8c6cf1c09a055eb931a6788990587929181c38",
+        "verdict": "rejected",
+        "date": "2026-10-22"
+      }
+    },
+    {
+      "id": "P20261022-c75127",
+      "kind": "verify",
+      "record": "D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C-NO-PACKAGE-CAN-BE-BUILT",
+      "change": {
+        "batch": "b20261022-1666e5"
+      },
+      "argument": "Verification batch b20261022-1666e5 was planned with plan-verify --control b20261022-f44545, sized from that control: with the fix reverted (tests/evidence/controls/D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C.fix.diff, sha256 02753e66...) the lap failed 20 of 20 exposed laps (lower bound 0.7673 at delta 0.005, so 4 clean laps). With the fix in (mxfs.c dropped from INPUTS in scripts/vm_package_build.sh:74, restored by hash after the control), all 4 planned laps passed with exposure=1 on build 2446C4C6401FC9D9224650F: each built mxfs_0.90.134_amd64.deb on debian12-1 (PKG_BUILD_OK, sha256 of each .deb in the log), no FAIL, no INCOMPLETE.",
+      "evidence": [
+        "tests/evidence/controls/pkg_control_20261022T181040Z.log",
+        "tests/evidence/controls/pkg_verify_20261022T181202Z.log",
+        "tests/evidence/controls/D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C.fix.diff",
+        "scripts/vm_package_build.sh"
+      ],
+      "state": "rejected",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-c75127.md",
+        "sha256": "3f9099623173471e14c7cec1b1791fa5ddd6aa9f71f265af8da561f658de8b95",
+        "verdict": "rejected",
+        "date": "2026-10-22"
+      }
     }
   ]
 }

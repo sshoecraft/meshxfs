@@ -51,6 +51,14 @@ Read the thresholds from `data/release_policy.json` (`stall_limit_s`, `delta`, `
   that control, passed every lap with exposure.
 - **remove --disproved**: direct evidence that the reported behaviour was not an MXFS
   defect.
+- **exception** (the owner let an open record stop blocking one configuration in one
+  release): `data/release_policy.json` `exceptions` names exactly this record, this
+  configuration and this release, and an `owner_approved` entry records the question the
+  owner was asked and the owner's answer in the owner's own words. The answer, read
+  against that question, must decide this record for this release; an exception the
+  question never put to the owner is not covered by it, whatever the policy entry says.
+  The record must stay in the queue with its impact, reach and evidence unchanged. You do
+  not judge whether the exception is wise; you judge whether the owner granted it.
 
 ## What you write
 

@@ -1,5 +1,5 @@
 {
-  "_": "What a configuration is: <nodes>/<class>/<method>/<attach>, e.g. 8/net/mesh/direct. tools/configuration.py is the only thing that parses one; everything else asks it. The design is docs/attachment-methods.md. A value with implemented=false is a real method or attachment MXFS does not have yet; it is named here so the grammar has a place for it, and a configuration using it is refused until it exists. The native-XFS baseline is not a configuration of MXFS and is spelled 1/xfs.",
+  "_": "What a configuration is: <nodes>/<class>/<method>/<attach>, e.g. 8/net/mesh/direct. An attachment names the logical block size of the LUN it reaches (block_size): direct is a 512-byte LUN, direct4k a 4K-native one. tools/configuration.py is the only thing that parses one; everything else asks it. The design is docs/attachment-methods.md. A value with implemented=false is a real method or attachment MXFS does not have yet; it is named here so the grammar has a place for it, and a configuration using it is refused until it exists. The native-XFS baseline is not a configuration of MXFS and is spelled 1/xfs.",
   "classes": {
     "net": {
       "doc": "lock state is held in node memory and exchanged over the interconnect"
@@ -44,24 +44,35 @@
     "direct": {
       "implemented": true,
       "rig_mode": "direct",
+      "block_size": 512,
       "device": "/dev/disk/by-path/ip-192.168.120.1:3260-iscsi-iqn.2026-05.local.mxfs:shared-lun-0",
       "doc": "each node's own initiator, one path: an in-guest iSCSI login to the rig's SCST target on one portal"
+    },
+    "direct4k": {
+      "implemented": true,
+      "rig_mode": "direct",
+      "block_size": 4096,
+      "device": "/dev/disk/by-path/ip-192.168.120.1:3260-iscsi-iqn.2026-05.local.mxfs:fourkn-01-lun-0",
+      "doc": "as direct, on a LUN of 4096-byte logical blocks (a 4K-native LUN, docs/4kn-support.md): each node's own initiator, one path, an in-guest iSCSI login to a pool LUN the rig's SCST target exports with blocksize=4096. The block size is part of the attachment because the volume's layout follows it: mkfs puts every 512-byte record unit in a block of its own and the XFS sector is 4096, so a board on a 512-byte LUN says nothing about one on a 4K-native LUN"
     },
     "mpath": {
       "implemented": true,
       "rig_mode": "mpath",
+      "block_size": 512,
       "device": "/dev/mapper/mpatha",
       "doc": "each node's own initiator over two or more paths, assembled by dm-multipath"
     },
     "pass": {
       "implemented": true,
       "rig_mode": "pass",
+      "block_size": 512,
       "device": "/dev/sda",
       "doc": "the hypervisor's initiator; the disk is passed into the VM as a SCSI LUN"
     },
     "drbd": {
       "implemented": false,
       "rig_mode": "drbd",
+      "block_size": 512,
       "own_rig": true,
       "device": "/dev/drbd0",
       "doc": "DRBD dual-primary replica of two local disks, admitted by its witness and fenced by its own proof profile instead of SCSI reservations (docs/attachment-methods.md). Released in 0.90.41 as 2/net/mesh/drbd, withdrawn on 2026-10-06 after it failed under eight concurrent VM installs on two physical Proxmox VE 9 hosts, released again in 0.90.107. The 'own_rig' flag says the attachment is verified by its own rig and board (scripts/drbd_rig.sh, MXFS_OWN_RIG=1) and is not a column of data/criteria.json or an entry of release_matrix; it says nothing about release status",
@@ -70,6 +81,7 @@
     "shared": {
       "implemented": false,
       "rig_mode": "shared",
+      "block_size": 512,
       "own_rig": true,
       "device": "/dev/disk/by-id/wwn-0x6000c2952d4cf17b9c6f50c882f9dda9",
       "doc": "a disk two VMs share through the hypervisor with no reservation fence MeshXFS can use (a vSphere multi-writer VMDK, which forwards no SCSI arbitration, or a physical-mode RDM, whose reservation key ESXi drops when it powers the VM off): two nodes, the network lock manager, compare-and-swap emulated on the disk, and a node fenced by its boot ending (fence=vcenter or fence=manual) instead of by the storage (docs/shared-disk-attachment.md). The devices are the lab VMDK and the cross-host RDM on vstest1/vstest2. The 'own_rig' flag says it is verified by its own harness (tests/vsphere_shared_fence.sh, MXFS_OWN_RIG=1) and is not a column of data/criteria.json or an entry of release_matrix"
@@ -104,7 +116,9 @@
     "2/net/mesh/mpath",
     "4/net/mesh/mpath",
     "8/net/mesh/mpath",
-    "16/net/mesh/mpath"
+    "16/net/mesh/mpath",
+    "2/disk/caw/direct4k",
+    "2/net/mesh/direct4k"
   ],
   "released_earlier": {
     "_": "Configurations an earlier release claimed that the current one does not: each was verified on the version named, and open records in the defect queue that cross the release bar reach it now (tools/defects.py <configuration> --release), so it is not re-verified or claimed until they are fixed. tools/release_text_check.py requires the README to list exactly these, with that version. 8/16 net/mesh/direct and 2-16 net/mesh/mpath were here from 0.90.51 until 0.90.130 verified them again. 2/net/mesh/direct and 2/net/mesh/mpath are claimed again by 0.90.131 (the packaged default is the network lock manager, and every platform row is graded on 2/net/mesh/direct); 4, 8 and 16/net/mesh/direct and 4/net/mesh/mpath are claimed again by 0.90.132. A net/mesh configuration still listed here is one an open record that crosses the release bar reaches. 8 and 16/net/mesh/mpath were left out of 0.90.132 only and are claimed again by 0.90.134 (owner, 2026-10-21): an entry here is a decision about one release, but nothing here names that release, so it stays in force for every later version until it is removed."

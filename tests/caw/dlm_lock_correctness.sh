@@ -14,6 +14,13 @@
 # runtime from the device's own super via chk_mxfs -v; if it cannot be derived
 # we SKIP rather than ever write a guessed LBA.
 #
+# caw_verify and fua_verify take the LBA in the device's own logical blocks
+# (BLKSSZGET).  On a 4K-native LUN mkfs leaves a block of its own before the
+# disklock region for exactly this (docs/4kn-support.md), so the LBA is
+# disklock_offset / L - 1 for the device's block size L, 512 or 4096.  Read
+# as 512-byte units on a 4096-byte LUN it would land eight times as far in,
+# inside the mounted volume.
+#
 # This test used to `umount $MNT` first and scribble a hardcoded LBA 40GiB in
 # (inside the XFS data area).  That unmount, running as the LAST test of every
 # caw rung, silently left node1 without the cluster FS while the cluster
@@ -41,8 +48,10 @@ if [ -z "$LBA" ]; then
     chkout=$("$CHK" --geometry "$DEV" 2>&1)
     chkrc=$?
     dloff=$(printf '%s\n' "$chkout" | sed -n 's/.*disklock_offset=\([0-9][0-9]*\).*/\1/p' | head -1)
-    if [ -n "$dloff" ] && [ "$dloff" -ge 4608 ] 2>/dev/null; then
-        LBA=$(( dloff / 512 - 1 ))
+    lbs=$(blockdev --getss "$DEV" 2>/dev/null)
+    case "$lbs" in 512|4096) ;; *) emit FAIL setup "the logical block size of $DEV reads '$lbs', not 512 or 4096"; exit 1 ;; esac
+    if [ -n "$dloff" ] && [ "$dloff" -ge 4608 ] 2>/dev/null && [ $(( dloff % lbs )) = 0 ]; then
+        LBA=$(( dloff / lbs - 1 ))
     else
         emit SKIP "scratch=underivable chk_rc=$chkrc" "no readable MXFS super on $DEV — refusing to write a guessed LBA; checker said: $(printf '%s\n' "$chkout" | head -4 | tr '\n' '|' | cut -c1-300)"
         exit 0
@@ -65,7 +74,7 @@ fua=fail
 caw=fail
 "$CAW" write "$DEV" "$LBA" cd >/dev/null 2>&1 && "$CAW" read "$DEV" "$LBA" cd >/dev/null 2>&1 && caw=ok
 
-measured="fua=$fua caw=$caw lba=$LBA"
+measured="fua=$fua caw=$caw lba=$LBA lbs=${lbs:-unknown}"
 if [ "$fua" = ok ] && [ "$caw" = ok ]; then
   emit PASS "$measured"
 else

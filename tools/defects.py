@@ -199,7 +199,7 @@ FIELDS = {"severity": "s", "summary": "m", "next": "n", "evidence": "w",
 #: happened. Measured 2026-09-17 on a copy of the real ledger.
 LOCK = LEDGER.with_name(".defects.lock")
 MUTATORS = ("add", "update", "remove", "verify", "rename", "migrate-config", "batch", "measure",
-            "plan-verify", "propose", "review")
+            "plan-verify", "propose", "review", "except")
 
 #: A save measures ~6 ms on the real 858 KB ledger, so anything still holding the lock after this
 #: long is wedged rather than busy, and saying so beats blocking a session forever.
@@ -207,12 +207,12 @@ LOCK_WAIT_SECONDS = 30
 
 #: For `lift_config` only: what a leading bare configuration must not be mistaken for.
 SUBCOMMANDS = ("show", "add", "update", "remove", "verify", "rename", "migrate-config", "batch",
-               "measure", "plan-verify", "batch-check", "propose", "review", "proposal")
+               "measure", "plan-verify", "batch-check", "propose", "review", "proposal", "except")
 VALUE_FLAGS = ("-s", "--severity", "--at", "--candidate")
 
 ORDERED = ("id", "severity", "nodes", "config", "platform", "opened", "updated", "summary",
            "evidence", "next", "cells", "collateral", "reproducer", "ab", "reproducible",
-           "verified_at", "batches", "rates")
+           "verified_at", "excepted_at", "batches", "rates")
 
 #: What a declared batch of laps is for. A calibration measures the defect's rate on the build
 #: that has it; a control measures it with the fix taken out of the candidate; a verification
@@ -221,7 +221,7 @@ BATCH_KINDS = ("calibrate", "control", "verify")
 
 #: What a proposal can ask for. Each is a decision that stops a defect, or a failure, blocking.
 PROPOSAL_KINDS = ("noblock", "narrow", "verify", "remove-fixed", "remove-disproved",
-                  "detector-defect", "infra-proven")
+                  "detector-defect", "infra-proven", "exception")
 
 
 #: The open lock file, kept for the process's lifetime so the lock is held until it exits. Nothing
@@ -347,7 +347,37 @@ def blocks(entry: dict, nodes: int, selector: tuple, platform=None, candidate: s
     #: verified at.
     if verified_here(entry, configuration.selector_label(nodes, selector), platform, candidate):
         return False
+    #: The owner's exception, applied through a reviewed proposal, lets an open record stop
+    #: blocking one configuration in one release. It blocks everything else it reaches.
+    if excepted_here(entry, configuration.selector_label(nodes, selector), candidate):
+        return False
     return configuration.overlaps(pattern, selector)
+
+
+def owner_exception(record: str, config: str, release: str):
+    """The exception in data/release_policy.json (`exceptions`, each one recorded with the owner's
+    words in `owner_approved`) that lets `record` stop blocking `config` in `release`, or None.
+    Only the owner writes one; a reviewed `exception` proposal applies it to the record."""
+    if not (record and config and release):
+        return None
+    for granted in board_tool().policy().get("exceptions") or []:
+        if (isinstance(granted, dict) and granted.get("release") == release
+                and record in (granted.get("records") or [])
+                and config in (granted.get("configs") or [])):
+            return granted
+    return None
+
+
+def excepted_here(entry: dict, config: str, candidate: str = "") -> bool:
+    """Was the owner's exception for this record applied at exactly `config` for `candidate`, and
+    does the policy still grant it? Without a candidate nothing is excepted: a development view
+    shows every record that reaches it."""
+    if not candidate:
+        return False
+    marks = [v for v in entry.get("excepted_at") or []
+             if isinstance(v, dict) and v.get("config") == config
+             and v.get("candidate") == candidate and v.get("approval")]
+    return bool(marks) and owner_exception(entry.get("id", ""), config, candidate) is not None
 
 
 #: This tree's mxfs.ko srcversion, read once per process.
@@ -584,6 +614,11 @@ def show_one(entry: dict) -> None:
                 print("  %-10s %s on build %s (%s): a single pass from before batches; it no "
                       "longer clears anything" % ("verified", mark.get("config"), mark.get("build"),
                                                   mark.get("date")))
+    for mark in entry.get("excepted_at") or []:
+        if isinstance(mark, dict):
+            print("  %-10s %s in %s (owner's exception, proposal %s, %s): does not block it there"
+                  % ("excepted", mark.get("config"), mark.get("candidate"), mark.get("approval"),
+                     mark.get("date")))
     for rate in entry.get("rates") or []:
         print("  %-10s %s at %s: %d of %d laps failed (batch %s, %s %s)"
               % ("rate", rate.get("row"), rate.get("config"), rate.get("k", 0), rate.get("n", 0),
@@ -1249,7 +1284,7 @@ def cmd_propose(args) -> int:
     data = load()
     change: dict = {}
     record = None
-    if args.kind in ("noblock", "narrow", "verify", "remove-fixed", "remove-disproved"):
+    if args.kind in ("noblock", "narrow", "verify", "remove-fixed", "remove-disproved", "exception"):
         if not args.record:
             sys.exit("defects: a %s proposal names the record (--record)" % args.kind)
         record = find(data, args.record)["id"]
@@ -1285,6 +1320,14 @@ def cmd_propose(args) -> int:
         cell = parse_cell(args.target, False)
         check_cells([cell])
         change = {"config": cell["config"], "row": cell["row"], "iso": cell["iso"]}
+    elif args.kind == "exception":
+        if not (args.exception_at and args.candidate):
+            sys.exit("defects: an exception proposal names the configuration (--at) and the "
+                     "release (--candidate)")
+        if owner_exception(record, args.exception_at, args.candidate) is None:
+            sys.exit("defects: data/release_policy.json grants no exception for %s at %s in %s; "
+                     "only the owner grants one" % (record, args.exception_at, args.candidate))
+        change = {"config": args.exception_at, "candidate": args.candidate}
     if not str(args.argument or "").strip() or not args.evidence:
         sys.exit("defects: a proposal needs --argument (why) and at least one --evidence path")
     missing = [p for p in args.evidence if not (ROOT / p).exists()]
@@ -1301,6 +1344,32 @@ def cmd_propose(args) -> int:
     print("proposal %s (%s%s) is pending review. Have the release-reviewer agent review it:\n"
           "  Agent(subagent_type=release-reviewer, prompt=\"Review proposal %s.\")"
           % (pid, args.kind, " of " + record if record else "", pid))
+    return 0
+
+
+def cmd_except(data: dict, args) -> int:
+    """The owner's exception, applied: the record stops blocking one configuration in one release.
+
+    The owner grants it in data/release_policy.json, with the question and the answer; the
+    release-reviewer checks that the proposal applies exactly that, and nothing else changes. The
+    record stays open with its impact and reach, blocks every other configuration and release it
+    reaches, and blocks this one again if the policy stops granting the exception."""
+    entry = find(data, args.id)
+    if owner_exception(entry["id"], args.except_at, args.candidate) is None:
+        sys.exit("defects: data/release_policy.json grants no exception for %s at %s in %s"
+                 % (entry["id"], args.except_at, args.candidate))
+    approval = require_approval(args.approval, "exception", entry["id"],
+                                {"config": args.except_at, "candidate": args.candidate})
+    entry["excepted_at"] = [v for v in entry.get("excepted_at") or []
+                            if not (isinstance(v, dict) and v.get("config") == args.except_at
+                                    and v.get("candidate") == args.candidate)]
+    entry["excepted_at"].append({"config": args.except_at, "candidate": args.candidate,
+                                 "approval": approval["proposal"],
+                                 "date": date.today().isoformat()})
+    entry["updated"] = date.today().isoformat()
+    save(data)
+    print("%s does not block %s in %s: the owner's exception, applied by %s. The record stays open."
+          % (entry["id"], args.except_at, args.candidate, approval["proposal"]))
     return 0
 
 
@@ -1756,6 +1825,9 @@ def main() -> int:
     propose.add_argument("-N", "--nodes", type=int, help="narrow: the new smallest cluster")
     propose.add_argument("-C", "--config", type=config_pattern, help="narrow: the new pattern")
     propose.add_argument("-P", "--platform", choices=PLATFORMS, help="narrow: the new platform")
+    propose.add_argument("--at", dest="exception_at", metavar="CONFIGURATION",
+                         help="exception: the configuration the owner's exception names")
+    propose.add_argument("--candidate", help="exception: the release it is granted for")
     propose.add_argument("--argument", required=True, help="why, in full")
     propose.add_argument("--evidence", action="append", required=True,
                          help="a path in the tree the reviewer must read (repeat for each)")
@@ -1766,6 +1838,13 @@ def main() -> int:
     verdict.add_argument("--approve", action="store_true")
     verdict.add_argument("--reject", action="store_true")
     review.add_argument("--file", required=True, help="the review it wrote, in data/reviews/")
+
+    excepted = subs.add_parser("except", help="apply the owner's exception: the record stops "
+                                              "blocking one configuration in one release")
+    excepted.add_argument("id")
+    excepted.add_argument("--at", dest="except_at", metavar="CONFIGURATION", required=True)
+    excepted.add_argument("--candidate", required=True, help="the release it is granted for")
+    excepted.add_argument("--approval", help="the approved exception proposal")
 
     proposal = subs.add_parser("proposal", help="show a proposal")
     proposal_subs = proposal.add_subparsers(dest="proposal_command", required=True)
@@ -1822,6 +1901,8 @@ def main() -> int:
         return cmd_plan_verify(data, args)
     if args.command == "batch-check":
         return cmd_batch_check(data, args)
+    if args.command == "except":
+        return cmd_except(data, args)
     if args.command == "migrate-config":
         return cmd_migrate_config(data, args)
     return cmd_list(data, args)

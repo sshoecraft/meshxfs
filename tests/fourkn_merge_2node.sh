@@ -36,6 +36,15 @@
 # write of the same block to land in between.  The MISCOMPARE that follows is
 # a real peer's write, and the retry must keep it.  HOLD_N=0 runs unwidened.
 #
+# A fixed hold catches the peer only when the peer happens to write the block
+# inside it: of four laps held 20 ms, one saw no MISCOMPARE and was VACUOUS
+# (D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS).  HOLD_PEER_MS
+# (dbg_iwr_merge_hold_peer_ms) makes each held block wait instead until the
+# block on the device no longer matches the image it read, which is the peer's
+# swap of it landing, or HOLD_PEER_MS at most: the swap that follows is then a
+# MISCOMPARE whenever the peer wrote the block at all.  iwr_merge_hold_landed
+# counts the holds a peer's swap ended.  HOLD_PEER_MS=0 keeps the fixed hold.
+#
 # Bounds, from what each step should take: insmod 30 s, mkfs 300 s, mount and
 # umount as tests/fourkn_mount_probe.sh (120 s, 60 s); the 64 creates 10 s of
 # ssh connect plus well under a second.  The workload: per round a node makes
@@ -46,17 +55,16 @@
 # ~130 ms a round, 2.6 s for 20 rounds, 2x that is 6 s, plus 10 s of ssh
 # connect: 16 s.  Measured unwidened: 5.9-7.9 s of workload a node.  Each held
 # block can keep a worker of either node waiting its HOLD_MS, so the bound
-# adds 2 x HOLD_N x HOLD_MS.  chk_mxfs of a 20 GiB 4K-native volume over
-# iSCSI 60 s.
+# adds 2 x HOLD_N x HOLD_MS, or 2 x HOLD_N x HOLD_PEER_MS for holds that wait
+# for the peer.  chk_mxfs of a 20 GiB 4K-native volume over iSCSI 60 s.
 #
-# Usage: [MXFS_CONFIG=<configuration>] [ROUNDS=20] [NF=64] [HOLD_N=64] [HOLD_MS=20] tests/fourkn_merge_2node.sh <dev> <node1> <node2>
+# Usage: [MXFS_CONFIG=<configuration>] [ROUNDS=20] [NF=64] [HOLD_N=64] [HOLD_MS=20] [HOLD_PEER_MS=0] tests/fourkn_merge_2node.sh <dev> <node1> <node2>
 # The module is loaded with the rig's parameters, as tests/setup/prep_node.sh
 # loads it for MXFS_CONFIG's transport (2/net/mesh/direct, the TCP lock
 # network, when unset; 2/disk/caw/direct for COMPARE AND WRITE): the transport
 # and the target's durability-domain declaration (tests/lib/rig.sh
-# mxfs_rig_modargs), log_repeat_limit=0 and dyndbg=+p, MXFS_EXTRA_MODARGS, and
-# dbg_lbs_mount=1 while 4K-native mounts are TEST ONLY.  A bare insmod without
-# them left target_cache_protected=0, and the first mount was refused
+# mxfs_rig_modargs), log_repeat_limit=0 and dyndbg=+p, and MXFS_EXTRA_MODARGS.
+# A bare insmod without them left target_cache_protected=0, and the first mount was refused
 # (P-DOMAIN-REFUSED: fua_disable=1 with target_cache_protected=0), so each is
 # read back from /sys/module/mxfs/parameters before anything is formatted.
 # The module is copied to the node and loaded only when its md5 matches the
@@ -74,18 +82,20 @@ MXFS_CONFIG=${MXFS_CONFIG:-2/net/mesh/direct}
 RIGARGS=$(mxfs_rig_modargs) || { echo "ABORT the rig's module arguments for $MXFS_CONFIG cannot be derived (tests/lib/rig.sh mxfs_rig_modargs)"; exit 2; }
 FT=$(sed -n 's/.*force_transport=\([01]\).*/\1/p' <<<"$RIGARGS")
 [ -n "$FT" ] || { echo "ABORT no force_transport in the rig's module arguments [$RIGARGS]"; exit 2; }
-MODARGS="$RIGARGS log_repeat_limit=0 dyndbg=+p ${MXFS_EXTRA_MODARGS:-} dbg_lbs_mount=1"
+MODARGS="$RIGARGS log_repeat_limit=0 dyndbg=+p ${MXFS_EXTRA_MODARGS:-}"
 KOMD5=$(md5sum < "$HERE/mxfs.ko" | cut -d' ' -f1)
 ROUNDS=${ROUNDS:-20}
 NF=${NF:-64}
 HOLD_N=${HOLD_N:-64}
 HOLD_MS=${HOLD_MS:-20}
-WBOUND=$(( 16 + (2 * HOLD_N * HOLD_MS + 999) / 1000 ))
+HOLD_PEER_MS=${HOLD_PEER_MS:-0}
+HOLD_EACH=$HOLD_MS; [ "$HOLD_PEER_MS" -gt 0 ] && HOLD_EACH=$HOLD_PEER_MS
+WBOUND=$(( 16 + (2 * HOLD_N * HOLD_EACH + 999) / 1000 ))
 NREPO=/src/$(basename "$HERE")
 MNT=/mnt/fourkn
 DIR=$MNT/merge
 P=/sys/module/mxfs/parameters
-CTRS="iwr_merge_blocks iwr_merge_miscompares iwr_merge_failed iwr_merge_empty"
+CTRS="iwr_merge_blocks iwr_merge_miscompares iwr_merge_failed iwr_merge_empty iwr_merge_hold_landed"
 SV=$(modinfo -F srcversion "$HERE/mxfs.ko")
 MARK="FOURKN-MERGE-$(date -u +%Y%m%dT%H%M%SZ)"
 OUT=$HERE/tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_fourkn_merge_$(tr / - <<<"$MXFS_CONFIG")
@@ -117,17 +127,21 @@ step "OK host preflight: $(tail -1 "$OUT/preflight.txt")"
 for n in "$N1" "$N2"; do
     on "$n" "echo $MARK > /dev/kmsg" 10 >/dev/null
     on "$n" "mountpoint -q /src || { mkdir -p /src; timeout 30 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp,rsize=1048576,wsize=1048576; }" 40 >/dev/null
-    r=$(on "$n" "grep -q ' $MNT ' /proc/mounts && timeout 55 umount $MNT; if lsmod | grep -q '^mxfs '; then rmmod mxfs; fi; for t in 1 2 3; do cp -f $NREPO/mxfs.ko /root/mxfs.ko.fourkn && [ \"\$(md5sum < /root/mxfs.ko.fourkn | cut -d' ' -f1)\" = $KOMD5 ] && break; echo 3 > /proc/sys/vm/drop_caches; sleep 1; done; md5sum < /root/mxfs.ko.fourkn | cut -d' ' -f1; insmod /root/mxfs.ko.fourkn $MODARGS; cat /sys/module/mxfs/srcversion; blockdev --getss $DEV; cat $P/force_transport $P/target_cache_protected $P/dbg_lbs_mount $P/log_repeat_limit" 30 | tr '\n' ' ')
-    case $r in "$KOMD5 $SV 4096 $FT 1 1 0 ") step "OK insmod $n md5/srcversion/logical/force_transport/target_cache_protected/dbg_lbs_mount/log_repeat_limit: $r" ;; *) abort "insmod $n: [$r] (want md5 $KOMD5, srcversion $SV on a 4096-byte device, force_transport=$FT target_cache_protected=1 dbg_lbs_mount=1 log_repeat_limit=0)" ;; esac
+    r=$(on "$n" "grep -q ' $MNT ' /proc/mounts && timeout 55 umount $MNT; if lsmod | grep -q '^mxfs '; then rmmod mxfs; fi; for t in 1 2 3; do cp -f $NREPO/mxfs.ko /root/mxfs.ko.fourkn && [ \"\$(md5sum < /root/mxfs.ko.fourkn | cut -d' ' -f1)\" = $KOMD5 ] && break; echo 3 > /proc/sys/vm/drop_caches; sleep 1; done; md5sum < /root/mxfs.ko.fourkn | cut -d' ' -f1; insmod /root/mxfs.ko.fourkn $MODARGS; cat /sys/module/mxfs/srcversion; blockdev --getss $DEV; cat $P/force_transport $P/target_cache_protected $P/log_repeat_limit" 30 | tr '\n' ' ')
+    case $r in "$KOMD5 $SV 4096 $FT 1 0 ") step "OK insmod $n md5/srcversion/logical/force_transport/target_cache_protected/log_repeat_limit: $r" ;; *) abort "insmod $n: [$r] (want md5 $KOMD5, srcversion $SV on a 4096-byte device, force_transport=$FT target_cache_protected=1 log_repeat_limit=0)" ;; esac
 done
-r=$(on "$N1" "$NREPO/tools/mkfs_mxfs -L -f $DEV 2>&1 | tail -2; echo mkfs_rc=\${PIPESTATUS[0]}" 300)
-case $r in *mkfs_rc=0*) step "OK mkfs -L on $N1" ;; *) abort "mkfs on $N1: $(echo "$r" | tr '\n' '|')" ;; esac
+r=$(on "$N1" "$NREPO/tools/mkfs_mxfs -f $DEV 2>&1 | tail -2; echo mkfs_rc=\${PIPESTATUS[0]}" 300)
+case $r in *mkfs_rc=0*) step "OK mkfs on $N1" ;; *) abort "mkfs on $N1: $(echo "$r" | tr '\n' '|')" ;; esac
 mount_both
 for n in "$N1" "$N2"; do
-    r=$(on "$n" "for c in $CTRS; do echo 0 > $P/\$c; done; echo $HOLD_MS > $P/dbg_iwr_merge_hold_ms; echo $HOLD_N > $P/dbg_iwr_merge_hold_n; cat $P/dbg_iwr_merge_hold_n $P/dbg_iwr_merge_hold_ms" 10 | tr '\n' ' ')
-    [ "$r" = "$HOLD_N $HOLD_MS " ] || abort "$n did not arm the hold: [$r] (want $HOLD_N blocks of $HOLD_MS ms)"
+    r=$(on "$n" "for c in $CTRS; do echo 0 > $P/\$c; done; echo $HOLD_MS > $P/dbg_iwr_merge_hold_ms; echo $HOLD_PEER_MS > $P/dbg_iwr_merge_hold_peer_ms; echo $HOLD_N > $P/dbg_iwr_merge_hold_n; cat $P/dbg_iwr_merge_hold_n $P/dbg_iwr_merge_hold_ms $P/dbg_iwr_merge_hold_peer_ms" 10 | tr '\n' ' ')
+    [ "$r" = "$HOLD_N $HOLD_MS $HOLD_PEER_MS " ] || abort "$n did not arm the hold: [$r] (want $HOLD_N blocks, $HOLD_MS ms fixed, $HOLD_PEER_MS ms waiting for the peer)"
 done
-step "INFO each node holds its first $HOLD_N merged blocks $HOLD_MS ms between read and swap; workload bound ${WBOUND}s"
+if [ "$HOLD_PEER_MS" -gt 0 ]; then
+    step "INFO each node holds its first $HOLD_N merged blocks between read and swap until the peer's swap lands, at most $HOLD_PEER_MS ms; workload bound ${WBOUND}s"
+else
+    step "INFO each node holds its first $HOLD_N merged blocks $HOLD_MS ms between read and swap; workload bound ${WBOUND}s"
+fi
 
 # the files, from node 1, and the blocks their inodes share
 on "$N1" "mkdir -p $DIR && for i in \$(seq 1 $NF); do : > $DIR/f\$i; done && sync && for i in \$(seq 1 $NF); do echo \$i \$(stat -c %i $DIR/f\$i); done" 15 > "$OUT/inodes.txt"
@@ -149,7 +163,7 @@ m1=6$((ROUNDS % 8))4; m2=6$((ROUNDS % 8))2
 # the counters, before the unmount's own flushes add to them; the hold is
 # disarmed first, and what it had left says how many blocks it held
 for n in "$N1" "$N2"; do
-    on "$n" "echo dbg_iwr_merge_hold_left=\$(cat $P/dbg_iwr_merge_hold_n); echo 0 > $P/dbg_iwr_merge_hold_n; for c in $CTRS; do echo \$c=\$(cat $P/\$c); done" 10 > "$OUT/ctr_$n.txt"
+    on "$n" "echo dbg_iwr_merge_hold_left=\$(cat $P/dbg_iwr_merge_hold_n); echo 0 > $P/dbg_iwr_merge_hold_n; echo 0 > $P/dbg_iwr_merge_hold_peer_ms; for c in $CTRS; do echo \$c=\$(cat $P/\$c); done" 10 > "$OUT/ctr_$n.txt"
     step "INFO $n after the workload: $(tr '\n' ' ' < "$OUT/ctr_$n.txt")"
 done
 umount_all

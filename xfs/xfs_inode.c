@@ -6464,6 +6464,9 @@ xfs_inactive(
 	 * may advance an existing same-tenure certificate past the grant
 	 * result's epoch); the INACT-EXREL revoke matches on this. */
 	struct mxfs_inact_cert_id mxfs_inact_cid = { 0 };
+	/* the tenure stamped a token under that certificate, so its release
+	 * owes a clean-release marker (P-RELMARK-OWED) */
+	bool			mxfs_inact_relmark_owed = false;
 	extern int		mxfs_inact_cert_inject;
 	/*
 	 * v0.5.6 P137 stage timer (always-on, ratelimited, reported only
@@ -7983,11 +7986,14 @@ out:
 				xfs_force_shutdown(mp, SHUTDOWN_CORRUPT_INCORE);
 			}
 			/*
-			 * Instrument, no behaviour: the release below publishes
-			 * no clean-release marker (the eviction and the release
-			 * a peer's request drives do).  Count the tenures that
-			 * stamped a token and leave here, so a lap says whether
-			 * any does before this arm is given one.
+			 * A tenure that stamped a token and leaves here owes a
+			 * clean-release marker, as the eviction and the release a
+			 * peer's request drives publish one: without it a death
+			 * that leaves this tenure's transactions in the replay
+			 * window (a deferred free's held EFI keeps them there)
+			 * shows the survivor neither a holder at death nor a
+			 * clean release, and the replay refuses them not-held.
+			 * Counted in both arms of inact_relmark; published below.
 			 */
 			if (rv == MXFS_INACT_REVOKED && mxfs_inact_cid.epoch &&
 			    READ_ONCE(ip->i_mxfs_auth_stamp_epoch) ==
@@ -7997,6 +8003,7 @@ out:
 				extern atomic64_t mxfs_relmark_inact_owed;
 				static atomic_t owed_n = ATOMIC_INIT(0);
 
+				mxfs_inact_relmark_owed = true;
 				atomic64_inc(&mxfs_relmark_inact_owed);
 				if (atomic_inc_return(&owed_n) <= 200)
 					mxfs_probe("mxfs: P-RELMARK-OWED site=inact-exrel ino=%llu gepoch=%llu lineage=%llu freed=%d routed=%d comm=%s -- a tenure that stamped a token is released with no clean-release marker\n",
@@ -8030,9 +8037,54 @@ out:
 		extern bool mxfs_v5_dlm_open_clear_rides_release(struct mxfs_v5_dlm *);
 		extern int mxfs_v5_dlm_inode_unlock_open(struct mxfs_v5_dlm *,
 							 uint64_t, uint32_t, int);
+		extern int mxfs_inode_relmark_before_unlock(struct xfs_inode *,
+							    uint64_t, uint64_t,
+							    uint64_t, bool *,
+							    const char *);
+		extern int mxfs_inact_relmark;
 		bool mxfs_open_rel = ip->i_mxfs_open_pub &&
 			VFS_I(ip)->i_nlink == 0 && !mxfs_freed &&
 			!mxfs_v5_dlm_is_single_node(mp->m_mxfs_dlm);
+
+		/*
+		 * The clean-release marker the tenure owes (see the revoke
+		 * above), durable before the unlock below clears the holder:
+		 * only with the core home, so every image the tenure logged is
+		 * written, and after a device flush, so it is on the platter
+		 * (mxfs_relmark_publish's ordering contract).  A core still
+		 * owed leaves unmarked, the closed direction: its transactions
+		 * refuse at replay.  Not on a mount that is shut down or
+		 * unmounting, as for the eviction's marker.  inact_relmark 0 is
+		 * the same-build control: released unmarked, as before.
+		 */
+		if (mxfs_inact_relmark_owed && !mxfs_inact_via_iclus &&
+		    READ_ONCE(mxfs_inact_relmark) && !mxfs_inact_owes_home(ip) &&
+		    !xfs_is_shutdown(mp) && !xfs_is_unmounting(mp)) {
+			static atomic_t	irm_n = ATOMIC_INIT(0);
+			bool		irm_marked = false;
+			u64		irm_t0 = ktime_get_ns();
+			int		irm_rc, irm_seen;
+
+			blkdev_issue_flush(mp->m_ddev_targp->bt_bdev);
+			irm_rc = mxfs_inode_relmark_before_unlock(ip,
+					mxfs_inact_cid.resource,
+					mxfs_inact_cid.epoch,
+					mxfs_inact_cid.lineage, &irm_marked,
+					mxfs_freed ? "inact-free" : "inact");
+			/* the first 400, then one in 256; a failed publish
+			 * always (the helper's own line names it too) */
+			irm_seen = atomic_inc_return(&irm_n);
+			if (irm_rc || irm_seen <= 400 || (irm_seen & 255) == 0)
+				mxfs_probe("mxfs: P-RELMARK-INACT ino=%llu res=%llu gepoch=%llu lineage=%llu freed=%d rc=%d us=%llu n=%d comm=%s -- clean-release marker before the inactivation releases its grant\n",
+					(unsigned long long)ip->i_ino,
+					(unsigned long long)mxfs_inact_cid.resource,
+					(unsigned long long)mxfs_inact_cid.epoch,
+					(unsigned long long)mxfs_inact_cid.lineage,
+					mxfs_freed ? 1 : 0, irm_rc,
+					(unsigned long long)((ktime_get_ns() -
+							      irm_t0) / 1000),
+					irm_seen, current->comm);
+		}
 
 		if (mxfs_inact_via_iclus) {
 			/* ICLUSTER release_check: is_free piggybacks the

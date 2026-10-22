@@ -3254,8 +3254,8 @@ step_takeover_test() {
 #      UpToDate/UpToDate Connected on a device of that logical block (two
 #      fresh zeroed images are identical, so the bitmap is cleared rather than
 #      synced);
-#   2. mkfs on $N1 (-L for 4096, while 4K-native volumes are TEST ONLY) and a
-#      mount on both, each attaching the emulation with the arm's block
+#   2. mkfs on $N1, which lays the volume out for the device's logical block,
+#      and a mount on both, each attaching the emulation with the arm's block
 #      (P-DRBD-CAS-ATTACH lbs=);
 #   3. each node writes 64 MiB the other reads back intact; then both change
 #      and stat inodes that share blocks (tests/fourkn_merge_worker.sh), the
@@ -3294,9 +3294,9 @@ fourkn_teardown() {  # every arm's resource, loop and image, on both nodes
         rm -f /root/fourkn_worker.pid
         for m in \$(awk '\$2 == \"$FOURKN_MNT\" {print \$2}' /proc/mounts); do fuser -km \$m 2>/dev/null; timeout 30 umount \$m; done
         for t in 1 2 3; do
-            grep -q '^ *$FOURKN_MINOR: ' /proc/drbd 2>/dev/null || break
+            grep -q '^ *$FOURKN_MINOR: ' /proc/drbd 2>/dev/null || break  # harness-lint: ok - inside the double-quoted remote command, so the minor expands on this host before ssh
             [ -e /etc/drbd.d/$FOURKN_RES.res ] && timeout 30 drbdadm down $FOURKN_RES >/dev/null 2>&1
-            grep -q '^ *$FOURKN_MINOR: ' /proc/drbd 2>/dev/null && sleep 1
+            grep -q '^ *$FOURKN_MINOR: ' /proc/drbd 2>/dev/null && sleep 1  # harness-lint: ok - inside the double-quoted remote command, so the minor expands on this host before ssh
         done
         if grep -q '^ *$FOURKN_MINOR: ' /proc/drbd 2>/dev/null; then echo \"FKDOWN_FAIL minor $FOURKN_MINOR still up: \$(grep '^ *$FOURKN_MINOR: ' /proc/drbd)\"; exit 1; fi
         rm -f /etc/drbd.d/$FOURKN_RES.res
@@ -3342,7 +3342,7 @@ fourkn_arm() {  # <sector size>
     done
     say "  DRBD Primary/Primary UpToDate/UpToDate Connected on $dev, logical block $ss on both"
 
-    out=$(ssh_n "$N1" "$NODE_REPO/tools/mkfs_mxfs $([ "$ss" = 512 ] || echo -L) -f -n $LOG_SLICES $dev 2>&1 | tail -2; echo MKFS_RC=\${PIPESTATUS[0]}" 120)
+    out=$(ssh_n "$N1" "$NODE_REPO/tools/mkfs_mxfs -f -n $LOG_SLICES $dev 2>&1 | tail -2; echo MKFS_RC=\${PIPESTATUS[0]}" 120)
     echo "$out" > "$EVID/${tag}_mkfs"
     grep -q '^MKFS_RC=0$' <<<"$out" || die "fourkn-test $ss: mkfs on $N1: $(tr '\n' ' ' <<<"$out")"
     for n in "${NODES[@]}"; do
@@ -3455,9 +3455,9 @@ step_fourkn_test() {
     for n in "${NODES[@]}"; do grep -aq '^INSTALL_OK' "$EVID/install.$n" || die "$n: $(tail -1 "$EVID/install.$n")"; done
     install_fencing
     for n in "${NODES[@]}"; do load_mxfs_node "$n" /dev/null; done
-    both lbs "echo 1 > /sys/module/mxfs/parameters/dbg_lbs_mount; cat /sys/module/mxfs/parameters/dbg_lbs_mount /sys/module/mxfs/srcversion" 20
+    both srcv "cat /sys/module/mxfs/srcversion" 20
     for n in "${NODES[@]}"; do
-        [ "$(tr '\n' ' ' < "$EVID/lbs.$n")" = "1 $(modinfo -F srcversion "$REPO/mxfs.ko") " ] || die "$n: module not loaded as built, or dbg_lbs_mount not set: $(tr '\n' ' ' < "$EVID/lbs.$n")"
+        [ "$(tr '\n' ' ' < "$EVID/srcv.$n")" = "$(modinfo -F srcversion "$REPO/mxfs.ko") " ] || die "$n: module not loaded as built: $(tr '\n' ' ' < "$EVID/srcv.$n")"
     done
     # each arm in a subshell, so a refusal in the control still runs the arm
     # under test; a subshell runs no EXIT trap, so whatever an arm that died

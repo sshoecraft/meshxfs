@@ -16,83 +16,113 @@
           "status": "PASS",
           "measured": "skipped (marker matched 1/xfs)",
           "reason": "",
-          "iso": "2026-10-21T20:30:04Z",
-          "recorded": "2026-10-21",
+          "iso": "2026-10-22T18:08:15Z",
+          "recorded": "2026-10-22",
           "elapsed_s": 0,
           "build": "xfs-no-module",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261021T202957Z",
+          "run_id": "20261022T180808Z",
+          "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run5.json",
           "history": [
             {
               "status": "PASS",
-              "iso": "2026-10-21T20:29:32Z",
+              "iso": "2026-10-22T18:06:53Z",
               "measured": "skipped (marker matched 1/xfs)",
               "reason": "",
               "build": "xfs-no-module",
               "outcome": "PASS",
-              "run_id": "20261021T202925Z"
+              "run_id": "20261022T180647Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run4.json"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-21T20:29:00Z",
+              "iso": "2026-10-22T18:05:31Z",
               "measured": "skipped (marker matched 1/xfs)",
               "reason": "",
               "build": "xfs-no-module",
               "outcome": "PASS",
-              "run_id": "20261021T202853Z"
+              "run_id": "20261022T180524Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run3.json"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-21T20:28:47Z",
-              "measured": "elapsed=2s (fresh prep)",
+              "iso": "2026-10-22T18:04:09Z",
+              "measured": "skipped (marker matched 1/xfs)",
               "reason": "",
               "build": "xfs-no-module",
               "outcome": "PASS",
-              "run_id": "20261021T202838Z"
+              "run_id": "20261022T180402Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run2.json"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-04T11:40:59Z",
+              "iso": "2026-10-22T18:02:47Z",
               "measured": "skipped (marker matched 1/xfs)",
               "reason": "",
-              "build": "xfs-no-module"
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T180241Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run1.json"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-04T11:40:51Z",
+              "iso": "2026-10-22T18:01:26Z",
+              "measured": "skipped (marker matched 1/xfs)",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T180119Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run5.json"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:00:05Z",
+              "measured": "skipped (marker matched 1/xfs)",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T175958Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run4.json"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T17:58:44Z",
+              "measured": "skipped (marker matched 1/xfs)",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T175838Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run3.json"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T17:57:11Z",
+              "measured": "skipped (marker matched 1/xfs)",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T175704Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run2.json"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T17:55:48Z",
+              "measured": "skipped (marker matched 1/xfs)",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T175541Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run1.json"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T17:55:41Z",
               "measured": "elapsed=1s (fresh prep)",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-04T11:39:57Z",
-              "measured": "skipped (marker matched 1/xfs)",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-04T11:39:50Z",
-              "measured": "elapsed=2s (fresh prep)",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-02T03:16:39Z",
-              "measured": "skipped (marker matched 1/xfs)",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-02T03:15:49Z",
-              "measured": "skipped (marker matched 1/xfs)",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-02T03:14:57Z",
-              "measured": "skipped (marker matched 1/xfs)",
-              "reason": ""
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T175532Z"
             }
           ]
         },
@@ -809,16 +839,34 @@
         },
         "2/net/mesh/direct": {
           "status": "PASS",
-          "measured": "elapsed=32s (fresh prep)",
+          "measured": "elapsed=31s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-22T12:26:44Z",
+          "iso": "2026-10-22T18:40:38Z",
           "recorded": "2026-10-22",
-          "elapsed_s": 32,
-          "build": "A6239940FC6B66138D10442",
+          "elapsed_s": 31,
+          "build": "9594B08726D6732D2ED5E87",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261022T122603Z-g2",
+          "run_id": "20261022T183957Z-g2",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:10:29Z",
+              "measured": "elapsed=31s (fresh prep)",
+              "reason": "",
+              "build": "2446C4C6401FC9D9224650F",
+              "outcome": "PASS",
+              "run_id": "20261022T180949Z-g2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T12:26:44Z",
+              "measured": "elapsed=32s (fresh prep)",
+              "reason": "",
+              "build": "A6239940FC6B66138D10442",
+              "outcome": "PASS",
+              "run_id": "20261022T122603Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-22T12:25:59Z",
@@ -890,24 +938,6 @@
               "build": "A6239940FC6B66138D10442",
               "outcome": "PASS",
               "run_id": "20261022T121622Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T12:14:28Z",
-              "measured": "elapsed=28s (fresh prep)",
-              "reason": "",
-              "build": "A6239940FC6B66138D10442",
-              "outcome": "PASS",
-              "run_id": "20261022T121352Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T12:13:49Z",
-              "measured": "elapsed=28s (fresh prep)",
-              "reason": "",
-              "build": "A6239940FC6B66138D10442",
-              "outcome": "PASS",
-              "run_id": "20261022T121312Z-g2"
             }
           ]
         },
@@ -1646,6 +1676,133 @@
               "iso": "2026-10-11T00:40:05Z",
               "measured": "elapsed=126s (fresh prep)",
               "reason": ""
+            }
+          ]
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "elapsed=38s (fresh prep)",
+          "reason": "",
+          "iso": "2026-10-22T17:09:23Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 38,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 300,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+          "reason": "",
+          "iso": "2026-10-22T18:50:05Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 0,
+          "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 300,
+          "run_id": "20261022T184956Z-g2d",
+          "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0",
+          "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:49:23Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T184914Z-g2d",
+              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:48:16Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T184807Z-g2d",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:47:55Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T184746Z-g2d",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:47:34Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T184725Z-g2d",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:47:13Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T184704Z-g2d",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:46:52Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T184643Z-g2d",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:46:31Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T184622Z-g2d",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:46:10Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T184601Z-g2d",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:45:49Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T184540Z-g2d",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:45:28Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T184519Z-g2d",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
             }
           ]
         }
@@ -2968,6 +3125,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 1,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "checks=9 passed=9 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:09:30Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 1,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 10,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "checks=9 passed=9 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:10:59Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 1,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 10,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -3090,6 +3271,30 @@
               "run_id": "20261021T190943Z-g2b"
             }
           ]
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "checks=29 passed=29 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:09:34Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 3,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 15,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "checks=29 passed=29 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:11:03Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 2,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 15,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any",
@@ -3215,6 +3420,32 @@
               "run_id": "20261021T190943Z-g2b"
             }
           ]
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "checks=2 passed=2 failed=0 seed=1199469885",
+          "reason": "",
+          "iso": "2026-10-22T17:09:46Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 12,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 88,
+          "run_id": "20261022T170816Z-g2d",
+          "seed": "1199469885"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "checks=2 passed=2 failed=0 seed=519881721",
+          "reason": "",
+          "iso": "2026-10-22T18:11:15Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 12,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 88,
+          "run_id": "20261022T180946Z-g2d",
+          "seed": "519881721"
         }
       },
       "applies_to": "any",
@@ -3338,6 +3569,30 @@
               "run_id": "20261021T190943Z-g2b"
             }
           ]
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "checks=3 passed=3 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:09:51Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 4,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 42,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "checks=3 passed=3 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:11:19Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 3,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 42,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any",
@@ -3461,6 +3716,30 @@
               "run_id": "20261021T190943Z-g2b"
             }
           ]
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "checks=13 passed=13 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:09:55Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 3,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 10,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "checks=13 passed=13 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:11:22Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 2,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 10,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any",
@@ -3499,72 +3778,116 @@
         },
         "1/xfs": {
           "status": "PASS",
-          "measured": "nodes_pass=1/1 hostload=1.19 seqW=1404MiB/s seqR=1294MiB/s randW=50803iops randR=47836iops passes seqW=1396/1404/1244/1361 randW=39864/30285/50803/49799 seqR=1267/1278/1294/1289 randR=47836/46745/35348/46678",
+          "measured": "nodes_pass=1/1 hostload=1.91 host_disk[sda wms_p95=30.6 wms_max=30.7 MiBs_max=512] host_mem[dirty_max=2MiB writeback_max=0MiB avail_min=86612MiB] seqW=511MiB/s seqR=539MiB/s randW=52345iops randR=47906iops passes seqW=511/511/510/511 randW=48981/52345/48762/50490 seqR=454/494/539/538 randR=47697/47906/47836/47353",
           "reason": "",
-          "iso": "2026-10-04T11:41:39Z",
-          "recorded": "2026-10-04",
-          "elapsed_s": 27,
+          "iso": "2026-10-22T18:09:29Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 39,
           "build": "xfs-no-module",
+          "outcome": "PASS",
+          "budget_s": 120,
+          "run_id": "20261022T180808Z",
+          "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run5.json",
           "history": [
             {
               "status": "PASS",
-              "iso": "2026-10-04T11:40:42Z",
-              "measured": "nodes_pass=1/1 hostload=1.22 seqW=1071MiB/s seqR=1340MiB/s randW=50104iops randR=44643iops passes seqW=1066/1036/1071/617 randW=49875/49275/50104/46087 seqR=1268/1281/1265/1340 randR=44643/44221/33301/44281",
-              "reason": ""
+              "iso": "2026-10-22T18:08:07Z",
+              "measured": "nodes_pass=1/1 hostload=1.43 host_disk[sda wms_p95=30.7 wms_max=31.1 MiBs_max=513] host_mem[dirty_max=1MiB writeback_max=0MiB avail_min=86636MiB] seqW=510MiB/s seqR=537MiB/s randW=52597iops randR=45322iops passes seqW=508/506/510/508 randW=48473/46946/51848/52597 seqR=530/535/537/528 randR=33677/33992/32735/45322",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T180647Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run4.json"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-02T03:17:20Z",
-              "measured": "nodes_pass=1/1 hostload=5.70 seqW=1338MiB/s seqR=1283MiB/s randW=44043iops randR=47767iops passes seqW=1338/1326/1309/1329 randW=41270/44043/42946/37406 seqR=1283/1239/1242/1253 randR=34456/32316/47767/34420",
-              "reason": ""
+              "iso": "2026-10-22T18:06:46Z",
+              "measured": "nodes_pass=1/1 hostload=1.29 host_disk[sda wms_p95=30.6 wms_max=30.8 MiBs_max=512] host_mem[dirty_max=0MiB writeback_max=0MiB avail_min=86699MiB] seqW=511MiB/s seqR=539MiB/s randW=52095iops randR=34312iops passes seqW=511/510/511/511 randW=50646/44765/52095/51200 seqR=531/538/539/492 randR=33539/34312/34027/31357",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T180524Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run3.json"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-02T03:16:32Z",
-              "measured": "nodes_pass=1/1 hostload=5.74 seqW=1460MiB/s seqR=1301MiB/s randW=44582iops randR=25284iops passes seqW=1426/1410/1460/1340 randW=42722/42172/44582/41531 seqR=1301/1288/1292/1292 randR=23953/25284/24237/24417",
-              "reason": ""
+              "iso": "2026-10-22T18:05:24Z",
+              "measured": "nodes_pass=1/1 hostload=1.62 host_disk[sda wms_p95=30.8 wms_max=42.6 MiBs_max=513] host_mem[dirty_max=1MiB writeback_max=0MiB avail_min=86688MiB] seqW=510MiB/s seqR=537MiB/s randW=50803iops randR=46811iops passes seqW=510/509/509/510 randW=46946/47284/50803/46414 seqR=536/537/531/491 randR=46811/33132/29789/32573",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T180402Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run2.json"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-02T03:15:42Z",
-              "measured": "nodes_pass=1/1 hostload=5.77 seqW=1097MiB/s seqR=1194MiB/s randW=29309iops randR=33066iops passes seqW=1084/1076/1075/1097 randW=29283/28544/29309/29231 seqR=1183/1194/1128/1190 randR=33066/32900/32933/32768",
-              "reason": ""
+              "iso": "2026-10-22T18:04:01Z",
+              "measured": "nodes_pass=1/1 hostload=1.61 host_disk[sda wms_p95=30.6 wms_max=30.8 MiBs_max=512] host_mem[dirty_max=0MiB writeback_max=0MiB avail_min=86681MiB] seqW=511MiB/s seqR=540MiB/s randW=51685iops randR=47490iops passes seqW=509/510/511/510 randW=51685/49054/50027/47977 seqR=492/540/539/539 randR=33471/47490/33505/32508",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T180241Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_disk-caw-direct4k.run1.json"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-02T03:14:50Z",
-              "measured": "nodes_pass=1/1 hostload=5.60 seqW=1133MiB/s seqR=1309MiB/s randW=47559iops randR=43116iops passes seqW=1092/1109/1133/1114 randW=41743/45765/43749/47559 seqR=1297/1309/1288/1306 randR=38415/40305/37882/43116",
-              "reason": ""
+              "iso": "2026-10-22T18:02:40Z",
+              "measured": "nodes_pass=1/1 hostload=1.54 host_disk[sda wms_p95=30.8 wms_max=30.8 MiBs_max=512] host_mem[dirty_max=0MiB writeback_max=0MiB avail_min=86633MiB] seqW=510MiB/s seqR=539MiB/s randW=53806iops randR=44826iops passes seqW=510/510/510/510 randW=53281/53806/53195/52095 seqR=539/491/453/492 randR=35121/44826/44522/34133",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T180119Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run5.json"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-02T03:14:02Z",
-              "measured": "nodes_pass=1/1 hostload=6.14 seqW=1083MiB/s seqR=1291MiB/s randW=38687iops randR=44461iops passes seqW=1081/1083/1081/1068 randW=36818/38687/22677/38325 seqR=1291/1273/1265/1275 randR=44461/44341/33712/34971",
-              "reason": ""
+              "iso": "2026-10-22T18:01:19Z",
+              "measured": "nodes_pass=1/1 hostload=1.88 host_disk[sda wms_p95=30.7 wms_max=47.9 MiBs_max=512] host_mem[dirty_max=0MiB writeback_max=0MiB avail_min=86611MiB] seqW=511MiB/s seqR=539MiB/s randW=52178iops randR=45322iops passes seqW=510/511/509/510 randW=45322/49724/51685/52178 seqR=539/530/533/528 randR=32157/45322/32670/33643",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T175958Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run4.json"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-02T03:13:12Z",
-              "measured": "nodes_pass=1/1 hostload=5.61 seqW=1396MiB/s seqR=1223MiB/s randW=43984iops randR=49349iops passes seqW=1395/1396/1387/1391 randW=41956/43984/39103/43401 seqR=1213/1168/1223/1220 randR=47906/47906/48835/49349",
-              "reason": ""
+              "iso": "2026-10-22T17:59:57Z",
+              "measured": "nodes_pass=1/1 hostload=1.89 host_disk[sda wms_p95=30.6 wms_max=30.9 MiBs_max=512] host_mem[dirty_max=1MiB writeback_max=0MiB avail_min=86664MiB] seqW=511MiB/s seqR=538MiB/s randW=51120iops randR=48188iops passes seqW=510/511/510/510 randW=51120/48047/47697/50490 seqR=538/538/492/450 randR=47421/47836/47148/48188",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T175838Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run3.json"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-02T03:12:25Z",
-              "measured": "nodes_pass=1/1 hostload=5.93 seqW=1452MiB/s seqR=1196MiB/s randW=39196iops randR=40157iops passes seqW=1452/1422/1345/1077 randW=38917/39196/38917/34934 seqR=1175/1163/1178/1196 randR=38917/40157/40059/30682",
-              "reason": ""
+              "iso": "2026-10-22T17:58:37Z",
+              "measured": "nodes_pass=1/1 hostload=1.33 host_disk[sda wms_p95=30.6 wms_max=30.6 MiBs_max=512] host_mem[dirty_max=0MiB writeback_max=0MiB avail_min=86596MiB] seqW=511MiB/s seqR=492MiB/s randW=51280iops randR=39196iops passes seqW=510/511/511/511 randW=50961/51280/48259/50181 seqR=130/246/492/358 randR=32284/34638/35387/39196",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T175704Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run2.json"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-02T03:11:36Z",
-              "measured": "nodes_pass=1/1 hostload=5.48 seqW=983MiB/s seqR=1338MiB/s randW=37882iops randR=48545iops passes seqW=983/801/642/806 randW=37882/36449/35812/37321 seqR=1329/1338/1235/1168 randR=48259/47216/47906/48545",
-              "reason": ""
+              "iso": "2026-10-22T17:57:03Z",
+              "measured": "nodes_pass=1/1 hostload=1.97 host_disk[sda wms_p95=30.6 wms_max=30.7 MiBs_max=512] host_mem[dirty_max=3MiB writeback_max=0MiB avail_min=86714MiB] seqW=510MiB/s seqR=539MiB/s randW=46414iops randR=37364iops passes seqW=509/509/510/510 randW=45829/46152/44643/46414 seqR=536/539/539/533 randR=29627/23306/37364/23306",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T175541Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/tmp/xfs_baseline_4kn_20261022T175530Z_net-mesh-direct4k.run1.json"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-02T03:10:43Z",
-              "measured": "nodes_pass=1/1 hostload=5.71 seqW=1137MiB/s seqR=1440MiB/s randW=43230iops randR=42391iops passes seqW=1137/1133/1084/1085 randW=37406/43230/41063/41478 seqR=1440/1326/1192/1204 randR=38963/40858/42391/30768",
-              "reason": ""
+              "iso": "2026-10-22T17:48:02Z",
+              "measured": "nodes_pass=1/1 hostload=1.60 host_disk[sda wms_p95=30.9 wms_max=31.0 MiBs_max=510] host_mem[dirty_max=1MiB writeback_max=0MiB avail_min=86637MiB] seqW=509MiB/s seqR=492MiB/s randW=51120iops randR=44949iops passes seqW=506/506/509/502 randW=47284/51120/47767/49127 seqR=196/420/492/337 randR=31907/44704/44102/44949",
+              "reason": "",
+              "build": "xfs-no-module",
+              "outcome": "PASS",
+              "run_id": "20261022T174633Z",
+              "variant": "MXFS_TEST_ENV=XFS_BASELINE=/src/mxfs/tests/evidence/xfs_baseline_4kn_20261022T173344Z_runs/disk-caw-direct4k.run5.json"
             }
           ]
         },
@@ -4847,6 +5170,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 39,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.85 host_disk[sda wms_p95=61.5 wms_max=73.0 MiBs_max=512] host_mem[dirty_max=3MiB writeback_max=0MiB avail_min=85958MiB] seqW=526MiB/s seqR=994MiB/s randW=72861iops randR=89653iops rank1 passes seqW=264/264/269/265 randW=32768/37751/31752/39010 seqR=457/262/322/229 randR=44765/43691/38370/43691",
+          "reason": "",
+          "iso": "2026-10-22T17:11:26Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 61,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 120,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=3.01 host_disk[sda wms_p95=61.4 wms_max=62.1 MiBs_max=512] host_mem[dirty_max=114MiB writeback_max=4MiB avail_min=83422MiB] seqW=532MiB/s seqR=643MiB/s randW=74631iops randR=71312iops rank1 passes seqW=272/261/267/270 randW=36735/39010/36901/40355 seqR=154/151/297/165 randR=27081/28007/27911/30454",
+          "reason": "",
+          "iso": "2026-10-22T18:13:02Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 69,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 120,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -6167,6 +6514,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 1,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "SKIP",
+          "measured": "no-baseline-for-scst-fio",
+          "reason": "rig=scst-fio has no native-XFS baseline for disk-caw-direct4k; capture it with  MXFS_TEST_ENV=\"XFS_BASELINE=/src/mxfs/.xfs_fio_baseline.disk-caw-direct4k.scst-fio.json\" ./run.sh 1/xfs fio_perf  \u2014 refusing to score against the untagged file, which describes a different rig",
+          "iso": "2026-10-22T17:11:27Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 0,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "SKIP",
+          "budget_s": 10,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "seqW=104% seqR=119% randW=145% randR=159% worst(write)=104% (threshold>=70%, wsrc=xfs-baseline, rig=scst-fio)",
+          "reason": "",
+          "iso": "2026-10-22T18:13:03Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 0,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 10,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -7492,6 +7863,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 9,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.52 checks=534 passed=534 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:11:43Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 6,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 60,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=2.86 checks=534 passed=534 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:13:17Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 5,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 60,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -8817,6 +9212,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 1,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.29 checks=3 passed=3 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:11:54Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 2,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 30,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=2.57 checks=3 passed=3 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:13:28Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 2,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 30,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -10154,6 +10573,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 2,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.24 checks=140 passed=140 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:12:07Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 4,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 30,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=2.15 checks=140 passed=140 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:13:40Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 2,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 30,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -11479,6 +11922,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 2,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.05 checks=5 passed=5 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:12:18Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 1,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 30,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=2.28 checks=5 passed=5 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:13:50Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 1,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 30,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -12804,6 +13271,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 4,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.18 checks=44 passed=44 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:12:30Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 3,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 60,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=2.15 checks=44 passed=44 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:14:03Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 4,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 60,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -14124,6 +14615,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 5,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.92 checks=5 passed=5 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:12:43Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 3,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 30,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.81 checks=5 passed=5 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:14:15Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 3,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 30,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -15407,6 +15922,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 6,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.86 checks=5 passed=5 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:12:56Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 4,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 30,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.68 checks=6 passed=6 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:14:30Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 6,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 30,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -16727,6 +17266,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 2,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.47 host_disk[sda wms_p95=4.0 wms_max=4.0 MiBs_max=342] host_mem[dirty_max=5MiB writeback_max=0MiB avail_min=86397MiB] checks=8 passed=8 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:13:29Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 3,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 90,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.17 host_disk[sda wms_p95=3.0 wms_max=3.0 MiBs_max=283] host_mem[dirty_max=11MiB writeback_max=1MiB avail_min=84199MiB] checks=8 passed=8 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:15:03Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 2,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 90,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -18047,6 +18610,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 6,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.67 host_disk[sda wms_p95=1.4 wms_max=3.4 MiBs_max=31] host_mem[dirty_max=6MiB writeback_max=1MiB avail_min=86374MiB] checks=7 passed=7 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:14:06Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 7,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 90,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.87 host_disk[sda wms_p95=0.6 wms_max=1.7 MiBs_max=42] host_mem[dirty_max=1MiB writeback_max=0MiB avail_min=84165MiB] checks=7 passed=7 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:15:39Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 6,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 90,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -19372,6 +19959,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 8,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.75 host_disk[sda wms_p95=3.0 wms_max=3.0 MiBs_max=45] host_mem[dirty_max=22MiB writeback_max=0MiB avail_min=86440MiB] checks=6 passed=6 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:14:41Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 4,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 60,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.86 host_disk[sda wms_p95=2.4 wms_max=3.2 MiBs_max=39] host_mem[dirty_max=5MiB writeback_max=0MiB avail_min=84168MiB] checks=6 passed=6 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:16:14Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 5,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 60,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -19427,6 +20038,221 @@
         }
       },
       "applies_to": "any"
+    },
+    {
+      "id": "fourkn_cdb",
+      "requirement": "On a 4K-native LUN a WRITE(16) with FUA and a COMPARE AND WRITE of one block at a known LBA, issued by caw_verify and fua_verify on one node, land whole in exactly that block, read back whole on the other node, and touch neither neighbouring block",
+      "detector": "tests/suite/fourkn_cdb.sh: the transport scratch block (disklock_offset/4096 - 1) written 0xab by fua_verify and 0xcd by caw_verify on node 1, read back by the tools and by a direct dd on node 2; a read expecting the old pattern must fail; the journal's last block keeps its md5 and the disklock region's first block keeps a zero tail",
+      "per_config": {
+        "2/net/mesh/direct4k": {
+          "status": "FAIL",
+          "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
+          "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184807Z-g2d_fourkn_cdb)",
+          "iso": "2026-10-22T18:48:28Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 6,
+          "build": "9594B08726D6732D2ED5E87",
+          "outcome": "FAIL",
+          "budget_s": 30,
+          "run_id": "20261022T184807Z-g2d",
+          "batch": "b20261022-545d6a",
+          "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c",
+          "history": [
+            {
+              "status": "FAIL",
+              "iso": "2026-10-22T18:48:07Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
+              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184746Z-g2d_fourkn_cdb)",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "FAIL",
+              "run_id": "20261022T184746Z-g2d",
+              "batch": "b20261022-545d6a",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-22T18:47:46Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
+              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184725Z-g2d_fourkn_cdb)",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "FAIL",
+              "run_id": "20261022T184725Z-g2d",
+              "batch": "b20261022-545d6a",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-22T18:47:25Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
+              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184704Z-g2d_fourkn_cdb)",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "FAIL",
+              "run_id": "20261022T184704Z-g2d",
+              "batch": "b20261022-545d6a",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-22T18:47:04Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
+              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184643Z-g2d_fourkn_cdb)",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "FAIL",
+              "run_id": "20261022T184643Z-g2d",
+              "batch": "b20261022-545d6a",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-22T18:46:43Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
+              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184622Z-g2d_fourkn_cdb)",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "FAIL",
+              "run_id": "20261022T184622Z-g2d",
+              "batch": "b20261022-545d6a",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-22T18:46:22Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
+              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184601Z-g2d_fourkn_cdb)",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "FAIL",
+              "run_id": "20261022T184601Z-g2d",
+              "batch": "b20261022-545d6a",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-22T18:46:01Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
+              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184540Z-g2d_fourkn_cdb)",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "FAIL",
+              "run_id": "20261022T184540Z-g2d",
+              "batch": "b20261022-545d6a",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-22T18:45:40Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
+              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184519Z-g2d_fourkn_cdb)",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "FAIL",
+              "run_id": "20261022T184519Z-g2d",
+              "batch": "b20261022-545d6a",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-22T18:45:19Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
+              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184458Z-g2d_fourkn_cdb)",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "FAIL",
+              "run_id": "20261022T184458Z-g2d",
+              "batch": "b20261022-545d6a",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-22T18:44:58Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
+              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184437Z-g2d_fourkn_cdb)",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "FAIL",
+              "run_id": "20261022T184437Z-g2d",
+              "batch": "b20261022-545d6a",
+              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
+            }
+          ]
+        }
+      },
+      "budget_s": 30,
+      "phase": "suite",
+      "why": "docs/4kn-support.md Verification: every CDB the tools and the PAL build must carry LBAs and lengths in the device's own logical blocks",
+      "source": "docs/4kn-support.md",
+      "coord": "host",
+      "min_nodes": 2,
+      "max_nodes": 2,
+      "applies_to": "*/*/direct4k"
+    },
+    {
+      "id": "fourkn_merge",
+      "requirement": "Two nodes dirtying different inodes of the same 4096-byte blocks at once on a 4K-native volume lose nothing: every file reads its own writer's last mode on both nodes after both remount, chk_mxfs finds nothing, no merged write fails or is refused, and at least one merged write's COMPARE AND WRITE miscompared and was retried, so the pass exercised the retry",
+      "detector": "tests/suite/fourkn_merge.sh: node 1 creates 64 files, each node changes the mode of its half and stats the other half for 20 rounds with its first 8 merged blocks held until the peer's swap of the block lands (dbg_iwr_merge_hold_peer_ms); per-node counters iwr_merge_blocks/miscompares/failed; chk_mxfs with both unmounted; modes read on both after remount; kernel log from the row's mark. A lap with no MISCOMPARE is a FAIL whose reason says VACUOUS",
+      "per_config": {
+        "2/net/mesh/direct4k": {
+          "status": "PENDING",
+          "measured": "",
+          "reason": "executing 20261022T184956Z-g2d",
+          "iso": "2026-10-22T18:50:11Z",
+          "recorded": "2026-10-22",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0",
+          "run_id": "20261022T184956Z-g2d",
+          "history": [
+            {
+              "status": "FAIL",
+              "iso": "2026-10-22T18:49:56Z",
+              "measured": "miscompares=0 hold_landed=0 merged_blocks=551 workload_ms=7960 hold=8x0ms",
+              "reason": "VACUOUS: no swap miscompared in 551 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261022T184914Z-g2d_fourkn_merge)",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "FAIL",
+              "run_id": "20261022T184914Z-g2d",
+              "batch": "b20261022-02b816",
+              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T18:17:03Z",
+              "measured": "miscompares=1 hold_landed=1 merged_blocks=429 workload_ms=21115 hold=8x1000ms",
+              "reason": "every inode kept its writer's last change; 1 MISCOMPARE(s) retried (evidence tests/evidence/board_20261022T180946Z-g2d_fourkn_merge)",
+              "build": "2446C4C6401FC9D9224650F",
+              "outcome": "PASS",
+              "run_id": "20261022T180946Z-g2d"
+            }
+          ]
+        }
+      },
+      "budget_s": 60,
+      "phase": "suite",
+      "why": "docs/4kn-support.md Verification: the merged write is the new code path that keeps a node's stale copies of its peers' inodes off the device; without a counted retry a pass proves nothing about it",
+      "source": "docs/4kn-support.md",
+      "coord": "host",
+      "min_nodes": 2,
+      "max_nodes": 2,
+      "applies_to": "*/*/direct4k"
+    },
+    {
+      "id": "fourkn_lbs_refusal",
+      "requirement": "A device of 1024- or 2048-byte logical blocks is refused at format and at mount, and each refusal names the size: mkfs.mxfs exits non-zero saying the device has that many bytes per logical block, and the mount fails, logs that the device has that many bytes per logical block and is refused, and leaves nothing mounted",
+      "detector": "tests/suite/fourkn_lbs_refusal.sh on node 1, over a throwaway image on the node's own disk: mkfs.mxfs on loop devices of 1024- and 2048-byte sectors; an image formatted on a 512-byte loop device (the control, which must format) attached again at each size and mounted with the build's module; the refusal lines read from the kernel log after the row's mark",
+      "per_config": {
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "sizes=1024,2048",
+          "reason": "mkfs.mxfs and the mount each refused 1024- and 2048-byte logical blocks, naming the size (evidence tests/evidence/board_20261022T180946Z-g2d_fourkn_lbs_refusal)",
+          "iso": "2026-10-22T18:17:08Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 4,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 20,
+          "run_id": "20261022T180946Z-g2d"
+        }
+      },
+      "budget_s": 20,
+      "phase": "suite",
+      "why": "docs/4kn-support.md: volumes exist for 512- and 4096-byte logical blocks only; on any other size the envelope read reports no more than a bad magic, so both refusals must name the cause",
+      "source": "docs/4kn-support.md",
+      "coord": "host",
+      "min_nodes": 2,
+      "max_nodes": 2,
+      "applies_to": "*/*/direct4k"
     },
     {
       "id": "crash_consistency",
@@ -20749,6 +21575,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 15,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.67 checks=104 passed=104 failed=0 planned=104 notrun=0",
+          "reason": "",
+          "iso": "2026-10-22T17:14:58Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 8,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 90,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.41 checks=104 passed=104 failed=0 planned=104 notrun=0",
+          "reason": "",
+          "iso": "2026-10-22T18:17:23Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 5,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 90,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any",
@@ -22083,6 +22933,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 110,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.25 checks=142 passed=142 failed=0 rounds=20 p36_retry=0 p36_stack=0 lkto_remote=0 lkto_holder=0 dialloc_sweep_retry=0 max_stall_ms=821 max_stall_ms=821",
+          "reason": "",
+          "iso": "2026-10-22T17:17:00Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 105,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 120,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.99 checks=163 passed=163 failed=0 rounds=23 p36_retry=0 p36_stack=0 lkto_remote=0 lkto_holder=0 dialloc_sweep_retry=0 max_stall_ms=614 max_stall_ms=614",
+          "reason": "",
+          "iso": "2026-10-22T18:19:29Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 108,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 120,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -23374,6 +24248,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 18,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.41 checks=8 passed=8 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:17:27Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 18,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 60,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.72 checks=8 passed=8 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:19:56Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 17,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 60,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -24665,6 +25563,30 @@
           "recorded": "2026-10-10",
           "elapsed_s": 9,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.38 checks=5 passed=5 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T17:17:56Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 11,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 60,
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.53 checks=5 passed=5 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:20:22Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 9,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 60,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -25900,6 +26822,28 @@
           "recorded": "2026-10-10",
           "elapsed_s": 62,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "ABORTED",
+          "measured": "",
+          "reason": "run died while this test was executing \u2014 result unknown; an incident until a reviewed disposition says why (it may have wedged the node)",
+          "iso": "2026-10-22T17:18:32Z",
+          "recorded": "2026-10-22",
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "INCOMPLETE",
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.76 rounds=30 durable_loss=0 late_ok=0 mkdir_err=0",
+          "reason": "",
+          "iso": "2026-10-22T18:21:42Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 61,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 240,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -27274,6 +28218,28 @@
           "recorded": "2026-10-10",
           "elapsed_s": 32,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "NOT RUN",
+          "measured": "",
+          "reason": "sweep ended before reaching this test \u2014 not a result",
+          "iso": "2026-10-22T17:18:32Z",
+          "recorded": "2026-10-22",
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "UNREACHED",
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "ops=1112 wall_ms=22891 errs=0 dmesg_hits=0",
+          "reason": "",
+          "iso": "2026-10-22T18:22:07Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 25,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 40,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any",
@@ -28524,6 +29490,28 @@
           "recorded": "2026-10-10",
           "elapsed_s": 11,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "NOT RUN",
+          "measured": "",
+          "reason": "sweep ended before reaching this test \u2014 not a result",
+          "iso": "2026-10-22T17:18:32Z",
+          "recorded": "2026-10-22",
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "UNREACHED",
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=1.02 checks=4 failed=0 dstate=0",
+          "reason": "",
+          "iso": "2026-10-22T18:22:17Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 1,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 90,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -29772,6 +30760,28 @@
           "recorded": "2026-10-10",
           "elapsed_s": 2,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "NOT RUN",
+          "measured": "",
+          "reason": "sweep ended before reaching this test \u2014 not a result",
+          "iso": "2026-10-22T17:18:32Z",
+          "recorded": "2026-10-22",
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "UNREACHED",
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.87 hits=0 kinds=[]",
+          "reason": "",
+          "iso": "2026-10-22T18:22:28Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 2,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 120,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -31007,6 +32017,28 @@
           "recorded": "2026-10-10",
           "elapsed_s": 5,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "NOT RUN",
+          "measured": "",
+          "reason": "sweep ended before reaching this test \u2014 not a result",
+          "iso": "2026-10-22T17:18:32Z",
+          "recorded": "2026-10-22",
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "UNREACHED",
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.67 stale_base_mutations=0 unlanded_at_unlock=0 probe=1 window=1 win_src=marker win_trunc=0",
+          "reason": "",
+          "iso": "2026-10-22T18:22:40Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 2,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 60,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -32242,6 +33274,28 @@
           "recorded": "2026-10-10",
           "elapsed_s": 6,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "NOT RUN",
+          "measured": "",
+          "reason": "sweep ended before reaching this test \u2014 not a result",
+          "iso": "2026-10-22T17:18:32Z",
+          "recorded": "2026-10-22",
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "UNREACHED",
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.72 unresolved=0 failed_estale=0 total_flips=0 stale_skips=0 probe=1 window=1 win_src=marker win_trunc=0",
+          "reason": "",
+          "iso": "2026-10-22T18:22:52Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 3,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 60,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -33498,6 +34552,28 @@
           "recorded": "2026-10-10",
           "elapsed_s": 44,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "NOT RUN",
+          "measured": "",
+          "reason": "sweep ended before reaching this test \u2014 not a result",
+          "iso": "2026-10-22T17:18:32Z",
+          "recorded": "2026-10-22",
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "UNREACHED",
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.53 strands=1 repaired=1 declined=0 abandoned=0 write_ok=1 faults=0",
+          "reason": "",
+          "iso": "2026-10-22T18:23:44Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 42,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 240,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -34754,6 +35830,28 @@
           "recorded": "2026-10-10",
           "elapsed_s": 4,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "NOT RUN",
+          "measured": "",
+          "reason": "sweep ended before reaching this test \u2014 not a result",
+          "iso": "2026-10-22T17:18:32Z",
+          "recorded": "2026-10-22",
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "UNREACHED",
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.52 ops=60 wall=1425ms per_op=23ms setup=43ms rmrf=8ms mkb=12ms syn=23ms bar1=77ms mkd=28ms bar2=98ms twall=1674ms errs=0",
+          "reason": "",
+          "iso": "2026-10-22T18:23:56Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 2,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 180,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -40957,6 +42055,29 @@
           "recorded": "2026-10-10",
           "elapsed_s": 56,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "NOT RUN",
+          "measured": "",
+          "reason": "sweep ended before reaching this test \u2014 not a result",
+          "iso": "2026-10-22T17:18:32Z",
+          "recorded": "2026-10-22",
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "UNREACHED",
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "FAIL",
+          "measured": "nodes_pass=0/2 states:FAIL=2 hostload=0.44 first_fail[test31:witness_dir=unwritable rank=1] rank1[witness_dir=unwritable rank=1]",
+          "reason": "test31:FAIL:the witness record must live outside the audited filesystem and /src/mxfs/tests/evidence/alloc_witness/20261022T180946Z-g2d is not writable from this node (is the tree mounted over NFS?) test32:FAIL:the witness record must live outside the audited filesystem and /src/mxfs/tests/evidence/alloc_witness/20261022T180946Z-g2d is not writable from this node (is the tree mounted over NFS?)",
+          "iso": "2026-10-22T18:24:08Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 1,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "FAIL",
+          "budget_s": 120,
+          "run_id": "20261022T180946Z-g2d",
+          "evidence": "tests/evidence/run_alloc_witness_20261022T180946Z-g2d"
         }
       },
       "budget_s": 120,
@@ -42308,6 +43429,29 @@
           "recorded": "2026-10-10",
           "elapsed_s": 17,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "NOT RUN",
+          "measured": "",
+          "reason": "sweep ended before reaching this test \u2014 not a result",
+          "iso": "2026-10-22T17:18:32Z",
+          "recorded": "2026-10-22",
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "UNREACHED",
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "FAIL",
+          "measured": "nodes_pass=1/2 states:FAIL=1 hostload=0.73 first_fail[test31:verdict=CLEAN release=INDETERMINATE rc=0 errors=0 remounted=1 icount=29056 ledger_holders=26 umount_ms=1182 remount_ms=5571 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=(evidence copy failed) release=INDETERMINATE coverage=? cohort=? finobt=? targets=? accounting=? witness=/src/mxfs/tests/evidence/alloc_witness/20261022T180946Z-g2d/witness.txt] rank1[verdict=CLEAN release=INDETERMINATE rc=0 errors=0 remounted=1 icount=29056 ledger_holders=26 umount_ms=1182 remount_ms=5571 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=(evidence copy failed) release=INDETERMINATE coverage=? cohort=? finobt=? targets=? accounting=? witness=/src/mxfs/tests/evidence/alloc_witness/20261022T180946Z-g2d/witness.txt]",
+          "reason": "test31:FAIL:the audit was clean but no trustworthy coverage witness exists for this run, so the CLEAN is not a release claim: no sealed witness for run 20261022T180946Z-g2d",
+          "iso": "2026-10-22T18:24:30Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 9,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "FAIL",
+          "budget_s": 180,
+          "run_id": "20261022T180946Z-g2d",
+          "evidence": "tests/evidence/run_chk_clean_20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -43505,6 +44649,28 @@
               "reason": "a single-node fast path was added without being classified; classify it, then re-baseline"
             }
           ]
+        },
+        "2/disk/caw/direct4k": {
+          "status": "NOT RUN",
+          "measured": "",
+          "reason": "sweep ended before reaching this test \u2014 not a result",
+          "iso": "2026-10-22T17:18:32Z",
+          "recorded": "2026-10-22",
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "UNREACHED",
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "guards=72 new=0 grown=0",
+          "reason": "",
+          "iso": "2026-10-22T18:24:32Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 1,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 20,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "any"
@@ -44518,6 +45684,16 @@
           "recorded": "2026-10-10",
           "elapsed_s": 1,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "NOT RUN",
+          "measured": "",
+          "reason": "sweep ended before reaching this test \u2014 not a result",
+          "iso": "2026-10-22T17:18:32Z",
+          "recorded": "2026-10-22",
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "UNREACHED",
+          "run_id": "20261022T170816Z-g2d"
         }
       },
       "applies_to": "disk/caw"
@@ -45096,6 +46272,18 @@
           "recorded": "2026-10-10",
           "elapsed_s": 18,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=0.85 checks=7 passed=7 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T18:24:57Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 16,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 300,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "applies_to": "net/mesh"
@@ -46262,6 +47450,28 @@
           "recorded": "2026-10-10",
           "elapsed_s": 151,
           "build": "A969E000AECBD63CBC36F81"
+        },
+        "2/disk/caw/direct4k": {
+          "status": "NOT RUN",
+          "measured": "",
+          "reason": "sweep ended before reaching this test \u2014 not a result",
+          "iso": "2026-10-22T17:18:32Z",
+          "recorded": "2026-10-22",
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "UNREACHED",
+          "run_id": "20261022T170816Z-g2d"
+        },
+        "2/net/mesh/direct4k": {
+          "status": "PASS",
+          "measured": "oracle=PASS acked=1639 replay_s=41 ns_ls=0 ns_mkdir=0 quar=0 shut=0 umount_ms=2006 chk_rc=0 errs=0 icount=29056 Chunk/free-space aliasing . OK (no inode-chunk block is also free) ALLOC checked=1674 allocated=1674 missing=0  wall=124s oracle_evidence=tests/evidence/20261022T182458Z_tcpdr_ca_20261022T180946Z-g2d",
+          "reason": " (evidence tests/evidence/board_20261022T180946Z-g2d_crash_audit)",
+          "iso": "2026-10-22T18:27:02Z",
+          "recorded": "2026-10-22",
+          "elapsed_s": 125,
+          "build": "2446C4C6401FC9D9224650F",
+          "outcome": "PASS",
+          "budget_s": 300,
+          "run_id": "20261022T180946Z-g2d"
         }
       },
       "budget_s": 300,

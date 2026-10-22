@@ -27,8 +27,15 @@
 #   outage-test        both nodes die at once and the pair recovers every fsynced file
 #   takeover-test      a pair outage whose recovery owner fails: taken over by itself, and by the peer
 #   down               unmount, DRBD down, both LUNs returned
+#   fourkn-test        DRBD over backing disks of 4096-byte blocks (a 4K-native
+#                      device) and, as its control, of 512: on a throwaway
+#                      resource over loop devices, mkfs, both mount, data both
+#                      ways, inodes that share blocks changed from both nodes,
+#                      remount, chk_mxfs (docs/4kn-support.md)
 # `mxfs` (load, mkfs, mount on both) runs before every test, so each starts
-# from a formed pair whatever the test before it left.
+# from a formed pair whatever the test before it left.  fourkn-test needs no
+# pool LUN and takes the rig's own resource down itself, so it runs after
+# `down`.
 #
 # The module verified is the tree's mxfs.ko; its srcversion is on the first
 # line, and the verdict line names it.
@@ -99,6 +106,7 @@ if step up up; then
     done
 fi
 step down down
+step fourkn-test fourkn-test
 if [ -z "$failed" ]; then
     echo "DRBD_RELEASE_VERIFY PASS version=$V srcversion=$SV failed=[]" >> "$O"
     exit 0

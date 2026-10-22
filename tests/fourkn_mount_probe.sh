@@ -17,9 +17,8 @@
 #
 # TREE names another built tree under ~/src (a published version's source, say
 # ~/src/mxfs-v130) whose module and tools the nodes load instead; the nodes see
-# it as /src/<its name>.  MKFS_ARGS is passed to mkfs (-L formats a 4K-native
-# volume while that is TEST ONLY; the module then needs dbg_lbs_mount=1 in
-# MODARGS).
+# it as /src/<its name>.  MKFS_ARGS is passed to mkfs, which lays the volume
+# out for the device's logical block size (512 or 4096) on its own.
 #
 # ONE=1 mounts the first node only: it writes a 64 MiB file, unmounts, mounts
 # again and reads it back (the remount 120 s, the read 60 s).  Two nodes

@@ -108,6 +108,12 @@ class Configuration:
     def rig_mode(self) -> str:
         return "" if self.baseline else ATTACHES[self.attach]["rig_mode"]
 
+    @property
+    def block_size(self) -> int:
+        """The logical block size of the LUN the attachment reaches: 512, or 4096 for a 4K-native
+        one (docs/4kn-support.md). The baseline's device is the rig's own 512-byte disk."""
+        return 512 if self.baseline else int(ATTACHES[self.attach].get("block_size", 512))
+
     def __str__(self) -> str:
         return self.key
 
@@ -312,7 +318,7 @@ def translate_retired(key: str) -> str:
 
 #: What `get` answers, for shell code that needs one value rather than an `eval`.
 FIELDS = ("key", "slug", "shape", "nodes", "cls", "method", "attach", "transport", "device",
-          "rig_mode")
+          "rig_mode", "block_size")
 
 
 def shell(config: Configuration) -> str:
@@ -327,6 +333,7 @@ def shell(config: Configuration) -> str:
         "CFG_BASELINE": 1 if config.baseline else 0,
         "CFG_TRANSPORT": config.transport,
         "CFG_RIG_MODE": config.rig_mode,
+        "CFG_BLOCK_SIZE": config.block_size,
         "CFG_DEV_DEFAULT": config.device,
     }
     return "\n".join("%s=%s" % (k, shlex.quote(str(v))) for k, v in values.items())
@@ -402,9 +409,15 @@ def selftest() -> int:
     expect("translate xfs", translate_retired("1/xfs"), "1/xfs")
     expect("shape", parse("8/net/mesh/direct").shape, "net-mesh-direct")
     expect("shape xfs", parse("1/xfs").shape, "xfs")
-    expect("release matrix", len(release_matrix()), 16)
+    expect("release matrix", len(release_matrix()), 18)
     expect("release at 2", [c.key for c in release_matrix(2)],
-           ["2/disk/caw/direct", "2/disk/caw/mpath", "2/net/mesh/direct", "2/net/mesh/mpath"])
+           ["2/disk/caw/direct", "2/disk/caw/mpath", "2/net/mesh/direct", "2/net/mesh/mpath",
+            "2/disk/caw/direct4k", "2/net/mesh/direct4k"])
+    expect("block size", parse("2/net/mesh/direct").block_size, 512)
+    expect("block size 4k", parse("2/disk/caw/direct4k").block_size, 4096)
+    expect("block size xfs", parse("1/xfs").block_size, 512)
+    expect("direct4k is its own attach", matches("*/*/direct", parse("2/net/mesh/direct4k")), False)
+    expect("direct4k rig", parse("2/net/mesh/direct4k").rig_mode, "direct")
     expect("release at 16", [c.key for c in release_matrix(16)],
            ["16/disk/caw/direct", "16/disk/caw/mpath", "16/net/mesh/direct", "16/net/mesh/mpath"])
     expect("released earlier, not in the matrix",

@@ -198,7 +198,12 @@ rs 15 "$V" "echo 60000 > $P/dbg_efd_hold_ms && cat $P/dbg_efd_hold_ms" | grep -q
 rs 15 "$V" "setsid nohup sh -c 'for f in $DIR/frag*; do rm -f \$f & done; wait' >/dev/null 2>&1 & echo started" | grep -q started || { echo "ABORT: could not start the unlink burst on $V"; exit 2; }
 wait_for_into t "$V" 30 "$MARK" "P-EFD-HOLD start"; ck "V entered the EFD hold with a durable EFI (${t}s)" "$([ "$t" != timeout ] && echo yes || echo no)" "yes"
 [ "$t" != timeout ] || { echo "ABORT: no P-EFD-HOLD on $V — nothing to destroy into"; rs 10 "$V" "echo 0 > $P/dbg_efd_hold_ms"; exit 2; }
-measure "$V" 15 "$OUT/dmesg_${V}_prekill.txt" '^DMESG_END$' "the victim's pre-kill kernel log on $V" "dmesg | sed -n \"/$MARK/,\\\$p\" | grep -a 'P-EFD-HOLD\|P-INACT-CERT\|P-IUNLINK-AGCLASS\|P228-TOKCLASS\|P-INACT-EX \|P-UNLPRE\|P82-'; echo DMESG_END"
+# The whole log since the mark, unfiltered: this is the victim's last word, and
+# the survivor's replay is judged against what the victim did before it.  A
+# filter of seven probes kept no line of any release, so a replay that refused
+# tenures the victim had released could not be traced to the release that
+# ended them.
+measure "$V" 15 "$OUT/dmesg_${V}_prekill.txt" '^DMESG_END$' "the victim's pre-kill kernel log on $V" "dmesg | sed -n \"/$MARK/,\\\$p\"; echo DMESG_END"
 echo "  INFO victim pre-kill capture: $(wc -l < "$OUT/dmesg_${V}_prekill.txt") lines; $(grep -a 'P-EFD-HOLD start' "$OUT/dmesg_${V}_prekill.txt" | head -1 | cut -c1-160)"
 $VIRSH destroy "$V" >/dev/null 2>&1; KILL_T=$(date +%s); echo "  INFO virsh destroy $V rc=$? at $(date -u +%T) (+$(el)s)"
 

@@ -99,6 +99,7 @@
 #define MXFS_SB_MAGIC            0x4D585342  /* "MXSB" */
 #define MXFS_AGF_MAGIC           0x4D414746  /* "MAGF" */
 #define MXFS_AGI_MAGIC           0x4D414749  /* "MAGI" */
+#define MXFS_AGFL_MAGIC          0x4D41464C  /* "MAFL" */
 #define MXFS_DINODE_MAGIC        0x4D4E      /* "MN" */
 
 /* V5 CRC btree magic numbers (from kernel xfs_format.h) */
@@ -268,6 +269,8 @@ struct xfs_geo {
     uint64_t    icount;
     uint64_t    ifree;
     uint64_t    fdblocks;
+    uint64_t    logstart;       /* sb_logstart: the internal log's first fsblock */
+    uint32_t    logblocks;      /* sb_logblocks */
     uint32_t    features_ro_compat;
     bool        has_finobt;
     bool        has_ftype;      /* sb incompat FTYPE: dirents carry a type byte */
@@ -324,6 +327,11 @@ struct ag_summary {
     uint32_t    agi_freecount;  /* AGI reported free inode count */
     uint64_t    inobt_total;    /* total inodes from inobt records */
     uint64_t    inobt_free;     /* total free inodes from inobt records */
+    /* the free-space btrees are damaged and are to be rebuilt once the fork
+     * walk has mapped every block the AG owns (fo_rebuild_freesp) */
+    bool        freesp_rebuild;
+    int         freesp_errors;  /* the btree errors the rebuild resolves */
+    uint32_t    agf_length;
 };
 
 /* both directory-sharding gates present on this device (set by
@@ -3592,6 +3600,8 @@ static int check_xfs_superblock(int fd, const struct mxfs_ondisk_super *super,
     geo->icount = icount;
     geo->ifree = ifree;
     geo->fdblocks = fdblocks;
+    geo->logstart = get_be64(buf + 0x30);
+    geo->logblocks = get_be32(buf + 0x60);
     geo->features_ro_compat = features_ro_compat;
     geo->has_finobt = (features_ro_compat & XFS_SB_FEAT_RO_COMPAT_FINOBT) != 0;
     memcpy(geo->uuid, uuid, 16);
@@ -4109,100 +4119,6 @@ static uint64_t walk_freespace_btree(int fd, const struct xfs_geo *geo,
     return total;
 }
 
-/*
- * Rebuild BNO and CNT btree roots as single-extent leaves, update AGF.
- * Used when both btrees are structurally damaged and the AG has no
- * allocated inodes, so the entire AG (minus fixed metadata) is free.
- *
- * The AG layout mkfs writes (calc_ag_layout), with h = ag_hdr_blocks():
- *   blocks 0..h-1:   SB, AGF, AGI, AGFL (h = 1 at 512, 4 at 4096)
- *   block h:         BNO btree root
- *   block h+1:       CNT btree root
- *   block h+2:       inobt root
- *   block h+3:       finobt root
- *   blocks h+4..h+7: AGFL entries (pre-reserved for btree splits)
- *   blocks h+8+:     free data space
- *
- * Writes BNO/CNT roots at blocks h and h+1, each with a single record:
- * [startblock=h+8, blockcount=agf_length-(h+8)].
- * Updates AGF: bno_root, cnt_root, levels=1, freeblks, longest.
- */
-static int rebuild_freespace_btrees(int fd, const struct xfs_geo *geo,
-                                    uint32_t agno, uint32_t agf_length)
-{
-    uint32_t h = ag_hdr_blocks(geo);
-    uint32_t bno_root = h, cnt_root = h + 1;
-    uint32_t free_start = h + 8;
-    uint32_t free_len;
-    uint64_t ag_base = geo->xfs_off +
-                       (uint64_t)agno * geo->agblocks * geo->blocksize;
-    uint8_t *blk;
-    int ret;
-
-    if (agf_length <= free_start)
-        return -1;
-    free_len = agf_length - free_start;
-    blk = calloc(1, geo->blocksize);
-    if (!blk)
-        return -1;
-
-    /* Write BNO root leaf at block h */
-    put_be32(blk + 0x00, MXFS_ABTB_CRC_MAGIC);
-    /* level=0, numrecs=1 */
-    put_be32(blk + 0x04, 0x00000001);  /* level(be16)=0, numrecs(be16)=1 */
-    put_be32(blk + 0x08, 0xFFFFFFFF);  /* leftsib = null */
-    put_be32(blk + 0x0C, 0xFFFFFFFF);  /* rightsib = null */
-    put_be64(blk + 0x10, (ag_base + (uint64_t)bno_root * geo->blocksize) / 512);  /* blkno */
-    memcpy(blk + 0x20, geo->uuid, 16);
-    put_be32(blk + 0x30, agno);
-
-    /* BNO record: [startblock, blockcount] */
-    put_be32(blk + BTREE_REC_OFF, free_start);
-    put_be32(blk + BTREE_REC_OFF + 4, free_len);
-
-    ret = xfs_fix_crc_and_write(fd, blk, geo->blocksize,
-                                 BTREE_CRC_OFF,
-                                 ag_base + (uint64_t)bno_root * geo->blocksize);
-    if (ret != 0) {
-        free(blk);
-        return -1;
-    }
-
-    /* Write CNT root leaf at block h+1 — same record, different magic */
-    memset(blk, 0, geo->blocksize);
-    put_be32(blk + 0x00, MXFS_ABTC_CRC_MAGIC);
-    put_be32(blk + 0x04, 0x00000001);  /* level=0, numrecs=1 */
-    put_be32(blk + 0x08, 0xFFFFFFFF);
-    put_be32(blk + 0x0C, 0xFFFFFFFF);
-    put_be64(blk + 0x10, (ag_base + (uint64_t)cnt_root * geo->blocksize) / 512);
-    memcpy(blk + 0x20, geo->uuid, 16);
-    put_be32(blk + 0x30, agno);
-    put_be32(blk + BTREE_REC_OFF, free_start);
-    put_be32(blk + BTREE_REC_OFF + 4, free_len);
-
-    ret = xfs_fix_crc_and_write(fd, blk, geo->blocksize,
-                                 BTREE_CRC_OFF,
-                                 ag_base + (uint64_t)cnt_root * geo->blocksize);
-    free(blk);
-    if (ret != 0)
-        return -1;
-
-    /* Update AGF: bno_root, cnt_root, levels=1, freeblks, longest */
-    uint64_t agf_off = ag_base + geo->sectsize;
-    uint8_t agf_buf[MXFS_LBS_MAX];
-    if (read_at(fd, agf_buf, geo->sectsize, agf_off) != 0)
-        return -1;
-
-    put_be32(agf_buf + 0x10, bno_root);
-    put_be32(agf_buf + 0x14, cnt_root);
-    put_be32(agf_buf + 0x1C, 1);         /* bno_level = 1 */
-    put_be32(agf_buf + 0x20, 1);         /* cnt_level = 1 */
-    put_be32(agf_buf + 0x34, free_len);  /* freeblks */
-    put_be32(agf_buf + 0x38, free_len);  /* longest */
-
-    return xfs_fix_crc_and_write(fd, agf_buf, geo->sectsize, 0xD8, agf_off);
-}
-
 static void check_freespace_btrees(int fd, const struct xfs_geo *geo,
                                    uint32_t agno, const struct ag_info *agi,
                                    struct ag_summary *summary)
@@ -4275,27 +4191,24 @@ static void check_freespace_btrees(int fd, const struct xfs_geo *geo,
 
     int btree_errors = errors - pre_errors;
 
-    /* Repair: rebuild BNO/CNT btrees when structurally damaged and
-     * no inodes are allocated in this AG.  Rewrites both btree roots
-     * as single-extent leaves covering all free space in the AG. */
-    bool btree_repaired = false;
+    /* Repair: BNO/CNT btrees structurally damaged in an AG with no inodes
+     * are rebuilt, but not here.  Nothing in this pass knows which of the
+     * AG's blocks are in use: its AGFL, the log, and the extents of files
+     * whose inodes live in other AGs are all allocated, and a tree that
+     * called them free would let the allocator give each a second owner.
+     * check_fork_owners rebuilds the trees once its walk has mapped every
+     * block the AG owns (fo_rebuild_freesp). */
     if (btree_errors > 0 && can_repair() && agi->agi_count == 0) {
-        if (rebuild_freespace_btrees(fd, geo, agno, agi->agf_length) == 0) {
-            uint32_t free_len = agi->agf_length - (ag_hdr_blocks(geo) + 8);
-            printf("  REPAIRED: AG %u BNO/CNT btrees rebuilt (1 extent, %u free blocks)\n",
-                   agno, free_len);
-            repaired++;
-            btree_repaired = true;
-            /* Update summary to reflect rebuilt state */
-            summary->bno_freeblks = free_len;
-            summary->agf_freeblks = free_len;
-            bno_total = free_len;
-        }
+        summary->freesp_rebuild = true;
+        summary->freesp_errors = btree_errors;
+        summary->agf_length = agi->agf_length;
     }
 
     printf("  AG %u BNO/CNT btrees .. %s  (free=%llu blocks)\n",
            agno,
-           btree_errors == 0 ? "OK" : (btree_repaired ? "REPAIRED" : "ERRORS"),
+           btree_errors == 0 ? "OK" :
+           summary->freesp_rebuild ? "ERRORS (rebuilt after the fork ownership walk)" :
+           "ERRORS",
            (unsigned long long)bno_total);
 }
 
@@ -7140,6 +7053,10 @@ out:
 struct fo_stats {
     uint64_t inodes, extents, blocks;
     uint64_t in_free, in_chunk, twice, bad_ptr, bad_bmbt, nblocks_bad;
+    /* inode btree blocks, inode chunks or allocated inodes the walk could
+     * not read: whatever their forks own is missing from xtree_owned, so no
+     * free space may be rebuilt from it */
+    uint64_t unwalked;
     uint64_t shown;
     bool reflink;
     uint32_t *ag_in_free;   /* per AG: fork blocks the BNO btree calls free */
@@ -7365,13 +7282,18 @@ static void fo_walk_inobt(int fd, const struct xfs_geo *geo, uint32_t agno,
 {
     uint8_t *blk;
 
-    if (depth > MAX_BTREE_DEPTH)
+    if (depth > MAX_BTREE_DEPTH) {
+        st->unwalked++;
         return;
+    }
     blk = malloc(geo->blocksize);
-    if (!blk)
+    if (!blk) {
+        st->unwalked++;
         return;
+    }
     if (read_ag_block(fd, geo, agno, agbno, blk) < 0 ||
         get_be32(blk + 0x00) != MXFS_IBT_CRC_MAGIC) {
+        st->unwalked++;
         free(blk);
         return;
     }
@@ -7380,16 +7302,21 @@ static void fo_walk_inobt(int fd, const struct xfs_geo *geo, uint32_t agno,
         uint8_t *chunk = malloc(chunk_bytes);
         uint16_t numrecs = get_be16(blk + 0x06);
 
+        if (!chunk && numrecs)
+            st->unwalked++;
         for (uint16_t r = 0; chunk && r < numrecs; r++) {
             const uint8_t *rec = blk + BTREE_REC_OFF + r * 16;
             uint32_t startino = get_be32(rec + 0);
             uint16_t holemask = get_be16(rec + 4);
             uint64_t free_mask = get_be64(rec + 8);
 
-            if ((startino >> geo->inopblog) >= geo->agblocks)
+            if ((startino >> geo->inopblog) >= geo->agblocks) {
+                st->unwalked++;
                 continue;
+            }
             if (read_at(fd, chunk, chunk_bytes,
                         inode_disk_offset(geo, agno, startino)) < 0) {
+                st->unwalked++;
                 fo_report(st, "AG %u inode chunk at agino %u unreadable; its "
                           "forks cannot be walked", agno, startino);
                 continue;
@@ -7402,8 +7329,12 @@ static void fo_walk_inobt(int fd, const struct xfs_geo *geo, uint32_t agno,
                 if (free_mask & (1ULL << i))
                     continue;
                 if (get_be16(dip) != MXFS_DINODE_MAGIC ||
-                    get_be16(dip + DS_DI_MODE) == 0)
-                    continue;       /* the dirents and orphan passes own these */
+                    get_be16(dip + DS_DI_MODE) == 0) {
+                    /* the dirents and orphan passes own these; what an
+                     * allocated inode the walk cannot read owns is unknown */
+                    st->unwalked++;
+                    continue;
+                }
                 fo_inode(fd, geo, ((uint64_t)agno <<
                                    (geo->agblklog + geo->inopblog)) |
                                   (startino + i), dip, st);
@@ -7419,10 +7350,14 @@ static void fo_walk_inobt(int fd, const struct xfs_geo *geo, uint32_t agno,
             for (uint16_t i = 0; i < numrecs; i++) {
                 uint32_t child = get_be32(blk + ptr_off + i * 4);
 
-                if (child == XFS_NULLAGBLOCK || child >= geo->agblocks)
+                if (child == XFS_NULLAGBLOCK || child >= geo->agblocks) {
+                    st->unwalked++;
                     continue;
+                }
                 fo_walk_inobt(fd, geo, agno, child, depth + 1, st);
             }
+        } else {
+            st->unwalked++;
         }
     }
     free(blk);
@@ -7576,6 +7511,250 @@ out:
     return rc;
 }
 
+/* mark every block of one short-form btree (inobt or finobt) in `used`;
+ * false when a block cannot be read or is not the tree's */
+static bool fs_mark_sbtree(int fd, const struct xfs_geo *geo, uint32_t agno,
+                           uint32_t agbno, uint32_t magic, uint32_t keylen,
+                           int depth, uint8_t *used, uint32_t len)
+{
+    uint8_t *blk;
+    bool ok = true;
+
+    if (depth > MAX_BTREE_DEPTH || agbno >= len)
+        return false;
+    blk = malloc(geo->blocksize);
+    if (!blk)
+        return false;
+    if (read_ag_block(fd, geo, agno, agbno, blk) < 0 || get_be32(blk) != magic) {
+        free(blk);
+        return false;
+    }
+    used[agbno >> 3] |= (uint8_t)(1u << (agbno & 7));
+    if (get_be16(blk + 4) > 0) {
+        uint16_t numrecs = get_be16(blk + 6);
+        uint32_t ptr_off = sbtree_ptr_off(geo->blocksize, keylen);
+
+        if (numrecs > sbtree_node_maxrecs(geo->blocksize, keylen))
+            ok = false;
+        for (uint16_t i = 0; ok && i < numrecs; i++)
+            ok = fs_mark_sbtree(fd, geo, agno, get_be32(blk + ptr_off + i * 4),
+                                magic, keylen, depth + 1, used, len);
+    }
+    free(blk);
+    return ok;
+}
+
+/* write one rebuilt free-space leaf: `v` its n records, at AG block `root` */
+static int fs_write_leaf(int fd, const struct xfs_geo *geo, uint32_t agno,
+                         uint32_t root, uint32_t magic, const struct fo_ext *v,
+                         uint32_t n, uint8_t *blk)
+{
+    uint64_t off = geo->xfs_off + (uint64_t)agno * geo->agblocks * geo->blocksize +
+                   (uint64_t)root * geo->blocksize;
+
+    memset(blk, 0, geo->blocksize);
+    put_be32(blk + 0x00, magic);
+    blk[6] = (uint8_t)(n >> 8);                 /* level 0, numrecs (be16) */
+    blk[7] = (uint8_t)n;
+    put_be32(blk + 0x08, XFS_NULLAGBLOCK);      /* leftsib */
+    put_be32(blk + 0x0C, XFS_NULLAGBLOCK);      /* rightsib */
+    put_be64(blk + 0x10, off / 512);            /* blkno */
+    memcpy(blk + 0x20, geo->uuid, 16);
+    put_be32(blk + 0x30, agno);                 /* owner */
+    for (uint32_t i = 0; i < n; i++) {
+        put_be32(blk + BTREE_REC_OFF + (size_t)i * 8, v[i].start);
+        put_be32(blk + BTREE_REC_OFF + (size_t)i * 8 + 4, v[i].count);
+    }
+    return xfs_fix_crc_and_write(fd, blk, geo->blocksize, BTREE_CRC_OFF, off);
+}
+
+/*
+ * THE REBUILD of an AG's damaged BNO and CNT btrees
+ * (D-CHK-FREESPACE-REBUILD-DECLARES-OWNED-BLOCKS-FREE-AGFL-LOG-AND-DATA).  A
+ * block is free when nothing owns it, so the free space is what is left of the
+ * AG once every owner has been marked: the header sectors, the two new roots,
+ * the inode and free-inode btrees, the blocks on the AGFL, the internal log,
+ * the inode chunks, and every block a fork of any inode in any AG names
+ * (xtree_owned, which this walk has just completed).  Never from fixed block
+ * numbers: the AGFL, the log and the data of files whose inodes live in other
+ * AGs all sit inside an AG with no inodes.
+ *
+ * Refused, leaving the AG unrepaired, whenever the map cannot be complete or
+ * the result cannot be written as this writes it: a walk that could not read
+ * an inode btree block, a chunk or an allocated inode; a fork the walk could
+ * not follow; an ownership conflict in the AG; reverse-mapping or shared
+ * extents (their trees would no longer agree); an AGFL or inode btree that
+ * cannot be read; roots that something owns; or free space that needs more
+ * than one leaf.  The roots go where mkfs puts them, blocks h and h+1.
+ */
+static void fo_rebuild_freesp(int fd, const struct xfs_geo *geo, uint32_t agno,
+                              const struct fo_stats *st,
+                              struct ag_summary *summary)
+{
+    uint32_t len = summary->agf_length, h = ag_hdr_blocks(geo);
+    uint64_t ag_base = geo->xfs_off + (uint64_t)agno * geo->agblocks * geo->blocksize;
+    uint64_t agf_off = ag_base + geo->sectsize;
+    uint8_t agf[MXFS_LBS_MAX], agi[MXFS_LBS_MAX], agfl[MXFS_LBS_MAX];
+    uint8_t *used = NULL, *blk = NULL;
+    struct fo_ext *ext = NULL, *cnt = NULL;
+    uint32_t maxrecs = (geo->blocksize - BTREE_REC_OFF) / 8, n = 0, longest = 0;
+    uint32_t flfirst = 0, flcount = 0, nbno = 0, old_free = 0;
+    uint64_t newfree = 0;
+    const char *why = NULL;
+
+    if (st->unwalked || st->bad_ptr || st->bad_bmbt)
+        why = "the fork walk could not read every inode, so what the AG owns is not known";
+    else if (st->ag_other && st->ag_other[agno])
+        why = "a fork in this AG has another ownership finding";
+    else if (geo->features_ro_compat & ((1u << 1) | (1u << 2)))
+        why = "the filesystem has reverse mapping or shared extents, whose trees this rebuild does not write";
+    else if (len == 0 || len > geo->agblocks || len <= h + 2)
+        why = "the AGF length is not usable";
+    if (why)
+        goto refuse;
+    used = calloc((len + 7) / 8, 1);
+    blk = malloc(geo->blocksize);
+    ext = calloc(maxrecs, sizeof(*ext));
+    cnt = calloc(maxrecs, sizeof(*cnt));
+    if (!used || !blk || !ext || !cnt) {
+        why = "out of memory";
+        goto refuse;
+    }
+#define FS_USE(b) (used[(b) >> 3] |= (uint8_t)(1u << ((b) & 7)))
+#define FS_USED(b) (used[(b) >> 3] & (1u << ((b) & 7)))
+    for (uint32_t b = 0; b < h; b++)
+        FS_USE(b);
+    /* the inode btrees: their roots and every block below them */
+    if (read_at(fd, agi, geo->sectsize, ag_base + 2 * geo->sectsize) < 0 ||
+        get_be32(agi) != MXFS_AGI_MAGIC ||
+        !fs_mark_sbtree(fd, geo, agno, get_be32(agi + 0x14), MXFS_IBT_CRC_MAGIC,
+                        4, 0, used, len) ||
+        (geo->has_finobt &&
+         !fs_mark_sbtree(fd, geo, agno, get_be32(agi + 0x148), MXFS_FIBT_CRC_MAGIC,
+                         4, 0, used, len))) {
+        why = "the inode btrees cannot be read whole";
+        goto refuse;
+    }
+    /* the AGFL's blocks, flcount of them from flfirst, circular */
+    if (read_at(fd, agf, geo->sectsize, agf_off) < 0 || get_be32(agf) != MXFS_AGF_MAGIC ||
+        read_at(fd, agfl, geo->sectsize, ag_base + 3 * geo->sectsize) < 0 ||
+        get_be32(agfl) != MXFS_AGFL_MAGIC) {
+        why = "the AGF or the AGFL cannot be read";
+        goto refuse;
+    }
+    nbno = (geo->sectsize - 0x24) / 4;
+    flfirst = get_be32(agf + 0x28);
+    flcount = get_be32(agf + 0x30);
+    old_free = get_be32(agf + 0x34);
+    if (flcount > nbno || (flcount && flfirst >= nbno)) {
+        why = "the AGF's free list is out of range";
+        goto refuse;
+    }
+    for (uint32_t i = 0; i < flcount; i++) {
+        uint32_t b = get_be32(agfl + 0x24 + (size_t)((flfirst + i) % nbno) * 4);
+
+        if (b >= len) {
+            why = "an AGFL entry names a block outside the AG";
+            goto refuse;
+        }
+        FS_USE(b);
+    }
+    /* the internal log, when it lives in this AG */
+    if (geo->logstart && (geo->logstart >> geo->agblklog) == agno) {
+        uint64_t lb = geo->logstart & ((1ULL << geo->agblklog) - 1);
+
+        if (lb + geo->logblocks > len) {
+            why = "the log runs past the AG's end";
+            goto refuse;
+        }
+        for (uint64_t b = lb; b < lb + geo->logblocks; b++)
+            FS_USE(b);
+    }
+    /* the inode chunks and every block a fork names */
+    for (uint32_t b = 0; b < len; b++) {
+        uint64_t g = (uint64_t)agno * xtree_agblocks + b;
+        uint8_t bit = (uint8_t)(1u << (g & 7));
+
+        if ((xtree_chunk[g >> 3] & bit) || (xtree_owned[g >> 3] & bit))
+            FS_USE(b);
+    }
+    if (FS_USED(h) || FS_USED(h + 1)) {
+        why = "a block where the new BNO or CNT root goes is owned";
+        goto refuse;
+    }
+    FS_USE(h);
+    FS_USE(h + 1);
+    for (uint32_t b = 0; b < len; ) {
+        uint32_t start;
+
+        if (FS_USED(b)) {
+            b++;
+            continue;
+        }
+        start = b;
+        while (b < len && !FS_USED(b))
+            b++;
+        if (n == maxrecs) {
+            why = "the free space would need more than one leaf";
+            goto refuse;
+        }
+        ext[n].start = start;
+        ext[n].count = b - start;
+        newfree += ext[n].count;
+        if (ext[n].count > longest)
+            longest = ext[n].count;
+        n++;
+    }
+#undef FS_USE
+#undef FS_USED
+    memcpy(cnt, ext, (size_t)n * sizeof(*cnt));
+    qsort(cnt, n, sizeof(*cnt), fo_ext_cnt_cmp);
+    if (fs_write_leaf(fd, geo, agno, h, MXFS_ABTB_CRC_MAGIC, ext, n, blk) != 0 ||
+        fs_write_leaf(fd, geo, agno, h + 1, MXFS_ABTC_CRC_MAGIC, cnt, n, blk) != 0) {
+        why = "a rebuilt root could not be written";
+        goto refuse;
+    }
+    put_be32(agf + 0x10, h);                    /* bno_root */
+    put_be32(agf + 0x14, h + 1);                /* cnt_root */
+    put_be32(agf + 0x1C, 1);                    /* bno_level */
+    put_be32(agf + 0x20, 1);                    /* cnt_level */
+    put_be32(agf + 0x34, (uint32_t)newfree);    /* freeblks */
+    put_be32(agf + 0x38, longest);              /* longest */
+    put_be32(agf + 0x3C, 0);                    /* btreeblks: two roots, no more */
+    if (xfs_fix_crc_and_write(fd, agf, geo->sectsize, 0xD8, agf_off) != 0) {
+        why = "the AGF could not be written";
+        goto refuse;
+    }
+    /* the free map follows the rebuilt trees, for the aliasing check */
+    for (uint32_t b = 0; b < len; b++) {
+        uint64_t g = (uint64_t)agno * xtree_agblocks + b;
+
+        xtree_free[g >> 3] &= (uint8_t)~(1u << (g & 7));
+    }
+    for (uint32_t i = 0; i < n; i++)
+        xtree_mark(xtree_free, agno, ext[i].start, ext[i].count);
+    total_bno_freeblks += newfree - summary->bno_freeblks;
+    total_agf_freeblks += newfree - summary->agf_freeblks;
+    summary->bno_freeblks = newfree;
+    summary->agf_freeblks = (uint32_t)newfree;
+    summary->agf_reserve = flcount;
+    /* the trees' own errors, and the fork blocks the damaged BNO tree called
+     * free: the rebuilt trees free none of them */
+    repaired += summary->freesp_errors +
+                (st->ag_in_free ? (int)st->ag_in_free[agno] : 0);
+    printf("  REPAIRED: AG %u BNO/CNT btrees rebuilt from the blocks the AG owns: "
+           "roots %u and %u, %u extent(s), freeblks %u -> %llu, longest %u\n",
+           agno, h, h + 1, n, old_free, (unsigned long long)newfree, longest);
+    goto out;
+refuse:
+    printf("  NOT REPAIRED: AG %u BNO/CNT btrees not rebuilt: %s\n", agno, why);
+out:
+    free(used);
+    free(blk);
+    free(ext);
+    free(cnt);
+}
+
 static void check_fork_owners(int fd, const struct xfs_geo *geo,
                               struct ag_summary *ag_summaries)
 {
@@ -7585,6 +7764,10 @@ static void check_fork_owners(int fd, const struct xfs_geo *geo,
     if (!xtree_chunk || !xtree_free || !xtree_owned) {
         err("fork ownership: no block map (out of memory) — the forks were "
             "not checked against free space");
+        for (uint32_t agno = 0; agno < geo->agcount; agno++)
+            if (ag_summaries[agno].freesp_rebuild)
+                printf("  NOT REPAIRED: AG %u BNO/CNT btrees not rebuilt: no "
+                       "block map\n", agno);
         return;
     }
     st.reflink = (geo->features_ro_compat & (1u << 2)) != 0;   /* REFLINK */
@@ -7598,20 +7781,30 @@ static void check_fork_owners(int fd, const struct xfs_geo *geo,
         uint32_t ino_root, ino_level;
 
         if (read_at(fd, agi_buf, geo->sectsize, agi_off) < 0 ||
-            get_be32(agi_buf + 0x00) != MXFS_AGI_MAGIC)
+            get_be32(agi_buf + 0x00) != MXFS_AGI_MAGIC) {
+            st.unwalked++;
             continue;
+        }
         ino_root  = get_be32(agi_buf + 0x14);
         ino_level = get_be32(agi_buf + 0x18);
         if (ino_level >= 1 && ino_root < geo->agblocks)
             fo_walk_inobt(fd, geo, agno, ino_root, 0, &st);
+        else
+            st.unwalked++;
     }
+    /* damaged free-space trees, now that the map of what each AG owns is
+     * whole: rebuilt from it, or refused */
+    for (uint32_t agno = 0; agno < geo->agcount; agno++)
+        if (ag_summaries[agno].freesp_rebuild)
+            fo_rebuild_freesp(fd, geo, agno, &st, &ag_summaries[agno]);
     /* the one finding with a repair: fork blocks free in BNO, in an AG with
-     * no other ownership finding */
+     * no other ownership finding whose trees were not just rebuilt */
     if (st.in_free && can_repair() && st.ag_in_free && st.ag_other) {
         for (uint32_t agno = 0; agno < geo->agcount; agno++) {
             uint64_t removed = 0;
 
-            if (!st.ag_in_free[agno] || st.ag_other[agno])
+            if (!st.ag_in_free[agno] || st.ag_other[agno] ||
+                ag_summaries[agno].freesp_rebuild)
                 continue;
             if (fo_repair_ag(fd, geo, agno, &removed) != 0)
                 continue;

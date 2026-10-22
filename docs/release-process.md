@@ -181,6 +181,7 @@ Every decision that stops something blocking a release goes through a proposal:
 | `remove-fixed`, `remove-disproved` | removes the record | as above |
 | `detector-defect` | settles one run as the detector's fault | the run, the evidence, and the detector fix already in the tree |
 | `infra-proven` | settles one run as the rig's fault | the run and the positive evidence from outside MeshXFS |
+| `exception` | the record stops blocking one configuration in one release (it stays open) | the owner's exception in the policy file, naming the record, the configuration and the release, with the question and the owner's answer |
 
 1. `defects.py propose <kind> ... --argument "..." --evidence <path> ...` records the proposal as
    pending. Every evidence path must exist in the tree.
@@ -195,6 +196,13 @@ Every decision that stops something blocking a release goes through a proposal:
 **The owner approves the gate itself:** the policy numbers, the gate rules and any exception.
 Each approval is recorded in `data/release_policy.json` with the question and the answer.
 Publishing stays delegated, because the publisher decides nothing.
+
+**An exception takes both keys.** The owner grants it in the policy file's `exceptions`, for
+named records at named configurations in one release. It changes nothing until an `exception`
+proposal applying exactly that is approved and `defects.py except <id> --at X --candidate C
+--approval P` records it on the record (`excepted_at`). The record stays open with its bar and
+reach, blocks every other configuration and release, and blocks this one again if the policy stops
+granting the exception.
 
 The reviewer agent returns a verdict, not raw evidence. That is deliberate: its job is to judge
 the evidence another agent assembled, and its review file is kept as the record of that
@@ -213,6 +221,7 @@ the same file.
 | `required_runs` | 1 | PASSes a cell needs on the candidate in the coverage pass |
 | `repeat_rows` | default-path fault and recovery rows, `sustained_load` and `soak` | what the detection budget repeats |
 | `default_install` | `net/mesh/*` | what a package installed with its defaults runs |
+| `exceptions` | per release | open records the owner let stop blocking named configurations in that release |
 
 ## The default install path
 

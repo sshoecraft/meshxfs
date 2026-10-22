@@ -2310,8 +2310,179 @@
           "config": "1/any",
           "row": "release:packages",
           "iso": "2026-10-21T21:49:29Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:11Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:13Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:15Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:16Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:18Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:20Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:22Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:24Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:25Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:27Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:29Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:32Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:34Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:36Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:38Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:41Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:43Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:vm_package_build_deb",
+          "iso": "2026-10-22T18:11:45Z"
         }
-      ]
+      ],
+      "batches": [
+        {
+          "id": "b20261022-f44545",
+          "kind": "control",
+          "row": "lap:vm_package_build_deb",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 20,
+          "probe": "PKG_INPUTS deb|could not pack the package inputs",
+          "candidate": "",
+          "build": "2446C4C6401FC9D9224650F",
+          "variant": "fix reverted: tests/evidence/controls/D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C.fix.diff sha256=02753e662dadfd2818520050636347dd9c5334a555120d67149c7dfad7588393",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "mxfs.c back in the package input list: tar must refuse and no package build; the build has no configuration, so the laps are kept at the packaged default 2/net/mesh/direct"
+        },
+        {
+          "id": "b20261022-1666e5",
+          "kind": "verify",
+          "row": "lap:vm_package_build_deb",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 4,
+          "probe": "PKG_INPUTS deb|could not pack the package inputs",
+          "candidate": "",
+          "build": "2446C4C6401FC9D9224650F",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:vm_package_build_deb",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-f44545",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C.fix.diff sha256=02753e662dadfd2818520050636347dd9c5334a555120d67149c7dfad7588393",
+            "builds": [
+              "2446C4C6401FC9D9224650F"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
+        }
+      ],
+      "updated": "2026-10-22",
+      "rates": [
+        {
+          "row": "lap:vm_package_build_deb",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-f44545",
+          "k": 20,
+          "n": 20,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C.fix.diff sha256=02753e662dadfd2818520050636347dd9c5334a555120d67149c7dfad7588393",
+          "builds": [
+            "2446C4C6401FC9D9224650F"
+          ],
+          "date": "2026-10-22"
+        }
+      ],
+      "reproducer": "one lap is tools/batch_lap.py --batch <batch> --at 2/net/mesh/direct --row lap:vm_package_build_deb --bound <s> --pass 'PKG_BUILD_OK deb' --fail 'PKG_BUILD_FAIL' -- scripts/vm_package_build.sh deb (tools/harness_batch.py drives the laps of a batch): the script packs the tree's package input list and builds on debian12-1; with mxfs.c in INPUTS tar cannot stat it and the lap prints PKG_BUILD_FAIL deb: could not pack the package inputs. A lap measured 24-37 s with the fix in, so its bound is 2x the slowest, 75 s"
     },
     {
       "id": "D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E-AND-NO-WWN-BYID-LINK",
@@ -2559,9 +2730,29 @@
       "config": "*/*/*",
       "opened": "2026-10-21",
       "summary": "A TCP node that dies holding an open EFI (rm of fragmented files, EFD held) is not recovered: the survivor's foreign replay refuses 37 of the 38 transactions in its slice as touching images the victim did not hold (not-held), the whole replay is refused (P241-RECOV-TERMINAL reason=1 POLICY_REFUSED_COMPLETE, refused=45), and the victim's domain is quarantined cluster-wide with its slot frozen until operator action, where the fix build is designed to complete the open obligation case (P226-FR-INTENTS-RECOVERABLE)",
-      "evidence": "2026-10-22 0.90.134 build 0988C50EC610F82EE08D135, test1 (W) / test2 (V), 2/net/mesh/direct pool LUN eui.6664363939643231, fix build (obl_complete_enable=1): tests/d_intents_2tcp_open_efi.sh healthy lap through tests/capture_fault_gate.sh 0.90.134-harnessfix --healthy-only (evidence tests/evidence/20261022T040719Z_intents2tcp_0.90.134-harnessfix-d_intents_2tcp_open_efi-ok): V built 8 files of 4096 extents, W listed and read them (published), V entered the EFD hold with a durable EFI (P-EFD-HOLD start=3416125), virsh destroy test2, W elected to replay slot 1, census P226-ICENSUS victim_slot=1 intents=217 dones=216 ambiguous_dones=215 open=194 extents=389; then P-FR-CANCEL-PASS1 txns=38 refused=37 cancel_kept=1, P227-FR-REFUSED-WHY why: not-held=2 / not-held=8 (images class=3 res=18874496/18874498 gepoch 8/9), P241-RECOV-TERMINAL slot=1 reason=1 domain=1 refused=45, P241-RECOV-TERMINAL-IMPORT, P240-QUAR-IMPORT; FAIL replay SUCCEEDED with an OPEN obligation case got=no. P-TAUTH-SEAL for the victim at 1799.94, the replay at 1804.53. Probe counts in dmesg_test1.txt: P226-ICENSUS-DONE-AMBIGUOUS 109, -INTENT 91, -OPEN 16. This harness had measured nothing since its IMG precondition broke (D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG-AND-DIES-BEFORE-MEASURING), so when this began is not known.",
-      "next": "establish why the victim's images read not-held at the replay gate (the authority each refused image needed, what the ledger recorded for it, and the P-TAUTH-SEAL purge ordering); rerun the lap on the last build it passed on to bound when it started; nothing is changed until the cause is proven",
-      "reproducer": "tests/d_intents_2tcp_open_efi.sh <label> test1 test2 with CHURN=0 MODE=complete on a TCP pair on the fix build; reached on its first healthy lap after the IMG fix"
+      "evidence": "2026-10-22 0.90.134 build 0988C50EC610F82EE08D135, test1 (W) / test2 (V), 2/net/mesh/direct pool LUN eui.6664363939643231, fix build (obl_complete_enable=1): tests/d_intents_2tcp_open_efi.sh healthy lap through tests/capture_fault_gate.sh 0.90.134-harnessfix --healthy-only (evidence tests/evidence/20261022T040719Z_intents2tcp_0.90.134-harnessfix-d_intents_2tcp_open_efi-ok): V built 8 files of 4096 extents, W listed and read them (published), V entered the EFD hold with a durable EFI (P-EFD-HOLD start=3416125), virsh destroy test2, W elected to replay slot 1, census P226-ICENSUS victim_slot=1 intents=217 dones=216 ambiguous_dones=215 open=194 extents=389; then P-FR-CANCEL-PASS1 txns=38 refused=37 cancel_kept=1, P227-FR-REFUSED-WHY why: not-held=2 / not-held=8 (images class=3 res=18874496/18874498 gepoch 8/9), P241-RECOV-TERMINAL slot=1 reason=1 domain=1 refused=45, P241-RECOV-TERMINAL-IMPORT, P240-QUAR-IMPORT; FAIL replay SUCCEEDED with an OPEN obligation case got=no. P-TAUTH-SEAL for the victim at 1799.94, the replay at 1804.53. Probe counts in dmesg_test1.txt: P226-ICENSUS-DONE-AMBIGUOUS 109, -INTENT 91, -OPEN 16. This harness had measured nothing since its IMG precondition broke (D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG-AND-DIES-BEFORE-MEASURING), so when this began is not known. ===== ===== 2026-10-22 CAUSE PROVEN (instrumented): the refused tenures are inactivation tenures released unmarked. Reproduced on the 0.90.134 tree build 2446C4C6401FC9D9224650F through tests/capture_fault_gate.sh openefi_repro_20261022T180946Z --healthy-only --only d_intents_2tcp_open_efi (g2, test1 W / test2 V): FAIL replay SUCCEEDED with an OPEN obligation case got=no. The harness now keeps the victim's whole pre-kill log (it used to keep 7 probes and no release line): tests/evidence/20261022T181031Z_intents2tcp_openefi_repro_20261022T180946Z-d_intents_2tcp_open_efi-ok/dmesg_test2_prekill.txt holds P-RELMARK-OWED site=inact-exrel for exactly ino 2097280 gepoch 7, 2097284 gepoch 8, 2097285 gepoch 9 and 2097281 gepoch 10 (freed=0), and dmesg_test1.txt refuses exactly those four tenures not-held (94/90/81/86 images) with relmarks=0 REDUNDANT_CLEAN=0 notheld=351. Sequence for 2097280: P-INACT-EX epoch 7, truncate 0.81 s, P-UNLPRE-SKIP rc=-11 (deferred free), P-IFREE-DEFER-DIRTY drain=1 drained=1, P-RELMARK-OWED, P128-INACT-EXREL freed=0. The INACT-EXREL release in xfs/xfs_inode.c (the instrument-only block before the unlock) publishes no clean-release marker, and the held EFI keeps the tenure's transactions in the replay window, so the survivor can prove neither held-at-death (the manifest no longer lists it) nor clean release. ===== ===== 2026-10-22 FIX in the tree: xfs/xfs_inode.c, at the INACT-EXREL release, a tenure that stamped a token (the P-RELMARK-OWED condition), not ICLUS-routed, with the core home (!mxfs_inact_owes_home), not shut down or unmounting, gets blkdev_issue_flush then mxfs_inode_relmark_before_unlock(who inact/inact-free) before the unlock, probe P-RELMARK-INACT; module option inact_relmark (xfs/xfs_mxfs_dlm.c, 1 default, 0 the same-build control). Build 9594B08726D6732D2ED5E87. Fix-on lap: MXFS_GROUP=g2 tests/capture_fault_gate.sh openefi_fixon_20261022T183915Z --healthy-only --only d_intents_2tcp_open_efi: GATE rc=0 fails=0 -> OK, RESULT: PASS vacuous=0 (tests/evidence/20261022T183915Z_capture_gate_openefi_fixon_20261022T183915Z); victim dmesg_test2_prekill.txt P-RELMARK-OWED 5, P-RELMARK-INACT 5 all rc=0 us=452-619; survivor dmesg_test1.txt relmarks=5 REDUNDANT_CLEAN=339 notheld=0, P-FR-CANCEL-PASS1 txns=36 refused=0.",
+      "next": "control batch of the gate lap with MXFS_EXTRA_MODARGS=inact_relmark=0 (the same build, released unmarked as before): it must refuse the replay; then the verification batch on the candidate, sized from it",
+      "reproducer": "tests/d_intents_2tcp_open_efi.sh <label> test1 test2 with CHURN=0 MODE=complete on a TCP pair on the fix build; reached on its first healthy lap after the IMG fix",
+      "updated": "2026-10-22",
+      "batches": [
+        {
+          "id": "b20261022-8375dc",
+          "kind": "control",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "P-RELMARK-OWED site=inact-exrel",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "inact_relmark=0 (sysfs on the formed pair, MXFS_EXTRA_MODARGS on every re-formed one): the same build releasing an inactivation's tenure unmarked, as before the fix",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the clean-release marker at the inactivation's release switched off: the survivor must refuse the replay not-held again"
+        }
+      ]
     },
     {
       "id": "D-TCP-STALE-RESEND-CANDIDATES-SHARE-ONE-ROUTING-SHARD-SO-ONE-MASTER-DRAW",
@@ -2582,11 +2773,11 @@
       "config": "*/*/*",
       "opened": "2026-10-22",
       "summary": "chk_mxfs repair rebuilds an AG free-space btrees (rebuild_freespace_btrees, called from check_freespace_btrees when the AG has btree errors and agi_count == 0) as one extent from block 8 to the end of the AG. Three kinds of owned block fall inside it: (1) block 8 is the fourth AGFL block on the layout mkfs writes at 512 (mkfs_mxfs.c calc_ag_layout: roots 1-4, AGFL 5-8, free from 9); (2) on the log AG the log starts at block 5, so the whole log is declared free; (3) agi_count == 0 means no inode chunk in the AG, not no data: extents of files whose inodes live in other AGs are declared free. Any allocation afterwards can give one of those blocks a second owner.",
-      "evidence": "Code read 2026-10-22: tools/chk_mxfs.c rebuild_freespace_btrees free_start = 8, free_len = agf_length - 8, roots at blocks 1 and 2; check_freespace_btrees calls it under (btree_errors > 0 && can_repair() && agi->agi_count == 0) with no check of the AGFL contents, the log placement or any block ownership map. tools/mkfs_mxfs.c calc_ag_layout: meta = hdr_blocks() + 4, agfl_blocks = meta..meta+3, free_start = meta + 4 (9 at 512); log AG: log at meta, AGFL after the log. Not yet reproduced on an image. ===== ===== 2026-10-22, partial change in the tree (the 4K-native chk_mxfs work, 0.90.134): rebuild_freespace_btrees now takes its positions from the layout mkfs writes, h = ag_hdr_blocks() (1 at 512, 4 at 4096): BNO root at h, CNT at h+1, free extent from h+8, and refuses an AG no longer than h+8. At 4096 this is verified by tests/chk_4kn_controls.sh (AG 3 of a 4-AG 4 GiB 4K-native image, BNO root magic broken, chk_mxfs -y: AGF bno_root=4 cnt_root=5, rebuilt record [12, agf_length-12] = 203359 blocks, recheck clean). At 512 the same expression gives roots 1 and 2 and free space from 9, which removes cause (1), the AGFL block 8 overlap; that has NOT been run at 512. Causes (2) the log AG and (3) file data in an AG with no inodes are unchanged: nothing proves the AG owns nothing past its fixed blocks before the rebuild runs. Record stays open.",
-      "next": "Reproduce on a 512-byte image: corrupt a non-log AG BNO root with no inodes, run chk_mxfs repair, then show the rebuilt BNO record starting at 8 while the AGF/AGFL still name block 8; then a log AG. Fix: the rebuild must derive free space from a complete block ownership map of the AG (headers, roots, AGFL entries, log, every fork extent from every AG inode), or refuse and leave the AG unrepaired; never from fixed block numbers.",
+      "evidence": "Code read 2026-10-22: tools/chk_mxfs.c rebuild_freespace_btrees free_start = 8, free_len = agf_length - 8, roots at blocks 1 and 2; check_freespace_btrees calls it under (btree_errors > 0 && can_repair() && agi->agi_count == 0) with no check of the AGFL contents, the log placement or any block ownership map. tools/mkfs_mxfs.c calc_ag_layout: meta = hdr_blocks() + 4, agfl_blocks = meta..meta+3, free_start = meta + 4 (9 at 512); log AG: log at meta, AGFL after the log. Not yet reproduced on an image. ===== ===== 2026-10-22, partial change in the tree (the 4K-native chk_mxfs work, 0.90.134): rebuild_freespace_btrees now takes its positions from the layout mkfs writes, h = ag_hdr_blocks() (1 at 512, 4 at 4096): BNO root at h, CNT at h+1, free extent from h+8, and refuses an AG no longer than h+8. At 4096 this is verified by tests/chk_4kn_controls.sh (AG 3 of a 4-AG 4 GiB 4K-native image, BNO root magic broken, chk_mxfs -y: AGF bno_root=4 cnt_root=5, rebuilt record [12, agf_length-12] = 203359 blocks, recheck clean). At 512 the same expression gives roots 1 and 2 and free space from 9, which removes cause (1), the AGFL block 8 overlap; that has NOT been run at 512. Causes (2) the log AG and (3) file data in an AG with no inodes are unchanged: nothing proves the AG owns nothing past its fixed blocks before the rebuild runs. Record stays open. ===== 2026-10-22, the fix in the tree (0.90.134): check_freespace_btrees no longer rebuilds; it marks the AG, and check_fork_owners rebuilds it (fo_rebuild_freesp) after the fork walk has marked every block any fork of any inode in any AG names (xtree_owned) and every inode chunk (xtree_chunk). The free space is what is left of the AG once the header sectors, the new roots at h and h+1, every inobt and finobt block, the AGF's AGFL entries and the internal log (sb_logstart/sb_logblocks, when in this AG) are marked too; the trees are written as one leaf each, btreeblks 0. It refuses, leaving the AG unrepaired, when the fork walk could not read an AGI, an inobt block, a chunk or an allocated inode (new fo_stats.unwalked), when any fork had a bad pointer or bmbt, on an ownership conflict in the AG, on rmapbt/reflink, when the roots' blocks are owned, or when the result needs more than one leaf. Control: tests/chk_freespace_rebuild_controls.sh formats a fresh 4 GiB image (fixed inputs, 4 AGs), and for every AG with no inodes (the log AG among them) breaks its BNO root magic, runs chk_mxfs -y and requires the rebuilt BNO records, freeblks and longest to be the ones mkfs wrote, then a clean check. tests/evidence/20261022T163657Z_chk_freespace_rebuild: the fixed chk_mxfs at 512 (new_512.log) and 4096 (new_4096.log) 24 PASS 0 FAIL, AGs 1, 2 (log) and 3; the 0.90.132 chk_mxfs (old_0.90.132_512.log, from dist/0.90.132/mxfs_0.90.132_amd64.deb) 9 FAIL: AGs 1 and 3 rebuilt as [8 246471] and [8 246470] against mkfs's [9 246470] and [9 246469] (AGFL block 8 declared free, cause 1), AG 2 as [8 246471] against [65545 180934] (the whole log, blocks 5-65540, declared free, cause 2), and that checker then called each repaired volume clean. tests/chk_4kn_controls.sh 17/17 PASS on the fixed checker. Cause 3 (data of a file whose inode is in another AG) is not in the offline control: it needs a mounted volume.",
+      "next": "Cause 3 on a rig node: a 2 GiB-capped format (mkfs -d 2G, two AGs, AG 1 the log AG with no inodes), one node mounts, a file in the root directory fallocated past AG 0's free space so its extents spill into AG 1, unmount, break AG 1's BNO root, chk_mxfs -y, then a clean check (the fork walk calls a fork block the BNO tree frees an error) and the rebuilt records exclude the file's AG 1 extents. Then a board row carrying the controls, a fix-off control batch on the reverted source and a fix-on verification batch sized from it, and remove --fixed.",
       "impact": "integrity",
       "impact_why": "Read from the code: the rebuilt BNO/CNT leaves name blocks the AG still owns as free, and the allocator hands a free block to a new owner, so two owners end up holding one block.",
-      "reproducer": "chk_mxfs repair on an image whose AG has damaged BNO/CNT btrees and agi_count 0 (to be written as a test under tests/)",
+      "reproducer": "tests/chk_freespace_rebuild_controls.sh <label> <chk_mxfs binary> (host only, no rig): exit 1 with the rebuilt BNO records differing from mkfs's on any AG with no inodes",
       "updated": "2026-10-22"
     },
     {
@@ -2598,7 +2789,27 @@
       "summary": "tests/fourkn_merge_2node.sh holds each node's first 64 merged inode-block writes 20 ms between the read and the COMPARE AND WRITE so a peer's write of the same block lands in between, but it lands only in most laps: of 4 held laps on the 4K-native LUN, 1 saw no MISCOMPARE and exited VACUOUS, so one lap does not reliably exercise the merged write's retry",
       "evidence": "Held laps (HOLD_N=64 HOLD_MS=20), module 2666D8544F367E3B7424B60, test31/test32: tests/evidence/20261022T135408Z_fourkn_merge_2-net-mesh-direct miscompares 1 (PASS); 20261022T135619Z_fourkn_merge_2-disk-caw-direct 1 (PASS); 20261022T145928Z_fourkn_merge_2-disk-caw-direct 0 (VACUOUS: iwr_merge_blocks 247 and 221, dbg_iwr_merge_hold_left=0 on both, so every hold was spent with no peer write inside it); 20261022T154721Z_fourkn_merge_2-disk-caw-direct 2 (PASS). Unheld, 0 MISCOMPAREs in ~480 merged writes a lap (20261022T133714Z, 134001Z, 134249Z). Every VACUOUS lap passed every correctness check; the lap never reads one as PASS.",
       "next": "Make the overlap certain instead of likely: have the hold wait for the peer's swap of the same block (or land a scripted peer write of it) inside the window, or measure the MISCOMPARE rate against HOLD_MS and HOLD_N and size the hold so a lap without one is rare enough to grade; until then rerun a VACUOUS lap, never count it.",
-      "reproducer": "tests/fourkn_merge_2node.sh <4Kn dev> test31 test32 with the default hold; count laps whose iwr_merge_miscompares is 0 on both nodes (exit 3)"
+      "reproducer": "tests/fourkn_merge_2node.sh <4Kn dev> test31 test32 with the default hold; count laps whose iwr_merge_miscompares is 0 on both nodes (exit 3)",
+      "batches": [
+        {
+          "id": "b20261022-02b816",
+          "kind": "control",
+          "row": "fourkn_merge",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 20,
+          "probe": "",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the hold that waits for the peer's swap switched off: laps with no MISCOMPARE (VACUOUS) must come back"
+        }
+      ],
+      "updated": "2026-10-22"
     },
     {
       "id": "D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT-IS-NEVER-LOGGED-OUT-AT-SHUTDOWN",
@@ -2610,6 +2821,197 @@
       "evidence": "Mechanism measured with the same hand login on the 4K-native LUN (tests/fourkn_lun.sh), test31/test32: tests/evidence/20261022T150025Z_fourkn_shutdown_bare (after a merge lap) and 20261022T150432Z_fourkn_shutdown_bare (mxfs never loaded), both nodes HUNG: network down with the session up, lvm2-monitor's vgchange --monitor n opened the LUN for its label scan and its read was never answered (iSCSI ping timeout 9 s later, 120 s replacement timeout); starting open-iscsi.service after the login (20261022T154826Z_fourkn_shutdown_bare) logged the session out before the network and both nodes were off in 2 s. tools/lun_pool.sh:297-302 (single path) and :359-363 (multipath) delete every node record and log in by hand with node.startup=automatic, so a node is exposed until its next boot: a freshly built VM, or one whose records another tool removed (tests/fourkn_lun.sh's login deletes them all), in the boot of its first bind. Not yet observed on a pool LUN: at 2026-10-22 14:23 UTC every pool VM shut down with its session logged out (host kernel log logout_exec for test1, test2, test15, test16).",
       "next": "Start open-iscsi.service after the bind's login in both lun_pool.sh paths and require it active, as tests/fourkn_lun.sh now does; verify with tests/fourkn_lun_shutdown_probe.sh on a pool LUN bound to nodes booted with no node record: unfixed both nodes hang, fixed both off in seconds.",
       "reproducer": "boot two pool nodes with no iSCSI node record, tools/lun_pool.sh alloc them, then tests/fourkn_lun_shutdown_probe.sh <node1> <node2>"
+    },
+    {
+      "id": "D-DRBD-PAIR-WITHOUT-QDEVICE-OR-NODE-FENCE-P1-DOES-NOT-SURVIVE-P0-DEATH",
+      "severity": "high",
+      "nodes": 2,
+      "config": "*/*/drbd",
+      "opened": "2026-10-22",
+      "summary": "On a DRBD pair with the default fence (agent=self with the fixed tie-break: no QDevice and no node fence configured), only participant 0 (the lower DRBD address) may carry on after a lost link. When participant 0 dies, participant 1 cannot tell that from a cut link, so it freezes, restarts and stays out until participant 0 returns: the pair survives the death of participant 1 but not of participant 0. Required (owner, 2026-10-22): in a 2-node cluster either node survives the other's death.",
+      "evidence": "Outside report, Proxmox forum thread 187097 post 873810 (2026-10-22), two VMs on virt-manager with vbmc as IPMI: 'If the node 02 dies, the node 01 remains, but not the other way around.' The owner's answer the same day: 'if you have a 2 node and 02 dies 01 should remain AND if 01 dies 02 should remain - if it doesn't thats a problem.' The behaviour is the documented default: docs/drbd-setup.md section 7 ('pve1 dies. pve2 cannot tell a dead pve1 from a cut cable, so it does not take over. It freezes, logs exactly this, restarts, and waits.') and docs/rulings/drbd-two-node-self-exclusion.md 'What it does not cover: Participant 0 dying'. tools/mxfs_drbd_fence_peer.sh:37-47: no config means agent=self; authority=quorum (a corosync QDevice) lets either participant win (removed D-DRBD-PAIR-NO-EXTERNAL-QUORUM-SO-P1-CANNOT-TAKE-OVER-WHEN-P0-DIES, 0.90.128, verified only with a QDevice); agent=exec/ssh needs a program that speaks the handler's fence verbs, and no IPMI adapter ships, so a site with IPMI (iLO, iDRAC, vbmc) gets the default. The release's DRBD failure tests (tests/drbd_release_verify.sh death-test) destroy only node 2, participant 1.",
+      "next": "The owner's planned work after 0.90.134: a node fence over IPMI (and Pacemaker), so a pair with a BMC fences whichever node died. On the rig, virtualbmc in front of the libvirt VMs gives each test node an IPMI BMC, so fence_ipmilan can be exercised without iLO or iDRAC hardware. Then a death test that destroys participant 0, on a pair with that fence and on one with authority=quorum, beside the existing destroy of participant 1.",
+      "impact": "stability",
+      "impact_why": "The survivor restarts itself and the pair serves nothing until participant 0 returns: a node shuts down because its peer died (docs/drbd-setup.md section 7)."
+    },
+    {
+      "id": "D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0-SO-AB-WRITES-ZEROS",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-22",
+      "summary": "tools/fua_verify write parses its byte pattern with strtol(argv[4], NULL, 0) (fua_verify.c:186) although its usage names it <byte_pattern_hex> (:136) and caw_verify parses its pattern in base 16 (caw_verify.c:222): a bare hex pattern is read as decimal digits up to the first letter, so 'ab' writes 0x00 and the documented example '5a' (docs/iscsi_setup.md:161) writes 0x05",
+      "evidence": "2/net/mesh/direct4k fourkn_cdb at 2026-10-22T18:16:20Z on build 2446C4C6401FC9D9224650F: tests/suite/fourkn_cdb.sh:72 ran 'fua_verify write $DEV 131074 ab' on test31 and the tool printed 'WRITE(16) FUA: lba=131074 pattern=0x00 OK' (tests/evidence/board_20261022T180946Z-g2d_fourkn_cdb/fua_write.txt); test32's read found 'FUATEST pattern=0x00 lba=131074' (fua_read.txt), so the row failed its three FUA checks. The COMPARE AND WRITE half of the same row, where caw_verify read 'cd' as 0xcd, passed (caw_write.txt: post-read cd cd cd ...).",
+      "next": "parse the pattern in base 16 in tools/fua_verify.c (strtol base 16 also takes a 0x prefix, which scripts/vsphere_shared_disks.sh:229 passes); rebuild it; run a control batch of fourkn_cdb laps at 2/net/mesh/direct4k with the fix reverted, then the verification batch sized from it",
+      "reproducer": "./run.sh 2/net/mesh/direct4k fourkn_cdb: tests/suite/fourkn_cdb.sh has node 1 write LBA disklock_offset/4096-1 with 'fua_verify write $DEV $S ab' and node 2 check the block reads back 0xab whole; a tool that reads 'ab' as 0 writes 0x00 and the three FUA checks fail",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:16:20Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:48:28Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:48:07Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:47:46Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:47:25Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:47:04Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:46:43Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:46:22Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:46:01Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:45:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:45:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:44:58Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:44:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:44:16Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:43:55Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:43:34Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:43:13Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:42:52Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:42:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:42:10Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_cdb",
+          "iso": "2026-10-22T18:40:25Z"
+        }
+      ],
+      "batches": [
+        {
+          "id": "b20261022-545d6a",
+          "kind": "control",
+          "row": "fourkn_cdb",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 20,
+          "probe": "",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "fua_verify's pattern parsed in base 0 again (the fix reverted and the tool rebuilt from it): the row's 'ab' must write 0x00 and its three FUA checks fail; every lap reaches the trigger, the row's first command"
+        }
+      ],
+      "updated": "2026-10-22",
+      "rates": [
+        {
+          "row": "fourkn_cdb",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-545d6a",
+          "k": 20,
+          "n": 20,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c",
+          "builds": [
+            "9594B08726D6732D2ED5E87"
+          ],
+          "date": "2026-10-22"
+        }
+      ]
+    },
+    {
+      "id": "D-NODES-CANNOT-WRITE-TESTS-EVIDENCE-IT-LINKS-TO-THE-HOSTS-OWN-MXFS-DISK",
+      "severity": "high",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-22",
+      "summary": "tests/evidence is a symlink to /mxfs/evidence, a disk of the lab host only; the nodes see the tree through the NFS export of /src, where the link resolves to a /mxfs/evidence the node does not have, so every row that writes its evidence from a node fails: alloc_witness cannot create its witness directory and chk_clean, which needs that sealed witness, can grade no CLEAN",
+      "evidence": "2/net/mesh/direct4k board run 20261022T180946Z-g2d (build 2446C4C6401FC9D9224650F): alloc_witness FAIL on both nodes 'witness_dir=unwritable rank=1' (tests/tooling/alloc_witness.sh:138 WDIR=$TREE/tests/evidence/alloc_witness/$RUN_ID); chk_clean FAIL on test31 'verdict=CLEAN release=INDETERMINATE ... evidence=(evidence copy failed) ... no sealed witness for run 20261022T180946Z-g2d' (tests/evidence/run_chk_clean_20261022T180946Z-g2d/test31.raw). On test31: 'ls -la /src/mxfs/tests/evidence' -> '/src/mxfs/tests/evidence -> /mxfs/evidence' and 'ls -ld /mxfs/evidence' -> 'No such file or directory'. /etc/exports exports /src to 192.168.120.0/24 and nothing under /mxfs. The newest alloc_witness witness directory on the host is from 2026-10-21 22:55, before the evidence moved to /mxfs. ===== ===== 2026-10-22 the fix, on the rig host: /mxfs/evidence bind-mounted at /home/steve/src/mxfs-evidence (/etc/fstab line '/mxfs/evidence /home/steve/src/mxfs-evidence none bind,nofail,x-systemd.requires-mounts-for=/mxfs 0 0'; /etc/fstab.backup kept), both /src lines of /etc/exports given crossmnt (/etc/exports.backup kept; exportfs -v shows crossmnt), and tests/evidence relinked to /src/mxfs-evidence by an atomic rename. On test31: /src/mxfs-evidence lists the evidence, and a root write to /src/mxfs/tests/evidence/alloc_witness/node_write_probe/w.txt read back on the host from /mxfs/evidence (probe removed). Control: the link pointed back at /mxfs/evidence (a knob, no tree diff), alloc_witness laps must record witness_dir=unwritable.",
+      "next": "control batch of alloc_witness laps with tests/evidence linked straight to /mxfs/evidence again (nothing else on the rig writing evidence from a node while it runs), then the verification batch on the candidate, sized from it",
+      "reproducer": "./run.sh 2/net/mesh/direct4k alloc_witness chk_clean (any configuration): alloc_witness on a node writes $TREE/tests/evidence/alloc_witness/<run>/; with the link unresolvable on the node it records witness_dir=unwritable, and chk_clean then finds no sealed witness",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "alloc_witness",
+          "iso": "2026-10-22T18:24:08Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "chk_clean",
+          "iso": "2026-10-22T18:24:30Z"
+        }
+      ],
+      "updated": "2026-10-22"
     }
   ]
 }

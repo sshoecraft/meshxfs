@@ -4030,15 +4030,6 @@ static unsigned int mxfs_affine_audit_pct;
 unsigned long long mxfs_dbg_dreval_trace_ino;	/* also read by xfs_vn_lookup */
 module_param_named(dbg_dreval_trace_ino, mxfs_dbg_dreval_trace_ino, ullong, 0644);
 MODULE_PARM_DESC(dbg_dreval_trace_ino, "DEBUG: print every fast-path dentry blessing (epoch or affine) and every stale-flag rejection under this parent inode (0=off)");
-/*
- * DEBUG (docs/4kn-support.md): mount a volume on a 4096-byte-block device.
- * Off, such a device is refused, as it is until every part of 4K-native
- * support is in place and verified: the inode cluster's merged write and the
- * authority ledger's whole-page swap among them.  Never enable in production.
- */
-static int mxfs_dbg_lbs_mount;
-module_param_named(dbg_lbs_mount, mxfs_dbg_lbs_mount, int, 0644);
-MODULE_PARM_DESC(dbg_lbs_mount, "DEBUG: mount volumes on 4096-byte-block devices while 4K-native support is developed (0=refuse, the default). Never enable in production.");
 static atomic64_t mxfs_affine_audit_n = ATOMIC64_INIT(0);	/* sampled     */
 static atomic64_t mxfs_affine_audit_ok = ATOMIC64_INIT(0);	/* blessing OK */
 static atomic64_t mxfs_affine_audit_gone = ATOMIC64_INIT(0);	/* name gone   */
@@ -4867,16 +4858,15 @@ xfs_fs_fill_super(
 		struct mxfs_ondisk_super *msup;
 
 		/*
-		 * A device of logical blocks larger than 512 bytes holds a volume
-		 * only once 4K-native support is complete (docs/4kn-support.md);
-		 * until then the envelope read below would report no more than a
-		 * bad magic, so name the cause.
+		 * A volume lives on a device of 512- or 4096-byte logical blocks
+		 * (docs/4kn-support.md).  On any other the envelope read below
+		 * would report no more than a bad magic, so name the cause.
 		 */
 		unsigned int devlbs = bdev_logical_block_size(mp->m_ddev_targp->bt_bdev);
 
-		if (devlbs != 512 && !(devlbs == 4096 && READ_ONCE(mxfs_dbg_lbs_mount))) {
+		if (devlbs != 512 && devlbs != 4096) {
 			xfs_alert(mp,
-	"MXFS: %pg has %u-byte logical blocks; this version mounts devices with 512-byte logical blocks only; refusing mount",
+	"MXFS: %pg has %u-byte logical blocks; this version mounts devices with 512- or 4096-byte logical blocks only; refusing mount",
 				  mp->m_ddev_targp->bt_bdev, devlbs);
 			error = -EINVAL;
 			goto out_free_scrub_stats;

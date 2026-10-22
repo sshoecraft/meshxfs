@@ -228,7 +228,7 @@ def main() -> int:
                 continue
             # a line that names a configuration the data does not release is
             # talking about that configuration (`32/disk/caw/mpath ... not released`)
-            keys = re.findall(r"\b\d+/[a-z]+/[a-z]+/[a-z]+\b", line)
+            keys = re.findall(r"\b\d+/[a-z]+/[a-z]+/[a-z][a-z0-9]*\b", line)
             if keys and any(k not in rel for k in keys):
                 continue
             ok = [a for a in ALLOWED if a[0] == f and a[1] == line.strip()]
@@ -271,7 +271,7 @@ def readme_claims(readme: str, rel: list, version: str, fails: list) -> None:
     """Checks 1-4: what the README claims for this release."""
     # 1. the Released table
     section = readme.split("### Released", 1)[1].split("###", 1)[0] if "### Released" in readme else ""
-    rows = re.findall(r"^> \| `(\d+/[a-z]+/[a-z]+/[a-z]+)` \|", section, re.M)
+    rows = re.findall(r"^> \| `(\d+/[a-z]+/[a-z]+/[a-z][a-z0-9]*)` \|", section, re.M)
     for c in rel:
         if c not in rows:
             fails.append(f"README.md: the Released table has no row for {c}")
@@ -281,7 +281,7 @@ def readme_claims(readme: str, rel: list, version: str, fails: list) -> None:
     earlier = released_earlier()
     head = "### Released in an earlier version"
     section = readme.split(head, 1)[1].split("###", 1)[0] if head in readme else ""
-    rows = dict(re.findall(r"^> \| `(\d+/[a-z]+/[a-z]+/[a-z]+)` \| ([0-9]+\.[0-9]+\.[0-9]+) \|", section, re.M))
+    rows = dict(re.findall(r"^> \| `(\d+/[a-z]+/[a-z]+/[a-z][a-z0-9]*)` \| ([0-9]+\.[0-9]+\.[0-9]+) \|", section, re.M))
     for c, v in earlier.items():
         if rows.get(c) != v:
             fails.append(f"README.md: the '{head[4:]}' table gives {c} as {rows.get(c, 'nothing')}; "
