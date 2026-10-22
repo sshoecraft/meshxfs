@@ -1,47 +1,85 @@
 ---
 name: compiled-harness-assertions-must-target-the-property-not-the-gate-snapshot-or-downstream-effect
-description: Fencing/lock harness measurement traps: assert the property not the gate, stamp snapshots with generation, read raw platter, assert anchors, widen ve…
+description: Harness traps: assert the property not the gate, stamp snapshots, read the platter; per-boot dmesg ring, lap-unique marks, injections, vacuous laps
 metadata:
   type: feedback
-tags: [compiled, measurement-integrity, harness, fencing, scsipr, verification]
+tags: [compiled, measurement-integrity, harness, fencing, scsipr, verification, dmesg, rig, fault-injection]
 ---
 
-# Harness assertions must target the property under test, not a gate name, a later snapshot, or a downstream effect
+# Harness measurement traps: assert the property under test, and read only data that belongs to this lap
 
-Six notes on one failure family: an instrument more specific, later, or more indirect than the thing it measures either fails a mechanism that works or passes one that does not. Each is a rule for what to assert and when to look.
+Eighteen notes, one failure family: an instrument more specific, later, or more indirect than the thing it measures, or one that reads a source still holding an earlier run's data, or a lap that never created the condition, either fails a mechanism that works or passes one that does not. Part 1 (six notes) is what to assert and when to look. Part 2 (twelve notes, folded in from `compiled-rig-dmesg-ring-and-harness-vacuity-traps`) is what a rig harness may read from and whether the lap ran at all; every failure in it was silent, in the direction of PASS, and was caught only by an impossible number or a second source of truth.
 
-## Assert the property, not which gate prints it
+## Part 1 — what to assert and when to look
+
+### Assert the property, not which gate prints it
 
 - `trap-an-assertion-that-names-which-refusal-must-fire-fails-a-refusal-that-is-working` (s83): a lap injected a retired fence kind and asserted `P236-REPLAY-REFUSED`; both arms failed with `replay_refusals=0`. The certificate is classified earlier, at the claim gate (`P236-CLAIM-UNCERTIFIED`, `dlm/disklock.c`), so the refusal worked and fired from a site the assertion did not name. The companion "slice was NOT replayed" assertion passed and would pass equally if the lap never got that far; counting only what did not happen cannot tell a working refusal from a stalled one.
-- Fix: assert that a refusal happened at any legitimate site, that it names the revoked class and the kind actually on the platter, and that the slice is untouched. Naming one expected token predicts internal ordering; loosening the assertion afterwards is how a real regression later passes. A kernel-log window taken with no mark (counting a previous probe's event) is the same shape.
+- Fix: assert that a refusal happened at any legitimate site, that it names the revoked class and the kind actually on the platter, and that the slice is untouched. Naming one expected token predicts internal ordering; loosening the assertion afterwards is how a real regression later passes. A kernel-log window taken with no mark (counting a previous probe's event) is the same shape (see the ring section in Part 2).
 
-## An injector that is safe to repeat is repeated before the lap can look
+### An injector that is safe to repeat is repeated before the lap can look
 
 - `trap-a-retryable-injected-failure-is-retried-before-the-lap-can-snapshot-so-assert-on-log-order-not-on-a-later-capture` (s137, `tests/fence_live_prover_faults.sh` modes 1 and 2): both failed the same four assertions (victim key still registered, PR generation unmoved, no P&A claimed, `may_have_run` clear). Not an MXFS defect: the prover logged INTENT, INJECT ("safe to repeat"), then the retry P&A, then CERTIFIED, all within milliseconds and the SAME term (no second `P236-FENCE-INTENT`). The injector sits correctly at the command-submission boundary (`dlm/scsipr.c:2062`) and is one-shot; any snapshot after polling dmesg describes only the winning attempt, and counting P&As between inject and next intent cannot isolate the injected one.
 - Change subject, not scope. "Assert nothing happened" is wrong for a fault whose contract is recovery; assert nothing happened unrecorded: no P&A issued without a durable arm naming it (compare arm markers to P&A completions), no `P238-FENCE-UNRECORDED` or `-BLOCKED`, and the settled descriptor proves the prover's own term. Assert on log order, not a later capture.
 - Never edit a harness while a sweep is executing it: bash re-reads a script by byte offset and later modes run from the same file.
 
-## A snapshot is evidence about one instant
+### A snapshot is evidence about one instant
 
 - `trap-a-pr-snapshot-only-proves-anything-about-the-generation-it-was-taken-at` (sess573, unmountable-volume defect): a correct stale-PR hypothesis was wrongly disproven by a capture at PR generation 2765 (0 keys, no reservation) while the failing mounts logged `P304-PREOBSERVE ... type=0x7 holder_key=0x0 gen=2757` and a reservation conflict. Eight generations of the investigator's own mounts and a module swap had cleared it.
 - Rule: PR generation changes on every registration change and every MXFS PR probe prints `gen=`. A capture whose generation differs from the failing log line is about a different world and can neither confirm nor refute. Generalises: any "I looked and it was clean" disproof of a transient-state hypothesis needs a stamp tying the look to the event (generation, epoch, incarnation, LSN, boot id); otherwise it retires true hypotheses. Time-shifted twin of `trap-a-silent-instrument-and-a-clean-system-are-the-same-observation`.
 - Finding once matched: the PR key derives from {host, boot, LUN}, so every mount of a host within one boot registers the same key, and a fence aimed at a dead incarnation's retained key lands on the live successor (`P305-RESV-SELF-GONE`, then self-fence). Initiator IQNs are distinct per node, so not a shared-nexus artifact.
 
-## Read the platter, not the success code
+### Read the platter, not the success code
 
 - `technique-a-successful-fsync-is-not-evidence-bytes-reached-the-lun-capture-the-extent-while-healthy-and-read-the-raw-block` (s87): `PROBE_DATA rc=0 ms=1` from a PREEMPT-AND-ABORTed node proved nothing either way, and reading back through the same mount returns its own page cache.
 - Procedure: while the FS is healthy, write, fill a whole block, fsync, `sync -f`, capture the physical offset via `FS_IOC_FIEMAP` (ioctl `0xC020660B`); baseline the block with `dd iflag=direct | od -c`; run the experiment; re-read the same block the same way. This turned rc=0 into `fenced-direct-wr` before the fix and `baseline` after.
 - Add a control arm (same probe on a healthy node must SUCCEED, since a containment harness asserts failures and a broken probe satisfies all of them). Order the decisive raw read before the slow metadata arm so its DLM retry-budget timeout cannot abort the lap first; record the timeout as an outcome.
 
-## Assert on the anchor, not on what it causes
+### Assert on the anchor, not on what it causes
 
 - `technique-verify-a-timestamp-anchor-by-asserting-on-the-two-timestamps-the-kernel-prints-not-on-the-downstream-behaviour` (s87): the authority-lease deadline must derive from the heartbeat ISSUE instant, not completion delivery. "Withhold the completion, then a write is refused" also passes on a completion-anchored build once any other closer (periodic evaluator, bounced write) has closed the epoch; it proves stickiness.
 - Park every other closer, then assert on the two kernel-printed timestamps: `deadline_ms - issued_ms == 30000` (a completion anchor would read 342039 vs 295959 here).
 - Unreachable guard (refuse a renewal whose beat was issued after authority lapsed; an upstream check stops such a beat): remove the primary check for one cycle (`dbg_hb_skip_auth_check`), leaving the guard and all other tests intact. Never weaken the thing under test; remove what hides it.
 
-## Unreachable trigger state: widen the final verdict under a knob
+### Unreachable trigger state: widen the final verdict under a knob
 
 - `technique-when-the-defects-trigger-is-unreachable-make-its-final-verdict-unconditional-under-a-knob-and-run-both-arms` (sess603, allocator defect D-0946): ordinary churn never produced the deferred deadshell that the recycle gate's platter check required (16+ rounds at DEADSHELL=0; reproducer 3 hits in 16 death/rejoin laps). Do not fabricate the trigger state. Under a test-only knob take the chain's final verdict (read platter, fail if live) on every create-path recycle, using the product's own reader via a private bounce-buffer read that perturbs no cache.
 - Run both arms: control (pre-fix) fired on the first re-pick at 2.2 s, same inode number 132 and signature (`disk_gen == ogen-1`) as all original occurrences; fix arm ran 4800 creates, ~770 assertions per round, live 0, with allocator refusal counter 90-240 per round proving the changed code carried it.
 - Sound only if (1) the widened verdict is implied by the fix invariant (no open FREE obligation implies free image durable; see `docs/free-publish.md`) and (2) the knob reads real state and touches no product cache or log. Expose exact resettable counters: dmesg is print-budgeted (first 32, then 1 in 500) and showed PUBPEND_LINES=32 every round.
 - Sibling: `trap-a-verification-condition-that-a-healthy-build-cannot-produce-is-vacuous-by-construction-inject-it-at-the-verdict` (input injected there; here input is real and only the verdict's reach widens, preferable when a real reader exists).
+
+## Part 2 — rig harness traps: the kernel ring, marks, injections, and laps that never ran
+
+Folded from `compiled-rig-dmesg-ring-and-harness-vacuity-traps` (twelve notes). Root: a harness reads a number from a source that still holds an earlier run's data, or from a lap that never exercised the condition, and reports good news.
+
+### The ring buffer is per BOOT; everything MXFS counts is per LOAD
+
+- `dmesg` is cleared by a reboot, never by `rmmod`/`insmod`, and `run.sh ... prep_cluster` reloads `mxfs.ko` without rebooting the VM. So the ring holds every earlier lap, every earlier session's probe, and every earlier build's lines. Surviving nodes in particular never reboot. `trap-a-dmesg-wait-on-a-node-not-rebooted-matches-an-earlier-runs-line`: `tests/rig_unmount_cover_race.sh` waited on `grep 'P-SB-COVER-PARK slot'`, matched the previous lap's line at once, unmounted before this lap's worker parked, and PASSed having exercised nothing. The tell: a matched line whose text differs from the build's current format string.
+- Every "wait for X" or "count X" on a rig node or PVE host reads only what follows a mark the test wrote to `/dev/kmsg` itself (`awk -v m="$MARK" 'index($0,m){p=1} p'`). `trap-four-ways-a-harness-reported-a-lap-that-never-happened` (case 2): an unmarked `ATOMIC-SKIP` count gave `atomic_skips=19` for six laps, all from earlier laps.
+- `window_into` (`tests/lib/rig.sh`) with an empty fourth argument runs plain `dmesg`, the whole ring. `trap-a-kernel-log-window-taken-with-no-mark-dumps-the-whole-ring-and-counts-a-previous-sessions-event`: a "no LU Reset issued" check FAILed with 9 hits, all from the previous session's `tests/lu_reset_probe.sh`. Pass the lap's own mark to every window that feeds a count; mark-less is for forensics only. A pattern meant to catch "we issued a reset" must match the issuing side (`iscsi_eh_device_reset`, `LU Reset`), not `Power-on or device reset occurred`, which is a target UNIT ATTENTION the initiator reports after any reboot.
+- Kept row logs: `kmsg_follow_start` runs `dmesg --follow`, which first dumps the ring. A `kmsg_<node>_fromnode.gz` can begin with earlier rows, laps, even a different build. `trap-a-kept-row-kernel-log-starts-with-the-ring-backlog-so-count-only-after-the-rows-own-mark`: 81 `P-FUA-READ-ERR` were counted in a path_failover file and read as "the FUA fix failed"; all sat before the row's own `PF-MARK-path_<row>-<run>` (the old build); after it: 0 ERR, 501 `P-FUA-READ-REPATH`. The first PF-MARK in a file is not necessarily its own. Tell subagent sweeps this explicitly.
+- Per-load counters and print budgets (statics in the module, reset on insmod) must not be read against the per-boot ring. `trap-a-per-load-counter-read-from-the-per-boot-ring-and-the-mount-line-that-anchors-it`: `P-INACT-CERT` prints only the first 96 per load, so arms run after a 1100-file filler asserted against a silenced probe and FAILed; the census read whole-ring "pre" (1115, previous load) against reloaded "post" (8), delta -1107. A budgeted probe gone quiet is UNREADABLE, not PASS or FAIL. Anchor per-load reads on the last mount's first line: `dmesg | tac | sed '/MXFS-MEMBERSHIP local=[0-9]* active_count=1/q' | tac`. A same-load remount under-counts, which errs toward FAIL, never false PASS.
+- Which build printed a line: `trap-a-probe-format-change-is-the-only-way-to-tell-which-build-a-dmesg-line-came-from`. A live `grep -c` for a refined probe returned 45 hits, all printed by the previous build earlier in the same boot. The discriminator is the printed format: when a probe's condition changes, change its fields too (0.75.95 added `why=`; `grep -c "why="` = 0 was the real reading). A byte-identical message across two builds is unfalsifiable from the ring. Scope a `why=` extraction to the probe tag first; other subsystems print `why=` too. A subagent told to "grep dmesg and count X" returns a confounded number; ask for the format-discriminating count or point it at per-lap evidence captures.
+
+### Marks must be unique to the lap, and none may contain another
+
+- `trap-a-kernel-log-mark-named-for-the-arm-and-not-for-the-lap-replays-the-previous-laps-verdict-to-the-millisecond`: `LURW-MARK-<arm>` was reused each lap; `sed -n '/mark/,$p'` opens at the FIRST match, so lap s101b (14 s) reported lap s101a's `upcall_ms=47261` and nonce to the digit. Build the token once per lap from a monotonic source, `MARKID="LURW-$LABEL-$(date +%s%N)"`, and derive every arm's marker from it.
+- `trap-a-second-log-mark-that-contains-the-first-defeats-the-window-guard-that-exists-to-catch-a-lost-mark`: marks `PLW-MARK-$LABEL` and `$MARK-PARK`; when the first scrolled out, `sed` and the `grep -qaF` ABORT guard both matched the park line, so the window opened 55 s late with no abort. No mark may be a prefix or substring of another in the same lap (`PLWPARK-$LABEL`, not `X-PARK`). Read an injector's confirmation AT THE ARM, not from the end-of-lap window where log volume has evicted it; make its absence an ABORT, not a verdict.
+
+### An injection is in effect when the module says so
+
+- `trap-a-one-shot-injection-knob-is-not-in-effect-when-the-write-returns-wait-for-the-modules-own-line`: `dl_inject_hb_pause_ms` is read and cleared at the top of the worker loop. A beat already in flight completes in ms, satisfies the barrier, and the arm reports `wait_ms~0` against a correct implementation. Poll (30 x 0.2 s) for `P-HB-INJECT-PAUSE` scoped to this lap's mark; that line doubles as the vacuity guard, and if it never appears exit VACUOUS. If the injector has no log line, add one before using it. Unscoped, the poll matches a previous lap's line.
+- `trap-a-heartbeat-park-that-outlives-a-failed-lap-stalls-the-next-preps-unmount`: a 480000 ms park (`tests/fence_lost_response.sh`) left armed by an early exit stalls the next `prep_cluster`, because unmount waits for the sleeping heartbeat thread (s74e prep still running at +150 s against a normal 45-58 s). Trap EXIT as soon as the park is set (`PARKED=1`; cleanup does `virsh destroy` then `start` of the victim; clear before the tail's own destroy). Any injection that sleeps a kernel thread longer than the harness's remaining runtime is a landmine for the next run: bound it by what the lap needs or clean up unconditionally.
+
+### Laps that never exercised the condition
+
+`trap-four-ways-a-harness-reported-a-lap-that-never-happened` is the general shape: an instrument that cannot tell "condition absent" from "condition never created".
+1. Stale build: `d0944_death_rejoin_ab.sh` only re-prepped on unmount or knob difference, so after a rebuild twelve laps finished in 102 s on the old module. Compare `/sys/module/mxfs/srcversion` on every node against `modinfo mxfs.ko` before every lap; prep on mismatch.
+2. Stale ring: see the ring section above.
+3. Substring grep: `mount_rc=` matches inside `umount_rc=`; five rc=32 laps read clean. Anchor: `sed -n 's/.*REJOIN mount_rc=\([0-9]*\).*/\1/p'`.
+4. Rejected workload: 40 symlinks with 3000-char targets, but `XFS_SYMLINK_MAXLEN` is 1024, every `ln -s` got ENAMETOOLONG and the stage PASSed. A stage must report what it PRODUCED (`made=`, `links=`, `extents=`) and assert on that. When a fix arm comes back clean, first ask whether the lap did the thing at all.
+
+### Attribution of times
+
+- `trap-a-guest-console-timestamp-counts-from-its-last-reboot-so-place-it-by-intervals-not-by-creation-time`: guest `[ t ]` is uptime since ITS last boot (live migration preserves it). Adding 925 s to VM creation put I/O errors at 22:39, beside an unrelated CAS wait, and a whole hypothesis, defect title and harness were built on it; the console showed `alma9-5 login:`, i.e. post-install reboot. The real cause was pve1's `P-RBLK-COVERS-DEAD-MASTER ino=138` refusals at 23:01:01.97/04.98/10.10/15.74/18.30, intervals +3.01/+5.12/+5.63/+2.56 s matching the guest's to 10 ms. Match the SHAPE of the gaps, map the image to its inode (`stat -c %i`) and filter on `ino=`. A coincidence with a "waiting" line is not a cause until an interval match or returned error code ties them.
+- `trap-a-refused-mounts-command-return-time-includes-its-unwinds-cluster-acquires`: D-0960 stall arm timed a refused mount by command wall time (~120 s) though the refusal was logged at 52 s; the unwind (`xfs_log_mount_cancel` -> `xfs_log_quiesce`) took the SB summary cover (`mxfs_sb_summary_key`) under its cluster lock, a non-fallible acquire parked behind the paused takeover. 0.84.5 skips the cover for a mount that never set `m_mxfs_mount_complete` (`P960-REFUSED-MOUNT-NOCOVER`). Issue the mount detached, time the refusal by its dmesg line, and time the command's return separately with its own bound; applies to any refused operation whose failure path tears down cluster state. Corollary: the D-0959 join install freezes its superblock and the same quiesce takes that lock, so with `dl_no_ondemand_takeover=1` the view install and B-mastered FREEZE_REQs (DEFER, `my_view=0x0/0`) wait for the paused pass.
