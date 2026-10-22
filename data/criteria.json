@@ -28932,12 +28932,15 @@
           ]
         },
         "2/net/mesh/direct4k": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261022T193055Z-g2",
-          "iso": "2026-10-22T19:59:27Z",
+          "status": "PASS",
+          "measured": "ops=1112 wall_ms=24101 errs=0 dmesg_hits=0",
+          "reason": "",
+          "iso": "2026-10-22T19:59:54Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 25,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 40,
           "run_id": "20261022T193055Z-g2",
           "history": [
             {
@@ -30225,13 +30228,17 @@
           ]
         },
         "2/net/mesh/direct4k": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261022T193055Z-g2",
-          "iso": "2026-10-22T19:35:51Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=6.87 checks=4 failed=0 dstate=0",
+          "reason": "",
+          "iso": "2026-10-22T20:00:06Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 0,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 90,
           "run_id": "20261022T193055Z-g2",
+          "evidence": "tests/evidence/run_node_responsive_20261022T193055Z-g2",
           "history": [
             {
               "status": "PASS",
@@ -31516,13 +31523,17 @@
           ]
         },
         "2/net/mesh/direct4k": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261022T193055Z-g2",
-          "iso": "2026-10-22T19:35:51Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=6.33 hits=0 kinds=[]",
+          "reason": "",
+          "iso": "2026-10-22T20:00:20Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 2,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 120,
           "run_id": "20261022T193055Z-g2",
+          "evidence": "tests/evidence/run_kernel_health_20261022T193055Z-g2",
           "history": [
             {
               "status": "PASS",
@@ -32794,13 +32805,17 @@
           ]
         },
         "2/net/mesh/direct4k": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261022T193055Z-g2",
-          "iso": "2026-10-22T19:35:51Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=5.86 stale_base_mutations=0 unlanded_at_unlock=0 probe=1 window=1 win_src=marker win_trunc=0",
+          "reason": "",
+          "iso": "2026-10-22T20:00:34Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 2,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 60,
           "run_id": "20261022T193055Z-g2",
+          "evidence": "tests/evidence/run_dirent_publish_integrity_20261022T193055Z-g2",
           "history": [
             {
               "status": "PASS",
@@ -34072,13 +34087,17 @@
           ]
         },
         "2/net/mesh/direct4k": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261022T193055Z-g2",
-          "iso": "2026-10-22T19:35:51Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=5.51 unresolved=0 failed_estale=0 total_flips=0 stale_skips=0 probe=1 window=1 win_src=marker win_trunc=0",
+          "reason": "",
+          "iso": "2026-10-22T20:00:50Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 3,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 60,
           "run_id": "20261022T193055Z-g2",
+          "evidence": "tests/evidence/run_dirent_type_integrity_20261022T193055Z-g2",
           "history": [
             {
               "status": "PASS",
@@ -35371,13 +35390,17 @@
           ]
         },
         "2/net/mesh/direct4k": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261022T193055Z-g2",
-          "iso": "2026-10-22T19:35:51Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=4.26 strands=1 repaired=2 declined=0 abandoned=0 write_ok=1 faults=0",
+          "reason": "",
+          "iso": "2026-10-22T20:01:44Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 42,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 240,
           "run_id": "20261022T193055Z-g2",
+          "evidence": "tests/evidence/run_ag_strand_repair_20261022T193055Z-g2",
           "history": [
             {
               "status": "PASS",
@@ -36670,13 +36693,17 @@
           ]
         },
         "2/net/mesh/direct4k": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261022T193055Z-g2",
-          "iso": "2026-10-22T19:35:51Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=4.05 ops=60 wall=1525ms per_op=25ms setup=36ms rmrf=3ms mkb=12ms syn=21ms bar1=83ms mkd=37ms bar2=327ms twall=2011ms errs=0",
+          "reason": "",
+          "iso": "2026-10-22T20:01:59Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 4,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 180,
           "run_id": "20261022T193055Z-g2",
+          "evidence": "tests/evidence/run_sustained_load_20261022T193055Z-g2",
           "history": [
             {
               "status": "PASS",
@@ -42949,13 +42976,17 @@
           ]
         },
         "2/net/mesh/direct4k": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261022T193055Z-g2",
-          "iso": "2026-10-22T19:35:51Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=4.84 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261022T193055Z-g2 fsid=55e12f2b-9b71-4b49-a504-a5e00d69b204 witness=tests/evidence/alloc_witness/20261022T193055Z-g2/witness.txt",
+          "reason": "",
+          "iso": "2026-10-22T20:04:10Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 118,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 120,
           "run_id": "20261022T193055Z-g2",
+          "evidence": "tests/evidence/run_alloc_witness_20261022T193055Z-g2",
           "history": [
             {
               "status": "FAIL",
@@ -44344,13 +44375,17 @@
           ]
         },
         "2/net/mesh/direct4k": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261022T193055Z-g2",
-          "iso": "2026-10-22T19:35:51Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=4.92 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=34624 ledger_holders=10221 umount_ms=4922 remount_ms=5298 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_2node_20261022T200433Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261022T193055Z-g2/witness.txt",
+          "reason": "",
+          "iso": "2026-10-22T20:04:48Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 26,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 180,
           "run_id": "20261022T193055Z-g2",
+          "evidence": "tests/evidence/run_chk_clean_20261022T193055Z-g2",
           "history": [
             {
               "status": "FAIL",
@@ -45585,12 +45620,15 @@
           ]
         },
         "2/net/mesh/direct4k": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261022T193055Z-g2",
-          "iso": "2026-10-22T19:35:51Z",
+          "status": "PASS",
+          "measured": "guards=72 new=0 grown=0",
+          "reason": "",
+          "iso": "2026-10-22T20:04:50Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 1,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 20,
           "run_id": "20261022T193055Z-g2",
           "history": [
             {
@@ -47219,13 +47257,17 @@
           "build": "A969E000AECBD63CBC36F81"
         },
         "2/net/mesh/direct4k": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261022T193055Z-g2",
-          "iso": "2026-10-22T19:35:51Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=5.14 checks=7 passed=7 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T20:05:19Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 17,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 300,
           "run_id": "20261022T193055Z-g2",
+          "evidence": "tests/evidence/run_tcp_dlm_scaling_20261022T193055Z-g2",
           "history": [
             {
               "status": "PASS",
@@ -48428,12 +48470,15 @@
           ]
         },
         "2/net/mesh/direct4k": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261022T193055Z-g2",
-          "iso": "2026-10-22T19:35:51Z",
+          "status": "PASS",
+          "measured": "oracle=PASS acked=729 replay_s=42 ns_ls=0 ns_mkdir=0 quar=0 shut=0 umount_ms=1962 chk_rc=0 errs=0 icount=35200 Chunk/free-space aliasing . OK (no inode-chunk block is also free) ALLOC checked=763 allocated=763 missing=0  wall=115s oracle_evidence=tests/evidence/20261022T200520Z_tcpdr_ca_20261022T193055Z-g2",
+          "reason": " (evidence tests/evidence/board_20261022T193055Z-g2_crash_audit)",
+          "iso": "2026-10-22T20:07:14Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 115,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 300,
           "run_id": "20261022T193055Z-g2",
           "history": [
             {

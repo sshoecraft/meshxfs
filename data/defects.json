@@ -2228,7 +2228,146 @@
       "opened": "2026-10-21",
       "summary": "tools/release_run.py records each step's outcome as a ledger run keyed config '1/any' (or the step's configuration) and row 'release:<step>'; no disposition can settle a failed one, so the first step that fails on any candidate leaves an incident the gate can never clear.",
       "evidence": "Read 2026-10-21: (1) criteria.parse_at('1/any') exits \"wanted <nodes>/<class>/<method>/<attach>\", so criteria.py amend/infra/incidents --at and defects.py propose --target refuse it; (2) the row contains a colon, and tools/defects.py parse_cell (lines 714-726) and propose --target (1241-1242) split CONFIG:ROW:ISO at the first two colons, reading row 'release' and iso 'presteps:2026-...'; (3) criteria.py cmd_amend/cmd_infra/withdraw (1427-1489) start with find(data, args.id), which needs a board criterion of that name, and release:* rows exist only in the ledger. The ledger already holds four such FAILs from dry-run candidate 0.90.133-2: release:presteps 2026-10-21T19:05:47Z, release:build 19:05:48Z, release:packages 19:08:29Z, release:boards 19:29:49Z (data/criteria.runs.jsonl), and later steps of that run will add more. The ledger is append-only, so the fix must make these existing keys settleable.",
-      "next": "Give step runs a key every parser accepts (a configuration parse_at takes and a row without a colon), parse cells with the ISO stamp anchored at the end, let amend/infra take a ledger-only row, and settle the 0.90.133-2 dry-run step FAILs through the reviewer path once the cause of each is fixed (missing MXFS_NODE_LIST in presteps; the clean-build copy of a root-only bench.json; pve9-1 without 7.0.14-24-pve headers)."
+      "next": "Give step runs a key every parser accepts (a configuration parse_at takes and a row without a colon), parse cells with the ISO stamp anchored at the end, let amend/infra take a ledger-only row, and settle the 0.90.133-2 dry-run step FAILs through the reviewer path once the cause of each is fixed (missing MXFS_NODE_LIST in presteps; the clean-build copy of a root-only bench.json; pve9-1 without 7.0.14-24-pve headers).",
+      "batches": [
+        {
+          "id": "b20261022-3f5a50",
+          "kind": "control",
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 20,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED.fix.diff sha256=d047663cb6c5df48da3dfdf0c4ed479b9fc43e646644a4f28d920324a57cd688",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix taken out: parse_cell splits at the first two colons and parses the configuration, and annotated_run looks the row up on the board; every exposed lap must refuse a recorded release step FAIL"
+        }
+      ],
+      "updated": "2026-10-22",
+      "rates": [
+        {
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-3f5a50",
+          "k": 20,
+          "n": 20,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED.fix.diff sha256=d047663cb6c5df48da3dfdf0c4ed479b9fc43e646644a4f28d920324a57cd688",
+          "builds": [
+            "9594B08726D6732D2ED5E87"
+          ],
+          "date": "2026-10-22"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:07:11Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:07:10Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:07:09Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:07:08Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:07:07Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:07:06Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:07:05Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:07:04Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:07:03Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:07:02Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:07:01Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:07:00Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:06:59Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:06:58Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:06:57Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:06:56Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:06:55Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:06:54Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:06:53Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-22T20:06:52Z"
+        }
+      ]
     },
     {
       "id": "D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED",
@@ -2817,6 +2956,175 @@
           "config": "2/net/mesh/drbd",
           "row": "release:drbd",
           "iso": "2026-10-21T22:56:58Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:31Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:30Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:29Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:28Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:27Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:26Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:25Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:24Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:23Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:22Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:21Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:20Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:19Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:18Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:17Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:16Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:15Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:14Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:13Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-22T20:05:12Z"
+        }
+      ],
+      "batches": [
+        {
+          "id": "b20261022-ec8648",
+          "kind": "control",
+          "row": "lap:release_board_verdict",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 20,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW.fix.diff sha256=99a943bdc9fb20fb7eab88c1d2ff47a776a14c85233b9d5655732b8c9e16e6f7",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix taken out: board_verdict no longer sets MXFS_OWN_RIG for an own-rig attachment nor refuses a verdict that graded no row; every exposed lap must read the DRBD board clean"
+        },
+        {
+          "id": "b20261022-4233e9",
+          "kind": "control",
+          "row": "lap:release_board_verdict",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 20,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW.fix.diff sha256=99a943bdc9fb20fb7eab88c1d2ff47a776a14c85233b9d5655732b8c9e16e6f7",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix taken out, lap inputs from the environment (b20261022-ec8648 passed the configuration on the probe's command line, where criteria.py sets MXFS_OWN_RIG itself, and measured nothing): every exposed lap must read the DRBD board clean"
+        }
+      ],
+      "updated": "2026-10-22",
+      "rates": [
+        {
+          "row": "lap:release_board_verdict",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-ec8648",
+          "k": 0,
+          "n": 20,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW.fix.diff sha256=99a943bdc9fb20fb7eab88c1d2ff47a776a14c85233b9d5655732b8c9e16e6f7",
+          "builds": [
+            "9594B08726D6732D2ED5E87"
+          ],
+          "date": "2026-10-22"
+        },
+        {
+          "row": "lap:release_board_verdict",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-4233e9",
+          "k": 20,
+          "n": 20,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW.fix.diff sha256=99a943bdc9fb20fb7eab88c1d2ff47a776a14c85233b9d5655732b8c9e16e6f7",
+          "builds": [
+            "9594B08726D6732D2ED5E87"
+          ],
+          "date": "2026-10-22"
         }
       ]
     },
