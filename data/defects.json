@@ -2667,6 +2667,106 @@
           "config": "1/any",
           "row": "release:presteps",
           "iso": "2026-10-21T23:22:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:41Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:39Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:35Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:32Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:30Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:28Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:26Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:24Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:22Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:20Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:18Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:16Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:14Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:11Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:09Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:07Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:05Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:03Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-22T20:21:01Z"
         }
       ],
       "updated": "2026-10-22",
@@ -2682,11 +2782,28 @@
           "candidate": "",
           "build": "9594B08726D6732D2ED5E87",
           "variant": "fix reverted: tests/evidence/controls/D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E.fix.diff sha256=62c688f79bff83a4525b140807cc3f5b222a0ab436a1ef2e1466dea7370332cf",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: the WWID normaliser keeps the e of eui. and the no-mount fallback looks only for wwn-0x<id>, which udev never makes for an EUI-64 LUN; every exposed lap must abort with no MXFS device basis"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:rig_eui64_resolve",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-bf8f03",
+          "k": 20,
+          "n": 20,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E.fix.diff sha256=62c688f79bff83a4525b140807cc3f5b222a0ab436a1ef2e1466dea7370332cf",
+          "builds": [
+            "9594B08726D6732D2ED5E87"
+          ],
+          "date": "2026-10-22"
         }
       ]
     },
