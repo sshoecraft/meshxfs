@@ -3652,8 +3652,14 @@
         "data/reviews/P20261023-e629b4.md",
         "data/defects.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-63aa62.md",
+        "sha256": "7e47cdd451b578458545a7d58ded68cac51cbbd7cc8cb212150eacf3b518d2b9",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-093564",
