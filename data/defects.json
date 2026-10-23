@@ -5937,6 +5937,65 @@
       "evidence": "Measured 2026-10-23 in the precheck lane tests/evidence/lanes/g2_awcensus_precheck_20261023T172736Z (g2 test1/test2 at 2/disk/caw/direct, build 08D63764A9352FBDD5A76CD): tests/alloc_witness_census_lap.sh ran the alloc_witness row out to its 120 s budget twice on one boot, first with ccph() in, then with ccph() and its calls removed by tests/evidence/controls/D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE.fix.diff. Both runs recorded last_phase_census[fill=1,start=1] (step4.log:5 run 20261023T172850Z-g2, :13 run 20261023T173118Z-g2): the second row's ranks wrote no marker, and the census read the first row's. control_precheck: 'CONTROL_PRECHECK NO the lap gave rc=0 with the fix in and rc=0 with it out' (:18).",
       "next": "Scope the census to the row: mark the row's start in each node's kernel log as mark_row_start marks its files (a lap-unique line), and have the census take the newest CCph line after that mark, 'none' when there is none. Reproduce with a lap that runs a marker-writing row and then a row that writes no marker and runs out its budget on the same boot: unfixed the second row is credited with the first's phase. A switch for the control, the verification sized from it, remove --fixed.",
       "reproducer": "tests/alloc_witness_census_lap.sh twice on one boot, the second with ccph() removed (tools/control_precheck.sh with the phase-marker fix diff): the second run's census names the first run's phases"
+    },
+    {
+      "id": "D-4CAWMPATH-PATH-ALL-LOST-A-CHURN-FILE-NO-LONGER-NAMED-ITS-CREATED-INODE",
+      "severity": "critical",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "On 4/disk/caw/mpath path_all_lost, test3's churn verification found a churn file that no longer named the inode its create was handed (the row's check 'every churn file still named the inode its create was handed' got 1), in a run whose victim test6 was fenced after 14 s and whose other nodes stalled up to 16.7 s; whether a directory entry now points at another inode, or the check misread a name, is not established.",
+      "evidence": "Run 4/disk/caw/mpath:path_all_lost:2026-10-23T16:32:35Z (FAIL, 148 s), a variant run (MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, MXFS_MPATH_TMO=2, MXFS_TEST_ENV=PF_KEEP_KMSG=1: a 12 s death window and the 2 s path timescale under evaluation for D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S), build 08D63764A9352FBDD5A76CD, lane tests/evidence/lanes/g4_mpathtmo2_k6_20261023T162032Z. Reason: 'test3: every churn file still named the inode its create was handed (verify_fail, tests/evidence/board_20261023T162952Z-g4_path_all_lost/load_test3/verify.log) (got 1)'; measured 'victim=test6 fenced_s=14 resumed_s=2 reinstate_s=8 other_stall_ms=16701 acked=2594 elapsed=142s fails=1 max_stall_ms=16770'. Each node's kernel log is kept in the run's evidence (PF_KEEP_KMSG=1).",
+      "next": "Read load_test3/verify.log: which file, which inode its create was handed, which inode the name now gives (or the error), and when; then each node's kernel log around that create and the victim's fence (kmsg_*_fromnode.gz in the run's evidence) and chk_mxfs of the volume if it was kept. Until the names and inodes are read this is a possible namespace corruption and is treated as one. Then whether it recurs at the default death window on the same row.",
+      "reproducer": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 MXFS_MPATH_TMO=2 MXFS_TEST_ENV=PF_KEEP_KMSG=1 ./run.sh 4/disk/caw/mpath --group g4 path_all_lost after a forced prep (seen once)",
+      "cells": [
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "path_all_lost",
+          "iso": "2026-10-23T16:32:35Z"
+        }
+      ]
+    },
+    {
+      "id": "D-MPATH-MOUNT-DEGRADED-12S-WINDOW-REGISTRATION-MISSING-AND-SHUTDOWNS",
+      "severity": "critical",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "On path_mount_degraded at 2/disk/caw/mpath and 4/disk/caw/mpath with a 12 s death window, the path that was down at mount came back carrying one registration fewer than every node's (3 of 4, 7 of 8), the node mounted on one path stalled 41.6 s and 33.5 s late in the window and its load completed no writes in the window's second half, over 1.4 million of its operations returned errors, and every node logged a shutdown, withdrawal, death declaration, BUG, oops or hung task, in a row that kills no node.",
+      "evidence": "Runs 2/disk/caw/mpath:path_mount_degraded:2026-10-23T16:57:29Z (FAIL, 182 s; victim=test18 mount_one_path_ms=5655 late_stall_ms=41626 reinstate_a_s=18 reinstate_b_s=20 acked=4778 fails=8; lane tests/evidence/lanes/g2e_mpathtmo2_k6_20261023T162033Z) and 4/disk/caw/mpath:path_mount_degraded:2026-10-23T16:58:04Z (FAIL, 172 s; victim=test6 mount_one_path_ms=7025 late_stall_ms=33453 reinstate_a_s=16 reinstate_b_s=5 acked=3361 fails=9; lane tests/evidence/lanes/g4_mpathtmo2_k6_20261023T162032Z), each a variant run (MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, MXFS_MPATH_TMO=2, MXFS_TEST_ENV=PF_KEEP_KMSG=1: a 12 s death window and the 2 s path timescale under evaluation for D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S), build 08D63764A9352FBDD5A76CD. Failed checks, from the runs' reasons: 'the path that was down at mount carries the victim's registration once it is back (4 registrations) (got 3)' and '(8 registrations) (got 7)'; 'late: <victim>'s path left standing (a) completed writes in the second half of the window (got no)'; 'no operation on <victim> returned an error (got 1437449)' and '(got 1462506)'; '<node> logged no shutdown, withdrawal, death declaration, BUG, oops or hung task (got 1)' on every node.",
+      "next": "Read each node's kernel log in the two runs' evidence (kmsg_*_fromnode.gz): which node declared which dead and when, against the 12 s window and the 2 s path timescale; whether the missing registration is the victim's own on the returning path, and whether a fence preempted it. Then the same row at the default death window, to tell a defect of the 12 s window from one the variant only exposes.",
+      "reproducer": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 MXFS_MPATH_TMO=2 MXFS_TEST_ENV=PF_KEEP_KMSG=1 ./run.sh <2|4>/disk/caw/mpath --group <g2e|g4> path_mount_degraded after a forced prep (seen once at each)",
+      "cells": [
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "path_mount_degraded",
+          "iso": "2026-10-23T16:57:29Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "path_mount_degraded",
+          "iso": "2026-10-23T16:58:04Z"
+        }
+      ]
+    },
+    {
+      "id": "D-2NETMESH-PATH-FLAP-12S-WINDOW-STALLS-120S-ACKED-FILES-UNREAD",
+      "severity": "critical",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "On 2/net/mesh/mpath path_flap with a 12 s death window, test18's load stalled 81.7 s during the flaps and 120.3 s after them, 5.5 million of its operations returned errors, test18 could not read every file test17 had acknowledged with its checksum, both nodes logged a shutdown, withdrawal, death declaration, BUG, oops or hung task, and test17 saw the membership fall below 2, in a row that kills no node.",
+      "evidence": "Run 2/net/mesh/mpath:path_flap:2026-10-23T17:22:40Z (FAIL, 169 s), a variant run (MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, MXFS_MPATH_TMO=2, MXFS_TEST_ENV=PF_KEEP_KMSG=1: a 12 s death window and the 2 s path timescale under evaluation for D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S), build 08D63764A9352FBDD5A76CD, lane tests/evidence/lanes/g2e_mpathtmo2_k6_20261023T162033Z. Measured 'victim=test18 flaps=10 flap_s=4 stall_ms=81690 settle_s=0 acked=29984 elapsed=166s fails=12 max_stall_ms=120272'. Failed checks, from the run's reason: 'F4: test18's longest stall, ms (got 81690)'; 'F4_after: test18's longest stall, ms (got 120272)'; 'test18: no operation returned an error in the whole run (got 5503784)'; 'test17 acknowledged files (> 0) and test18 reads every one with its checksum (got no)'; 'test17 logged no shutdown, withdrawal, death declaration, BUG, oops or hung task (got 1)'; 'test17 saw no membership below 2 (got 1)'.",
+      "next": "Read both nodes' kernel logs in the run's evidence (kmsg_*_fromnode.gz): whether test17 declared test18 dead during a 4 s flap on its own 12 s window, what each node shut down on, and which acknowledged files test18 could not read with their checksum and why (an error, or different data). Until that is read the unread files are a possible loss of acknowledged data and are treated as one. Then the same row at the default death window.",
+      "reproducer": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 MXFS_MPATH_TMO=2 MXFS_TEST_ENV=PF_KEEP_KMSG=1 ./run.sh 2/net/mesh/mpath --group g2e path_flap after a forced prep (seen once)",
+      "cells": [
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "path_flap",
+          "iso": "2026-10-23T17:22:40Z"
+        }
+      ]
     }
   ]
 }
