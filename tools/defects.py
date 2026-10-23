@@ -390,6 +390,13 @@ def verified_here(entry: dict, config: str, platform=None, candidate: str = "") 
 
     A mark with no batch is a single-pass `verify` from before 2026-10-21; it proves nothing about
     a defect that showed only now and then, and it no longer counts.
+
+    A candidate is its version, and a version is frozen again after an attempt fails, so a mark
+    counts only on the attempt its laps ran on (the `attempt` it carries, that attempt's frozen-at
+    stamp). Matched by the version alone, a batch that passed on one attempt stopped the record
+    blocking on every later attempt, none of whose trees its laps ran on
+    (D-VERIFIED-AT-MATCHED-BY-VERSION-ALONE-CARRIES-TO-A-LATER-ATTEMPT); a mark from before the
+    attempt was recorded counts on none.
     """
     marks = [v for v in entry.get("verified_at") or []
              if isinstance(v, dict) and v.get("config") == config and v.get("batch")
@@ -397,7 +404,9 @@ def verified_here(entry: dict, config: str, platform=None, candidate: str = "") 
     if not marks:
         return False
     if candidate:
-        return any(v.get("candidate") == candidate for v in marks)
+        began = board_tool().attempt_began(candidate)
+        return bool(began) and any(v.get("candidate") == candidate and v.get("attempt") == began
+                                   for v in marks)
     global build_cache
     if build_cache is None:
         build_cache = tree_build()
@@ -608,7 +617,8 @@ def show_one(entry: dict) -> None:
             if mark.get("batch"):
                 print("  %-10s %s on %s (batch %s, %s): does not block it there"
                       % ("verified", mark.get("config"),
-                         "candidate " + mark["candidate"] if mark.get("candidate")
+                         "candidate %s attempt %s" % (mark["candidate"], mark.get("attempt") or "?")
+                         if mark.get("candidate")
                          else "build " + str(mark.get("build")), mark["batch"], mark.get("date")))
             else:
                 print("  %-10s %s on build %s (%s): a single pass from before batches; it no "
@@ -1289,6 +1299,8 @@ def cmd_verify(data: dict, args) -> int:
                                     and v.get("platform", "any") == batch.get("platform", "any"))]
     entry["verified_at"].append({"config": batch["config"], "platform": batch.get("platform", "any"),
                                  "candidate": batch.get("candidate", ""),
+                                 "attempt": (criteria.attempt_began(batch["candidate"])
+                                             if batch.get("candidate") else ""),
                                  "build": batch.get("build") or (laps[0].get("build") if laps else ""),
                                  "batch": batch["id"], "approval": approval["proposal"],
                                  "date": date.today().isoformat()})

@@ -57,7 +57,9 @@ def main() -> int:
     default = marker(ROOT / ".cluster_marker.json")
 
     def pair(m: dict) -> tuple:
-        return (str(m.get("node_list", "")), str(m.get("config", "")))
+        # run.sh writes the marker's configuration under `configuration`; read as `config`, both
+        # sides were empty and only the node list was compared
+        return (str(m.get("node_list", "")), str(m.get("configuration", "")))
 
     print(f"INFO {group} marker: nodes={pair(own)[0]} config={pair(own)[1]}; default marker: "
           f"nodes={pair(default)[0]} config={pair(default)[1]}")

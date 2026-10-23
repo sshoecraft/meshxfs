@@ -3388,7 +3388,7 @@
       "config": "*/*/*",
       "opened": "2026-10-21",
       "summary": "tools/release_run.py presteps form the pair with run.sh --group g2, which records .cluster_marker.g2.json (run.sh:209), then run rig_lib_contract and capture_fault_gate without MXFS_MARKER, so every harness and tools/mxfs_rig_tag.sh read the default .cluster_marker.json, whatever an earlier unrelated run left there",
-      "evidence": "release_run.py step_presteps: run.sh ... --group g2 prep_cluster, then tests/rig_lib_contract.sh and tests/capture_fault_gate.sh with only MXFS_NODE_LIST added; grep of capture_fault_gate.sh for MXFS_MARKER: none; mxfs_rig_tag.sh:45 defaults to .cluster_marker.json. The in-gate preps (d0940:114, d0944:66, fence_crash_cuts:336, ...) run run.sh without --group and rewrite the default marker mid-gate. The default marker content during the 0.90.134 gate before 21:43:22Z was not kept. ===== ===== 2026-10-22, fix in the tree: tools/release_run.py step_presteps passes MXFS_GROUP=g2 and MXFS_MARKER=<repo>/.cluster_marker.g2.json (with MXFS_NODE_LIST) to tests/rig_lib_contract.sh and tests/capture_fault_gate.sh, so an in-gate run.sh prep forms the pair under the group and every tool reads the group's marker. Dry run attempt 20261022T031549Z: .cluster_marker.g2.json went from gen 309 to 333 across the presteps, which is exactly 1 presteps prep + 15 in-gate preps + 8 gate restores; the default .cluster_marker.json stayed at gen 1042 through the gate (1043 now, from a later plain prep at 03:52:09Z). Contract PASS fails=0; gate 59/60 OK, the one broken entry a different cause (D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE).",
+      "evidence": "release_run.py step_presteps: run.sh ... --group g2 prep_cluster, then tests/rig_lib_contract.sh and tests/capture_fault_gate.sh with only MXFS_NODE_LIST added; grep of capture_fault_gate.sh for MXFS_MARKER: none; mxfs_rig_tag.sh:45 defaults to .cluster_marker.json. The in-gate preps (d0940:114, d0944:66, fence_crash_cuts:336, ...) run run.sh without --group and rewrite the default marker mid-gate. The default marker content during the 0.90.134 gate before 21:43:22Z was not kept. ===== ===== 2026-10-22, fix in the tree: tools/release_run.py step_presteps passes MXFS_GROUP=g2 and MXFS_MARKER=<repo>/.cluster_marker.g2.json (with MXFS_NODE_LIST) to tests/rig_lib_contract.sh and tests/capture_fault_gate.sh, so an in-gate run.sh prep forms the pair under the group and every tool reads the group's marker. Dry run attempt 20261022T031549Z: .cluster_marker.g2.json went from gen 309 to 333 across the presteps, which is exactly 1 presteps prep + 15 in-gate preps + 8 gate restores; the default .cluster_marker.json stayed at gen 1042 through the gate (1043 now, from a later plain prep at 03:52:09Z). Contract PASS fails=0; gate 59/60 OK, the one broken entry a different cause (D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE). ===== 2026-10-23: tests/presteps_env_lap.py read each marker's configuration as 'config', a key run.sh never writes ('configuration'), so both sides were empty and only the node lists were compared (review data/reviews/P20261022-0b1720.md, Observation 2). It reads 'configuration' now. The control's exposure came from the node list (default marker test15, the g2 marker test1,test2), which the change leaves as it was.",
       "next": "form the presteps pair the way the self-test harnesses expect it (the default marker), or export the group marker to every self-test and make the in-gate preps use it; rerun the presteps",
       "cells": [
         {
@@ -6054,8 +6054,8 @@
       "config": "*/*/*",
       "opened": "2026-10-22",
       "summary": "Two rig lanes on one configuration collide on run.sh's configuration lock, and tools/harness_batch.py verify then spends a verification batch's laps INCOMPLETE: lane g2_verify_round1's prep_cluster for 2/net/mesh/direct was refused because lane g2c_verify_round1's run.sh held 2-net-mesh-direct, so test1/test2 were never formed on the candidate; harness_batch.py ran every planned lap anyway, each aborting on the unformed pair (rc=2), and three verification batches used up their laps with 0, 0 and 4 PASS.",
-      "evidence": "Candidate 0.90.134 (frozen 2026-10-23T02:25:06Z), seven round-1 lanes started 02:25:12-02:25:24Z. tests/evidence/lanes/g2_verify_round1_20261023T022512Z/step2.log: 'ERROR: configuration 2-net-mesh-direct is held by another run: 3949243 2026-10-23T02:25:17Z run.sh 2/net/mesh/direct --group g2c run_id=20261023T022517Z-g2c' (summary.log: step 2 end rc=3 0s). step3.log: batch b20261022-bd6f17 (evidence link, 6 planned) laps 1-6 INCOMPLETE rc=2 elapsed 0 s, each lap log (tests/evidence/batch_laps/b20261022-bd6f17/20261023T022542Z.log ...) 'ABORT: test1 does not see the tree at /src/mxfs (got src=0)'. step4.log: batch b20261022-4a86bc (open-EFI image gate entry, 6 planned) laps 1-6 INCOMPLETE rc=2, each 'PAIR before d_intents_2tcp_open_efi fault: not formed ... ABORT: the pair could not be formed again ...; ERROR: configuration 2-net-mesh-direct is held by another run ... --group g2c' (tests/evidence/batch_laps/b20261022-4a86bc/20261023T022549Z.log). step5.log: batch b20261022-1c2336 (open-EFI death gate entry, 6 planned) laps 1-2 INCOMPLETE rc=2, laps 3-6 PASS once g2c's run had ended. tools/defects.py check_batch_lap counts PASS, FAIL and INCOMPLETE laps against a batch's planned number, so each of the three batches has run all its laps. No MXFS module was loaded on test1/test2 before any of the 14 aborts (the pair had not been formed on this boot).",
-      "next": "Make a lap that aborts on a precondition before its trigger (pair not formed, tree not visible) stop the batch's run without spending the rest of its laps (harness_batch.py stops at the first INCOMPLETE), and keep two lanes from holding one configuration at once (the lane runner, or run.sh waiting for the configuration lock with a derived bound, instead of refusing); a reproducer: a verification lap run while another process holds the configuration's lock. Then plan the three verifications again.",
+      "evidence": "Candidate 0.90.134 (frozen 2026-10-23T02:25:06Z), seven round-1 lanes started 02:25:12-02:25:24Z. tests/evidence/lanes/g2_verify_round1_20261023T022512Z/step2.log: 'ERROR: configuration 2-net-mesh-direct is held by another run: 3949243 2026-10-23T02:25:17Z run.sh 2/net/mesh/direct --group g2c run_id=20261023T022517Z-g2c' (summary.log: step 2 end rc=3 0s). step3.log: batch b20261022-bd6f17 (evidence link, 6 planned) laps 1-6 INCOMPLETE rc=2 elapsed 0 s, each lap log (tests/evidence/batch_laps/b20261022-bd6f17/20261023T022542Z.log ...) 'ABORT: test1 does not see the tree at /src/mxfs (got src=0)'. step4.log: batch b20261022-4a86bc (open-EFI image gate entry, 6 planned) laps 1-6 INCOMPLETE rc=2, each 'PAIR before d_intents_2tcp_open_efi fault: not formed ... ABORT: the pair could not be formed again ...; ERROR: configuration 2-net-mesh-direct is held by another run ... --group g2c' (tests/evidence/batch_laps/b20261022-4a86bc/20261023T022549Z.log). step5.log: batch b20261022-1c2336 (open-EFI death gate entry, 6 planned) laps 1-2 INCOMPLETE rc=2, laps 3-6 PASS once g2c's run had ended. tools/defects.py check_batch_lap counts PASS, FAIL and INCOMPLETE laps against a batch's planned number, so each of the three batches has run all its laps. No MXFS module was loaded on test1/test2 before any of the 14 aborts (the pair had not been formed on this boot). ===== 2026-10-23, fix in the tree (tests/evidence/controls/D-LANES-ON-ONE-CONFIGURATION-COLLIDE.fix.diff): scripts/rig_lane.sh holds every configuration its queue's steps name (run.sh <configuration>, --at <configuration>) for as long as the lane runs, through a holder process per /tmp/mxfs_lane.<configuration>.lock that exits with the lane, and refuses to start (rc 3, the holder named in its summary) while another lane holds one; so two lanes can no longer run one configuration at once, which is how g2's pair went unformed. harness_batch.py is unchanged: once the collision cannot happen, nothing in round 1 made a lap abort on its precondition. With the fix in, tests/lane_config_lock_lap.sh: PASS (lane B refused 64/net/mesh/direct while lane A held it; lane C ran 1.5 s after A ended).",
+      "next": "control batch with the fix out (lap:lane_config_lock at 2/net/mesh/direct, 10 laps), then the verification batch on the frozen candidate, then remove --fixed",
       "cells": [
         {
           "config": "2/net/mesh/direct",
@@ -6126,6 +6126,94 @@
           "config": "2/net/mesh/direct",
           "row": "gate:d_intents_2tcp_open_efi",
           "iso": "2026-10-23T02:26:36Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T03:37:45Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T03:37:39Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T03:37:33Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T03:37:27Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T03:37:21Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T03:37:15Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T03:37:09Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T03:37:03Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T03:36:57Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T03:36:51Z"
+        }
+      ],
+      "reproducer": "tests/lane_config_lock_lap.sh (host only): lane A's one step names a configuration and holds 4 s; lane B, started while A's step runs, names the same one; lane C is started 1.5 s after A ends. EXPOSED when B was started while A's step ran, FAIL when B ran its step (or neither ran nor refused), or C did not run. With the fix out B runs alongside A.",
+      "updated": "2026-10-22",
+      "batches": [
+        {
+          "id": "b20261022-18f783",
+          "kind": "control",
+          "row": "lap:lane_config_lock",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED:",
+          "candidate": "",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "fix reverted: tests/evidence/controls/D-LANES-ON-ONE-CONFIGURATION-COLLIDE.fix.diff sha256=1f76854ef93400a125cd64e8da4b0b6d30f3932e80a443f6e2a02c74266bc11c",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix-out rate of the lane configuration hold"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:lane_config_lock",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-18f783",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-LANES-ON-ONE-CONFIGURATION-COLLIDE.fix.diff sha256=1f76854ef93400a125cd64e8da4b0b6d30f3932e80a443f6e2a02c74266bc11c",
+          "builds": [
+            "16A5F5DDDB4852C9D5DB236"
+          ],
+          "date": "2026-10-22"
         }
       ]
     },
@@ -6136,8 +6224,98 @@
       "config": "*/*/*",
       "opened": "2026-10-22",
       "summary": "tools/batch_lap.py names each lap's log after the second the lap starts (:174) and opens it with 'w' (:182), while the lap's ledger stamp is moved to a free second (:215): two laps started in one second write one file, the second overwriting the first, so a counted lap's PASS and exposure lines survive nowhere but the ledger row.",
-      "evidence": "Review data/reviews/P20261022-0b1720.md: batch b20261022-b46717 (lap:presteps_env) laps 1 and 2 (ledger data/criteria.runs.jsonl:7970, :7972) both name tests/evidence/batch_laps/b20261022-b46717/20261023T022540Z.log, which holds lap 2's output (it closes at 02:25:41Z; lap 1's own stamp is 02:25:40Z): three logs for four rows. Control b20261022-12fbb7 rows :7617 and :7618 both name 20261022T200846Z.log: 19 logs for 20 rows.",
-      "next": "Name each lap's log so no two laps can share it (the lap's number and its own ledger stamp) and open it exclusively; a lap that runs two sub-second laps of one batch and requires two logs, each holding its own lap's verdict line."
+      "evidence": "Review data/reviews/P20261022-0b1720.md: batch b20261022-b46717 (lap:presteps_env) laps 1 and 2 (ledger data/criteria.runs.jsonl:7970, :7972) both name tests/evidence/batch_laps/b20261022-b46717/20261023T022540Z.log, which holds lap 2's output (it closes at 02:25:41Z; lap 1's own stamp is 02:25:40Z): three logs for four rows. Control b20261022-12fbb7 rows :7617 and :7618 both name 20261022T200846Z.log: 19 logs for 20 rows. ===== 2026-10-23, fix in the tree: tools/batch_lap.py lap_log() names each lap's log <start second>-<8 hex>.log and creates it exclusively (open 'x', a new tag on a clash), so two laps started in one second write two logs. main() named and opened the log inline; a refactor that changed no behaviour moved that into lap_log() first, so the fix, tests/evidence/controls/D-BATCH-LAP-LOG-NAMED-BY-THE-SECOND.fix.diff, is lap_log's body alone. With the fix in, tests/batch_lap_log_lap.py: PASS, two logs 20261023T033348Z-095f24cf.log and 20261023T033348Z-e7ed369d.log opened in one second.",
+      "next": "control batch with the fix out (tools/harness_batch.py control, lap:batch_lap_log at 2/net/mesh/direct, 10 laps), then the verification batch on the frozen candidate, then remove --fixed",
+      "reproducer": "tests/batch_lap_log_lap.py (host only): two processes import tools/batch_lap.py and open their log with lap_log() at one instant in one scratch directory, each writing its own line; EXPOSED when both opened in the same second, FAIL when they were given one log or a log lost its own line. With the fix out they share one log holding the second process's line.",
+      "updated": "2026-10-22",
+      "batches": [
+        {
+          "id": "b20261022-6cf780",
+          "kind": "control",
+          "row": "lap:batch_lap_log",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED:",
+          "candidate": "",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "fix reverted: tests/evidence/controls/D-BATCH-LAP-LOG-NAMED-BY-THE-SECOND.fix.diff sha256=f9c60d2ceed2f363354e67127404417639c894c3cac3e95b6ff2e006afa14f25",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix-out rate of the lap log naming"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:batch_lap_log",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-6cf780",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-BATCH-LAP-LOG-NAMED-BY-THE-SECOND.fix.diff sha256=f9c60d2ceed2f363354e67127404417639c894c3cac3e95b6ff2e006afa14f25",
+          "builds": [
+            "16A5F5DDDB4852C9D5DB236"
+          ],
+          "date": "2026-10-22"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_log",
+          "iso": "2026-10-23T03:36:43Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_log",
+          "iso": "2026-10-23T03:36:41Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_log",
+          "iso": "2026-10-23T03:36:39Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_log",
+          "iso": "2026-10-23T03:36:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_log",
+          "iso": "2026-10-23T03:36:35Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_log",
+          "iso": "2026-10-23T03:36:33Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_log",
+          "iso": "2026-10-23T03:36:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_log",
+          "iso": "2026-10-23T03:36:29Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_log",
+          "iso": "2026-10-23T03:36:27Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_log",
+          "iso": "2026-10-23T03:36:25Z"
+        }
+      ]
     },
     {
       "id": "D-VERIFIED-AT-MATCHED-BY-VERSION-ALONE-CARRIES-TO-A-LATER-ATTEMPT",
@@ -6146,8 +6324,98 @@
       "config": "*/*/*",
       "opened": "2026-10-22",
       "summary": "A record's verified_at entry is matched to a candidate by the version string alone (tools/defects.py blocks/verified_at, :399-400), so a verification batch that passed on one attempt of a version stops the record blocking that configuration on every later attempt of the same version, though none of its laps ran on them; grading counts only runs made after the current attempt was frozen, the verification exemption does not.",
-      "evidence": "Reviews data/reviews/P20261022-981ed4.md and data/reviews/P20261022-f64a95.md: 'the verified_at mark that approval writes is matched by the name 0.90.134 alone ... It would therefore carry over to a refrozen attempt of the same version that no lap of this batch ran on.' Candidate 0.90.134's attempt frozen 2026-10-23T02:25:06Z went INVALID at 03:1xZ; verified_at for D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK-FOR-A-NODE-DEVICE-PATH at 2/net/mesh/direct (batch b20261022-7742a9, approval P20261022-51ab60) was applied on it and would exempt that record on the next attempt.",
-      "next": "Record the attempt (the candidate's frozen-at stamp) in each verified_at entry and match it against the current attempt only; a lap that verifies on one attempt, freezes another, and requires the record to block again."
+      "evidence": "Reviews data/reviews/P20261022-981ed4.md and data/reviews/P20261022-f64a95.md: 'the verified_at mark that approval writes is matched by the name 0.90.134 alone ... It would therefore carry over to a refrozen attempt of the same version that no lap of this batch ran on.' Candidate 0.90.134's attempt frozen 2026-10-23T02:25:06Z went INVALID at 03:1xZ; verified_at for D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK-FOR-A-NODE-DEVICE-PATH at 2/net/mesh/direct (batch b20261022-7742a9, approval P20261022-51ab60) was applied on it and would exempt that record on the next attempt. ===== 2026-10-23, fix in the tree (tests/evidence/controls/D-VERIFIED-AT-MATCHED-BY-VERSION-ALONE.fix.diff): defects.py verify stamps each verified_at mark with the attempt its laps ran on (criteria.attempt_began, the candidate manifest's created), and verified_here counts a candidate's mark only when that stamp is the candidate's current attempt; a mark without one (written before) counts on no attempt. With the fix in, tests/verified_at_attempt_lap.py: PASS (a mark stamped 2026-10-22T03:15:49Z does not stop the record blocking 2/net/mesh/direct on attempt 2026-10-23T02:25:06Z; one stamped with the current attempt does).",
+      "next": "control batch with the fix out (lap:verified_at_attempt at 2/net/mesh/direct, 10 laps), then the verification batch on the frozen candidate, then remove --fixed",
+      "reproducer": "tests/verified_at_attempt_lap.py (host only): gives a copy of the record of the queue's newest verification batch on the active candidate one verified_at mark at that batch's configuration, stamped with an earlier attempt of the candidate and then with the current one, and asks defects.verified_here on the current attempt; EXPOSED when the candidate has an earlier attempt, FAIL when the earlier attempt's mark stops the record blocking or the current one's does not. With the fix out the earlier mark counts.",
+      "updated": "2026-10-22",
+      "batches": [
+        {
+          "id": "b20261022-503d4f",
+          "kind": "control",
+          "row": "lap:verified_at_attempt",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED:",
+          "candidate": "",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "fix reverted: tests/evidence/controls/D-VERIFIED-AT-MATCHED-BY-VERSION-ALONE.fix.diff sha256=be416d8a450336de4f0917e2c187f674cd857a8b95c936c2af2d28ee93977ed6",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix-out rate of the verified_at attempt match"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:verified_at_attempt",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-503d4f",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-VERIFIED-AT-MATCHED-BY-VERSION-ALONE.fix.diff sha256=be416d8a450336de4f0917e2c187f674cd857a8b95c936c2af2d28ee93977ed6",
+          "builds": [
+            "16A5F5DDDB4852C9D5DB236"
+          ],
+          "date": "2026-10-22"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:verified_at_attempt",
+          "iso": "2026-10-23T03:36:21Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:verified_at_attempt",
+          "iso": "2026-10-23T03:36:20Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:verified_at_attempt",
+          "iso": "2026-10-23T03:36:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:verified_at_attempt",
+          "iso": "2026-10-23T03:36:18Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:verified_at_attempt",
+          "iso": "2026-10-23T03:36:17Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:verified_at_attempt",
+          "iso": "2026-10-23T03:36:16Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:verified_at_attempt",
+          "iso": "2026-10-23T03:36:15Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:verified_at_attempt",
+          "iso": "2026-10-23T03:36:14Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:verified_at_attempt",
+          "iso": "2026-10-23T03:36:13Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:verified_at_attempt",
+          "iso": "2026-10-23T03:36:12Z"
+        }
+      ]
     },
     {
       "id": "D-TAUTH-LAPS-RELINK-FROZEN-TEST-BINARIES-AND-INVALIDATE-THE-CANDIDATE",
@@ -6156,8 +6424,98 @@
       "config": "*/*/*",
       "opened": "2026-10-22",
       "summary": "tests/tauth/adopted_grant_handoff_test.sh:25 and tests/tauth/fenced_node_ledger_test.sh:23 compile and link their test binary in place, tests/tauth/<name>_test, which is a frozen file of the release candidate; so every lap rewrites a frozen file, and a verification batch of either lap makes the candidate it runs on INVALID.",
-      "evidence": "Candidate 0.90.134 frozen 2026-10-23T02:25:06Z (data/candidates/0.90.134.json); the host lane's tauth verification laps ran at 02:25:47-02:27:53Z. tools/release_candidate.py check 0.90.134: 'touched (content restored after a change, or rewritten): tests/tauth/adopted_grant_handoff_test', 'changed: tests/tauth/fenced_node_ledger_test', 'candidate 0.90.134 is now INVALID'. Reviews data/reviews/P20261022-981ed4.md (inode 98566229 -> 98566218, ctime 02:26:52Z; fenced_node_ledger_test 998600 -> 1008032 bytes at 02:27:41Z), data/reviews/P20261022-f64a95.md (a scan of all 2543 frozen files found only these two) and data/reviews/P20261022-7a05dc.md. Every verification batch on that attempt ran on a drifted tree and was rejected for it.",
-      "next": "Build each tauth test binary outside the frozen tree (a scratch directory, or a path the freeze lists as a build output) and run it from there; a lap that runs both tauth tests with a candidate frozen and requires release_candidate.py check to find nothing changed after them."
+      "evidence": "Candidate 0.90.134 frozen 2026-10-23T02:25:06Z (data/candidates/0.90.134.json); the host lane's tauth verification laps ran at 02:25:47-02:27:53Z. tools/release_candidate.py check 0.90.134: 'touched (content restored after a change, or rewritten): tests/tauth/adopted_grant_handoff_test', 'changed: tests/tauth/fenced_node_ledger_test', 'candidate 0.90.134 is now INVALID'. Reviews data/reviews/P20261022-981ed4.md (inode 98566229 -> 98566218, ctime 02:26:52Z; fenced_node_ledger_test 998600 -> 1008032 bytes at 02:27:41Z), data/reviews/P20261022-f64a95.md (a scan of all 2543 frozen files found only these two) and data/reviews/P20261022-7a05dc.md. Every verification batch on that attempt ran on a drifted tree and was rejected for it. ===== 2026-10-23, fix in the tree (tests/evidence/controls/D-TAUTH-LAPS-RELINK-FROZEN-TEST-BINARIES.fix.diff): both scripts make only the shared objects (obj/*.o, not frozen) instead of the local_page_full_test binary, link the test into a mktemp directory under /tmp and run it from there, so a lap writes no frozen file. With the fix in, tests/tauth_freeze_lap.py: PASS, both tests rc=0, none of the 2547 frozen files changed (26.6 s).",
+      "next": "control batch with the fix out (lap:tauth_freeze at 2/net/mesh/direct, 10 laps), then the verification batch on the frozen candidate, then remove --fixed",
+      "reproducer": "tests/tauth_freeze_lap.py (host only): stats every frozen file (release_candidate.frozen_paths()), runs both tauth scripts, stats them again and compares inode, size and change time as release_candidate.drift() does; EXPOSED when both tests built and ran, FAIL naming each frozen file that changed. With the fix out the two test binaries are relinked in the tree.",
+      "updated": "2026-10-22",
+      "batches": [
+        {
+          "id": "b20261022-ce2e25",
+          "kind": "control",
+          "row": "lap:tauth_freeze",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED:",
+          "candidate": "",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "fix reverted: tests/evidence/controls/D-TAUTH-LAPS-RELINK-FROZEN-TEST-BINARIES.fix.diff sha256=55ce93524fb0e371dc4bc6d874b5a1ac3912cf41f6c746570ef314a3213e532a",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix-out rate of the tauth in-tree relink"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:tauth_freeze",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-ce2e25",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-TAUTH-LAPS-RELINK-FROZEN-TEST-BINARIES.fix.diff sha256=55ce93524fb0e371dc4bc6d874b5a1ac3912cf41f6c746570ef314a3213e532a",
+          "builds": [
+            "16A5F5DDDB4852C9D5DB236"
+          ],
+          "date": "2026-10-22"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:tauth_freeze",
+          "iso": "2026-10-23T03:42:13Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:tauth_freeze",
+          "iso": "2026-10-23T03:41:45Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:tauth_freeze",
+          "iso": "2026-10-23T03:41:18Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:tauth_freeze",
+          "iso": "2026-10-23T03:40:52Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:tauth_freeze",
+          "iso": "2026-10-23T03:40:26Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:tauth_freeze",
+          "iso": "2026-10-23T03:39:58Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:tauth_freeze",
+          "iso": "2026-10-23T03:39:30Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:tauth_freeze",
+          "iso": "2026-10-23T03:39:02Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:tauth_freeze",
+          "iso": "2026-10-23T03:38:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:tauth_freeze",
+          "iso": "2026-10-23T03:38:13Z"
+        }
+      ]
     }
   ]
 }

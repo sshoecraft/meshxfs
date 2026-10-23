@@ -19,6 +19,16 @@
 # tests/suite/manifest; tools/batch_lap.py and every harness bound themselves),
 # so the lane wraps nothing in a timeout of its own.
 #
+# A lane holds every configuration its steps name (`run.sh <configuration>`,
+# `--at <configuration>`) until it exits, and refuses to start while another
+# lane holds one of them (rc 3, the holder in the summary): two lanes on one
+# configuration collided on run.sh's configuration lock, so one lane's pair was
+# never formed and its verification batches spent every lap on it, INCOMPLETE
+# (D-LANES-ON-ONE-CONFIGURATION-COLLIDE-AND-BATCHES-SPEND-THEIR-LAPS-INCOMPLETE).
+# A holder process keeps each lock (/tmp/mxfs_lane.<configuration>.lock) and
+# exits with the lane; the lane closes its own copy, so neither a step nor
+# anything a step leaves running keeps a configuration held after the lane.
+#
 # Output, under tests/evidence/lanes/<name>_<stamp>/:
 #   summary.log    one line as each step starts and one as it ends: its number,
 #                  rc, seconds and the command
@@ -37,6 +47,20 @@ mkdir -p "$OUT" || exit 2
 cp "$QUEUE" "$OUT/queue"
 echo $$ > "$OUT/pid"
 SUM=$OUT/summary.log
+for cfg in $(grep -v '^[[:space:]]*#' "$OUT/queue" \
+             | grep -oE '(run\.sh|--at)[[:space:]]+[0-9]+/[^[:space:]]+' | awk '{print $2}' | sort -u); do
+    lock=/tmp/mxfs_lane.${cfg//\//-}.lock
+    exec {fd}>>"$lock"
+    if ! flock -n "$fd"; then
+        echo "$(date -u +%FT%TZ) lane $NAME refused: configuration $cfg is held by another lane ($(head -c 200 "$lock"))" >> "$SUM"
+        date -u +%FT%TZ > "$OUT/DONE"
+        exit 3
+    fi
+    echo "$$ $(date -u +%FT%TZ) lane $NAME" > "$lock"
+    tail --pid=$$ -f /dev/null < /dev/null > /dev/null 2>&1 &
+    exec {fd}>&-
+    echo "$(date -u +%FT%TZ) holds configuration $cfg" >> "$SUM"
+done
 n=0
 while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in ''|'#'*) continue ;; esac

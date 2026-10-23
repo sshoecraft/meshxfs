@@ -136,6 +136,23 @@ def count_probe(probe: str, texts: list) -> int:
     return sum(1 for text in texts for line in text.splitlines() if pattern.search(line))
 
 
+def lap_log(logdir: Path) -> tuple:
+    """The lap's log, created for this lap alone: (path, handle).
+
+    Named by the second the lap starts and a random tag, and created exclusively, so two laps
+    that start in one second write two logs. Named by the second alone and opened with "w", the
+    second lap truncated the first one's log, and that lap's PASS and exposure lines survived
+    nowhere but its ledger row
+    (D-BATCH-LAP-LOG-NAMED-BY-THE-SECOND-SO-SUB-SECOND-LAPS-OVERWRITE-EACH-OTHER)."""
+    while True:
+        log = logdir / (f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+                        f"-{uuid.uuid4().hex[:8]}.log")
+        try:
+            return log, log.open("x")
+        except FileExistsError:
+            continue
+
+
 def fresh_iso(board: Path, config: str, row: str) -> str:
     """A stamp no run of this row at this configuration already carries."""
     taken = {str(r.get("iso", "")) for r in criteria.ledger_runs(board, config, row)}
@@ -171,7 +188,7 @@ def main() -> int:
         sys.exit(f"batch_lap: no srcversion in {args.build_from}: a run must carry its build")
     logdir = ROOT / "tests" / "evidence" / "batch_laps" / args.batch
     logdir.mkdir(parents=True, exist_ok=True)
-    log = logdir / f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.log"
+    log, handle = lap_log(logdir)
     vms = lap_vms() if os.environ.get("MXFS_BATCH_LAP_HOLD", "1") != "0" else []
     holds = hold_vms(vms, f"batch_lap {args.batch} {args.row}")
     print(f"--- batch {args.batch}: one lap of {args.row} at {config}"
@@ -179,7 +196,7 @@ def main() -> int:
           f"{', variant ' + variant if variant else ''}; bound {args.bound}s; "
           f"VMs held: {' '.join(vms) or 'none'}; log {log} ---", flush=True)
     t0 = time.time()
-    with log.open("w") as handle:
+    with handle:
         handle.write(f"=== {stamp()} {' '.join(command)} (bound {args.bound}s) ===\n")
         handle.write(f"=== VMs held for the lap: {' '.join(vms) or 'none'} ===\n")
         handle.flush()
