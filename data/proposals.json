@@ -3417,8 +3417,14 @@
         "data/reviews/P20261023-6dae93.md",
         "CHANGELOG.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-52a18d.md",
+        "sha256": "dc54c48b87abd84d80c2cae1bb6186405cafd26dd467ac104f17892f3348c801",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-f07942",
@@ -3443,6 +3449,61 @@
         "data/reviews/P20261022-dcd1a8.md",
         "data/reviews/P20261023-e629b4.md",
         "data/defects.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-66e926",
+      "kind": "remove-fixed",
+      "record": "D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E-AND-NO-WWN-BYID-LINK",
+      "change": {
+        "control": "b20261023-92db3a",
+        "fixon": "b20261023-4b50c2",
+        "cause": "tests/lib/rig.sh normalised a LUN identifier by stripping naa., 0x and mpath- but not eui., so an EUI-64 LUN's eui.<hex> became e<hex>, and its no-mount fallback looked the LUN up only as /dev/disk/by-id/wwn-0x<id>, a link udev makes for NAA identifiers only (an EUI-64 LUN is linked as scsi-2<hex>), so on a pool pair whose node had no mxfs mount the resolver aborted 'no MXFS device basis'; it now strips eui. too and looks the LUN up under wwn-0x, scsi-3 and scsi-2"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: the capture-gate entries that do not prep themselves (d0980_barrier_killable, d0981_pending_victim_sweep, prep_heartbeat_writer_guard, chk_mounted_node_reads_platter) aborted on the pool pair's EUI-64 LUN with 'ABORT: no MXFS device basis on test1: no MXFS_DEV, no live mxfs mount, no /dev/disk/by-id/wwn-0xe6664363939643231, no MXFS_CONFIG', four times in each of the two named presteps runs: tests/evidence/candidates/0.90.133-2.presteps.log:185, :188, :191, :194 (1/any:release:presteps:2026-10-21T19:05:47Z) and tests/evidence/candidates/0.90.134_20261021T212712Z.presteps.log:184, :187, :190, :193 (1/any:release:presteps:2026-10-21T21:43:30Z). The identifier in each line carries the stray e (wwn-0xe6664363939643231 for eui.6664363939643231) and names the wwn-0x link only.\n\nThe cause, measured: the pooled SCST LUNs report wwid eui.6664363939643231 and the node's /dev/disk/by-id holds only scsi-26664363939643231 (the record's evidence). The fix is two hunks in one place, tests/lib/rig.sh:467-475, both behind MXFS_RIG_EUI64 (default on): MXFS_WWID_STRIP gains s/^eui\\.// (:471), and MXFS_BYID_PREFIXES becomes 'wwn-0x scsi-3 scsi-2' (:471); with the switch at 0 both are the pre-fix values, 's/^naa\\.//; s/^0x//; s/^mpath-//' and 'wwn-0x' only (:473). The lookup the control actually performed is :473's wwn-0x alone, as the verify review notes; the abort text printed at :555 lists all three prefixes in either case. The fix-on lap needs both hunks: with the eui. strip alone the id is right but no wwn-0x link exists, and with the prefixes alone the id still carries the stray e.\n\nThe reproducer, tests/rig_eui64_resolve_lap.sh <nodes> <group>: on a pool pair whose node holds the pool LUN with no mxfs mount, it resolves the LUN through tests/lib/rig.sh with no MXFS_DEV, no mount and no MXFS_CONFIG, the basis the gate entries had; EXPOSED when the node's LUN reports an EUI-64 wwid, PASS when the resolver binds it by its identifier (source=declared-wwid), FAIL on an abort.\n\nControl b20261023-92db3a, candidate 0.90.134 attempt 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), pool pair g2c (test29/test30, LUN pool-05-lun-0, eui.3837303435343634), the frozen tree with only MXFS_RIG_EUI64=0 in the lap's own environment: 10 of 10 exposed laps FAIL with 'ABORT: no MXFS device basis on test29' (tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step6.log:5-14, :17; data/criteria.runs.jsonl:9921-9930), inputs before and after alike (tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step6.log:16; tests/evidence/controls/b20261023-92db3a.20261023T160436Z.inputs.before.json and .after.json). This answers data/reviews/P20261023-e8d614.md requirement 4: tools/lun_pool.sh and every other input of the lap are the frozen attempt's.\n\nFix-on batch b20261023-4b50c2, same attempt and pair, switch at its default: sized from the control (N = 6 at delta = alpha = 0.005, tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step7.log:1), 6 of 6 PASS with exposure, each 'DEVICE node=test29 path=/dev/disk/by-id/scsi-23837303435343634 source=declared-wwid wwid=eui.3837303435343634' (tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step7.log:3-8; data/criteria.runs.jsonl:9931-9936), approved and applied (data/reviews/P20261023-3a597a.md).\n\nThe rest of the earlier rejection (data/reviews/P20261023-e8d614.md): contract check 13j and its resolver change are D-RIG-LIB-CONFIGURATION-DEFAULT-ON-A-POOL-RIG-IS-THE-FIXED-RIG-LUN, which names the 23:22:19Z presteps run (no longer a cell here); contract check 11b is D-RIG-LIB-CONTRACT-11B-ACCEPTED-ONLY-AN-NAA-WWID-SO-AN-EUI-64-LUN-FAILED-IT, which names the 21:43:30Z run for its 11b FAIL; the summary names only the two rig.sh hunks.\n\nCells: the two presteps runs above, whose own logs show this abort four times each; the 20 laps of control b20261022-bf8f03 (the fix diff reversed) and the 10 of b20261023-92db3a, each a lap of this reproducer failing on this abort. Reach: the rig library resolves every harness's device at every configuration; the fix has no configuration branch, and an NAA LUN resolves as before (wwn-0x is still the first prefix tried).",
+      "evidence": [
+        "tests/lib/rig.sh",
+        "tests/rig_eui64_resolve_lap.sh",
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/summary.log",
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step6.log",
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step7.log",
+        "tests/evidence/controls/b20261023-92db3a.20261023T160436Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-92db3a.20261023T160436Z.inputs.after.json",
+        "tests/evidence/candidates/0.90.133-2.presteps.log",
+        "tests/evidence/candidates/0.90.134_20261021T212712Z.presteps.log",
+        "data/criteria.runs.jsonl",
+        "data/reviews/P20261023-e8d614.md",
+        "data/reviews/P20261023-3a597a.md",
+        "data/defects.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-10e0c9",
+      "kind": "remove-fixed",
+      "record": "D-RIG-LIB-CONFIGURATION-DEFAULT-ON-A-POOL-RIG-IS-THE-FIXED-RIG-LUN",
+      "change": {
+        "control": "b20261023-31a7bd",
+        "fixon": "b20261023-bacf66",
+        "cause": "tests/lib/rig.sh mxfs_dev_resolve, on a node with no MXFS_DEV, no live mxfs mount and no by-id link of the declared LUN, took the configuration's device path as its candidate; on a pool rig that path is the fixed rig LUN's (/dev/disk/by-path/...:shared-lun-0), which no pool node is logged in to, so it aborted 'is not a block device' instead of identity-checking the LUN the pool bound to the nodes; on a pool rig the candidate is now that allocation's dev=, as run.sh takes it"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: tests/rig_lib_contract.sh check 13j (no live mount, a wrong declaration, the configuration default as the candidate, expecting an ABORT naming the mismatch) failed in the 0.90.134 dry run's presteps: tests/evidence/candidates/0.90.134_20261021T230333Z.presteps.log:153 ' FAIL 13j no live mount, a wrong declaration, the configuration default as the candidate -> ABORT naming the mismatch got=rc=2 abort=1 why=unnamed want=rc=2 abort=1 why=named' (run 1/any:release:presteps:2026-10-21T23:22:19Z), and its verdict file tests/evidence/20261021T230432Z_riglib_0.90.134_20261021T230333Z/c13j.verdict:1 'ABORT: /dev/disk/by-path/ip-192.168.120.1:3260-iscsi-iqn.2026-05.local.mxfs:shared-lun-0 is not a block device on test2 (configuration-default)'. The resolver checked the fixed rig LUN's path, which does not exist on a pool node, instead of the LUN the pool had bound.\n\nThe fix, one hunk, tests/lib/rig.sh:554-566 (mxfs_dev_resolve's configuration-default candidate): on a pool rig the candidate is the allocation's dev= (mxfs_pool_field \"$tag\" dev, :562-565), the configuration's path otherwise (:566); the candidate is identity-checked either way (:571 mxfs_dev_ident). MXFS_RIG_POOL_DEFAULT=0 skips :562-565 and takes the configuration's path, exactly the pre-fix candidate.\n\nThe reproducer, tests/rig_pool_default_resolve_lap.sh <nodes> <group> <configuration>: on a pool pair whose node holds the pool LUN with no mxfs mount, it declares a LUN that exists nowhere, so no by-id link matches and the fallback is reached, as in check 13j; EXPOSED when the configuration's own device path is not a block device on the node (a pool rig); PASS when the resolver aborts naming the identity mismatch of the pool LUN's device ('is not the declared LUN', source=configuration-default); FAIL on 'is not a block device' or anything else.\n\nControl b20261023-31a7bd, candidate 0.90.134 attempt 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), pool pair g2c (test29/test30, LUN pool-05-lun-0), the frozen tree with only MXFS_RIG_POOL_DEFAULT=0 in the lap's own environment: 10 of 10 exposed laps FAIL with 'ABORT: /dev/disk/by-path/...:shared-lun-0 ...' (tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step10.log:5-14, :17; data/criteria.runs.jsonl:9937-9956), inputs before and after alike (tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step10.log:16; tests/evidence/controls/b20261023-31a7bd.20261023T160524Z.inputs.before.json and .after.json). The control's abort is the presteps run's own.\n\nFix-on batch b20261023-bacf66, same attempt and pair, switch at its default: sized from the control (N = 6 at delta = alpha = 0.005, tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step11.log:1), 6 of 6 PASS with exposure, each the resolver's identity abort on the pool LUN's own device, '/dev/disk/by-path/...:pool-05-lun-0 ... is not the declared LUN' (tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step11.log:3-8; data/criteria.runs.jsonl:9957-9962), approved and applied (data/reviews/P20261023-e67e71.md). That review notes the lap reads test29 only and shows the resolver rejecting a wrong declaration on the pool LUN, not accepting a right one. The hunk has no per-node branch: the candidate comes from the pool allocation bound to MXFS_NODE_LIST, the same dev= for every node of the pair, and check 13j, the failure the record names, is itself the wrong-declaration case. A right declaration never reaches this fallback while the node has the LUN's by-id link, which the resolver tries first.\n\nCells: the presteps run above and the 10 laps of control b20261023-31a7bd. The presteps run is also named by the EUI-64, capture-gate and other records for their own failures in it and is already retired; its 13j FAIL is this record's alone. Reach: the rig library resolves every harness's device at every configuration; the hunk changes only a pool rig's candidate.",
+      "evidence": [
+        "tests/lib/rig.sh",
+        "tests/rig_pool_default_resolve_lap.sh",
+        "tests/rig_lib_contract.sh",
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/summary.log",
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step10.log",
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step11.log",
+        "tests/evidence/controls/b20261023-31a7bd.20261023T160524Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-31a7bd.20261023T160524Z.inputs.after.json",
+        "tests/evidence/candidates/0.90.134_20261021T230333Z.presteps.log",
+        "tests/evidence/20261021T230432Z_riglib_0.90.134_20261021T230333Z",
+        "data/criteria.runs.jsonl",
+        "data/reviews/P20261023-e67e71.md"
       ],
       "state": "pending",
       "created": "2026-10-23"
