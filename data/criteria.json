@@ -41831,15 +41831,19 @@
           ]
         },
         "4/net/mesh/mpath": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261023T195257Z-g4",
-          "iso": "2026-10-23T19:53:12Z",
+          "status": "FAIL",
+          "measured": "victim=test6 fenced_s=39 resumed_s=6 reinstate_s=17 other_stall_ms=43029 acked=5062 elapsed=180s fails=0 max_stall_ms=43410",
+          "reason": "operation stall 43410 ms is over the 30 s limit (data/release_policy.json stall_limit_s): a stability defect;  (evidence tests/evidence/board_20261023T195257Z-g4_path_all_lost)",
+          "iso": "2026-10-23T19:56:17Z",
           "recorded": "2026-10-23",
+          "elapsed_s": 183,
           "build": "C54C14B681D148267D084FC",
+          "outcome": "FAIL",
+          "raw_status": "PASS",
+          "budget_s": 380,
+          "run_id": "20261023T195257Z-g4",
           "candidate": "0.90.134",
           "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
-          "run_id": "20261023T195257Z-g4",
           "history": [
             {
               "status": "FAIL",
