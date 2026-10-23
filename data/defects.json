@@ -5030,7 +5030,7 @@
           "candidate": "0.90.134",
           "build": "C54C14B681D148267D084FC",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -5135,6 +5135,18 @@
           "config": "2/disk/caw/direct",
           "row": "lap:row_pull",
           "iso": "2026-10-23T18:53:54Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-5a85e4",
+          "approval": "P20261023-f47dcb",
+          "date": "2026-10-23"
         }
       ]
     },
@@ -6941,7 +6953,7 @@
           "candidate": "0.90.134",
           "build": "C54C14B681D148267D084FC",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -7031,6 +7043,18 @@
           "config": "2/disk/caw/direct4k",
           "row": "lap:census_scope",
           "iso": "2026-10-23T18:36:21Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-701dee",
+          "approval": "P20261023-e4ab95",
+          "date": "2026-10-23"
         }
       ]
     },
@@ -7280,8 +7304,8 @@
       "config": "disk/caw/*",
       "opened": "2026-10-23",
       "summary": "dlm/disklock.c validate_lockstate reads the first lock record at base + MXFS_DISKLOCK_HB_SIZE, which on a COMPARE AND WRITE volume is CAW slot 0 (dlm/dlm_caw.c:16200 lock_region_offset = disklock_offset + MXFS_DISKLOCK_HB_SIZE), and when that slot is live (magic MXCW) and its bytes at the record's flags field read ACTIVE it logs 'disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)' at every such mount: a corruption message for a healthy slot",
-      "evidence": "Code: dlm/disklock.c:276-279 lock_slot_offset = base_offset + MXFS_DISKLOCK_HB_SIZE + slot*MXFS_DISKLOCK_RECORD_SIZE; :2644-2657 validate_lockstate's check of slot 0; dlm/dlm_caw.c:1300-1304 slot_offset = lock_region_offset + slot*MXFS_CAW_SLOT_SIZE; dlm/dlm_caw.h:33 MXFS_CAW_MAGIC 0x4D584357 'MXCW' live slot. Logs: board_20261023T165407Z-g2e_path_mount_degraded/kmsg_test18_fromnode.gz:119302 and :182393 'disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)', each followed by 'lockstate validation returned -5 (may be freshly initialized)' and the disklock's normal init (:119303-119306); 2/disk/caw/mpath, 512-byte volume. The mount went on. Its one caller, dlm/disklock.c:5235-5241 (disklock init), only logs 'lockstate validation returned %d (may be freshly initialized)' and goes on ('Not fatal'): the -EIO changes nothing but the two log lines.",
-      "next": "First: the legacy disklock lock-record slots still have readers and writers (dlm/disklock.c:2589 find_lock_slot, :5723, :5756, :5806, :6094, :6150, :6399, all through lock_slot_offset, the same bytes as the CAW slot table): read each one and establish which transport and which entry points reach it, and whether any can run on a COMPARE AND WRITE volume, where it would read or write CAW slots as lock records. Then make validate_lockstate skip the lock-record half where the region holds CAW slots, with a switch for the control, and a lap that mounts with CAW slot 0 live and requires no 'corrupt lock record' line (switch off: the line).",
+      "evidence": "Code: dlm/disklock.c:276-279 lock_slot_offset = base_offset + MXFS_DISKLOCK_HB_SIZE + slot*MXFS_DISKLOCK_RECORD_SIZE; :2644-2657 validate_lockstate's check of slot 0; dlm/dlm_caw.c:1300-1304 slot_offset = lock_region_offset + slot*MXFS_CAW_SLOT_SIZE; dlm/dlm_caw.h:33 MXFS_CAW_MAGIC 0x4D584357 'MXCW' live slot. Logs: board_20261023T165407Z-g2e_path_mount_degraded/kmsg_test18_fromnode.gz:119302 and :182393 'disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)', each followed by 'lockstate validation returned -5 (may be freshly initialized)' and the disklock's normal init (:119303-119306); 2/disk/caw/mpath, 512-byte volume. The mount went on. Its one caller, dlm/disklock.c:5235-5241 (disklock init), only logs 'lockstate validation returned %d (may be freshly initialized)' and goes on ('Not fatal'): the -EIO changes nothing but the two log lines. ===== Code read 2026-10-23 (session 48; a scout's call-chain enumeration, then the decisive lines read): of the legacy lock-record users, mxfs_disklock_write_grant (dlm/disklock.c:5688, the only writer of a lock record's MXFS_DISKLOCK_MAGIC, :5747), mxfs_disklock_clear_grant (:5778) and mxfs_disklock_read_all (:6380) have no caller in any .c or .h file, and find_lock_slot (:2577) is called only by the first two. mxfs_disklock_purge_node (:5967), reached at node death (dlm/v5_mount.c:15988) and at recovery completion (:19077) on both transports, scans the whole region (:6093-6163) but zeroes only a record that carries the disklock magic, is ACTIVE and is owned by the dead node (:6179-6181), by COMPARE AND WRITE of the exact image read (:6189, purge_cas_zero); a live CAW slot carries MXCW and never matches. So on a COMPARE AND WRITE volume nothing writes CAW slots as lock records; what remains is validate_lockstate's false corruption message.",
+      "next": "Make validate_lockstate skip the lock-record half (the region is the CAW slot table on a COMPARE AND WRITE volume, and nothing writes a lock record any more), with a switch for the control, and a lap that mounts with CAW slot 0 live and requires no 'corrupt lock record' line (switch off: the line).",
       "updated": "2026-10-23"
     },
     {

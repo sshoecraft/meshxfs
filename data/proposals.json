@@ -4252,8 +4252,15 @@
         "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
         "data/candidates/0.90.134.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-e4ab95.md",
+        "sha256": "bbd44db8446e61a5418ab319a2debbf4932a2b7b0e42884c8665e5c58afd0093",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-f47dcb",
@@ -4274,8 +4281,15 @@
         "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
         "data/candidates/0.90.134.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-f47dcb.md",
+        "sha256": "c8dcd391794ff535f023087830f87d7c0187d7a40c85df37c59534cc78597559",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-5c6d25",
@@ -4312,6 +4326,28 @@
         "data/release_policy.json",
         "data/defects.json",
         "data/reviews/P20261023-8d639f.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-a252b4",
+      "kind": "verify",
+      "record": "D-LANES-ON-ONE-CONFIGURATION-COLLIDE-AND-BATCHES-SPEND-THEIR-LAPS-INCOMPLETE",
+      "change": {
+        "batch": "b20261023-e6a814"
+      },
+      "argument": "Verification batch b20261023-e6a814 on candidate 0.90.134, attempt frozen 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC; frozen list tests/evidence/candidates/0.90.134_20261023T183224Z.files.json), run as step 2 of lane tests/evidence/lanes/local_a12_lanelock_20261023T191316Z (queue tests/evidence/lanes/queue_local_a12_lanelock.txt; summary.log:2 'env MXFS_CANDIDATE=0.90.134') at 2/net/mesh/direct, declared by tools/harness_batch.py verify before its first lap (step2.log:1 'declared verification batch b20261023-e6a814 for D-LANES-ON-ONE-CONFIGURATION-COLLIDE-AND-BATCHES-SPEND-THEIR-LAPS-INCOMPLETE: lap:lane_config_lock at 2/net/mesh/direct, 6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)') and sized from control b20261023-bc8d64 on the same attempt (step 1 of the same lane, summary.log:3-4): 10 of 10 laps FAIL, each exposed, with LANE_CONFIG_HOLD=0 in the lap's own command only (summary.log:3 '-- env LANE_CONFIG_HOLD=0 tests/lane_config_lock_lap.sh'; the lane's own environment line, summary.log:2, carries only MXFS_CANDIDATE) ('EXPOSED: lane B was started while lane A's step on 64/net/mesh/direct was running' and 'LANE_LOCK_LAP FAIL lane B ran its step while lane A held 64/net/mesh/direct', each in all 10 lap logs; step1.log:5-14 'exposure=1 -- LANE_LOCK_LAP FAIL lane B ran its step while lane A held 64/net/mesh/direct', step1.log:29 'control b20261023-bc8d64: 10 of 10 laps failed with the fix out (10 run by this call)'; step1.log, tests/evidence/batch_laps/b20261023-bc8d64). Inputs before and after the control hash alike (step1.log:16 'inputs before -> after: content=0; touched=0; added=0; gone=0').\n\nThe switch is scripts/rig_lane.sh:71 ('[ \"${LANE_CONFIG_HOLD:-1}\" = 0 ] || held=$(grep -v'), commented at :68-69 ('# LANE_CONFIG_HOLD=0 holds no configuration and refuses nothing, as before' / '# that fix: its control.'): with 0 the held list stays empty, so the lane takes no lock and refuses nothing, the behaviour before the fix; by default (1) the lane collects every configuration its queue names after run.sh or --at (:71-72), takes flock -n on /tmp/mxfs_lane.<configuration>.lock for each (:74-76), refuses to start with rc 3 naming the holder when one is already held (:77-79), and otherwise keeps each lock held by a holder process for the lane's life (:81-85).\n\nLower bound 0.5887 at delta 0.005, so 6 clean laps (step1.log:18 'lower bound 0.5887 at delta 0.005: a verification batch needs 6 clean laps'). All 6 laps PASS ('LANE_LOCK_LAP PASS lane B refused 64/net/mesh/direct while lane A held it, and lane C ran once A had ended', in all 6 lap logs and step2.log:3-8; step2.log:9 'verify b20261023-e6a814: 6 PASS, 0 FAIL of 6 planned'), each exposed ('EXPOSED: lane B was started while lane A's step on 64/net/mesh/direct was running', in all 6 lap logs; 'exposure=1' on step2.log:3-8), none failed or incomplete (no FAIL and no ABORT line in any of the 6 lap logs), elapsed_s=4 each against the 20 s bound (step2.log:3-8, tests/evidence/batch_laps/b20261023-e6a814).\n\nThe lap, tests/lane_config_lock_lap.sh, starts lane A, whose one step names configuration 64/net/mesh/direct and holds for 4 s, then, once A's step has started, lane B, whose one step names the same configuration and only records that it ran, and the moment A's process has exited, lane C, the same as B (header :9-11); the steps touch no node, LUN or board, and 64 nodes is a configuration no rig lane runs (:11-13). EXPOSED means lane B was started while lane A's step was running; PASS means B refused to start, naming the configuration, and ran no step, and C ran its step; FAIL means B ran its step while A held the configuration, or C was refused after A ended (:20-24). LANE_CONFIG_HOLD=0 in the lap's environment reaches every lane it starts (:26-28). Bound derived at :30-31: under 7 s, bounded at 20 s.\n\nThe lap's header also names an EXPOSED-RELEASE line (:21, 'lane C was started within 1000 ms of lane A's exit'). Counted with grep over the lap logs: all 10 control laps carry it ('EXPOSED-RELEASE: lane C was started 1 ms after lane A exited', 10 of 10) and all 6 verification laps carry it (5 at 1 ms, 1 at 2 ms, 6 of 6). This argument claims nothing from that line about any other record.\n\nFrozen sources: sha256sum of scripts/rig_lane.sh (e3193ca578411ae9e306e8bca8bf98d4319058e0aed2b3220df8c1b9e104232b) and tests/lane_config_lock_lap.sh (90690019eeab2cb9ffa6e7531e1202c15ea5ce4025d51e15c571579289d6495c) match their entries in tests/evidence/candidates/0.90.134_20261023T183224Z.files.json (:2578-2579 and :7086-7087); data/candidates/0.90.134.json records created 2026-10-23T18:32:24Z (:4) and srcversion C54C14B681D148267D084FC (:308).",
+      "evidence": [
+        "tests/evidence/lanes/local_a12_lanelock_20261023T191316Z/summary.log",
+        "tests/evidence/lanes/local_a12_lanelock_20261023T191316Z/step1.log",
+        "tests/evidence/lanes/local_a12_lanelock_20261023T191316Z/step2.log",
+        "tests/evidence/batch_laps/b20261023-bc8d64",
+        "tests/evidence/batch_laps/b20261023-e6a814",
+        "tests/lane_config_lock_lap.sh",
+        "scripts/rig_lane.sh",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/candidates/0.90.134.json"
       ],
       "state": "pending",
       "created": "2026-10-23"
