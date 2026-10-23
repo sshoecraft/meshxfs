@@ -2907,8 +2907,14 @@
         "tests/evidence/20261023T121155Z_capture_gate_openefivd5",
         "tests/evidence/20261023T121345Z_capture_gate_openefivd6"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-0230e2.md",
+        "sha256": "652f8074343e665bbf3bf82de77b2734b842178153400216f434fdb7347ed18a",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-f2db37",
@@ -3335,8 +3341,15 @@
         "tests/lib/rig.sh",
         "data/candidates/0.90.134.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-3a597a.md",
+        "sha256": "a9da376f0cde832ff4c09b3b869ee239885559d266de4ff111a0f71eef94dce3",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-e67e71",
@@ -3355,6 +3368,40 @@
         "tests/rig_pool_default_resolve_lap.sh",
         "tests/lib/rig.sh",
         "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-e67e71.md",
+        "sha256": "2665239f4db3440950795ac55bc1f2dbc058de95bdb2ee7a6344d3b13e4437c7",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-52a18d",
+      "kind": "remove-fixed",
+      "record": "D-BATCH-LAP-TIMEOUT-KILLS-ONLY-THE-DIRECT-CHILD-SO-THE-HARNESS-WRITES-ON",
+      "change": {
+        "control": "b20261023-1d7216",
+        "fixon": "b20261023-8e8ccd",
+        "cause": "tools/batch_lap.py bounded a lap with subprocess.run(timeout=bound), which on expiry ends only the process it started, so a harness's own children outlived the lap and went on writing after it was recorded; run_bounded now starts the lap in a session of its own and on expiry ends the whole process group (SIGTERM, then SIGKILL, 5 s apart) and waits until none of it is left before the lap is recorded"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: tools/batch_lap.py bounded every harness lap with subprocess.run(timeout=bound), which on expiry ends only its direct child. A harness's own children survived the bound and wrote into the lap's log and the evidence the lap is graded from after the lap had been recorded, and while the next lap ran (the record's evidence: control b20261022-8375dc lap 7 recorded at 19:14:48Z with rc=124 while its harness kept writing until 19:15:08Z).\n\nThe fix, one site: tools/batch_lap.py run_bounded (:192-232), which main() calls for every lap (:316). The lap runs under Popen(start_new_session=True) (:208-209); on expiry the group gets SIGTERM, then SIGKILL, each followed by up to KILL_GRACE_S=5 s (:178-179, :214-226), and the lap is recorded only after proc.wait() with the group gone (:227-232). MXFS_BATCH_LAP_KILLPG=0 (:202-207) runs exactly the pre-fix call, subprocess.run(command, ..., timeout=bound) returning 124 on TimeoutExpired, so the knob takes out the whole fix and nothing else.\n\nThe reproducer, tests/batch_lap_killpg_lap.py: it calls batch_lap.run_bounded with a 1 s bound on a harness that starts a child which sleeps 2 s and then appends to a scratch marker, while the harness sleeps 10 s (:36-44, :52-53). EXPOSED is the bound running out with the child alive (rc=124, :55-59); the lap then waits 4 s and FAILs if the marker was written after run_bounded returned (:60-66). The cause is measured directly: in a control lap the child's write lands after the lap was bounded; with the fix the group is ended before the child's 2 s write.\n\nControl b20261023-1d7216, candidate 0.90.134 attempt 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), the frozen tree with only MXFS_BATCH_LAP_KILLPG=0 set in the lap's own environment (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/summary.log:16, '-- env MXFS_BATCH_LAP_KILLPG=0 tests/batch_lap_killpg_lap.py'), so the tools/batch_lap.py that recorded the control laps ran with the fix in: 10 of 10 exposed laps FAIL (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step7.log:5-14, each 'rc=1 elapsed_s=5 exposure=1 -- FAIL: the harness's child wrote after the lap was bounded and recorded'; :17 'failed 10 of 10 exposed laps'; data/criteria.runs.jsonl:9847-9856). Inputs before and after alike (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step7.log:16 'content=0; touched=0; added=0; gone=0'; tests/evidence/controls/b20261023-1d7216.20261023T160057Z.inputs.before.json and .after.json).\n\nFix-on batch b20261023-8e8ccd, same attempt, switch at its default: sized from the control's 10 of 10 (L = 0.005^(1/10) = 0.5887, N = ceil(ln 0.005 / ln(1 - 0.5887)) = 6, tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step8.log:1), 6 of 6 PASS with exposure (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step8.log:3-9; data/criteria.runs.jsonl:9857-9862). Each lap log shows the group ended before the verdict, e.g. tests/evidence/batch_laps/b20261023-8e8ccd/20261023T160204Z-aab39f8f.log:3 'EXPOSED: the bound ran out with the harness's child alive (rc=124)', :5 '=== the lap overran its bound of 1s: its process group 2772544 was ended (gone) ===', :6 'PASS: nothing the lap started wrote after its bound ended it'. The verification was approved and applied (data/reviews/P20261023-6dae93.md). That review notes the PASS test reads the marker's mtime against run_bounded's return, so a write between the bound and the return would pass; it found that this cannot have happened in these laps: each took elapsed_s=5 (the 1 s bound plus the 4 s wait), the child writes 2 s after the harness starts, and each log reports the group gone before the PASS line.\n\nCells: the record names the ten control laps only (2/net/mesh/direct:lap:batch_lap_killpg:2026-10-23T16:01:04Z through 16:01:53Z), each showing this cause in its own lap log. Reach: a defect of the batch tool, which bounds every harness lap at every configuration; the fix is in that one tool and the reproducer calls the same function every lap goes through.",
+      "evidence": [
+        "tools/batch_lap.py",
+        "tests/batch_lap_killpg_lap.py",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/summary.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step7.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step8.log",
+        "tests/evidence/controls/b20261023-1d7216.20261023T160057Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-1d7216.20261023T160057Z.inputs.after.json",
+        "tests/evidence/batch_laps/b20261023-1d7216",
+        "tests/evidence/batch_laps/b20261023-8e8ccd",
+        "data/criteria.runs.jsonl",
+        "data/reviews/P20261023-6dae93.md",
+        "CHANGELOG.md"
       ],
       "state": "pending",
       "created": "2026-10-23"
