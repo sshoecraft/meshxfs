@@ -839,17 +839,27 @@
         },
         "2/net/mesh/direct": {
           "status": "PASS",
-          "measured": "elapsed=36s (fresh prep)",
+          "measured": "elapsed=32s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-23T03:12:14Z",
+          "iso": "2026-10-23T04:02:35Z",
           "recorded": "2026-10-22",
-          "elapsed_s": 36,
+          "elapsed_s": 32,
           "build": "16A5F5DDDB4852C9D5DB236",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261023T031129Z-g2",
+          "run_id": "20261023T040139Z-g2c",
           "candidate": "0.90.134",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T03:12:14Z",
+              "measured": "elapsed=36s (fresh prep)",
+              "reason": "",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261023T031129Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T03:09:24Z",
@@ -939,16 +949,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261023T024606Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-23T02:44:23Z",
-              "measured": "elapsed=30s (fresh prep)",
-              "reason": "",
-              "build": "16A5F5DDDB4852C9D5DB236",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261023T024344Z-g2"
             }
           ]
         },
@@ -1764,112 +1764,125 @@
         },
         "2/net/mesh/direct4k": {
           "status": "PASS",
-          "measured": "elapsed=35s (fresh prep)",
+          "measured": "skipped (marker matched 2/net/mesh/direct4k)",
           "reason": "",
-          "iso": "2026-10-23T03:49:27Z",
+          "iso": "2026-10-23T04:06:47Z",
           "recorded": "2026-10-22",
-          "elapsed_s": 35,
+          "elapsed_s": 0,
           "build": "16A5F5DDDB4852C9D5DB236",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261023T034827Z-g2d",
+          "run_id": "20261023T040637Z-g2d",
+          "candidate": "0.90.134",
+          "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain",
           "history": [
             {
               "status": "PASS",
-              "iso": "2026-10-23T02:43:03Z",
+              "iso": "2026-10-23T04:06:02Z",
               "measured": "skipped (marker matched 2/net/mesh/direct4k)",
               "reason": "",
               "build": "16A5F5DDDB4852C9D5DB236",
               "outcome": "PASS",
               "candidate": "0.90.134",
-              "run_id": "20261023T024253Z-g2d"
+              "run_id": "20261023T040552Z-g2d",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-23T02:42:02Z",
+              "iso": "2026-10-23T04:05:18Z",
               "measured": "skipped (marker matched 2/net/mesh/direct4k)",
               "reason": "",
               "build": "16A5F5DDDB4852C9D5DB236",
               "outcome": "PASS",
               "candidate": "0.90.134",
-              "run_id": "20261023T024152Z-g2d"
+              "run_id": "20261023T040508Z-g2d",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-23T02:41:35Z",
+              "iso": "2026-10-23T04:04:32Z",
               "measured": "skipped (marker matched 2/net/mesh/direct4k)",
               "reason": "",
               "build": "16A5F5DDDB4852C9D5DB236",
               "outcome": "PASS",
               "candidate": "0.90.134",
-              "run_id": "20261023T024126Z-g2d"
+              "run_id": "20261023T040422Z-g2d",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-23T02:41:06Z",
+              "iso": "2026-10-23T04:03:47Z",
               "measured": "skipped (marker matched 2/net/mesh/direct4k)",
               "reason": "",
               "build": "16A5F5DDDB4852C9D5DB236",
               "outcome": "PASS",
               "candidate": "0.90.134",
-              "run_id": "20261023T024057Z-g2d"
+              "run_id": "20261023T040337Z-g2d",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-23T02:40:41Z",
+              "iso": "2026-10-23T04:02:57Z",
               "measured": "skipped (marker matched 2/net/mesh/direct4k)",
               "reason": "",
               "build": "16A5F5DDDB4852C9D5DB236",
               "outcome": "PASS",
               "candidate": "0.90.134",
-              "run_id": "20261023T024032Z-g2d"
+              "run_id": "20261023T040248Z-g2d",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-23T02:40:16Z",
+              "iso": "2026-10-23T04:02:11Z",
               "measured": "skipped (marker matched 2/net/mesh/direct4k)",
               "reason": "",
               "build": "16A5F5DDDB4852C9D5DB236",
               "outcome": "PASS",
               "candidate": "0.90.134",
-              "run_id": "20261023T024006Z-g2d"
+              "run_id": "20261023T040155Z-g2d",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-23T02:40:06Z",
-              "measured": "elapsed=36s (fresh prep)",
+              "iso": "2026-10-23T04:01:15Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
               "reason": "",
               "build": "16A5F5DDDB4852C9D5DB236",
               "outcome": "PASS",
               "candidate": "0.90.134",
-              "run_id": "20261023T023906Z-g2d"
+              "run_id": "20261023T040106Z-g2d",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-22T23:43:23Z",
+              "iso": "2026-10-23T04:00:29Z",
               "measured": "skipped (marker matched 2/net/mesh/direct4k)",
               "reason": "",
-              "build": "9594B08726D6732D2ED5E87",
+              "build": "16A5F5DDDB4852C9D5DB236",
               "outcome": "PASS",
-              "run_id": "20261022T234314Z-g2d"
+              "candidate": "0.90.134",
+              "run_id": "20261023T040020Z-g2d",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-22T23:42:41Z",
+              "iso": "2026-10-23T04:00:05Z",
               "measured": "skipped (marker matched 2/net/mesh/direct4k)",
               "reason": "",
-              "build": "9594B08726D6732D2ED5E87",
+              "build": "16A5F5DDDB4852C9D5DB236",
               "outcome": "PASS",
-              "run_id": "20261022T234232Z-g2d"
+              "candidate": "0.90.134",
+              "run_id": "20261023T035955Z-g2d"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-22T23:42:00Z",
+              "iso": "2026-10-23T03:59:41Z",
               "measured": "skipped (marker matched 2/net/mesh/direct4k)",
               "reason": "",
-              "build": "9594B08726D6732D2ED5E87",
+              "build": "16A5F5DDDB4852C9D5DB236",
               "outcome": "PASS",
-              "run_id": "20261022T234151Z-g2d"
+              "candidate": "0.90.134",
+              "run_id": "20261023T035931Z-g2d"
             }
           ]
         }
@@ -20822,17 +20835,61 @@
         "2/net/mesh/direct4k": {
           "status": "PASS",
           "measured": "lba=131074 disklock_offset=536883200 lbs=4096 exposure=1",
-          "reason": "WRITE(16) FUA and COMPARE AND WRITE of LBA 131074 landed whole in that block and nowhere next to it (evidence tests/evidence/board_20261023T024126Z-g2d_fourkn_cdb)",
-          "iso": "2026-10-23T02:41:49Z",
+          "reason": "WRITE(16) FUA and COMPARE AND WRITE of LBA 131074 landed whole in that block and nowhere next to it (evidence tests/evidence/board_20261023T035955Z-g2d_fourkn_cdb)",
+          "iso": "2026-10-23T04:00:19Z",
           "recorded": "2026-10-22",
-          "elapsed_s": 6,
+          "elapsed_s": 7,
           "build": "16A5F5DDDB4852C9D5DB236",
           "outcome": "PASS",
           "budget_s": 30,
-          "run_id": "20261023T024126Z-g2d",
+          "run_id": "20261023T035955Z-g2d",
           "candidate": "0.90.134",
-          "batch": "b20261022-28fcd8",
+          "batch": "b20261022-7c9f88",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T03:59:54Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096 exposure=1",
+              "reason": "WRITE(16) FUA and COMPARE AND WRITE of LBA 131074 landed whole in that block and nowhere next to it (evidence tests/evidence/board_20261023T035931Z-g2d_fourkn_cdb)",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261023T035931Z-g2d",
+              "batch": "b20261022-7c9f88"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T03:59:30Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096 exposure=1",
+              "reason": "WRITE(16) FUA and COMPARE AND WRITE of LBA 131074 landed whole in that block and nowhere next to it (evidence tests/evidence/board_20261023T035906Z-g2d_fourkn_cdb)",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261023T035906Z-g2d",
+              "batch": "b20261022-7c9f88"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T03:59:05Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096 exposure=1",
+              "reason": "WRITE(16) FUA and COMPARE AND WRITE of LBA 131074 landed whole in that block and nowhere next to it (evidence tests/evidence/board_20261023T035839Z-g2d_fourkn_cdb)",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261023T035839Z-g2d",
+              "batch": "b20261022-7c9f88"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T02:41:49Z",
+              "measured": "lba=131074 disklock_offset=536883200 lbs=4096 exposure=1",
+              "reason": "WRITE(16) FUA and COMPARE AND WRITE of LBA 131074 landed whole in that block and nowhere next to it (evidence tests/evidence/board_20261023T024126Z-g2d_fourkn_cdb)",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261023T024126Z-g2d",
+              "batch": "b20261022-28fcd8"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T02:41:25Z",
@@ -20896,50 +20953,6 @@
               "run_id": "20261022T184746Z-g2d",
               "batch": "b20261022-545d6a",
               "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
-            },
-            {
-              "status": "FAIL",
-              "iso": "2026-10-22T18:47:46Z",
-              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
-              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184725Z-g2d_fourkn_cdb)",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "FAIL",
-              "run_id": "20261022T184725Z-g2d",
-              "batch": "b20261022-545d6a",
-              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
-            },
-            {
-              "status": "FAIL",
-              "iso": "2026-10-22T18:47:25Z",
-              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
-              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184704Z-g2d_fourkn_cdb)",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "FAIL",
-              "run_id": "20261022T184704Z-g2d",
-              "batch": "b20261022-545d6a",
-              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
-            },
-            {
-              "status": "FAIL",
-              "iso": "2026-10-22T18:47:04Z",
-              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
-              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184643Z-g2d_fourkn_cdb)",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "FAIL",
-              "run_id": "20261022T184643Z-g2d",
-              "batch": "b20261022-545d6a",
-              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
-            },
-            {
-              "status": "FAIL",
-              "iso": "2026-10-22T18:46:43Z",
-              "measured": "lba=131074 disklock_offset=536883200 lbs=4096",
-              "reason": "test31's FUA write of block 131074 (got 0); test32's FUA read finds test31's write of block 131074 (got 0); test32 reads 0xab in every byte of block 131074 after the header (got 0) (evidence tests/evidence/board_20261022T184622Z-g2d_fourkn_cdb)",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "FAIL",
-              "run_id": "20261022T184622Z-g2d",
-              "batch": "b20261022-545d6a",
-              "variant": "batch:fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c"
             }
           ]
         },
@@ -20972,18 +20985,126 @@
       "per_config": {
         "2/net/mesh/direct4k": {
           "status": "FAIL",
-          "measured": "miscompares=0 hold_landed=0 merged_blocks=508 workload_ms=21882 hold=8x1000ms exposure=0",
-          "reason": "VACUOUS: no swap miscompared in 508 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261023T024253Z-g2d_fourkn_merge)",
-          "iso": "2026-10-23T02:43:59Z",
+          "measured": "miscompares=0 hold_landed=0 merged_blocks=396 workload_ms=5841 hold=0x1000ms forced=off",
+          "reason": "VACUOUS: no swap miscompared in 396 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261023T040637Z-g2d_fourkn_merge)",
+          "iso": "2026-10-23T04:07:23Z",
           "recorded": "2026-10-22",
-          "elapsed_s": 47,
+          "elapsed_s": 29,
           "build": "16A5F5DDDB4852C9D5DB236",
           "outcome": "FAIL",
           "budget_s": 60,
-          "run_id": "20261023T024253Z-g2d",
+          "run_id": "20261023T040637Z-g2d",
           "candidate": "0.90.134",
-          "batch": "b20261022-7effb7",
+          "batch": "b20261022-811d98",
+          "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain",
           "history": [
+            {
+              "status": "FAIL",
+              "iso": "2026-10-23T04:06:37Z",
+              "measured": "miscompares=0 hold_landed=0 merged_blocks=407 workload_ms=6059 hold=0x1000ms forced=off",
+              "reason": "VACUOUS: no swap miscompared in 407 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261023T040552Z-g2d_fourkn_merge)",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "FAIL",
+              "candidate": "0.90.134",
+              "run_id": "20261023T040552Z-g2d",
+              "batch": "b20261022-811d98",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-23T04:05:52Z",
+              "measured": "miscompares=0 hold_landed=0 merged_blocks=426 workload_ms=6141 hold=0x1000ms forced=off",
+              "reason": "VACUOUS: no swap miscompared in 426 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261023T040508Z-g2d_fourkn_merge)",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "FAIL",
+              "candidate": "0.90.134",
+              "run_id": "20261023T040508Z-g2d",
+              "batch": "b20261022-811d98",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-23T04:05:07Z",
+              "measured": "miscompares=0 hold_landed=0 merged_blocks=448 workload_ms=6502 hold=0x1000ms forced=off",
+              "reason": "VACUOUS: no swap miscompared in 448 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261023T040422Z-g2d_fourkn_merge)",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "FAIL",
+              "candidate": "0.90.134",
+              "run_id": "20261023T040422Z-g2d",
+              "batch": "b20261022-811d98",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-23T04:04:22Z",
+              "measured": "miscompares=0 hold_landed=0 merged_blocks=423 workload_ms=6715 hold=0x1000ms forced=off",
+              "reason": "VACUOUS: no swap miscompared in 423 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261023T040337Z-g2d_fourkn_merge)",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "FAIL",
+              "candidate": "0.90.134",
+              "run_id": "20261023T040337Z-g2d",
+              "batch": "b20261022-811d98",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-23T04:03:37Z",
+              "measured": "miscompares=0 hold_landed=0 merged_blocks=365 workload_ms=8963 hold=0x1000ms forced=off",
+              "reason": "VACUOUS: no swap miscompared in 365 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261023T040248Z-g2d_fourkn_merge)",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "FAIL",
+              "candidate": "0.90.134",
+              "run_id": "20261023T040248Z-g2d",
+              "batch": "b20261022-811d98",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T04:02:47Z",
+              "measured": "miscompares=2 hold_landed=0 merged_blocks=514 workload_ms=7505 hold=0x1000ms forced=off",
+              "reason": "every inode kept its writer's last change; 2 MISCOMPARE(s) retried (evidence tests/evidence/board_20261023T040155Z-g2d_fourkn_merge)",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261023T040155Z-g2d",
+              "batch": "b20261022-811d98",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-23T04:01:55Z",
+              "measured": "miscompares=0 hold_landed=0 merged_blocks=454 workload_ms=7182 hold=0x1000ms forced=off",
+              "reason": "VACUOUS: no swap miscompared in 454 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261023T040106Z-g2d_fourkn_merge)",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "FAIL",
+              "candidate": "0.90.134",
+              "run_id": "20261023T040106Z-g2d",
+              "batch": "b20261022-811d98",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-23T04:01:05Z",
+              "measured": "miscompares=0 hold_landed=0 merged_blocks=466 workload_ms=7256 hold=0x1000ms forced=off",
+              "reason": "VACUOUS: no swap miscompared in 466 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261023T040020Z-g2d_fourkn_merge)",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "FAIL",
+              "candidate": "0.90.134",
+              "run_id": "20261023T040020Z-g2d",
+              "batch": "b20261022-811d98",
+              "variant": "MXFS_TEST_ENV=FORCE_MS=0;batch:FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain"
+            },
+            {
+              "status": "FAIL",
+              "iso": "2026-10-23T02:43:59Z",
+              "measured": "miscompares=0 hold_landed=0 merged_blocks=508 workload_ms=21882 hold=8x1000ms exposure=0",
+              "reason": "VACUOUS: no swap miscompared in 508 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261023T024253Z-g2d_fourkn_merge)",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "FAIL",
+              "candidate": "0.90.134",
+              "run_id": "20261023T024253Z-g2d",
+              "batch": "b20261022-7effb7"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T02:42:53Z",
@@ -20994,103 +21115,6 @@
               "candidate": "0.90.134",
               "run_id": "20261023T024152Z-g2d",
               "batch": "b20261022-7effb7"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T19:54:29Z",
-              "measured": "miscompares=2 hold_landed=1 merged_blocks=478 workload_ms=19803 hold=8x1000ms",
-              "reason": "every inode kept its writer's last change; 2 MISCOMPARE(s) retried (evidence tests/evidence/board_20261022T193055Z-g2_fourkn_merge)",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T193055Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T19:03:04Z",
-              "measured": "miscompares=1 hold_landed=0 merged_blocks=417 workload_ms=6457 hold=8x0ms",
-              "reason": "every inode kept its writer's last change; 1 MISCOMPARE(s) retried (evidence tests/evidence/board_20261022T190223Z-g2d_fourkn_merge)",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T190223Z-g2d",
-              "batch": "b20261022-02b816",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
-            },
-            {
-              "status": "FAIL",
-              "iso": "2026-10-22T19:02:22Z",
-              "measured": "miscompares=0 hold_landed=0 merged_blocks=447 workload_ms=6269 hold=8x0ms",
-              "reason": "VACUOUS: no swap miscompared in 447 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261022T190140Z-g2d_fourkn_merge)",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "FAIL",
-              "run_id": "20261022T190140Z-g2d",
-              "batch": "b20261022-02b816",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
-            },
-            {
-              "status": "FAIL",
-              "iso": "2026-10-22T19:01:40Z",
-              "measured": "miscompares=0 hold_landed=0 merged_blocks=383 workload_ms=5930 hold=8x0ms",
-              "reason": "VACUOUS: no swap miscompared in 383 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261022T190059Z-g2d_fourkn_merge)",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "FAIL",
-              "run_id": "20261022T190059Z-g2d",
-              "batch": "b20261022-02b816",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T19:00:58Z",
-              "measured": "miscompares=2 hold_landed=0 merged_blocks=399 workload_ms=6330 hold=8x0ms",
-              "reason": "every inode kept its writer's last change; 2 MISCOMPARE(s) retried (evidence tests/evidence/board_20261022T190017Z-g2d_fourkn_merge)",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T190017Z-g2d",
-              "batch": "b20261022-02b816",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T19:00:16Z",
-              "measured": "miscompares=2 hold_landed=0 merged_blocks=435 workload_ms=6439 hold=8x0ms",
-              "reason": "every inode kept its writer's last change; 2 MISCOMPARE(s) retried (evidence tests/evidence/board_20261022T185935Z-g2d_fourkn_merge)",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T185935Z-g2d",
-              "batch": "b20261022-02b816",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
-            },
-            {
-              "status": "FAIL",
-              "iso": "2026-10-22T18:59:35Z",
-              "measured": "miscompares=0 hold_landed=0 merged_blocks=416 workload_ms=6387 hold=8x0ms",
-              "reason": "VACUOUS: no swap miscompared in 416 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261022T185853Z-g2d_fourkn_merge)",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "FAIL",
-              "run_id": "20261022T185853Z-g2d",
-              "batch": "b20261022-02b816",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
-            },
-            {
-              "status": "FAIL",
-              "iso": "2026-10-22T18:58:53Z",
-              "measured": "miscompares=0 hold_landed=0 merged_blocks=403 workload_ms=6094 hold=8x0ms",
-              "reason": "VACUOUS: no swap miscompared in 403 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261022T185811Z-g2d_fourkn_merge)",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "FAIL",
-              "run_id": "20261022T185811Z-g2d",
-              "batch": "b20261022-02b816",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T18:58:11Z",
-              "measured": "miscompares=1 hold_landed=0 merged_blocks=403 workload_ms=5998 hold=8x0ms",
-              "reason": "every inode kept its writer's last change; 1 MISCOMPARE(s) retried (evidence tests/evidence/board_20261022T185730Z-g2d_fourkn_merge)",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T185730Z-g2d",
-              "batch": "b20261022-02b816",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
             }
           ]
         },

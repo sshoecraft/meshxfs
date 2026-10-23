@@ -2374,6 +2374,39 @@
           },
           "transfer": "",
           "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261022-db370d",
+          "kind": "verify",
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:release_step_cell",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-3f5a50",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED.fix.diff sha256=d047663cb6c5df48da3dfdf0c4ed479b9fc43e646644a4f28d920324a57cd688",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
         }
       ],
       "updated": "2026-10-22",
@@ -2636,6 +2669,39 @@
         },
         {
           "id": "b20261022-d1f171",
+          "kind": "verify",
+          "row": "lap:fsx_seed",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^LAP fsx_seed start .* draw=4294967295 ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:fsx_seed",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-4bf99d",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff sha256=8696fceaa6c7370480148efe459b824c241407ac3fda6c037ac4e664782ea61f",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261022-c54100",
           "kind": "verify",
           "row": "lap:fsx_seed",
           "config": "2/net/mesh/direct",
@@ -3151,6 +3217,39 @@
           },
           "transfer": "",
           "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261022-8cd6d2",
+          "kind": "verify",
+          "row": "lap:rig_eui64_resolve",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:rig_eui64_resolve",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-bf8f03",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E.fix.diff sha256=62c688f79bff83a4525b140807cc3f5b222a0ab436a1ef2e1466dea7370332cf",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
         }
       ],
       "rates": [
@@ -3329,6 +3428,39 @@
           "build": "16A5F5DDDB4852C9D5DB236",
           "variant": "",
           "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:rig_tag_dev_host",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-ba4c55",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK.fix.diff sha256=ceb7e822f9f19cdb2e879620c2cbb764a2fc6838bed120349aaabed2becacef6",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261022-28a11c",
+          "kind": "verify",
+          "row": "lap:rig_tag_dev_host",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
@@ -3528,6 +3660,39 @@
         },
         {
           "id": "b20261022-b46717",
+          "kind": "verify",
+          "row": "lap:presteps_env",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:presteps_env",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-12fbb7",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-PRESTEPS-FORM-PAIR-UNDER-G2-MARKER.fix.diff sha256=b6b634c61780bc4e18124e31ccf278a08d7c531865279c10593d09c0810033ab",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261022-825560",
           "kind": "verify",
           "row": "lap:presteps_env",
           "config": "2/net/mesh/direct",
@@ -4051,6 +4216,39 @@
         },
         {
           "id": "b20261022-c5beda",
+          "kind": "verify",
+          "row": "lap:release_board_verdict",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:release_board_verdict",
+            "config": "2/net/mesh/drbd",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-4233e9",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW.fix.diff sha256=99a943bdc9fb20fb7eab88c1d2ff47a776a14c85233b9d5655732b8c9e16e6f7",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261022-d569c5",
           "kind": "verify",
           "row": "lap:release_board_verdict",
           "config": "2/net/mesh/drbd",
@@ -4653,6 +4851,39 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261022-1f3dec",
+          "kind": "verify",
+          "row": "lap:chk_freespace_rebuild",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "holding [0-9]+ blocks of a file whose inode is in another AG",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:chk_freespace_rebuild",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-dcc377",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-CHK-FREESPACE-REBUILD-DECLARES-OWNED-BLOCKS-FREE.fix.diff sha256=72994279ef5e167700d5cc2676b15ecbe77f659a48d24dd860f0f8e55d9438b0",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -4785,6 +5016,23 @@
           },
           "transfer": "",
           "lower_bound": 0.18064889524117572
+        },
+        {
+          "id": "b20261022-811d98",
+          "kind": "control",
+          "row": "fourkn_merge",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 10,
+          "probe": "",
+          "candidate": "",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the forced overlap left out: laps with no MISCOMPARE retried (VACUOUS) must come back"
         }
       ],
       "updated": "2026-10-22",
@@ -4888,6 +5136,39 @@
         },
         {
           "id": "b20261022-8174f4",
+          "kind": "verify",
+          "row": "lap:lunpool_shutdown",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^LAP lunpool_shutdown exposed: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:lunpool_shutdown",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-3c656e",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT.fix.diff sha256=928a9b80753b79430dec41c2be23d8a9c97281f59d9debdbe8ff89fdf7994fc4",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261022-da3e51",
           "kind": "verify",
           "row": "lap:lunpool_shutdown",
           "config": "2/net/mesh/direct",
@@ -5140,6 +5421,39 @@
         },
         {
           "id": "b20261022-28fcd8",
+          "kind": "verify",
+          "row": "fourkn_cdb",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 4,
+          "probe": "FOURKN-CDB-[^ ]+ fua_verify write",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "fourkn_cdb",
+            "config": "2/net/mesh/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-545d6a",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261022-7c9f88",
           "kind": "verify",
           "row": "fourkn_cdb",
           "config": "2/net/mesh/direct4k",
@@ -6197,6 +6511,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix-out rate of the lane configuration hold"
+        },
+        {
+          "id": "b20261022-5921cd",
+          "kind": "verify",
+          "row": "lap:lane_config_lock",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED:",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:lane_config_lock",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-18f783",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-LANES-ON-ONE-CONFIGURATION-COLLIDE.fix.diff sha256=1f76854ef93400a125cd64e8da4b0b6d30f3932e80a443f6e2a02c74266bc11c",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -6245,6 +6592,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix-out rate of the lap log naming"
+        },
+        {
+          "id": "b20261022-9bb166",
+          "kind": "verify",
+          "row": "lap:batch_lap_log",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED:",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:batch_lap_log",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-6cf780",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-BATCH-LAP-LOG-NAMED-BY-THE-SECOND.fix.diff sha256=f9c60d2ceed2f363354e67127404417639c894c3cac3e95b6ff2e006afa14f25",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -6345,6 +6725,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix-out rate of the verified_at attempt match"
+        },
+        {
+          "id": "b20261022-ab8b8e",
+          "kind": "verify",
+          "row": "lap:verified_at_attempt",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED:",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:verified_at_attempt",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-503d4f",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-VERIFIED-AT-MATCHED-BY-VERSION-ALONE.fix.diff sha256=be416d8a450336de4f0917e2c187f674cd857a8b95c936c2af2d28ee93977ed6",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -6445,6 +6858,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix-out rate of the tauth in-tree relink"
+        },
+        {
+          "id": "b20261022-bfae24",
+          "kind": "verify",
+          "row": "lap:tauth_freeze",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED:",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:tauth_freeze",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-ce2e25",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-TAUTH-LAPS-RELINK-FROZEN-TEST-BINARIES.fix.diff sha256=55ce93524fb0e371dc4bc6d874b5a1ac3912cf41f6c746570ef314a3213e532a",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -6514,6 +6960,33 @@
           "config": "2/net/mesh/direct",
           "row": "lap:tauth_freeze",
           "iso": "2026-10-23T03:38:13Z"
+        }
+      ]
+    },
+    {
+      "id": "D-LANE-HOLD-LINGERS-AFTER-ITS-LANE-SO-THE-NEXT-LANE-IS-REFUSED",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-22",
+      "summary": "scripts/rig_lane.sh keeps each configuration a lane holds with a holder process (tail --pid=<lane> -f /dev/null) that notices the lane has exited only at its next 1 s poll, so for up to a second after a lane ends its configurations stay held, and a lane started in that second on one of them is refused (rc 3) as if the ended lane still ran.",
+      "evidence": "Verification batch b20261022-5921cd (D-LANES-ON-ONE-CONFIGURATION-COLLIDE-AND-BATCHES-SPEND-THEIR-LAPS-INCOMPLETE, lap:lane_config_lock at 2/net/mesh/direct, candidate 0.90.134 frozen 2026-10-23T03:56Z), lane tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z step 6: laps 1, 3 and 5 PASS; laps 2, 4 and 6 INCOMPLETE rc=2 in 3 s, each lap's lane A refused by the previous lap's lane C, which had ended: tests/evidence/batch_laps/b20261022-5921cd/20261023T035823Z-978640ad.log 'ABORT: lane A's step did not start (2026-10-23T03:58:23Z lane lanelockAv2 refused: configuration 64/net/mesh/direct is held by another lane (80852 2026-10-23T03:58:23Z lane lanelockCv1))', tests/evidence/batch_laps/b20261022-5921cd/20261023T035833Z-a87cda41.log (lanelockAv4 refused, held by lanelockCv3), tests/evidence/batch_laps/b20261022-5921cd/20261023T035843Z-a2533991.log (lanelockAv6 refused, held by lanelockCv5). Each lap starts its lane A within a second of the previous lap's lane C ending (lap 1 ended 03:58:23Z, lap 2 started 03:58:23Z). The fix-out control laps (b20261022-18f783) took no lock, so they never met it; the development lap ran alone.",
+      "next": "Release a lane's holds when the lane exits (an EXIT trap that ends its holder processes, the holder's own poll left as the backstop for a lane killed outright), and give tests/lane_config_lock_lap.sh a check that a lane started right after another ended on the same configuration runs; then a control with that fix out and a new verification batch for D-LANES-ON-ONE-CONFIGURATION-COLLIDE-AND-BATCHES-SPEND-THEIR-LAPS-INCOMPLETE on a new attempt (the tree is frozen now).",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T03:58:27Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T03:58:36Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T03:58:46Z"
         }
       ]
     }

@@ -1,8 +1,8 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-23T02:25:06Z",
-  "state": "INVALID",
+  "created": "2026-10-23T03:55:19Z",
+  "state": "RUNNING",
   "attempts": [
     {
       "created": "2026-10-21T21:26:41Z",
@@ -214,14 +214,36 @@
         "presteps": "FAIL",
         "batches": "PASS"
       }
+    },
+    {
+      "created": "2026-10-23T02:25:06Z",
+      "state": "INVALID",
+      "dry_run": false,
+      "srcversion": "16A5F5DDDB4852C9D5DB236",
+      "files": "tests/evidence/candidates/0.90.134_20261023T022506Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-23T02:25:06Z",
+          "why": "created"
+        },
+        {
+          "state": "INVALID",
+          "at": "2026-10-23T03:14:19Z",
+          "why": "2 frozen file(s) changed: touched (content restored after a change, or rewritten): tests/tauth/adopted_grant_handoff_test; changed: tests/tauth/fenced_node_ledger_test"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
   "srcversion": "16A5F5DDDB4852C9D5DB236",
   "module_sha256": "845d148d491c073f27f9e20dc1eaf7bba48144efbaeb2e102f6932e10f8e517b",
-  "files": "tests/evidence/candidates/0.90.134_20261023T022506Z.files.json",
-  "files_count": 2543,
-  "files_digest": "fc568d6c60235cccdb2bd2e61308ed3cbc28b5e4d48818e99f7dc8508c79bc09",
+  "files": "tests/evidence/candidates/0.90.134_20261023T035519Z.files.json",
+  "files_count": 2545,
+  "files_digest": "7111c9f1571611e6d3f19d3b799eff6e9bedd35c19f918a5a44ac4349a4e1425",
   "spec": "239edd020f1a096365b741c3102e0e052eec58ebe70c3d53dd631e5aa7a81ea8",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
@@ -231,13 +253,8 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-23T02:25:06Z",
+      "at": "2026-10-23T03:55:20Z",
       "why": "created"
-    },
-    {
-      "state": "INVALID",
-      "at": "2026-10-23T03:14:19Z",
-      "why": "2 frozen file(s) changed: touched (content restored after a change, or rewritten): tests/tauth/adopted_grant_handoff_test; changed: tests/tauth/fenced_node_ledger_test"
     }
   ]
 }
