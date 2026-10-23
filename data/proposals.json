@@ -2870,8 +2870,15 @@
         "tests/suite/manifest",
         "data/criteria.runs.jsonl"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-fce738.md",
+        "sha256": "ecd234c7fa5983be0a26047a6f32afd8985fad7b4253247067a224cbbb38921c",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-0230e2",
@@ -2930,8 +2937,15 @@
         "tests/evidence/20261023T121155Z_capture_gate_openefivd5",
         "tests/evidence/20261023T121345Z_capture_gate_openefivd6"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-f2db37.md",
+        "sha256": "280df6225d130483fb92a4d7f70f27905b45f38a99e1c3a796acee4a6898f02b",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }
