@@ -3505,8 +3505,15 @@
         "data/criteria.runs.jsonl",
         "data/reviews/P20261023-e67e71.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-10e0c9.md",
+        "sha256": "57dc3edc12c5619edbfef71f0a5a33edff4fc633a4696b2e664737e6ab03e1e6",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-d3a418",
