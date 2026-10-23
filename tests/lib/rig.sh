@@ -465,8 +465,14 @@ MXFS_DEV_RESOLVED=; MXFS_DEV_WWID=; MXFS_DEV_FSID=; MXFS_DEV_SOURCE=
 MXFS_RIG_LIB_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 mxfs_dev_abort() { echo "ABORT: $1"; echo "RESULT: ABORT label=${LABEL:-?} stage=device evidence=${OUT:-?}"; exit 2; }
 # eui. as well as naa.: the pooled SCST LUNs are EUI-64 (eui.<hex>), and the hex filter alone
-# kept the e of "eui", so the declared identifier named a by-id link that cannot exist
-mxfs_wwid_norm() { printf '%s' "$1" | tr 'A-Z' 'a-z' | sed 's/^naa\.//; s/^eui\.//; s/^0x//; s/^mpath-//' | tr -cd '0-9a-f'; }
+# kept the e of "eui", so the declared identifier named a by-id link that cannot exist.
+# MXFS_RIG_EUI64=0 normalises and looks the LUN up as before (naa. only, wwn-0x only): the control
+if [ "${MXFS_RIG_EUI64:-1}" != 0 ]; then
+    MXFS_WWID_STRIP='s/^naa\.//; s/^eui\.//; s/^0x//; s/^mpath-//'; MXFS_BYID_PREFIXES='wwn-0x scsi-3 scsi-2'
+else
+    MXFS_WWID_STRIP='s/^naa\.//; s/^0x//; s/^mpath-//'; MXFS_BYID_PREFIXES='wwn-0x'
+fi
+mxfs_wwid_norm() { printf '%s' "$1" | tr 'A-Z' 'a-z' | sed "$MXFS_WWID_STRIP" | tr -cd '0-9a-f'; }
 # A pool rig (data/rigs.json "pool": true) has no LUN of its own: the LUN is
 # whichever one tools/lun_pool.sh has bound to this harness's nodes, named by
 # MXFS_NODE_LIST exactly as the allocation recorded them.
@@ -543,16 +549,20 @@ mxfs_dev_resolve() {
         if [ -z "$d" ]; then
             # no mount: the declared LUN by its own identifier, never a spelling. udev links an
             # NAA LUN as wwn-0x<id> and scsi-3<id>, an EUI-64 one as scsi-2<id> only
-            q=$(rsx 20 "$n" "for p in wwn-0x$decl scsi-3$decl scsi-2$decl; do test -e /dev/disk/by-id/\$p && { echo BYID_OK /dev/disk/by-id/\$p; break; }; done")
+            q=$(rsx 20 "$n" "for p in $(for x in $MXFS_BYID_PREFIXES; do printf '%s ' "$x$decl"; done); do test -e /dev/disk/by-id/\$p && { echo BYID_OK /dev/disk/by-id/\$p; break; }; done")
             d=$(echo "$q" | sed -n 's/^BYID_OK //p' | tail -1); src=declared-wwid
             if [ -z "$d" ]; then
                 [ -n "${MXFS_CONFIG:-}" ] || mxfs_dev_abort "no MXFS device basis on $n: no MXFS_DEV, no live mxfs mount, no /dev/disk/by-id/{wwn-0x,scsi-3,scsi-2}$decl, no MXFS_CONFIG"
                 # the configuration's device as run.sh resolves it: on a pool rig that is the LUN
                 # the pool bound to these nodes (run.sh takes the allocation's dev= the same way),
                 # never the configuration's path for the fixed rig LUN, which no pool node is
-                # logged in to; the candidate is identity-checked below either way
-                tag=$("$MXFS_RIG_LIB_DIR/../../tools/mxfs_rig_tag.sh" 2>/dev/null) || tag=
-                d=$(mxfs_pool_field "$tag" dev) || { echo "$d"; exit 2; }
+                # logged in to; the candidate is identity-checked below either way.
+                # MXFS_RIG_POOL_DEFAULT=0 takes the configuration's path, as before: the control
+                d=
+                if [ "${MXFS_RIG_POOL_DEFAULT:-1}" != 0 ]; then
+                    tag=$("$MXFS_RIG_LIB_DIR/../../tools/mxfs_rig_tag.sh" 2>/dev/null) || tag=
+                    d=$(mxfs_pool_field "$tag" dev) || { echo "$d"; exit 2; }
+                fi
                 [ -n "$d" ] || d=$(python3 "$MXFS_RIG_LIB_DIR/../../tools/configuration.py" get "$MXFS_CONFIG" device) \
                     || mxfs_dev_abort "MXFS_CONFIG=$MXFS_CONFIG is not a configuration"
                 src=configuration-default

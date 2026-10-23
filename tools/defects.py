@@ -767,16 +767,25 @@ def parse_cell(text: str, collateral: bool) -> dict:
             sys.exit("defects: --collateral needs CONFIG:ROW:ISO=<the log evidence that this run "
                      "failed because of the defect>; a run that only failed at the same time is "
                      "not collateral")
-    #: The stamp is anchored at the end: a release step's row (`release:<step>`) has a colon of
-    #: its own, and splitting at the first two colons read row `release` and stamp `<step>:...`.
-    match = re.fullmatch(r"([^:]+):(.+):(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)", text.strip())
-    if not match:
+    criteria = board_tool()
+    if criteria.RELEASE_STEP_SETTLE:
+        #: The stamp is anchored at the end: a release step's row (`release:<step>`) has a colon
+        #: of its own, and splitting at the first two colons read row `release` and stamp
+        #: `<step>:...`.
+        match = re.fullmatch(r"([^:]+):(.+):(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)", text.strip())
+        fields = match.groups() if match else None
+    else:
+        config, sep1, rest = text.strip().partition(":")
+        row, sep2, iso = rest.partition(":")
+        fields = (config, row, iso) if sep1 and sep2 and iso else None
+    if not fields:
         sys.exit(f"defects: {text!r}: a board run is CONFIG:ROW:ISO, e.g. "
                  "4/net/mesh/direct:alloc_witness:2026-10-20T07:38:35Z")
-    config, row, iso = match.groups()
+    config, row, iso = fields
     #: A release step's run (tools/release_run.py: row `release:<step>`) is filed under the
     #: configuration the orchestrator gave it, which may be a placeholder such as `1/any`.
-    parsed = config if row.startswith("release:") else board_tool().parse_at(config)
+    parsed = config if criteria.RELEASE_STEP_SETTLE and row.startswith("release:") \
+        else criteria.parse_at(config)
     cell = {"config": parsed, "row": row, "iso": iso}
     if collateral:
         cell["why"] = why.strip()
@@ -1175,7 +1184,7 @@ def retire_cells(entry: dict, disposition: str, why: str, configs=None,
              if configs is None or c["config"] in configs]
     by_board: dict = {}
     for cell in cells:
-        by_board.setdefault(criteria.board_for(cell["config"]), []).append(cell)
+        by_board.setdefault(criteria.run_board(cell["config"], cell["row"]), []).append(cell)
     mark = {"defect": entry["id"], "disposition": disposition, "date": date.today().isoformat(),
             "why": why[:400]}
     if approval:

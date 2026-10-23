@@ -100,16 +100,25 @@ SPEC = Path(os.environ["MXFS_SPEC"]) if os.environ.get("MXFS_SPEC") else ROOT / 
 #: `MXFS_CRIT` points at a different board file, so a second rig's results can be kept off the
 #: primary board without a second copy of this tool.
 CRITERIA = Path(os.environ["MXFS_CRIT"]) if os.environ.get("MXFS_CRIT") else SPEC
+#: tools/release_run.py writes every release step's run (row `release:<step>`) into the primary
+#: board's ledger, whatever configuration it files it under, so a command naming one reads and
+#: writes the primary board. `MXFS_RELEASE_STEP_SETTLE=0` reads and routes a release step's run as
+#: any other run, as before that fix: the fix's control.
+RELEASE_STEP_SETTLE = os.environ.get("MXFS_RELEASE_STEP_SETTLE", "1") != "0"
 #: An attachment verified by a rig of its own (data/configurations.json attaches.<a>.board, e.g.
 #: drbd) keeps its board there; naming such a configuration reads and writes that board, as its
-#: rig does, so `criteria.py 2/net/mesh/drbd` needs no environment.
+#: rig does, so `criteria.py 2/net/mesh/drbd` needs no environment. A command that names a release
+#: step's run keeps the primary board: the drbd step's run, filed under 2/net/mesh/drbd, is there.
 if not os.environ.get("MXFS_CRIT"):
+    step_run = RELEASE_STEP_SETTLE and any(re.fullmatch(r"release:\S+", arg)
+                                           for arg in sys.argv[1:])
     for board_arg in sys.argv[1:]:
         board_match = re.match(r"^\d+/[a-z]+/[a-z]+/([a-z]+)$", board_arg)
         board_path = board_match and configuration.ATTACHES.get(board_match.group(1), {}).get("board")
         if board_path:
             os.environ.setdefault("MXFS_OWN_RIG", "1")
-            CRITERIA = ROOT / board_path
+            if not step_run:
+                CRITERIA = ROOT / board_path
             break
 
 POLICY = ROOT / "data" / "release_policy.json"
@@ -171,6 +180,15 @@ def board_for(config: str) -> Path:
     match = re.match(r"^\d+/[a-z]+/[a-z]+/([a-z]+)$", config)
     own = match and configuration.ATTACHES.get(match.group(1), {}).get("board")
     return ROOT / own if own else SPEC
+
+
+def run_board(config: str, row: str) -> Path:
+    """The board whose run ledger holds one run: the primary for a release step's (row
+    `release:<step>`, which tools/release_run.py writes there whatever configuration it files the
+    run under), the configuration's board (board_for) for any other."""
+    if RELEASE_STEP_SETTLE and str(row).startswith("release:"):
+        return SPEC
+    return board_for(config)
 
 
 #: A status this board does not recognise is NOT green. An unknown string paints as a warning and
@@ -1444,7 +1462,7 @@ def annotated_run(data: dict, args) -> tuple:
     """(row, configuration) of the run an annotation is for: a board criterion's, or a release
     step's (tools/release_run.py records row `release:<step>`, which exists only in the ledger,
     filed under the step's configuration or the placeholder `1/any`)."""
-    if str(args.id).startswith("release:"):
+    if RELEASE_STEP_SETTLE and str(args.id).startswith("release:"):
         return args.id, (args.at if args.at == "1/any" else parse_at(args.at))
     return find(data, args.id)["id"], parse_at(args.at)
 
