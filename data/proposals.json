@@ -3697,6 +3697,504 @@
         "date": "2026-10-23"
       },
       "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-7ac76d",
+      "kind": "verify",
+      "record": "D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED",
+      "change": {
+        "batch": "b20261023-349597"
+      },
+      "argument": "Verification batch b20261023-349597 on candidate 0.90.134, attempt frozen 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC; tests/evidence/candidates/0.90.134_20261023T183224Z.files.json), declared by tools/harness_batch.py verify before its first lap and sized from control b20261023-955af2: 10 of 10 laps failed, each exposed ('LAP fsx_tmp FAIL: 0 of 2 failed checks' fsx output survived the row on test1'), run in place on the tree immediately before this attempt was frozen with only tests/suite/fsx.sh reverted by the fix's saved diff (tests/evidence/controls/D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED.fix.diff, sha256 488a9fbd6b61a4aedc33b6728eaa50a5a0b62ad399606efb762dd9cb3c8326f9; tests/evidence/lanes/g2_a12_fsx_revert_control_20261023T182752Z/step3.log: 'inputs before -> during: content=1 tests/suite/fsx.sh', 'restored: tests/suite/fsx.sh hash as before'). tools/harness_batch.py proof b20261023-955af2 against the attempt's frozen list printed HOLDS on all four checks (the attempt froze every file as it was after the restore; nothing was touched between the restore and the freeze; the restore put back every file; during the laps only tests/suite/fsx.sh differed). Lower bound of the control's rate 0.5887 at delta 0.005, so 6 clean laps. All 6 laps PASS ('LAP fsx_tmp PASS: each failed check's fsx output survived the row on test1'), each with exposure=1 from '^EXPOSED: the fsx row failed both checks', none failed or incomplete (tests/evidence/lanes/g2_a12_rig_caw_20261023T183310Z/step4.log, tests/evidence/batch_laps/b20261023-349597), g2 test1/test2 at 2/disk/caw/direct. The lap, tests/fsx_tmp_log_lap.sh, runs the fsx row through run.sh on a scratch board with FSX_SEED=-1 so both of its checks fail at once, and requires a file of fsx's usage output written after the lap's mark, in /root or /tmp on the row's node, for each failed check.",
+      "evidence": [
+        "tests/evidence/lanes/g2_a12_fsx_revert_control_20261023T182752Z/step3.log",
+        "tests/evidence/lanes/g2_a12_rig_caw_20261023T183310Z/step4.log",
+        "tests/evidence/batch_laps/b20261023-955af2",
+        "tests/evidence/batch_laps/b20261023-349597",
+        "tests/evidence/controls/D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED.fix.diff",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "tests/fsx_tmp_log_lap.sh",
+        "tests/suite/fsx.sh",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-7ac76d.md",
+        "sha256": "d2de3a90067cc244dea85f4cd5ccca2566974d0e77616cb690f1a1f6403b46cc",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-564a5c",
+      "kind": "remove-fixed",
+      "record": "D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED",
+      "change": {
+        "control": "b20261023-955af2",
+        "fixon": "b20261023-349597",
+        "cause": "tests/suite/fsx.sh sent each fsx check's output to /tmp/fsx.$$.<ops>.log and its EXIT trap removed /tmp/fsx.$$.* when the script ended, so a failing check's log was gone before run.sh pulled the row's evidence; run_fsx now writes the log to /root/fsx.<seed>.<ops>.log and keeps it when the check fails, and the EXIT trap no longer removes it"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: tests/suite/fsx.sh ran fsx with its output in /tmp/fsx.$$.<ops>.log, and the script's EXIT trap (rm -rf \"$W\" /tmp/fsx.$$.*) deleted that log when the script ended, so a check that failed left nothing for run.sh's artifact pull.\n\nThe fix, one site, tests/suite/fsx.sh, exactly the saved diff tests/evidence/controls/D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED.fix.diff (sha256 488a9fbd6b61a4aedc33b6728eaa50a5a0b62ad399606efb762dd9cb3c8326f9): the EXIT trap removes only the work directory, and run_fsx writes /root/fsx.<seed>.<ops>.log, keeps it when fsx exits nonzero and removes it when fsx passes. The same hunk also names the kept log in the row's measured text (fsx_fail_log=) and writes its last lines to the kernel log (mxfs-FSXfail); this removal claims neither, only that the failing check's log survives the row on the node, which is what the lap grades.\n\nThe lap, tests/fsx_tmp_log_lap.sh, runs the fsx row through run.sh on a scratch board with FSX_SEED=-1 so both checks fail at once (EXPOSED: the fsx row failed both checks), and passes only when the row's node holds, in /root or /tmp, a file of fsx's usage output written after the lap's mark for each failed check.\n\nControl b20261023-955af2: run in place on the tree immediately before attempt 2026-10-23T18:32:24Z of candidate 0.90.134 was frozen (module C54C14B681D148267D084FC), with only tests/suite/fsx.sh reverted by that diff (tests/evidence/lanes/g2_a12_fsx_revert_control_20261023T182752Z/step3.log: 'inputs before -> during: content=1 tests/suite/fsx.sh', 'restored: tests/suite/fsx.sh hash as before'); 10 of 10 laps FAIL, each exposed ('LAP fsx_tmp FAIL: 0 of 2 failed checks' fsx output survived the row on test1'). tools/harness_batch.py proof against the attempt's frozen list holds on all four checks (tests/evidence/controls/b20261023-955af2.proof.txt). Fix-on b20261023-349597 on that attempt, sized from the control (lower bound 0.5887, 6 laps): 6 of 6 PASS, each exposed (tests/evidence/lanes/g2_a12_rig_caw_20261023T183310Z/step4.log); its verify P20261023-7ac76d was approved and applied (data/reviews/P20261023-7ac76d.md). The record's cells are the 10 control laps, each failing on this cause, all retired by that verify at 2/disk/caw/direct.",
+      "evidence": [
+        "tests/suite/fsx.sh",
+        "tests/fsx_tmp_log_lap.sh",
+        "tests/evidence/controls/D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED.fix.diff",
+        "tests/evidence/lanes/g2_a12_fsx_revert_control_20261023T182752Z/step3.log",
+        "tests/evidence/controls/b20261023-955af2.proof.txt",
+        "tests/evidence/lanes/g2_a12_rig_caw_20261023T183310Z/step4.log",
+        "tests/evidence/batch_laps/b20261023-955af2",
+        "tests/evidence/batch_laps/b20261023-349597",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/reviews/P20261023-7ac76d.md",
+        "data/defects.json"
+      ],
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-564a5c.md",
+        "sha256": "a58095f6837e1d3a7e618a8a2cfa4efba17a21d73bb5ba7e72f670ae2cec3fbb",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
+    },
+    {
+      "id": "P20261023-7d22e1",
+      "kind": "verify",
+      "record": "D-4CAWMPATH-PATH-ALL-LOST-A-CHURN-FILE-NO-LONGER-NAMED-ITS-CREATED-INODE",
+      "change": {
+        "batch": "b20261023-024fe9"
+      },
+      "argument": "Verification batch b20261023-024fe9 on candidate 0.90.134, attempt frozen 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC; tests/evidence/candidates/0.90.134_20261023T183224Z.files.json), g2 (test1/test2) at 2/disk/caw/direct on a 512-byte pool LUN, declared by tools/harness_batch.py verify before its first lap and sized from control b20261023-346edb on the same attempt: 10 of 10 laps FAIL, each exposed, with the fix's switch off through the lap's arm 0 (the lap sets iwr_ra_partial=0 on both nodes and reads it back; the switch is xfs/xfs_mxfs_dlm.c:2666-2668, read at pal/linux/xfs_buf.c:5719 in mxfs_submit_partial_inode_write), each 'LAP recov_iwr FAIL ... arm=0 fails=1 missing=[late]' (tests/evidence/lanes/g2_a12_rig_caw_20261023T183310Z/step5.log). Lower bound 0.5887 at delta 0.005, so 6 clean laps. All 6 laps PASS with arm 1, the module's default ('LAP recov_iwr PASS label=riwvN arm=1 every name A and B made in D is on the ...'), each with exposure=1 from '^EXPOSED: ', e.g. 'EXPOSED: B's recovery skipped D (ino 188), held the write of its cluster 15000 ms, and A's unmount with 'late' in D finished inside the hold' (tests/evidence/batch_laps/b20261023-024fe9/20261023T184916Z-c4eb2edf.log), none failed or incomplete, 59-63 s each against the 240 s bound (tests/evidence/lanes/g2_a12_rig_caw_20261023T183310Z/step6.log). The lap, tests/recov_iwr_revert_lap.sh, fails B's log writes so its filesystem shuts down after it renamed a file in a shared directory D, has A replay B's slice, brings B back with its recovery's write of the first cluster holding a directory held 15 s (dbg_recov_iwr_hold_n=1), has A create 'late' in D and unmount cleanly inside the hold, then lists D from the platter on B: every name A and B made must be there. Its EXPOSED line requires B's recovery to have skipped D, the held write to carry D's slot, and A's unmount to finish inside the hold.",
+      "evidence": [
+        "tests/evidence/lanes/g2_a12_rig_caw_20261023T183310Z/summary.log",
+        "tests/evidence/lanes/g2_a12_rig_caw_20261023T183310Z/step5.log",
+        "tests/evidence/lanes/g2_a12_rig_caw_20261023T183310Z/step6.log",
+        "tests/evidence/batch_laps/b20261023-346edb",
+        "tests/evidence/batch_laps/b20261023-024fe9",
+        "tests/recov_iwr_revert_lap.sh",
+        "xfs/xfs_mxfs_dlm.c",
+        "pal/linux/xfs_buf.c",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-7d22e1.md",
+        "sha256": "94386d6eb3b1ba2de0304d6ebec4965ed28df6258b34fe2c9db85f44f2998533",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-23fd30",
+      "kind": "verify",
+      "record": "D-PATH-ROW-ABORT-KEEPS-NO-KERNEL-LOG-SO-A-HUNG-REJOIN-LEAVES-NO-EVIDENCE",
+      "change": {
+        "batch": "b20261023-c554fb"
+      },
+      "argument": "Verification batch b20261023-c554fb on candidate 0.90.134, attempt frozen 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC; tests/evidence/candidates/0.90.134_20261023T183224Z.files.json), g2b (test15/test16) at 2/disk/caw/mpath, declared by tools/harness_batch.py verify before its first lap and sized from control b20261023-7da0f1 on the same attempt: 10 of 10 laps FAIL, each exposed, with PF_KEEP_ON_ABORT=0 in the lap's own command only (tests/evidence/lanes/g2b_a12_pathabort_20261023T183812Z/step3.log; every control lap log in tests/evidence/batch_laps/b20261023-7da0f1 ends 'FAIL: the ABORTed row kept no kernel log of: test15 test16'). The switch is tests/mpath/lib.sh:243 in kmsg_keep, which with it at 0 returns before copying unless the row counted a failure (comment :239), the condition before the fix. Lower bound 0.5887 at delta 0.005, so 6 clean laps. All 6 laps PASS ('PASS: the ABORTed row kept every node's kernel log (2 in tests/evidence/board_<label>_path_abort_kmsg)'), each with exposure=1 from '^EXPOSED: the row ABORTed at stage=capture', none failed or incomplete (tests/evidence/lanes/g2b_a12_pathabort_20261023T183812Z/step4.log, tests/evidence/batch_laps/b20261023-c554fb). The lap, tests/path_abort_kmsg_lap.sh, runs the path rows' own start (pf_start_gate: the starting-state gate, then a follower of every node's kernel log) and then one capture that cannot complete in its 2 s bound (a remote sleep 8), so the row ABORTs at stage=capture with every follower running, as the hung rejoin remount's did; it passes only when every node's kmsg_<node>_fromnode.gz is in the row's evidence. Before the control, a precheck of each arm on this attempt: tests/evidence/lanes/g2b_a12_pathabort_precheck_20261023T183607Z steps 4 (PASS) and 5 (FAIL).",
+      "evidence": [
+        "tests/evidence/lanes/g2b_a12_pathabort_20261023T183812Z/summary.log",
+        "tests/evidence/lanes/g2b_a12_pathabort_20261023T183812Z/step3.log",
+        "tests/evidence/lanes/g2b_a12_pathabort_20261023T183812Z/step4.log",
+        "tests/evidence/batch_laps/b20261023-7da0f1",
+        "tests/evidence/batch_laps/b20261023-c554fb",
+        "tests/evidence/lanes/g2b_a12_pathabort_precheck_20261023T183607Z/summary.log",
+        "tests/path_abort_kmsg_lap.sh",
+        "tests/mpath/lib.sh",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-23fd30.md",
+        "sha256": "beb48c8fff154a2c18bdb023964c3db23ab1373fca94e9088eb4b3975762a200",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-b955fd",
+      "kind": "verify",
+      "record": "D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED",
+      "change": {
+        "batch": "b20261023-0efa95"
+      },
+      "argument": "Verification batch b20261023-0efa95 on candidate 0.90.134, attempt frozen 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC), declared by tools/harness_batch.py verify before its first lap with '6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)' and sized from control b20261023-0be094 on the same attempt ('failed 10 of 10 exposed laps (batch b20261023-0be094)', each 'STEP_CELL_LAP FAIL 9 of 12 dispositions did not settle their run', with MXFS_RELEASE_STEP_SETTLE=0 in the lap's own environment only, '-- env MXFS_RELEASE_STEP_SETTLE=0 tests/release_step_cell_lap.py', so the tools/harness_batch.py and tools/batch_lap.py recording the control kept the fix, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step1.log, tests/evidence/batch_laps/b20261023-0be094). 6 of 6 laps PASS ('STEP_CELL_LAP PASS all 12 dispositions settled their run (3 key shapes x infra, amend, removal, named removal) and every take-back listed it again'), each with its exposure probe '^EXPOSED: the gate lists' (exposure=12 per lap), none failed or dropped ('verify b20261023-0efa95: 6 PASS, 0 FAIL of 6 planned', tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step2.log, tests/evidence/batch_laps/b20261023-0efa95). The lap (tests/release_step_cell_lap.py, per its docstring) takes three recorded release-step FAILs, one on each shape of key a step's run is filed under (1/any, 2/net/mesh/direct, 2/net/mesh/drbd), and settles each in the four ways a session settles one (infra, amend, removal, named removal), each in a scratch tree of its own. The switch is tools/criteria.py:112 (RELEASE_STEP_SETTLE), which gates the parse in parse_cell at tools/defects.py:771 and :787; both files are frozen files of the attempt (tests/evidence/candidates/0.90.134_20261023T183224Z.files.json).",
+      "evidence": [
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step1.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step2.log",
+        "tests/evidence/batch_laps/b20261023-0be094",
+        "tests/evidence/batch_laps/b20261023-0efa95",
+        "tests/release_step_cell_lap.py",
+        "tools/criteria.py",
+        "tools/defects.py",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-b955fd.md",
+        "sha256": "bff41dd9348cf4f701566a9810af62e37ef41dc6bfc6d9d342c5ada08e993cd0",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-136a61",
+      "kind": "verify",
+      "record": "D-RELEASE-STEP-COMMAND-NAMING-AN-OWN-RIG-KEY-READS-THE-RIG-BOARD",
+      "change": {
+        "batch": "b20261023-2bbcff"
+      },
+      "argument": "Verification batch b20261023-2bbcff on candidate 0.90.134, attempt frozen 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC), declared by tools/harness_batch.py verify before its first lap with '6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)' and sized from control b20261023-c4c308 on the same attempt ('failed 10 of 10 exposed laps (batch b20261023-c4c308)', each 'STEP_CELL_LAP FAIL 4 of 12 dispositions did not settle their run', with MXFS_RELEASE_STEP_BOARD=0 in the lap's own environment only, '-- env MXFS_RELEASE_STEP_BOARD=0 tests/release_step_cell_lap.py', so the tools/harness_batch.py and tools/batch_lap.py recording the control kept the fix, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step5.log, tests/evidence/batch_laps/b20261023-c4c308). 6 of 6 laps PASS ('STEP_CELL_LAP PASS all 12 dispositions settled their run (3 key shapes x infra, amend, removal, named removal) and every take-back listed it again'), each with its exposure probe '^EXPOSED: the gate lists' (exposure=12 per lap), none failed or dropped ('verify b20261023-2bbcff: 6 PASS, 0 FAIL of 6 planned', tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step6.log, tests/evidence/batch_laps/b20261023-2bbcff). The lap (tests/release_step_cell_lap.py, per its docstring) takes three recorded release-step FAILs, one on each shape of key a step's run is filed under (1/any, 2/net/mesh/direct, 2/net/mesh/drbd), and settles each in the four ways a session settles one (infra, amend, removal, named removal), each in a scratch tree of its own. The switch is tools/criteria.py:114 (RELEASE_STEP_BOARD), which gates the import-time board choice at tools/criteria.py:121; the file is a frozen file of the attempt (tests/evidence/candidates/0.90.134_20261023T183224Z.files.json).",
+      "evidence": [
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step5.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step6.log",
+        "tests/evidence/batch_laps/b20261023-c4c308",
+        "tests/evidence/batch_laps/b20261023-2bbcff",
+        "tests/release_step_cell_lap.py",
+        "tools/criteria.py",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-136a61.md",
+        "sha256": "c6e8e8d8403f751176f0c03692de3494e203371994a0656605171abaccde61a0",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-171e79",
+      "kind": "verify",
+      "record": "D-RELEASE-STEP-RUN-LOOKUP-AND-RETIREMENT-ROUTED-TO-THE-RIG-BOARD",
+      "change": {
+        "batch": "b20261023-08d2f4"
+      },
+      "argument": "Verification batch b20261023-08d2f4 on candidate 0.90.134, attempt frozen 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC), declared by tools/harness_batch.py verify before its first lap with '6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)' and sized from control b20261023-356bc4 on the same attempt ('failed 10 of 10 exposed laps (batch b20261023-356bc4)', each 'STEP_CELL_LAP FAIL 4 of 12 dispositions did not settle their run', with MXFS_RELEASE_STEP_ROUTE=0 in the lap's own environment only, '-- env MXFS_RELEASE_STEP_ROUTE=0 tests/release_step_cell_lap.py', so the tools/harness_batch.py and tools/batch_lap.py recording the control kept the fix, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step7.log, tests/evidence/batch_laps/b20261023-356bc4). 6 of 6 laps PASS ('STEP_CELL_LAP PASS all 12 dispositions settled their run (3 key shapes x infra, amend, removal, named removal) and every take-back listed it again'), each with its exposure probe '^EXPOSED: the gate lists' (exposure=12 per lap), none failed or dropped ('verify b20261023-08d2f4: 6 PASS, 0 FAIL of 6 planned', tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step8.log, tests/evidence/batch_laps/b20261023-08d2f4). The lap (tests/release_step_cell_lap.py, per its docstring) takes three recorded release-step FAILs, one on each shape of key a step's run is filed under (1/any, 2/net/mesh/direct, 2/net/mesh/drbd), and settles each in the four ways a session settles one (infra, amend, removal, named removal), each in a scratch tree of its own. The switch is tools/criteria.py:115 (RELEASE_STEP_ROUTE), which gates run_board at tools/criteria.py:198; the file is a frozen file of the attempt (tests/evidence/candidates/0.90.134_20261023T183224Z.files.json).",
+      "evidence": [
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step7.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step8.log",
+        "tests/evidence/batch_laps/b20261023-356bc4",
+        "tests/evidence/batch_laps/b20261023-08d2f4",
+        "tests/release_step_cell_lap.py",
+        "tools/criteria.py",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-171e79.md",
+        "sha256": "48d82461861d0ca5f976fee20591dddd9258b24aa288ecebdf2e08ed715fe0ba",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-8aa6af",
+      "kind": "verify",
+      "record": "D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD",
+      "change": {
+        "batch": "b20261023-e3a8d5"
+      },
+      "argument": "Verification batch b20261023-e3a8d5 on candidate 0.90.134, attempt frozen 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC), declared by tools/harness_batch.py verify before its first lap with '6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)' and sized from control b20261023-146820 on the same attempt ('failed 10 of 10 exposed laps (batch b20261023-146820)', each 'BOARD_VERDICT_LAP FAIL the orchestrator's verdict names 1 row(s), the board has 35', with MXFS_BOARD_VERDICT_OWN_RIG=0 in the lap's own environment only, '-- env MXFS_BOARD_VERDICT_OWN_RIG=0 tests/release_board_verdict_lap.py', so the tools/harness_batch.py and tools/batch_lap.py recording the control kept the fix, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step9.log, tests/evidence/batch_laps/b20261023-146820). 6 of 6 laps PASS ('BOARD_VERDICT_LAP PASS the orchestrator's verdict names the 35 row(s)'), each with its exposure probe '^EXPOSED: ' (exposure=1 per lap), none failed or dropped ('verify b20261023-e3a8d5: 6 PASS, 0 FAIL of 6 planned', tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step10.log, tests/evidence/batch_laps/b20261023-e3a8d5). The lap (tests/release_board_verdict_lap.py, per its docstring) calls board_verdict twice, each in a fresh interpreter, as the orchestrator does (MXFS_OWN_RIG unset) and with the flag set by the caller, and the two must name the same rows. The switch is tools/release_run.py:69 (BOARD_VERDICT_OWN_RIG), which gates the own-rig flag in board_verdict at tools/release_run.py:416; the file is a frozen file of the attempt (tests/evidence/candidates/0.90.134_20261023T183224Z.files.json).",
+      "evidence": [
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step9.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step10.log",
+        "tests/evidence/batch_laps/b20261023-146820",
+        "tests/evidence/batch_laps/b20261023-e3a8d5",
+        "tests/release_board_verdict_lap.py",
+        "tools/release_run.py",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-8aa6af.md",
+        "sha256": "04690c3581ec1e79fe55520a62486d1a1540e419f05e57bb72109ab47a2809a6",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-2c9e6b",
+      "kind": "verify",
+      "record": "D-RELEASE-RUN-BOARD-VERDICT-READ-AN-EMPTY-VERDICT-AS-CLEAN",
+      "change": {
+        "batch": "b20261023-3fc798"
+      },
+      "argument": "Verification batch b20261023-3fc798 on candidate 0.90.134, attempt frozen 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC), declared by tools/harness_batch.py verify before its first lap with '6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)' and sized from control b20261023-2bafbd on the same attempt ('failed 10 of 10 exposed laps (batch b20261023-2bafbd)', each 'BOARD_VERDICT_LAP FAIL the verdict that graded no row reads []: clean', with MXFS_BOARD_VERDICT_EMPTY=0 in the lap's own environment only, '-- env MXFS_BOARD_VERDICT_EMPTY=0 tests/release_board_verdict_lap.py --empty', so the tools/harness_batch.py and tools/batch_lap.py recording the control kept the fix, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step11.log, tests/evidence/batch_laps/b20261023-2bafbd). 6 of 6 laps PASS ('BOARD_VERDICT_LAP PASS the verdict that graded no row is refused: no row of the specification applies at 2/net/mesh/drbd: nothing was graded'), each with its exposure probe '^EXPOSED: ' (exposure=1 per lap), none failed or dropped ('verify b20261023-3fc798: 6 PASS, 0 FAIL of 6 planned', tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step12.log, tests/evidence/batch_laps/b20261023-3fc798). The lap (tests/release_board_verdict_lap.py --empty, per its docstring) calls board_verdict as the orchestrator does with the flag fix taken out (MXFS_BOARD_VERDICT_OWN_RIG=0), so no row of the board applies at the configuration. The switch is tools/release_run.py:73 (BOARD_VERDICT_EMPTY_REFUSED), which gates the refusal of a verdict that graded no row at tools/release_run.py:433; the file is a frozen file of the attempt (tests/evidence/candidates/0.90.134_20261023T183224Z.files.json).",
+      "evidence": [
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step11.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step12.log",
+        "tests/evidence/batch_laps/b20261023-2bafbd",
+        "tests/evidence/batch_laps/b20261023-3fc798",
+        "tests/release_board_verdict_lap.py",
+        "tools/release_run.py",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-2c9e6b.md",
+        "sha256": "f68f4cda0474ae49692df2da65ebbf114f64f888390ddf3e2b692d7026132a83",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-fa992e",
+      "kind": "verify",
+      "record": "D-BATCH-LAP-TIMEOUT-KILLS-ONLY-THE-DIRECT-CHILD-SO-THE-HARNESS-WRITES-ON",
+      "change": {
+        "batch": "b20261023-81f39b"
+      },
+      "argument": "Verification batch b20261023-81f39b on candidate 0.90.134, attempt frozen 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC), declared by tools/harness_batch.py verify before its first lap with '6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)' and sized from control b20261023-50b34d on the same attempt ('failed 10 of 10 exposed laps (batch b20261023-50b34d)', each 'FAIL: the harness's writer wrote after the lap was bounded and recorded: timeout setsid orphan', with MXFS_BATCH_LAP_KILLTREE=0 in the lap's own environment only, '-- env MXFS_BATCH_LAP_KILLTREE=0 tests/batch_lap_killpg_lap.py', so the tools/harness_batch.py and tools/batch_lap.py recording the control kept the fix, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step13.log, tests/evidence/batch_laps/b20261023-50b34d). 6 of 6 laps PASS ('PASS: nothing the lap started wrote after its bound ended it'), each with its exposure probe '^EXPOSED: every bound ran out' (exposure=1 per lap), none failed or dropped ('verify b20261023-81f39b: 6 PASS, 0 FAIL of 6 planned', tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step14.log, tests/evidence/batch_laps/b20261023-81f39b). The lap (tests/batch_lap_killpg_lap.py, per its docstring) runs tools/batch_lap.py run_bounded() three times under a 1 s bound, each on a bash harness that starts a writer one way a process can leave the lap's process group or its parentage (timeout, setsid, orphan), then reads a scratch file for any write after the bound. The switch is tools/batch_lap.py:260 (MXFS_BATCH_LAP_KILLTREE), which gates run_bounded at tools/batch_lap.py:247-297; the file is a frozen file of the attempt (tests/evidence/candidates/0.90.134_20261023T183224Z.files.json).",
+      "evidence": [
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step13.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step14.log",
+        "tests/evidence/batch_laps/b20261023-50b34d",
+        "tests/evidence/batch_laps/b20261023-81f39b",
+        "tests/batch_lap_killpg_lap.py",
+        "tools/batch_lap.py",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-fa992e.md",
+        "sha256": "7cff80e58c4809811626afd2e6bb2c60054fc53c37d9928d5755c2d6891807f4",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-516c9b",
+      "kind": "verify",
+      "record": "D-BATCH-LAP-RECORDS-NO-STALL-SO-A-HARNESS-LAP-OVER-THE-STALL-LIMIT-GRADES-PASS",
+      "change": {
+        "batch": "b20261023-193240"
+      },
+      "argument": "Verification batch b20261023-193240 on candidate 0.90.134, attempt frozen 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC), declared by tools/harness_batch.py verify before its first lap with '6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)' and sized from control b20261023-d0af77 on the same attempt ('failed 10 of 10 exposed laps (batch b20261023-d0af77)', each 'FAIL: a lap with an operation of 31500 ms was recorded PASS', with MXFS_BATCH_LAP_STALL=0 in the lap's own environment only, '-- env MXFS_BATCH_LAP_STALL=0 tests/batch_lap_stall_lap.py', so the tools/harness_batch.py and tools/batch_lap.py recording the control kept the fix, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log, tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step15.log, tests/evidence/batch_laps/b20261023-d0af77). 6 of 6 laps PASS ('PASS: the recorded run of a passing lap with a stall over the limit is a FAIL'), each with its exposure probe '^EXPOSED: the run batch_lap.py recorded' (exposure=1 per lap), none failed or dropped ('verify b20261023-193240: 6 PASS, 0 FAIL of 6 planned', tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step16.log, tests/evidence/batch_laps/b20261023-193240). The lap (tests/batch_lap_stall_lap.py, per its docstring) records one harness lap end to end through tools/batch_lap.py main() on scratch copies of the queue and the board (MXFS_DEFECTS, MXFS_CRIT), the harness printing an operation over the stall limit and then 'RESULT: PASS', and reads the run batch_lap.py appended to the scratch ledger against the limit in data/release_policy.json. The switch is tools/batch_lap.py:308 (MXFS_BATCH_LAP_STALL), which gates stall_graded at tools/batch_lap.py:304-324, called from main() at tools/batch_lap.py:391; the file is a frozen file of the attempt (tests/evidence/candidates/0.90.134_20261023T183224Z.files.json).",
+      "evidence": [
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step15.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step16.log",
+        "tests/evidence/batch_laps/b20261023-d0af77",
+        "tests/evidence/batch_laps/b20261023-193240",
+        "tests/batch_lap_stall_lap.py",
+        "tools/batch_lap.py",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-516c9b.md",
+        "sha256": "4f0bb3184212c1a64e968a663bb128aa1a5e8016a2fb3cf56f15343c9f8de38c",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-0a53fb",
+      "kind": "remove-fixed",
+      "record": "D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED",
+      "change": {
+        "control": "b20261023-955af2",
+        "fixon": "b20261023-349597",
+        "cause": "with tests/suite/fsx.sh's earlier log handling no failing fsx check's output stayed on the node after the row; run_fsx now writes each check's output to /root/fsx.<seed>.<ops>.log and keeps it when the check fails"
+      },
+      "argument": "FIXED AND VERIFIED, the cause limited to what the laps measured (resubmission of P20261023-564a5c, whose review data/reviews/P20261023-564a5c.md found the batches sound and the earlier cause's claims about which step removed the log, and about run.sh's pull, unmeasured; both claims are dropped here and nothing was re-run).\n\nThe defect as measured: with tests/suite/fsx.sh as it was before the fix, a failing fsx check left no file of fsx's output on the node once the row had ended (10 of 10 control laps). With the fix, each failing check's output is kept in /root on the node (6 of 6 laps).\n\nThe fix, one site, tests/suite/fsx.sh, exactly the saved diff tests/evidence/controls/D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED.fix.diff (sha256 488a9fbd6b61a4aedc33b6728eaa50a5a0b62ad399606efb762dd9cb3c8326f9): run_fsx writes /root/fsx.<seed>.<ops>.log, keeps it when fsx exits nonzero and removes it when fsx passes, and the EXIT trap removes only the work directory. The same hunk also names the kept log in the row's measured text (fsx_fail_log=) and writes its last lines to the kernel log (mxfs-FSXfail); this removal claims neither.\n\nThe lap, tests/fsx_tmp_log_lap.sh, runs the fsx row through run.sh on a scratch board with FSX_SEED=-1 so both checks fail at once (EXPOSED: the fsx row failed both checks), and passes only when the row's node holds, in /root or /tmp, a file of fsx's usage output written after the lap's mark for each failed check.\n\nControl b20261023-955af2: run in place on the tree immediately before attempt 2026-10-23T18:32:24Z of candidate 0.90.134 was frozen (module C54C14B681D148267D084FC), with only tests/suite/fsx.sh reverted by that diff (tests/evidence/lanes/g2_a12_fsx_revert_control_20261023T182752Z/step3.log: 'inputs before -> during: content=1 tests/suite/fsx.sh', 'restored: tests/suite/fsx.sh hash as before'); 10 of 10 laps FAIL, each exposed ('LAP fsx_tmp FAIL: 0 of 2 failed checks' fsx output survived the row on test1'). tools/harness_batch.py proof against the attempt's frozen list holds on all four checks (tests/evidence/controls/b20261023-955af2.proof.txt). Fix-on b20261023-349597 on that attempt, sized from the control (lower bound 0.5887, 6 laps): 6 of 6 PASS, each exposed (tests/evidence/lanes/g2_a12_rig_caw_20261023T183310Z/step4.log); its verify P20261023-7ac76d was approved and applied (data/reviews/P20261023-7ac76d.md). The record's cells are the 10 control laps, each failing on this cause, all retired by that verify at 2/disk/caw/direct. The fix is in the test harness's fsx row, which runs the same script at every configuration.",
+      "evidence": [
+        "tests/suite/fsx.sh",
+        "tests/fsx_tmp_log_lap.sh",
+        "tests/evidence/controls/D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED.fix.diff",
+        "tests/evidence/lanes/g2_a12_fsx_revert_control_20261023T182752Z/step3.log",
+        "tests/evidence/controls/b20261023-955af2.proof.txt",
+        "tests/evidence/lanes/g2_a12_rig_caw_20261023T183310Z/step4.log",
+        "tests/evidence/batch_laps/b20261023-955af2",
+        "tests/evidence/batch_laps/b20261023-349597",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/reviews/P20261023-7ac76d.md",
+        "data/reviews/P20261023-564a5c.md",
+        "data/defects.json"
+      ],
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-0a53fb.md",
+        "sha256": "45004dba7a4a65d4d2b2d5ca6531078fa578b2c807aee15108589a03bfc83f9c",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
+    },
+    {
+      "id": "P20261023-c33ae1",
+      "kind": "remove-fixed",
+      "record": "D-PATH-ROW-ABORT-KEEPS-NO-KERNEL-LOG-SO-A-HUNG-REJOIN-LEAVES-NO-EVIDENCE",
+      "change": {
+        "control": "b20261023-7da0f1",
+        "fixon": "b20261023-c554fb",
+        "cause": "tests/mpath/lib.sh kmsg_keep returned before copying the followed kernel logs unless the row had counted a failure, so a path row that ABORTed at a capture (which counts none) kept no node's kernel log in its evidence; kmsg_keep now copies them whenever it runs, which the EXIT trap does on every exit but a pass"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect as measured: a path row on a formed multipath pair (g2b, test15/test16, 2/disk/caw/mpath) that ABORTs at stage=capture with every node's kernel-log follower running kept neither node's kernel log in its evidence with the earlier condition (10 of 10 control laps, each 'FAIL: the ABORTed row kept no kernel log of: test15 test16'), and kept both with the fix (6 of 6, 'PASS: the ABORTed row kept every node's kernel log (2 in tests/evidence/board_<label>_path_abort_kmsg)').\n\nThe fix, one line, tests/mpath/lib.sh:243 in kmsg_keep: the earlier line '[ \"${fails:-0}\" != 0 ] || return 0' (as in the 0.90.130 checkout /home/steve/src/mxfs-v130/tests/mpath/lib.sh:210) now runs only when PF_KEEP_ON_ABORT=0, so the switch restores exactly the earlier condition and nothing else; comment :233-240. pf_done clears the EXIT trap before a passing row's end (:529-530, unchanged by the fix and present in the 0.90.130 checkout at :491-492), so the trap's kmsg_keep runs only for a row that did not pass.\n\nThe lap, tests/path_abort_kmsg_lap.sh (header :2-30), runs the path rows' own start (pf_start_gate: the starting-state gate, then a follower of every node's kernel log) and then one capture that cannot complete in its 2 s bound (a remote sleep 8), so the row ABORTs at stage=capture (capture_require's exit 2, no failure counted); it passes only when every node's kmsg_<node>_fromnode.gz is in the row's evidence. EXPOSED is the row's own 'RESULT: ABORT ... stage=capture' line.\n\nPrecheck of both arms on this attempt: tests/evidence/lanes/g2b_a12_pathabort_precheck_20261023T183607Z steps 4 (fix, rc=0) and 5 (PF_KEEP_ON_ABORT=0, rc=1). Control b20261023-7da0f1 on candidate 0.90.134, attempt frozen 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC; tests/evidence/candidates/0.90.134_20261023T183224Z.files.json), with PF_KEEP_ON_ABORT=0 in the lap's own command only: 10 of 10 FAIL, each exposed (tests/evidence/lanes/g2b_a12_pathabort_20261023T183812Z/step3.log, tests/evidence/batch_laps/b20261023-7da0f1). Verification b20261023-c554fb sized from it (lower bound 0.5887 at delta 0.005, 6 laps): 6 of 6 PASS, each exposed (step4.log, tests/evidence/batch_laps/b20261023-c554fb); its verify P20261023-23fd30 was approved and applied (data/reviews/P20261023-23fd30.md). The record's cells are the 10 control laps, each failing on this cause, all retired by that verify at 2/disk/caw/mpath. kmsg_keep is the one copy every path row runs (its callers: tests/mpath/lib.sh:189, :269, :570, and the EXIT traps of tests/mpath/fenced_takeover_stop.sh:57, freeze_race.sh:59, path_fenced_return.sh:46, total_outage_rejoin.sh:68), whatever the node count, lock manager or attachment.",
+      "evidence": [
+        "tests/mpath/lib.sh",
+        "tests/path_abort_kmsg_lap.sh",
+        "tests/evidence/lanes/g2b_a12_pathabort_precheck_20261023T183607Z/summary.log",
+        "tests/evidence/lanes/g2b_a12_pathabort_20261023T183812Z/summary.log",
+        "tests/evidence/lanes/g2b_a12_pathabort_20261023T183812Z/step3.log",
+        "tests/evidence/lanes/g2b_a12_pathabort_20261023T183812Z/step4.log",
+        "tests/evidence/batch_laps/b20261023-7da0f1",
+        "tests/evidence/batch_laps/b20261023-c554fb",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/reviews/P20261023-23fd30.md",
+        "data/defects.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-c33ae1.md",
+        "sha256": "cb70004e90c9dbcaa9daee11cb18a08b92bac66f3fd8cdd320485c678fa23244",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-44869d",
+      "kind": "remove-fixed",
+      "record": "D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED",
+      "change": {
+        "control": "b20261023-955af2",
+        "fixon": "b20261023-349597",
+        "cause": "with tests/suite/fsx.sh's earlier log handling no failing fsx check's output stayed on the node after the row; run_fsx now writes each check's output to /root/fsx.<seed>.<ops>.log and keeps it when the check fails"
+      },
+      "argument": "FIXED AND VERIFIED, the cause and the record's summary limited to what the laps measured (resubmission of P20261023-0a53fb, rejected only because the record's summary, which heads the CHANGELOG entry, still named the unmeasured mechanism; the summary now states the measured claim (tools/defects.py update -m). Earlier: P20261023-564a5c, whose review data/reviews/P20261023-564a5c.md found the batches sound and the earlier cause's claims about which step removed the log, and about run.sh's pull, unmeasured; both claims are dropped here and nothing was re-run).\n\nThe defect as measured: with tests/suite/fsx.sh as it was before the fix, a failing fsx check left no file of fsx's output on the node once the row had ended (10 of 10 control laps). With the fix, each failing check's output is kept in /root on the node (6 of 6 laps).\n\nThe fix, one site, tests/suite/fsx.sh, exactly the saved diff tests/evidence/controls/D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED.fix.diff (sha256 488a9fbd6b61a4aedc33b6728eaa50a5a0b62ad399606efb762dd9cb3c8326f9): run_fsx writes /root/fsx.<seed>.<ops>.log, keeps it when fsx exits nonzero and removes it when fsx passes, and the EXIT trap removes only the work directory. The same hunk also names the kept log in the row's measured text (fsx_fail_log=) and writes its last lines to the kernel log (mxfs-FSXfail); this removal claims neither.\n\nThe lap, tests/fsx_tmp_log_lap.sh, runs the fsx row through run.sh on a scratch board with FSX_SEED=-1 so both checks fail at once (EXPOSED: the fsx row failed both checks), and passes only when the row's node holds, in /root or /tmp, a file of fsx's usage output written after the lap's mark for each failed check.\n\nControl b20261023-955af2: run in place on the tree immediately before attempt 2026-10-23T18:32:24Z of candidate 0.90.134 was frozen (module C54C14B681D148267D084FC), with only tests/suite/fsx.sh reverted by that diff (tests/evidence/lanes/g2_a12_fsx_revert_control_20261023T182752Z/step3.log: 'inputs before -> during: content=1 tests/suite/fsx.sh', 'restored: tests/suite/fsx.sh hash as before'); 10 of 10 laps FAIL, each exposed ('LAP fsx_tmp FAIL: 0 of 2 failed checks' fsx output survived the row on test1'). tools/harness_batch.py proof against the attempt's frozen list holds on all four checks (tests/evidence/controls/b20261023-955af2.proof.txt). Fix-on b20261023-349597 on that attempt, sized from the control (lower bound 0.5887, 6 laps): 6 of 6 PASS, each exposed (tests/evidence/lanes/g2_a12_rig_caw_20261023T183310Z/step4.log); its verify P20261023-7ac76d was approved and applied (data/reviews/P20261023-7ac76d.md). The record's cells are the 10 control laps, each failing on this cause, all retired by that verify at 2/disk/caw/direct. The fix is in the test harness's fsx row, which runs the same script at every configuration.",
+      "evidence": [
+        "tests/suite/fsx.sh",
+        "tests/fsx_tmp_log_lap.sh",
+        "tests/evidence/controls/D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED.fix.diff",
+        "tests/evidence/lanes/g2_a12_fsx_revert_control_20261023T182752Z/step3.log",
+        "tests/evidence/controls/b20261023-955af2.proof.txt",
+        "tests/evidence/lanes/g2_a12_rig_caw_20261023T183310Z/step4.log",
+        "tests/evidence/batch_laps/b20261023-955af2",
+        "tests/evidence/batch_laps/b20261023-349597",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/reviews/P20261023-7ac76d.md",
+        "data/reviews/P20261023-564a5c.md",
+        "data/defects.json",
+        "data/reviews/P20261023-0a53fb.md"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-44869d.md",
+        "sha256": "84a4eb9d75a2c3222ed42e53a23091298e61d8f7854967672e1f7050617d58ff",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-4a3ce1",
+      "kind": "remove-fixed",
+      "record": "D-BATCH-LAP-TIMEOUT-KILLS-ONLY-THE-DIRECT-CHILD-SO-THE-HARNESS-WRITES-ON",
+      "change": {
+        "control": "b20261023-50b34d",
+        "fixon": "b20261023-81f39b",
+        "cause": "With tools/batch_lap.py run_bounded bounding a lap by subprocess.run(timeout=bound) (the MXFS_BATCH_LAP_KILLTREE=0 path, tools/batch_lap.py:260-265), a writer the harness had started under GNU timeout, under setsid or by a double fork wrote after run_bounded returned 124 (control b20261023-50b34d, 10 of 10 laps, all three shapes); run_bounded now makes batch_lap.py a child subreaper, starts the lap in a session of its own and on an overrun signals, then waits for, every process it finds by parent pid, by reparenting to itself and by session (tools/batch_lap.py:266-297), and no writer wrote after the bound (verification b20261023-81f39b, 6 of 6 laps, all three shapes)."
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect as measured: with run_bounded's earlier code (MXFS_BATCH_LAP_KILLTREE=0), every one of three harness writers, started under GNU timeout in the foreground without --foreground (as tests/capture_fault_gate.sh:157 and :173 start every gate entry), under setsid, and by a double fork, wrote after run_bounded returned 124 for its 1 s bound (control, 10 of 10: tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step13.log:5 'lap 1/10: FAIL 2/net/mesh/direct:lap:batch_lap_killtree:2026-10-23T18:53:25Z rc=1 elapsed_s=15 exposure=1 -- FAIL: the harness's writer wrote after the lap was bounded and recorded: timeout setsid orphan'; its lap log tests/evidence/batch_laps/b20261023-50b34d/20261023T185310Z-8dcbc4ac.log:3 'timeout: exposed=1 wrote_late=1 -- writer pid 3464319, its write due 1.0 s after the bound; run_bounded: (nothing)', :4 and :5 the same for setsid and orphan). With the fix none did (verification, 6 of 6: step14.log:3 'lap 1/6: PASS 2/net/mesh/direct:lap:batch_lap_killtree:2026-10-23T18:56:06Z rc=0 elapsed_s=16 exposure=1 -- PASS: nothing the lap started wrote after its bound ended it'; tests/evidence/batch_laps/b20261023-81f39b/20261023T185550Z-94ab9798.log:3 'timeout: exposed=1 wrote_late=0 -- writer pid 3488790, its write due 1.0 s after the bound; run_bounded: === the lap overran its bound of 1s: the 4 process(es) it had started were ended (gone) ==='). Counted over every lap log: all 10 control logs carry the FAIL line naming 'timeout setsid orphan' and 30 'run_bounded: (nothing)' shape lines; all 6 verification logs carry the PASS line, 18 '(gone)' shape lines and no 'wrote_late=1'. The record's observed instance, the gate lap b20261022-8375dc lap 7 whose entry ran under timeout and wrote until 19:15:08Z after the lap was recorded at 19:14:48Z and lap 8 had started, is the timeout shape (data/reviews/P20261023-52a18d.md, Check 1).\n\nThe fix: tools/batch_lap.py run_bounded (:247-297). become_subreaper (:186-193) sets PR_SET_CHILD_SUBREAPER so an orphaned descendant is reparented to batch_lap.py; the lap starts with start_new_session=True (:267-268); on an overrun lap_processes (:215-233) collects the lap's descendants by parent pid, the orphans reparented to this process and the members of the lap's session, read from /proc/<pid>/stat (proc_table, :196-212, never cmdline); each is sent SIGTERM, then SIGKILL, with KILL_GRACE_S (5 s) to be gone, reaped (:236-244, :276-290), and the log line reports what is left (:291-295) before run_bounded returns 124. The switch MXFS_BATCH_LAP_KILLTREE (tools/batch_lap.py:260) restores exactly the earlier code: subprocess.run(command, ..., timeout=bound).returncode, 124 on TimeoutExpired (:261-265), returning before the subreaper, the new session or the tree kill is reached. The switch gates every hunk of the fix.\n\nThe lap: tests/batch_lap_killpg_lap.py (docstring :1-34) runs run_bounded three times under a 1 s bound on a bash harness that starts a writer (its pid into a file, 2 s asleep, then a line into a marker) one way each: timeout 30 in the foreground, setsid, and a double fork, then sleeps 10 s; after each bound it waits 4 s and reads the marker. EXPOSED only when every bound ran out (rc 124), every writer started and its write was due after the bound (:66-72, :90-94): 'EXPOSED: every bound ran out with its harness's writer alive and its write due (timeout, setsid, orphan)'. PASS when no writer's line landed at or after run_bounded returned (:74, :99).\n\nControl b20261023-50b34d on candidate 0.90.134 attempt 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC; tests/evidence/candidates/0.90.134_20261023T183224Z.files.json), switch off in the lap's own environment only (summary.log:28 '... -- env MXFS_BATCH_LAP_KILLTREE=0 tests/batch_lap_killpg_lap.py'): 10 of 10 FAIL, each exposed (step13.log:5-14, :16 'inputs before -> after: content=0; touched=0; added=0; gone=0', :17-18). Verification b20261023-81f39b sized from it (lower bound 0.5887 at delta 0.005, 6 laps; step14.log:1): 6 of 6 PASS, each exposed (step14.log:3-9); its verify P20261023-fa992e was approved and applied (data/reviews/P20261023-fa992e.md). The tree still holds the frozen files: tools/batch_lap.py sha256 a005d6cfa9cb485209bc3fad724be7c33ebbd3252ec44a5c6d4f1f28fd1bc448 (files.json:14093-14094) and tests/batch_lap_killpg_lap.py e37bb2d0e88d01c7123e1fb9187fda6395c85671c111043aea1780de0955bf3b (:3285-3286), both measured equal now.\n\nThe rejection of P20261023-52a18d asked for (1) a fix that ends every process the lap started, those that left its group included, with its gone check covering them: lap_processes above, and the '(gone)' line is now computed from it (:291-295); (2) a reproducer starting its writer as the observed lap did, under timeout without --foreground, and a setsid variant, with its own control and a verification sized from it: the timeout and setsid shapes above (the double fork added), control b20261023-50b34d and verification b20261023-81f39b. CHANGELOG.md:14 states the fix's mechanism; this removal claims only the three shapes measured.\n\nThe record's cells: 20, all FAIL with the record's cause and all retired by the applied verify ('batch b20261023-81f39b: 6 exposed clean laps on 0.90.134', data/criteria.runs.jsonl:10525-10544). Ten are this control's laps, lap:batch_lap_killtree 2026-10-23T18:53:25Z-18:55:45Z (data/criteria.runs.jsonl:10413-10427), each 'FAIL: the harness's writer wrote after the lap was bounded and recorded: timeout setsid orphan'. Ten are lap:batch_lap_killpg 2026-10-23T16:01:04Z-16:01:53Z, control b20261023-1d7216 on attempt 2026-10-23T15:56:24Z with MXFS_BATCH_LAP_KILLPG=0, whose off path was the same subprocess.run(timeout=) call (data/reviews/P20261023-52a18d.md, Check 2; tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step7.log:5-14); each log, e.g. tests/evidence/batch_laps/b20261023-1d7216/20261023T160059Z-b703e0a0.log:3-5, reads 'EXPOSED: the bound ran out with the harness's child alive (rc=124)' and 'FAIL: the harness's child wrote after the lap was bounded and recorded', the same cause on a child in the lap's own group.\n\nScope: the record is 1/any. run_bounded (tools/batch_lap.py:247-297) takes the command, working directory, log handle and bound and nothing of the configuration; main() calls it for every batch lap at :381, and uses the configuration only to parse --at (:361), choose the board (:396) and write the run (:399-408). Every lap of both batches held no VMs (each log :2 '=== VMs held for the lap: none ==='). The code measured at 2/net/mesh/direct is therefore the code that bounds a lap at every configuration.",
+      "evidence": [
+        "tools/batch_lap.py",
+        "tests/batch_lap_killpg_lap.py",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step13.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step14.log",
+        "tests/evidence/batch_laps/b20261023-50b34d",
+        "tests/evidence/batch_laps/b20261023-81f39b",
+        "tests/evidence/batch_laps/b20261023-1d7216",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step7.log",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/reviews/P20261023-fa992e.md",
+        "data/reviews/P20261023-52a18d.md",
+        "data/reviews/P20261023-564a5c.md",
+        "data/reviews/P20261023-0a53fb.md",
+        "tests/capture_fault_gate.sh",
+        "tests/evidence/batch_laps/b20261022-8375dc",
+        "data/criteria.runs.jsonl",
+        "data/defects.json",
+        "CHANGELOG.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-8d639f",
+      "kind": "remove-fixed",
+      "record": "D-BATCH-LAP-RECORDS-NO-STALL-SO-A-HARNESS-LAP-OVER-THE-STALL-LIMIT-GRADES-PASS",
+      "change": {
+        "control": "b20261023-d0af77",
+        "fixon": "b20261023-193240",
+        "cause": "With tools/batch_lap.py's stall grading switched off (MXFS_BATCH_LAP_STALL=0, tools/batch_lap.py:308-309), a harness lap run through batch_lap.py main() that printed an operation of 31000 ms as max_stall_ms=, one of 31500 ms through a declared --stall pattern and then its PASS line was recorded PASS with no max_stall_ms= in its measured text (control b20261023-d0af77, 10 of 10 laps); stall_graded now appends the lap's worst operation to the recorded run's measured text as max_stall_ms= and turns a PASS over data/release_policy.json stall_limit_s into a FAIL through criteria.stall_over_limit (tools/batch_lap.py:304-324, applied in main() at :391), and the same lap was recorded FAIL with max_stall_ms=31500 (verification b20261023-193240, 6 of 6 laps)."
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect as measured: with the switch off, tools/batch_lap.py main() recorded PASS a lap whose own output held an operation over the 30 s stall limit followed by its PASS line (control, 10 of 10: tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step15.log:5 'lap 1/10: FAIL 2/net/mesh/direct:lap:batch_lap_stall_main:2026-10-23T18:57:32Z rc=1 elapsed_s=0 exposure=1 -- FAIL: a lap with an operation of 31500 ms was recorded PASS'; its lap log tests/evidence/batch_laps/b20261023-d0af77/20261023T185731Z-5a0df45e.log:5 'recorded PASS: rc=0 elapsed_s=0 exposure=1 -- RESULT: PASS label=stall', and the recorded run's own log tests/evidence/batch_laps/b20261023-f26f0f/20261023T185732Z-51910c08.log:3-5 'op 1 max_stall_ms=31000' / 'op 2 op_ms=31500' / 'RESULT: PASS label=stall'). With the fix the recorded run was a FAIL carrying the 31500 ms operation (verification, 6 of 6: step16.log:3 'lap 1/6: PASS 2/net/mesh/direct:lap:batch_lap_stall_main:2026-10-23T18:57:47Z rc=0 elapsed_s=0 exposure=1 -- PASS: the recorded run of a passing lap with a stall over the limit is a FAIL'; tests/evidence/batch_laps/b20261023-193240/20261023T185746Z-73061598.log:5 'recorded FAIL: rc=0 elapsed_s=0 exposure=1 worst_ms=31500 -- operation stall 31500 ms is over the 30 s limit (data/release_policy.json stall_limit_s): a stability defect; RESULT: PASS label=stall', its recorded run's log tests/evidence/batch_laps/b20261023-965f7c/20261023T185747Z-7a98710b.log:3-5 the same three harness lines). 'worst_ms=' is the lap's own renaming of the recorded max_stall_ms= when it prints (tests/batch_lap_stall_lap.py:54-57, so the outer batch_lap.py does not grade the lap itself), and its PASS requires the recorded run to be FAIL with 'max_stall_ms=31500' in its measured text (:120). Counted over every lap log: all 10 control logs carry the EXPOSED and FAIL lines, all 6 verification logs the EXPOSED and PASS lines.\n\nThe fix: tools/batch_lap.py stall_graded (:304-324) reads every max_stall_ms=<ms> (STALL_LINE, :301) and every match of each --stall pattern in the lap's output and the evidence files it wrote, appends max_stall_ms=<worst> to measured (:317), and when criteria.stall_over_limit (tools/criteria.py:1131-1138, which reads only max_stall_ms= against data/release_policy.json stall_limit_s) reports a stall and the outcome is PASS, makes it FAIL with the stall in the reason (:318-323). main() applies it at :391 and writes the result into the recorded run (:399-408) - the wiring the verify review asked to see measured (data/reviews/P20261023-d6265d.md:80-82); this lap runs main() and reads the run it recorded. The switch MXFS_BATCH_LAP_STALL (tools/batch_lap.py:308) returns outcome, reason and measured unchanged, exactly the earlier recording: the verdict line alone, no stall field. Not gated by the switch, and not claimed by this removal: the --stall option (:348-350) and its one-capture-group check (:357-360), which with the switch off only carry a pattern to stall_graded, and tools/harness_batch.py's pass-through of --stall (:160-161, :470), which this lap does not use.\n\nThe lap: tests/batch_lap_stall_lap.py (docstring :1-28) declares a one-lap calibration batch on scratch copies of the queue and the board (MXFS_DEFECTS, MXFS_CRIT), runs tools/batch_lap.py main() on a harness that prints an operation one second over the limit as max_stall_ms=, another half a second longer through '--stall \\bop_ms=(\\d+)', then RESULT: PASS, and reads the run main() appended to the scratch ledger. EXPOSED when that run's own log holds the operation over the limit and the PASS line (:111-117); PASS when the recorded run is FAIL carrying max_stall_ms=31500 (:120-122).\n\nControl b20261023-d0af77 on candidate 0.90.134 attempt 2026-10-23T18:32:24Z (module C54C14B681D148267D084FC; tests/evidence/candidates/0.90.134_20261023T183224Z.files.json), switch off in the lap's own environment only (summary.log:32 '... -- env MXFS_BATCH_LAP_STALL=0 tests/batch_lap_stall_lap.py'; the lap hands its environment to the inner main(), :72-74): 10 of 10 FAIL, each exposed (step15.log:5-14, :16 'inputs before -> after: content=0; touched=0; added=0; gone=0', :17, :29). Verification b20261023-193240 sized from it (lower bound 0.5887 at delta 0.005, 6 laps; step16.log:1): 6 of 6 PASS, each exposed (step16.log:3-9); its verify P20261023-516c9b was approved and applied (data/reviews/P20261023-516c9b.md). The tree still holds the frozen files: tools/batch_lap.py sha256 a005d6cfa9cb485209bc3fad724be7c33ebbd3252ec44a5c6d4f1f28fd1bc448 (files.json:14093-14094), tests/batch_lap_stall_lap.py 451267216b678b80fee5f520b80c0acf6eab64ad7e5699f72de16d3961292bc1 (:3299-3300) and tools/criteria.py d37435c7fe06c6aaeddebeed065b992e8fcfaffbf5cd9b87ff8b4b369b2e265b (:14289-14290), each measured equal now.\n\nThe record's summary claims, besides the above, that such a run can count toward a verification batch: verification batch b20261022-548ef2 recorded PASS laps whose rows timed A's last-member umount at 31.0-32.7 s (tests/evidence/20261023T043949Z_capture_gate_jdtv1/row.log 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=31006'), traced in data/reviews/P20261023-128f2f.md.\n\nThe record's cells: 20, all FAIL with this cause and all retired by the applied verify ('batch b20261023-193240: 6 exposed clean laps on 0.90.134', data/criteria.runs.jsonl:10505-10524). Ten are this control's laps, lap:batch_lap_stall_main 2026-10-23T18:57:32Z-18:57:41Z (data/criteria.runs.jsonl:10439-10449), each 'FAIL: a lap with an operation of 31500 ms was recorded PASS'. Ten are lap:batch_lap_stall 2026-10-23T16:02:34Z-16:02:43Z, control b20261023-572eb1 on attempt 2026-10-23T15:56:24Z with the same switch off (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step9.log:4-14), whose lap called stall_graded in-process; each log, e.g. tests/evidence/batch_laps/b20261023-572eb1/20261023T160234Z-11902f6f.log:3-5, reads 'EXPOSED: a lap printed operations of 31000 and 31500 ms against the 30000 ms limit, then its PASS line', 'graded PASS: rc=0 elapsed_s=0 -- RESULT: PASS label=stall', 'FAIL: a lap with an operation of 31500 ms was graded PASS'.\n\nScope: the record is 1/any. stall_graded (tools/batch_lap.py:304-324) takes the outcome, reason, measured text, the lap's texts and the --stall patterns and nothing of the configuration; its limit is the single stall_limit_s of data/release_policy.json (criteria.stall_over_limit); main() applies it at :391, before it chooses the board by configuration at :396. Every lap of both batches held no VMs (each log :2). The code measured at 2/net/mesh/direct is therefore the code that grades a batch lap at every configuration.",
+      "evidence": [
+        "tools/batch_lap.py",
+        "tools/criteria.py",
+        "tests/batch_lap_stall_lap.py",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/summary.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step15.log",
+        "tests/evidence/lanes/local_a12_tooling_20261023T183240Z/step16.log",
+        "tests/evidence/batch_laps/b20261023-d0af77",
+        "tests/evidence/batch_laps/b20261023-193240",
+        "tests/evidence/batch_laps/b20261023-f26f0f",
+        "tests/evidence/batch_laps/b20261023-965f7c",
+        "tests/evidence/batch_laps/b20261023-572eb1",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step9.log",
+        "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+        "data/reviews/P20261023-516c9b.md",
+        "data/reviews/P20261023-d6265d.md",
+        "data/reviews/P20261023-564a5c.md",
+        "data/reviews/P20261023-0a53fb.md",
+        "data/reviews/P20261023-128f2f.md",
+        "tests/evidence/20261023T043949Z_capture_gate_jdtv1",
+        "tools/harness_batch.py",
+        "data/criteria.runs.jsonl",
+        "data/release_policy.json",
+        "data/defects.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
     }
   ]
 }

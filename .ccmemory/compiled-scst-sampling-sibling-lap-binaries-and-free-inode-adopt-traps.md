@@ -1,14 +1,14 @@
 ---
 name: compiled-scst-sampling-sibling-lap-binaries-and-free-inode-adopt-traps
-description: Traps: SCST/sd-inflight probes, sibling make clean, free-image adopt, B4 no-authority, withdrawal/NULL gate/barrier, harness asserts, stale route
+description: Traps: SCST/sd-inflight probes, sibling make clean, free-image adopt, B4, withdrawal/NULL gate/barrier, harness asserts, PF_KEEP_KMSG, tauth laps
 metadata:
   type: feedback
-tags: [compiled, scst, caw, lap, sampling, sibling-checkout, reload, adopt, icache, nblocks, verifier, chk_mxfs, inactivation, unlinked-list, repro-design, vacuous-lap, B4, fencing, withdrawal, authority-lease, barrier, harness, measurement-integrity]
+tags: [compiled, scst, caw, lap, sampling, sibling-checkout, reload, adopt, icache, nblocks, verifier, chk_mxfs, inactivation, unlinked-list, repro-design, vacuous-lap, B4, fencing, withdrawal, authority-lease, barrier, harness, measurement-integrity, rig, mpath, kernel-log, release-reviewer, tauth, defect-queue]
 ---
 
-Traps in MXFS lap/rig work and in the gates, predicates, barriers and assertions those laps exercise. Common thread: the real state sits behind something that looks authoritative and is not. A probe reads idle / `0:0` / CLEAN while a command is held or a block count is corrupt (sections 1 and 3); a sibling-checkout lap depends on the main tree's `tools/` binaries without announcing it (section 2); a repro built around a peer freeing an inode it did not unlink passes structurally vacuous because the peer lacks authority at its last close (section 4); and a predicate, barrier, assertion or verdict is written against the one state, producer, arm or caller its author observed and silently misjudges every other one (sections 5-11). Some are product defects; some are harness attribution errors that look like MXFS defects in the RESULT line.
+Traps in MXFS lap/rig work and in the gates, predicates, barriers and assertions those laps exercise. Common thread: the real state sits behind something that looks authoritative and is not. A probe reads idle / `0:0` / CLEAN while a command is held or a block count is corrupt (sections 1 and 3); a sibling-checkout lap depends on the main tree's `tools/` binaries without announcing it (section 2); a repro built around a peer freeing an inode it did not unlink passes structurally vacuous because the peer lacks authority at its last close (section 4); and a predicate, barrier, assertion or verdict is written against the one state, producer, arm or caller its author observed and silently misjudges every other one (sections 5-11). Sections 12-13 cover what evidence a rig-configuration defect record can rest on: how to keep a path row's full kernel log, and why in-process simulation laps are rejected as verify/removal proof. Some are product defects; some are harness attribution errors that look like MXFS defects in the RESULT line.
 
-Provenance: sections 1-4 are the original lap/rig article (sessions 37-39 and 86; four notes the clusterer could not fit to one topic, plus `compiled-peer-last-close-b4-no-authority` absorbed as section 4). Sections 5-11 are absorbed in full from `compiled-fencing-withdrawal-gates-barriers-and-harness-assertion-traps`: product-side traps (5-7), harness and measurement traps (8-10), one planning trap (11).
+Provenance: sections 1-4 are the original lap/rig article (sessions 37-39 and 86; four notes the clusterer could not fit to one topic, plus `compiled-peer-last-close-b4-no-authority` absorbed as section 4). Sections 5-11 are absorbed in full from `compiled-fencing-withdrawal-gates-barriers-and-harness-assertion-traps`: product-side traps (5-7), harness and measurement traps (8-10), one planning trap (11). Sections 12-13 are absorbed in full from `compiled-rig-evidence-kmsg-capture-and-verify-laps` (an assorted group: two rig-testing notes sharing only that both concern the evidence a defect record observed on a rig configuration, e.g. 8/net/mesh/mpath, can rest on).
 
 ## 1. SCST target-side and node-side sampling blind spots
 
@@ -83,3 +83,29 @@ From `compiled-fencing-withdrawal-gates-barriers-and-harness-assertion-traps`. D
 ## 11. Planning trap: a "route closed" verdict expires when the capability is built another way
 
 From `compiled-fencing-withdrawal-gates-barriers-and-harness-assertion-traps`. `D-FENCE-CRASH-MATRIX-UNTESTED` said route 1 (witnessed SCSI LU RESET) was closed because `scsi_ioctl_reset` is unexported and `try_*_reset` are static on 6.8. True for in-kernel reach only. 0.89.33/34 built it through `mxfs_pal_lu_reset_witness()` -> `call_usermodehelper` -> `ioctl(SG_SCSI_RESET ...)` with `retire_basis = completed-target-op`, called from the dead-peer prover; the record was never updated. A feasibility judgement phrased "there is no X" outlives someone building the capability without X. Check whether the capability (grep `lu_reset`, `LURESET`, the fence-kind enum) has an implementation, not whether the named symbol is still missing; when a route is built, sweep the queue for records whose next step was written while it was closed. Mirror of withdrawing a mechanism expiring banked passes (`trap-banked-lap-evidence-stops-describing-the-build-when-an-intervening-change-withdraws-the-mechanism-the-lap-depended-on`). See `trap-a-records-next-step-can-declare-a-route-closed-on-reasoning-a-later-version-made-obsolete-by-building-it-another-way`.
+
+## 12. Keep the unfiltered kernel log of a multipath path row
+
+From `compiled-rig-evidence-kmsg-capture-and-verify-laps`. Goal, from `technique-path-rows-keep-the-unfiltered-kernel-log-with-pf-keep-kmsg`: every kernel line of a path row (path_all_lost, path_fence_degraded, path_fenced_return, path_peer_withdrawn), debug lines included, without a code change.
+
+- The rig already loads the module with `dyndbg=+p` (`tests/setup/prep_node.sh:53-54`), so every `MXFS_LOG_DEBUG` line (one `pr_debug` in `mxfs_pal_vlog`, `pal/linux/kern.c:4803-4823`) and every `mxfs_probe` site prints. `technique-path-rows-keep-the-unfiltered-kernel-log-with-pf-keep-kmsg`
+- Each path row follows each node's kernel log unfiltered into `/run/mxfs_pf_kmsg.<run>.<row>` on the node (`tests/mpath/lib.sh:177-180`, `tests/lib/rig.sh:301-305`, `dmesg --follow`).
+- The row's own `kern_<node>.txt` is a filtered grep (`tests/mpath/lib.sh:399`), so it misses the takeover phases.
+- The whole log is kept as `kmsg_<node>_fromnode.gz` only when the row's own checks failed (`kmsg_keep`, `:233-243`). A PASS deletes it (`:544-554`), and so does a row that run.sh fails on its stall.
+- `MXFS_TEST_ENV=PF_KEEP_KMSG=1` (run.sh passes MXFS_TEST_ENV to the row, `run.sh:1593-1595`) keeps the gzip on a PASS too. MXFS_TEST_ENV records the run as a variant, so it grades no candidate, but its failures are still incidents.
+- `MXFS_KEEP_ARTIFACTS` does not reach these rows: it is read only in `run_coord`, and path rows go through `run_host`.
+- Found 2026-10-23 when the silent-peer-death record claimed no unfiltered trace could be kept without editing the harness. `technique-path-rows-keep-the-unfiltered-kernel-log-with-pf-keep-kmsg`
+
+## 13. In-process simulation laps cannot verify or remove a rig-configuration record
+
+From `compiled-rig-evidence-kmsg-capture-and-verify-laps`, source `trap-in-process-simulation-laps-cannot-verify-a-rig-configuration-record`: a verification or removal batch for a defect observed on a rig configuration (e.g. 8/net/mesh/mpath) is rejected when its laps run the in-process tauth simulation (`tests/tauth/*_test.sh`: four simulated nodes in one process on the lab host, `VMs held for the lap: none`), however clean the statistics.
+
+Seen 2026-10-23 on candidate 0.90.134: verifies P20261023-867053 and P20261023-6664ba and removals P20261023-778a6d and P20261023-6c4c99 (records D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER and D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES-FOREVER-ON-RESERVATION-CONFLICT) were all rejected although controls were 10/10 and fix-on batches 6/6 with exposure.
+
+Why the reviewer refuses:
+- the configuration the verify would clear never ran, and no lap loaded the candidate's module (the ledger's build field comes from `modinfo` of a module nobody loaded);
+- a simulation whose store never refuses a write cannot produce a RESERVATION CONFLICT loop, so the recorded failure was neither reproduced nor shown gone;
+- `tests/tauth/Makefile` omits included headers from some object rules, so the linked binary is not shown to be built from the frozen tree;
+- a removal settles every run the record names, so failures in that run the cause does not explain must first be named by another open record.
+
+What passes instead: board-row laps (`harness_batch.py --board`, `MXFS_CANDIDATE` set) at the record's configuration on the candidate's module, a kernel-log probe of the trigger on the node that hits it, and N sized from a control measured there (knob off through `MXFS_EXTRA_MODARGS`, or the fix reverted in a scratch copy of the frozen file list), or an explicit `--transfer` the reviewer can check. Plan the rig laps before spending a lane on simulation laps.

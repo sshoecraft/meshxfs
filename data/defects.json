@@ -2457,6 +2457,56 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-0be094",
+          "kind": "control",
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the gate lists",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py and tools/defects.py parse a release step's run as any other run, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix's parse taken out: a release step's FAIL cannot be named, annotated or retired"
+        },
+        {
+          "id": "b20261023-0efa95",
+          "kind": "verify",
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: the gate lists",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:release_step_cell",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-0be094",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py and tools/defects.py parse a release step's run as any other run, as before the fix)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "updated": "2026-10-23",
@@ -2488,6 +2538,21 @@
           "variant": "MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py and tools/defects.py read and route a release step's run as any other run, as before the fix)",
           "builds": [
             "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
+        },
+        {
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-0be094",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py and tools/defects.py parse a release step's run as any other run, as before the fix)",
+          "builds": [
+            "C54C14B681D148267D084FC"
           ],
           "date": "2026-10-23"
         }
@@ -2642,6 +2707,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:release_step_cell",
           "iso": "2026-10-23T15:57:43Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:34:41Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:34:29Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:34:17Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:34:05Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:33:53Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:33:41Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:33:29Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:33:18Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:33:06Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:32:54Z"
         }
       ],
       "reproducer": "tests/release_step_cell_lap.py (host only, under 1 s): takes a recorded release step FAIL from the primary ledger and requires it to parse as a cell (tools/criteria.py parse_cell), to be found in the ledger and to take an annotation; prints EXPOSED for the recorded step FAIL it uses. With the fix taken out parse_cell refuses the step's key ('criteria: 1/any: wanted <nodes>/<class>/<method>/<attach>'): STEP_CELL_LAP FAIL",
@@ -2650,10 +2765,10 @@
           "config": "2/net/mesh/direct",
           "platform": "any",
           "candidate": "0.90.134",
-          "attempt": "2026-10-23T15:56:24Z",
-          "build": "08D63764A9352FBDD5A76CD",
-          "batch": "b20261023-8f5476",
-          "approval": "P20261023-e3cea7",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-0efa95",
+          "approval": "P20261023-b955fd",
           "date": "2026-10-23"
         }
       ]
@@ -3127,6 +3242,56 @@
           "config": "2/net/mesh/drbd",
           "row": "lap:release_board_verdict",
           "iso": "2026-10-23T16:00:18Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T18:52:39Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T18:52:38Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T18:52:37Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T18:52:36Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T18:52:35Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T18:52:34Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T18:52:33Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T18:52:32Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T18:52:31Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T18:52:30Z"
         }
       ],
       "batches": [
@@ -3279,6 +3444,56 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-146820",
+          "kind": "control",
+          "row": "lap:release_board_verdict",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "MXFS_BOARD_VERDICT_OWN_RIG=0 (tools/release_run.py board_verdict grades an own-rig board with the own-rig flag as its caller has it, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: the orchestrator's verdict on the DRBD board grades no row"
+        },
+        {
+          "id": "b20261023-e3a8d5",
+          "kind": "verify",
+          "row": "lap:release_board_verdict",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:release_board_verdict",
+            "config": "2/net/mesh/drbd",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-146820",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_BOARD_VERDICT_OWN_RIG=0 (tools/release_run.py board_verdict grades an own-rig board with the own-rig flag as its caller has it, as before the fix)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "updated": "2026-10-23",
@@ -3327,6 +3542,21 @@
             "08D63764A9352FBDD5A76CD"
           ],
           "date": "2026-10-23"
+        },
+        {
+          "row": "lap:release_board_verdict",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-146820",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_BOARD_VERDICT_OWN_RIG=0 (tools/release_run.py board_verdict grades an own-rig board with the own-rig flag as its caller has it, as before the fix)",
+          "builds": [
+            "C54C14B681D148267D084FC"
+          ],
+          "date": "2026-10-23"
         }
       ],
       "reproducer": "tests/release_board_verdict_lap.py <candidate> (host only): grades the 2/net/mesh/drbd board for the candidate as tools/release_run.py does (MXFS_OWN_RIG unset) and as an own-rig run does (set), taking its inputs from the environment and dropping MXFS_OWN_RIG from the orchestrator's call, and requires the orchestrator's verdict to name every row that is not green; EXPOSED when the board has rows not green. With the fix taken out the orchestrator's verdict names 0 rows: BOARD_VERDICT_LAP FAIL",
@@ -3335,10 +3565,10 @@
           "config": "2/net/mesh/drbd",
           "platform": "any",
           "candidate": "0.90.134",
-          "attempt": "2026-10-23T15:56:24Z",
-          "build": "08D63764A9352FBDD5A76CD",
-          "batch": "b20261023-45c118",
-          "approval": "P20261023-e629b4",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-e3a8d5",
+          "approval": "P20261023-8aa6af",
           "date": "2026-10-23"
         }
       ]
@@ -4771,6 +5001,56 @@
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: the defect must reproduce"
+        },
+        {
+          "id": "b20261023-32a609",
+          "kind": "control",
+          "row": "lap:row_pull",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: every node held",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "MXFS_PULL_SINCE_ROW=0 (run.sh's artifact pull takes every /root capture and fsx log whatever its age, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a row's evidence takes captures an earlier row or boot left in /root"
+        },
+        {
+          "id": "b20261023-5a85e4",
+          "kind": "verify",
+          "row": "lap:row_pull",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: every node held",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:row_pull",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-32a609",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_PULL_SINCE_ROW=0 (run.sh's artifact pull takes every /root capture and fsx log whatever its age, as before the fix)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -4788,6 +5068,73 @@
             "08D63764A9352FBDD5A76CD"
           ],
           "date": "2026-10-23"
+        },
+        {
+          "row": "lap:row_pull",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-32a609",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_PULL_SINCE_ROW=0 (run.sh's artifact pull takes every /root capture and fsx log whatever its age, as before the fix)",
+          "builds": [
+            "C54C14B681D148267D084FC"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T18:58:07Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T18:57:39Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T18:57:11Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T18:56:43Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T18:56:15Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T18:55:47Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T18:55:18Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T18:54:51Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T18:54:22Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T18:53:54Z"
         }
       ]
     },
@@ -5346,6 +5693,56 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-d0af77",
+          "kind": "control",
+          "row": "lap:batch_lap_stall_main",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the run batch_lap.py recorded",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py main() grades a lap from its verdict line alone and records no stall, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a lap whose operation stalled over the limit and that printed its PASS line is recorded PASS by batch_lap.py main()"
+        },
+        {
+          "id": "b20261023-193240",
+          "kind": "verify",
+          "row": "lap:batch_lap_stall_main",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: the run batch_lap.py recorded",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:batch_lap_stall_main",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-d0af77",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py main() grades a lap from its verdict line alone and records no stall, as before the fix)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -5361,6 +5758,21 @@
           "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py grades a lap from its verdict line alone and records no stall, as before the fix)",
           "builds": [
             "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
+        },
+        {
+          "row": "lap:batch_lap_stall_main",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-d0af77",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py main() grades a lap from its verdict line alone and records no stall, as before the fix)",
+          "builds": [
+            "C54C14B681D148267D084FC"
           ],
           "date": "2026-10-23"
         }
@@ -5415,6 +5827,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:batch_lap_stall",
           "iso": "2026-10-23T16:02:34Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall_main",
+          "iso": "2026-10-23T18:57:41Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall_main",
+          "iso": "2026-10-23T18:57:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall_main",
+          "iso": "2026-10-23T18:57:39Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall_main",
+          "iso": "2026-10-23T18:57:38Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall_main",
+          "iso": "2026-10-23T18:57:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall_main",
+          "iso": "2026-10-23T18:57:36Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall_main",
+          "iso": "2026-10-23T18:57:35Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall_main",
+          "iso": "2026-10-23T18:57:34Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall_main",
+          "iso": "2026-10-23T18:57:33Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall_main",
+          "iso": "2026-10-23T18:57:32Z"
         }
       ],
       "verified_at": [
@@ -5422,10 +5884,10 @@
           "config": "2/net/mesh/direct",
           "platform": "any",
           "candidate": "0.90.134",
-          "attempt": "2026-10-23T15:56:24Z",
-          "build": "08D63764A9352FBDD5A76CD",
-          "batch": "b20261023-f16825",
-          "approval": "P20261023-d6265d",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-193240",
+          "approval": "P20261023-516c9b",
           "date": "2026-10-23"
         }
       ]
@@ -5705,6 +6167,56 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-50b34d",
+          "kind": "control",
+          "row": "lap:batch_lap_killtree",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: every bound ran out",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "MXFS_BATCH_LAP_KILLTREE=0 (tools/batch_lap.py run_bounded ends only the process it started when a lap's bound runs out, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a bounded lap's harness writer, started under timeout, setsid or a double fork, outlives the bound and writes after the lap is recorded"
+        },
+        {
+          "id": "b20261023-81f39b",
+          "kind": "verify",
+          "row": "lap:batch_lap_killtree",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: every bound ran out",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:batch_lap_killtree",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-50b34d",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_BATCH_LAP_KILLTREE=0 (tools/batch_lap.py run_bounded ends only the process it started when a lap's bound runs out, as before the fix)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "updated": "2026-10-23",
@@ -5721,6 +6233,21 @@
           "variant": "MXFS_BATCH_LAP_KILLPG=0 (tools/batch_lap.py ends only the process it started when a lap's bound runs out, as before the fix)",
           "builds": [
             "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
+        },
+        {
+          "row": "lap:batch_lap_killtree",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-50b34d",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_BATCH_LAP_KILLTREE=0 (tools/batch_lap.py run_bounded ends only the process it started when a lap's bound runs out, as before the fix)",
+          "builds": [
+            "C54C14B681D148267D084FC"
           ],
           "date": "2026-10-23"
         }
@@ -5775,6 +6302,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:batch_lap_killpg",
           "iso": "2026-10-23T16:01:04Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killtree",
+          "iso": "2026-10-23T18:55:45Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killtree",
+          "iso": "2026-10-23T18:55:29Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killtree",
+          "iso": "2026-10-23T18:55:14Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killtree",
+          "iso": "2026-10-23T18:54:58Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killtree",
+          "iso": "2026-10-23T18:54:43Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killtree",
+          "iso": "2026-10-23T18:54:27Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killtree",
+          "iso": "2026-10-23T18:54:12Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killtree",
+          "iso": "2026-10-23T18:53:56Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killtree",
+          "iso": "2026-10-23T18:53:41Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killtree",
+          "iso": "2026-10-23T18:53:25Z"
         }
       ],
       "verified_at": [
@@ -5782,10 +6359,10 @@
           "config": "2/net/mesh/direct",
           "platform": "any",
           "candidate": "0.90.134",
-          "attempt": "2026-10-23T15:56:24Z",
-          "build": "08D63764A9352FBDD5A76CD",
-          "batch": "b20261023-8e8ccd",
-          "approval": "P20261023-6dae93",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-81f39b",
+          "approval": "P20261023-fa992e",
           "date": "2026-10-23"
         }
       ]
@@ -5797,8 +6374,9 @@
       "config": "*/*/*",
       "opened": "2026-10-23",
       "summary": "During a foreign replay the surviving node writes allocation-group header blocks (AGF) without holding that group's lock: PROBE-A AG-META-WRITE-NOT-HELD fires 4-10 times in every lap of the open-EFI gate, fix on and fix off; the probe exists because such a write can erase a live peer's change to the header, which no record has shown cannot happen here",
-      "evidence": "Review of P20261023-f2db37 (data/reviews/P20261023-f2db37.md:290-291): 10 and 7 times in the verification laps of b20261023-30233a and 4 to 9 in the control laps of b20261023-dc6d35, each on the survivor during the replay's writes; e.g. tests/evidence/20261023T120439Z_capture_gate_openefivd1 dmesg_test1.txt:2296 '[ 2234.539643] mxfs: PROBE-A AG-META-WRITE-NOT-HELD agno=1 daddr=2065329 ops=agf comm=kworker/u5:2 pid=5401 cached=0 holders=0 demoting=0 relpend=0 bflags=0x240022', with its stack from :2300 through xlog_do_recovery_pass and mxfs_xlog_recover_foreign_slice. The probe: pal/linux/xfs_buf.c:11925. On these 2-node laps the only peer is the dead victim.",
-      "next": "Read the probe's own comment and conditions (pal/linux/xfs_buf.c near :11925) and the foreign replay's AG header writes (mxfs_xlog_recover_foreign_slice): which lock or recovery barrier stands in for the AG lock during a replay, and whether a live third node could hold that AG and change its header meanwhile. Then a 3-node or larger death with a live peer allocating in the replayed AG, the probe and the AG headers checked on every node."
+      "evidence": "Review of P20261023-f2db37 (data/reviews/P20261023-f2db37.md:290-291): 10 and 7 times in the verification laps of b20261023-30233a and 4 to 9 in the control laps of b20261023-dc6d35, each on the survivor during the replay's writes; e.g. tests/evidence/20261023T120439Z_capture_gate_openefivd1 dmesg_test1.txt:2296 '[ 2234.539643] mxfs: PROBE-A AG-META-WRITE-NOT-HELD agno=1 daddr=2065329 ops=agf comm=kworker/u5:2 pid=5401 cached=0 holders=0 demoting=0 relpend=0 bflags=0x240022', with its stack from :2300 through xlog_do_recovery_pass and mxfs_xlog_recover_foreign_slice. The probe: pal/linux/xfs_buf.c:11925. On these 2-node laps the only peer is the dead victim. ===== 2026-10-23 code read (frozen tree of attempt 2026-10-23T18:32:24Z): pal/linux/xfs_buf_item_recover.c:1353-1420: on an untrusted (foreign or adopted) replay an image whose on-disk LSN would veto it is applied (OVERRIDE-APPLY) only when its item's token verdict is APPLY and its class is AG or INODE; the comment states APPLY for class AG means the fence-time manifest shows the victim held that AG at death and the live CAW slot still carries the victim's bit with unchanged lineage (P-RMAN live check, a mismatch aborts the attempt), and that the dead slot is zeroed only after P163-RECOVERY-COMPLETE, so no later tenure can have written the block. A foreign replay's AG buffer write is tagged b_mxfs_recov_image (:1570-1578). PROBE-A (pal/linux/xfs_buf.c:11965-12012) tests only this node's own grant (pag_dlm_cached, pag_dlm_holders, pag_dlm_demoting, pag_dlm_release_pending) and reads neither b_mxfs_recov_image nor the replay's verdict, so it fires on every foreign replay write of an AG header whatever authorised it.",
+      "next": "Read the probe's own comment and conditions (pal/linux/xfs_buf.c near :11925) and the foreign replay's AG header writes (mxfs_xlog_recover_foreign_slice): which lock or recovery barrier stands in for the AG lock during a replay, and whether a live third node could hold that AG and change its header meanwhile. Then a 3-node or larger death with a live peer allocating in the replayed AG, the probe and the AG headers checked on every node. ===== Not yet read: where ri_mxfs_verdict is set for class AG (the fence-time manifest and the live check) and whether an image whose AG the victim did not hold at death can reach pass 2 by any path; and, on the TCP lock manager (net/mesh), what holds a dead node's AG grant against a live node's acquire until P163-RECOVERY-COMPLETE, as the CAW slot's bit does on disk/caw. If both hold, PROBE-A is a detector that cannot tell an authorised replay write from an unauthorised one; the 3-node lap (a live peer allocating while a third node's death is replayed) then tests the claim.",
+      "updated": "2026-10-23"
     },
     {
       "id": "D-16NETMESH-PATH-ALL-LOST-REJOIN-REMOUNT-DID-NOT-COMPLETE-IN-100S",
@@ -5816,28 +6394,6 @@
           "iso": "2026-10-23T13:05:27Z"
         }
       ],
-      "updated": "2026-10-23"
-    },
-    {
-      "id": "D-PATH-ROW-ABORT-KEEPS-NO-KERNEL-LOG-SO-A-HUNG-REJOIN-LEAVES-NO-EVIDENCE",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-23",
-      "summary": "tests/mpath/lib.sh kmsg_keep copies each node's followed kernel log into a path row's evidence only when the row counted a FAIL ($fails non-zero); a row that ends in ABORT (capture_require's exit 2 in tests/lib/rig.sh, as when a rejoin remount times out) leaves with fails=0, so no node's kernel log is kept, and the nodes are then powered off with the only copy in /run",
-      "evidence": "tests/mpath/lib.sh:233-238: 'kmsg_keep() {' / '    local n' / '    [ \"${fails:-0}\" != 0 ] || return 0' / '    [ -z \"${kmsg_kept:-}\" ] || return 0' / '    kmsg_kept=1' / the per-node 'gzip -c $KFILE > /src/mxfs/$OUT/kmsg_${n}_fromnode.gz'; it runs from the row's EXIT trap (:261 'trap ... kmsg_keep; kmsg_stop' EXIT). tests/lib/rig.sh:202-208: capture_require prints 'ABORT: $what did not complete: ...' and 'RESULT: ABORT label=... stage=capture' and exits 2 on any MXFS-RS-STATUS record, without touching fails. Measured: run 20261023T130045Z-g16b (16/net/mesh/mpath:path_all_lost:2026-10-23T13:05:27Z, INCOMPLETE) ABORTed on test32's rejoin remount (row.log:135-136) and its evidence directory tests/evidence/board_20261023T130045Z-g16b_path_all_lost holds no kmsg_*_fromnode.gz for any of its 16 nodes, against 16 in each FAIL or PF_KEEP_KMSG run of the same lane (board_20261023T124303Z-g16b_path_fence_degraded, board_20261023T125059Z-g16b_path_fenced_return); the lane's power-down then destroyed test32 (tests/evidence/lanes/g16b_spd_window14_20261023T124032Z/step11.log:16-17), so the hung remount (D-16NETMESH-PATH-ALL-LOST-REJOIN-REMOUNT-DID-NOT-COMPLETE-IN-100S) has no kernel log. The run's variant set PF_KEEP_KMSG=1, which keeps the logs of a row that passes; it did not keep them for the ABORT either.",
-      "next": "Keep each node's kernel log on every exit of a path row that did not pass (FAIL or ABORT), and on a PASS under PF_KEEP_KMSG=1; reproduce with a lap that forces a rejoin remount ABORT (an rs bound shorter than the remount on a formed pair) and requires a kmsg_<node>_fromnode.gz per node; control with the old condition, verify, remove."
-    },
-    {
-      "id": "D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-23",
-      "summary": "tests/suite/fsx.sh sent fsx's output to /tmp/fsx.$$.*.log on the node and deleted it in its EXIT trap, so a failing fsx check's log did not survive the row on the node for any pull to collect; fsx.sh now keeps a failing check's log as /root/fsx.<seed>.<ops>.log (tests/suite/fsx.sh:38, :45) and names it in the row's measured text.",
-      "evidence": "Split out of D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE at its reviewer's request (data/reviews/P20261023-175966.md:218-232): that record's control (MXFS_PULL_RUN_NONE=0, b20261023-0934e6) took out only run.sh's run_none pull and every lap ran the fixed fsx.sh, so this half rests on a reading of the old code and no control has taken its fix out. The fix is in the tree; it is not proven. ===== 2026-10-23: the fix diff is tests/evidence/controls/D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED.fix.diff. Its old side is today's tests/suite/fsx.sh with only the log handling as it was: the EXIT trap removing /tmp/fsx.$$.* and run_fsx writing /tmp/fsx.$$.<ops>.log, the forms of every older checkout on the host (/home/steve/src/mxfs-v130/tests/suite/fsx.sh:22, :24-25, unchanged from 2026-06-14 to 0.90.130), keeping the -S \"$SEED\" argument today's source passes, which is not this fix. Precheck both ways (tools/control_precheck.sh) in lane tests/evidence/lanes/g2_fsxtmp_precheck_20261023T172303Z. ===== 2026-10-23 precheck (tests/evidence/lanes/g2_fsxtmp_precheck_20261023T172303Z/step3.log), g2 test1/test2 at 2/disk/caw/direct, build 08D63764A9352FBDD5A76CD: with the fix in, 'LAP fsx_tmp survived on test1: /root/fsx.-1.50000.log /root/fsx.-1.100000.log' and PASS; with the diff reversed, 'LAP fsx_tmp survived on test1: none' and 'FAIL: 0 of 2 failed checks' fsx output survived the row on test1', each lap EXPOSED (failed=2); control_precheck put the fix back with tests/suite/fsx.sh hashing as before.",
-      "next": "Read the precheck lane g2_fsxtmp_precheck_20261023T172303Z (step 3: PASS with the fix in, FAIL reverted). Then, immediately before the next freeze with nothing written in between: tools/harness_batch.py control D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED --row lap:fsx_tmp --at 2/disk/caw/direct --runs 10 --revert tests/evidence/controls/D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED.fix.diff --probe '^EXPOSED: the fsx row failed both checks' --bound 150 --pass '^LAP fsx_tmp PASS' --fail '^LAP fsx_tmp FAIL', then harness_batch.py proof, freeze, the verification batch on that attempt sized from it, remove --fixed.",
-      "reproducer": "tests/fsx_tmp_log_lap.sh <label> <configuration> on a formed pair (about 1-2 min): the fsx row through run.sh on a scratch board with FSX_SEED=-1, so both checks fail at once (the suite library's failed=2); PASS when the row's node holds, in /root or /tmp, a file of fsx's usage output written after the lap's mark for each failed check; it reads neither the log's name nor the measured text's fsx_fail_log. Control: tools/harness_batch.py control --revert tests/evidence/controls/D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED.fix.diff.",
       "updated": "2026-10-23"
     },
     {
@@ -5892,7 +6448,141 @@
       "summary": "tools/release_run.py board_verdict returned the rows of a board not graded green, so a verdict in which no row of the specification applied came back as an empty list, which the orchestrator reads as a clean board: on candidate 0.90.134, board_verdict(0.90.134, 2/net/mesh/drbd, tests/evidence/drbd_rig/criteria.json) returned [] with MXFS_OWN_RIG unset, not one of the board's rows graded",
       "evidence": "The measurement in D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD's evidence: [] with MXFS_OWN_RIG unset, [fio_perf_vs_xfs=SKIP, alloc_witness=FAIL, chk_clean=FAIL] with it set. That record's missing flag is what left no row applying; that an ungraded board read as clean is this record. Split out of it at its reviewer's request (data/reviews/P20261023-f07942.md): the refusal of a verdict that graded no row shared that record's switch, so no control isolated it and no fix-on lap ever reached it. FIX in the tree, not yet controlled or verified: board_verdict appends 'no row of the specification applies at <config>: nothing was graded' when it graded no row (tools/release_run.py board_verdict, the 'not graded' test), under a switch of its own, MXFS_BOARD_VERDICT_EMPTY (0 reads an empty verdict as clean, as before). Precheck on the host with tests/release_board_verdict_lap.py --empty (the flag fix out, MXFS_BOARD_VERDICT_OWN_RIG=0, so no row applies): fix in 'BOARD_VERDICT_LAP PASS the verdict that graded no row is refused'; MXFS_BOARD_VERDICT_EMPTY=0 'BOARD_VERDICT_LAP FAIL the verdict that graded no row reads []: clean'.",
       "next": "On the next attempt: control batch of tests/release_board_verdict_lap.py --empty with MXFS_BOARD_VERDICT_EMPTY=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 30 s, probe '^EXPOSED: ', pass '^BOARD_VERDICT_LAP PASS'), the verification batch sized from it, then remove --fixed.",
-      "reproducer": "tests/release_board_verdict_lap.py --empty: board_verdict called as the orchestrator calls it, in a child process with MXFS_OWN_RIG dropped and its inputs from the environment, with MXFS_BOARD_VERDICT_OWN_RIG=0 so no row of the DRBD board applies (the state the dry run found); EXPOSED when no row applies, PASS when the verdict names that nothing was graded, FAIL when it is empty (host only, about 2 s)"
+      "reproducer": "tests/release_board_verdict_lap.py --empty: board_verdict called as the orchestrator calls it, in a child process with MXFS_OWN_RIG dropped and its inputs from the environment, with MXFS_BOARD_VERDICT_OWN_RIG=0 so no row of the DRBD board applies (the state the dry run found); EXPOSED when no row applies, PASS when the verdict names that nothing was graded, FAIL when it is empty (host only, about 2 s)",
+      "batches": [
+        {
+          "id": "b20261023-2bafbd",
+          "kind": "control",
+          "row": "lap:release_board_verdict_empty",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "MXFS_BOARD_VERDICT_EMPTY=0 (tools/release_run.py reads a verdict that graded no row as clean, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a board verdict that graded no row reads as a clean board"
+        },
+        {
+          "id": "b20261023-3fc798",
+          "kind": "verify",
+          "row": "lap:release_board_verdict_empty",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:release_board_verdict_empty",
+            "config": "2/net/mesh/drbd",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-2bafbd",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_BOARD_VERDICT_EMPTY=0 (tools/release_run.py reads a verdict that graded no row as clean, as before the fix)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "updated": "2026-10-23",
+      "rates": [
+        {
+          "row": "lap:release_board_verdict_empty",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-2bafbd",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_BOARD_VERDICT_EMPTY=0 (tools/release_run.py reads a verdict that graded no row as clean, as before the fix)",
+          "builds": [
+            "C54C14B681D148267D084FC"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict_empty",
+          "iso": "2026-10-23T18:52:59Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict_empty",
+          "iso": "2026-10-23T18:52:58Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict_empty",
+          "iso": "2026-10-23T18:52:57Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict_empty",
+          "iso": "2026-10-23T18:52:56Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict_empty",
+          "iso": "2026-10-23T18:52:55Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict_empty",
+          "iso": "2026-10-23T18:52:54Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict_empty",
+          "iso": "2026-10-23T18:52:53Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict_empty",
+          "iso": "2026-10-23T18:52:52Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict_empty",
+          "iso": "2026-10-23T18:52:51Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict_empty",
+          "iso": "2026-10-23T18:52:50Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-3fc798",
+          "approval": "P20261023-2c9e6b",
+          "date": "2026-10-23"
+        }
+      ]
     },
     {
       "id": "D-RELEASE-STEP-ANNOTATION-LOOKS-THE-STEP-ROW-UP-AS-A-BOARD-CRITERION",
@@ -5903,7 +6593,129 @@
       "summary": "tools/criteria.py annotated_run, which infra, amend, unamend and unretire call first, looked every row up as a board criterion (find) and passed every configuration to parse_at, but a release step's row (release:<step>) exists only in the run ledger: infra-proven and detector-defect annotations of a failed step's run, and the take-back of its retirement, were refused 'nothing matches', so no reviewed disposition could settle a failed release step.",
       "evidence": "Read 2026-10-21 (D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED's evidence, part 3): cmd_amend, cmd_infra and withdraw start with find(data, args.id). Measured 2026-10-23 on the host with tests/release_step_cell_lap.py and only MXFS_RELEASE_STEP_ANNOTATE=0 (annotated_run's release-step branch off, the other parts on): FAIL 12 of 12, criteria.py infra and amend refused \"criteria: nothing matches 'release:boards'\" (release:platforms, release:drbd) on all three keys, and the take-back of each removal, criteria.py unretire, refused the same (tests/evidence/release_step_switches_20261023T171448Z/lap_MXFS_RELEASE_STEP_ANNOTATE.log); all on, PASS 12 of 12 (tests/evidence/release_step_switches_20261023T171448Z/lap_on.log). The fix: annotated_run returns a release step's row as it is and takes the placeholder 1/any (tools/criteria.py annotated_run, behind MXFS_RELEASE_STEP_ANNOTATE).",
       "next": "On the next attempt: control batch of tests/release_step_cell_lap.py with MXFS_RELEASE_STEP_ANNOTATE=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 40 s, probe '^EXPOSED: the gate lists', pass '^STEP_CELL_LAP PASS'), the verification batch sized from it, then remove --fixed.",
-      "reproducer": "tests/release_step_cell_lap.py (about 20 s, host only, scratch trees); MXFS_RELEASE_STEP_ANNOTATE=0 is the control"
+      "reproducer": "tests/release_step_cell_lap.py (about 20 s, host only, scratch trees); MXFS_RELEASE_STEP_ANNOTATE=0 is the control",
+      "batches": [
+        {
+          "id": "b20261023-9fdb1d",
+          "kind": "control",
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the gate lists",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "MXFS_RELEASE_STEP_ANNOTATE=0 (tools/criteria.py looks a release step's row up as a board criterion, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix's annotation lookup taken out: infra, amend and every take-back of a release step's run refused"
+        },
+        {
+          "id": "b20261023-67d3e5",
+          "kind": "verify",
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: the gate lists",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:release_step_cell",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-9fdb1d",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_RELEASE_STEP_ANNOTATE=0 (tools/criteria.py looks a release step's row up as a board criterion, as before the fix)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "updated": "2026-10-23",
+      "rates": [
+        {
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-9fdb1d",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_RELEASE_STEP_ANNOTATE=0 (tools/criteria.py looks a release step's row up as a board criterion, as before the fix)",
+          "builds": [
+            "C54C14B681D148267D084FC"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:39:33Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:39:18Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:39:02Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:38:46Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:38:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:38:15Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:38:00Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:37:44Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:37:28Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:37:13Z"
+        }
+      ]
     },
     {
       "id": "D-RELEASE-STEP-COMMAND-NAMING-AN-OWN-RIG-KEY-READS-THE-RIG-BOARD",
@@ -5914,7 +6726,141 @@
       "summary": "tools/criteria.py switched to an own-rig board (the DRBD board for 2/net/mesh/drbd) whenever its arguments named that configuration, but tools/release_run.py writes every release step's run into the primary board's ledger: infra and amend of the drbd step's run, and the take-back of its retirement, were refused 'records no run stamped', so a failed drbd step could not be settled.",
       "evidence": "Measured 2026-10-23 on the tree before the fix (D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED's evidence): infra and amend of 2/net/mesh/drbd:release:drbd:2026-10-22T00:35:43Z refused 'criteria: release:drbd [2/net/mesh/drbd] records no run stamped 2026-10-22T00:35:43Z'. Measured again 2026-10-23 with tests/release_step_cell_lap.py and only MXFS_RELEASE_STEP_BOARD=0 (the board choice at tools/criteria.py import off, the other parts on): FAIL 4 of 12, exactly the drbd key's infra and amend refused by criteria.py with that message and the take-back (criteria.py unretire) of its removal and of its named removal refused the same, while the 1/any and 2/net/mesh/direct keys settled (tests/evidence/release_step_switches_20261023T171448Z/lap_MXFS_RELEASE_STEP_BOARD.log); all on, PASS 12 of 12 (tests/evidence/release_step_switches_20261023T171448Z/lap_on.log). The fix: a command whose arguments name a release step's row keeps the primary board (tools/criteria.py, the board choice at import, behind MXFS_RELEASE_STEP_BOARD).",
       "next": "On the next attempt: control batch of tests/release_step_cell_lap.py with MXFS_RELEASE_STEP_BOARD=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 40 s, probe '^EXPOSED: the gate lists', pass '^STEP_CELL_LAP PASS'), the verification batch sized from it, then remove --fixed.",
-      "reproducer": "tests/release_step_cell_lap.py (about 20 s, host only, scratch trees); MXFS_RELEASE_STEP_BOARD=0 is the control"
+      "reproducer": "tests/release_step_cell_lap.py (about 20 s, host only, scratch trees); MXFS_RELEASE_STEP_BOARD=0 is the control",
+      "batches": [
+        {
+          "id": "b20261023-c4c308",
+          "kind": "control",
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the gate lists",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "MXFS_RELEASE_STEP_BOARD=0 (tools/criteria.py gives a command naming the drbd key the DRBD board, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix's board choice taken out: a command naming the drbd release step's key reads the DRBD board and finds no run"
+        },
+        {
+          "id": "b20261023-2bbcff",
+          "kind": "verify",
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: the gate lists",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:release_step_cell",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-c4c308",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_RELEASE_STEP_BOARD=0 (tools/criteria.py gives a command naming the drbd key the DRBD board, as before the fix)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "updated": "2026-10-23",
+      "rates": [
+        {
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-c4c308",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_RELEASE_STEP_BOARD=0 (tools/criteria.py gives a command naming the drbd key the DRBD board, as before the fix)",
+          "builds": [
+            "C54C14B681D148267D084FC"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:44:57Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:44:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:44:18Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:43:58Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:43:38Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:43:18Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:42:59Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:42:39Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:42:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:41:59Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-2bbcff",
+          "approval": "P20261023-136a61",
+          "date": "2026-10-23"
+        }
+      ]
     },
     {
       "id": "D-RELEASE-STEP-RUN-LOOKUP-AND-RETIREMENT-ROUTED-TO-THE-RIG-BOARD",
@@ -5925,7 +6871,141 @@
       "summary": "tools/defects.py looked a named run up (check_cells, behind propose --target and update --cell) and retired it (retire_cells, behind every removal) on its configuration's board (board_for), but tools/release_run.py writes every release step's run into the primary board's ledger: the drbd step's run, filed under 2/net/mesh/drbd, could not be named ('records no run stamped'), and the removal of a record that named it retired it in the DRBD ledger, where it is not, leaving it listed.",
       "evidence": "Measured 2026-10-23 on the tree before the fix: the removal left the run listed (D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED's evidence); check_cells' part came from D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD (data/reviews/P20261022-dcd1a8.md, requirement 4). Measured again 2026-10-23 with tests/release_step_cell_lap.py and only MXFS_RELEASE_STEP_ROUTE=0 (criteria.run_board's release-step branch off, the other parts on): FAIL 4 of 12, the drbd key's propose --target (infra, amend) and update --cell refused 'defects: release:drbd at 2/net/mesh/drbd records no run stamped 2026-10-22T00:35:43Z', and its named removal left the run listed ('the gate still lists it after the disposition'), while the other two keys settled (tests/evidence/release_step_switches_20261023T171448Z/lap_MXFS_RELEASE_STEP_ROUTE.log); all on, PASS 12 of 12 (tests/evidence/release_step_switches_20261023T171448Z/lap_on.log). The fix: criteria.run_board gives a release step's run the primary board (behind MXFS_RELEASE_STEP_ROUTE), and check_cells, drop_cells, unsettled and retire_cells all take the board from it; the lap exercises check_cells and retire_cells, not drop_cells or unsettled.",
       "next": "On the next attempt: control batch of tests/release_step_cell_lap.py with MXFS_RELEASE_STEP_ROUTE=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 40 s, probe '^EXPOSED: the gate lists', pass '^STEP_CELL_LAP PASS'), the verification batch sized from it, then remove --fixed.",
-      "reproducer": "tests/release_step_cell_lap.py (about 20 s, host only, scratch trees); MXFS_RELEASE_STEP_ROUTE=0 is the control"
+      "reproducer": "tests/release_step_cell_lap.py (about 20 s, host only, scratch trees); MXFS_RELEASE_STEP_ROUTE=0 is the control",
+      "batches": [
+        {
+          "id": "b20261023-356bc4",
+          "kind": "control",
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the gate lists",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "MXFS_RELEASE_STEP_ROUTE=0 (tools/defects.py looks a named run up and retires it on its configuration's board, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix's routing taken out: the drbd release step's run is looked up and retired on the DRBD board, where it is not"
+        },
+        {
+          "id": "b20261023-08d2f4",
+          "kind": "verify",
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: the gate lists",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:release_step_cell",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-356bc4",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_RELEASE_STEP_ROUTE=0 (tools/defects.py looks a named run up and retires it on its configuration's board, as before the fix)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "updated": "2026-10-23",
+      "rates": [
+        {
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-356bc4",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_RELEASE_STEP_ROUTE=0 (tools/defects.py looks a named run up and retires it on its configuration's board, as before the fix)",
+          "builds": [
+            "C54C14B681D148267D084FC"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:50:13Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:49:55Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:49:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:49:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:49:01Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:48:43Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:48:25Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:48:07Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:47:49Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:47:31Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-08d2f4",
+          "approval": "P20261023-171e79",
+          "date": "2026-10-23"
+        }
+      ]
     },
     {
       "id": "D-RUN-SH-TIMEOUT-CENSUS-READS-AN-EARLIER-ROWS-PHASE-MARKER-FROM-THE-BOOTS-RING",
@@ -5937,7 +7017,128 @@
       "evidence": "Measured 2026-10-23 in the precheck lane tests/evidence/lanes/g2_awcensus_precheck_20261023T172736Z (g2 test1/test2 at 2/disk/caw/direct, build 08D63764A9352FBDD5A76CD): tests/alloc_witness_census_lap.sh ran the alloc_witness row out to its 120 s budget twice on one boot, first with ccph() in, then with ccph() and its calls removed by tests/evidence/controls/D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE.fix.diff. Both runs recorded last_phase_census[fill=1,start=1] (step4.log:5 run 20261023T172850Z-g2, :13 run 20261023T173118Z-g2): the second row's ranks wrote no marker, and the census read the first row's. control_precheck: 'CONTROL_PRECHECK NO the lap gave rc=0 with the fix in and rc=0 with it out' (:18). ===== 2026-10-23: fixed in the tree: mark_row_start writes 'mxfs-rowmark <run id>-<ns>' into each node's kernel log and the census reads only the CCph lines after it ('nomark' when the ring no longer holds the mark); MXFS_CENSUS_SINCE_ROW=0 reads the whole ring as before. Precheck both ways, lane tests/evidence/lanes/g2_census_scope_precheck_20261023T181453Z (g2 test1/test2, 2/disk/caw/direct, module C54C14B681D148267D084FC): step 3 with the fix 'LAP census_scope PASS ... [none=2]' (run 20261023T181605Z-g2); step 4 with MXFS_CENSUS_SINCE_ROW=0 'LAP census_scope FAIL: 2 of 2 nodes credited with the earlier row's marker ... [earlierrow=2]' (run 20261023T181832Z-g2).",
       "next": "On the next attempt: control batch of tests/census_scope_lap.sh with MXFS_CENSUS_SINCE_ROW=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 180 s, probe '^EXPOSED: the row ran out its budget', pass '^LAP census_scope PASS', fail '^LAP census_scope FAIL'), the verification batch sized from it, then remove --fixed.",
       "reproducer": "tests/census_scope_lap.sh <label> <configuration> on a formed pair (about 2.5 min): writes 'mxfs-CCph rank=0 PHASE=earlierrow' into each node's kernel log, then runs the alloc_witness row through run.sh on a scratch board with its own markers off (AW_PHASE_MARKS=0), AW_ABORT_RANK=2 and AW_ABORT_BROADCAST=0, so the row runs out its 120 s budget and run.sh takes its census; PASS when every node's entry is 'none', FAIL when one is 'earlierrow'. Control: MXFS_CENSUS_SINCE_ROW=0 in the lap's environment (run.sh reads the whole ring, as before).",
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "batches": [
+        {
+          "id": "b20261023-282bfc",
+          "kind": "control",
+          "row": "lap:census_scope",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the row ran out its budget",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "MXFS_CENSUS_SINCE_ROW=0 (run.sh's timeout census reads each node's newest phase marker in the whole kernel ring, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a row whose ranks wrote no marker is credited with an earlier row's phase"
+        },
+        {
+          "id": "b20261023-701dee",
+          "kind": "verify",
+          "row": "lap:census_scope",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: the row ran out its budget",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:census_scope",
+            "config": "2/disk/caw/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-282bfc",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_CENSUS_SINCE_ROW=0 (run.sh's timeout census reads each node's newest phase marker in the whole kernel ring, as before the fix)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:census_scope",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-282bfc",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_CENSUS_SINCE_ROW=0 (run.sh's timeout census reads each node's newest phase marker in the whole kernel ring, as before the fix)",
+          "builds": [
+            "C54C14B681D148267D084FC"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:census_scope",
+          "iso": "2026-10-23T18:58:34Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:census_scope",
+          "iso": "2026-10-23T18:56:06Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:census_scope",
+          "iso": "2026-10-23T18:53:38Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:census_scope",
+          "iso": "2026-10-23T18:51:10Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:census_scope",
+          "iso": "2026-10-23T18:48:42Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:census_scope",
+          "iso": "2026-10-23T18:46:14Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:census_scope",
+          "iso": "2026-10-23T18:43:46Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:census_scope",
+          "iso": "2026-10-23T18:41:18Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:census_scope",
+          "iso": "2026-10-23T18:38:50Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:census_scope",
+          "iso": "2026-10-23T18:36:21Z"
+        }
+      ]
     },
     {
       "id": "D-4CAWMPATH-PATH-ALL-LOST-A-CHURN-FILE-NO-LONGER-NAMED-ITS-CREATED-INODE",
@@ -5954,11 +7155,159 @@
           "config": "4/disk/caw/mpath",
           "row": "path_all_lost",
           "iso": "2026-10-23T16:32:35Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T18:47:10Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T18:46:09Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T18:45:06Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T18:44:06Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T18:43:04Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T18:42:04Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T18:41:06Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T18:40:06Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T18:39:07Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T18:38:07Z"
         }
       ],
       "updated": "2026-10-23",
       "impact": "integrity",
-      "impact_why": "a survivor's own acknowledged directory entry (test3.756.r) is gone from the shared directory after the victim's rejoin mount; the leading cause is a recovery write that reverted the directory's inode-cluster slot"
+      "impact_why": "a survivor's own acknowledged directory entry (test3.756.r) is gone from the shared directory after the victim's rejoin mount; the leading cause is a recovery write that reverted the directory's inode-cluster slot",
+      "batches": [
+        {
+          "id": "b20261023-346edb",
+          "kind": "control",
+          "row": "lap:recov_iwr",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "iwr_ra_partial=0 (set on both nodes by the lap's arm 0: a recovery write of an inode cluster that still carries the readahead ops goes out whole on a 512-byte-sector volume, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix switched off: the rejoin's recovery writes the whole cluster of the directory it skipped, over the survivor's newer image"
+        },
+        {
+          "id": "b20261023-024fe9",
+          "kind": "verify",
+          "row": "lap:recov_iwr",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:recov_iwr",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-346edb",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "iwr_ra_partial=0 (set on both nodes by the lap's arm 0: a recovery write of an inode cluster that still carries the readahead ops goes out whole on a 512-byte-sector volume, as before the fix)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-a06f82",
+          "kind": "control",
+          "row": "lap:recov_iwr",
+          "config": "4/disk/caw/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "iwr_ra_partial=0 (set on both nodes by the lap's arm 0: a recovery write of an inode cluster that still carries the readahead ops goes out whole on a 512-byte-sector volume, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix switched off: the rejoin's recovery writes the whole cluster of the directory it skipped, over the survivor's newer image"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:recov_iwr",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-346edb",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "iwr_ra_partial=0 (set on both nodes by the lap's arm 0: a recovery write of an inode cluster that still carries the readahead ops goes out whole on a 512-byte-sector volume, as before the fix)",
+          "builds": [
+            "C54C14B681D148267D084FC"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-024fe9",
+          "approval": "P20261023-7d22e1",
+          "date": "2026-10-23"
+        }
+      ]
     },
     {
       "id": "D-MPATH-MOUNT-DEGRADED-12S-WINDOW-REGISTRATION-MISSING-AND-SHUTDOWNS",
@@ -5967,8 +7316,8 @@
       "config": "*/*/*",
       "opened": "2026-10-23",
       "summary": "On path_mount_degraded at 2/disk/caw/mpath and 4/disk/caw/mpath with a 12 s death window, the path that was down at mount came back carrying one registration fewer than every node's (3 of 4, 7 of 8), the node mounted on one path stalled 41.6 s and 33.5 s late in the window and its load completed no writes in the window's second half, over 1.4 million of its operations returned errors, and every node logged a shutdown, withdrawal, death declaration, BUG, oops or hung task, in a row that kills no node.",
-      "evidence": "Runs 2/disk/caw/mpath:path_mount_degraded:2026-10-23T16:57:29Z (FAIL, 182 s; victim=test18 mount_one_path_ms=5655 late_stall_ms=41626 reinstate_a_s=18 reinstate_b_s=20 acked=4778 fails=8; lane tests/evidence/lanes/g2e_mpathtmo2_k6_20261023T162033Z) and 4/disk/caw/mpath:path_mount_degraded:2026-10-23T16:58:04Z (FAIL, 172 s; victim=test6 mount_one_path_ms=7025 late_stall_ms=33453 reinstate_a_s=16 reinstate_b_s=5 acked=3361 fails=9; lane tests/evidence/lanes/g4_mpathtmo2_k6_20261023T162032Z), each a variant run (MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, MXFS_MPATH_TMO=2, MXFS_TEST_ENV=PF_KEEP_KMSG=1: a 12 s death window and the 2 s path timescale under evaluation for D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S), build 08D63764A9352FBDD5A76CD. Failed checks, from the runs' reasons: 'the path that was down at mount carries the victim's registration once it is back (4 registrations) (got 3)' and '(8 registrations) (got 7)'; 'late: <victim>'s path left standing (a) completed writes in the second half of the window (got no)'; 'no operation on <victim> returned an error (got 1437449)' and '(got 1462506)'; '<node> logged no shutdown, withdrawal, death declaration, BUG, oops or hung task (got 1)' on every node. ===== 2026-10-23 evidence read (board_20261023T165407Z-g2e_path_mount_degraded, board_20261023T165456Z-g4_path_mount_degraded): each victim (test18, test6) logged P290-AUTH-CLOSED reason=AUTHORITY_LEASE_EXPIRED (overdue_ms 4072, 4111), P131-SELF-FENCE [AUTHORITY_LEASE_EXPIRED] and P-WITHDRAW: its heartbeat did not land within the 8 s authority lease the 12 s window gives while its path was down. On the 4-node run test6 first logged 'DLM inode lock unrecoverable: ino=2114031 mode=3 rc=-95' and 'Corruption of in-memory data (0x8) detected at mxfs_ilock_acquire_from_dlm+0x698 (xfs/xfs_mxfs_ilock.c:2517). Shutting down filesystem.' (kmsg_test6_fromnode.gz:159031, :159034). On the 2-node run test18 logged 'disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)' twice while mounting (kmsg_test18_fromnode.gz:119302, :182393). Survivors declared the victim dead after its fence was certified (P163-FENCED-SEEN, P309). Hit lists: /tmp/claude-1000/-home-steve-src-mxfs/b943d379-d576-4e63-a466-c398808883d0/scratchpad/hits/.",
-      "next": "Read each node's kernel log in the two runs' evidence (kmsg_*_fromnode.gz): which node declared which dead and when, against the 12 s window and the 2 s path timescale; whether the missing registration is the victim's own on the returning path, and whether a fence preempted it. Then the same row at the default death window, to tell a defect of the 12 s window from one the variant only exposes.",
+      "evidence": "Runs 2/disk/caw/mpath:path_mount_degraded:2026-10-23T16:57:29Z (FAIL, 182 s; victim=test18 mount_one_path_ms=5655 late_stall_ms=41626 reinstate_a_s=18 reinstate_b_s=20 acked=4778 fails=8; lane tests/evidence/lanes/g2e_mpathtmo2_k6_20261023T162033Z) and 4/disk/caw/mpath:path_mount_degraded:2026-10-23T16:58:04Z (FAIL, 172 s; victim=test6 mount_one_path_ms=7025 late_stall_ms=33453 reinstate_a_s=16 reinstate_b_s=5 acked=3361 fails=9; lane tests/evidence/lanes/g4_mpathtmo2_k6_20261023T162032Z), each a variant run (MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, MXFS_MPATH_TMO=2, MXFS_TEST_ENV=PF_KEEP_KMSG=1: a 12 s death window and the 2 s path timescale under evaluation for D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S), build 08D63764A9352FBDD5A76CD. Failed checks, from the runs' reasons: 'the path that was down at mount carries the victim's registration once it is back (4 registrations) (got 3)' and '(8 registrations) (got 7)'; 'late: <victim>'s path left standing (a) completed writes in the second half of the window (got no)'; 'no operation on <victim> returned an error (got 1437449)' and '(got 1462506)'; '<node> logged no shutdown, withdrawal, death declaration, BUG, oops or hung task (got 1)' on every node. ===== 2026-10-23 evidence read (board_20261023T165407Z-g2e_path_mount_degraded, board_20261023T165456Z-g4_path_mount_degraded): each victim (test18, test6) logged P290-AUTH-CLOSED reason=AUTHORITY_LEASE_EXPIRED (overdue_ms 4072, 4111), P131-SELF-FENCE [AUTHORITY_LEASE_EXPIRED] and P-WITHDRAW: its heartbeat did not land within the 8 s authority lease the 12 s window gives while its path was down. On the 4-node run test6 first logged 'DLM inode lock unrecoverable: ino=2114031 mode=3 rc=-95' and 'Corruption of in-memory data (0x8) detected at mxfs_ilock_acquire_from_dlm+0x698 (xfs/xfs_mxfs_ilock.c:2517). Shutting down filesystem.' (kmsg_test6_fromnode.gz:159031, :159034). On the 2-node run test18 logged 'disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)' twice while mounting (kmsg_test18_fromnode.gz:119302, :182393). Survivors declared the victim dead after its fence was certified (P163-FENCED-SEEN, P309). Hit lists: /tmp/claude-1000/-home-steve-src-mxfs/b943d379-d576-4e63-a466-c398808883d0/scratchpad/hits/. ===== 2026-10-23 (session 48), each victim's whole kernel log read in order (log sweep; raw lines): the victim never registered the path that was down at mount, and the first failure was a refused command on that path once the other path failed, not the lease. 2-node (board_20261023T165407Z-g2e_path_mount_degraded, kmsg_test18_fromnode.gz): mount on one path ':119291 P-PR-PATHS-REGISTERED dm-1 key=0xeca266f0265714ac paths=2 registered=1 unreachable=1'; the down path back ':180156 [1626.408397] device-mapper: multipath: 252:1: Reinstating path 8:16.'; no P-PR-PATH-FILLED line anywhere in the log; the other path fails (':181802 [1633.617608] Failing path 8:0'); then ':181895 [1634.053048] sd 4:0:0:0: reservation conflict', ':181899 P277-RESV-CONFLICT node 4081290446 count=1 -- data-path write bounced with SCSI RESERVATION CONFLICT', ':181905 P-WITHDRAW -- FS shut down', and only after it ':181939 P290-AUTH-SUSPENDED' and ':181953 P290-AUTH-CLOSED ... overdue_ms=4072'. 4-node (board_20261023T165456Z-g4_path_mount_degraded, kmsg_test6_fromnode.gz): ':123306 P-PR-PATHS-REGISTERED dm-1 key=0xcd70bb48224ede05 paths=2 registered=1 unreachable=1'; ':157549 [1724.201807] Reinstating path 8:0.'; no P-PR-PATH-FILLED; ':158831 [1731.823344] Failing path 8:16.'; ':158886 [1731.965277] sd 3:0:0:0: reservation conflict'; the CAW lock I/O on that path ':158982-158986 caw_slot 15936 I/O error -95, retry 1/5..5/5', ':159019 P-CAW-REGISTER-HARD-EXIT ... rc=-95', ':159031 DLM inode lock unrecoverable: ino=2114031 mode=3 rc=-95 ... shutting down filesystem', ':159034 Corruption of in-memory data (0x8) detected at mxfs_ilock_acquire_from_dlm+0x698 (xfs/xfs_mxfs_ilock.c:2517)' (the shutdown's reason code for that lock failure, at 1733.45 s), then ':158968 P290-AUTH-SUSPENDED' (1732.73) and ':159928 P290-AUTH-CLOSED' (1736.82). THE CODE: the only registration after a mount is v5_pr_fill_tick (dlm/v5_mount.c:10944-10959), every 500 ms, and it returns without filling while mxfs_authority_remaining_ms < V5_PR_FILL_MIN_LEASE_MS 15000 (:10941, :10949). The 12 s window gives an 8 s lease ('authority lease 8000 ms, death window 12000 ms', kmsg_test18:119306), so the remaining lease is never 15 s and no late path is ever registered. MEASURED SPLIT, every path_mount_degraded row with kept kernel logs (sum of P-PR-PATH-FILLED over every node's kmsg_*_fromnode.gz, the window from the 'death window' line, the row's registration check): 12000 ms windows board_20261023T172911Z-g4, T172810Z-g2e, T165456Z-g4, T165407Z-g2e: filled=0 and FAIL each; 34000 ms windows board_20261023T153609Z-g8, T150612Z-g8: filled=1 and PASS each. The 'corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)' lines (kmsg_test18:119302, :182393) are each followed by 'lockstate validation returned -5 (may be freshly initialized)' at the disklock's own init and are not yet explained.",
+      "next": "The fill's admission is redesigned, not retuned: docs/rulings/silent-peer-death-under-the-stall-limit.md 'Registering a late path under a short lease' (gpt-6-astra, 2026-10-23) says no remaining-lease threshold is sound without a bound B on when a timed-out REGISTER can no longer execute at the target, and that a timed-out REGISTER must quarantine its late nexus. Next: (1) measure on the rig the pieces of B (a REGISTER's admission-to-dispatch delay, when the 5 s timeout fires, how SCST answers ABORT TASK for a queued/running PR OUT, re-login retries) at 2/disk/caw/mpath with a path held unanswering; (2) implement admission R + 4 s > B + d with B enforced (a short T and a confirmed abort, the late nexus quarantined on any unresolved REGISTER), with the 15 s constant as the switch's control; (3) a lap at 2/disk/caw/mpath with dead_timeout_ms=12000: mount on one path, bring it back, require P-PR-PATH-FILLED and the key on both paths in a bounded time. The 'corrupt lock record at slot 0' lines are D-DISKLOCK-VALIDATE-READS-CAW-SLOT-0-AND-LOGS-A-CORRUPT-LOCK-RECORD (validate_lockstate reading CAW slot 0).",
       "reproducer": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 MXFS_MPATH_TMO=2 MXFS_TEST_ENV=PF_KEEP_KMSG=1 ./run.sh <2|4>/disk/caw/mpath --group <g2e|g4> path_mount_degraded after a forced prep (seen once at each)",
       "cells": [
         {
@@ -5991,8 +7340,8 @@
       "config": "*/*/*",
       "opened": "2026-10-23",
       "summary": "On 2/net/mesh/mpath path_flap with a 12 s death window, test18's load stalled 81.7 s during the flaps and 120.3 s after them, 5.5 million of its operations returned errors, test18 could not read every file test17 had acknowledged with its checksum, both nodes logged a shutdown, withdrawal, death declaration, BUG, oops or hung task, and test17 saw the membership fall below 2, in a row that kills no node.",
-      "evidence": "Run 2/net/mesh/mpath:path_flap:2026-10-23T17:22:40Z (FAIL, 169 s), a variant run (MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, MXFS_MPATH_TMO=2, MXFS_TEST_ENV=PF_KEEP_KMSG=1: a 12 s death window and the 2 s path timescale under evaluation for D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S), build 08D63764A9352FBDD5A76CD, lane tests/evidence/lanes/g2e_mpathtmo2_k6_20261023T162033Z. Measured 'victim=test18 flaps=10 flap_s=4 stall_ms=81690 settle_s=0 acked=29984 elapsed=166s fails=12 max_stall_ms=120272'. Failed checks, from the run's reason: 'F4: test18's longest stall, ms (got 81690)'; 'F4_after: test18's longest stall, ms (got 120272)'; 'test18: no operation returned an error in the whole run (got 5503784)'; 'test17 acknowledged files (> 0) and test18 reads every one with its checksum (got no)'; 'test17 logged no shutdown, withdrawal, death declaration, BUG, oops or hung task (got 1)'; 'test17 saw no membership below 2 (got 1)'. ===== 2026-10-23 evidence read (board_20261023T171936Z-g2e_path_flap): all 29390 of test17's files read on test18 failed 'read_error=EIO' (verify_test17_on_test18.txt:1-201), read after test18's own shutdown, so they are the shut-down node's errors, not data the files lost; test18's 594 files read on test17 all matched. test18 logged P-WITHDRAW at [993.6], P290-AUTH-CLOSED reason=AUTHORITY_LEASE_EXPIRED overdue_ms=4104 at [1005.6] and P131-SELF-FENCE [PR_KEY_PREEMPTED] at [1015.8] (kmsg_test18_fromnode.gz:168770, :171886, :172946); test17 saw the withdrawal (P163-WITHDRAW-SEEN) and recovered test18's slice. The row also failed 'the target holds the same reservation keys at the end as at the start (got differ(2))'. Hit lists: /tmp/claude-1000/-home-steve-src-mxfs/b943d379-d576-4e63-a466-c398808883d0/scratchpad/hits/.",
-      "next": "Read both nodes' kernel logs in the run's evidence (kmsg_*_fromnode.gz): whether test17 declared test18 dead during a 4 s flap on its own 12 s window, what each node shut down on, and which acknowledged files test18 could not read with their checksum and why (an error, or different data). Until that is read the unread files are a possible loss of acknowledged data and are treated as one. Then the same row at the default death window.",
+      "evidence": "Run 2/net/mesh/mpath:path_flap:2026-10-23T17:22:40Z (FAIL, 169 s), a variant run (MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, MXFS_MPATH_TMO=2, MXFS_TEST_ENV=PF_KEEP_KMSG=1: a 12 s death window and the 2 s path timescale under evaluation for D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S), build 08D63764A9352FBDD5A76CD, lane tests/evidence/lanes/g2e_mpathtmo2_k6_20261023T162033Z. Measured 'victim=test18 flaps=10 flap_s=4 stall_ms=81690 settle_s=0 acked=29984 elapsed=166s fails=12 max_stall_ms=120272'. Failed checks, from the run's reason: 'F4: test18's longest stall, ms (got 81690)'; 'F4_after: test18's longest stall, ms (got 120272)'; 'test18: no operation returned an error in the whole run (got 5503784)'; 'test17 acknowledged files (> 0) and test18 reads every one with its checksum (got no)'; 'test17 logged no shutdown, withdrawal, death declaration, BUG, oops or hung task (got 1)'; 'test17 saw no membership below 2 (got 1)'. ===== 2026-10-23 evidence read (board_20261023T171936Z-g2e_path_flap): all 29390 of test17's files read on test18 failed 'read_error=EIO' (verify_test17_on_test18.txt:1-201), read after test18's own shutdown, so they are the shut-down node's errors, not data the files lost; test18's 594 files read on test17 all matched. test18 logged P-WITHDRAW at [993.6], P290-AUTH-CLOSED reason=AUTHORITY_LEASE_EXPIRED overdue_ms=4104 at [1005.6] and P131-SELF-FENCE [PR_KEY_PREEMPTED] at [1015.8] (kmsg_test18_fromnode.gz:168770, :171886, :172946); test17 saw the withdrawal (P163-WITHDRAW-SEEN) and recovered test18's slice. The row also failed 'the target holds the same reservation keys at the end as at the start (got differ(2))'. Hit lists: /tmp/claude-1000/-home-steve-src-mxfs/b943d379-d576-4e63-a466-c398808883d0/scratchpad/hits/. ===== 2026-10-23 (session 48), test18's whole kernel log read in order (log sweep; raw lines, board_20261023T171936Z-g2e_path_flap/kmsg_test18_fromnode.gz): both paths registered at mount (':120447 P-PR-PATHS-REGISTERED dm-1 key=0x4ef62bfe92211b9e paths=2 registered=2'); the row's mark ':120861 [967.219600]' (17:20:01.5Z by the nearest realns line); path a flaps from 17:20:22.9Z (links.log). At the first flap's return the iSCSI connection of sd 4:0:0:0 was dropped and logged in again inside the 2 s session recovery timeout (no 'session recovery timed out' and no 'Failing path' before it): ':168753 [993.604095] connection2:0: detected conn error (1022)', ':168756 [993.612189] sd 4:0:0:0: Power-on or device reset occurred', ':168757 sd 4:0:0:0: reservation conflict', ':168760 reservation conflict error, dev dm-1, sector 21432631 op 0x1:(WRITE)', ':168761 P277-RESV-CONFLICT node 3636049448 count=1 -- data-path write bounced with SCSI RESERVATION CONFLICT', ':168770 P-WITHDRAW -- FS shut down', 8 ms after the re-login. Only after it ':170848 P290-AUTH-SUSPENDED' (1001.5), ':171886 P290-AUTH-CLOSED ... overdue_ms=4104' (1005.6), and test17's preempt ':172943 P-PR-OWNKEY-GONE' (1015.8). test17 declared nothing on its own window: ':160673 P163-WITHDRAW-SEEN slot=1 node=3636049448 -- peer declared voluntary death (FS shutdown)'. So the 12 s window is not what shut test18 down: a write the session re-sent on the re-logged-in nexus was refused, and one refused data write shuts the filesystem down. pal/linux/kern.c:5967-5970 already records that 'a reinstated iSCSI session can be unregistered on SCST for tens of milliseconds, and a log write refused then shuts the filesystem down'. With the 5 s path settings a 4 s flap is not detected as a connection loss at all (NOP-Out 5 s plus 5 s answer), which is why the default rows never re-logged in. ===== Code read 2026-10-23 (session 48): even where the late-path fill runs (lease >= V5_PR_FILL_MIN_LEASE_MS, dlm/v5_mount.c:10941-10949), it never re-checks a path it already counts as registered: mxfs_pal_scsi_pr_fill_paths (pal/linux/kern.c:7074-7083) marks every path in the map's known[] list 'known to hold the key' (t.r[i] = 0) and skips it (:7097), and the scsi_device of a path whose iSCSI session logged in again is the same object, so a registration the target dropped at the re-login is never restored by the fill. At a 12 s window the fill does not run at all (lease 8 s).",
+      "next": "Measure the gap: on a formed 2/net/mesh/mpath pair with MXFS_MPATH_TMO=2, drop one path's connection for ~4 s while a writer runs, with READ KEYS down that path in a loop from the node, timestamping when the re-logged-in nexus shows the key again against the first refused write (scsi logging or the P277 line). Then decide the fix at the cause: a reservation conflict on a nexus that just reported POWER ON/RESET (the re-login) is checked against READ KEYS before it counts as a fence, and the refused write is retried once the key is back, instead of shutting down on the first one. Control: the same drop with the check's switch off.",
       "reproducer": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 MXFS_MPATH_TMO=2 MXFS_TEST_ENV=PF_KEEP_KMSG=1 ./run.sh 2/net/mesh/mpath --group g2e path_flap after a forced prep (seen once)",
       "cells": [
         {
@@ -6002,6 +7351,43 @@
         }
       ],
       "updated": "2026-10-23"
+    },
+    {
+      "id": "D-RELEASE-STEP-CELL-LAP-COPIES-LIVE-DATA-DIR-AND-DIES-ON-A-VANISHED-TMP-FILE",
+      "severity": "minor",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "tests/release_step_cell_lap.py's scratch_tree copies the live tree's data/ with shutil.copytree while other processes write it; tools/defects.py replaces data/defects.json through data/defects.json.tmp and a rename, so a lap that lists the directory while that temp file exists and copies after the rename dies with shutil.Error (No such file or directory) and records no verdict",
+      "evidence": "Verification batch b20261023-67d3e5 (D-RELEASE-STEP-ANNOTATION-LOOKS-THE-STEP-ROW-UP-AS-A-BOARD-CRITERION, candidate 0.90.134 attempt 2026-10-23T18:32:24Z, lane tests/evidence/lanes/local_a12_tooling_20261023T183240Z step4.log:6): lap 4/6 'INCOMPLETE 2/net/mesh/direct:lap:release_step_cell:2026-10-23T18:40:54Z rc=1 elapsed_s=10 exposure=6 -- no verdict line'; its log tests/evidence/batch_laps/b20261023-67d3e5/20261023T184043Z-412940c2.log:23-37 'Traceback ... release_step_cell_lap.py, line 244, in main / tree = scratch_tree(base / f\"{number:02d}\") / line 98, in scratch_tree / shutil.copytree(ROOT / \"data\", base / \"data\", symlinks=True) ... shutil.Error: [(\\'/home/steve/src/mxfs/data/defects.json.tmp\\', ..., \"[Errno 2] No such file or directory: \\'/home/steve/src/mxfs/data/defects.json.tmp\\'\")]'. Six dispositions had settled before it (lines 7-22). The g2 and g2d rig lanes were writing data/defects.json through tools/harness_batch.py at the same time. The batch closed 5 PASS of 6 planned, so the record has no complete verification on this attempt.",
+      "next": "Copy data/ so a file that vanishes between the listing and the copy cannot end the lap (ignore the atomic writers' *.tmp files, which no lap reads), after the attempt's reviews are done (the lap is a frozen file); then a lap that writes data/defects.json in a loop while the lap copies, fix out and fix in, and the ANNOTATE record's verification again on the next attempt.",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T18:40:54Z"
+        }
+      ]
+    },
+    {
+      "id": "D-FSX-SH-EXIT-TRAP-REMOVES-FSX-OWN-FSXLOG-AND-FSXGOOD-WITH-THE-WORK-DIR",
+      "severity": "minor",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "tests/suite/fsx.sh runs fsx on a test file inside its work directory $W on the mxfs mount, where fsx writes its own .fsxlog (the operation log) and .fsxgood (the expected file image), and its EXIT trap removes $W however the row ends, so a real fsx miscompare leaves neither file for diagnosis; only fsx's stdout is kept (/root/fsx.<seed>.<ops>.log)",
+      "evidence": "Code, read 2026-10-23 (session 48): tests/suite/fsx.sh:19 'W=\"$MNT/.suite_fsx.$(hostname).$$\"', :22 \"trap 'rm -rf \\\"$W\\\" 2>/dev/null' EXIT\"; tests/suite/tools/fsx.c:204 'int fsxgoodfd', :239 'FILE * fsxlogf', :285-287 (prt also writes each line to fsxlogf), :635 and :662 (save_buffer writes the .fsxgood image). Found by the review of P20261023-0a53fb (data/reviews/P20261023-0a53fb.md) and noted again in data/reviews/P20261023-44869d.md: neither batch of D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED reached these files, because FSX_SEED=-1 makes fsx exit at its usage before creating them. Not yet measured: whether a miscompare's stdout already carries everything .fsxlog does, and what .fsxgood would add.",
+      "next": "Measure first: a lap that makes fsx miscompare for certain on a scratch file (a second writer changing the file under it), runs the fsx row's own code, and lists what survives the row on the node; then keep .fsxlog/.fsxgood/.fsxops of a failing check beside the kept stdout log, with a switch for the control."
+    },
+    {
+      "id": "D-DISKLOCK-VALIDATE-READS-CAW-SLOT-0-AND-LOGS-A-CORRUPT-LOCK-RECORD",
+      "severity": "minor",
+      "nodes": 1,
+      "config": "disk/caw/*",
+      "opened": "2026-10-23",
+      "summary": "dlm/disklock.c validate_lockstate reads the first lock record at base + MXFS_DISKLOCK_HB_SIZE, which on a COMPARE AND WRITE volume is CAW slot 0 (dlm/dlm_caw.c:16200 lock_region_offset = disklock_offset + MXFS_DISKLOCK_HB_SIZE), and when that slot is live (magic MXCW) and its bytes at the record's flags field read ACTIVE it logs 'disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)' at every such mount: a corruption message for a healthy slot",
+      "evidence": "Code: dlm/disklock.c:276-279 lock_slot_offset = base_offset + MXFS_DISKLOCK_HB_SIZE + slot*MXFS_DISKLOCK_RECORD_SIZE; :2644-2657 validate_lockstate's check of slot 0; dlm/dlm_caw.c:1300-1304 slot_offset = lock_region_offset + slot*MXFS_CAW_SLOT_SIZE; dlm/dlm_caw.h:33 MXFS_CAW_MAGIC 0x4D584357 'MXCW' live slot. Logs: board_20261023T165407Z-g2e_path_mount_degraded/kmsg_test18_fromnode.gz:119302 and :182393 'disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)', each followed by 'lockstate validation returned -5 (may be freshly initialized)' and the disklock's normal init (:119303-119306); 2/disk/caw/mpath, 512-byte volume. The mount went on. Not yet established: whether any caller acts on the -EIO beyond that log line.",
+      "next": "Read every caller of validate_lockstate for what the -EIO changes; then make the check skip the lock-record half when the volume's transport is COMPARE AND WRITE (the region holds CAW slots), with a switch for the control, and a lap that mounts with CAW slot 0 live and requires no 'corrupt lock record' line (switch off: the line)."
     }
   ]
 }

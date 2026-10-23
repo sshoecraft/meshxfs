@@ -222,6 +222,43 @@ inside the requirement and how to bound it.
   memory pressure and VM pauses, with every phase timestamped; and injecting backing writes delayed
   past the slice proof.
 
+## Registering a late path under a short lease
+
+A path that was down at mount, or whose session logged in again and lost its registration, is
+registered after the mount by the late-path fill (`v5_pr_fill_tick`, `mxfs_pal_scsi_pr_fill_paths`):
+READ KEYS down the late path, REGISTER on it, READ KEYS again, and keep the registration only if
+another nexus still holds the key. That check orders a REGISTER that completed before any fence. It
+does not cover a REGISTER that timed out: such a command can still execute at the target after a
+peer's PREEMPT AND ABORT, whose abort does not reach a nexus that held no registration, and register
+the fenced node again on that path. The fill guards that case by running only while 15 s of the
+authority lease remain. A 12 s window leaves an 8 s lease, so the fill never runs and no late path is
+ever registered.
+
+Put to gpt-6-astra (2026-10-23): no threshold on the remaining lease alone is sound. What has to be
+bounded is B, the real time from the fill's admission until its REGISTER has either completed or can
+no longer execute at the target (queueing, the command timeout T, and a confirmed cancellation, not
+merely an ABORT TASK sent). With a the age of the last landed beat's issue time on the local clock
+(a = L - R), the clock-rate error e and an allowance d, the fill may issue the REGISTER only when
+
+    a/(1-e) + B + d  <  (L + 4 s)/(1+e)
+
+which is R + 4 s > B + d with no clock error: the 4 s reserve between the lease and the death window
+may absorb completion, provided cancellation and recovery may still run while admission is
+suspended. If cancellation has no enforced upper bound, no finite threshold proves the absence of a
+registration after the fence, and the 15 s constant rests on the same unproven bound. A REGISTER
+that timed out puts its late nexus in quarantine: it is not counted or used, and a READ KEYS that
+finds it unregistered later is not enough, since the unresolved command could still execute after
+that read; only an established end of the original task releases it. Issuing the fill right after a
+beat lands maximizes R but does not bound B. Shortening T helps only by starting a bounded
+cancellation sooner. The witness in the third step must already have existed before the fill (fills
+serialized), since READ KEYS does not name nexuses.
+
+What must be measured before any value is trusted: admission-to-dispatch delay, when the timeout
+actually fires, how SCST cancels a queued or running PR OUT, transport recovery and re-login and any
+hidden retry, beat completion jitter, the clock error, and the latency of stopping admission; and the
+claimed earliest fence, pending fences included. Measured maxima validate an enforced bound; they do
+not establish one.
+
 ## Open
 
 - The read-stop acknowledgment protocol over the TCP mesh, and what CAW, which has no network between

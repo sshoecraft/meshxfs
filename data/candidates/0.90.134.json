@@ -1,8 +1,8 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-23T15:56:24Z",
-  "state": "ABANDONED",
+  "created": "2026-10-23T18:32:24Z",
+  "state": "RUNNING",
   "attempts": [
     {
       "created": "2026-10-21T21:26:41Z",
@@ -280,14 +280,36 @@
       "dist": "",
       "packages": {},
       "steps": {}
+    },
+    {
+      "created": "2026-10-23T15:56:24Z",
+      "state": "ABANDONED",
+      "dry_run": false,
+      "srcversion": "08D63764A9352FBDD5A76CD",
+      "files": "tests/evidence/candidates/0.90.134_20261023T155624Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-23T15:56:25Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-23T16:48:49Z",
+          "why": "attempt 2026-10-23T15:56:24Z retired for changes it cannot take: tools/batch_lap.py ends every descendant of a timed-out lap (a subreaper and its process tree, writers under GNU timeout and setsid included) and its stall lap runs batch_lap.py main(); a second switch for the release-step routing hunks and check_cells; tests/suite/fsx.sh's log-keeping fix and contract check 11b each controlled on their own; a path row's rejoin loads the lane's module arguments and run.sh re-preps a node whose loaded parameters differ; each node publishes its death window and a survivor waits out the longer of its own and the peer's; the default death window and path timescale from the 2- to 16-node measurements. Every verification that passed on it is applied."
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
-  "srcversion": "08D63764A9352FBDD5A76CD",
-  "module_sha256": "2d563ca5f424423d3c0c482e02e9280273ca87ea2da8a5c0a40e5f1406e7189c",
-  "files": "tests/evidence/candidates/0.90.134_20261023T155624Z.files.json",
-  "files_count": 2564,
-  "files_digest": "fa008d0a48b01209a3daf5fe1ccfbaf5b136d650b9ab2c1b9fd0eae6c6f4e488",
+  "srcversion": "C54C14B681D148267D084FC",
+  "module_sha256": "1e4ce3fc8e26c83b51b9743c9dac0fdaa1090306e992a02b8792a0c4ecba515d",
+  "files": "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+  "files_count": 2569,
+  "files_digest": "ba38cd177d065f973b767f7b24d38f398654114e314f03bc6eaca73e12886d00",
   "spec": "ec57ce06eb09c644b368cde523dfd4fa03e87d54b80a4bee31602c59f3ec175b",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
@@ -297,13 +319,8 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-23T15:56:25Z",
+      "at": "2026-10-23T18:32:25Z",
       "why": "created"
-    },
-    {
-      "state": "ABANDONED",
-      "at": "2026-10-23T16:48:49Z",
-      "why": "attempt 2026-10-23T15:56:24Z retired for changes it cannot take: tools/batch_lap.py ends every descendant of a timed-out lap (a subreaper and its process tree, writers under GNU timeout and setsid included) and its stall lap runs batch_lap.py main(); a second switch for the release-step routing hunks and check_cells; tests/suite/fsx.sh's log-keeping fix and contract check 11b each controlled on their own; a path row's rejoin loads the lane's module arguments and run.sh re-preps a node whose loaded parameters differ; each node publishes its death window and a survivor waits out the longer of its own and the peer's; the default death window and path timescale from the 2- to 16-node measurements. Every verification that passed on it is applied."
     }
   ]
 }
