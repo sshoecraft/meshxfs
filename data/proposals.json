@@ -4750,8 +4750,15 @@
         "data/defects.json",
         "data/release_policy.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-fb7625.md",
+        "sha256": "43ec9fc08c9277c09b1b976b630581209ba43d1eb77ed57be8374569028ecf60",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-730865",
@@ -4833,8 +4840,14 @@
         "CHANGELOG.md",
         "data/release_policy.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "approved",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-49c3f9.md",
+        "sha256": "33d2fd8aaecf5c95c0db7b46e826cd37741f1f7c7d987ad804a42b31f4546408",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      }
     }
   ]
 }
