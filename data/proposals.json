@@ -914,8 +914,15 @@
         "tests/evidence/controls/D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW.fix.diff",
         "tests/release_board_verdict_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-6c4776.md",
+        "sha256": "0a7c08755702bb2834ca7e3a656730659a6853d2f7a37ca3418ae234d17a6ff2",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-dcd1a8",
@@ -958,8 +965,15 @@
         "tests/evidence/controls/D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED.fix.diff",
         "tests/release_step_cell_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-d6567c.md",
+        "sha256": "9a4a8e5e2e32610b8f84717044897a6b13345b16ba7c525e9b765ddbddfc0bea",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-8da563",
@@ -981,8 +995,14 @@
         "tests/evidence/controls/D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED.fix.diff",
         "tests/release_step_cell_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "rejected",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-8da563.md",
+        "sha256": "fe5d7c08dfbd3edf3127cb8faf673e937b7a5f2909cf0981d864d6fb09e947b5",
+        "verdict": "rejected",
+        "date": "2026-10-22"
+      }
     },
     {
       "id": "P20261022-fa5891",
@@ -1001,8 +1021,14 @@
         "tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff",
         "tests/fsx_seed_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "rejected",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-fa5891.md",
+        "sha256": "987aa8554a4d86474f03b0ed0fd0206ac2dffea33882854126019256079f55e9",
+        "verdict": "rejected",
+        "date": "2026-10-22"
+      }
     },
     {
       "id": "P20261022-4f8043",
@@ -1044,8 +1070,15 @@
         "tests/evidence/controls/D-PRESTEPS-FORM-PAIR-UNDER-G2-MARKER.fix.diff",
         "tests/presteps_env_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-8d103a.md",
+        "sha256": "965aa5ccecc5499d9e300dc59abd1e8029eb2c1cb0fad413798a891beb01b777",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-a6f02f",
@@ -1088,8 +1121,15 @@
         "tests/evidence/controls/D-VERIFIED-AT-MATCHED-BY-VERSION-ALONE.fix.diff",
         "tests/verified_at_attempt_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-aac779.md",
+        "sha256": "d74f50d613f1244b0ab7e36c56fde5e17562dfb0aba81614a278f56bb420776a",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-7c82d2",
@@ -1111,8 +1151,14 @@
         "tests/evidence/controls/D-VERIFIED-AT-MATCHED-BY-VERSION-ALONE.fix.diff",
         "tests/verified_at_attempt_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "approved",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-7c82d2.md",
+        "sha256": "ebe82f00391ed88045b4a3711f020bbd08947574200e5a3e9490a8d990bf8c90",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      }
     },
     {
       "id": "P20261022-6eee93",
@@ -1132,8 +1178,15 @@
         "tests/evidence/controls/D-BATCH-LAP-LOG-NAMED-BY-THE-SECOND.fix.diff",
         "tests/batch_lap_log_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-6eee93.md",
+        "sha256": "6acf7915235384f360d5409e87be6738c8ee0ced9816c32fcc301c3ff1ee9ea1",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-21b593",
@@ -1155,8 +1208,15 @@
         "tests/evidence/controls/D-BATCH-LAP-LOG-NAMED-BY-THE-SECOND.fix.diff",
         "tests/batch_lap_log_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-21b593.md",
+        "sha256": "6e7a67c679a7f72e7c1b8dc51d4379e0994686c11cf5bcf7ba18f526e0afdec6",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-78f336",
@@ -1176,8 +1236,15 @@
         "tests/evidence/controls/D-TAUTH-LAPS-RELINK-FROZEN-TEST-BINARIES.fix.diff",
         "tests/tauth_freeze_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-78f336.md",
+        "sha256": "b919ee8d418541c2d181a42c87eb3d821db5e83ce917dee67b9c18983d61f146",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-2790bd",
@@ -1199,8 +1266,15 @@
         "tests/evidence/controls/D-TAUTH-LAPS-RELINK-FROZEN-TEST-BINARIES.fix.diff",
         "tests/tauth_freeze_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-2790bd.md",
+        "sha256": "2946d325ed1a895917b4802437f83a3739238e712d018aa43a4218f9148d1dbe",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-9ee296",
@@ -1219,8 +1293,15 @@
         "tests/evidence/controls/D-CHK-FREESPACE-REBUILD-DECLARES-OWNED-BLOCKS-FREE.fix.diff",
         "tests/chk_freespace_rebuild_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-9ee296.md",
+        "sha256": "172b89a8a89f5be689f73693defa8466c9654fa8c85c74f3cab81a72f8afac0f",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-1ac314",
@@ -1261,8 +1342,15 @@
         "tests/evidence/controls/D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E.fix.diff",
         "tests/rig_eui64_resolve_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-5b07e9.md",
+        "sha256": "b53ff235a4a93f61637da06a08d20d125c856ee6f9b602adaa260e61fd18e8b3",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-b8cf93",
@@ -1283,8 +1371,14 @@
         "tests/evidence/controls/D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E.fix.diff",
         "tests/rig_eui64_resolve_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "rejected",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-b8cf93.md",
+        "sha256": "8b965187d0c4862cbe2970c354388610b878d26ed3ebd002c917e76c21a70424",
+        "verdict": "rejected",
+        "date": "2026-10-22"
+      }
     },
     {
       "id": "P20261022-c0b24c",
@@ -1304,8 +1398,15 @@
         "tests/evidence/controls/D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK.fix.diff",
         "tests/rig_tag_dev_host_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-c0b24c.md",
+        "sha256": "7741845257f765635c28da1bf8286a54a0ec37ce0f2321bace9988ecaf699ab3",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-c565ec",
@@ -1326,6 +1427,391 @@
         "tests/evidence/controls/rigtag_control_20261022T195900Z.log",
         "tests/evidence/controls/D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK.fix.diff",
         "tests/rig_tag_dev_host_lap.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-cfe8ac",
+      "kind": "verify",
+      "record": "D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT-IS-NEVER-LOGGED-OUT-AT-SHUTDOWN",
+      "change": {
+        "batch": "b20261022-da3e51"
+      },
+      "argument": "Fix-on batch b20261022-da3e51 was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-3c656e --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 12 started 2026-10-23T04:03:54Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step12.log:1 is the batch's declaration and its first lap is 2026-10-23T04:04:40Z. Its size comes from control b20261022-3c656e: with the fix taken out (fix reverted: tests/evidence/controls/D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT.fix.diff sha256=928a9b80753b79430dec41c2be23d8a9c97281f59d9debdbe8ff89fdf7994fc4) 10 of 10 laps failed; the batch's lower bound 0.5887 at delta 0.005 gives N = 6 at alpha 0.005 (data/release_policy.json). All 6 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^LAP lunpool_shutdown exposed: ' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step12.log lists laps 1..6; their logs are in tests/evidence/batch_laps/b20261022-da3e51/ and their rows in data/criteria.runs.jsonl (row lap:lunpool_shutdown at 2/net/mesh/direct, batch b20261022-da3e51), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:04:40Z exposure=1; 2026-10-23T04:05:26Z exposure=1; 2026-10-23T04:06:11Z exposure=1; 2026-10-23T04:06:56Z exposure=1; 2026-10-23T04:07:41Z exposure=1; 2026-10-23T04:08:28Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T041628Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step12.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "tests/evidence/batch_laps/b20261022-da3e51",
+        "tests/evidence/batch_laps/b20261022-3c656e",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T041628Z.txt",
+        "tests/lun_pool_shutdown_lap.sh",
+        "tests/evidence/controls/D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT.fix.diff"
+      ],
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-cfe8ac.md",
+        "sha256": "c5f13435357f341ce9872b02baab0b2f338503baa4b3d05c0024bafd5d0f6349",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
+    },
+    {
+      "id": "P20261022-f1425f",
+      "kind": "remove-fixed",
+      "record": "D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT-IS-NEVER-LOGGED-OUT-AT-SHUTDOWN",
+      "change": {
+        "control": "b20261022-3c656e",
+        "fixon": "b20261022-da3e51",
+        "cause": "tools/lun_pool.sh binds a node by logging it in by hand (iscsiadm -o new, --login); on a node whose boot found no iSCSI node record open-iscsi.service is inactive, so nothing logs the pool session out before systemd stops the network at shutdown, and the node can hang past scripts/lab_power.sh's 90 s bound and be destroyed, as the 4K-native LUN's nodes did"
+      },
+      "argument": "FIXED AND VERIFIED. The cause: tools/lun_pool.sh binds a node by logging it in by hand (iscsiadm -o new, --login); on a node whose boot found no iSCSI node record open-iscsi.service is inactive, so nothing logs the pool session out before systemd stops the network at shutdown, and the node can hang past scripts/lab_power.sh's 90 s bound and be destroyed, as the 4K-native LUN's nodes did Reproducer: tests/lun_pool_shutdown_lap.sh test15 test16 clears the pair's iSCSI node records while it is up, boots it with none (so open-iscsi.service is inactive), binds a pool LUN with tools/lun_pool.sh and shuts the pair down with scripts/lab_power.sh, whose bound is 90 s; exposure is the lap's own line that the pair booted with no node record and was bound by hand ('LAP lunpool_shutdown exposed: '). With the bind starting open-iscsi.service both nodes are off in seconds; with it taken out both overrun the 90 s bound and are destroyed. Control b20261022-3c656e: with the fix taken out (fix reverted: tests/evidence/controls/D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT.fix.diff sha256=928a9b80753b79430dec41c2be23d8a9c97281f59d9debdbe8ff89fdf7994fc4) 10 of 10 laps failed (tests/evidence/batch_laps/b20261022-3c656e/), each failing on the cause itself, e.g. tests/evidence/batch_laps/b20261022-3c656e/20261022T233916Z.log: 'LAP lunpool_shutdown FAIL: 2 node(s) overran the shutdown bound and were destroyed'. Fix-on batch b20261022-da3e51 was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-3c656e --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 12 started 2026-10-23T04:03:54Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step12.log:1 is the batch's declaration and its first lap is 2026-10-23T04:04:40Z. Its size comes from control b20261022-3c656e: with the fix taken out (fix reverted: tests/evidence/controls/D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT.fix.diff sha256=928a9b80753b79430dec41c2be23d8a9c97281f59d9debdbe8ff89fdf7994fc4) 10 of 10 laps failed; the batch's lower bound 0.5887 at delta 0.005 gives N = 6 at alpha 0.005 (data/release_policy.json). All 6 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^LAP lunpool_shutdown exposed: ' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step12.log lists laps 1..6; their logs are in tests/evidence/batch_laps/b20261022-da3e51/ and their rows in data/criteria.runs.jsonl (row lap:lunpool_shutdown at 2/net/mesh/direct, batch b20261022-da3e51), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:04:40Z exposure=1; 2026-10-23T04:05:26Z exposure=1; 2026-10-23T04:06:11Z exposure=1; 2026-10-23T04:06:56Z exposure=1; 2026-10-23T04:07:41Z exposure=1; 2026-10-23T04:08:28Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T041628Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step12.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "tests/evidence/batch_laps/b20261022-da3e51",
+        "tests/evidence/batch_laps/b20261022-3c656e",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T041628Z.txt",
+        "tests/lun_pool_shutdown_lap.sh",
+        "tests/evidence/controls/D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT.fix.diff"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-1e240a",
+      "kind": "verify",
+      "record": "D-BATCH-LAP-HOLDS-NO-VM-SO-RUN-SH-REAPER-POWERS-ITS-NODES-OFF-MID-LAP",
+      "change": {
+        "batch": "b20261022-3a54cc"
+      },
+      "argument": "Fix-on batch b20261022-3a54cc was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-50c5dc --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 14 started 2026-10-23T04:08:28Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step14.log:1 is the batch's declaration and its first lap is 2026-10-23T04:08:46Z. Its size comes from control b20261022-50c5dc: with the fix switched off (MXFS_BATCH_LAP_HOLD=0 (tools/batch_lap.py holds no VM for the lap, as before the fix)) 10 of 10 laps failed; the batch's lower bound 0.5887 at delta 0.005 gives N = 6 at alpha 0.005 (data/release_policy.json). All 6 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^EXPOSED: ' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step14.log lists laps 1..6; their logs are in tests/evidence/batch_laps/b20261022-3a54cc/ and their rows in data/criteria.runs.jsonl (row lap:vmhold_reaper at 2/net/mesh/direct, batch b20261022-3a54cc), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:08:46Z exposure=1; 2026-10-23T04:08:49Z exposure=1; 2026-10-23T04:08:51Z exposure=1; 2026-10-23T04:08:54Z exposure=1; 2026-10-23T04:08:56Z exposure=1; 2026-10-23T04:08:59Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T041628Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step14.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "tests/evidence/batch_laps/b20261022-3a54cc",
+        "tests/evidence/batch_laps/b20261022-50c5dc",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T041628Z.txt",
+        "tests/vmhold_reaper_lap.sh"
+      ],
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-1e240a.md",
+        "sha256": "77b26b11818981248cca9c33f728f193b6daf9bb216067da226b88110d4494e9",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
+    },
+    {
+      "id": "P20261022-2e5d32",
+      "kind": "remove-fixed",
+      "record": "D-BATCH-LAP-HOLDS-NO-VM-SO-RUN-SH-REAPER-POWERS-ITS-NODES-OFF-MID-LAP",
+      "change": {
+        "control": "b20261022-50c5dc",
+        "fixon": "b20261022-3a54cc",
+        "cause": "tools/batch_lap.py runs a batch's harness lap without holding the lab VMs it uses, so the reaper run.sh leaves behind (tools/vm_pool.sh release --after <run.sh pid>, run.sh:378) shuts those VMs off once they have gone unheld for its 600 s grace after the run.sh exits, under whatever lap is running then. A lane that forms its pair with run.sh prep_cluster and then runs plain harness laps (no run.sh) loses its nodes 600 s after the prep."
+      },
+      "argument": "FIXED AND VERIFIED. The cause: tools/batch_lap.py runs a batch's harness lap without holding the lab VMs it uses, so the reaper run.sh leaves behind (tools/vm_pool.sh release --after <run.sh pid>, run.sh:378) shuts those VMs off once they have gone unheld for its 600 s grace after the run.sh exits, under whatever lap is running then. A lane that forms its pair with run.sh prep_cluster and then runs plain harness laps (no run.sh) loses its nodes 600 s after the prep. Reproducer: tests/vmhold_reaper_lap.sh test17 runs as a batch lap (tools/batch_lap.py), starts the reaper run.sh leaves behind (tools/vm_pool.sh release --after <pid>) against the running node with a 30 s grace and reads the node's state after the grace; exposure is the lap's line that the reaper was armed against the node ('EXPOSED: '). With batch_lap.py holding the lap's VMs the node stays up; with the hold switched off it is powered off once the grace ends. Control b20261022-50c5dc: with the fix switched off (MXFS_BATCH_LAP_HOLD=0 (tools/batch_lap.py holds no VM for the lap, as before the fix)) 10 of 10 laps failed (tests/evidence/batch_laps/b20261022-50c5dc/), each failing on the cause itself, e.g. tests/evidence/batch_laps/b20261022-50c5dc/20261023T014324Z.log: 'LAP vmhold_reaper FAIL: the reaper shut test17 off while the lap ran (state shut off)'. Fix-on batch b20261022-3a54cc was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-50c5dc --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 14 started 2026-10-23T04:08:28Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step14.log:1 is the batch's declaration and its first lap is 2026-10-23T04:08:46Z. Its size comes from control b20261022-50c5dc: with the fix switched off (MXFS_BATCH_LAP_HOLD=0 (tools/batch_lap.py holds no VM for the lap, as before the fix)) 10 of 10 laps failed; the batch's lower bound 0.5887 at delta 0.005 gives N = 6 at alpha 0.005 (data/release_policy.json). All 6 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^EXPOSED: ' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step14.log lists laps 1..6; their logs are in tests/evidence/batch_laps/b20261022-3a54cc/ and their rows in data/criteria.runs.jsonl (row lap:vmhold_reaper at 2/net/mesh/direct, batch b20261022-3a54cc), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:08:46Z exposure=1; 2026-10-23T04:08:49Z exposure=1; 2026-10-23T04:08:51Z exposure=1; 2026-10-23T04:08:54Z exposure=1; 2026-10-23T04:08:56Z exposure=1; 2026-10-23T04:08:59Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T041628Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step14.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "tests/evidence/batch_laps/b20261022-3a54cc",
+        "tests/evidence/batch_laps/b20261022-50c5dc",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T041628Z.txt",
+        "tests/vmhold_reaper_lap.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-6a7040",
+      "kind": "verify",
+      "record": "D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C-NO-PACKAGE-CAN-BE-BUILT",
+      "change": {
+        "batch": "b20261022-82e8a9"
+      },
+      "argument": "Fix-on batch b20261022-82e8a9 was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-f44545 --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 17 started 2026-10-23T04:09:24Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step17.log:1 is the batch's declaration and its first lap is 2026-10-23T04:09:50Z. Its size comes from control b20261022-f44545: with the fix taken out (fix reverted: tests/evidence/controls/D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C.fix.diff sha256=02753e662dadfd2818520050636347dd9c5334a555120d67149c7dfad7588393) 20 of 20 laps failed; the batch's lower bound 0.7673 at delta 0.005 gives N = 4 at alpha 0.005 (data/release_policy.json). All 4 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe 'PKG_INPUTS deb|could not pack the package inputs' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step17.log lists laps 1..4; their logs are in tests/evidence/batch_laps/b20261022-82e8a9/ and their rows in data/criteria.runs.jsonl (row lap:vm_package_build_deb at 2/net/mesh/direct, batch b20261022-82e8a9), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:09:50Z exposure=1; 2026-10-23T04:10:14Z exposure=1; 2026-10-23T04:10:39Z exposure=1; 2026-10-23T04:11:04Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T041628Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step17.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "tests/evidence/batch_laps/b20261022-82e8a9",
+        "tests/evidence/batch_laps/b20261022-f44545",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T041628Z.txt",
+        "scripts/vm_package_build.sh",
+        "tests/evidence/controls/D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C.fix.diff"
+      ],
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-6a7040.md",
+        "sha256": "ee66674f1aba6aea13e03907d46cffbedf920dc0ac729931377990cb58915b9d",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
+    },
+    {
+      "id": "P20261022-ce5f04",
+      "kind": "remove-fixed",
+      "record": "D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C-NO-PACKAGE-CAN-BE-BUILT",
+      "change": {
+        "control": "b20261022-f44545",
+        "fixon": "b20261022-82e8a9",
+        "cause": "scripts/vm_package_build.sh:74 lists a top-level mxfs.c among the package inputs; the tree has none (Kbuild obj-m mxfs.o is built from the subdirectories), so tar refuses and no .deb or .rpm can be built"
+      },
+      "argument": "FIXED AND VERIFIED. The cause: scripts/vm_package_build.sh:74 lists a top-level mxfs.c among the package inputs; the tree has none (Kbuild obj-m mxfs.o is built from the subdirectories), so tar refuses and no .deb or .rpm can be built Reproducer: scripts/vm_package_build.sh deb <fresh dir> builds the .deb from the tree on the package build VM (debian12-1) exactly as the release's packages step does; exposure is the step that packs the package inputs ('PKG_INPUTS deb', or 'could not pack the package inputs' when tar refuses). With the input list naming a top-level mxfs.c that the tree does not have, tar refuses and no package is built; with the list fixed the .deb builds ('PKG_BUILD_OK deb'). Control b20261022-f44545: with the fix taken out (fix reverted: tests/evidence/controls/D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C.fix.diff sha256=02753e662dadfd2818520050636347dd9c5334a555120d67149c7dfad7588393) 20 of 20 laps failed (tests/evidence/batch_laps/b20261022-f44545/), each failing on the cause itself, e.g. tests/evidence/batch_laps/b20261022-f44545/20261022T181040Z.log: 'PKG_BUILD_FAIL deb: could not pack the package inputs'. Fix-on batch b20261022-82e8a9 was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-f44545 --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 17 started 2026-10-23T04:09:24Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step17.log:1 is the batch's declaration and its first lap is 2026-10-23T04:09:50Z. Its size comes from control b20261022-f44545: with the fix taken out (fix reverted: tests/evidence/controls/D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C.fix.diff sha256=02753e662dadfd2818520050636347dd9c5334a555120d67149c7dfad7588393) 20 of 20 laps failed; the batch's lower bound 0.7673 at delta 0.005 gives N = 4 at alpha 0.005 (data/release_policy.json). All 4 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe 'PKG_INPUTS deb|could not pack the package inputs' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step17.log lists laps 1..4; their logs are in tests/evidence/batch_laps/b20261022-82e8a9/ and their rows in data/criteria.runs.jsonl (row lap:vm_package_build_deb at 2/net/mesh/direct, batch b20261022-82e8a9), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:09:50Z exposure=1; 2026-10-23T04:10:14Z exposure=1; 2026-10-23T04:10:39Z exposure=1; 2026-10-23T04:11:04Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T041628Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step17.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "tests/evidence/batch_laps/b20261022-82e8a9",
+        "tests/evidence/batch_laps/b20261022-f44545",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T041628Z.txt",
+        "scripts/vm_package_build.sh",
+        "tests/evidence/controls/D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C.fix.diff"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-b56e26",
+      "kind": "verify",
+      "record": "D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER",
+      "change": {
+        "batch": "b20261022-76ed30"
+      },
+      "argument": "Fix-on batch b20261022-76ed30 was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-c82774 --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/host_verify_round2_20261023T041355Z/summary.log step 1 started 2026-10-23T04:13:55Z, tests/evidence/lanes/host_verify_round2_20261023T041355Z/step1.log:1 is the batch's declaration and its first lap is 2026-10-23T04:14:11Z. Its size comes from control b20261022-c82774: with the fix switched off (dl_shortcut_claim=0 (DL_SHORTCUT_CLAIM=0 in the lap's environment)) 10 of 10 laps failed; the batch's lower bound 0.5887 at delta 0.005 gives N = 6 at alpha 0.005 (data/release_policy.json). All 6 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^EXPOSURE adopted=1 handed=1 local=1' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/host_verify_round2_20261023T041355Z/step1.log lists laps 1..6; their rows are in data/criteria.runs.jsonl (row lap:adopted_grant_handoff at 8/net/mesh/mpath, batch b20261022-76ed30), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:14:11Z exposure=1; 2026-10-23T04:14:27Z exposure=1; 2026-10-23T04:14:43Z exposure=1; 2026-10-23T04:14:58Z exposure=1; 2026-10-23T04:15:13Z exposure=1; 2026-10-23T04:15:28Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/host_verify_round2_20261023T041355Z/step1.log",
+        "tests/evidence/lanes/host_verify_round2_20261023T041355Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt",
+        "tests/tauth/adopted_grant_handoff_test.sh",
+        "tests/evidence/batch_laps/b20261022-76ed30/20261023T041355Z-a01ccdae.log",
+        "tests/evidence/batch_laps/b20261022-76ed30/20261023T041411Z-795042a4.log",
+        "tests/evidence/batch_laps/b20261022-76ed30/20261023T041427Z-16529949.log",
+        "tests/evidence/batch_laps/b20261022-76ed30",
+        "tests/evidence/batch_laps/b20261022-c82774"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-f2e0b6",
+      "kind": "remove-fixed",
+      "record": "D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER",
+      "change": {
+        "control": "b20261022-c82774",
+        "fixon": "b20261022-76ed30",
+        "cause": "On 8/net/mesh/mpath, in the one-path phase of path_peer_withdrawn, after the second withdrawn peer was fenced and recovered and test21 took over its authority-ledger pages, test21's ledger refused 110 conflicting AG 6 EX grants to another survivor in six seconds (P-TAUTH-DOUBLE-GRANT ... vs record ex=<test21>), then test21 received a fresh CAW grant on AG 6 whose lineage was still open (P130-FALSE-FRESH), refused it as in-memory corruption and shut its filesystem down: a survivor of a clean peer departure crashed out of the cluster."
+      },
+      "argument": "FIXED AND VERIFIED. The cause: On 8/net/mesh/mpath, in the one-path phase of path_peer_withdrawn, after the second withdrawn peer was fenced and recovered and test21 took over its authority-ledger pages, test21's ledger refused 110 conflicting AG 6 EX grants to another survivor in six seconds (P-TAUTH-DOUBLE-GRANT ... vs record ex=<test21>), then test21 received a fresh CAW grant on AG 6 whose lineage was still open (P130-FALSE-FRESH), refused it as in-memory corruption and shut its filesystem down: a survivor of a clean peer departure crashed out of the cluster. Reproducer: tests/tauth/adopted_grant_handoff_test.sh reproduces it in one process with four nodes: C holds EX on R, mastered by B; A's wait times out into the TEST ONLY gap (dl_acq_gap_ino/dl_acq_gap_ms); C releases and B's grant is adopted; D leaves, and R's page is handed from B to A; A's next attempt is answered by the already-granted shortcut. Exposure is the test's line that the grant was adopted, the page handed and the shortcut taken locally ('EXPOSURE adopted=1 handed=1 local=1'). With the fix taken out A held EX with no entry in its own table, B's EX was refused by A's ledger as a double grant, and R stayed refused after A's unlock; with it in, A's master keeps A's EX and B is granted after A's release. Control b20261022-c82774: with the fix switched off (dl_shortcut_claim=0 (DL_SHORTCUT_CLAIM=0 in the lap's environment)) 10 of 10 laps failed, e.g. data/criteria.runs.jsonl 8/net/mesh/mpath:lap:adopted_grant_handoff:2026-10-23T01:01:03Z FAIL 'rc=1 elapsed_s=11 exposure=1 -- === adopted_grant_handoff_test RESULT FAIL fails=4 ==='. Fix-on batch b20261022-76ed30 was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-c82774 --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/host_verify_round2_20261023T041355Z/summary.log step 1 started 2026-10-23T04:13:55Z, tests/evidence/lanes/host_verify_round2_20261023T041355Z/step1.log:1 is the batch's declaration and its first lap is 2026-10-23T04:14:11Z. Its size comes from control b20261022-c82774: with the fix switched off (dl_shortcut_claim=0 (DL_SHORTCUT_CLAIM=0 in the lap's environment)) 10 of 10 laps failed; the batch's lower bound 0.5887 at delta 0.005 gives N = 6 at alpha 0.005 (data/release_policy.json). All 6 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^EXPOSURE adopted=1 handed=1 local=1' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/host_verify_round2_20261023T041355Z/step1.log lists laps 1..6; their rows are in data/criteria.runs.jsonl (row lap:adopted_grant_handoff at 8/net/mesh/mpath, batch b20261022-76ed30), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:14:11Z exposure=1; 2026-10-23T04:14:27Z exposure=1; 2026-10-23T04:14:43Z exposure=1; 2026-10-23T04:14:58Z exposure=1; 2026-10-23T04:15:13Z exposure=1; 2026-10-23T04:15:28Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/host_verify_round2_20261023T041355Z/step1.log",
+        "tests/evidence/lanes/host_verify_round2_20261023T041355Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt",
+        "tests/tauth/adopted_grant_handoff_test.sh",
+        "tests/evidence/batch_laps/b20261022-76ed30/20261023T041355Z-a01ccdae.log",
+        "tests/evidence/batch_laps/b20261022-76ed30/20261023T041411Z-795042a4.log",
+        "tests/evidence/batch_laps/b20261022-76ed30/20261023T041427Z-16529949.log",
+        "tests/evidence/batch_laps/b20261022-76ed30",
+        "tests/evidence/batch_laps/b20261022-c82774"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-0df191",
+      "kind": "verify",
+      "record": "D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES-FOREVER-ON-RESERVATION-CONFLICT",
+      "change": {
+        "batch": "b20261022-8c2cba"
+      },
+      "argument": "Fix-on batch b20261022-8c2cba was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-1bb8dc --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/host_verify_round2_20261023T041355Z/summary.log step 2 started 2026-10-23T04:15:28Z, tests/evidence/lanes/host_verify_round2_20261023T041355Z/step2.log:1 is the batch's declaration and its first lap is 2026-10-23T04:15:40Z. Its size comes from control b20261022-1bb8dc: with the fix taken out (fix reverted: tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff sha256=87b95c6e8dea4dcb261e667db107bd90f7023aa34b17d4518c8816f7c0a73521) 20 of 20 laps failed; the batch's lower bound 0.7673 at delta 0.005 gives N = 4 at alpha 0.005 (data/release_policy.json). All 4 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^  PASS 3 exposure: ' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/host_verify_round2_20261023T041355Z/step2.log lists laps 1..4; their rows are in data/criteria.runs.jsonl (row lap:fenced_node_ledger at 8/net/mesh/mpath, batch b20261022-8c2cba), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:15:40Z exposure=2; 2026-10-23T04:15:51Z exposure=2; 2026-10-23T04:16:02Z exposure=2; 2026-10-23T04:16:13Z exposure=2. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/host_verify_round2_20261023T041355Z/step2.log",
+        "tests/evidence/lanes/host_verify_round2_20261023T041355Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt",
+        "tests/tauth/fenced_node_ledger_test.sh",
+        "tests/evidence/batch_laps/b20261022-8c2cba/20261023T041529Z-bd966c14.log",
+        "tests/evidence/batch_laps/b20261022-8c2cba/20261023T041540Z-43632912.log",
+        "tests/evidence/batch_laps/b20261022-8c2cba/20261023T041551Z-c0e192d0.log",
+        "tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff",
+        "tests/evidence/batch_laps/b20261022-8c2cba",
+        "tests/evidence/batch_laps/b20261022-1bb8dc"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-93796c",
+      "kind": "remove-fixed",
+      "record": "D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES-FOREVER-ON-RESERVATION-CONFLICT",
+      "change": {
+        "control": "b20261022-1bb8dc",
+        "fixon": "b20261022-8c2cba",
+        "cause": "A node whose filesystem has shut down and whose PR key is gone (self-fenced) keeps its mount and its authority-ledger publisher, which retries every page it holds against RESERVATION CONFLICT about 100 times a second without end (P-TAUTH-PUBLISH-FAIL rc=-52, then P-TAUTH-RECONCILE, per page), so a fenced node hammers the shared LUN and floods the target's log until it is powered off."
+      },
+      "argument": "FIXED AND VERIFIED. The cause: A node whose filesystem has shut down and whose PR key is gone (self-fenced) keeps its mount and its authority-ledger publisher, which retries every page it holds against RESERVATION CONFLICT about 100 times a second without end (P-TAUTH-PUBLISH-FAIL rc=-52, then P-TAUTH-RECONCILE, per page), so a fenced node hammers the shared LUN and floods the target's log until it is powered off. Reproducer: tests/tauth/fenced_node_ledger_test.sh runs four in-process nodes, one whose authority over the LUN closes while every view still names it, and counts that node's ledger writes as a request, a FREEZE_REQ and a FROZEN reach it; exposure is the test's line that all three reached the closed node ('  PASS 3 exposure: '). With the fix in the closed node writes no ledger page; with it taken out it writes 2, 4 and 6 more and the request is granted. Control b20261022-1bb8dc: with the fix taken out (fix reverted: tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff sha256=87b95c6e8dea4dcb261e667db107bd90f7023aa34b17d4518c8816f7c0a73521) 20 of 20 laps failed, e.g. data/criteria.runs.jsonl 8/net/mesh/mpath:lap:fenced_node_ledger:2026-10-22T20:43:21Z FAIL 'rc=1 elapsed_s=14 exposure=2 -- === fenced_node_ledger_test RESULT FAIL fails=4 ==='. Fix-on batch b20261022-8c2cba was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-1bb8dc --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/host_verify_round2_20261023T041355Z/summary.log step 2 started 2026-10-23T04:15:28Z, tests/evidence/lanes/host_verify_round2_20261023T041355Z/step2.log:1 is the batch's declaration and its first lap is 2026-10-23T04:15:40Z. Its size comes from control b20261022-1bb8dc: with the fix taken out (fix reverted: tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff sha256=87b95c6e8dea4dcb261e667db107bd90f7023aa34b17d4518c8816f7c0a73521) 20 of 20 laps failed; the batch's lower bound 0.7673 at delta 0.005 gives N = 4 at alpha 0.005 (data/release_policy.json). All 4 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^  PASS 3 exposure: ' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/host_verify_round2_20261023T041355Z/step2.log lists laps 1..4; their rows are in data/criteria.runs.jsonl (row lap:fenced_node_ledger at 8/net/mesh/mpath, batch b20261022-8c2cba), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:15:40Z exposure=2; 2026-10-23T04:15:51Z exposure=2; 2026-10-23T04:16:02Z exposure=2; 2026-10-23T04:16:13Z exposure=2. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/host_verify_round2_20261023T041355Z/step2.log",
+        "tests/evidence/lanes/host_verify_round2_20261023T041355Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt",
+        "tests/tauth/fenced_node_ledger_test.sh",
+        "tests/evidence/batch_laps/b20261022-8c2cba/20261023T041529Z-bd966c14.log",
+        "tests/evidence/batch_laps/b20261022-8c2cba/20261023T041540Z-43632912.log",
+        "tests/evidence/batch_laps/b20261022-8c2cba/20261023T041551Z-c0e192d0.log",
+        "tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff",
+        "tests/evidence/batch_laps/b20261022-8c2cba",
+        "tests/evidence/batch_laps/b20261022-1bb8dc"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-85a0b8",
+      "kind": "verify",
+      "record": "D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS",
+      "change": {
+        "batch": "b20261022-64048d"
+      },
+      "argument": "Fix-on batch b20261022-64048d was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-811d98 --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/summary.log step 4 started 2026-10-23T04:08:11Z, tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/step4.log:1 is the batch's declaration and its first lap is 2026-10-23T04:09:00Z. Its size comes from control b20261022-811d98: with the fix switched off (FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain) 9 of 10 laps failed; the batch's lower bound 0.4557 at delta 0.005 gives N = 9 at alpha 0.005 (data/release_policy.json). All 9 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe 'FOURKN-MERGE-[^ ]+ counted miscompares=[1-9].*forced=landed' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/step4.log lists laps 1..9; their rows are in data/criteria.runs.jsonl (row fourkn_merge at 2/net/mesh/direct4k, batch b20261022-64048d), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:09:00Z exposure=1; 2026-10-23T04:09:50Z exposure=1; 2026-10-23T04:10:41Z exposure=1; 2026-10-23T04:11:36Z exposure=1; 2026-10-23T04:12:27Z exposure=1; 2026-10-23T04:13:16Z exposure=1; 2026-10-23T04:14:06Z exposure=1; 2026-10-23T04:15:04Z exposure=1; 2026-10-23T04:16:01Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/step4.log",
+        "tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt",
+        "tests/suite/fourkn_merge.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-68ebdb",
+      "kind": "remove-fixed",
+      "record": "D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS",
+      "change": {
+        "control": "b20261022-811d98",
+        "fixon": "b20261022-64048d",
+        "cause": "tests/fourkn_merge_2node.sh holds each node's first 64 merged inode-block writes 20 ms between the read and the COMPARE AND WRITE so a peer's write of the same block lands in between, but it lands only in most laps: of 4 held laps on the 4K-native LUN, 1 saw no MISCOMPARE and exited VACUOUS, so one lap does not reliably exercise the merged write's retry"
+      },
+      "argument": "FIXED AND VERIFIED. The cause: tests/fourkn_merge_2node.sh holds each node's first 64 merged inode-block writes 20 ms between the read and the COMPARE AND WRITE so a peer's write of the same block lands in between, but it lands only in most laps: of 4 held laps on the 4K-native LUN, 1 saw no MISCOMPARE and exited VACUOUS, so one lap does not reliably exercise the merged write's retry Reproducer: the board row fourkn_merge (tests/suite/fourkn_merge.sh, test31/test32 on the 4096-byte pool LUN) runs its workload unheld, and at the unmount node 1 holds its one merged write of a block between the read and the swap while node 2 writes its own slot of the same block; node 1's swap then miscompares and its retry must keep node 2's slot. Exposure is the row's forced overlap landing (forced=landed, miscompares>=1, exposure=1 in the run's measured line). With the overlap switched off the row is the old unforced lap, which retried no MISCOMPARE in most laps (VACUOUS, graded FAIL). Control b20261022-811d98: with the fix switched off (FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain) 9 of 10 laps failed, e.g. data/criteria.runs.jsonl 2/net/mesh/direct4k:fourkn_merge:2026-10-23T04:01:05Z FAIL 'miscompares=0 hold_landed=0 merged_blocks=466 workload_ms=7256 hold=0x1000ms forced=off -- VACUOUS: no swap miscompared in 466 merged writes (hold_landed=0), so the row did not exercise the merged write's retry (evidence tests/evidence/board_20261023T040020Z-g2d_fourkn_merge)'. Fix-on batch b20261022-64048d was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-811d98 --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/summary.log step 4 started 2026-10-23T04:08:11Z, tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/step4.log:1 is the batch's declaration and its first lap is 2026-10-23T04:09:00Z. Its size comes from control b20261022-811d98: with the fix switched off (FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain) 9 of 10 laps failed; the batch's lower bound 0.4557 at delta 0.005 gives N = 9 at alpha 0.005 (data/release_policy.json). All 9 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe 'FOURKN-MERGE-[^ ]+ counted miscompares=[1-9].*forced=landed' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/step4.log lists laps 1..9; their rows are in data/criteria.runs.jsonl (row fourkn_merge at 2/net/mesh/direct4k, batch b20261022-64048d), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:09:00Z exposure=1; 2026-10-23T04:09:50Z exposure=1; 2026-10-23T04:10:41Z exposure=1; 2026-10-23T04:11:36Z exposure=1; 2026-10-23T04:12:27Z exposure=1; 2026-10-23T04:13:16Z exposure=1; 2026-10-23T04:14:06Z exposure=1; 2026-10-23T04:15:04Z exposure=1; 2026-10-23T04:16:01Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/step4.log",
+        "tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt",
+        "tests/suite/fourkn_merge.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-800972",
+      "kind": "verify",
+      "record": "D-NODES-CANNOT-WRITE-TESTS-EVIDENCE-IT-LINKS-TO-THE-HOSTS-OWN-MXFS-DISK",
+      "change": {
+        "batch": "b20261022-0ec0b9"
+      },
+      "argument": "Fix-on batch b20261022-0ec0b9 was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-86f27f --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 21 started 2026-10-23T04:13:47Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step21.log:1 is the batch's declaration and its first lap is 2026-10-23T04:13:49Z. Its size comes from control b20261022-86f27f: with the fix switched off (EVIDENCE_LINK_TARGET=/mxfs/evidence (the lap's own link gets the target tests/evidence had before the fix)) 10 of 10 laps failed; the batch's lower bound 0.5887 at delta 0.005 gives N = 6 at alpha 0.005 (data/release_policy.json). All 6 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^EXPOSED: ' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step21.log lists laps 1..6; their rows are in data/criteria.runs.jsonl (row lap:evidence_link at 2/net/mesh/direct, batch b20261022-0ec0b9), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:13:49Z exposure=1; 2026-10-23T04:13:51Z exposure=1; 2026-10-23T04:13:54Z exposure=1; 2026-10-23T04:13:56Z exposure=1; 2026-10-23T04:13:58Z exposure=1; 2026-10-23T04:14:00Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step21.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt",
+        "tests/evidence_link_lap.sh",
+        "tests/evidence/batch_laps/b20261022-0ec0b9/20261023T041347Z-ae2af474.log",
+        "tests/evidence/batch_laps/b20261022-0ec0b9/20261023T041349Z-48ef3771.log",
+        "tests/evidence/batch_laps/b20261022-0ec0b9/20261023T041352Z-6132b071.log",
+        "tests/evidence/batch_laps/b20261022-0ec0b9",
+        "tests/evidence/batch_laps/b20261022-86f27f"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-78d4cf",
+      "kind": "remove-fixed",
+      "record": "D-NODES-CANNOT-WRITE-TESTS-EVIDENCE-IT-LINKS-TO-THE-HOSTS-OWN-MXFS-DISK",
+      "change": {
+        "control": "b20261022-86f27f",
+        "fixon": "b20261022-0ec0b9",
+        "cause": "tests/evidence is a symlink to /mxfs/evidence, a disk of the lab host only; the nodes see the tree through the NFS export of /src, where the link resolves to a /mxfs/evidence the node does not have, so every row that writes its evidence from a node fails: alloc_witness cannot create its witness directory and chk_clean, which needs that sealed witness, can grade no CLEAN"
+      },
+      "argument": "FIXED AND VERIFIED. The cause: tests/evidence is a symlink to /mxfs/evidence, a disk of the lab host only; the nodes see the tree through the NFS export of /src, where the link resolves to a /mxfs/evidence the node does not have, so every row that writes its evidence from a node fails: alloc_witness cannot create its witness directory and chk_clean, which needs that sealed witness, can grade no CLEAN Reproducer: tests/evidence_link_lap.sh <label> test1 has the node write through a link of the lap's own in the exported tree, with the target tests/evidence has, and through tests/evidence itself, and the host reads both back; exposure is the lap's line that the node wrote through the link ('EXPOSED: '). EVIDENCE_LINK_TARGET=/mxfs/evidence (the control) gives the lap's link the target the defect had, a directory only the host has, and the node's write fails. Control b20261022-86f27f: with the fix switched off (EVIDENCE_LINK_TARGET=/mxfs/evidence (the lap's own link gets the target tests/evidence had before the fix)) 10 of 10 laps failed, e.g. data/criteria.runs.jsonl 2/net/mesh/direct:lap:evidence_link:2026-10-23T01:14:56Z FAIL 'rc=1 elapsed_s=1 exposure=1 -- EVIDENCE_LINK_LAP FAIL test1 could not write through tests/.evidence_link_lap.elctl1.20261023T011454Z (wrote=0)'. Fix-on batch b20261022-0ec0b9 was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-86f27f --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 21 started 2026-10-23T04:13:47Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step21.log:1 is the batch's declaration and its first lap is 2026-10-23T04:13:49Z. Its size comes from control b20261022-86f27f: with the fix switched off (EVIDENCE_LINK_TARGET=/mxfs/evidence (the lap's own link gets the target tests/evidence had before the fix)) 10 of 10 laps failed; the batch's lower bound 0.5887 at delta 0.005 gives N = 6 at alpha 0.005 (data/release_policy.json). All 6 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^EXPOSED: ' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step21.log lists laps 1..6; their rows are in data/criteria.runs.jsonl (row lap:evidence_link at 2/net/mesh/direct, batch b20261022-0ec0b9), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:13:49Z exposure=1; 2026-10-23T04:13:51Z exposure=1; 2026-10-23T04:13:54Z exposure=1; 2026-10-23T04:13:56Z exposure=1; 2026-10-23T04:13:58Z exposure=1; 2026-10-23T04:14:00Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step21.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt",
+        "tests/evidence_link_lap.sh",
+        "tests/evidence/batch_laps/b20261022-0ec0b9/20261023T041347Z-ae2af474.log",
+        "tests/evidence/batch_laps/b20261022-0ec0b9/20261023T041349Z-48ef3771.log",
+        "tests/evidence/batch_laps/b20261022-0ec0b9/20261023T041352Z-6132b071.log",
+        "tests/evidence/batch_laps/b20261022-0ec0b9",
+        "tests/evidence/batch_laps/b20261022-86f27f"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-c77f10",
+      "kind": "verify",
+      "record": "D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG-AND-DIES-BEFORE-MEASURING",
+      "change": {
+        "batch": "b20261022-228bd7"
+      },
+      "argument": "Fix-on batch b20261022-228bd7 was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-601b13 --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 22 started 2026-10-23T04:14:00Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step22.log:1 is the batch's declaration and its first lap is 2026-10-23T04:14:11Z. Its size comes from control b20261022-601b13: with the fix taken out (fix reverted: tests/evidence/controls/D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG.fix.diff sha256=210f1d9f3ad6e32f13d8c9f1e4f8c345e868f6c8740343177b8fdb927727be67) 10 of 10 laps failed; the batch's lower bound 0.5887 at delta 0.005 gives N = 6 at alpha 0.005 (data/release_policy.json). All 6 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^GATE d_intents_2tcp_open_efi fault: ' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step22.log lists laps 1..6; their rows are in data/criteria.runs.jsonl (row lap:openefi_img_gate_fault at 2/net/mesh/direct, batch b20261022-228bd7), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:14:11Z exposure=1; 2026-10-23T04:14:28Z exposure=1; 2026-10-23T04:14:39Z exposure=1; 2026-10-23T04:14:49Z exposure=1; 2026-10-23T04:14:59Z exposure=1; 2026-10-23T04:15:11Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step22.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt",
+        "tests/d_intents_2tcp_open_efi.sh",
+        "tests/evidence/batch_laps/b20261022-228bd7/20261023T041401Z-d2dc13da.log",
+        "tests/evidence/batch_laps/b20261022-228bd7/20261023T041411Z-3e8f6cf2.log",
+        "tests/evidence/batch_laps/b20261022-228bd7/20261023T041428Z-461614fe.log",
+        "tests/evidence/controls/D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG.fix.diff",
+        "tests/evidence/batch_laps/b20261022-228bd7",
+        "tests/evidence/batch_laps/b20261022-601b13"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-8ba001",
+      "kind": "remove-fixed",
+      "record": "D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG-AND-DIES-BEFORE-MEASURING",
+      "change": {
+        "control": "b20261022-601b13",
+        "fixon": "b20261022-228bd7",
+        "cause": "tests/d_intents_2tcp_open_efi.sh:161 tests the readability of $IMG under set -u (:110) and nothing in the script assigns IMG, so every run dies with IMG: unbound variable before it measures anything"
+      },
+      "argument": "FIXED AND VERIFIED. The cause: tests/d_intents_2tcp_open_efi.sh:161 tests the readability of $IMG under set -u (:110) and nothing in the script assigns IMG, so every run dies with IMG: unbound variable before it measures anything Reproducer: tests/capture_fault_gate.sh <label> --only d_intents_2tcp_open_efi runs the capture gate's d_intents_2tcp_open_efi entry alone on the g2 pair; exposure is the entry's fault lap reaching its gate line ('GATE d_intents_2tcp_open_efi fault: '), which runs tests/d_intents_2tcp_open_efi.sh past its readability test of $IMG. With the fix taken out that test reads IMG, which nothing assigns, under set -u, and the harness dies (IMG: unbound variable) before it measures anything. Control b20261022-601b13: with the fix taken out (fix reverted: tests/evidence/controls/D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG.fix.diff sha256=210f1d9f3ad6e32f13d8c9f1e4f8c345e868f6c8740343177b8fdb927727be67) 10 of 10 laps failed, e.g. data/criteria.runs.jsonl 2/net/mesh/direct:lap:openefi_img_gate_fault:2026-10-23T00:53:53Z FAIL 'rc=1 elapsed_s=3 exposure=1 -- RESULT: FAIL label=imgctl1 entries=1 broken=1 vacuous=0 restores=0 wall=4s evidence=tests/evidence/20261023T005349Z_capture_gate_imgctl1'. Fix-on batch b20261022-228bd7 was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-601b13 --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 22 started 2026-10-23T04:14:00Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step22.log:1 is the batch's declaration and its first lap is 2026-10-23T04:14:11Z. Its size comes from control b20261022-601b13: with the fix taken out (fix reverted: tests/evidence/controls/D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG.fix.diff sha256=210f1d9f3ad6e32f13d8c9f1e4f8c345e868f6c8740343177b8fdb927727be67) 10 of 10 laps failed; the batch's lower bound 0.5887 at delta 0.005 gives N = 6 at alpha 0.005 (data/release_policy.json). All 6 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^GATE d_intents_2tcp_open_efi fault: ' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step22.log lists laps 1..6; their rows are in data/criteria.runs.jsonl (row lap:openefi_img_gate_fault at 2/net/mesh/direct, batch b20261022-228bd7), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:14:11Z exposure=1; 2026-10-23T04:14:28Z exposure=1; 2026-10-23T04:14:39Z exposure=1; 2026-10-23T04:14:49Z exposure=1; 2026-10-23T04:14:59Z exposure=1; 2026-10-23T04:15:11Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step22.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt",
+        "tests/d_intents_2tcp_open_efi.sh",
+        "tests/evidence/batch_laps/b20261022-228bd7/20261023T041401Z-d2dc13da.log",
+        "tests/evidence/batch_laps/b20261022-228bd7/20261023T041411Z-3e8f6cf2.log",
+        "tests/evidence/batch_laps/b20261022-228bd7/20261023T041428Z-461614fe.log",
+        "tests/evidence/controls/D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG.fix.diff",
+        "tests/evidence/batch_laps/b20261022-228bd7",
+        "tests/evidence/batch_laps/b20261022-601b13"
       ],
       "state": "pending",
       "created": "2026-10-22"

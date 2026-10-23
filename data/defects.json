@@ -2386,7 +2386,7 @@
           "candidate": "0.90.134",
           "build": "16A5F5DDDB4852C9D5DB236",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
@@ -2529,7 +2529,19 @@
           "iso": "2026-10-22T20:06:52Z"
         }
       ],
-      "reproducer": "tests/release_step_cell_lap.py (host only, under 1 s): takes a recorded release step FAIL from the primary ledger and requires it to parse as a cell (tools/criteria.py parse_cell), to be found in the ledger and to take an annotation; prints EXPOSED for the recorded step FAIL it uses. With the fix taken out parse_cell refuses the step's key ('criteria: 1/any: wanted <nodes>/<class>/<method>/<attach>'): STEP_CELL_LAP FAIL"
+      "reproducer": "tests/release_step_cell_lap.py (host only, under 1 s): takes a recorded release step FAIL from the primary ledger and requires it to parse as a cell (tools/criteria.py parse_cell), to be found in the ledger and to take an annotation; prints EXPOSED for the recorded step FAIL it uses. With the fix taken out parse_cell refuses the step's key ('criteria: 1/any: wanted <nodes>/<class>/<method>/<attach>'): STEP_CELL_LAP FAIL",
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T03:55:19Z",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "batch": "b20261022-db370d",
+          "approval": "P20261022-d6567c",
+          "date": "2026-10-22"
+        }
+      ]
     },
     {
       "id": "D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED",
@@ -2537,9 +2549,9 @@
       "nodes": 1,
       "config": "*/*/*",
       "opened": "2026-10-21",
-      "summary": "tests/suite/fsx.sh draws its seed from 4 random bytes (0..2^32-1), but the vendored fsx stores -S in an int and calls usage() when it is negative, so about half of all runs exit 90 at once and record a FAIL that exercised nothing; and fsx.sh writes fsx's output to /tmp/fsx.$$.*.log on the node and deletes it in its EXIT trap, so no failing run keeps its evidence.",
-      "evidence": "2/net/mesh/drbd fsx 2026-10-21T19:36:37Z (dry-run candidate 0.90.133-2, build 71AC6107043DD5BE3D9181A): FAIL checks=2 passed=0 failed=2 seed=3832054505, both checks in 2 s of an 88 s budget (tests/evidence/drbd_rig/criteria.runs.jsonl). Code: tests/suite/fsx.sh:27 SEED=$(od -An -N4 -tu4 /dev/urandom); tests/suite/tools/fsx.c:186 'int seed = 1;', :3397 'seed = getnum(optarg, &endp);', :3402-3403 'if (seed < 0) usage();'; tests/suite/fsx.sh:22 trap 'rm -rf \"$W\" /tmp/fsx.$$.*'. Reproduced on clyde 2026-10-21 with the vendored binary: 'tests/suite/tools/fsx -S 3832054505 -N 200 <file>' rc=90 'usage: fsx ...'; -S 2147483648 rc=90; -S 2147483647 rc=0 'Seed set to 2147483647'. ===== ===== 2026-10-22, the rest of the fix: run.sh's artifact pull for a row that did not pass (the one that already brings /root/drc_* from every node) now takes /root/fsx.<seed>.<ops>.log too, so a failing fsx check's log lands in tests/evidence/run_fsx_<run id>/ as <node>_fsx.<seed>.<ops>.log. Exercised on the host with the same remote command: a /root holding fsx.123.100000.log came back as test1_fsx.123.100000.log; a /root holding neither drc_* nor fsx logs sends nothing (rc 1, as before). The seed range (1..2^31-1) and the kept log were already in the tree.",
-      "next": "control batch of fsx laps at 2/net/mesh/direct with the fix taken out (tests/suite/fsx.sh drawing 4 random bytes again and deleting its logs, run.sh's pull without fsx logs): about half its laps must fail with fsx's usage; then the verification batch on the candidate, sized from it, and remove --fixed ===== 2026-10-22: control b20261022-4bf99d closed, 20 of 20 laps of tests/fsx_seed_lap.sh failed with the fix out (lap:fsx_seed at 2/net/mesh/direct). Next: the verification batch on the frozen candidate, 4 clean laps of the same lap (defects.py plan-verify ... --row lap:fsx_seed --at 2/net/mesh/direct --probe '^LAP fsx_seed start .* draw=4294967295 '), then remove --fixed with that control.",
+      "summary": "tests/suite/fsx.sh draws its seed from 4 random bytes (0..2^32-1), but the vendored fsx stores -S in an int and calls usage() when it is negative, so about half of all runs exit 90 at once and record a FAIL that exercised nothing. (Its second half, the deleted failure logs, is now D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE.)",
+      "evidence": "2/net/mesh/drbd fsx 2026-10-21T19:36:37Z (dry-run candidate 0.90.133-2, build 71AC6107043DD5BE3D9181A): FAIL checks=2 passed=0 failed=2 seed=3832054505, both checks in 2 s of an 88 s budget (tests/evidence/drbd_rig/criteria.runs.jsonl). Code: tests/suite/fsx.sh:27 SEED=$(od -An -N4 -tu4 /dev/urandom); tests/suite/tools/fsx.c:186 'int seed = 1;', :3397 'seed = getnum(optarg, &endp);', :3402-3403 'if (seed < 0) usage();'; tests/suite/fsx.sh:22 trap 'rm -rf \"$W\" /tmp/fsx.$$.*'. Reproduced on clyde 2026-10-21 with the vendored binary: 'tests/suite/tools/fsx -S 3832054505 -N 200 <file>' rc=90 'usage: fsx ...'; -S 2147483648 rc=90; -S 2147483647 rc=0 'Seed set to 2147483647'. ===== ===== 2026-10-22, the rest of the fix: run.sh's artifact pull for a row that did not pass (the one that already brings /root/drc_* from every node) now takes /root/fsx.<seed>.<ops>.log too, so a failing fsx check's log lands in tests/evidence/run_fsx_<run id>/ as <node>_fsx.<seed>.<ops>.log. Exercised on the host with the same remote command: a /root holding fsx.123.100000.log came back as test1_fsx.123.100000.log; a /root holding neither drc_* nor fsx logs sends nothing (rc 1, as before). The seed range (1..2^31-1) and the kept log were already in the tree. ===== 2026-10-23: split. Review data/reviews/P20261022-fa5891.md rejected verify b20261022-c54100 because this record named two defects and the batch measured one: control b20261022-4bf99d reverted only fsx.sh's SEED= line (tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff, one hunk), so the deleted-log half never had a control. This record keeps the seed defect, which that control and tests/fsx_seed_lap.sh measure; the deleted-log defect is D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE.",
+      "next": "control batch of fsx laps at 2/net/mesh/direct with the fix taken out (tests/suite/fsx.sh drawing 4 random bytes again and deleting its logs, run.sh's pull without fsx logs): about half its laps must fail with fsx's usage; then the verification batch on the candidate, sized from it, and remove --fixed ===== 2026-10-22: control b20261022-4bf99d closed, 20 of 20 laps of tests/fsx_seed_lap.sh failed with the fix out (lap:fsx_seed at 2/net/mesh/direct). Next: the verification batch on the frozen candidate, 4 clean laps of the same lap (defects.py plan-verify ... --row lap:fsx_seed --at 2/net/mesh/direct --probe '^LAP fsx_seed start .* draw=4294967295 '), then remove --fixed with that control. ===== 2026-10-23: the seed defect alone. A verification batch of tests/fsx_seed_lap.sh on the next candidate attempt, sized from control b20261022-4bf99d, then remove --fixed with that control.",
       "reproducer": "tests/fsx_seed_lap.sh (host-local: /dev/urandom bound to four 0xff bytes in a private mount namespace, fsx.sh on tmpfs; every lap exposed)",
       "cells": [
         {
@@ -3018,6 +3030,39 @@
           },
           "transfer": "",
           "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261022-82e8a9",
+          "kind": "verify",
+          "row": "lap:vm_package_build_deb",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 4,
+          "probe": "PKG_INPUTS deb|could not pack the package inputs",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:vm_package_build_deb",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-f44545",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C.fix.diff sha256=02753e662dadfd2818520050636347dd9c5334a555120d67149c7dfad7588393",
+            "builds": [
+              "2446C4C6401FC9D9224650F"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
         }
       ],
       "updated": "2026-10-22",
@@ -3038,7 +3083,19 @@
           "date": "2026-10-22"
         }
       ],
-      "reproducer": "one lap is tools/batch_lap.py --batch <batch> --at 2/net/mesh/direct --row lap:vm_package_build_deb --bound <s> --pass 'PKG_BUILD_OK deb' --fail 'PKG_BUILD_FAIL' -- scripts/vm_package_build.sh deb (tools/harness_batch.py drives the laps of a batch): the script packs the tree's package input list and builds on debian12-1; with mxfs.c in INPUTS tar cannot stat it and the lap prints PKG_BUILD_FAIL deb: could not pack the package inputs. A lap measured 24-37 s with the fix in, so its bound is 2x the slowest, 75 s"
+      "reproducer": "one lap is tools/batch_lap.py --batch <batch> --at 2/net/mesh/direct --row lap:vm_package_build_deb --bound <s> --pass 'PKG_BUILD_OK deb' --fail 'PKG_BUILD_FAIL' -- scripts/vm_package_build.sh deb (tools/harness_batch.py drives the laps of a batch): the script packs the tree's package input list and builds on debian12-1; with mxfs.c in INPUTS tar cannot stat it and the lap prints PKG_BUILD_FAIL deb: could not pack the package inputs. A lap measured 24-37 s with the fix in, so its bound is 2x the slowest, 75 s",
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T03:55:19Z",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "batch": "b20261022-82e8a9",
+          "approval": "P20261022-6a7040",
+          "date": "2026-10-22"
+        }
+      ]
     },
     {
       "id": "D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E-AND-NO-WWN-BYID-LINK",
@@ -3229,7 +3286,7 @@
           "candidate": "0.90.134",
           "build": "16A5F5DDDB4852C9D5DB236",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
@@ -3269,7 +3326,19 @@
           "date": "2026-10-22"
         }
       ],
-      "reproducer": "tests/rig_eui64_resolve_lap.sh <node1>,<node2> <group> (a pool pair whose LUN is EUI-64, no mxfs mount on the node): resolves the pair's LUN by its identifier through tests/lib/rig.sh as the capture-gate entries do; EXPOSED when the LUN's wwid is eui.*. With the fix taken out: 'ABORT: no MXFS device basis ... no /dev/disk/by-id/{wwn-0x,scsi-3,scsi-2}e3837...': RIG_EUI64_LAP FAIL"
+      "reproducer": "tests/rig_eui64_resolve_lap.sh <node1>,<node2> <group> (a pool pair whose LUN is EUI-64, no mxfs mount on the node): resolves the pair's LUN by its identifier through tests/lib/rig.sh as the capture-gate entries do; EXPOSED when the LUN's wwid is eui.*. With the fix taken out: 'ABORT: no MXFS device basis ... no /dev/disk/by-id/{wwn-0x,scsi-3,scsi-2}e3837...': RIG_EUI64_LAP FAIL",
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T03:55:19Z",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "batch": "b20261022-8cd6d2",
+          "approval": "P20261022-5b07e9",
+          "date": "2026-10-22"
+        }
+      ]
     },
     {
       "id": "D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK-FOR-A-NODE-DEVICE-PATH",
@@ -3460,7 +3529,7 @@
           "candidate": "0.90.134",
           "build": "16A5F5DDDB4852C9D5DB236",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
@@ -3506,9 +3575,10 @@
           "config": "2/net/mesh/direct",
           "platform": "any",
           "candidate": "0.90.134",
+          "attempt": "2026-10-23T03:55:19Z",
           "build": "16A5F5DDDB4852C9D5DB236",
-          "batch": "b20261022-7742a9",
-          "approval": "P20261022-51ab60",
+          "batch": "b20261022-28a11c",
+          "approval": "P20261022-c0b24c",
           "date": "2026-10-22"
         }
       ]
@@ -3702,7 +3772,7 @@
           "candidate": "0.90.134",
           "build": "16A5F5DDDB4852C9D5DB236",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
@@ -3742,7 +3812,19 @@
           "date": "2026-10-22"
         }
       ],
-      "reproducer": "tests/presteps_env_lap.py <group> (host only): builds the environment tools/release_run.py presteps_env() gives the presteps' self-tests for that group and requires them to read the group's own marker (.cluster_marker.<group>.json) and MXFS_GROUP; EXPOSED when the default .cluster_marker.json describes another pair. With the fix taken out they read .cluster_marker.json: PRESTEPS_ENV_LAP FAIL"
+      "reproducer": "tests/presteps_env_lap.py <group> (host only): builds the environment tools/release_run.py presteps_env() gives the presteps' self-tests for that group and requires them to read the group's own marker (.cluster_marker.<group>.json) and MXFS_GROUP; EXPOSED when the default .cluster_marker.json describes another pair. With the fix taken out they read .cluster_marker.json: PRESTEPS_ENV_LAP FAIL",
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T03:55:19Z",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "batch": "b20261022-825560",
+          "approval": "P20261022-8d103a",
+          "date": "2026-10-22"
+        }
+      ]
     },
     {
       "id": "D-RECOV-BMBT-REUSE-ABORT-LEAVES-THE-DESTROYED-VICTIM-POWERED-OFF",
@@ -3841,6 +3923,39 @@
         },
         {
           "id": "b20261022-80174d",
+          "kind": "verify",
+          "row": "lap:rbr_abort",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^LAP rbr_abort exposed: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:rbr_abort",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-f49ba8",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff sha256=c5887bb0786fa3d5d44336542dc0472bc25a968d64fb80822fd0eb87b508c905",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261022-2bb429",
           "kind": "verify",
           "row": "lap:rbr_abort",
           "config": "2/net/mesh/direct",
@@ -3984,6 +4099,39 @@
         },
         {
           "id": "b20261022-4a86bc",
+          "kind": "verify",
+          "row": "lap:openefi_img_gate_fault",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^GATE d_intents_2tcp_open_efi fault: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:openefi_img_gate_fault",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-601b13",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG.fix.diff sha256=210f1d9f3ad6e32f13d8c9f1e4f8c345e868f6c8740343177b8fdb927727be67",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261022-228bd7",
           "kind": "verify",
           "row": "lap:openefi_img_gate_fault",
           "config": "2/net/mesh/direct",
@@ -4258,7 +4406,7 @@
           "candidate": "0.90.134",
           "build": "16A5F5DDDB4852C9D5DB236",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
@@ -4314,7 +4462,19 @@
           "date": "2026-10-22"
         }
       ],
-      "reproducer": "tests/release_board_verdict_lap.py <candidate> (host only): grades the 2/net/mesh/drbd board for the candidate as tools/release_run.py does (MXFS_OWN_RIG unset) and as an own-rig run does (set), taking its inputs from the environment and dropping MXFS_OWN_RIG from the orchestrator's call, and requires the orchestrator's verdict to name every row that is not green; EXPOSED when the board has rows not green. With the fix taken out the orchestrator's verdict names 0 rows: BOARD_VERDICT_LAP FAIL"
+      "reproducer": "tests/release_board_verdict_lap.py <candidate> (host only): grades the 2/net/mesh/drbd board for the candidate as tools/release_run.py does (MXFS_OWN_RIG unset) and as an own-rig run does (set), taking its inputs from the environment and dropping MXFS_OWN_RIG from the orchestrator's call, and requires the orchestrator's verdict to name every row that is not green; EXPOSED when the board has rows not green. With the fix taken out the orchestrator's verdict names 0 rows: BOARD_VERDICT_LAP FAIL",
+      "verified_at": [
+        {
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T03:55:19Z",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "batch": "b20261022-d569c5",
+          "approval": "P20261022-6c4776",
+          "date": "2026-10-22"
+        }
+      ]
     },
     {
       "id": "D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN",
@@ -4633,6 +4793,39 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261022-b6f805",
+          "kind": "verify",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "P-RELMARK-OWED site=inact-exrel",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "gate:d_intents_2tcp_open_efi",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-8375dc",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "inact_relmark=0 (sysfs on the formed pair, MXFS_EXTRA_MODARGS on every re-formed one): the same build releasing an inactivation's tenure unmarked, as before the fix",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -4863,7 +5056,7 @@
           "candidate": "0.90.134",
           "build": "16A5F5DDDB4852C9D5DB236",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
@@ -4954,6 +5147,18 @@
           "row": "lap:chk_freespace_rebuild",
           "iso": "2026-10-22T20:19:28Z"
         }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T03:55:19Z",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "batch": "b20261022-1f3dec",
+          "approval": "P20261022-9ee296",
+          "date": "2026-10-22"
+        }
       ]
     },
     {
@@ -5028,11 +5233,44 @@
           "candidate": "",
           "build": "16A5F5DDDB4852C9D5DB236",
           "variant": "FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
           "why": "the forced overlap left out: laps with no MISCOMPARE retried (VACUOUS) must come back"
+        },
+        {
+          "id": "b20261022-64048d",
+          "kind": "verify",
+          "row": "fourkn_merge",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 9,
+          "probe": "FOURKN-MERGE-[^ ]+ counted miscompares=[1-9].*forced=landed",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "fourkn_merge",
+            "config": "2/net/mesh/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-811d98",
+            "k": 9,
+            "n": 10,
+            "candidate": "",
+            "variant": "FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.45571294310031313
         }
       ],
       "updated": "2026-10-22",
@@ -5049,6 +5287,21 @@
           "variant": "HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0",
           "builds": [
             "9594B08726D6732D2ED5E87"
+          ],
+          "date": "2026-10-22"
+        },
+        {
+          "row": "fourkn_merge",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-811d98",
+          "k": 9,
+          "n": 10,
+          "candidate": "",
+          "variant": "FORCE_MS=0 (MXFS_TEST_ENV): the row without its forced overlap, the workload unheld and both unmounts plain",
+          "builds": [
+            "16A5F5DDDB4852C9D5DB236"
           ],
           "date": "2026-10-22"
         }
@@ -5103,6 +5356,51 @@
           "config": "2/net/mesh/direct4k",
           "row": "fourkn_merge",
           "iso": "2026-10-23T02:43:59Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T04:08:09Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T04:07:23Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T04:06:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T04:05:52Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T04:05:07Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T04:04:22Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T04:03:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T04:01:55Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T04:01:05Z"
         }
       ]
     },
@@ -5178,7 +5476,7 @@
           "candidate": "0.90.134",
           "build": "16A5F5DDDB4852C9D5DB236",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
@@ -5269,6 +5567,18 @@
           "config": "2/net/mesh/direct",
           "row": "lap:lunpool_shutdown",
           "iso": "2026-10-22T23:41:29Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T03:55:19Z",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "batch": "b20261022-da3e51",
+          "approval": "P20261022-cfe8ac",
+          "date": "2026-10-22"
         }
       ]
     },
@@ -5628,6 +5938,39 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261022-0ec0b9",
+          "kind": "verify",
+          "row": "lap:evidence_link",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:evidence_link",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-86f27f",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "EVIDENCE_LINK_TARGET=/mxfs/evidence (the lap's own link gets the target tests/evidence had before the fix)",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -5754,6 +6097,39 @@
         },
         {
           "id": "b20261022-ad2d57",
+          "kind": "verify",
+          "row": "lap:adopted_grant_handoff",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSURE adopted=1 handed=1 local=1",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:adopted_grant_handoff",
+            "config": "8/net/mesh/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-c82774",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "dl_shortcut_claim=0 (DL_SHORTCUT_CLAIM=0 in the lap's environment)",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261022-76ed30",
           "kind": "verify",
           "row": "lap:adopted_grant_handoff",
           "config": "8/net/mesh/mpath",
@@ -5940,6 +6316,39 @@
         },
         {
           "id": "b20261022-6db36b",
+          "kind": "verify",
+          "row": "lap:fenced_node_ledger",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^  PASS 3 exposure: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:fenced_node_ledger",
+            "config": "8/net/mesh/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-1bb8dc",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff sha256=87b95c6e8dea4dcb261e667db107bd90f7023aa34b17d4518c8816f7c0a73521",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261022-8c2cba",
           "kind": "verify",
           "row": "lap:fenced_node_ledger",
           "config": "8/net/mesh/mpath",
@@ -6309,6 +6718,39 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261022-3a54cc",
+          "kind": "verify",
+          "row": "lap:vmhold_reaper",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:vmhold_reaper",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-50c5dc",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_BATCH_LAP_HOLD=0 (tools/batch_lap.py holds no VM for the lap, as before the fix)",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "updated": "2026-10-22",
@@ -6327,6 +6769,18 @@
           "builds": [
             "16A5F5DDDB4852C9D5DB236"
           ],
+          "date": "2026-10-22"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T03:55:19Z",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "batch": "b20261022-3a54cc",
+          "approval": "P20261022-1e240a",
           "date": "2026-10-22"
         }
       ]
@@ -6565,139 +7019,6 @@
       ]
     },
     {
-      "id": "D-BATCH-LAP-LOG-NAMED-BY-THE-SECOND-SO-SUB-SECOND-LAPS-OVERWRITE-EACH-OTHER",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-22",
-      "summary": "tools/batch_lap.py names each lap's log after the second the lap starts (:174) and opens it with 'w' (:182), while the lap's ledger stamp is moved to a free second (:215): two laps started in one second write one file, the second overwriting the first, so a counted lap's PASS and exposure lines survive nowhere but the ledger row.",
-      "evidence": "Review data/reviews/P20261022-0b1720.md: batch b20261022-b46717 (lap:presteps_env) laps 1 and 2 (ledger data/criteria.runs.jsonl:7970, :7972) both name tests/evidence/batch_laps/b20261022-b46717/20261023T022540Z.log, which holds lap 2's output (it closes at 02:25:41Z; lap 1's own stamp is 02:25:40Z): three logs for four rows. Control b20261022-12fbb7 rows :7617 and :7618 both name 20261022T200846Z.log: 19 logs for 20 rows. ===== 2026-10-23, fix in the tree: tools/batch_lap.py lap_log() names each lap's log <start second>-<8 hex>.log and creates it exclusively (open 'x', a new tag on a clash), so two laps started in one second write two logs. main() named and opened the log inline; a refactor that changed no behaviour moved that into lap_log() first, so the fix, tests/evidence/controls/D-BATCH-LAP-LOG-NAMED-BY-THE-SECOND.fix.diff, is lap_log's body alone. With the fix in, tests/batch_lap_log_lap.py: PASS, two logs 20261023T033348Z-095f24cf.log and 20261023T033348Z-e7ed369d.log opened in one second.",
-      "next": "control batch with the fix out (tools/harness_batch.py control, lap:batch_lap_log at 2/net/mesh/direct, 10 laps), then the verification batch on the frozen candidate, then remove --fixed",
-      "reproducer": "tests/batch_lap_log_lap.py (host only): two processes import tools/batch_lap.py and open their log with lap_log() at one instant in one scratch directory, each writing its own line; EXPOSED when both opened in the same second, FAIL when they were given one log or a log lost its own line. With the fix out they share one log holding the second process's line.",
-      "updated": "2026-10-22",
-      "batches": [
-        {
-          "id": "b20261022-6cf780",
-          "kind": "control",
-          "row": "lap:batch_lap_log",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED:",
-          "candidate": "",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "fix reverted: tests/evidence/controls/D-BATCH-LAP-LOG-NAMED-BY-THE-SECOND.fix.diff sha256=f9c60d2ceed2f363354e67127404417639c894c3cac3e95b6ff2e006afa14f25",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "why": "the fix-out rate of the lap log naming"
-        },
-        {
-          "id": "b20261022-9bb166",
-          "kind": "verify",
-          "row": "lap:batch_lap_log",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED:",
-          "candidate": "0.90.134",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "",
-          "state": "open",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "rate": {
-            "row": "lap:batch_lap_log",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261022-6cf780",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "fix reverted: tests/evidence/controls/D-BATCH-LAP-LOG-NAMED-BY-THE-SECOND.fix.diff sha256=f9c60d2ceed2f363354e67127404417639c894c3cac3e95b6ff2e006afa14f25",
-            "builds": [
-              "16A5F5DDDB4852C9D5DB236"
-            ],
-            "date": "2026-10-22"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:batch_lap_log",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261022-6cf780",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "fix reverted: tests/evidence/controls/D-BATCH-LAP-LOG-NAMED-BY-THE-SECOND.fix.diff sha256=f9c60d2ceed2f363354e67127404417639c894c3cac3e95b6ff2e006afa14f25",
-          "builds": [
-            "16A5F5DDDB4852C9D5DB236"
-          ],
-          "date": "2026-10-22"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_log",
-          "iso": "2026-10-23T03:36:43Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_log",
-          "iso": "2026-10-23T03:36:41Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_log",
-          "iso": "2026-10-23T03:36:39Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_log",
-          "iso": "2026-10-23T03:36:37Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_log",
-          "iso": "2026-10-23T03:36:35Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_log",
-          "iso": "2026-10-23T03:36:33Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_log",
-          "iso": "2026-10-23T03:36:31Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_log",
-          "iso": "2026-10-23T03:36:29Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_log",
-          "iso": "2026-10-23T03:36:27Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_log",
-          "iso": "2026-10-23T03:36:25Z"
-        }
-      ]
-    },
-    {
       "id": "D-VERIFIED-AT-MATCHED-BY-VERSION-ALONE-CARRIES-TO-A-LATER-ATTEMPT",
       "severity": "high",
       "nodes": 1,
@@ -6737,7 +7058,7 @@
           "candidate": "0.90.134",
           "build": "16A5F5DDDB4852C9D5DB236",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
@@ -6828,138 +7149,17 @@
           "row": "lap:verified_at_attempt",
           "iso": "2026-10-23T03:36:12Z"
         }
-      ]
-    },
-    {
-      "id": "D-TAUTH-LAPS-RELINK-FROZEN-TEST-BINARIES-AND-INVALIDATE-THE-CANDIDATE",
-      "severity": "high",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-22",
-      "summary": "tests/tauth/adopted_grant_handoff_test.sh:25 and tests/tauth/fenced_node_ledger_test.sh:23 compile and link their test binary in place, tests/tauth/<name>_test, which is a frozen file of the release candidate; so every lap rewrites a frozen file, and a verification batch of either lap makes the candidate it runs on INVALID.",
-      "evidence": "Candidate 0.90.134 frozen 2026-10-23T02:25:06Z (data/candidates/0.90.134.json); the host lane's tauth verification laps ran at 02:25:47-02:27:53Z. tools/release_candidate.py check 0.90.134: 'touched (content restored after a change, or rewritten): tests/tauth/adopted_grant_handoff_test', 'changed: tests/tauth/fenced_node_ledger_test', 'candidate 0.90.134 is now INVALID'. Reviews data/reviews/P20261022-981ed4.md (inode 98566229 -> 98566218, ctime 02:26:52Z; fenced_node_ledger_test 998600 -> 1008032 bytes at 02:27:41Z), data/reviews/P20261022-f64a95.md (a scan of all 2543 frozen files found only these two) and data/reviews/P20261022-7a05dc.md. Every verification batch on that attempt ran on a drifted tree and was rejected for it. ===== 2026-10-23, fix in the tree (tests/evidence/controls/D-TAUTH-LAPS-RELINK-FROZEN-TEST-BINARIES.fix.diff): both scripts make only the shared objects (obj/*.o, not frozen) instead of the local_page_full_test binary, link the test into a mktemp directory under /tmp and run it from there, so a lap writes no frozen file. With the fix in, tests/tauth_freeze_lap.py: PASS, both tests rc=0, none of the 2547 frozen files changed (26.6 s).",
-      "next": "control batch with the fix out (lap:tauth_freeze at 2/net/mesh/direct, 10 laps), then the verification batch on the frozen candidate, then remove --fixed",
-      "reproducer": "tests/tauth_freeze_lap.py (host only): stats every frozen file (release_candidate.frozen_paths()), runs both tauth scripts, stats them again and compares inode, size and change time as release_candidate.drift() does; EXPOSED when both tests built and ran, FAIL naming each frozen file that changed. With the fix out the two test binaries are relinked in the tree.",
-      "updated": "2026-10-22",
-      "batches": [
+      ],
+      "verified_at": [
         {
-          "id": "b20261022-ce2e25",
-          "kind": "control",
-          "row": "lap:tauth_freeze",
           "config": "2/net/mesh/direct",
           "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED:",
-          "candidate": "",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "fix reverted: tests/evidence/controls/D-TAUTH-LAPS-RELINK-FROZEN-TEST-BINARIES.fix.diff sha256=55ce93524fb0e371dc4bc6d874b5a1ac3912cf41f6c746570ef314a3213e532a",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "why": "the fix-out rate of the tauth in-tree relink"
-        },
-        {
-          "id": "b20261022-bfae24",
-          "kind": "verify",
-          "row": "lap:tauth_freeze",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED:",
           "candidate": "0.90.134",
+          "attempt": "2026-10-23T03:55:19Z",
           "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "",
-          "state": "open",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "rate": {
-            "row": "lap:tauth_freeze",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261022-ce2e25",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "fix reverted: tests/evidence/controls/D-TAUTH-LAPS-RELINK-FROZEN-TEST-BINARIES.fix.diff sha256=55ce93524fb0e371dc4bc6d874b5a1ac3912cf41f6c746570ef314a3213e532a",
-            "builds": [
-              "16A5F5DDDB4852C9D5DB236"
-            ],
-            "date": "2026-10-22"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:tauth_freeze",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261022-ce2e25",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "fix reverted: tests/evidence/controls/D-TAUTH-LAPS-RELINK-FROZEN-TEST-BINARIES.fix.diff sha256=55ce93524fb0e371dc4bc6d874b5a1ac3912cf41f6c746570ef314a3213e532a",
-          "builds": [
-            "16A5F5DDDB4852C9D5DB236"
-          ],
+          "batch": "b20261022-ab8b8e",
+          "approval": "P20261022-aac779",
           "date": "2026-10-22"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:tauth_freeze",
-          "iso": "2026-10-23T03:42:13Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:tauth_freeze",
-          "iso": "2026-10-23T03:41:45Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:tauth_freeze",
-          "iso": "2026-10-23T03:41:18Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:tauth_freeze",
-          "iso": "2026-10-23T03:40:52Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:tauth_freeze",
-          "iso": "2026-10-23T03:40:26Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:tauth_freeze",
-          "iso": "2026-10-23T03:39:58Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:tauth_freeze",
-          "iso": "2026-10-23T03:39:30Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:tauth_freeze",
-          "iso": "2026-10-23T03:39:02Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:tauth_freeze",
-          "iso": "2026-10-23T03:38:37Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:tauth_freeze",
-          "iso": "2026-10-23T03:38:13Z"
         }
       ]
     },
@@ -6989,6 +7189,16 @@
           "iso": "2026-10-23T03:58:46Z"
         }
       ]
+    },
+    {
+      "id": "D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-22",
+      "summary": "tests/suite/fsx.sh wrote fsx's output to /tmp/fsx.$$.*.log on the node and deleted it in its EXIT trap, and run.sh's artifact pull for a row that did not pass brought no fsx log, so no failing fsx check kept its evidence: a FAIL of the fsx row could not be diagnosed from what the run kept.",
+      "evidence": "Split from D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED on 2026-10-23 (review data/reviews/P20261022-fa5891.md: that record's control reverted only the seed line). Code before the fix: tests/suite/fsx.sh:22 trap 'rm -rf \"$W\" /tmp/fsx.$$.*' deleted every fsx log. Fix in the tree (0.90.134): fsx.sh keeps a failing check's log on the node as /root/fsx.<seed>.<ops>.log (a passing check's log is still deleted, tests/suite/fsx.sh:44-45), and run.sh's pull for a row that did not pass (the one that brings /root/drc_* from every node, run.sh:2202) takes /root/fsx.<seed>.<ops>.log too, so it lands in tests/evidence/run_fsx_<run id>/ as <node>_fsx.<seed>.<ops>.log. Exercised on the host with the same remote command only: a /root holding fsx.123.100000.log came back as test1_fsx.123.100000.log. No lap has measured it through run.sh, and no control has taken it out.",
+      "next": "A lap that runs the fsx row through run.sh on a formed pair with one fsx check made to fail, and requires <node>_fsx.<seed>.<ops>.log in tests/evidence/run_fsx_<run id>/ holding that check's output (exposure: the check failed); a control with fsx.sh's old EXIT trap and run.sh's pull without fsx logs, which must lose the log; then a verification batch on the candidate sized from it, and remove --fixed."
     }
   ]
 }
