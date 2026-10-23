@@ -193,6 +193,151 @@
         "date": "2026-10-22"
       },
       "applied": "2026-10-22"
+    },
+    {
+      "id": "P20261022-0e19fe",
+      "kind": "detector-defect",
+      "record": null,
+      "change": {
+        "config": "3/disk/caw/direct",
+        "row": "guard_census",
+        "iso": "2026-10-11T00:56:39Z"
+      },
+      "argument": "This proposal settles 3/disk/caw/direct:guard_census:2026-10-11T00:56:39Z. The run's FAIL was the census tool's fault, not MeshXFS's. tests/tooling/guard_census.sh runs tools/sole_survivor_audit.py --check against tests/criteria/sole_survivor_sites.json and fails when it reads any guard as new or grown (guard_census.sh:61-70). On 2026-10-11 the audit credited each single-node guard to the last column-0 'name(' above it and counted MODULE_PARM_DESC(, module_param_named( and EXPORT_SYMBOL( as names; 0.90.118 added the ag_nb_mute_unanswered_master module parameter between v5_boot_k_lineage and mxfs_v5_dlm_is_mds(), which re-credited that already reviewed guard to MODULE_PARM_DESC, so the census read it as new (measured 'new=1 grown=0') on every configuration that ran it that evening: 3/disk/caw/direct 00:56:39Z, 3/net/mesh/direct 00:58:17Z, 5/disk/caw/direct 00:58:14Z and 5/net/mesh/direct 01:01:56Z (data/criteria.runs.jsonl:1349, :1359, :1357, :1372). The detector fix is in the tree: tools/sole_survivor_audit.py:58-62 (NOT_FUNC skips column-0 MODULE_*, module_param* and EXPORT_SYMBOL* invocations), described in CHANGELOG.md:3881-3891 (0.90.119); the file's mtime is 2026-10-11T01:02:44Z, after the four FAILs and before the next runs. Independent evidence that the code did the right thing: the guard the census flagged is the reviewed inventory entry, and the same configurations' guard_census passed on the fixed detector minutes later with nothing else changed (data/criteria.runs.jsonl:1377 3/disk/caw/direct 01:05:18Z PASS, :1379 3/net/mesh/direct 01:05:26Z PASS, :1381 5/disk/caw/direct 01:05:36Z PASS, :1384 5/net/mesh/direct 01:06:48Z PASS, build A969E000AECBD63CBC36F81), as has every guard_census run since. The sweep that collected these lines is tests/evidence/incident_remaining_evidence_20261023.txt:2010-2146.",
+      "evidence": [
+        "tools/sole_survivor_audit.py",
+        "tests/tooling/guard_census.sh",
+        "CHANGELOG.md",
+        "data/criteria.runs.jsonl",
+        "tests/criteria/sole_survivor_sites.json",
+        "tests/evidence/incident_remaining_evidence_20261023.txt"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-93885a",
+      "kind": "detector-defect",
+      "record": null,
+      "change": {
+        "config": "3/net/mesh/direct",
+        "row": "guard_census",
+        "iso": "2026-10-11T00:58:17Z"
+      },
+      "argument": "This proposal settles 3/net/mesh/direct:guard_census:2026-10-11T00:58:17Z. The run's FAIL was the census tool's fault, not MeshXFS's. tests/tooling/guard_census.sh runs tools/sole_survivor_audit.py --check against tests/criteria/sole_survivor_sites.json and fails when it reads any guard as new or grown (guard_census.sh:61-70). On 2026-10-11 the audit credited each single-node guard to the last column-0 'name(' above it and counted MODULE_PARM_DESC(, module_param_named( and EXPORT_SYMBOL( as names; 0.90.118 added the ag_nb_mute_unanswered_master module parameter between v5_boot_k_lineage and mxfs_v5_dlm_is_mds(), which re-credited that already reviewed guard to MODULE_PARM_DESC, so the census read it as new (measured 'new=1 grown=0') on every configuration that ran it that evening: 3/disk/caw/direct 00:56:39Z, 3/net/mesh/direct 00:58:17Z, 5/disk/caw/direct 00:58:14Z and 5/net/mesh/direct 01:01:56Z (data/criteria.runs.jsonl:1349, :1359, :1357, :1372). The detector fix is in the tree: tools/sole_survivor_audit.py:58-62 (NOT_FUNC skips column-0 MODULE_*, module_param* and EXPORT_SYMBOL* invocations), described in CHANGELOG.md:3881-3891 (0.90.119); the file's mtime is 2026-10-11T01:02:44Z, after the four FAILs and before the next runs. Independent evidence that the code did the right thing: the guard the census flagged is the reviewed inventory entry, and the same configurations' guard_census passed on the fixed detector minutes later with nothing else changed (data/criteria.runs.jsonl:1377 3/disk/caw/direct 01:05:18Z PASS, :1379 3/net/mesh/direct 01:05:26Z PASS, :1381 5/disk/caw/direct 01:05:36Z PASS, :1384 5/net/mesh/direct 01:06:48Z PASS, build A969E000AECBD63CBC36F81), as has every guard_census run since. The sweep that collected these lines is tests/evidence/incident_remaining_evidence_20261023.txt:2010-2146.",
+      "evidence": [
+        "tools/sole_survivor_audit.py",
+        "tests/tooling/guard_census.sh",
+        "CHANGELOG.md",
+        "data/criteria.runs.jsonl",
+        "tests/criteria/sole_survivor_sites.json",
+        "tests/evidence/incident_remaining_evidence_20261023.txt"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-1319cc",
+      "kind": "detector-defect",
+      "record": null,
+      "change": {
+        "config": "5/disk/caw/direct",
+        "row": "guard_census",
+        "iso": "2026-10-11T00:58:14Z"
+      },
+      "argument": "This proposal settles 5/disk/caw/direct:guard_census:2026-10-11T00:58:14Z. The run's FAIL was the census tool's fault, not MeshXFS's. tests/tooling/guard_census.sh runs tools/sole_survivor_audit.py --check against tests/criteria/sole_survivor_sites.json and fails when it reads any guard as new or grown (guard_census.sh:61-70). On 2026-10-11 the audit credited each single-node guard to the last column-0 'name(' above it and counted MODULE_PARM_DESC(, module_param_named( and EXPORT_SYMBOL( as names; 0.90.118 added the ag_nb_mute_unanswered_master module parameter between v5_boot_k_lineage and mxfs_v5_dlm_is_mds(), which re-credited that already reviewed guard to MODULE_PARM_DESC, so the census read it as new (measured 'new=1 grown=0') on every configuration that ran it that evening: 3/disk/caw/direct 00:56:39Z, 3/net/mesh/direct 00:58:17Z, 5/disk/caw/direct 00:58:14Z and 5/net/mesh/direct 01:01:56Z (data/criteria.runs.jsonl:1349, :1359, :1357, :1372). The detector fix is in the tree: tools/sole_survivor_audit.py:58-62 (NOT_FUNC skips column-0 MODULE_*, module_param* and EXPORT_SYMBOL* invocations), described in CHANGELOG.md:3881-3891 (0.90.119); the file's mtime is 2026-10-11T01:02:44Z, after the four FAILs and before the next runs. Independent evidence that the code did the right thing: the guard the census flagged is the reviewed inventory entry, and the same configurations' guard_census passed on the fixed detector minutes later with nothing else changed (data/criteria.runs.jsonl:1377 3/disk/caw/direct 01:05:18Z PASS, :1379 3/net/mesh/direct 01:05:26Z PASS, :1381 5/disk/caw/direct 01:05:36Z PASS, :1384 5/net/mesh/direct 01:06:48Z PASS, build A969E000AECBD63CBC36F81), as has every guard_census run since. The sweep that collected these lines is tests/evidence/incident_remaining_evidence_20261023.txt:2010-2146.",
+      "evidence": [
+        "tools/sole_survivor_audit.py",
+        "tests/tooling/guard_census.sh",
+        "CHANGELOG.md",
+        "data/criteria.runs.jsonl",
+        "tests/criteria/sole_survivor_sites.json",
+        "tests/evidence/incident_remaining_evidence_20261023.txt"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-84468c",
+      "kind": "detector-defect",
+      "record": null,
+      "change": {
+        "config": "5/net/mesh/direct",
+        "row": "guard_census",
+        "iso": "2026-10-11T01:01:56Z"
+      },
+      "argument": "This proposal settles 5/net/mesh/direct:guard_census:2026-10-11T01:01:56Z. The run's FAIL was the census tool's fault, not MeshXFS's. tests/tooling/guard_census.sh runs tools/sole_survivor_audit.py --check against tests/criteria/sole_survivor_sites.json and fails when it reads any guard as new or grown (guard_census.sh:61-70). On 2026-10-11 the audit credited each single-node guard to the last column-0 'name(' above it and counted MODULE_PARM_DESC(, module_param_named( and EXPORT_SYMBOL( as names; 0.90.118 added the ag_nb_mute_unanswered_master module parameter between v5_boot_k_lineage and mxfs_v5_dlm_is_mds(), which re-credited that already reviewed guard to MODULE_PARM_DESC, so the census read it as new (measured 'new=1 grown=0') on every configuration that ran it that evening: 3/disk/caw/direct 00:56:39Z, 3/net/mesh/direct 00:58:17Z, 5/disk/caw/direct 00:58:14Z and 5/net/mesh/direct 01:01:56Z (data/criteria.runs.jsonl:1349, :1359, :1357, :1372). The detector fix is in the tree: tools/sole_survivor_audit.py:58-62 (NOT_FUNC skips column-0 MODULE_*, module_param* and EXPORT_SYMBOL* invocations), described in CHANGELOG.md:3881-3891 (0.90.119); the file's mtime is 2026-10-11T01:02:44Z, after the four FAILs and before the next runs. Independent evidence that the code did the right thing: the guard the census flagged is the reviewed inventory entry, and the same configurations' guard_census passed on the fixed detector minutes later with nothing else changed (data/criteria.runs.jsonl:1377 3/disk/caw/direct 01:05:18Z PASS, :1379 3/net/mesh/direct 01:05:26Z PASS, :1381 5/disk/caw/direct 01:05:36Z PASS, :1384 5/net/mesh/direct 01:06:48Z PASS, build A969E000AECBD63CBC36F81), as has every guard_census run since. The sweep that collected these lines is tests/evidence/incident_remaining_evidence_20261023.txt:2010-2146.",
+      "evidence": [
+        "tools/sole_survivor_audit.py",
+        "tests/tooling/guard_census.sh",
+        "CHANGELOG.md",
+        "data/criteria.runs.jsonl",
+        "tests/criteria/sole_survivor_sites.json",
+        "tests/evidence/incident_remaining_evidence_20261023.txt"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-8059bb",
+      "kind": "detector-defect",
+      "record": null,
+      "change": {
+        "config": "1/any",
+        "row": "release:build",
+        "iso": "2026-10-21T19:05:48Z"
+      },
+      "argument": "The release build step of the 0.90.133-2 dry run failed before building anything: its whole-tree rsync could not read a root-only result file, tests/evidence/candidates/0.90.133-2.build.log:2 'rsync: [sender] send_files failed to open \"/home/steve/src/mxfs/bench.json\": Permission denied (13)', :4 '=== rc=23', recorded as data/criteria.runs.jsonl:6836 'could not copy the tree'. That is the step's own fault (the detector): bench.json is a benchmark result, not a frozen input, and nothing about the candidate's module or tools was measured. The detector fix is in the tree: tools/release_run.py:229-238, the build copies the candidate's frozen file list only (rsync --files-from of the manifest's files), with the comment naming this failure; CHANGELOG.md 0.90.133 entry, 'The clean build copied the whole tree and stopped on a root-only result file. It now copies the candidate's frozen file list and nothing else'. Independent evidence that the candidate built: the next build step on the same module 71AC6107043DD5BE3D9181A passed on the fixed detector (data/criteria.runs.jsonl:6943, 2026-10-21T20:49:59Z, 'clean build 71AC6107043DD5BE3D9181A, tools, tauth, audits'), and every build step since passed (:6962, :7053, :7144). Collected in tests/evidence/incident_remaining_evidence_20261023.txt:2701-2718.",
+      "evidence": [
+        "tests/evidence/candidates/0.90.133-2.build.log",
+        "tools/release_run.py",
+        "CHANGELOG.md",
+        "data/criteria.runs.jsonl",
+        "tests/evidence/incident_remaining_evidence_20261023.txt"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-40f6b5",
+      "kind": "infra-proven",
+      "record": null,
+      "change": {
+        "config": "1/any",
+        "row": "release:packages",
+        "iso": "2026-10-21T19:08:29Z"
+      },
+      "argument": "The packages step of the 0.90.133-2 dry run failed in the platform build check, before any package was built, because the rig's Proxmox build VM lacked the kernel headers for one claimed kernel: tests/evidence/candidates/0.90.133-2.packages.log:10 'VM_KBUILD_FAIL pve9 pve9-1 7.0.14-24-pve (no headers for 7.0.14-24-pve installed on pve9-1)', :11 'NO_HEADERS 7.0.14-24-pve', :12 'ERROR: ... failed; no packages built' (scripts/vm_kbuild_check.sh:74 prints NO_HEADERS when the VM has no $hdr/Makefile for that kernel, :91). The same check built MeshXFS on that VM for the other kernels in the same step (:6 VM_KBUILD_OK ... 7.0.14-19-pve, :8 VM_KBUILD_OK ... 6.17.2-1-pve), so the build itself was sound; the missing header package is the VM's state, outside MeshXFS, and it precedes the failure. Once the headers were on the VM the identical check passed for that kernel: tests/evidence/candidates/0.90.134_20261021T212712Z.packages.log:6 'VM_KBUILD_OK pve9 pve9-1 7.0.14-24-pve C0589CD3CE0FFA63297F6A8' (2026-10-21T21:27Z) and 0.90.134_20261021T230333Z.packages.log:6, and the packages step passed at data/criteria.runs.jsonl:7055 (2026-10-21T23:30:01Z, '3 packages in dist/0.90.134'). No MeshXFS kernel line is involved: nothing was loaded or mounted in this step. Collected in tests/evidence/incident_remaining_evidence_20261023.txt:2719-2743.",
+      "evidence": [
+        "tests/evidence/candidates/0.90.133-2.packages.log",
+        "tests/evidence/candidates/0.90.134_20261021T212712Z.packages.log",
+        "scripts/vm_kbuild_check.sh",
+        "data/criteria.runs.jsonl",
+        "tests/evidence/incident_remaining_evidence_20261023.txt"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-52eada",
+      "kind": "infra-proven",
+      "record": null,
+      "change": {
+        "config": "2/net/mesh/direct",
+        "row": "release:platforms",
+        "iso": "2026-10-21T20:12:33Z"
+      },
+      "argument": "The platforms step of the 0.90.133-2 dry run had no packages to verify, because the packages step before it had failed on the build VM's missing kernel headers (tests/evidence/candidates/0.90.133-2.packages.log:10-12, 'VM_KBUILD_FAIL pve9 pve9-1 7.0.14-24-pve (no headers for 7.0.14-24-pve installed on pve9-1)' ... 'no packages built'; data/candidates/0.90.133-2.json:46-52 packages failed). tests/full_verify.sh then refused before running a round: tests/evidence/candidates/0.90.133-2.platforms.log:2 'PLATFORMS leaves out pve9, which has no run of 0.90.133-2 to be graded on', :3 '=== rc=2', recorded as data/criteria.runs.jsonl:6911 'full_verify platforms rc=2, -1 failed step(s)'. No package was installed and no node ran MeshXFS in this step, so it measured nothing of MeshXFS; its cause is the same infrastructure fault, outside MeshXFS, that preceded it. The step now refuses outright when the packages step did not pass (tools/release_run.py:489-493, comment naming 0.90.133-2), and with packages present it passed: data/criteria.runs.jsonl:7129 (2026-10-22T01:55:36Z, \"every released platform's packaged round and hung-node test\"). Collected in tests/evidence/incident_remaining_evidence_20261023.txt:2780-2793.",
+      "evidence": [
+        "tests/evidence/candidates/0.90.133-2.platforms.log",
+        "tests/evidence/candidates/0.90.133-2.packages.log",
+        "data/candidates/0.90.133-2.json",
+        "tools/release_run.py",
+        "data/criteria.runs.jsonl",
+        "tests/evidence/incident_remaining_evidence_20261023.txt"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
     }
   ]
 }

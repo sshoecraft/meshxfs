@@ -28,13 +28,21 @@ the harness once and records the lap the way run.sh records a board row's:
   - it is appended, under the board's lock, to the ledger of the board that keeps the batch's
     configuration (tools/criteria.py board_for and append_ledger, as tools/release_run.py records
     its steps), which is where tools/defects.py reads the batch's laps; the lap's log is its
-    evidence.
+    evidence;
+  - the lab VMs the lap uses, those MXFS_NODE_LIST names and the nodes of the rig group
+    MXFS_GROUP, are held for tools/vm_pool.sh while the lap runs, as tests/lib/runlock.sh
+    vmhold_take holds them. Every run.sh leaves a reaper behind (vm_pool.sh release --after
+    <its pid>) that shuts its nodes off once they have gone unheld for 600 s after it exits, and a
+    lane that formed its pair with run.sh and then ran harness laps lost both nodes under a lap
+    that way (D-BATCH-LAP-HOLDS-NO-VM-SO-RUN-SH-REAPER-POWERS-ITS-NODES-OFF-MID-LAP).
+    MXFS_BATCH_LAP_HOLD=0 holds nothing, as before: the same-build control.
 
 Exit status: 0 PASS, 1 FAIL, 2 INCOMPLETE or refused.
 """
 from __future__ import annotations
 
 import argparse
+import fcntl
 import glob
 import os
 import re
@@ -70,6 +78,33 @@ def batch_check(args) -> dict:
         if sep:
             answer[key.strip()] = value
     return answer
+
+
+def lap_vms() -> list:
+    """The lab VMs the caller says the lap uses: MXFS_NODE_LIST, and the rig group MXFS_GROUP's
+    nodes (tools/mxfs_lab.sh group)."""
+    vms = [vm for vm in os.environ.get("MXFS_NODE_LIST", "").split(",") if vm]
+    group = os.environ.get("MXFS_GROUP", "")
+    if group:
+        out = subprocess.run([str(ROOT / "tools" / "mxfs_lab.sh"), "group", group],
+                             capture_output=True, text=True, timeout=30)
+        if out.returncode != 0:
+            sys.exit(f"batch_lap: no rig group {group!r} (tools/mxfs_lab.sh group): {out.stderr.strip()}")
+        vms += out.stdout.split()
+    return sorted(set(vms))
+
+
+def hold_vms(vms: list, what: str) -> list:
+    """A shared flock on each VM's /tmp/mxfs_vmhold.<vm>.lock, kept until this process exits: the
+    hold tools/vm_pool.sh reads, as tests/lib/runlock.sh vmhold_take takes it."""
+    handles = []
+    for vm in vms:
+        handle = open(f"/tmp/mxfs_vmhold.{vm}.lock", "a")
+        fcntl.flock(handle.fileno(), fcntl.LOCK_SH)
+        handle.write(f"{os.getpid()} {stamp()} {what}\n")
+        handle.flush()
+        handles.append(handle)
+    return handles
 
 
 def build_of(ko: str) -> str:
@@ -137,13 +172,16 @@ def main() -> int:
     logdir = ROOT / "tests" / "evidence" / "batch_laps" / args.batch
     logdir.mkdir(parents=True, exist_ok=True)
     log = logdir / f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.log"
+    vms = lap_vms() if os.environ.get("MXFS_BATCH_LAP_HOLD", "1") != "0" else []
+    holds = hold_vms(vms, f"batch_lap {args.batch} {args.row}")
     print(f"--- batch {args.batch}: one lap of {args.row} at {config}"
           f"{', exposure probe ' + repr(probe) if probe else ''}"
-          f"{', variant ' + variant if variant else ''}; bound {args.bound}s; log {log} ---",
-          flush=True)
+          f"{', variant ' + variant if variant else ''}; bound {args.bound}s; "
+          f"VMs held: {' '.join(vms) or 'none'}; log {log} ---", flush=True)
     t0 = time.time()
     with log.open("w") as handle:
         handle.write(f"=== {stamp()} {' '.join(command)} (bound {args.bound}s) ===\n")
+        handle.write(f"=== VMs held for the lap: {' '.join(vms) or 'none'} ===\n")
         handle.flush()
         try:
             rc = subprocess.run(command, cwd=ROOT, stdout=handle, stderr=subprocess.STDOUT,

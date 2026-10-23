@@ -174,6 +174,10 @@ landed=$(sum iwr_merge_hold_landed)
 blocks=$(sum iwr_merge_blocks)
 measured="miscompares=$mis hold_landed=$landed merged_blocks=$blocks workload_ms=$wall hold=${HOLD_N}x${HOLD_PEER_MS}ms"
 echo "  INFO $measured"
+# the counts in node 1's kernel log too: a batch lap's exposure is read from
+# the nodes' kernel logs, and the merged write counts its retries without
+# logging them
+rs 10 "$N1" "echo '$MARK counted $measured' > /dev/kmsg" >/dev/null
 if [ "$fails" -gt 0 ]; then finish FAIL; exit 1; fi
 if [ "$mis" -lt 1 ]; then
     finish FAIL "VACUOUS: no swap miscompared in $blocks merged writes (hold_landed=$landed), so the row did not exercise the merged write's retry"

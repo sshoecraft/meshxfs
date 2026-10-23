@@ -68,8 +68,10 @@ S=$(( dloff / 4096 - 1 ))
 echo "  INFO disklock_offset=$dloff: scratch block LBA $S, journal's last block $((S - 1)), disklock's first $((S + 1))"
 lo_before=$(rs 15 "$N2" "dd if=$DEV bs=4096 skip=$((S - 1)) count=1 iflag=direct status=none | md5sum" | awk '{print $1}')
 
-# FUA write on node 1, read back whole on node 2
-rs 15 "$N1" "$T/fua_verify write $DEV $S ab 2>&1" > "$OUT/fua_write.txt"
+# FUA write on node 1, read back whole on node 2.  The kernel mark first: a
+# batch lap's exposure is read from the nodes' kernel logs, and the tools log
+# nothing there, so the mark is what shows the lap reached the write
+rs 15 "$N1" "echo 'FOURKN-CDB-$RUN fua_verify write lba=$S pattern=ab' > /dev/kmsg; $T/fua_verify write $DEV $S ab 2>&1" > "$OUT/fua_write.txt"
 ck "$N1's FUA write of block $S" "$(grep -c '^WRITE(16) FUA: lba='"$S"' pattern=0xab OK' "$OUT/fua_write.txt")" 1
 rs 15 "$N2" "$T/fua_verify read $DEV $S 2>&1" > "$OUT/fua_read.txt"
 ck "$N2's FUA read finds $N1's write of block $S" "$(grep -c "FUATEST pattern=0xab lba=$S " "$OUT/fua_read.txt")" 1
