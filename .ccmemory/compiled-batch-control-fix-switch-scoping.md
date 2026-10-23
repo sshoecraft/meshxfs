@@ -6,7 +6,7 @@ metadata:
 tags: [compiled, harness_batch, control, knob, switch, batch_lap, trap]
 ---
 
-Assorted-tail group (one note, no peers): scoping a fix switch when running a control batch through `tools/harness_batch.py`. Source: [[trap-a-fix-switch-exported-to-a-batch-step-also-switches-the-batch-tools]].
+Assorted-tail group (one note, no peers): scoping a fix switch when running a control batch through `tools/harness_batch.py`. Source: `trap-a-fix-switch-exported-to-a-batch-step-also-switches-the-batch-tools`.
 
 When a tooling record's fix sits behind an environment switch and its control runs through `tools/harness_batch.py control ... --knob ... -- <lap>`, put the switch on the lap command only:
 

@@ -6894,7 +6894,7 @@
           "candidate": "0.90.134",
           "build": "08D63764A9352FBDD5A76CD",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -6986,6 +6986,18 @@
           "row": "lap:batch_lap_killpg",
           "iso": "2026-10-23T16:01:04Z"
         }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T15:56:24Z",
+          "build": "08D63764A9352FBDD5A76CD",
+          "batch": "b20261023-8e8ccd",
+          "approval": "P20261023-6dae93",
+          "date": "2026-10-23"
+        }
       ]
     },
     {
@@ -7041,6 +7053,56 @@
           "config": "1/any",
           "row": "release:presteps",
           "iso": "2026-10-21T23:22:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_pool_default_resolve",
+          "iso": "2026-10-23T16:05:52Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_pool_default_resolve",
+          "iso": "2026-10-23T16:05:49Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_pool_default_resolve",
+          "iso": "2026-10-23T16:05:47Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_pool_default_resolve",
+          "iso": "2026-10-23T16:05:44Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_pool_default_resolve",
+          "iso": "2026-10-23T16:05:41Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_pool_default_resolve",
+          "iso": "2026-10-23T16:05:39Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_pool_default_resolve",
+          "iso": "2026-10-23T16:05:36Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_pool_default_resolve",
+          "iso": "2026-10-23T16:05:34Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_pool_default_resolve",
+          "iso": "2026-10-23T16:05:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_pool_default_resolve",
+          "iso": "2026-10-23T16:05:29Z"
         }
       ],
       "batches": [
@@ -7055,14 +7117,64 @@
           "candidate": "",
           "build": "08D63764A9352FBDD5A76CD",
           "variant": "MXFS_RIG_POOL_DEFAULT=0 (tests/lib/rig.sh takes the configuration's device path as the no-mount candidate on a pool rig, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: on a pool rig the resolver's configuration-default candidate is the fixed rig LUN's path, which no pool node has, so it aborts 'is not a block device' without checking the bound LUN's identity"
+        },
+        {
+          "id": "b20261023-bacf66",
+          "kind": "verify",
+          "row": "lap:rig_pool_default_resolve",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:rig_pool_default_resolve",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-31a7bd",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_RIG_POOL_DEFAULT=0 (tests/lib/rig.sh takes the configuration's device path as the no-mount candidate on a pool rig, as before the fix)",
+            "builds": [
+              "08D63764A9352FBDD5A76CD"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "rates": [
+        {
+          "row": "lap:rig_pool_default_resolve",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-31a7bd",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_RIG_POOL_DEFAULT=0 (tests/lib/rig.sh takes the configuration's device path as the no-mount candidate on a pool rig, as before the fix)",
+          "builds": [
+            "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
+        }
+      ]
     },
     {
       "id": "D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED",
