@@ -2318,7 +2318,7 @@
       "opened": "2026-10-21",
       "summary": "tests/tooling/alloc_witness.sh: when one rank aborts its own precondition (fail_out writes ABORT to its rank file), the other rank waits for it until the row's 120 s budget kills both, and the board records FAIL BUDGET_EXHAUSTED on both ranks instead of the abort",
       "evidence": "Run 20261021T190943Z-g2b (2/net/mesh/direct): rank2.txt ABORT at 19:26:15Z, rank1 waited without a PHASE1 line, both rc=124 at 120 s, board line 96 'FAIL alloc_witness (nodes_pass=0/2 states:BUDGET_EXHAUSTED=2)'. run.sh:2061 greps 'mxfs-CCph rank=[0-9]* PHASE=' and run.sh:2070-2071 turn an empty result into none; tests/tooling/alloc_witness.sh records its phases with rec() into rank<N>.txt (lines 143, 326-417) and contains no CCph and no PHASE= (grep -c 0 each). ===== Again on 2/net/mesh/drbd, candidate 0.90.134, run 20261021T221943Z-g2: rank2 ABORT at its fill, both ranks recorded BUDGET_EXHAUSTED rc=124 with last_phase_census[none=2] (DRBD board ledger 2026-10-21T22:35:00Z). ===== 2026-10-23, precheck on g2b (test15/test16, 2/net/mesh/mpath, build 16A5F5DDDB4852C9D5DB236; lane tests/evidence/lanes/g2b_awabort_precheck_20261023T073948Z): with the fix (AW_ABORT_BROADCAST=1) both laps ended in 1 s, states FAIL=2, rank 1 'peer_abort rank=1' with reason 'another rank aborted the lap: rank 2: AW_ABORT_RANK=2: this rank aborts after its fill' (tests/evidence/alloc_witness/20261023T074334Z-g2b/rank1.txt ABORTED_BY_PEER, rank2.txt ABORT); with the switch off (AW_ABORT_BROADCAST=0) both laps ran 120 s of 120 s, states BUDGET_EXHAUSTED=2, last_phase_census[fill=1,start=1] (the census now reads the phases). The lap graded all four FAIL because it looked for injected_abort only, which the recorded row did not carry (rank 1 recorded first); it now accepts the abort's own text AW_ABORT_RANK=2.",
-      "next": "Control batch of tests/alloc_witness_abort_lap.sh with AW_ABORT_BROADCAST=0 (tools/harness_batch.py control --knob, 10 laps, bound 160 s, probe '^EXPOSED: rank2 aborted after its fill', pass '^LAP aw_abort PASS'), then the verification batch on the frozen candidate sized from it, then remove --fixed. The removal may name 2/net/mesh/drbd:alloc_witness:2026-10-21T22:35:00Z only with that run's own rank files showing the abort. ===== 2026-10-23: the census half of this record (the script wrote no mxfs-CCph marker, so the timeout census read none) is now D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE: this record's control turns off only the abort broadcast, so a removal here proves only that fix.",
+      "next": "Control batch of tests/alloc_witness_abort_lap.sh with AW_ABORT_BROADCAST=0 (tools/harness_batch.py control --knob, 10 laps, bound 160 s, probe '^EXPOSED: rank2 aborted after its fill', pass '^LAP aw_abort PASS'), then the verification batch on the frozen candidate sized from it, then remove --fixed. The removal may name 2/net/mesh/drbd:alloc_witness:2026-10-21T22:35:00Z only with that run's own rank files showing the abort. ===== 2026-10-23: the census half of this record (the script wrote no mxfs-CCph marker, so the timeout census read none) is now D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE: this record's control turns off only the abort broadcast, so a removal here proves only that fix. ===== Removal P20261023-5e015a was rejected (data/reviews/P20261023-5e015a.md) with cause, control (10 of 10, the frozen list unchanged) and fix-on batch (6 of 6, N recomputed) all found proven: removal would retire 2/net/mesh/drbd:alloc_witness:2026-10-21T22:35:00Z, which this record names, while that run's failure belongs to D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION (open); tools/criteria.py:777-778 drops a settled FAIL before :779 looks at which records name it. Approvable once that run is not settled by this removal: either this record stops naming it (tools/defects.py update has no option to drop a cell) or the removal waits until D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION is disposed of. Review notes: control and fix-on ran only at 2/disk/caw/direct; run.sh passes its default 120 s as COORD_TIMEOUT, which equals the row's budget, not the budget itself.",
       "cells": [
         {
           "config": "2/net/mesh/drbd",
@@ -4507,11 +4507,44 @@
           "candidate": "",
           "build": "08D63764A9352FBDD5A76CD",
           "variant": "HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=0 FORCE_MS=0 (MXFS_TEST_ENV): the row's held window back, each node's first 8 merged blocks held a fixed 20 ms between read and swap, and its forced overlap left out (both unmounts plain), as the record found it",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the held window without the forced overlap: laps with no MISCOMPARE retried (VACUOUS) must come back"
+        },
+        {
+          "id": "b20261023-9456ea",
+          "kind": "verify",
+          "row": "fourkn_merge",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 22,
+          "probe": "FOURKN-MERGE-[^ ]+ counted miscompares=[1-9].*forced=landed",
+          "candidate": "0.90.134",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "fourkn_merge",
+            "config": "2/net/mesh/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-fe3eb3",
+            "k": 10,
+            "n": 20,
+            "candidate": "",
+            "variant": "HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=0 FORCE_MS=0 (MXFS_TEST_ENV): the row's held window back, each node's first 8 merged blocks held a fixed 20 ms between read and swap, and its forced overlap left out (both unmounts plain), as the record found it",
+            "builds": [
+              "08D63764A9352FBDD5A76CD"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.21774748526125431
         }
       ],
       "updated": "2026-10-23",
@@ -4545,6 +4578,21 @@
             "16A5F5DDDB4852C9D5DB236"
           ],
           "date": "2026-10-22"
+        },
+        {
+          "row": "fourkn_merge",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-fe3eb3",
+          "k": 10,
+          "n": 20,
+          "candidate": "",
+          "variant": "HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=0 FORCE_MS=0 (MXFS_TEST_ENV): the row's held window back, each node's first 8 merged blocks held a fixed 20 ms between read and swap, and its forced overlap left out (both unmounts plain), as the record found it",
+          "builds": [
+            "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
         }
       ],
       "cells": [
@@ -4642,6 +4690,56 @@
           "config": "2/net/mesh/direct4k",
           "row": "fourkn_merge",
           "iso": "2026-10-23T04:01:05Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T11:46:12Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T11:45:21Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T11:43:43Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T11:42:53Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T11:41:14Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T11:38:50Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T11:38:00Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T11:37:12Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T11:35:36Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T11:32:27Z"
         }
       ],
       "verified_at": [
@@ -6198,7 +6296,7 @@
           "candidate": "0.90.134",
           "build": "08D63764A9352FBDD5A76CD",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -6288,6 +6386,18 @@
           "config": "2/net/mesh/direct",
           "row": "lap:lmu",
           "iso": "2026-10-23T10:42:47Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T10:11:20Z",
+          "build": "08D63764A9352FBDD5A76CD",
+          "batch": "b20261023-dff6ea",
+          "approval": "P20261023-8226ea",
+          "date": "2026-10-23"
         }
       ]
     },

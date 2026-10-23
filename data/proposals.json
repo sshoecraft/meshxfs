@@ -2708,8 +2708,14 @@
         "tests/evidence/run_alloc_witness_20261021T221943Z-g2/test2.rc",
         "tests/evidence/drbd_rig/criteria.runs.jsonl"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-5e015a.md",
+        "sha256": "9243103f69857f9586ef87e4bb6617e3e77b3826122b48d809a6f97a67f237a1",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-b3dddc",
@@ -2764,6 +2770,42 @@
         "tests/evidence/batch_laps/b20261023-9a3afc",
         "tests/last_member_umount_lap.sh",
         "tests/last_member_umount_trace.sh"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-8226ea.md",
+        "sha256": "ce971b153095c9694f194eef2338d5b50767280cedcf0d6496cfce1833513f62",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-2ed8d3",
+      "kind": "remove-fixed",
+      "record": "D-LAST-MEMBER-UMOUNT-AFTER-A-15K-PAGE-HANDBACK-TAKES-31S-OVER-THE-STALL-LIMIT",
+      "change": {
+        "control": "b20261023-9a3afc",
+        "fixon": "b20261023-dff6ea",
+        "cause": "A clean last-member unmount's release-all (dlm_wire_release_all in dlm/dlm.c, reached from mxfs_dlm_release_all at dlm/v5_mount.c:22458) released every grant the member held one authority-ledger transition at a time, each about 0.9 ms of page commit under mxfs_tauth_page_write (FUA reads, COMPARE AND WRITE writes, flushes), serially, so a last member holding 32000-40000 grants took 28-61 s to unmount, over the 30 s stall limit."
+      },
+      "argument": "FIXED AND VERIFIED. Cause, measured (lane tests/evidence/lanes/g2_lmu_trace_20261023T075544Z, build B155E10D900872E6CE36289): A's unmount 30972 and 31746 ms at NFILES=32000, of which release-all took 27939 and 28708 ms releasing 31946 and 31962 grants (tests/evidence/20261023T075654Z_lmutrace_lmu32k1/a_kmsg.txt 'P-RELALL-WALL released=31946 ms=27939', tests/evidence/20261023T080029Z_lmutrace_lmu32k2 'released=31962 ms=28708'); the umount task's stack samples taken every 200 ms are FUA reads, COMPARE AND WRITE writes and flushes under mxfs_tauth_page_write; at NFILES=4000 'released=4001 ms=3684'. The wall is the grant count times one page commit. Fix: dlm_wire_release_all sends the remote masters' releases first on its own thread and commits the locally mastered ones on dl_relall_threads threads (default 8, each taking every nth resource); dl_relall_threads=1 is the old serial release-all, so the knob takes exactly the fix out on the same build. Precheck lane tests/evidence/lanes/g2_relall_prechecks_20261023T080727Z: 8 threads against 1 on the same formation. Control b20261023-9a3afc (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step13.log): candidate 0.90.134's module 08D63764A9352FBDD5A76CD on the g2 pair, dl_relall_threads=1 through MXFS_EXTRA_MODARGS on each lap's own prep, tests/last_member_umount_lap.sh at its default nfiles=40000 (the verify review's correction: not 32000; both batches ran the same value): 10 of 10 exposed laps FAIL, A's last-member unmount 37573-61378 ms against 30000. Verification b20261023-dff6ea (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step14.log), sized from it (L=0.5887, N=6), the same build, lap, pair and nfiles with the default 8 threads: 6 of 6 exposed laps PASS, 10256-12906 ms; approved and applied (P20261023-8226ea, data/reviews/P20261023-8226ea.md: every lap sv=08D63764A9352FBDD5A76CD, KNOB=8, A's kernel log shows each release-all handling 39842-39938 grants). Every run this record names is a control lap of b20261023-9a3afc (its cells), settled by that verification. Scope: the path runs only under the TCP lock manager: ctx->dlm is the TCP DLM, created on the TCP path (dlm/v5_mount.c:20534, 'TCP DLM create failed' on error), and the unmount calls mxfs_dlm_release_all only when ctx->dlm is set (:22457-22458); a COMPARE AND WRITE mount releases through mxfs_dlm_caw_stop (:22453-22455) and opens no authority ledger (tauth_open, :21070), so disk/caw configurations never run the serial release-all. On net/mesh configurations the wall is per grant the last member holds (the measured 0.9 ms per page commit, 28 s at 32000 against 3.7 s at 4000), not per node or attachment: the fix divides the locally mastered commits over 8 threads and moves remote masters' releases off them whatever the node count. Observations from the verify review that are not this record: 3 of 6 verify laps and 5 of 10 control laps log one ~1 s P-LKTIMEOUT-REMOTE with a retry early in A's unmount (present with the fix out as well).",
+      "evidence": [
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step2.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step13.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step14.log",
+        "tests/evidence/lanes/g2_lmu_trace_20261023T075544Z",
+        "tests/evidence/20261023T075654Z_lmutrace_lmu32k1",
+        "tests/evidence/20261023T080029Z_lmutrace_lmu32k2",
+        "tests/evidence/lanes/g2_relall_prechecks_20261023T080727Z",
+        "tests/evidence/batch_laps/b20261023-9a3afc",
+        "tests/evidence/batch_laps/b20261023-dff6ea",
+        "tests/last_member_umount_lap.sh",
+        "tests/last_member_umount_trace.sh",
+        "dlm/dlm.c",
+        "dlm/v5_mount.c",
+        "data/reviews/P20261023-8226ea.md"
       ],
       "state": "pending",
       "created": "2026-10-23"
