@@ -2321,7 +2321,7 @@
       "nodes": 1,
       "config": "*/*/*",
       "opened": "2026-10-21",
-      "summary": "tools/release_run.py records each step's outcome as a ledger run keyed config '1/any' (or the step's configuration) and row 'release:<step>', and tools/defects.py parse_cell split CONFIG:ROW:ISO at its first two colons and passed every configuration to parse_at: a step's run read as row 'release' with stamp '<step>:...', '1/any' was refused, and the own-rig key 2/net/mesh/drbd was refused without MXFS_OWN_RIG, so no disposition could name or settle a failed release step's run and the gate could never clear it.",
+      "summary": "tools/defects.py parse_cell split CONFIG:ROW:ISO at its first two colons and passed every configuration to criteria.parse_at; with that parse (MXFS_RELEASE_STEP_SETTLE=0), propose --target (infra, amend) and update --cell were refused on all three release-step keys: 1/any ('wanted <nodes>/<class>/<method>/<attach>'), 2/net/mesh/direct ('records no run stamped platforms:2026-10-21T20:12:33Z') and 2/net/mesh/drbd ('verified on a rig of its own'); in control b20261023-0be094 9 of 12 dispositions were refused, and only the removals of a record already naming the run cleared it",
       "evidence": "Read 2026-10-21: (1) criteria.parse_at('1/any') exits \"wanted <nodes>/<class>/<method>/<attach>\", so criteria.py amend/infra/incidents --at and defects.py propose --target refuse it; (2) the row contains a colon, and tools/defects.py parse_cell (lines 714-726) and propose --target (1241-1242) split CONFIG:ROW:ISO at the first two colons, reading row 'release' and iso 'presteps:2026-...'; (3) criteria.py cmd_amend/cmd_infra/withdraw (1427-1489) start with find(data, args.id), which needs a board criterion of that name, and release:* rows exist only in the ledger. The ledger already holds four such FAILs from dry-run candidate 0.90.133-2: release:presteps 2026-10-21T19:05:47Z, release:build 19:05:48Z, release:packages 19:08:29Z, release:boards 19:29:49Z (data/criteria.runs.jsonl), and later steps of that run will add more. The ledger is append-only, so the fix must make these existing keys settleable. ===== 2026-10-23: the own-rig key cause, measured with tests/release_step_cell_lap.py on the tree before this change: infra and amend of 2/net/mesh/drbd:release:drbd:2026-10-22T00:35:43Z refused 'criteria: release:drbd [2/net/mesh/drbd] records no run stamped 2026-10-22T00:35:43Z' (tools/criteria.py switched to the DRBD board because its argv named 2/net/mesh/drbd, while tools/release_run.py writes every step's run into the primary ledger), and the removal left the run listed (defects.py retire_cells routed the cell by configuration, board_for, to the DRBD ledger, where the run is not); the 1/any and 2/net/mesh/direct shapes settled. Fix: criteria.py keeps the primary board when its argv names a release step's row (release:<step>), and retire_cells routes a release step's cell to the primary ledger (criteria.run_board), with the parse and annotation hunks, all behind MXFS_RELEASE_STEP_SETTLE (0 = as before). Lap with the switch on: 'STEP_CELL_LAP PASS all 9 dispositions settled their run (3 key shapes x infra, amend, removal) and both take-backs listed it again'; off: 'STEP_CELL_LAP FAIL 9 of 9 dispositions did not settle their run' (propose and update --cell refused on all three shapes). ===== 2026-10-23: the defects.py check_cells routing joins this record from D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD (data/reviews/P20261022-dcd1a8.md, requirement 4: that removal's batches do not exercise it). It is the same cause at one more site: tools/release_run.py writes every release step's run into the primary ledger, but check_cells looked a release:<step> cell up in criteria.board_for(config), so a release:drbd run filed under 2/net/mesh/drbd was searched for in the DRBD board's ledger and could never be named with update --cell ('records no run stamped'); tools/defects.py:800-804 now reads a release step's run from criteria.SPEC. The fix is in the tree and not yet switched, controlled or verified. ===== 2026-10-23 (after attempt 11): the fix's four parts now have a switch each in tools/criteria.py (MXFS_RELEASE_STEP_SETTLE the parse, _ANNOTATE annotated_run, _BOARD a command's board choice, _ROUTE run_board), and this record keeps the parse part alone: parse_cell's stamp anchored at the end, and a release step's configuration not passed to parse_at (tools/defects.py parse_cell). The other three parts are D-RELEASE-STEP-ANNOTATION-LOOKS-THE-STEP-ROW-UP-AS-A-BOARD-CRITERION, D-RELEASE-STEP-COMMAND-NAMING-AN-OWN-RIG-KEY-READS-THE-RIG-BOARD and D-RELEASE-STEP-RUN-LOOKUP-AND-RETIREMENT-ROUTED-TO-THE-RIG-BOARD. tests/release_step_cell_lap.py now settles each key four ways (infra, amend, removal, and the removal of a record already naming the run). On the host (tests/evidence/release_step_switches_20261023T171448Z, inputs hashed in inputs.sha256): all on, PASS 12 of 12 in 21 s (lap_on.log); MXFS_RELEASE_STEP_SETTLE=0, FAIL 9 of 12, every propose --target and update --cell refused at the parse on all three keys while the three named removals settled (lap_MXFS_RELEASE_STEP_SETTLE.log). The 30 cells are control laps with every part off (b20261022-3f5a50, b20261023-e1901e), each refused at the parse, so they stay here.",
       "next": "On the next attempt: control batch of tests/release_step_cell_lap.py with MXFS_RELEASE_STEP_SETTLE=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 40 s, probe '^EXPOSED: the gate lists', pass '^STEP_CELL_LAP PASS'), the verification batch sized from it, then remove --fixed naming the parse cause only. The dry-run step FAILs the evidence lists are settled through the reviewer path by the records of their own causes.",
       "batches": [
@@ -3089,7 +3089,7 @@
       "nodes": 1,
       "config": "*/*/*",
       "opened": "2026-10-21",
-      "summary": "tools/release_run.py board_verdict read an own-rig board (2/net/mesh/drbd) as clean: that configuration parses only with MXFS_OWN_RIG=1, which criteria.py sets only when its own argv names one, so in the orchestrator no row applied and the verdict was an empty list; the orchestrator second check on the DRBD step graded nothing",
+      "summary": "tools/release_run.py board_verdict graded the own-rig board 2/net/mesh/drbd with MXFS_OWN_RIG as its caller had it; called as the orchestrator calls it, with the flag unset, no row of the board applied, so its verdict named none of the board's 35 rows that are not green (controls b20261022-4233e9 and b20261023-b9400f: 0 rows; b20261023-146820, with the empty-verdict refusal in: only that refusal)",
       "evidence": "candidate 0.90.134: board_verdict(0.90.134, 2/net/mesh/drbd, tests/evidence/drbd_rig/criteria.json) returned [] with MXFS_OWN_RIG unset and [fio_perf_vs_xfs=SKIP, alloc_witness=FAIL, chk_clean=FAIL] with it set; configuration.parse refused 2/net/mesh/drbd without it (attach drbd is verified on a rig of its own). The step still failed on the verify own verdict line, so no false PASS was recorded. Fixed in the tree: board_verdict sets the flag for an own-rig attachment and refuses a verdict that graded no row. Also found naming this run: defects.py check_cells looked for release:<step> runs in the board of the configuration they are filed under, so a release:drbd run could never be named; it now reads them from the primary ledger, where release_run.py writes them. ===== Two controls with the same fix diff: b20261022-ec8648 (0 of 20 failed) ran the lap while it still passed 2/net/mesh/drbd as an argument, and tools/criteria.py sets MXFS_OWN_RIG at import whenever a process's arguments name an own-rig configuration (criteria.py:111), so the orchestrator's verdict was graded as an own-rig run's whatever the code under test did; the lap was changed to take its inputs from the environment and to drop MXFS_OWN_RIG from the orchestrator's call (tests/release_board_verdict_lap.py:34-54), and control b20261022-4233e9 then failed 20 of 20 with the fix out. The verification is sized from b20261022-4233e9. ===== 2026-10-23: no longer names 2/net/mesh/drbd:release:drbd:2026-10-21T22:56:58Z, settled (retired_by): The run's own evidence names its cause: tests/evidence/drbd_release_verify_0.90.134_20261021T212712Z.out:114 'FAIL  alloc_witness  (nodes_pass=0/2 states:BUDGET_EXHAUSTED=2 ...) [120s/120s]', :116 'FAIL  chk_clean ... release=INDETERMINATE' (no coverage witness after that overrun), :125 'fio_perf_vs_xfs | SKIP | rig-unknown', :128 '=== STEP suite-board rc=1 ===', :304 'DRBD_RELEASE_VERIFY FAIL ... failed=[suite-board]'. The DRBD board's rows failed the step, not the orchestrator's verdict on that board. D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION names it with the alloc_witness run 2/net/mesh/drbd:alloc_witness:2026-10-21T22:35:00Z and the earlier step run of the same shape (2/net/mesh/drbd:release:drbd:2026-10-21T20:12:33Z), and D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN names it for the SKIP; data/reviews/P20261022-dcd1a8.md requirement 3. ===== 2026-10-23: the defects.py check_cells fix described above is part of D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED now (a release step's run that could not be named, routed by configuration instead of to the primary ledger), to be controlled and verified under that record's routing switch; this record's cause is tools/release_run.py board_verdict alone. The release:drbd run of 2026-10-21T22:56:58Z is dropped from this record's cells: it failed on the DRBD board's alloc_witness overrun and its chk_clean (tests/evidence/drbd_release_verify_0.90.134_20261021T212712Z.out:114-128), which D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION names. ===== 2026-10-23: removal P20261023-f07942 rejected (data/reviews/P20261023-f07942.md): (1) the release:drbd run of 2026-10-21T22:56:58Z was still retired by this record's applied verify (data/criteria.runs.jsonl:9919); that retirement is withdrawn (tools/criteria.py unretire), and the run stays named by D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION and D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN, whose rows failed it; (2) the refusal of a verdict that graded no row shared this record's switch and never acted in a lap: it is D-RELEASE-RUN-BOARD-VERDICT-READ-AN-EMPTY-VERDICT-AS-CLEAN now, under a switch of its own (MXFS_BOARD_VERDICT_EMPTY). This record's fix is the flag alone: board_verdict sets MXFS_OWN_RIG=1 for an own-rig attachment while it grades and restores the caller's value (tools/release_run.py, under MXFS_BOARD_VERDICT_OWN_RIG).",
       "next": "Removal P20261023-63aa62 was rejected (data/reviews/P20261023-63aa62.md): tools/release_run.py and tests/release_board_verdict_lap.py were rewritten after control b20261023-b9400f and fix-on b20261023-45c118 ran and after their attempt was abandoned, so nothing shows the tree's flag fix is the one measured; and the cause claimed the caller's MXFS_OWN_RIG is restored after board_verdict, which no lap observes. On the next attempt: control batch of tests/release_board_verdict_lap.py with MXFS_BOARD_VERDICT_OWN_RIG=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 30 s, probe '^EXPOSED: ', pass '^BOARD_VERDICT_LAP PASS'), the fix-on batch sized from it, then remove --fixed with a cause that claims only what the lap measures (the own-rig flag set while board_verdict grades an own-rig board), and every lap output the argument quotes cited from a saved log.",
       "cells": [
@@ -5413,6 +5413,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:lane_config_lock",
           "iso": "2026-10-23T03:36:51Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T19:14:03Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T19:13:58Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T19:13:54Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T19:13:49Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T19:13:45Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T19:13:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T19:13:36Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T19:13:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T19:13:27Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lane_config_lock",
+          "iso": "2026-10-23T19:13:22Z"
         }
       ],
       "reproducer": "tests/lane_config_lock_lap.sh (host only): lane A's one step names a configuration and holds 4 s; lane B, started while A's step runs, names the same one; lane C is started 1.5 s after A ends. EXPOSED when B was started while A's step ran, FAIL when B ran its step (or neither ran nor refused), or C did not run. With the fix out B runs alongside A.",
@@ -5467,6 +5517,56 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-bc8d64",
+          "kind": "control",
+          "row": "lap:lane_config_lock",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: lane B was started",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "LANE_CONFIG_HOLD=0 (scripts/rig_lane.sh holds no configuration, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix's hold taken out: lane B runs its step while lane A holds the configuration"
+        },
+        {
+          "id": "b20261023-e6a814",
+          "kind": "verify",
+          "row": "lap:lane_config_lock",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: lane B was started",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:lane_config_lock",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-bc8d64",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "LANE_CONFIG_HOLD=0 (scripts/rig_lane.sh holds no configuration, as before the fix)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -5484,6 +5584,21 @@
             "16A5F5DDDB4852C9D5DB236"
           ],
           "date": "2026-10-22"
+        },
+        {
+          "row": "lap:lane_config_lock",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-bc8d64",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "LANE_CONFIG_HOLD=0 (scripts/rig_lane.sh holds no configuration, as before the fix)",
+          "builds": [
+            "C54C14B681D148267D084FC"
+          ],
+          "date": "2026-10-23"
         }
       ]
     },
@@ -5638,7 +5753,7 @@
       "nodes": 1,
       "config": "*/*/*",
       "opened": "2026-10-23",
-      "summary": "A harness lap run through tools/batch_lap.py is graded only on its verdict line: batch_lap.py writes no max_stall_ms= into the run it records, and tools/criteria.py reads a stall only from that field, so a lap in which a file operation stalled past stall_limit_s (30 s) is recorded PASS and can count toward a verification batch",
+      "summary": "tools/batch_lap.py recorded a harness lap on its verdict line alone: a lap whose own output printed an operation over stall_limit_s (30 s), as max_stall_ms= or through a declared --stall pattern, and then its PASS line was recorded PASS with no max_stall_ms= in the run, so it could count toward a verification batch (control b20261023-d0af77, 10 of 10, MXFS_BATCH_LAP_STALL=0)",
       "evidence": "Verification batch b20261022-548ef2 (lap:jdt_gate_fault at 2/net/mesh/direct, candidate 0.90.134): 7 of its 9 laps timed A's last-member umount at 30.9-32.7 s on the node (row.log 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=31006' in tests/evidence/20261023T043949Z_capture_gate_jdtv1, and the same in jdtv2, 4, 5, 6, 8, 9), and every lap was recorded PASS in data/criteria.runs.jsonl. The review data/reviews/P20261023-128f2f.md traced why: the stall check in tools/criteria.py reads only a max_stall_ms= field, which tools/batch_lap.py never writes, and the harness bounds that step at 180 s.",
       "next": "Give batch laps a stall measurement the ledger grades: either batch_lap.py extracts each harness's timed operations (a declared pattern per lap, like the probe) and records the largest as max_stall_ms, or the harnesses print a 'max_stall_ms=' line batch_lap.py copies; make criteria.py grade a batch lap over stall_limit_s FAIL as it does a board row. Reproduce with a lap that prints an operation over 30 s and passes its verdict line; control with the change out (graded PASS), verification with it in (graded FAIL). ===== FIX in the tree (not yet controlled or verified): tools/batch_lap.py stall_graded() reads every max_stall_ms=<ms> line and every match of each --stall pattern (one capture group, milliseconds; tools/harness_batch.py passes --stall through) in the lap's output and the evidence files it wrote, appends max_stall_ms=<worst> to measured, and turns a PASS over the policy's stall_limit_s into a FAIL with criteria.stall_over_limit, the function that grades a board row's stall; MXFS_BATCH_LAP_STALL=0 measures and grades nothing, as before. verdict() is the old verdict-line code moved out of main() unchanged. First runs on the tree: fix on, 'graded FAIL: rc=0 elapsed_s=0 max_stall_ms=31500 -- operation stall 31500 ms is over the 30 s limit'; switch off, 'graded PASS: rc=0 elapsed_s=0 -- RESULT: PASS label=stall'. Next: on the next attempt, a control batch with MXFS_BATCH_LAP_STALL=0 (lap:batch_lap_stall at 1/any or the configuration the batch names), then a verification batch sized from it, then remove --fixed. ===== 2026-10-23, read before any batch: the lap cannot pass a verification batch as written. tests/batch_lap_stall_lap.py:58 prints 'graded {outcome}: {measured} -- {reason}', and with the fix on, measured carries 'max_stall_ms=31500' (tools/batch_lap.py:194). tools/harness_batch.py runs each lap through tools/batch_lap.py, whose stall_graded() reads every max_stall_ms= in the lap's own output (STALL_LINE, :178, :269-272), so the outer grading turns the lap's PASS into a FAIL on every verification lap; in the control (MXFS_BATCH_LAP_STALL=0 in the lap's environment, inherited by the outer batch_lap.py too) neither grading runs and the lap fails as a control should. Before the control: print the inner measured value without the max_stall_ms= token (e.g. 'worst_ms=31500'), then the control and the verification batch on the next attempt. ===== 2026-10-23: control b20261023-572eb1 (10/10 failed, MXFS_BATCH_LAP_STALL=0 in the lap's env) and verification b20261023-f16825 (6/6) on attempt 2026-10-23T15:56:24Z; verify P20261023-d6265d approved and applied. Before remove --fixed (data/reviews/P20261023-d6265d.md): the lap calls batch_lap.verdict() and stall_graded() directly and never runs batch_lap.py main(), so no lap has shown a recorded run carrying max_stall_ms= graded FAIL (the wiring at tools/batch_lap.py:326, :334-335); make the lap run batch_lap.py main() on a harness that prints the stall and read the recorded run.",
       "reproducer": "tests/batch_lap_stall_lap.py (a harness that prints an operation one second over stall_limit_s as max_stall_ms= and another through a declared --stall pattern, then RESULT: PASS, graded as tools/batch_lap.py grades a lap; EXPOSED line each lap; MXFS_BATCH_LAP_STALL=0 is the fix's switch off)",
@@ -6077,7 +6192,26 @@
       "next": "On the next attempt: control batch of tests/alloc_witness_census_lap.sh with AW_PHASE_MARKS=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 180 s, probe '^EXPOSED: the row ran out its budget', pass '^LAP aw_census PASS', fail '^LAP aw_census FAIL'), the verification batch sized from it, then remove --fixed.",
       "cells": [],
       "updated": "2026-10-23",
-      "reproducer": "tests/alloc_witness_census_lap.sh <label> <configuration> on a formed pair (about 2.5 min): the alloc_witness row through run.sh on a scratch board with AW_ABORT_RANK=2 and AW_ABORT_BROADCAST=0, so rank 1 waits until the row's 120 s budget ends it and run.sh takes its timeout census; PASS when last_phase_census names a phase for every node and none is 'none'. Control: tools/harness_batch.py control --revert tests/evidence/controls/D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE.fix.diff (removes ccph() and its eight calls)."
+      "reproducer": "tests/alloc_witness_census_lap.sh <label> <configuration> on a formed pair (about 2.5 min): the alloc_witness row through run.sh on a scratch board with AW_ABORT_RANK=2 and AW_ABORT_BROADCAST=0, so rank 1 waits until the row's 120 s budget ends it and run.sh takes its timeout census; PASS when last_phase_census names a phase for every node and none is 'none'. Control: tools/harness_batch.py control --revert tests/evidence/controls/D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE.fix.diff (removes ccph() and its eight calls).",
+      "batches": [
+        {
+          "id": "b20261023-ad4da0",
+          "kind": "control",
+          "row": "lap:aw_census",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the row ran out its budget",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "AW_PHASE_MARKS=0 (tests/tooling/alloc_witness.sh writes no phase marker, as before the fix; the lap passes it to the row's ranks)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a timed-out alloc_witness row leaves no phase of its ranks for run.sh's census"
+        }
+      ]
     },
     {
       "id": "D-FOURKN-MERGE-2NODE-LAP-HOLD-CATCHES-THE-PEER-ONLY-BY-CHANCE",
@@ -6107,265 +6241,6 @@
         }
       ],
       "updated": "2026-10-23"
-    },
-    {
-      "id": "D-BATCH-LAP-TIMEOUT-KILLS-ONLY-THE-DIRECT-CHILD-SO-THE-HARNESS-WRITES-ON",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-23",
-      "summary": "tools/batch_lap.py bounds a lap with subprocess.run(timeout=bound), which on expiry kills only the process it started, so a harness's own children outlive the lap: they go on writing after the lap is recorded and while the next lap runs on the same nodes",
-      "evidence": "tools/batch_lap.py:259-262 'rc = subprocess.run(command, cwd=ROOT, stdout=handle, stderr=subprocess.STDOUT, timeout=args.bound).returncode' / 'except subprocess.TimeoutExpired: rc = 124'. Control b20261022-8375dc lap 7 (2/net/mesh/direct:gate:d_intents_2tcp_open_efi:2026-10-22T19:14:48Z) was recorded at 19:14:48Z with rc=124 while its harness kept writing until 19:15:08Z, 20 s later, after lap 8 had started (review of P20261023-b45350, 'Other findings').",
-      "next": "Start each lap in its own session (start_new_session=True) and on expiry kill the whole process group and wait for it before recording the lap; reproduce with a lap whose command forks a child that sleeps past a short bound and then writes a marker: unfixed the marker lands after the lap's record line, fixed it never does. ===== Removal P20261023-52a18d was rejected (data/reviews/P20261023-52a18d.md): the writer in the record's evidence ran under GNU timeout (tests/capture_fault_gate.sh:157 and :173 run every entry as 'timeout ... tests/<entry>.sh'), and timeout puts itself and its child in a process group of their own within the session, so run_bounded's killpg of the lap's group misses it: the reviewer ran the frozen fixed run_bounded on a bash script starting its writer under timeout, it returned rc=124 with '(gone)' and the writer wrote 0.904 s later. Needed: (1) a fix that ends every process the lap started, those that left its group included (timeout, setsid, a self-daemonising helper), with its 'gone' check covering them: tools/batch_lap.py becomes a child subreaper (prctl PR_SET_CHILD_SUBREAPER) so every orphaned descendant is reparented to it, and on expiry it signals and waits for its whole descendant tree, found by parent pid from /proc/<pid>/stat (never cmdline); (2) a reproducer that starts its writer as the observed lap did, a bash script running it under timeout without --foreground (and a setsid variant), with its own fix-off control and a fix-on batch sized from that control. CHANGELOG.md's line no longer says the lap ends everything it started.",
-      "batches": [
-        {
-          "id": "b20261023-1d7216",
-          "kind": "control",
-          "row": "lap:batch_lap_killpg",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: the bound ran out",
-          "candidate": "",
-          "build": "08D63764A9352FBDD5A76CD",
-          "variant": "MXFS_BATCH_LAP_KILLPG=0 (tools/batch_lap.py ends only the process it started when a lap's bound runs out, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: a bounded lap's harness child outlives the bound and writes after the lap is recorded"
-        },
-        {
-          "id": "b20261023-8e8ccd",
-          "kind": "verify",
-          "row": "lap:batch_lap_killpg",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: the bound ran out",
-          "candidate": "0.90.134",
-          "build": "08D63764A9352FBDD5A76CD",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:batch_lap_killpg",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-1d7216",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_BATCH_LAP_KILLPG=0 (tools/batch_lap.py ends only the process it started when a lap's bound runs out, as before the fix)",
-            "builds": [
-              "08D63764A9352FBDD5A76CD"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        },
-        {
-          "id": "b20261023-50b34d",
-          "kind": "control",
-          "row": "lap:batch_lap_killtree",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: every bound ran out",
-          "candidate": "",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "MXFS_BATCH_LAP_KILLTREE=0 (tools/batch_lap.py run_bounded ends only the process it started when a lap's bound runs out, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: a bounded lap's harness writer, started under timeout, setsid or a double fork, outlives the bound and writes after the lap is recorded"
-        },
-        {
-          "id": "b20261023-81f39b",
-          "kind": "verify",
-          "row": "lap:batch_lap_killtree",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: every bound ran out",
-          "candidate": "0.90.134",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:batch_lap_killtree",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-50b34d",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_BATCH_LAP_KILLTREE=0 (tools/batch_lap.py run_bounded ends only the process it started when a lap's bound runs out, as before the fix)",
-            "builds": [
-              "C54C14B681D148267D084FC"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "updated": "2026-10-23",
-      "rates": [
-        {
-          "row": "lap:batch_lap_killpg",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-1d7216",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_BATCH_LAP_KILLPG=0 (tools/batch_lap.py ends only the process it started when a lap's bound runs out, as before the fix)",
-          "builds": [
-            "08D63764A9352FBDD5A76CD"
-          ],
-          "date": "2026-10-23"
-        },
-        {
-          "row": "lap:batch_lap_killtree",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-50b34d",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_BATCH_LAP_KILLTREE=0 (tools/batch_lap.py run_bounded ends only the process it started when a lap's bound runs out, as before the fix)",
-          "builds": [
-            "C54C14B681D148267D084FC"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killpg",
-          "iso": "2026-10-23T16:01:53Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killpg",
-          "iso": "2026-10-23T16:01:48Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killpg",
-          "iso": "2026-10-23T16:01:42Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killpg",
-          "iso": "2026-10-23T16:01:37Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killpg",
-          "iso": "2026-10-23T16:01:31Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killpg",
-          "iso": "2026-10-23T16:01:26Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killpg",
-          "iso": "2026-10-23T16:01:20Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killpg",
-          "iso": "2026-10-23T16:01:15Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killpg",
-          "iso": "2026-10-23T16:01:09Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killpg",
-          "iso": "2026-10-23T16:01:04Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killtree",
-          "iso": "2026-10-23T18:55:45Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killtree",
-          "iso": "2026-10-23T18:55:29Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killtree",
-          "iso": "2026-10-23T18:55:14Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killtree",
-          "iso": "2026-10-23T18:54:58Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killtree",
-          "iso": "2026-10-23T18:54:43Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killtree",
-          "iso": "2026-10-23T18:54:27Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killtree",
-          "iso": "2026-10-23T18:54:12Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killtree",
-          "iso": "2026-10-23T18:53:56Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killtree",
-          "iso": "2026-10-23T18:53:41Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_killtree",
-          "iso": "2026-10-23T18:53:25Z"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T18:32:24Z",
-          "build": "C54C14B681D148267D084FC",
-          "batch": "b20261023-81f39b",
-          "approval": "P20261023-fa992e",
-          "date": "2026-10-23"
-        }
-      ]
     },
     {
       "id": "D-FOREIGN-REPLAY-WRITES-AG-HEADERS-WITHOUT-THE-AG-LOCK",
@@ -6413,7 +6288,26 @@
         }
       ],
       "updated": "2026-10-23",
-      "reproducer": "tests/rig_contract_eui64_lap.sh <label>: tests/rig_lib_contract.sh run as tools/release_run.py presteps runs it (MXFS_NODE_LIST=test1,test2 MXFS_GROUP=g2 and its marker) on the g2 pair's pool LUN; EXPOSED when test1's LUN reports an eui. WWID, PASS when checks 11b, 13b and 13h all PASS, FAIL when 11b or 13h FAILs or 13b FAILs or aborts the contract (about 150 s a lap with the fix in, under 60 s without)"
+      "reproducer": "tests/rig_contract_eui64_lap.sh <label>: tests/rig_lib_contract.sh run as tools/release_run.py presteps runs it (MXFS_NODE_LIST=test1,test2 MXFS_GROUP=g2 and its marker) on the g2 pair's pool LUN; EXPOSED when test1's LUN reports an eui. WWID, PASS when checks 11b, 13b and 13h all PASS, FAIL when 11b or 13h FAILs or 13b FAILs or aborts the contract (about 150 s a lap with the fix in, under 60 s without)",
+      "batches": [
+        {
+          "id": "b20261023-b6c85a",
+          "kind": "control",
+          "row": "lap:rig_contract_eui64",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "MXFS_CONTRACT_EUI64=0 (tests/rig_lib_contract.sh holds checks 11b, 13b and 13h to the NAA designator's form only, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: the rig library's contract fails 11b and 13b on a pool LUN whose WWID is EUI-64"
+        }
+      ]
     },
     {
       "id": "D-SURVIVOR-DECLARES-A-PEER-DEAD-ON-ITS-OWN-WINDOW-INSIDE-THE-PEERS-LONGER-LEASE",
@@ -6445,7 +6339,7 @@
       "nodes": 1,
       "config": "*/*/*",
       "opened": "2026-10-23",
-      "summary": "tools/release_run.py board_verdict returned the rows of a board not graded green, so a verdict in which no row of the specification applied came back as an empty list, which the orchestrator reads as a clean board: on candidate 0.90.134, board_verdict(0.90.134, 2/net/mesh/drbd, tests/evidence/drbd_rig/criteria.json) returned [] with MXFS_OWN_RIG unset, not one of the board's rows graded",
+      "summary": "tools/release_run.py board_verdict returned only the rows it graded not green, so when no row of the board applied it returned an empty list, the same answer as a green board: with MXFS_BOARD_VERDICT_OWN_RIG=0 and MXFS_BOARD_VERDICT_EMPTY=0, board_verdict(0.90.134, 2/net/mesh/drbd), called as the orchestrator calls it, returned [] with no row applying (control b20261023-2bafbd, 10 of 10)",
       "evidence": "The measurement in D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD's evidence: [] with MXFS_OWN_RIG unset, [fio_perf_vs_xfs=SKIP, alloc_witness=FAIL, chk_clean=FAIL] with it set. That record's missing flag is what left no row applying; that an ungraded board read as clean is this record. Split out of it at its reviewer's request (data/reviews/P20261023-f07942.md): the refusal of a verdict that graded no row shared that record's switch, so no control isolated it and no fix-on lap ever reached it. FIX in the tree, not yet controlled or verified: board_verdict appends 'no row of the specification applies at <config>: nothing was graded' when it graded no row (tools/release_run.py board_verdict, the 'not graded' test), under a switch of its own, MXFS_BOARD_VERDICT_EMPTY (0 reads an empty verdict as clean, as before). Precheck on the host with tests/release_board_verdict_lap.py --empty (the flag fix out, MXFS_BOARD_VERDICT_OWN_RIG=0, so no row applies): fix in 'BOARD_VERDICT_LAP PASS the verdict that graded no row is refused'; MXFS_BOARD_VERDICT_EMPTY=0 'BOARD_VERDICT_LAP FAIL the verdict that graded no row reads []: clean'.",
       "next": "On the next attempt: control batch of tests/release_board_verdict_lap.py --empty with MXFS_BOARD_VERDICT_EMPTY=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 30 s, probe '^EXPOSED: ', pass '^BOARD_VERDICT_LAP PASS'), the verification batch sized from it, then remove --fixed.",
       "reproducer": "tests/release_board_verdict_lap.py --empty: board_verdict called as the orchestrator calls it, in a child process with MXFS_OWN_RIG dropped and its inputs from the environment, with MXFS_BOARD_VERDICT_OWN_RIG=0 so no row of the DRBD board applies (the state the dry run found); EXPOSED when no row applies, PASS when the verdict names that nothing was graded, FAIL when it is empty (host only, about 2 s)",
@@ -6723,7 +6617,7 @@
       "nodes": 1,
       "config": "*/*/*",
       "opened": "2026-10-23",
-      "summary": "tools/criteria.py switched to an own-rig board (the DRBD board for 2/net/mesh/drbd) whenever its arguments named that configuration, but tools/release_run.py writes every release step's run into the primary board's ledger: infra and amend of the drbd step's run, and the take-back of its retirement, were refused 'records no run stamped', so a failed drbd step could not be settled.",
+      "summary": "tools/criteria.py chose its board at import from its arguments, so a command naming 2/net/mesh/drbd read the DRBD board even for a release step's run, which is in the primary ledger; with that choice (MXFS_RELEASE_STEP_BOARD=0), infra and amend of 2/net/mesh/drbd:release:drbd:2026-10-22T00:35:43Z, and unretire after both its removals, were refused 'records no run stamped 2026-10-22T00:35:43Z' (control b20261023-c4c308, 10 of 10)",
       "evidence": "Measured 2026-10-23 on the tree before the fix (D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED's evidence): infra and amend of 2/net/mesh/drbd:release:drbd:2026-10-22T00:35:43Z refused 'criteria: release:drbd [2/net/mesh/drbd] records no run stamped 2026-10-22T00:35:43Z'. Measured again 2026-10-23 with tests/release_step_cell_lap.py and only MXFS_RELEASE_STEP_BOARD=0 (the board choice at tools/criteria.py import off, the other parts on): FAIL 4 of 12, exactly the drbd key's infra and amend refused by criteria.py with that message and the take-back (criteria.py unretire) of its removal and of its named removal refused the same, while the 1/any and 2/net/mesh/direct keys settled (tests/evidence/release_step_switches_20261023T171448Z/lap_MXFS_RELEASE_STEP_BOARD.log); all on, PASS 12 of 12 (tests/evidence/release_step_switches_20261023T171448Z/lap_on.log). The fix: a command whose arguments name a release step's row keeps the primary board (tools/criteria.py, the board choice at import, behind MXFS_RELEASE_STEP_BOARD).",
       "next": "On the next attempt: control batch of tests/release_step_cell_lap.py with MXFS_RELEASE_STEP_BOARD=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 40 s, probe '^EXPOSED: the gate lists', pass '^STEP_CELL_LAP PASS'), the verification batch sized from it, then remove --fixed.",
       "reproducer": "tests/release_step_cell_lap.py (about 20 s, host only, scratch trees); MXFS_RELEASE_STEP_BOARD=0 is the control",
@@ -6868,7 +6762,7 @@
       "nodes": 1,
       "config": "*/*/*",
       "opened": "2026-10-23",
-      "summary": "tools/defects.py looked a named run up (check_cells, behind propose --target and update --cell) and retired it (retire_cells, behind every removal) on its configuration's board (board_for), but tools/release_run.py writes every release step's run into the primary board's ledger: the drbd step's run, filed under 2/net/mesh/drbd, could not be named ('records no run stamped'), and the removal of a record that named it retired it in the DRBD ledger, where it is not, leaving it listed.",
+      "summary": "tools/defects.py check_cells (propose --target, update --cell) and retire_cells (every removal) took a named run's board from its configuration; with that routing (MXFS_RELEASE_STEP_ROUTE=0) the drbd release step's run 2/net/mesh/drbd:release:drbd:2026-10-22T00:35:43Z, which is in the primary ledger, could not be named ('records no run stamped 2026-10-22T00:35:43Z'), and removing a record that already named it left the gate listing it (control b20261023-356bc4, 10 of 10)",
       "evidence": "Measured 2026-10-23 on the tree before the fix: the removal left the run listed (D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED's evidence); check_cells' part came from D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD (data/reviews/P20261022-dcd1a8.md, requirement 4). Measured again 2026-10-23 with tests/release_step_cell_lap.py and only MXFS_RELEASE_STEP_ROUTE=0 (criteria.run_board's release-step branch off, the other parts on): FAIL 4 of 12, the drbd key's propose --target (infra, amend) and update --cell refused 'defects: release:drbd at 2/net/mesh/drbd records no run stamped 2026-10-22T00:35:43Z', and its named removal left the run listed ('the gate still lists it after the disposition'), while the other two keys settled (tests/evidence/release_step_switches_20261023T171448Z/lap_MXFS_RELEASE_STEP_ROUTE.log); all on, PASS 12 of 12 (tests/evidence/release_step_switches_20261023T171448Z/lap_on.log). The fix: criteria.run_board gives a release step's run the primary board (behind MXFS_RELEASE_STEP_ROUTE), and check_cells, drop_cells, unsettled and retire_cells all take the board from it; the lap exercises check_cells and retire_cells, not drop_cells or unsettled.",
       "next": "On the next attempt: control batch of tests/release_step_cell_lap.py with MXFS_RELEASE_STEP_ROUTE=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 40 s, probe '^EXPOSED: the gate lists', pass '^STEP_CELL_LAP PASS'), the verification batch sized from it, then remove --fixed.",
       "reproducer": "tests/release_step_cell_lap.py (about 20 s, host only, scratch trees); MXFS_RELEASE_STEP_ROUTE=0 is the control",
@@ -7386,8 +7280,19 @@
       "config": "disk/caw/*",
       "opened": "2026-10-23",
       "summary": "dlm/disklock.c validate_lockstate reads the first lock record at base + MXFS_DISKLOCK_HB_SIZE, which on a COMPARE AND WRITE volume is CAW slot 0 (dlm/dlm_caw.c:16200 lock_region_offset = disklock_offset + MXFS_DISKLOCK_HB_SIZE), and when that slot is live (magic MXCW) and its bytes at the record's flags field read ACTIVE it logs 'disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)' at every such mount: a corruption message for a healthy slot",
-      "evidence": "Code: dlm/disklock.c:276-279 lock_slot_offset = base_offset + MXFS_DISKLOCK_HB_SIZE + slot*MXFS_DISKLOCK_RECORD_SIZE; :2644-2657 validate_lockstate's check of slot 0; dlm/dlm_caw.c:1300-1304 slot_offset = lock_region_offset + slot*MXFS_CAW_SLOT_SIZE; dlm/dlm_caw.h:33 MXFS_CAW_MAGIC 0x4D584357 'MXCW' live slot. Logs: board_20261023T165407Z-g2e_path_mount_degraded/kmsg_test18_fromnode.gz:119302 and :182393 'disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)', each followed by 'lockstate validation returned -5 (may be freshly initialized)' and the disklock's normal init (:119303-119306); 2/disk/caw/mpath, 512-byte volume. The mount went on. Not yet established: whether any caller acts on the -EIO beyond that log line.",
-      "next": "Read every caller of validate_lockstate for what the -EIO changes; then make the check skip the lock-record half when the volume's transport is COMPARE AND WRITE (the region holds CAW slots), with a switch for the control, and a lap that mounts with CAW slot 0 live and requires no 'corrupt lock record' line (switch off: the line)."
+      "evidence": "Code: dlm/disklock.c:276-279 lock_slot_offset = base_offset + MXFS_DISKLOCK_HB_SIZE + slot*MXFS_DISKLOCK_RECORD_SIZE; :2644-2657 validate_lockstate's check of slot 0; dlm/dlm_caw.c:1300-1304 slot_offset = lock_region_offset + slot*MXFS_CAW_SLOT_SIZE; dlm/dlm_caw.h:33 MXFS_CAW_MAGIC 0x4D584357 'MXCW' live slot. Logs: board_20261023T165407Z-g2e_path_mount_degraded/kmsg_test18_fromnode.gz:119302 and :182393 'disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)', each followed by 'lockstate validation returned -5 (may be freshly initialized)' and the disklock's normal init (:119303-119306); 2/disk/caw/mpath, 512-byte volume. The mount went on. Its one caller, dlm/disklock.c:5235-5241 (disklock init), only logs 'lockstate validation returned %d (may be freshly initialized)' and goes on ('Not fatal'): the -EIO changes nothing but the two log lines.",
+      "next": "First: the legacy disklock lock-record slots still have readers and writers (dlm/disklock.c:2589 find_lock_slot, :5723, :5756, :5806, :6094, :6150, :6399, all through lock_slot_offset, the same bytes as the CAW slot table): read each one and establish which transport and which entry points reach it, and whether any can run on a COMPARE AND WRITE volume, where it would read or write CAW slots as lock records. Then make validate_lockstate skip the lock-record half where the region holds CAW slots, with a switch for the control, and a lap that mounts with CAW slot 0 live and requires no 'corrupt lock record' line (switch off: the line).",
+      "updated": "2026-10-23"
+    },
+    {
+      "id": "D-HARNESS-LAP-TIMED-OPS-REACH-NO-STALL-GRADER-JDT-31S-UNMOUNT-GRADED-PASS",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "A harness lap run through tools/batch_lap.py is graded against stall_limit_s only from max_stall_ms= lines and declared --stall patterns, but tests/join_during_takeover.sh (through tests/capture_fault_gate.sh) prints its timed operations in other forms (A_UMOUNT_RC=0 ms=31006) and no lane passes --stall for it, so a 31 s last-member unmount inside a jdt gate lap was recorded PASS and counted toward verification batch b20261022-548ef2",
+      "evidence": "Review of P20261023-8d639f (data/reviews/P20261023-8d639f.md): batch b20261022-548ef2 (lap:jdt_gate_fault at 2/net/mesh/direct) was launched with no --stall pattern (tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log:61); the harness wrote 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=31006' (tests/evidence/20261023T043949Z_capture_gate_jdtv1/join_during_takeover_fault.log:8); tools/batch_lap.py stall_graded reads only 'max_stall_ms=' (:301) and declared --stall patterns (:311); neither tests/capture_fault_gate.sh nor tests/join_during_takeover.sh prints max_stall_ms=, and no lane summary has passed --stall. Split out of D-BATCH-LAP-RECORDS-NO-STALL-SO-A-HARNESS-LAP-OVER-THE-STALL-LIMIT-GRADES-PASS, whose fix grades what reaches the grader.",
+      "next": "Make every harness lap's timed file operations reach the grader: the jdt harness (and each harness run through batch_lap.py; list them) prints max_stall_ms= over its timed operations, or its lanes declare --stall for its ms= lines; then a control (the print or declaration taken out) and a verification through a jdt gate lap with a 31 s operation forced."
     }
   ]
 }
