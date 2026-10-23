@@ -7025,6 +7025,29 @@
           "iso": "2026-10-21T21:43:30Z"
         }
       ]
+    },
+    {
+      "id": "D-SURVIVOR-DECLARES-A-PEER-DEAD-ON-ITS-OWN-WINDOW-INSIDE-THE-PEERS-LONGER-LEASE",
+      "severity": "high",
+      "nodes": 2,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "Each node declares a silent peer dead after its own dead_threshold of unchanged heartbeat reads (dlm/disklock.c:4838-4846, the declaration at :4960-4972 prints threshold=ctx->dead_threshold) and derives its own authority lease from its own window (dlm/disklock.c:5304-5341), and no node publishes its window, so in a cluster whose nodes run different windows (a dead_timeout_ms set on some nodes only, or modules of different defaults) a survivor can declare a peer dead before that peer's lease has ended, which the window-outlasts-the-lease invariant exists to prevent.",
+      "evidence": "Observed in variant lane tests/evidence/lanes/g8_mpathtmo2_20261023T143444Z, where test14 ran the default window (D-PATH-ROW-REJOIN-RELOADS-THE-MODULE-WITHOUT-THE-LANES-MODARGS-SO-A-VARIANT-LANE-RUNS-MIXED-WINDOWS) and test7-test13 a 12 s one: board_20261023T144327Z-g8_path_all_lost kmsg_test14_fromnode.gz:730 'P290-AUTH-ADMITTED ... lease_ms=30000', :48532 'P290-AUTH-SUSPENDED ... deadline_ms=162511 ... last_ok_ms=132511', :49546 'P290-AUTH-CLOSED ... reason=AUTHORITY_LEASE_EXPIRED deadline_ms=162511 now_ms=166705' (its lease ran 30 s past its last landed beat), while kmsg_test7_fromnode.gz:151120 'heartbeat expired after 5 checks ... [threshold=6 last_stamp_ms=132511 last_seen_ms=574144 now_ms=586432]' (declared 12.3 s after last seeing the stamp change), and test8-test13 the same with threshold=6. The victim had lost every path, so it could not write; integrity rested on the PR fence. The same shape in 151713Z path_all_lost (test14 lease 30000, survivors threshold=6). docs/rulings/silent-peer-death-under-the-stall-limit.md, 'Keeping the window longer than the lease': every declaration path must obey the bound. MXFS_PROTO_GEN (dlm/disklock.h, mxfs_hb_feature) refuses peers of another protocol generation, but nothing compares windows. ===== The harness defect that put test14 on the default window in that lane is D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS.",
+      "next": "Publish each node's death window in its heartbeat record and make a survivor declare a silent peer only after the longer of its own window and the peer's published one (a record that publishes none counts as the default of its attachment), with the PROTO_GEN bump the layout change needs; or refuse a mount whose window differs from a live peer's, naming both. Measure on a 2-node pair with dead_timeout_ms=12000 on one node and the default on the other: freeze the default node's beats past 12 s but inside its lease and require that the 12 s node does not declare it; control with the fix's switch off (it declares), verification sized from it.",
+      "impact": "stability",
+      "impact_why": "A survivor whose death window is shorter than a live peer's lease can declare that peer dead, fence it and replay its slice while the peer still holds authority by its own lease: a node shut down by its peers while it believed itself admitted (observed with a 12 s survivor window against a 30 s victim lease).",
+      "updated": "2026-10-23"
+    },
+    {
+      "id": "D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "A path row that kills its victim brings it back through tests/mpath/lib.sh's rejoin, which loads mxfs with the configuration's module arguments only (mxfs_rig_modargs, lib.sh:506, :519), not the lane's MXFS_EXTRA_MODARGS, and run.sh skips the next row's prep because the marker matches the configuration and srcversion (run.sh:2619-2621), so after the first death row the victim runs the default death window while every other node runs the variant's.",
+      "evidence": "Sweep of lanes tests/evidence/lanes/g8_mpathtmo2_20261023T143444Z and g16b_mpathtmo2_20261023T143733Z (both exporting MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, summary.log:6): board_20261023T144020Z-g8_path_fence_degraded kmsg_test14_fromnode.gz:665 'mxfs: dead_timeout_ms=0 (0 = 34 s on SCSI, 62 s on DRBD or shared)', :701 'authority lease 30000 ms, death window 34000 ms', against test7-test13 '=12000' and 'authority lease 8000 ms, death window 12000 ms'; the same for test14 in 144327Z path_all_lost, 144649Z path_peer_withdrawn, 151409Z path_fence_degraded, 151713Z path_all_lost, and for test32 in 144449Z, 144842Z, 150343Z, 150725Z and 151125Z (16 nodes). The step logs of every row after a lane's first prep print '--- cluster already prepped for <config> (srcver=08D63764A9352FBDD5A76CD) \u2014 skipping prep ---' (g8 step4-12 and step14-22, g16b step4-7 and step9-12). test14 came back on 12000 only after a forced prep (151048Z path_fenced_return kmsg_test14 :157277). Every row passed; the runs were variants and grade nothing. The survivors declared on their own 12 s window, so the stalls those rows measured are the survivors' at that window.",
+      "next": "Make the rejoin load the module with the lane's arguments as prep does (MXFS_EXTRA_MODARGS appended to mxfs_rig_modargs in tests/mpath/lib.sh, and wherever else a row reloads mxfs on a node it restarted), and make run.sh's marker match also compare each node's loaded parameters with the ones requested, so a mismatch re-preps instead of skipping; a lap that kills a victim in one row and reads every node's /sys/module/mxfs/parameters/dead_timeout_ms in the next; control with the fix's switch off, verification sized from it, remove --fixed."
     }
   ]
 }

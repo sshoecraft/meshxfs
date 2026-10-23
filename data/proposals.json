@@ -3507,6 +3507,28 @@
       ],
       "state": "pending",
       "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-d3a418",
+      "kind": "verify",
+      "record": "D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE",
+      "change": {
+        "batch": "b20261023-877d3c"
+      },
+      "argument": "Verification batch b20261023-877d3c on candidate 0.90.134, attempt frozen 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), at 2/disk/caw/direct on pair g2b (test15/test16), rerun on this attempt because the earlier batches ran on attempt 2026-10-23T10:11:20Z, whose run.sh differs from this one's (removal review data/reviews/P20261023-175966.md). Declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2b_a11_fsx_20261023T161533Z/step4.log:1) and sized from control b20261023-6f28c5 on the same attempt: 10 of 10 exposed laps FAIL with MXFS_PULL_RUN_NONE=0 in the lap's own environment (tests/evidence/lanes/g2b_a11_fsx_20261023T161533Z/step3.log:5-14 'LAP fsx_pull FAIL: not in the run's evidence: ...', :17; inputs before and after alike, :16, tests/evidence/controls/b20261023-6f28c5.20261023T161641Z.inputs.before.json and .after.json), so L = 0.005^(1/10) = 0.5887 and N = ceil(ln 0.005 / ln(1 - 0.5887)) = 6. All 6 laps PASS with the exposure probe '^EXPOSED: the fsx row failed both checks' matched (tests/evidence/lanes/g2b_a11_fsx_20261023T161533Z/step4.log:3-9, each 'LAP fsx_pull PASS: both failing checks' logs are in tests/evidence/run_fsx_<stamp>-g2b'), none failed or was dropped (:9 '6 PASS, 0 FAIL of 6 planned'). The lap is tests/fsx_log_pull_lap.sh, which drives run.sh's fsx row at the configuration it is given; the record covers run.sh run_none's pull alone (the fsx.sh EXIT-trap deletion is D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED).",
+      "evidence": [
+        "tests/evidence/lanes/g2b_a11_fsx_20261023T161533Z/summary.log",
+        "tests/evidence/lanes/g2b_a11_fsx_20261023T161533Z/step3.log",
+        "tests/evidence/lanes/g2b_a11_fsx_20261023T161533Z/step4.log",
+        "tests/evidence/controls/b20261023-6f28c5.20261023T161641Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-6f28c5.20261023T161641Z.inputs.after.json",
+        "tests/fsx_log_pull_lap.sh",
+        "run.sh",
+        "data/criteria.runs.jsonl",
+        "data/reviews/P20261023-175966.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
     }
   ]
 }
