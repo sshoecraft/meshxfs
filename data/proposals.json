@@ -5229,8 +5229,14 @@
         "tests/fsx_fail_files_lap.sh",
         "tests/suite/fsx.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-495519.md",
+        "sha256": "4078212d5ab512df0b7e96ab6515d52a29116ed61d8750c32d3b6c6f02741aaa",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-0344fd",
@@ -5255,8 +5261,14 @@
         "tests/rejoin_modargs_lap.sh",
         "tests/mpath/lib.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-0344fd.md",
+        "sha256": "25951ab477457a951dc5efaefbe21735b386ecf62bc0228e0e60b719ba31c8e1",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-8b1048",

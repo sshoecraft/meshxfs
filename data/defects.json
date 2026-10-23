@@ -3891,7 +3891,7 @@
       "opened": "2026-10-22",
       "summary": "On the 4/ and 8/disk/caw/mpath boards of 2026-10-19 (runs 20261019T142249Z-g4b and -g8b, v0.90.131 tools), chk_clean's cold audit found the volume CORRUPT with one nlink mismatch each: a regular file with nlink 1 named by two directory entries. In both runs the row just before chk_clean was path_answer_lost, which reports COMPARE AND WRITE answers lost on purpose and has some resent swaps find a peer's write in between. The chk_clean FAIL never reached the ledger (the boards were migrated without it); the crash_audit rows after it found the audited node left unmounted and recorded PRE-ASSERT INCOMPLETE.",
       "evidence": "tests/evidence/run_chk_clean_20261019T142249Z-g4b/test17:3 'RESULT: FAIL | test=chk_clean | nodes=4 | measured=verdict=CORRUPT release=CORRUPT rc=4 errors=3 remounted=0 icount=19328 ... evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261019T151341Z.log'; chk_clean_4node_20261019T151341Z.log:821 'ERROR: inode 6872560 (mode 0100644) has nlink 1 but 2 directory entries name it', :822 nlink_mismatch=1. tests/evidence/run_chk_clean_20261019T142249Z-g8b/test21:3 'verdict=CORRUPT release=CORRUPT rc=4 errors=3 ... chk_clean_8node_20261019T152029Z.log'; chk_clean_8node_20261019T152029Z.log:1045 'ERROR: inode 13147165 (mode 0100644) has nlink 1 but 2 directory entries name it', :1046 nlink_mismatch=1. Preceding rows: board_20261019T142249Z-g4b_path_answer_lost/row.log:129 'RESULT: PASS ... victim=test20 injected=40 landed=23 unresolved=17'; board_20261019T142249Z-g8b_path_answer_lost/row.log:241 'RESULT: PASS ... victim=test28 injected=40 landed=24 unresolved=16'. Located by tests/evidence/incident_preassert_sweep_20261022T2355Z.txt (groups d, e). ===== 2026-10-23 sweep of both runs' kept files (run_chk_clean_20261019T142249Z-g4b and -g8b kernlog_test*.gz, the path_answer_lost rows' load_* files): neither chk log names the two entries or their directories (chk_clean_4node_20261019T151341Z.log:821 and chk_clean_8node_20261019T152029Z.log:1045 are each log's only ERROR line and its only mention of the inode), and no image of either volume was kept. 8 nodes, inode 13147165 (agno 3, agino 0x89c1d): test28's churn (tests/mpath/pathload.py churn: create shared/<node>.<lap>, rename to .r, unlink the previous lap's .r) was handed that number for 59 creates, shared/test28.406 to shared/test28.806, 15:17:40-15:18:28Z (board_20261019T142249Z-g8b_path_answer_lost/load_test28/inos.log:814-1614), then its private write for test28/f0000811 at 15:18:33.790Z (inos.log:1623; directory 13121792, chk log :894). At 15:18:33 test28 logged 'P26-DSCAN-MISS ino=13121792 ndb=5 scanned=813 name=\"f0000811\" (not in any data block ...)' twice (run_chk_clean_20261019T142249Z-g8b/kernlog_test28.gz:93041, :93191). At 15:19:22 test27 still held an in-core directory incarnation of the number (P-RELOAD-XINCARN-POISON ino=13147165 incore_mode=040755 disk_mode=0100644, kernlog_test27.gz:140806; INODE-REUSE-EVICT incore_ftype=2 dirent_ftype=1 name=f0000811, :140768), the mutex's lock directory being the workload's only mkdir. chk found no ftype mismatch, so the second entry names a regular file. The 40 injected lost answers were all swaps of one lock slot (P-CAW-ANSWER-LOST-* slot=27793 in answer_lost_test28.txt: 24 LANDED, 16 UNRESOLVED), the lock of ino 25704706: every node logged P-ACQ-STUCK on it at 15:17:20 and 15:18:16-18, and test28 'P-ACQ-SELF-ORPHAN ino=25704706 slot=27793 ... sole wire holder is THIS node while this waiter starves' (kernlog_test28.gz:86021-86022). 4 nodes, inode 6872560 (agno 3, agino 0x8ddf0): no file names it besides the chk log and four lock lines (kernlog_test17.gz:45478, test18 :40251 :40264, test19 :47553); the injected swaps were slot 21417, the lock of ino 2636354 (P-ACQ-STUCK and P-ACQ-SELF-ORPHAN on test20 at 15:11:36, kernlog_test20.gz:53569-53570). ===== 2026-10-23, on build 08D63764A9352FBDD5A76CD (tree of the 0.90.134 attempt frozen 10:11:20Z), one run each of path_answer_lost then chk_clean with every node's kernel log kept (PF_KEEP_KMSG=1, lanes tests/evidence/lanes/g4_nlink_repro_20261023T102759Z and g8_nlink_repro_20261023T102802Z, step4.log): 4/disk/caw/mpath 'RESULT: PASS ... victim=test6 injected=40 landed=15 unresolved=25 ... max_stall_ms=17445' (board_20261023T105528Z-g4_path_answer_lost/row.log), chk_clean CLEAN 'nlink_mismatch=0' (chk_clean_4node_20261023T105949Z.log); 8/disk/caw/mpath 'RESULT: PASS ... victim=test14 injected=40 landed=24 unresolved=16 ... max_stall_ms=18098' (board_20261023T105719Z-g8_path_answer_lost/row.log), chk_clean CLEAN 'nlink_mismatch=0' (chk_clean_8node_20261023T110155Z.log). The trigger's conditions were present: the kept kmsg dumps hold 8 (g4) and 15 (g8) P-ACQ-STUCK/P-ACQ-SELF-ORPHAN lines. 0 of 2 runs failed on this build against 2 of 2 on 2026-10-19 (v0.90.131 tools); two clean runs dispose of nothing.",
-      "next": "Read both chk_clean logs in full and each run's path_answer_lost kernel logs for the two inodes (6872560, 13147165): which directory holds the two entries, their names, which node created and linked each, and whether a resent COMPARE AND WRITE of a directory block applied an entry insert twice. Then check whether a later version changed that path (0.90.131 was withdrawn; the 0.90.132 entry of CHANGELOG.md), and reproduce on the current build: 4/disk/caw/mpath path_answer_lost followed by chk_clean. ===== 2026-10-23: the kept files cannot name the second entry, so the cause has to come from a run on the current build: 4/disk/caw/mpath and 8/disk/caw/mpath path_answer_lost followed by chk_clean, with the rows' kernel logs kept (PF_KEEP_KMSG=1) and, on a CORRUPT verdict, the volume read before anything remounts it, so the two entries, their directories and the lock ino 25704706 is (whether it is the shared directory) are known. ===== 2026-10-23: the current build did not reproduce in one run at 4 and one at 8 nodes, with the trigger's stuck acquisitions present. Next: diff the inode-reuse and directory-entry paths between the 2026-10-19 build and this one (the 0.90.132 entry of CHANGELOG.md, the P-RELOAD-XINCARN-POISON and INODE-REUSE-EVICT sites) to find a change that would explain it; if one does, a control with that change reverted at 8/disk/caw/mpath must reproduce before a verification batch can be sized; if none does, a calibration batch of path_answer_lost+chk_clean at 8/disk/caw/mpath on this build measures the rate.",
+      "next": "Read both chk_clean logs in full and each run's path_answer_lost kernel logs for the two inodes (6872560, 13147165): which directory holds the two entries, their names, which node created and linked each, and whether a resent COMPARE AND WRITE of a directory block applied an entry insert twice. Then check whether a later version changed that path (0.90.131 was withdrawn; the 0.90.132 entry of CHANGELOG.md), and reproduce on the current build: 4/disk/caw/mpath path_answer_lost followed by chk_clean. ===== 2026-10-23: the kept files cannot name the second entry, so the cause has to come from a run on the current build: 4/disk/caw/mpath and 8/disk/caw/mpath path_answer_lost followed by chk_clean, with the rows' kernel logs kept (PF_KEEP_KMSG=1) and, on a CORRUPT verdict, the volume read before anything remounts it, so the two entries, their directories and the lock ino 25704706 is (whether it is the shared directory) are known. ===== 2026-10-23: the current build did not reproduce in one run at 4 and one at 8 nodes, with the trigger's stuck acquisitions present. Next: diff the inode-reuse and directory-entry paths between the 2026-10-19 build and this one (the 0.90.132 entry of CHANGELOG.md, the P-RELOAD-XINCARN-POISON and INODE-REUSE-EVICT sites) to find a change that would explain it; if one does, a control with that change reverted at 8/disk/caw/mpath must reproduce before a verification batch can be sized; if none does, a calibration batch of path_answer_lost+chk_clean at 8/disk/caw/mpath on this build measures the rate. ===== ===== 2026-10-23 (session 55): THE CAUSE IS ALREADY TRACED, as D-CAW-MPATH-8NODE-REUSED-INODE-NAMED-BY-TWO-DIRENTS-NLINK-1-AFTER-SUITE, removed fixed and verified in 0.90.131 (CHANGELOG.md:613-651). That removal names this record's runs and inodes: 'On the 8-node multipath board of the first 0.90.131 build (8DAEC6B8298ADB049222D74), test23 held the workload's LOCK directory (13147169) shared and wrote back a copy that still named LOCK/test28 after test28 had removed it. Inode 13147165 was then freed and reused as test28/f0000811, and the cold audit found it named twice with a link count of 1. The 4-node multipath board showed the same shape on LOCK directory 6872562' (:619-624), and its cells 'chk_clean FAIL 2026-10-19T15:20:43Z (CORRUPT)' at 8/disk/caw/mpath and 'chk_clean FAIL 2026-10-19T15:13:51Z, dlm_lock_correctness FAIL 2026-10-19T15:13:56Z and crash_audit FAIL 2026-10-19T15:13:57Z' at 4/disk/caw/mpath (:645-651). The 14:22:49Z runs were that build (data/defects.json prose of three other records: 'Builds 8DAEC6B8298ADB049222D74 (14:22:49Z runs)'; board run 20261019T142249Z-g8b path_failover 'release build 8DAEC6B8298ADB049222D74'); no file kept from the runs names a srcversion (the board logs were overwritten by the 2026-10-20 runs, board_8-disk-caw-mpath_g8b_bL1_0.90.131.log:38 build 292B547486AE6E75317F308). Cause: mxfs_dlm_relog_authorized read the CAW slot through the held-or-not query, which reports a shared bit as exclusive, so a shared holder's release drain re-logged its stale directory core; fix relog_auth_granted_mode=1 (re-log only on the granted mode; 0 is the same-build control). This record was opened from the incident sweep (tests/evidence/incident_preassert_sweep_20261022T2355Z.txt) because the chk_clean FAILs reached no run ledger and so were never retired by that removal. ===== The hypothesis tested first this session (the D-CC-16NODE abort that overwrote ACQUIRING, rel_abort_keeps_acquiring) is not this record's cause: lane tests/evidence/lanes/g4_nlink_relabort_off_20261023T230646Z (4/disk/caw/mpath, candidate build 79779BEAECBEA94844FDC72, rel_abort_keeps_acquiring=0 as a variant) made the second acquires happen (board_20261023T231404Z-g4_path_answer_lost kmsg: P-REL-ABORT-UNDER-ACQ keep=0 339-364 a node, P-ACQ-CONCURRENT 6 and 2, P109-EDEADLK-NL-RELEASE 8-13 a node) and chk_clean was CLEAN in each lap read. ===== Next, on the next candidate attempt: tests/relog_auth_lap.sh (built in the sibling tree mxfs-a15: a fresh prep, then one single-arm lap of tests/relog_pr_release_auth.sh, which gains RELOG_ARM=C|F and runs from its own tree) at 4/disk/caw/mpath: control ARM=0 (relog_auth_granted_mode=0, the read before the fix), the verification sized from it, then remove --fixed with the cause above.",
       "impact": "integrity",
       "impact_why": "chk_mxfs found a structural violation of the directory tree: a file whose link count is 1 is named by two directory entries, so unlinking one name frees an inode the other still names",
       "collateral": [
@@ -4249,6 +4249,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-07077e",
+          "kind": "control",
+          "row": "lap:lmu",
+          "config": "2/net/mesh/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: A's last-member unmount released",
+          "candidate": "",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the last member's release-all on one thread, as before the fix",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: the last member's release-all commits each grant's ledger page one at a time, on multipath"
         }
       ],
       "rates": [
@@ -4930,6 +4947,56 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-5acd5e",
+          "kind": "control",
+          "row": "lap:peer_window",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a node on a short window declares a silent peer dead inside the peer's longer lease, on the network lock manager"
+        },
+        {
+          "id": "b20261023-d9b09a",
+          "kind": "verify",
+          "row": "lap:peer_window",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:peer_window",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-5acd5e",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
+            "builds": [
+              "79779BEAECBEA94844FDC72"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -4939,6 +5006,21 @@
           "platform": "any",
           "kind": "control",
           "batch": "b20261023-fc852f",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
+          "builds": [
+            "79779BEAECBEA94844FDC72"
+          ],
+          "date": "2026-10-23"
+        },
+        {
+          "row": "lap:peer_window",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-5acd5e",
           "k": 10,
           "n": 10,
           "candidate": "",
@@ -4999,6 +5081,56 @@
           "config": "2/disk/caw/direct",
           "row": "lap:peer_window",
           "iso": "2026-10-23T20:45:20Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T23:27:39Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T23:26:13Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T23:24:45Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T23:23:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T23:21:53Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T23:20:24Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T23:18:58Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T23:17:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T23:16:05Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T23:14:40Z"
         }
       ],
       "verified_at": [
