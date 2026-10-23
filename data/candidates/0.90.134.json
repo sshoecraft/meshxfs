@@ -1,8 +1,8 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-23T03:55:19Z",
-  "state": "ABANDONED",
+  "created": "2026-10-23T10:11:20Z",
+  "state": "RUNNING",
   "attempts": [
     {
       "created": "2026-10-21T21:26:41Z",
@@ -236,14 +236,36 @@
       "dist": "",
       "packages": {},
       "steps": {}
+    },
+    {
+      "created": "2026-10-23T03:55:19Z",
+      "state": "ABANDONED",
+      "dry_run": false,
+      "srcversion": "16A5F5DDDB4852C9D5DB236",
+      "files": "tests/evidence/candidates/0.90.134_20261023T035519Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-23T03:55:20Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-23T07:00:48Z",
+          "why": "Every release blocker left on this attempt needs a change to the frozen tree: the stale extent-tree read (D-SURVIVOR-CACHE-SERVES-A-DELETED-FILES-BMBT-BLOCK-FOR-A-PEERS-NEW-FILE, found in this attempt's open-EFI verification) and the harness fixes whose controls must run with each fix's own switch off on the candidate's source. Its removals stand; the next attempt freezes the tree with those fixes in."
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
-  "srcversion": "16A5F5DDDB4852C9D5DB236",
-  "module_sha256": "845d148d491c073f27f9e20dc1eaf7bba48144efbaeb2e102f6932e10f8e517b",
-  "files": "tests/evidence/candidates/0.90.134_20261023T035519Z.files.json",
-  "files_count": 2545,
-  "files_digest": "7111c9f1571611e6d3f19d3b799eff6e9bedd35c19f918a5a44ac4349a4e1425",
+  "srcversion": "08D63764A9352FBDD5A76CD",
+  "module_sha256": "2d563ca5f424423d3c0c482e02e9280273ca87ea2da8a5c0a40e5f1406e7189c",
+  "files": "tests/evidence/candidates/0.90.134_20261023T101120Z.files.json",
+  "files_count": 2559,
+  "files_digest": "540cc45c86a220b367e2301d9bc14ba154b5570e172e6600f12917d247a05c1c",
   "spec": "239edd020f1a096365b741c3102e0e052eec58ebe70c3d53dd631e5aa7a81ea8",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
@@ -253,13 +275,8 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-23T03:55:20Z",
+      "at": "2026-10-23T10:11:20Z",
       "why": "created"
-    },
-    {
-      "state": "ABANDONED",
-      "at": "2026-10-23T07:00:48Z",
-      "why": "Every release blocker left on this attempt needs a change to the frozen tree: the stale extent-tree read (D-SURVIVOR-CACHE-SERVES-A-DELETED-FILES-BMBT-BLOCK-FOR-A-PEERS-NEW-FILE, found in this attempt's open-EFI verification) and the harness fixes whose controls must run with each fix's own switch off on the candidate's source. Its removals stand; the next attempt freezes the tree with those fixes in."
     }
   ]
 }
