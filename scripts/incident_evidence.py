@@ -500,6 +500,8 @@ def main(argv):
              % sum(1 for r in found if r["where"] != r["expected"]),
              "  matched lines that carry a run_id: %d of %d incidents found"
              % (len(with_run_id), len(found)),
+             "  matched lines that carry a `migrated` key: %d of %d incidents found"
+             % (sum(1 for r in found if any("migrated" in item for _, item in r["chosen"])), len(found)),
              "  'run died while this test was executing' incidents: %d" % len(died),
              "  release:<step> incidents: %d; guard_census incidents: %d" % (len(release), len(guard)),
              "  evidence-name walk: %d entries under tests/evidence/ visited for %d run_id(s); "

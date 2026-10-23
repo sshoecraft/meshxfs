@@ -465,13 +465,61 @@
       "nodes": 32,
       "config": "disk/caw/*",
       "opened": "2026-08-23",
-      "updated": "2026-09-03",
+      "updated": "2026-10-22",
       "summary": "crash_consistency (tests/suite/crash_consistency.sh) FAILED on ALL 32 nodes at once with exactly ONE failed check per node (test1: checks=204 passed=203 failed=1; every other rank 203/1; faildist[1x32]) at 88 s of its 90 s budget, on 0.23.13 sv BBCE455416145E4783E3821, run_id 20260823T011846Z (full-board run, fresh prep, 14th row). The same row PASSED 32/32 at 16 s seven minutes later (01:33Z, 204/204) and has PASSed every other run today. The per-node check set is 3 coord barriers + (own + 3 peers) x 50 cold-read md5 durable checks (+1 count check on rank 1); the only check that can fail identically on every rank is a BARRIER \u2014 consistent with one node stalling ~70 s in its phase (cold FUA reads of 200 files+sidecars normally take <10 s) and the fleet timing out at cc_done. The per-node detail log was lost (run.sh artifacts not kept on that invocation). RULE: ZERO ACCEPTED KNOWN DEFECTS: intermittent = still a defect; a 70 s stall in cold reads is itself a RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS failure.",
       "evidence": [
-        "sess409 (0.26.9 sv 8F59A85088DBA6459479F55): full board row crash_consistency 90/90 s BUDGET_EXHAUSTED=1 FAIL=31 (rank1 checks=182 passed=182, steps[cc r1 durable node4_f31=1]) \u2014 tests/evidence/sess409_board_0269.log. A/B with the new create-path knob ccprev_enable (fresh prep per run, rig-runner 15:37-15:52Z): ON 85 s PASS (204/204), OFF 86 s FAIL (203/204 rank1 barrier), OFF 89 s FAIL (same), ON 90 s BUDGET_EXHAUSTED (201/201, 'killed leftover crash_consistency processes'). The row is at its 90 s edge in both knob states -> this shape is NOT attributable to the 0.26.5-0.26.9 di_changecount read (D-408 fix); it is this defect's 3200-creates-through-one-shared-dir-EX pace (per-run logs /tmp/tmp.P4q6GYq9kP, /tmp/tmp.R6FbpiZm4S, /tmp/tmp.JUSZJ5GZJJ on clyde \u2014 /tmp, lost on reboot)."
+        "sess409 (0.26.9 sv 8F59A85088DBA6459479F55): full board row crash_consistency 90/90 s BUDGET_EXHAUSTED=1 FAIL=31 (rank1 checks=182 passed=182, steps[cc r1 durable node4_f31=1]) \u2014 tests/evidence/sess409_board_0269.log. A/B with the new create-path knob ccprev_enable (fresh prep per run, rig-runner 15:37-15:52Z): ON 85 s PASS (204/204), OFF 86 s FAIL (203/204 rank1 barrier), OFF 89 s FAIL (same), ON 90 s BUDGET_EXHAUSTED (201/201, 'killed leftover crash_consistency processes'). The row is at its 90 s edge in both knob states -> this shape is NOT attributable to the 0.26.5-0.26.9 di_changecount read (D-408 fix); it is this defect's 3200-creates-through-one-shared-dir-EX pace (per-run logs /tmp/tmp.P4q6GYq9kP, /tmp/tmp.R6FbpiZm4S, /tmp/tmp.JUSZJ5GZJJ on clyde \u2014 /tmp, lost on reboot).",
+        "2026-10-22: nine 32/disk/caw/mpath crash_consistency FAILs of 2026-09-04 11:52-13:00Z, migrated into data/criteria.runs.jsonl (lines 577, 592, 605, 610, 615, 620, 627, 630, 636; no run id, no evidence path) and named by no record, carry this record's two shapes in their own reasons: every node BUDGET_EXHAUSTED at 85-86 s of the 90 s budget parked at 'cc r1 durable' (e.g. 12:37:06Z 'test1:BUDGET_EXHAUSTED:step=cc r1 durable node3_f9 report_s=85 elapsed_s=85'), or nodes at 'FAIL:cc barrier done' (13:00:05Z). Each alternates with a crash_consistency PASS of the same configuration minutes apart (11:52:46Z FAIL, 11:56:05Z PASS), the run-to-run variance this record describes. Named here as cells so the incident gate attributes them; nothing about the record's cause changes."
       ],
       "next": "SESS483 \u2014 THE BARRIER ARM IS RULED OUT AS THE CAUSE OF THE crash_consistency ROW, on a 4-lap A/B recovered from sess480's chain 126 (its own vacuity gate had discarded the passing half). tests/evidence/sess480_cc_private_s480l/, one build sv EAD72FC7EC56BA505829901, legs alternating minutes apart. With CC_PRIVATE=1 (per-node private directories, everything else identical including the fleet-wide barrier) crash_consistency PASSES twice: run 20260904T023018Z 18s/90s nodes_pass=32/32 checks=204 passed=204 notrun=0, and run 20260904T023746Z 19s/90s nodes_pass=32/32 checks=204 notrun=0. The interleaved shared legs FAIL both times at 90s/90s with nodes_pass=0/32. THE BARRIER CONVERGES FINE when the directory is not shared, so the fleet-wide barrier is not what strands the nodes - chain 126's header stated exactly this discriminator ('If BOTH shapes strand nodes, the fleet-wide barrier has a problem of its own and D-CRASH-CONSISTENCY-FLEETWIDE-BARRIER-TIMEOUT-401 needs a separate root') and only the shared shape stranded. The row is now owned by D-32NODE-SHARED-DIR-CREATE-PACE; see that record for the per-create cost ladder. THIS DOES NOT CLOSE THIS RECORD: it removes the crash_consistency row as this record's evidence, it does not disprove the originally reported all-32-at-once barrier timeout, which needs its own disposition on its own evidence. Do not read 'the barrier was fine in this shape' as 'the barrier has no defect'. || SESS480 THE STRAGGLERS ARE NAMED AND THERE IS NOW A FALSIFIABLE HYPOTHESIS WITH THE EXPERIMENT QUEUED. FIRST, THE steps[] FIELD MEANS 'PARKED AT', NOT 'COMPLETED' \u2014 proven from run.sh:1326, 'stp=$(echo \"$line\" | field reason | sed -n \"s/^step=\\(.*\\) report_s=.*/\\1/p\")', which takes the step out of each node's FAILURE REASON, and the comment at run.sh:1322-1324 states the intent outright ('31 nodes parked at one barrier and ONE somewhere else names the node to investigate'). That reading is also forced by the source order: 'cc barrier ready' is crash_consistency.sh:69 and 'cc barrier written' is :89, so 29 nodes could not have passed the LATER barrier while only 3 passed the earlier one. SECOND, THE THREE ARE NAMED: extracting step= per node from tests/evidence/run_crash_consistency_20260904T000831Z gives exactly 3 x 'step=cc barrier ready' (test23, test27, test30) and 29 x 'step=cc barrier written'. Twenty-nine nodes had finished their work and were waiting at the second barrier for three that never cleared the first. Their kernel logs are NOT distinguishable by probe volume \u2014 P68-EVDECIDE/P-AGIFC-MOD/P165-AFFINE-STALE/P82-REM/P50-RD counts on test23/27/30 sit inside the spread of healthy nodes (test1, test2) \u2014 so the stragglers are not doing anything visibly different; they are simply late. THIRD, THE HYPOTHESIS: everything a node does BEFORE 'ck cc barrier ready' touches the ONE SHARED DIRECTORY \u2014 the stat of $D at crash_consistency.sh:47 and, in the default non-private shape, 'mkdir -p $D' at :65 through ccdir() \u2014 which is precisely the inode whose contention D-32NODE-SHARED-DIR-CREATE-PACE measures at p50=10 ms with a multi-second tail and 74.5% of blocked time in the CAW inode-grant wait. With 32 nodes each touching it before the barrier the row becomes a 32-SAMPLE DRAW FROM THAT TAIL, and a fleet-wide barrier makes ONE unlucky draw fatal for all 32. That single mechanism would explain both observed failure shapes (barrier-stall at 3/32 ready, and create-loop-slow at 32/32 durable), the 4x run-to-run variance, and why the failure POINT moves while the outcome never does \u2014 without the barrier itself being defective. FOURTH, THE TEST, QUEUED as tests/sess480_chain126_cc_private_barrier.sh (label s480l): CC_PRIVATE=1 gives every node its own subdirectory so the shared directory lock does not rotate (crash_consistency.sh:53-60, built for the sess436 ruling and explicitly 'never a board condition'), and the chain runs shared and private legs ALTERNATING, TWICE EACH, on the same build minutes apart, reporting per leg the nodes_pass, the steps[] histogram and the named cc_ready stragglers. PREDICTION: if the shared directory is the cause, the private legs converge through both barriers while the shared legs strand nodes. IF BOTH SHAPES STRAND NODES the shared directory is not the whole story and THIS record needs a root of its own separate from the pace record \u2014 which would be a finding, not a null result. Nothing in the chain changes the board row; it is a measurement. || SESS480 SECOND REPRODUCTION ON 0.64.37 WITHIN THE HOUR, AND THIS ONE IS THE BARRIER FACE PROPER RATHER THAN THE CREATE-PACE TAIL. Run 20260904T000831Z (chain 123 s480h): 'FAIL crash_consistency nodes_pass=0/32 states:BUDGET_EXHAUSTED=32 hostload=20.26 first_fail[test1:checks=1 passed=1 failed=0] rank1[checks=1 passed=1 failed=0] faildist[0x32] steps[cc barrier written=29,cc barrier ready=3]'. Twenty-nine of 32 nodes had WRITTEN the barrier and only THREE ever reached barrier-ready, so the run died at the barrier with a single check completed. Compare run 20260903T231724Z fifty minutes earlier on the SAME freeze (sv EAD72FC7EC56BA505829901, same 90 s budget, same workload): there every node reported checks=11 passed=11 failed=0 and ALL 32 reached durable (cc r1 durable node1_f10=1 ... cc r32 durable node32_f10=1) before the budget cut it off. So on one build, within an hour, the row fails at two quite different depths \u2014 once at barrier convergence with 3/32 ready, once deep in the create/verify loop with 32/32 durable \u2014 while the OUTCOME is identical both times: nodes_pass=0/32, BUDGET_EXHAUSTED on all 32, and not one correctness failure in either run. That pairing is worth more than either run alone: it says the failure is not a fixed stage that could be optimised away but a load-dependent convergence problem whose stall point moves, and it is a caution against attributing the row to the create pace alone (D-32NODE-SHARED-DIR-CREATE-PACE) when the barrier can be the thing that does not converge. It also kills the reading that these rows are near-misses: 0/32 twice is not a budget that needs a little more room. ANY future green crash_consistency must therefore be read as a STREAK at lap 1, never as a single board \u2014 two consecutive reds here against one green on 2026-09-02 make the green the outlier. || SESS480 REPRODUCED ON 0.64.37, FLEET-WIDE, AGAINST THE UNCHANGED 90 s BUDGET. Board run 20260903T231724Z (freeze sv EAD72FC7EC56BA505829901, table in tests/evidence/sess479_chain119_board_s479a.log, logs dir tests/evidence/run_crash_consistency_20260903T231724Z): 'crash_consistency 32/caw FAIL 91/90s nodes_pass=0/32 states:BUDGET_EXHAUSTED=32 hostload=22.05 first_fail[test1:checks=11 passed=11 failed=0] rank1[checks=11 passed=11 failed=0] faildist[0x32]'. ZERO nodes passed and ZERO nodes recorded a correctness failure \u2014 every one of the 32 reports checks=11 passed=11 failed=0, and the steps list shows all 32 reaching durable (cc r1 durable node1_f10=1 ... cc r32 durable node32_f10=1). The row is failing purely on wall time. THIS MATTERS BEYOND THIS RECORD: the 2026-09-02T18:43Z board had this same row at PASS 22/90s, and that single green sample was being read as evidence that criterion (2) of D-FOREIGN-REPLAY-UNGATED-IMAGES (the #1 critical record) had become satisfiable. It has not: at 91 s on 32/32 nodes this defect is squarely on that record's critical path, and no board on this build can be 'clean apart from the policy cell' until the shared-dir create pace is fixed. The 22 s and 91 s samples on adjacent builds also confirm the first-lap/cold-directory character already recorded here \u2014 the row's outcome swings by 4x between runs, so any future citation of a green crash_consistency must be a streak read at lap 1, never a single board and never an average. || SESS463 OCCURRENCE on 0.61.7 (chain 87 board, run 20260902T064145Z, tests/evidence/sess460_chain87_ndr_streak_s460b.log): crash_consistency FAIL nodes_pass=0/32 BUDGET_EXHAUSTED=1 FAIL=31 at 90/90 s, checks=105 passed=105 failed=0 on test1 (rank1), faildist[0x1,1x31], step 'cc r1 durable node3_f4', hostload 16.7 \u2014 the pure RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS pace face again (every check passed, the fleet-wide barrier missed the budget). Disposition unchanged: symptom of D-32NODE-SHARED-DIR-CREATE-PACE; budget NOT widened. || SESS447 OCCURRENCE on the 0.54.0 PRODUCTION-DEFAULT board (chain 55, run 20260829T135413Z, sv 2E283B58, /tmp/run_crash_consistency_20260829T135413Z): FAIL nodes_pass=15/32 FAIL=17, elapsed 88 s of 90; every checksum check passed on all 32 nodes (checks=203/204 passed, mxfs-cc-FAIL 0, mxfs-cc-DISCRIM 0); the ONLY failed check is the final 'cc barrier done' (coord_barrier cc_done, crash_consistency.sh:155) on 17 nodes, watchdog BUDGET_EXHAUSTED at report_s=85 (test1 at step 'cc r1 durable node4_f50'); CCph verify-done 14:02:10, count-done/barrier-done-done 14:02:15 on FAIL and PASS nodes alike. Same face as history[4] (01:43Z, 32/32 'cc barrier done') and [7] (01:04Z, 6/32); the 09:39Z occurrence was the earlier 'cc barrier written' step. Not a durability loss; RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS pace at the budget edge. || SESS445 OCCURRENCE on the 0.51.0 fresh-prep board (chain 34, run 20260829T093135Z, sv 1AB2A2C6): FAIL nodes_pass=0/32 BUDGET_EXHAUSTED=32 at 85 s, checks=1 step 'cc barrier written', hostload 26. Archive tests/evidence/sess445_cc_fail_0510 (32 kernlogs, 451 MB). Phase walls (CCph, test1/test2/test16/test32): datawrite 16/16/42/50 s, md5write 33/43/34/31 s, every rank barrier-written-done at 09:39:19 (83 s after start), dropcaches-done 09:39:21, watchdog report_s=85. The 'checks=1' face is the SAME mechanism as every prior face: the datawrite/md5write phases carry no ck() calls, so the counter sits at 1 until the written barrier. Fleet counts: P382-WAKE 8888, P138-BAST 6909 (shared-dir EX rotation), P133-ICLUSTER-SYNCINIT 18-20/node rc=0 (18 on test1, 16 of them BEFORE the cc start \u2014 the 0.51.0 carve invariant is NOT the cost), ZERO mxfs-cc-FAIL/DISCRIM/'stuck for'/Corruption/'timed out'. Disposition unchanged: symptom of D-32NODE-SHARED-DIR-CREATE-PACE; budget NOT widened. Harness note: every testN.ccph artifact is empty (1 byte) \u2014 the phase capture in run.sh is not recording; the kernlogs carry the stamps. || SESS435 OCCURRENCE on the 0.41.3 armed board (run 20260829T001229Z): rank 1 'cc barrier done' FAIL 203/204 at 87/90 s, 31 ranks PASS, zero mxfs-cc-FAIL/DISCRIM \u2014 the budget-edge face; per-grant attribution of the 22 ms handoff runs in tests/sess435_chain13_0414.sh (cc_grantwait mark/report). || SESS435 ATTRIBUTION (tests/cc_phase_walls.py on the retained 20:20Z FAIL archive + tests/cc_stackprof.sh on a 0.41.2 run, tests/evidence/sess435_ccprof_s435c/agg.txt): per node the wall is datawrite median 30 s (min 16 max 51) + md5write median 39 s (26-49) = the 100 O_SYNC creates per node into ONE shared directory (3200 fleet-wide, ~22 ms per serialized create); barrier waits 0-29 s are only the spread of that; dropcaches 2 s, verify 9 s, count 0; ZERO fault probes (no mxfs-cc-FAIL, P130/P131, stuck-for, Corruption). Stack profile (32 nodes, 156223 wait samples): 26.5%% mxfs_pal_cond_timedwait < caw_nudge_wait < caw_acquire_poll_sleep < caw_wait_for_grant < caw_lock_body (dd 13.2%%, bash 11.3%%), 11.6%% md5sum open_last_lookups (verify-phase cold opens), release/holder side (FOCUS) only 1.25%% of ticks \u2014 of which 78%% is the sess380 finding still present: read_slot < find_slot_skip < mxfs_dlm_caw_held < bast_notify in the BAST dispatcher. The wall is the serialized HANDOFF of the directory inode lock across 32 nodes, i.e. D-32NODE-SHARED-DIR-CREATE-PACE; this record is its symptom on the 90 s budget. Not widened. NOTE: the profiled run itself timed out (rc=124, profiler overhead) \u2014 measurement only. || SESS433 3x RECURRENCE TODAY on 32/caw boards: 17:40Z (0.39.x, BUDGET_EXHAUSTED=32 at 68 checks, all ranks still in durable phase), 18:11Z (BUDGET_EXHAUSTED=32 at 128 checks) and 20:28Z run 20260828T202007Z on 0.39.13 sv 530DBAD2 (tests/evidence/sess432_board_03913_s432b.log:105): test1 rank1 BUDGET_EXHAUSTED at 140/204 checks step 'cc r1 durable node3_f39' report_s=85 \u2014 byte-identical to the sess414 run-3 face \u2014 31 ranks 'cc barrier done' 202/203, hostload 22.62; 7 other runs today PASS 204/204 at 85-88 s. Retained archive /tmp/run_crash_consistency_20260828T202007Z (32x 18 MB kernlogs, relay-fragile; node journals for the window have already rotated). Disposition unchanged: cold cross-node md5 verify pace at the 90 s ceiling, tied to D-32NODE-SHARED-DIR-CREATE-PACE; budget NOT widened. || SESS431 (18:30Z) OCCURRENCE: s442 board on 0.39.7 (sv 6116AF0D, tests/evidence/sess430_s442.log, board mark 18:02:50Z): crash_consistency FAIL 90/90s BUDGET_EXHAUSTED=32, nodes_pass=0/32, every node checks=128 passed=128 failed=0, hostload=25.12 (s439 on 0.39.5: 85/90s hostload 21.70 FLAKY; s440 on 0.39.6: FLAKY). TIMEOUT_BUDGETS.md: runs 86-88 s of 90 every board ('thin \u2014 watch, do NOT widen'). RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS: the budget miss IS the failure; correctness was 100%. Not attributable to 0.39.5-0.39.7 without a wall series \u2014 the row was already at 85-88 s before them. SESS425 RECURRENCE on the 0.35.0 32/caw board (run 20260828T092746Z, criteria.json:5733): test1 (rank 1) FAIL 'cc barrier done' 204/203, all 32 nodes watchdog BUDGET_EXHAUSTED report_s=85 elapsed_s=85 (budget 90); zero mxfs-cc-FAIL / mxfs-cc-DISCRIM on any kernlog (archive /tmp/run_crash_consistency_20260828T092746Z, relay-fragile), i.e. data intact, the final barrier ran out of reporting window. Phase walls on rank 1: datawrite 18 s, md5write 26 s, barrier-written 22 s, verify 7 s, count 11 s. The six earlier runs today PASSed 204/204. RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS: the wall is at the budget ceiling; the barrier-written 22 s and count 11 s phases are the pace suspects.",
-      "reach_source": "heuristic"
+      "reach_source": "heuristic",
+      "cells": [
+        {
+          "config": "32/disk/caw/mpath",
+          "row": "crash_consistency",
+          "iso": "2026-09-04T11:52:46Z"
+        },
+        {
+          "config": "32/disk/caw/mpath",
+          "row": "crash_consistency",
+          "iso": "2026-09-04T12:05:43Z"
+        },
+        {
+          "config": "32/disk/caw/mpath",
+          "row": "crash_consistency",
+          "iso": "2026-09-04T12:23:57Z"
+        },
+        {
+          "config": "32/disk/caw/mpath",
+          "row": "crash_consistency",
+          "iso": "2026-09-04T12:28:25Z"
+        },
+        {
+          "config": "32/disk/caw/mpath",
+          "row": "crash_consistency",
+          "iso": "2026-09-04T12:37:06Z"
+        },
+        {
+          "config": "32/disk/caw/mpath",
+          "row": "crash_consistency",
+          "iso": "2026-09-04T12:41:38Z"
+        },
+        {
+          "config": "32/disk/caw/mpath",
+          "row": "crash_consistency",
+          "iso": "2026-09-04T12:50:22Z"
+        },
+        {
+          "config": "32/disk/caw/mpath",
+          "row": "crash_consistency",
+          "iso": "2026-09-04T12:55:21Z"
+        },
+        {
+          "config": "32/disk/caw/mpath",
+          "row": "crash_consistency",
+          "iso": "2026-09-04T13:00:05Z"
+        }
+      ]
     },
     {
       "id": "D-AGIFC-SHARED-AG-DOUBLE-VICTIM-REPLAY-DIVERGENCE-408",
@@ -1674,11 +1722,43 @@
       "config": "*/*/*",
       "opened": "2026-10-19",
       "summary": "0.90.131 board cells that ended without a verdict (ABORTED, NOT RUN, FINALIZED): every one examined for a hang, a crash or a fence of its own; each run was ended from outside the filesystem.",
-      "evidence": "Cells and causes (log-sweeper extraction, session 9bfeb3af; each board log ends with run.sh's exit trap 'finalized N marker(s)'): (A) 2/disk/caw/mpath path_fenced_return ABORTED 2026-10-17T05:44:30Z (run 20261017T054315Z-g2b, board_2-disk-caw-mpath_path_fenced_return_chk_clean_g2b_pfrXd.log:132), 06:04:30Z (20261017T060128Z-g2b, _pfrYc.log:97), 06:25:45Z (20261017T062444Z-g2b, _pfrZd.log:86), with their alloc_witness/chk_clean markers: each died the same second its launching Claude session ended (transcripts 58efc810:1579, 00c8b678:1314, 73f97dbb:1353; task notifications 'failed with exit code 144'; next ccloop session prompts 2-3 s later); last row lines show the row mid-workload, no hang. (B) 8/disk/caw/mpath path_fenced_return ABORTED 2026-10-17T06:04:30Z (20261017T060306Z-g8b, board_8-disk-caw-mpath_path_fenced_return_g8b_rpwBc.log:101): same session end as A's Yc (00c8b678:1315). (C) 8/net/mesh/mpath run 20261017T051050Z-g8 (board_8-net-mesh-mpath_..._g8_t131na.log): path_fabric ABORTED 05:18:29Z and the NOT RUN cells path_all_lost, path_fence_degraded, path_fenced_return, path_flap, path_mount_degraded, path_peer_withdrawn (05:11:08Z and 05:18:29Z): session c2d1404e ended 05:18:29.4Z ('was stopped', :1411); its path_failover ABORTED 05:11:08Z is the leftover marker of run 20261016T170302Z-g8, killed by the 2026-10-16 ~17:04Z silent host reset recorded in D-HOST-CLYDE-SILENT-RESET-NO-FAULT-RECORD-RIG-LIVE-0902. (D) 2/disk/caw/mpath alloc_witness ABORTED, chk_clean NOT RUN 2026-10-18T21:26:10Z (run 20261018T212548Z-g2d, the chk step of tests/unstaged_slot_ab.sh lap uslc4, 20261018T212430Z_unstaged_slot_uslc4/chk.log:39-40): session a1cf8ac9 'was stopped' 21:26:10.167Z (:1218). (E) 16/net/mesh/direct 22 NOT RUN 2026-10-19T15:52:34Z (run 20261019T154607Z-g16) and 8/net/mesh/mpath 28 NOT RUN 15:52:35Z (20261019T154607Z-g8b): the 0.90.131 release chain killed by its operator (session 0da2c171:2465, kill -TERM of the chain's process group at 15:52:34.579Z; board logs end 'Terminated' then 'finalized'). (F) 2/net/mesh/mpath path_fenced_return ABORTED 2026-10-19T17:29:27Z with alloc_witness, chk_clean NOT RUN (20261019T172723Z-g2e, board_..._g2e_frkb3a.log:107) and 4/disk/caw/mpath path_flap NOT RUN 17:29:27Z (20261019T171815Z-g4, board_4-disk-caw-mpath_path_failover_path_fabric_path_flap_g4_purf1a.log:111-113): session 7d9a52ae ended (:1531, :1533 exit code 144). (G) 2/net/mesh/mpath alloc_witness, chk_clean FINALIZED (run 20261019T165510Z-g2e, board_..._g2e_frk3a.log:72): session dc9708e5 ended 17:00:48Z (:1418). ===== BOARD CELLS this record accounts for (each 'finalized N marker(s)' after the run was ended from outside; no row verdict): 2/disk/caw/direct guard_census NOT RUN 2026-10-19T19:02:13Z (run 20261019T185846Z-g2, board_2-disk-caw-direct_guard_census_g2_qw2d2_0.90.131.log:112, after 'Terminated'); 2/disk/caw/mpath path_fenced_return ABORTED 2026-10-17T06:25:45Z (20261017T062444Z-g2b, board_2-disk-caw-mpath_path_fenced_return_chk_clean_g2b_pfrZd.log:86); 8/disk/caw/direct dirent_type_integrity ABORTED and guard_census NOT RUN 2026-10-19T19:02:23Z (20261019T185359Z-g8, board_8-disk-caw-direct_posix_multi_dirent_type_integrity_guard_census_g8_qw8d1_0.90.131.log:109); 8/net/mesh/mpath path_fabric ABORTED and path_flap, path_mount_degraded, path_fence_degraded, path_fenced_return, path_all_lost, path_peer_withdrawn NOT RUN 2026-10-17T05:18:29Z (20261017T051050Z-g8, board_8-net-mesh-mpath_..._g8_t131na.log:95); 8/net/mesh/mpath NOT RUN 2026-10-19T15:52:35Z, 28 rows (20261019T154607Z-g8b, board_8-net-mesh-mpath_g8b_bL3_0.90.131.log:73, the board stopped after its posix_multi row): scaling_curve dlm_scaling rsync_paired crash_consistency dir_reuse_coherency fence_during_write fault_netpartition dirent_durability soak node_responsive kernel_health dirent_publish_integrity dirent_type_integrity ag_strand_repair sustained_load path_failover path_fabric path_flap path_mount_degraded path_fence_degraded path_fenced_return path_all_lost path_peer_withdrawn alloc_witness chk_clean guard_census tcp_dlm_scaling crash_audit.",
+      "evidence": "Cells and causes (log-sweeper extraction, session 9bfeb3af; each board log ends with run.sh's exit trap 'finalized N marker(s)'): (A) 2/disk/caw/mpath path_fenced_return ABORTED 2026-10-17T05:44:30Z (run 20261017T054315Z-g2b, board_2-disk-caw-mpath_path_fenced_return_chk_clean_g2b_pfrXd.log:132), 06:04:30Z (20261017T060128Z-g2b, _pfrYc.log:97), 06:25:45Z (20261017T062444Z-g2b, _pfrZd.log:86), with their alloc_witness/chk_clean markers: each died the same second its launching Claude session ended (transcripts 58efc810:1579, 00c8b678:1314, 73f97dbb:1353; task notifications 'failed with exit code 144'; next ccloop session prompts 2-3 s later); last row lines show the row mid-workload, no hang. (B) 8/disk/caw/mpath path_fenced_return ABORTED 2026-10-17T06:04:30Z (20261017T060306Z-g8b, board_8-disk-caw-mpath_path_fenced_return_g8b_rpwBc.log:101): same session end as A's Yc (00c8b678:1315). (C) 8/net/mesh/mpath run 20261017T051050Z-g8 (board_8-net-mesh-mpath_..._g8_t131na.log): path_fabric ABORTED 05:18:29Z and the NOT RUN cells path_all_lost, path_fence_degraded, path_fenced_return, path_flap, path_mount_degraded, path_peer_withdrawn (05:11:08Z and 05:18:29Z): session c2d1404e ended 05:18:29.4Z ('was stopped', :1411); its path_failover ABORTED 05:11:08Z is the leftover marker of run 20261016T170302Z-g8, killed by the 2026-10-16 ~17:04Z silent host reset recorded in D-HOST-CLYDE-SILENT-RESET-NO-FAULT-RECORD-RIG-LIVE-0902. (D) 2/disk/caw/mpath alloc_witness ABORTED, chk_clean NOT RUN 2026-10-18T21:26:10Z (run 20261018T212548Z-g2d, the chk step of tests/unstaged_slot_ab.sh lap uslc4, 20261018T212430Z_unstaged_slot_uslc4/chk.log:39-40): session a1cf8ac9 'was stopped' 21:26:10.167Z (:1218). (E) 16/net/mesh/direct 22 NOT RUN 2026-10-19T15:52:34Z (run 20261019T154607Z-g16) and 8/net/mesh/mpath 28 NOT RUN 15:52:35Z (20261019T154607Z-g8b): the 0.90.131 release chain killed by its operator (session 0da2c171:2465, kill -TERM of the chain's process group at 15:52:34.579Z; board logs end 'Terminated' then 'finalized'). (F) 2/net/mesh/mpath path_fenced_return ABORTED 2026-10-19T17:29:27Z with alloc_witness, chk_clean NOT RUN (20261019T172723Z-g2e, board_..._g2e_frkb3a.log:107) and 4/disk/caw/mpath path_flap NOT RUN 17:29:27Z (20261019T171815Z-g4, board_4-disk-caw-mpath_path_failover_path_fabric_path_flap_g4_purf1a.log:111-113): session 7d9a52ae ended (:1531, :1533 exit code 144). (G) 2/net/mesh/mpath alloc_witness, chk_clean FINALIZED (run 20261019T165510Z-g2e, board_..._g2e_frk3a.log:72): session dc9708e5 ended 17:00:48Z (:1418). ===== BOARD CELLS this record accounts for (each 'finalized N marker(s)' after the run was ended from outside; no row verdict): 2/disk/caw/direct guard_census NOT RUN 2026-10-19T19:02:13Z (run 20261019T185846Z-g2, board_2-disk-caw-direct_guard_census_g2_qw2d2_0.90.131.log:112, after 'Terminated'); 2/disk/caw/mpath path_fenced_return ABORTED 2026-10-17T06:25:45Z (20261017T062444Z-g2b, board_2-disk-caw-mpath_path_fenced_return_chk_clean_g2b_pfrZd.log:86); 8/disk/caw/direct dirent_type_integrity ABORTED and guard_census NOT RUN 2026-10-19T19:02:23Z (20261019T185359Z-g8, board_8-disk-caw-direct_posix_multi_dirent_type_integrity_guard_census_g8_qw8d1_0.90.131.log:109); 8/net/mesh/mpath path_fabric ABORTED and path_flap, path_mount_degraded, path_fence_degraded, path_fenced_return, path_all_lost, path_peer_withdrawn NOT RUN 2026-10-17T05:18:29Z (20261017T051050Z-g8, board_8-net-mesh-mpath_..._g8_t131na.log:95); 8/net/mesh/mpath NOT RUN 2026-10-19T15:52:35Z, 28 rows (20261019T154607Z-g8b, board_8-net-mesh-mpath_g8b_bL3_0.90.131.log:73, the board stopped after its posix_multi row): scaling_curve dlm_scaling rsync_paired crash_consistency dir_reuse_coherency fence_during_write fault_netpartition dirent_durability soak node_responsive kernel_health dirent_publish_integrity dirent_type_integrity ag_strand_repair sustained_load path_failover path_fabric path_flap path_mount_degraded path_fence_degraded path_fenced_return path_all_lost path_peer_withdrawn alloc_witness chk_clean guard_census tcp_dlm_scaling crash_audit. ===== 2026-10-22: six INCOMPLETE 'run died while this test was executing' cells, each ended within 3 s of its launching session's ccloop relay halt, the run being a background task of that session (tests/evidence/incident_preassert_sweep_20261022T2355Z.txt, CLASS B): 8/net/mesh/mpath path_fabric 2026-10-17T05:18:29Z (.ccloop/runs/7e16fd1d.../hook-events.log:254 halt 05:18:27Z, session c2d1404e, transcript ends 05:18:29.483Z); 2/disk/caw/mpath path_fenced_return 2026-10-17T06:25:45Z (already cited above; 7e16fd1d:307 halt 06:25:44Z, session 73f97dbb); 2/net/mesh/mpath, 4/disk/caw/mpath path_mount_degraded and 8/disk/caw/mpath path_fence_degraded 2026-10-21T02:35:33Z (ca01b485:458 halt 02:35:30Z, session c0f48319, transcript ends 02:35:33.314Z); and, of the same kind on 0.90.134, 2/disk/caw/direct4k dirent_durability 2026-10-22T17:18:32Z, run 20261022T170816Z-g2d (9aa0fe9b:30 halt 17:18:30Z, session 56b5c333, transcript ends 17:18:32.798Z). Five other 'run died' cells (2026-10-05T00:24:53Z, 10-10T14:05:46Z, 10-11T23:29:12Z, 10-17T05:11:08Z, 10-20T13:42:36Z) had no halt in the ten minutes before them and are NOT named here.",
       "next": "Add this session's own non-verdict cells (laps stopped or overrun while lap queues were re-composed, 2026-10-19 19:00-19:10Z), then remove as DISPROVED: not an MXFS defect.",
       "impact": "noblock",
       "impact_why": "No MXFS behaviour was measured in these cells: each run was ended from outside (its launching session ended, an operator killed it, or the host reset) before the row produced a verdict; recorded so that no 0.90.131 board cell is left unexamined.",
-      "updated": "2026-10-19"
+      "updated": "2026-10-22",
+      "cells": [
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "path_fabric",
+          "iso": "2026-10-17T05:18:29Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "path_fenced_return",
+          "iso": "2026-10-17T06:25:45Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "path_mount_degraded",
+          "iso": "2026-10-21T02:35:33Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "path_mount_degraded",
+          "iso": "2026-10-21T02:35:33Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "path_fence_degraded",
+          "iso": "2026-10-21T02:35:33Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "dirent_durability",
+          "iso": "2026-10-22T17:18:32Z"
+        }
+      ]
     },
     {
       "id": "D-FENCED-NODE-SYNC-WEDGED-AND-REJOIN-TIMED-OUT-AFTER-TOTAL-STORAGE-LOSS",
@@ -2377,16 +2457,152 @@
       "opened": "2026-10-21",
       "summary": "tests/suite/fsx.sh draws its seed from 4 random bytes (0..2^32-1), but the vendored fsx stores -S in an int and calls usage() when it is negative, so about half of all runs exit 90 at once and record a FAIL that exercised nothing; and fsx.sh writes fsx's output to /tmp/fsx.$$.*.log on the node and deletes it in its EXIT trap, so no failing run keeps its evidence.",
       "evidence": "2/net/mesh/drbd fsx 2026-10-21T19:36:37Z (dry-run candidate 0.90.133-2, build 71AC6107043DD5BE3D9181A): FAIL checks=2 passed=0 failed=2 seed=3832054505, both checks in 2 s of an 88 s budget (tests/evidence/drbd_rig/criteria.runs.jsonl). Code: tests/suite/fsx.sh:27 SEED=$(od -An -N4 -tu4 /dev/urandom); tests/suite/tools/fsx.c:186 'int seed = 1;', :3397 'seed = getnum(optarg, &endp);', :3402-3403 'if (seed < 0) usage();'; tests/suite/fsx.sh:22 trap 'rm -rf \"$W\" /tmp/fsx.$$.*'. Reproduced on clyde 2026-10-21 with the vendored binary: 'tests/suite/tools/fsx -S 3832054505 -N 200 <file>' rc=90 'usage: fsx ...'; -S 2147483648 rc=90; -S 2147483647 rc=0 'Seed set to 2147483647'. ===== ===== 2026-10-22, the rest of the fix: run.sh's artifact pull for a row that did not pass (the one that already brings /root/drc_* from every node) now takes /root/fsx.<seed>.<ops>.log too, so a failing fsx check's log lands in tests/evidence/run_fsx_<run id>/ as <node>_fsx.<seed>.<ops>.log. Exercised on the host with the same remote command: a /root holding fsx.123.100000.log came back as test1_fsx.123.100000.log; a /root holding neither drc_* nor fsx logs sends nothing (rc 1, as before). The seed range (1..2^31-1) and the kept log were already in the tree.",
-      "next": "control batch of fsx laps at 2/net/mesh/direct with the fix taken out (tests/suite/fsx.sh drawing 4 random bytes again and deleting its logs, run.sh's pull without fsx logs): about half its laps must fail with fsx's usage; then the verification batch on the candidate, sized from it, and remove --fixed",
-      "reproducer": "tests/suite/tools/fsx -S 2147483648 -N 200 <scratch file>: rc=90 usage (host-local, no rig)",
+      "next": "control batch of fsx laps at 2/net/mesh/direct with the fix taken out (tests/suite/fsx.sh drawing 4 random bytes again and deleting its logs, run.sh's pull without fsx logs): about half its laps must fail with fsx's usage; then the verification batch on the candidate, sized from it, and remove --fixed ===== 2026-10-22: control b20261022-4bf99d closed, 20 of 20 laps of tests/fsx_seed_lap.sh failed with the fix out (lap:fsx_seed at 2/net/mesh/direct). Next: the verification batch on the frozen candidate, 4 clean laps of the same lap (defects.py plan-verify ... --row lap:fsx_seed --at 2/net/mesh/direct --probe '^LAP fsx_seed start .* draw=4294967295 '), then remove --fixed with that control.",
+      "reproducer": "tests/fsx_seed_lap.sh (host-local: /dev/urandom bound to four 0xff bytes in a private mount namespace, fsx.sh on tmpfs; every lap exposed)",
       "cells": [
         {
           "config": "2/net/mesh/drbd",
           "row": "fsx",
           "iso": "2026-10-21T19:36:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:28:04Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:28:03Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:28:02Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:28:01Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:28:00Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:59Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:58Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:57Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:56Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:55Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:54Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:53Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:52Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:51Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:50Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:49Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:48Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:47Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:46Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_seed",
+          "iso": "2026-10-22T23:27:45Z"
         }
       ],
-      "updated": "2026-10-22"
+      "updated": "2026-10-22",
+      "batches": [
+        {
+          "id": "b20261022-4bf99d",
+          "kind": "control",
+          "row": "lap:fsx_seed",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 20,
+          "probe": "^LAP fsx_seed start .* draw=4294967295 ",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "fix reverted: tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff sha256=8696fceaa6c7370480148efe459b824c241407ac3fda6c037ac4e664782ea61f",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix taken out: tests/suite/fsx.sh draws its seed from four random bytes again, and a draw past INT_MAX (here 4294967295, every lap) makes the vendored fsx print its usage and exit 90 in both checks"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:fsx_seed",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-4bf99d",
+          "k": 20,
+          "n": 20,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff sha256=8696fceaa6c7370480148efe459b824c241407ac3fda6c037ac4e664782ea61f",
+          "builds": [
+            "9594B08726D6732D2ED5E87"
+          ],
+          "date": "2026-10-22"
+        }
+      ]
     },
     {
       "id": "D-2NETMESH-DRBD-NODE-SYNC-WEDGED-AFTER-FIO-PERF-OVERRAN-RECORDED-AS-INFRA",
@@ -3143,7 +3359,7 @@
       "opened": "2026-10-21",
       "summary": "tests/recov_bmbt_reuse.sh destroys its victim (:134) and restarts it only at :159/:162; an ABORT in between (the capture gate injected fault at :143) exits with the victim off, and the harness has no EXIT trap, so every later harness finds test2 down",
       "evidence": "capture gate 0.90.134 recov_bmbt_reuse_fault.log: INFO virsh destroy test2 rc=0 ... ABORT: the kernel log on test1 from the lap marker did not complete. Next entries: tcp_death_replay ABORT test2 srcversion != tree (INFO test2 empty), lone_mount_crash_replay ABORT /src with the tree is not reachable on test2. grep -c trap tests/recov_bmbt_reuse.sh: 0. 0.90.133-2 gate: lone_mount_crash_replay the same. ===== ===== 2026-10-22, fix in the tree: tests/recov_bmbt_reuse.sh arms an EXIT trap (rbr_cleanup) before the destroy and clears it once V has rejoined; the trap starts V and mounts /src on it. Dry run attempt 20261022T031549Z gate (tests/evidence/20261022T031739Z_capture_gate_0.90.134_20261022T031549Z/recov_bmbt_reuse_fault.log): virsh destroy test2 at +21s, STAGE FAULT at the first capture, RESULT ABORT, then 'CLEANUP: starting test2, which this lap destroyed and did not get back' and 'CLEANUP: test2 is up with /src'; the next entry, tcp_death_replay, found test2 up with /src (src=1, module not loaded: the gate re-formed the pair) and its fault lap was OK, as was lone_mount_crash_replay's.",
-      "next": "an EXIT trap that starts a destroyed victim and remounts /src on it, as fence_lost_response flr_cleanup does; rerun the gate",
+      "next": "an EXIT trap that starts a destroyed victim and remounts /src on it, as fence_lost_response flr_cleanup does; rerun the gate ===== 2026-10-22: precheck OK (fix in PASS, fix out FAIL: test2 shut off); control b20261022-f49ba8 (10 laps, fix diff tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff) running in lane tests/evidence/lanes/g2_rbr_control_20261022T233020Z. Next: read its result; then the verification batch on the candidate, sized from it, and remove --fixed.",
       "cells": [
         {
           "config": "1/any",
@@ -3159,9 +3375,96 @@
           "config": "1/any",
           "row": "release:presteps",
           "iso": "2026-10-21T23:22:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rbr_abort",
+          "iso": "2026-10-23T00:00:05Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rbr_abort",
+          "iso": "2026-10-22T23:57:34Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rbr_abort",
+          "iso": "2026-10-22T23:55:03Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rbr_abort",
+          "iso": "2026-10-22T23:52:29Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rbr_abort",
+          "iso": "2026-10-22T23:49:54Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rbr_abort",
+          "iso": "2026-10-22T23:47:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rbr_abort",
+          "iso": "2026-10-22T23:44:55Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rbr_abort",
+          "iso": "2026-10-22T23:42:32Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rbr_abort",
+          "iso": "2026-10-22T23:39:48Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rbr_abort",
+          "iso": "2026-10-22T23:37:05Z"
         }
       ],
-      "updated": "2026-10-21"
+      "updated": "2026-10-22",
+      "batches": [
+        {
+          "id": "b20261022-f49ba8",
+          "kind": "control",
+          "row": "lap:rbr_abort",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^LAP rbr_abort exposed: ",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "fix reverted: tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff sha256=c5887bb0786fa3d5d44336542dc0472bc25a968d64fb80822fd0eb87b508c905",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix taken out: tests/recov_bmbt_reuse.sh has no EXIT trap, so a lap that aborts after destroying its victim exits with the victim powered off"
+        }
+      ],
+      "reproducer": "tests/recov_bmbt_reuse_abort_lap.sh <label> on g2 (the gate's fault lap of recov_bmbt_reuse alone, tests/recov_bmbt_reuse_abort.manifest; exposure: the destroy before the injection)",
+      "rates": [
+        {
+          "row": "lap:rbr_abort",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-f49ba8",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff sha256=c5887bb0786fa3d5d44336542dc0472bc25a968d64fb80822fd0eb87b508c905",
+          "builds": [
+            "9594B08726D6732D2ED5E87"
+          ],
+          "date": "2026-10-22"
+        }
+      ]
     },
     {
       "id": "D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG-AND-DIES-BEFORE-MEASURING",
@@ -3171,7 +3474,7 @@
       "opened": "2026-10-21",
       "summary": "tests/d_intents_2tcp_open_efi.sh:161 tests the readability of $IMG under set -u (:110) and nothing in the script assigns IMG, so every run dies with IMG: unbound variable before it measures anything",
       "evidence": "capture gate 0.90.134 d_intents_2tcp_open_efi_fault.log: tests/d_intents_2tcp_open_efi.sh: line 161: IMG: unbound variable (rc=1, no ABORT, no RESULT). grep -n IMG: only :161 and a comment at :317. ===== ===== 2026-10-22, fix in the tree: the IMG readability check (tests/d_intents_2tcp_open_efi.sh:161) is removed. Nothing in the harness reads a host image: since s70 its platter free-query runs chk_mxfs --query-only on the resolved LUN from the node (:317-322), so the check was a precondition for a read the harness no longer makes; the header now says so. Dry run attempt 20261022T031549Z gate: STAGE FAULT at measurement #1 (ext on test2), RESULT ABORT, fault lap OK (before: rc=1, IMG: unbound variable, no fault line). ===== ===== 2026-10-22 healthy lap through tests/capture_fault_gate.sh 0.90.134-harnessfix --healthy-only (tests/evidence/20261022T040716Z_capture_gate_0.90.134-harnessfix): the harness runs past :161 to its assertions (fragmented build, publication, EFD hold, kill, election, census) and measures; it FAILED one MXFS assertion, the fix build's replay refused terminally instead of completing the open obligation case, recorded as D-OPEN-EFI-DEATH-REPLAY-REFUSED-NOT-HELD-VICTIM-DOMAIN-QUARANTINED-2TCP.",
-      "next": "resolve the backing image through tests/lib/rig.sh mxfs_host_image as the other platter-reading harnesses do; rerun the harness and the gate entry",
+      "next": "resolve the backing image through tests/lib/rig.sh mxfs_host_image as the other platter-reading harnesses do; rerun the harness and the gate entry ===== 2026-10-22: fix diff tests/evidence/controls/D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG.fix.diff (the IMG check as the unfixed harness has it, from the sibling checkouts' tests/d_intents_2tcp_open_efi.sh:161). Control queued: lane tests/evidence/lanes/g2_gate_controls_20261022T233534Z step 7 (the gate's fault lap of the entry alone, 10 laps, after the join-during-takeover control on the same pair).",
       "cells": [
         {
           "config": "1/any",
@@ -3184,7 +3487,7 @@
           "iso": "2026-10-21T23:22:19Z"
         }
       ],
-      "updated": "2026-10-21"
+      "updated": "2026-10-22"
     },
     {
       "id": "D-CAPTURE-GATE-ENTRIES-INHERIT-THE-CLUSTER-STATE-AN-EARLIER-FAULT-LEFT",
@@ -3449,7 +3752,7 @@
       "opened": "2026-10-21",
       "summary": "tests/capture_gate.manifest runs join_during_takeover with NFILES=4000; under routing hash v2 (eight inode numbers to a ledger page) that authority is about 500 pages, the takeover pass finished in 5.1 s, inside the lap's first 5 s in-flight sample, and the lap aborted before its first measurement, so the gate read it BROKEN without testing its capture handling",
       "evidence": "0.90.134 dry run attempt 20261022T031549Z capture gate (tests/evidence/20261022T031739Z_capture_gate_0.90.134_20261022T031549Z): GATE join_during_takeover fault: rc=2 wall=280s fault_line=0 -> BROKEN, ABORT: the takeover pass was not seen in flight (activations=502). test1 /tmp/jointk_dmesg.txt from the A2 marker: 502 P-TAUTH-PAGE-MINE via=takeover lines, the first at 154.792859, the last at 159.919506, the mount at 154.751369. The in-flight loop (tests/join_during_takeover.sh:224-231) samples every 5 s from the mount's return and needs two growing samples; its header puts the pass at ~10 ms a page and detection at ~11 s. include/mxfs/mxfs_tauth.h:505-507: the route hash clears an inode number's low three bits. The pair was formed before the lap (PAIR formed again before join_during_takeover fault in 42s, every node src=1 sv=tree ft=1 m=1), so this is not the inherited-state cause D-CAPTURE-GATE-ENTRIES-INHERIT-THE-CLUSTER-STATE-AN-EARLIER-FAULT-LEFT names; that cause hid this one on every earlier gate. ===== ===== 2026-10-22, fix in the tree: tests/capture_gate.manifest runs the entry with NFILES=32000, the harness's own default (~4000 ledger pages under routing v2), fault-lap bound 228 s from the measured lap; the harness also reads the cluster marker it is given (MXFS_MARKER) instead of .cluster_marker.json by name. Verified with the presteps' environment (MXFS_NODE_LIST=test1,test2 MXFS_GROUP=g2 MXFS_MARKER=.cluster_marker.g2.json): tests/capture_fault_gate.sh 0.90.134-jdt32k --only join_during_takeover -> GATE join_during_takeover fault: rc=2 wall=114s fault_line=1 abort=1 -> OK, RESULT PASS (tests/evidence/20261022T035659Z_capture_gate_0.90.134-jdt32k). In the lap: 32000 creates in 57 s, the pass seen in flight 11 s after the mount (452 then 916 activations), STAGE FAULT at the first measurement (mine_at_issue), ABORT.",
-      "next": "give the gate entry an authority whose pass outlasts in-flight detection and B's mount: NFILES=32000, the harness default (~4000 pages, ~40 s), with the fault-lap bound measured from a lap at that size; rerun the entry",
+      "next": "give the gate entry an authority whose pass outlasts in-flight detection and B's mount: NFILES=32000, the harness default (~4000 pages, ~40 s), with the fault-lap bound measured from a lap at that size; rerun the entry ===== 2026-10-22: the g2c lanes (20261022T202825Z, 20261022T232233Z) measured nothing: the gate checked test29/test30 while join_during_takeover ran on its default test1; the gate now refuses any pair but test1/test2. Control queued on g2: lane tests/evidence/lanes/g2_gate_controls_20261022T233534Z step 6 (10 laps).",
       "cells": [
         {
           "config": "1/any",
@@ -3457,7 +3760,7 @@
           "iso": "2026-10-22T03:48:37Z"
         }
       ],
-      "updated": "2026-10-21"
+      "updated": "2026-10-22"
     },
     {
       "id": "D-OPEN-EFI-DEATH-REPLAY-REFUSED-NOT-HELD-VICTIM-DOMAIN-QUARANTINED-2TCP",
@@ -3681,7 +3984,7 @@
       "opened": "2026-10-22",
       "summary": "tests/fourkn_merge_2node.sh holds each node's first 64 merged inode-block writes 20 ms between the read and the COMPARE AND WRITE so a peer's write of the same block lands in between, but it lands only in most laps: of 4 held laps on the 4K-native LUN, 1 saw no MISCOMPARE and exited VACUOUS, so one lap does not reliably exercise the merged write's retry",
       "evidence": "Held laps (HOLD_N=64 HOLD_MS=20), module 2666D8544F367E3B7424B60, test31/test32: tests/evidence/20261022T135408Z_fourkn_merge_2-net-mesh-direct miscompares 1 (PASS); 20261022T135619Z_fourkn_merge_2-disk-caw-direct 1 (PASS); 20261022T145928Z_fourkn_merge_2-disk-caw-direct 0 (VACUOUS: iwr_merge_blocks 247 and 221, dbg_iwr_merge_hold_left=0 on both, so every hold was spent with no peer write inside it); 20261022T154721Z_fourkn_merge_2-disk-caw-direct 2 (PASS). Unheld, 0 MISCOMPAREs in ~480 merged writes a lap (20261022T133714Z, 134001Z, 134249Z). Every VACUOUS lap passed every correctness check; the lap never reads one as PASS.",
-      "next": "Make the overlap certain instead of likely: have the hold wait for the peer's swap of the same block (or land a scripted peer write of it) inside the window, or measure the MISCOMPARE rate against HOLD_MS and HOLD_N and size the hold so a lap without one is rare enough to grade; until then rerun a VACUOUS lap, never count it.",
+      "next": "Make the overlap certain instead of likely: have the hold wait for the peer's swap of the same block (or land a scripted peer write of it) inside the window, or measure the MISCOMPARE rate against HOLD_MS and HOLD_N and size the hold so a lap without one is rare enough to grade; until then rerun a VACUOUS lap, never count it. ===== 2026-10-22 (state): the fix is in the tree, the hold until the peer's swap of the held block lands (dbg_iwr_merge_hold_peer_ms, tests/suite/fourkn_merge.sh); control b20261022-02b816 closed with the knob off (HOLD_PEER_MS=0): 9 of 20 laps failed VACUOUS. Next: the verification batch of fourkn_merge at 2/net/mesh/direct4k on the frozen candidate, sized from that rate, then remove --fixed.",
       "reproducer": "tests/fourkn_merge_2node.sh <4Kn dev> test31 test32 with the default hold; count laps whose iwr_merge_miscompares is 0 on both nodes (exit 3)",
       "batches": [
         {
@@ -3776,8 +4079,97 @@
       "opened": "2026-10-22",
       "summary": "tools/lun_pool.sh binds a node by logging it in by hand (iscsiadm -o new, --login); on a node whose boot found no iSCSI node record open-iscsi.service is inactive, so nothing logs the pool session out before systemd stops the network at shutdown, and the node can hang past scripts/lab_power.sh's 90 s bound and be destroyed, as the 4K-native LUN's nodes did",
       "evidence": "Mechanism measured with the same hand login on the 4K-native LUN (tests/fourkn_lun.sh), test31/test32: tests/evidence/20261022T150025Z_fourkn_shutdown_bare (after a merge lap) and 20261022T150432Z_fourkn_shutdown_bare (mxfs never loaded), both nodes HUNG: network down with the session up, lvm2-monitor's vgchange --monitor n opened the LUN for its label scan and its read was never answered (iSCSI ping timeout 9 s later, 120 s replacement timeout); starting open-iscsi.service after the login (20261022T154826Z_fourkn_shutdown_bare) logged the session out before the network and both nodes were off in 2 s. tools/lun_pool.sh:297-302 (single path) and :359-363 (multipath) delete every node record and log in by hand with node.startup=automatic, so a node is exposed until its next boot: a freshly built VM, or one whose records another tool removed (tests/fourkn_lun.sh's login deletes them all), in the boot of its first bind. Not yet observed on a pool LUN: at 2026-10-22 14:23 UTC every pool VM shut down with its session logged out (host kernel log logout_exec for test1, test2, test15, test16).",
-      "next": "Start open-iscsi.service after the bind's login in both lun_pool.sh paths and require it active, as tests/fourkn_lun.sh now does; verify with tests/fourkn_lun_shutdown_probe.sh on a pool LUN bound to nodes booted with no node record: unfixed both nodes hang, fixed both off in seconds.",
-      "reproducer": "boot two pool nodes with no iSCSI node record, tools/lun_pool.sh alloc them, then tests/fourkn_lun_shutdown_probe.sh <node1> <node2>"
+      "next": "Start open-iscsi.service after the bind's login in both lun_pool.sh paths and require it active, as tests/fourkn_lun.sh now does; verify with tests/fourkn_lun_shutdown_probe.sh on a pool LUN bound to nodes booted with no node record: unfixed both nodes hang, fixed both off in seconds. ===== 2026-10-22: the fix is in tools/lun_pool.sh (ISCSI_UNIT starts the unit after every bind; alloc refuses a bind whose unit is not active); fix diff tests/evidence/controls/D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT.fix.diff. Precheck OK on test15/test16 (fix in: both off in seconds; fix out: both destroyed at the 90 s bound). Control (10 laps) running in lane tests/evidence/lanes/g2b_lunpool_control_20261022T233620Z. Next: read its result; the verification batch on the candidate; remove --fixed.",
+      "reproducer": "tests/lun_pool_shutdown_lap.sh <node1> <node2> (records cleared while up, a recordless boot, a pool bind, lab_power.sh down; exposure: no record, no session, the unit not active after boot)",
+      "batches": [
+        {
+          "id": "b20261022-3c656e",
+          "kind": "control",
+          "row": "lap:lunpool_shutdown",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^LAP lunpool_shutdown exposed: ",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "fix reverted: tests/evidence/controls/D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT.fix.diff sha256=928a9b80753b79430dec41c2be23d8a9c97281f59d9debdbe8ff89fdf7994fc4",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix taken out: a bind logs a node that booted with no node record in by hand and leaves the iSCSI login unit inactive, so nothing logs the session out before the network goes at shutdown"
+        }
+      ],
+      "updated": "2026-10-22",
+      "rates": [
+        {
+          "row": "lap:lunpool_shutdown",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-3c656e",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "fix reverted: tests/evidence/controls/D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT.fix.diff sha256=928a9b80753b79430dec41c2be23d8a9c97281f59d9debdbe8ff89fdf7994fc4",
+          "builds": [
+            "9594B08726D6732D2ED5E87"
+          ],
+          "date": "2026-10-22"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lunpool_shutdown",
+          "iso": "2026-10-23T00:01:22Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lunpool_shutdown",
+          "iso": "2026-10-22T23:59:12Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lunpool_shutdown",
+          "iso": "2026-10-22T23:57:01Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lunpool_shutdown",
+          "iso": "2026-10-22T23:54:50Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lunpool_shutdown",
+          "iso": "2026-10-22T23:52:34Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lunpool_shutdown",
+          "iso": "2026-10-22T23:50:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lunpool_shutdown",
+          "iso": "2026-10-22T23:48:08Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lunpool_shutdown",
+          "iso": "2026-10-22T23:45:55Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lunpool_shutdown",
+          "iso": "2026-10-22T23:43:42Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lunpool_shutdown",
+          "iso": "2026-10-22T23:41:29Z"
+        }
+      ]
     },
     {
       "id": "D-DRBD-PAIR-WITHOUT-QDEVICE-OR-NODE-FENCE-P1-DOES-NOT-SURVIVE-P0-DEATH",
@@ -3977,7 +4369,7 @@
       "config": "*/*/*",
       "opened": "2026-10-22",
       "summary": "On the 2/net/mesh/direct4k board (build 9594B08726D6732D2ED5E87, test1/test2 on a 4096-byte pool LUN), the pre-row sync check before dlm_membership found test2 unable to finish 'timeout 12 sync' within 12 s; the follow-up D-state read found no blocked mxfs/writeback task, so the row recorded BLOCKED/INCOMPLETE node-fault test2:sync-wedged[no-diag]. Why test2's sync took more than 12 s is not known.",
-      "evidence": "Ledger data/criteria.runs.jsonl:7548, 2/net/mesh/direct4k:dlm_membership:2026-10-22T19:43:42Z INCOMPLETE run 20261022T193055Z-g2 (no evidence directory: run.sh records the node fault before the row runs; run.sh:1763-1806). test2's kernel log (tests/evidence/run_dlm_scaling_20261022T193055Z-g2/kernlog_test2.gz, boot 19:31:14 to 19:49:46): no hung_task, BUG, Oops, WARNING, 'blocked for more than' or 'Shutting down' in 19:35-19:50; at 19:42:12 P-LKTIMEOUT-REMOTE type=1 ino=180355073 ag=0 req=EX then P36-RETRY retries_left=59 and P36-STACK from xfs_log_worker -> mxfs_sb_summary_lock -> mxfs_v5_dlm_inode_lock -> dlm_lock_retries_impl (the superblock summary lock), granted the same second (P74-GRANT gen=843); the next grant of ino=180355073 is at 19:43:43 (gen=1126) with P-SB-WRITE-SUBMIT and P-SB-RUNTIME-COVER, one second after the sync check gave up; no kernel line 19:43:44-19:44:04. Every other row of that board run before and after passed (dlm_fairness 19:43:25, scaling_curve, dlm_scaling, rsync_paired, fourkn_cdb, fourkn_merge, fourkn_lbs_refusal, node_responsive, kernel_health, sustained_load...).",
+      "evidence": "Ledger data/criteria.runs.jsonl:7548, 2/net/mesh/direct4k:dlm_membership:2026-10-22T19:43:42Z INCOMPLETE run 20261022T193055Z-g2 (no evidence directory: run.sh records the node fault before the row runs; run.sh:1763-1806). test2's kernel log (tests/evidence/run_dlm_scaling_20261022T193055Z-g2/kernlog_test2.gz, boot 19:31:14 to 19:49:46): no hung_task, BUG, Oops, WARNING, 'blocked for more than' or 'Shutting down' in 19:35-19:50; at 19:42:12 P-LKTIMEOUT-REMOTE type=1 ino=180355073 ag=0 req=EX then P36-RETRY retries_left=59 and P36-STACK from xfs_log_worker -> mxfs_sb_summary_lock -> mxfs_v5_dlm_inode_lock -> dlm_lock_retries_impl (the superblock summary lock), granted the same second (P74-GRANT gen=843); the next grant of ino=180355073 is at 19:43:43 (gen=1126) with P-SB-WRITE-SUBMIT and P-SB-RUNTIME-COVER, one second after the sync check gave up; no kernel line 19:43:44-19:44:04. Every other row of that board run before and after passed (dlm_fairness 19:43:25, scaling_curve, dlm_scaling, rsync_paired, fourkn_cdb, fourkn_merge, fourkn_lbs_refusal, node_responsive, kernel_health, sustained_load...). ===== 2026-10-22: run.sh's pre-row sync check now reads, for a sync still running at 11 s, its own stack and wait channel and every D-state task's (SYNCSTACK lines in the node-fault reason). Lane tests/evidence/lanes/g2d_tcp4k_sync_probe_20261022T233927Z (test31/test32, 4096-byte pool LUN, build 9594B08726D6732D2ED5E87): dlm_fairness and dlm_membership five times, all 10 rows PASS, 20 pre-row sync checks completed: not reproduced, and not a rate.",
       "next": "Establish what test2's sync waited on: rerun 2/net/mesh/direct4k dlm_membership (and the rows before it, dlm_fairness) with a sysrq-w / /proc/<pid>/stack capture of the sync task itself taken inside the 12 s bound (run.sh's diag reads only after the bound, and only D-state tasks of named comms), and read whether sync_fs waits on the superblock summary lock's EX acquisition from the peer. Measure how often the pre-row sync exceeds 12 s on this configuration and on 2/net/mesh/direct (512) before narrowing anything.",
       "cells": [
         {
@@ -3985,7 +4377,8 @@
           "row": "dlm_membership",
           "iso": "2026-10-22T19:43:42Z"
         }
-      ]
+      ],
+      "updated": "2026-10-22"
     },
     {
       "id": "D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER",

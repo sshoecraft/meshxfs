@@ -839,114 +839,105 @@
         },
         "2/net/mesh/direct": {
           "status": "PASS",
-          "measured": "elapsed=30s (fresh prep)",
+          "measured": "elapsed=31s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-22T20:18:48Z",
+          "iso": "2026-10-23T00:01:42Z",
           "recorded": "2026-10-22",
-          "elapsed_s": 30,
+          "elapsed_s": 31,
           "build": "9594B08726D6732D2ED5E87",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261022T201754Z-g2c",
+          "run_id": "20261023T000102Z-g2",
           "history": [
             {
               "status": "PASS",
-              "iso": "2026-10-22T19:22:57Z",
-              "measured": "elapsed=33s (fresh prep)",
+              "iso": "2026-10-22T23:58:46Z",
+              "measured": "elapsed=31s (fresh prep)",
               "reason": "",
               "build": "9594B08726D6732D2ED5E87",
               "outcome": "PASS",
-              "run_id": "20261022T192214Z-g2",
-              "variant": "MXFS_EXTRA_MODARGS=inact_relmark=0"
+              "run_id": "20261022T235806Z-g2"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-22T19:19:29Z",
-              "measured": "elapsed=30s (fresh prep)",
+              "iso": "2026-10-22T23:56:15Z",
+              "measured": "elapsed=31s (fresh prep)",
               "reason": "",
               "build": "9594B08726D6732D2ED5E87",
               "outcome": "PASS",
-              "run_id": "20261022T191848Z-g2",
-              "variant": "MXFS_EXTRA_MODARGS=inact_relmark=0"
+              "run_id": "20261022T235535Z-g2"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-22T19:16:04Z",
+              "iso": "2026-10-22T23:53:45Z",
+              "measured": "elapsed=31s (fresh prep)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T235305Z-g2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:51:07Z",
+              "measured": "elapsed=31s (fresh prep)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T235027Z-g2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:48:36Z",
               "measured": "elapsed=32s (fresh prep)",
               "reason": "",
               "build": "9594B08726D6732D2ED5E87",
               "outcome": "PASS",
-              "run_id": "20261022T191523Z-g2",
-              "variant": "MXFS_EXTRA_MODARGS=inact_relmark=0"
+              "run_id": "20261022T234755Z-g2"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-22T19:12:58Z",
-              "measured": "elapsed=207s (fresh prep)",
-              "reason": "",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T190921Z-g2",
-              "variant": "MXFS_EXTRA_MODARGS=inact_relmark=0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T19:06:34Z",
-              "measured": "elapsed=72s (fresh prep)",
-              "reason": "",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T190513Z-g2",
-              "variant": "MXFS_EXTRA_MODARGS=inact_relmark=0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T19:02:28Z",
+              "iso": "2026-10-22T23:46:07Z",
               "measured": "elapsed=31s (fresh prep)",
               "reason": "",
               "build": "9594B08726D6732D2ED5E87",
               "outcome": "PASS",
-              "run_id": "20261022T190143Z-g2",
-              "variant": "MXFS_EXTRA_MODARGS=inact_relmark=0"
+              "run_id": "20261022T234527Z-g2"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-22T18:58:59Z",
+              "iso": "2026-10-22T23:43:44Z",
               "measured": "elapsed=31s (fresh prep)",
               "reason": "",
               "build": "9594B08726D6732D2ED5E87",
               "outcome": "PASS",
-              "run_id": "20261022T185814Z-g2",
-              "variant": "MXFS_EXTRA_MODARGS=inact_relmark=0"
+              "run_id": "20261022T234304Z-g2"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-22T18:55:34Z",
+              "iso": "2026-10-22T23:41:14Z",
               "measured": "elapsed=31s (fresh prep)",
               "reason": "",
               "build": "9594B08726D6732D2ED5E87",
               "outcome": "PASS",
-              "run_id": "20261022T185454Z-g2",
-              "variant": "MXFS_EXTRA_MODARGS=inact_relmark=0"
+              "run_id": "20261022T234031Z-g2"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-22T18:52:15Z",
+              "iso": "2026-10-22T23:38:20Z",
               "measured": "elapsed=31s (fresh prep)",
               "reason": "",
               "build": "9594B08726D6732D2ED5E87",
               "outcome": "PASS",
-              "run_id": "20261022T185107Z-g2",
-              "variant": "MXFS_EXTRA_MODARGS=inact_relmark=0"
+              "run_id": "20261022T233741Z-g2"
             },
             {
               "status": "PASS",
-              "iso": "2026-10-22T18:40:38Z",
-              "measured": "elapsed=31s (fresh prep)",
+              "iso": "2026-10-22T23:35:48Z",
+              "measured": "elapsed=30s (fresh prep)",
               "reason": "",
               "build": "9594B08726D6732D2ED5E87",
               "outcome": "PASS",
-              "run_id": "20261022T183957Z-g2"
+              "run_id": "20261022T233509Z-g2"
             }
           ]
         },
@@ -1745,16 +1736,70 @@
         },
         "2/net/mesh/direct4k": {
           "status": "PASS",
-          "measured": "elapsed=245s (fresh prep)",
+          "measured": "skipped (marker matched 2/net/mesh/direct4k)",
           "reason": "",
-          "iso": "2026-10-22T19:35:46Z",
+          "iso": "2026-10-22T23:43:23Z",
           "recorded": "2026-10-22",
-          "elapsed_s": 245,
+          "elapsed_s": 0,
           "build": "9594B08726D6732D2ED5E87",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261022T193055Z-g2",
+          "run_id": "20261022T234314Z-g2d",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:42:41Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T234232Z-g2d"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:42:00Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T234151Z-g2d"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:41:18Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T234109Z-g2d"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:40:36Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T234026Z-g2d"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:40:26Z",
+              "measured": "elapsed=32s (fresh prep)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T233945Z-g2d"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T19:35:46Z",
+              "measured": "elapsed=245s (fresh prep)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T193055Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-22T19:02:32Z",
@@ -1793,66 +1838,6 @@
               "build": "9594B08726D6732D2ED5E87",
               "outcome": "PASS",
               "run_id": "20261022T190017Z-g2d",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T18:59:44Z",
-              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
-              "reason": "",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T185935Z-g2d",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T18:59:03Z",
-              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
-              "reason": "",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T185853Z-g2d",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T18:58:20Z",
-              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
-              "reason": "",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T185811Z-g2d",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T18:57:39Z",
-              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
-              "reason": "",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T185730Z-g2d",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T18:56:57Z",
-              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
-              "reason": "",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T185648Z-g2d",
-              "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T18:56:16Z",
-              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
-              "reason": "",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T185607Z-g2d",
               "variant": "MXFS_TEST_ENV=HOLD_PEER_MS=0;batch:HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0"
             }
           ]
@@ -14962,17 +14947,67 @@
         },
         "2/net/mesh/direct4k": {
           "status": "PASS",
-          "measured": "nodes_pass=2/2 hostload=9.16 checks=5 passed=5 failed=0",
+          "measured": "nodes_pass=2/2 hostload=2.17 checks=5 passed=5 failed=0",
           "reason": "",
-          "iso": "2026-10-22T19:43:25Z",
+          "iso": "2026-10-22T23:43:40Z",
           "recorded": "2026-10-22",
-          "elapsed_s": 3,
+          "elapsed_s": 2,
           "build": "9594B08726D6732D2ED5E87",
           "outcome": "PASS",
           "budget_s": 30,
-          "run_id": "20261022T193055Z-g2",
-          "evidence": "tests/evidence/run_dlm_fairness_20261022T193055Z-g2",
+          "run_id": "20261022T234314Z-g2d",
+          "evidence": "tests/evidence/run_dlm_fairness_20261022T234314Z-g2d",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:42:59Z",
+              "measured": "nodes_pass=2/2 hostload=1.98 checks=5 passed=5 failed=0",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T234232Z-g2d",
+              "evidence": "tests/evidence/run_dlm_fairness_20261022T234232Z-g2d"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:42:17Z",
+              "measured": "nodes_pass=2/2 hostload=2.71 checks=5 passed=5 failed=0",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T234151Z-g2d",
+              "evidence": "tests/evidence/run_dlm_fairness_20261022T234151Z-g2d"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:41:35Z",
+              "measured": "nodes_pass=2/2 hostload=2.64 checks=5 passed=5 failed=0",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T234109Z-g2d",
+              "evidence": "tests/evidence/run_dlm_fairness_20261022T234109Z-g2d"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:40:53Z",
+              "measured": "nodes_pass=2/2 hostload=1.87 checks=5 passed=5 failed=0",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T234026Z-g2d",
+              "evidence": "tests/evidence/run_dlm_fairness_20261022T234026Z-g2d"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T19:43:25Z",
+              "measured": "nodes_pass=2/2 hostload=9.16 checks=5 passed=5 failed=0",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T193055Z-g2",
+              "evidence": "tests/evidence/run_dlm_fairness_20261022T193055Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-22T18:14:15Z",
@@ -16291,17 +16326,67 @@
           ]
         },
         "2/net/mesh/direct4k": {
-          "status": "BLOCKED",
-          "measured": "node-fault",
-          "reason": "NODE FAULT (not a filesystem verdict): test2:sync-wedged[no-diag] \u2014 a node cannot complete sync and/or has a task wedged in D state. READ THE {sub} TAG BEFORE BLAMING MXFS: {EXT4-ROOTDISK} means the wedge is in the NODE OWN root filesystem (ext4/jbd2 on dm-0), i.e. host storage, and MXFS is not in the path at all \u2014 sess376 saw exactly that and it is the documented host-rig degradation class (see D-DIR-REUSE-COHERENCY-32-FLAKY). {MXFS} is the one that implicates the filesystem; cf. D-BAST-WRITEBACK-ABBA-DEADLOCK. Every barrier criterion would report NO_TERMINAL_RECORD on ALL nodes because one rank can never reach a barrier; BLOCKED so that is not recorded as a correctness failure. Recover the node (virsh destroy+start) and re-run.",
-          "iso": "2026-10-22T19:43:42Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=2.95 checks=6 passed=6 failed=0",
+          "reason": "",
+          "iso": "2026-10-22T23:43:55Z",
           "recorded": "2026-10-22",
-          "elapsed_s": 0,
+          "elapsed_s": 4,
           "build": "9594B08726D6732D2ED5E87",
-          "outcome": "INCOMPLETE",
+          "outcome": "PASS",
           "budget_s": 30,
-          "run_id": "20261022T193055Z-g2",
+          "run_id": "20261022T234314Z-g2d",
+          "evidence": "tests/evidence/run_dlm_membership_20261022T234314Z-g2d",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:43:14Z",
+              "measured": "nodes_pass=2/2 hostload=1.86 checks=6 passed=6 failed=0",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T234232Z-g2d",
+              "evidence": "tests/evidence/run_dlm_membership_20261022T234232Z-g2d"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:42:32Z",
+              "measured": "nodes_pass=2/2 hostload=2.18 checks=6 passed=6 failed=0",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T234151Z-g2d",
+              "evidence": "tests/evidence/run_dlm_membership_20261022T234151Z-g2d"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:41:50Z",
+              "measured": "nodes_pass=2/2 hostload=2.48 checks=6 passed=6 failed=0",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T234109Z-g2d",
+              "evidence": "tests/evidence/run_dlm_membership_20261022T234109Z-g2d"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T23:41:09Z",
+              "measured": "nodes_pass=2/2 hostload=1.95 checks=6 passed=6 failed=0",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T234026Z-g2d",
+              "evidence": "tests/evidence/run_dlm_membership_20261022T234026Z-g2d"
+            },
+            {
+              "status": "BLOCKED",
+              "iso": "2026-10-22T19:43:42Z",
+              "measured": "node-fault",
+              "reason": "NODE FAULT (not a filesystem verdict): test2:sync-wedged[no-diag] \u2014 a node cannot complete sync and/or has a task wedged in D state. READ THE {sub} TAG BEFORE BLAMING MXFS: {EXT4-ROOTDISK} means the wedge is in the NODE OWN root filesystem (ext4/jbd2 on dm-0), i.e. host storage, and MXFS is not in the path at all \u2014 sess376 saw exactly that and it is the documented host-rig degradation class (see D",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "INCOMPLETE",
+              "run_id": "20261022T193055Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-22T18:14:30Z",

@@ -1491,17 +1491,26 @@ def cmd_update(data: dict, args) -> int:
     #: a separate `next_step`, which `-n` then silently left in place while replacing `next`, so a
     #: record could carry two next-step histories and a replace could destroy the canonical one
     #: while the caller checked the stray one. `load` folds any such field back into `next`.
+    #: A record written before the fields were text keeps them as a list of entries (the
+    #: 32-node records of 2026-08 and 2026-09); an append to one adds an entry, so the list
+    #: neither breaks the append nor is flattened into text it was not written as.
     appended = getattr(args, "append_next", None)
     if appended:
         have = entry.get("next") or ""
-        entry["next"] = (have + " ===== " if have else "") + appended
+        if isinstance(have, list):
+            entry["next"] = have + [appended]
+        else:
+            entry["next"] = (have + " ===== " if have else "") + appended
         changed.append("next")
     #: The same for evidence: a board cell a record accounts for (configuration, row, verdict,
     #: stamp) is added to what the record already cites, never typed over it.
     appended = getattr(args, "append_evidence", None)
     if appended:
         have = entry.get("evidence") or ""
-        entry["evidence"] = (have + " ===== " if have else "") + appended
+        if isinstance(have, list):
+            entry["evidence"] = have + [appended]
+        else:
+            entry["evidence"] = (have + " ===== " if have else "") + appended
         changed.append("evidence")
     changed += add_cells(entry, args)
     if args.reproducer:

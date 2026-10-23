@@ -77,6 +77,13 @@ broken=0; vacuous=0; entries=0; s0=$(date +%s)
 verdicts_after_fault() { awk '/STAGE FAULT:/{f=1; next} f && /^  (PASS|FAIL) /{n++} END{print n+0}' "$1"; }
 
 PAIR_NODES=${MXFS_NODE_LIST:-test1,test2}; PAIR_NODES=${PAIR_NODES//,/ }
+# The harnesses run on their own default nodes, test1 and test2 (a manifest
+# entry passes the label and its args, never the pair), so a gate pointed at
+# another pair checked and formed that pair and then measured test1/test2: with
+# MXFS_NODE_LIST=test29,test30, join_during_takeover aborted at once on an
+# unmounted test1 (lanes g2c_jdt_control_20261022T202825Z and
+# 20261022T232233Z).  Such a gate measures nothing, so it is refused.
+[ "$PAIR_NODES" = "test1 test2" ] || { echo "ABORT: the gate's pair is [$PAIR_NODES], but its harnesses run on their default nodes test1 and test2; run it on the g2 pair"; echo "RESULT: ABORT label=$LABEL entries=0 broken=0 vacuous=0 restores=0 wall=0s stage=pair evidence=$OUT"; exit 2; }
 PAIR_MNT=${MXFS_MOUNT:-/mnt/shared}
 PAIR_SV=$(modinfo -F srcversion mxfs.ko 2>/dev/null)
 PAIR_CONFIG=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("configuration") or "")' "${MXFS_MARKER:-.cluster_marker.json}" 2>/dev/null)

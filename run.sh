@@ -1759,10 +1759,26 @@ run_coord() {  # name cat budget scale
     #
     # Each node writes SYNCOK only if sync completed.  Anything else -- partial
     # output, killed ssh, nothing at all -- means it did not.
+    #
+    # A sync still running at 11 s has its own stack read there, inside the
+    # 12 s bound, with every D-state task's (SYNCSTACK lines): the read after
+    # the bound came too late on 2/net/mesh/direct4k, where test2's sync had
+    # finished one second after the check gave up and the read found nothing
+    # blocked (D-2NETMESH-4K-PRE-ROW-SYNC-OVER-12S-NO-DSTATE-DIAG-SB-SUMMARY-LOCK-WAIT).
     local pa_sp=() pa_sn
     for pa_sn in "${NODES[@]}"; do
         ( timeout 20 "$SSH" "$pa_sn" "$PASS" \
-            "timeout 12 sync && echo SYNCOK" > "$pa_d/$pa_sn" 2>/dev/null ) &
+            "sync & s=\$!; i=0
+             while kill -0 \$s 2>/dev/null && [ \$i -lt 110 ]; do sleep 0.1; i=\$((i+1)); done
+             if kill -0 \$s 2>/dev/null; then
+                 echo SYNCSTACK sync[\$s][\$(cat /proc/\$s/wchan 2>/dev/null)] \$(sed -n 's/^\\[<0>\\] //p' /proc/\$s/stack 2>/dev/null | head -14 | tr '\n' '<')
+                 for dp in \$(ps -eo stat,pid --no-headers 2>/dev/null | awk '\$1 ~ /^D/ {print \$2}'); do
+                     [ \"\$dp\" = \"\$s\" ] && continue
+                     echo SYNCSTACK \$(cat /proc/\$dp/comm 2>/dev/null)[\$dp][\$(cat /proc/\$dp/wchan 2>/dev/null)] \$(sed -n 's/^\\[<0>\\] //p' /proc/\$dp/stack 2>/dev/null | head -14 | tr '\n' '<')
+                 done
+                 i=0; while kill -0 \$s 2>/dev/null && [ \$i -lt 10 ]; do sleep 0.1; i=\$((i+1)); done
+             fi
+             kill -0 \$s 2>/dev/null || { wait \$s && echo SYNCOK; }" > "$pa_d/$pa_sn" 2>/dev/null ) &
         pa_sp+=($!)
     done
     for pa_sn in "${NODES[@]}"; do wait; done 2>/dev/null

@@ -1,0 +1,6 @@
+# tests/recov_bmbt_reuse_abort.manifest — the one entry tests/recov_bmbt_reuse_abort_lap.sh
+# runs through tests/capture_fault_gate.sh: recov_bmbt_reuse on the default pair (S=test1,
+# V=test2, the harness's own defaults), its fault lap bounded as in tests/capture_gate.manifest.
+#
+#   <harness> | <fault lap timeout s> | <healthy lap timeout s> | <env> | <args after the label>
+recov_bmbt_reuse                   | 360 | 900 | - |
