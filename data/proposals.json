@@ -2277,6 +2277,91 @@
         "verdict": "rejected",
         "date": "2026-10-23"
       }
+    },
+    {
+      "id": "P20261023-188716",
+      "kind": "remove-fixed",
+      "record": "D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE",
+      "change": {
+        "control": "b20261022-4bf99d",
+        "fixon": "b20261022-c54100",
+        "cause": "tests/suite/fsx.sh drew its seed from 4 random bytes (0..2^32-1); the vendored fsx keeps -S in an int (tests/suite/tools/fsx.c:186) and calls usage() for a negative value (:3402-3403), which exits 90 (:2745), so a draw above INT_MAX (about half of all draws) made fsx exit at once and the row record a FAIL that exercised nothing."
+      },
+      "argument": "FIXED AND VERIFIED.\n\nTHE CAUSE, MEASURED. (1) Code: tests/suite/tools/fsx.c:186 'int seed = 1;', :3397 'seed = getnum(optarg, &endp);', :3402-3403 'if (seed < 0) usage();', and usage() (:2654) ends :2745 'exit(90);'. (2) The vendored binary itself, tests/suite/tools/fsx, sha256 2e740285ca706ac94609964e3626c28352a60341e05c4994e7e89d31cabfca1a, ctime 2026-10-14 (unchanged since; the review P20261022-b2613a check 2 records the same ctime): tests/evidence/fsx_seed_int_max_repro_20261021.log (its header names the binary by the first 16 hex digits of that hash) gives seed=3832054505 rc=90 and seed=2147483648 rc=90, each with first line 'usage: fsx [...]', and seed=2147483647 rc=0 and seed=1 rc=0, 'Seed set to ...'; the old draw (od -N4 -tu4) put 10022 of 20000 draws above INT_MAX, the fixed draw 0 of 20000 outside 1..2147483647. tests/evidence/fsx_seed_4294967295_repro_20261023T062142Z.log measures the very seed the control forced: seed=4294967295 rc=90 'usage: fsx [...]' (4294967295 as an int is -1), seed=2147483647 rc=0. (3) The approved detector-defect review data/reviews/P20261021-676432.md established the same mechanism for the board run 2/net/mesh/drbd:fsx:2026-10-21T19:36:37Z (fsx rejects the negative seed during option parsing, before it opens its file).\n\nTHE FIX: tests/suite/fsx.sh:30 SEED=\"${FSX_SEED:-$(( $(od -An -N4 -tu4 /dev/urandom | tr -d ' \\n') % 2147483647 + 1 ))}\", always 1..2147483647; the diff is tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff, sha256 8696fceaa6c7370480148efe459b824c241407ac3fda6c037ac4e664782ea61f, one hunk, the SEED= line.\n\nREPRODUCER: tests/fsx_seed_lap.sh binds four 0xff bytes over /dev/urandom in a private mount namespace and runs fsx.sh on tmpfs, so the draw is 4294967295 in every lap. With the fix out fsx.sh passes -S 4294967295; with it in, the fixed line maps that draw to 2.\n\nCONTROL b20261022-4bf99d (fix reverted with that diff, the variant naming its hash): 20 of 20 laps failed. The control's own harness output is the 19 lap logs in tests/evidence/batch_laps/b20261022-4bf99d/ and the batch's 20 ledger rows, data/criteria.runs.jsonl:7700-7719; row 7700's lap log was overwritten by row 7701's (both name 20261022T232745Z.log), so that lap survives only as its ledger row, whose reason carries the lap's verdict line. No other output of the control was kept. What each logged lap shows: fsx.sh's own seed=4294967295 (the draw passed unchanged, which proves the fix was out) and 'RESULT: FAIL ... checks=2 passed=0 failed=2' with elapsed 0 s. fsx's usage line and its exit status are not in those logs, because tests/fsx_seed_lap.sh:43 deletes fsx's output; that a -S 4294967295 run of this binary exits 90 with its usage is measured directly in the two repro logs above, with the same binary.\n\nFIX-ON BATCH b20261022-c54100, sized from that control (20/20, lower bound 0.767, N=4): 4 of 4 laps PASS on the frozen candidate 0.90.134 (attempt frozen 2026-10-23T03:55:19Z, build 16A5F5DDDB4852C9D5DB236), ledger rows data/criteria.runs.jsonl:8143-8146, logs in tests/evidence/batch_laps/b20261022-c54100/; each lap's fsx.sh reports seed=2 (the forced draw through the fixed line) and 'checks=2 passed=2'. The batch is passed: verify P20261022-8a9584 was approved and applied. Drift check after its last lap: tests/evidence/candidates/0.90.134_check_20261023T040141Z.txt, 'candidate 0.90.134: every frozen file is as it was frozen'.\n\nTHE CONTROL'S TREE: it ran on the tree of 2026-10-22T23:27Z (build 9594B08726D6732D2ED5E87), before the freeze. For what the lap reads, the review P20261022-b2613a check 2 compared each file against its frozen manifest entry and found the hunk the only difference: tests/fsx_seed_lap.sh, tests/suite/lib.sh, tests/suite/coord.sh and the fsx binary unchanged; tools/batch_lap.py changed but runs and records the lap without computing its verdict; the lap loads no module and holds no VM.\n\nSCOPE: the record was renamed (it was D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED) so its id names only the seed defect. The deleted-log defect is the separate open record D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE, and this removal claims nothing about it. The removal also retires 2/net/mesh/drbd:fsx:2026-10-21T19:36:37Z, already settled as the detector's fault by approval P20261021-676432.",
+      "evidence": [
+        "tests/evidence/fsx_seed_int_max_repro_20261021.log",
+        "tests/evidence/fsx_seed_4294967295_repro_20261023T062142Z.log",
+        "tests/suite/tools/fsx.c",
+        "tests/suite/fsx.sh",
+        "data/reviews/P20261021-676432.md",
+        "data/reviews/P20261022-b2613a.md",
+        "tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff",
+        "tests/fsx_seed_lap.sh",
+        "tests/evidence/batch_laps/b20261022-4bf99d",
+        "tests/evidence/batch_laps/b20261022-c54100",
+        "tests/evidence/candidates/0.90.134_check_20261023T040141Z.txt",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-188716.md",
+        "sha256": "25e9306dd11d3e6187a7ec54b60e5b7a5f366bb5b0913859a85df2cb58aa39d4",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-e8d614",
+      "kind": "remove-fixed",
+      "record": "D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E-AND-NO-WWN-BYID-LINK",
+      "change": {
+        "control": "b20261022-bf8f03",
+        "fixon": "b20261022-8cd6d2",
+        "cause": "tests/lib/rig.sh could not resolve an EUI-64 LUN by its identifier: mxfs_wwid_norm stripped naa., 0x and mpath- but not eui., so eui.<hex> became e<hex>, and the no-mount fallback looked only for /dev/disk/by-id/wwn-0x<decl>, a link udev never makes for an EUI-64 designator (it makes scsi-2<hex>)."
+      },
+      "argument": "FIXED AND VERIFIED.\n\nTHE CAUSE, MEASURED IN THE CONTROL'S OWN LAPS. Every logged control lap prints the pool LUN's identifier and the links the resolver then looked for, e.g. tests/evidence/batch_laps/b20261022-bf8f03/20261022T202059Z.log:2 \"INFO test29 sda wwid='eui.3837303435343634' mxfs mounts=0\", :3 \"EXPOSED: test29's pool LUN is EUI-64 (eui.3837303435343634)\", :4 \"ABORT: no MXFS device basis on test29: no MXFS_DEV, no live mxfs mount, no /dev/disk/by-id/{wwn-0x,scsi-3,scsi-2}e3837303435343634, no MXFS_CONFIG\": the identifier normalised with its stray 'e' (eui. stripped as if it were 'eui' followed by a hex string beginning e), so no by-id link of any designator type could match. The fix-on laps resolve the same LUN on the same node through the link udev does make: tests/evidence/batch_laps/b20261022-8cd6d2/20261023T040335Z-cc02c49e.log:5 'DEVICE node=test29 path=/dev/disk/by-id/scsi-23837303435343634 source=declared-wwid wwid=eui.3837303435343634'.\n\nTHE FIX: tests/lib/rig.sh normalises eui. like naa., and the no-mount fallback tries the by-id links udev makes for each designator type (wwn-0x and scsi-3 for NAA, scsi-2 for EUI-64); tests/rig_lib_contract.sh 11b, 13b and 13h accept either designator. The diff is tests/evidence/controls/D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E.fix.diff, sha256 62c688f79bff83a4525b140807cc3f5b222a0ab436a1ef2e1466dea7370332cf; it changes one file, tests/lib/rig.sh.\n\nREPRODUCER: tests/rig_eui64_resolve_lap.sh <node1>,<node2> <group>, on a pool pair whose LUN is EUI-64 with no mxfs mount on the node: it sources tests/lib/rig.sh (:33) and resolves the pair's LUN by its identifier as the capture-gate entries do. EXPOSED is printed only when the node's LUN wwid is eui.*; PASS needs source=declared-wwid.\n\nCONTROL b20261022-bf8f03 (fix reverted with that diff, the variant naming its hash): 20 of 20 laps failed, ledger rows data/criteria.runs.jsonl:7648-7667, 20 lap logs in tests/evidence/batch_laps/b20261022-bf8f03/, each with EXPOSED and 'RIG_EUI64_LAP FAIL rc=2 ABORT: no MXFS device basis ... e3837303435343634' (grep -c 'RIG_EUI64_LAP FAIL' over the 20 logs: 20 files with 1).\n\nTHE CONTROL'S TREE. It ran on the tree of 2026-10-22T20:21Z (build 9594B08726D6732D2ED5E87), before the freeze. For what the lap reads, only the reverted hunk differed from the candidate: the frozen manifest tests/evidence/candidates/0.90.134_20261023T035519Z.files.json records tests/lib/rig.sh with mtime and ctime 2026-10-22T20:21:41.446Z, the second of the control's last lap (the control putting the fix back), so rig.sh did not change between the control and the freeze except by that restore; tests/rig_eui64_resolve_lap.sh has ctime 2026-10-22T20:14:59Z, before the first control lap; tools/mxfs_sshpass.sh (2026-10-13) and tools/mxfs_lab.sh (2026-10-12) are older still. tools/batch_lap.py changed after (2026-10-23T03:36:43Z): it runs the lap, bounds it and records its verdict line, without computing the verdict (it now also holds the lap's VMs, which is why only the fix-on logs carry '=== VMs held for the lap').\n\nFIX-ON BATCH b20261022-8cd6d2, sized from that control (20/20, lower bound 0.7673, N=4), declared after the freeze (tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step9.log:1): 4 of 4 laps PASS with exposure on the frozen candidate 0.90.134 (attempt frozen 2026-10-23T03:55:19Z, build 16A5F5DDDB4852C9D5DB236), test29/test30 (g2c), ledger rows data/criteria.runs.jsonl:8199-8202, stamped 04:03:37Z, :40Z, :43Z and :46Z, each with candidate 0.90.134 and that build; step9.log:7 'verify b20261022-8cd6d2: 4 PASS, 0 FAIL of 4 planned'. The batch is passed: verify P20261022-5b07e9 was approved and applied (verified_at 2/net/mesh/direct, attempt 2026-10-23T03:55:19Z). Drift check after its last lap: tests/evidence/candidates/0.90.134_check_20261023T040532Z.txt, 'candidate 0.90.134: every frozen file is as it was frozen'.\n\nCELLS. Besides its 20 control laps, the record names three runs, 1/any:release:presteps 2026-10-21T19:05:47Z, 21:43:30Z and 23:22:19Z, whose rig_lib_contract and capture-gate entries aborted on this resolution among other causes. Each of the three is also named by the open records D-PRESTEPS-FORM-PAIR-UNDER-G2-MARKER-BUT-SELF-TESTS-READ-DEFAULT-MARKER and D-CAPTURE-GATE-ENTRIES-INHERIT-THE-CLUSTER-STATE-AN-EARLIER-FAULT-LEFT (and 23:22:19Z by D-LIVE-HOLDER-WAIT-FINDS-NO-REMOTE-MASTERED-INODE-AND-ABORTS-BEFORE-MEASURING), so those runs stay accounted for after this record leaves; this removal claims only that this cause is gone from them.",
+      "evidence": [
+        "tests/evidence/controls/D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E.fix.diff",
+        "tests/rig_eui64_resolve_lap.sh",
+        "tests/lib/rig.sh",
+        "tests/evidence/batch_laps/b20261022-bf8f03",
+        "tests/evidence/batch_laps/b20261022-8cd6d2",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step9.log",
+        "tests/evidence/candidates/0.90.134_20261023T035519Z.files.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T040532Z.txt",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-5fbb20",
+      "kind": "remove-fixed",
+      "record": "D-TCP-STALE-RESEND-CANDIDATES-SHARE-ONE-ROUTING-SHARD-SO-ONE-MASTER-DRAW",
+      "change": {
+        "control": "b20261023-720c28",
+        "fixon": "b20261023-be3e39",
+        "cause": "tests/tcp_stale_resend.sh wrote its 8 candidate files back to back, so their inode numbers were consecutive; under ledger routing version 2 an inode routes with the low three bits of its number cleared (include/mxfs/mxfs_tauth.h MXFS_TAUTH_INO_SHARD), so all 8 shared one master and the search for a candidate remotely mastered from W was one draw, which on a 2-node group ABORTs whenever that draw is W (the gate's only BROKEN entry, tests/evidence/presteps_harnessfix_20261022.log). The fix creates files until 16 distinct routing shards are represented and keeps the first in each as a candidate; SR_SHARD_SELECT=0 restores the old eight consecutive files."
+      },
+      "argument": "FIXED AND VERIFIED. Resubmission of P20261023-49a2f7, which data/reviews/P20261023-49a2f7.md rejected only because the record also names tests/pending_late_grant.sh and its consequence there was argued, not run. The control, the fix-on batch and the cause carry over unchanged:\n\nReproducer: tests/stale_resend_shard_lap.sh (one harness setup, the verdict computed from the candidates' inode numbers and shards). Control b20261023-720c28, closed, on the candidate's own frozen tree with the fix's switch off (SR_SHARD_SELECT=0, nothing in the tree changed): 10 of 10 laps failed, each printing its candidates' single shard. Fix-on batch b20261023-be3e39 on the frozen candidate, sized from that control (N=6): 6 of 6 PASS with exposure, 16 candidates in 16 shards each; it passed through the approved verify P20261023-efb250 (verified_at 2/net/mesh/direct, attempt 2026-10-23T03:55:19Z).\n\nTHE RUN THE REVIEW ASKED FOR, tests/pending_late_grant.sh with NFILES=8 at 2/net/mesh/direct on the candidate's module, lane tests/evidence/lanes/g2_sr_plgrant_cand_20261023T063016Z (queue in tests/evidence/lanes/g2_sr_plgrant_cand_20261023T063016Z/queue), step 3: the lap re-prepped test1/test2 with MXFS_FORCE_PREP=1 and checked both nodes run the tree's build ('PASS prep deployed the tree build on test1 (16A5F5DDDB4852C9D5DB236)', the same on test2); 'STAGE late-kept: test1 45 (lines 8), test2 50 (lines 8); written test1=3472 test2=48 errors 0/0; read back test1=3472 test2=48; bad lines 0/0; shutdowns 0/0'; 'RESULT: PASS label=srcand1 late_kept=95 written=3520 fails=0 wall=149s evidence=tests/evidence/20261023T063125Z_plgrant_srcand1'. The eight files stay in /mnt/shared/plgrant_srcand1; step 4 recorded their inode numbers, tests/evidence/plgrant_srcand1_inos.txt: f1..f8 = 16777345..16777352. Their routing shards (ino >> 3): f1..f7 all 2097168 (base 16777344), f8 2097169 (base 16777352). So the eight consecutive creates fell in two routing shards, two master draws for eight files, as the record states ('does not hold for one or two shards'); the lap's verdict, a late-kept count over both nodes, which both append to every file, held anyway: 45 and 50, at least 1 on each. Drift check after the lap: tests/evidence/lanes/g2_sr_plgrant_cand_20261023T063016Z/step5.log, 'candidate 0.90.134: every frozen file is as it was frozen'. The stale comment at tests/pending_late_grant.sh:120-121 is left for the next attempt, as the review directs.",
+      "evidence": [
+        "tests/evidence/lanes/g2_sr_plgrant_cand_20261023T063016Z/step3.log",
+        "tests/evidence/lanes/g2_sr_plgrant_cand_20261023T063016Z/step5.log",
+        "tests/evidence/lanes/g2_sr_plgrant_cand_20261023T063016Z/queue",
+        "tests/evidence/plgrant_srcand1_inos.txt",
+        "tests/evidence/20261023T063125Z_plgrant_srcand1",
+        "tests/pending_late_grant.sh",
+        "data/reviews/P20261023-49a2f7.md",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step27.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step28.log",
+        "tests/evidence/presteps_harnessfix_20261022.log",
+        "tests/tcp_stale_resend.sh",
+        "tests/stale_resend_shard_lap.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
     }
   ]
 }

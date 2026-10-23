@@ -2556,239 +2556,6 @@
       ]
     },
     {
-      "id": "D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-21",
-      "summary": "tests/suite/fsx.sh draws its seed from 4 random bytes (0..2^32-1), but the vendored fsx stores -S in an int and calls usage() when it is negative, so about half of all runs exit 90 at once and record a FAIL that exercised nothing. (Its second half, the deleted failure logs, is now D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE.)",
-      "evidence": "2/net/mesh/drbd fsx 2026-10-21T19:36:37Z (dry-run candidate 0.90.133-2, build 71AC6107043DD5BE3D9181A): FAIL checks=2 passed=0 failed=2 seed=3832054505, both checks in 2 s of an 88 s budget (tests/evidence/drbd_rig/criteria.runs.jsonl). Code: tests/suite/fsx.sh:27 SEED=$(od -An -N4 -tu4 /dev/urandom); tests/suite/tools/fsx.c:186 'int seed = 1;', :3397 'seed = getnum(optarg, &endp);', :3402-3403 'if (seed < 0) usage();'; tests/suite/fsx.sh:22 trap 'rm -rf \"$W\" /tmp/fsx.$$.*'. Reproduced on clyde 2026-10-21 with the vendored binary: 'tests/suite/tools/fsx -S 3832054505 -N 200 <file>' rc=90 'usage: fsx ...'; -S 2147483648 rc=90; -S 2147483647 rc=0 'Seed set to 2147483647'. ===== ===== 2026-10-22, the rest of the fix: run.sh's artifact pull for a row that did not pass (the one that already brings /root/drc_* from every node) now takes /root/fsx.<seed>.<ops>.log too, so a failing fsx check's log lands in tests/evidence/run_fsx_<run id>/ as <node>_fsx.<seed>.<ops>.log. Exercised on the host with the same remote command: a /root holding fsx.123.100000.log came back as test1_fsx.123.100000.log; a /root holding neither drc_* nor fsx logs sends nothing (rc 1, as before). The seed range (1..2^31-1) and the kept log were already in the tree. ===== 2026-10-23: split. Review data/reviews/P20261022-fa5891.md rejected verify b20261022-c54100 because this record named two defects and the batch measured one: control b20261022-4bf99d reverted only fsx.sh's SEED= line (tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff, one hunk), so the deleted-log half never had a control. This record keeps the seed defect, which that control and tests/fsx_seed_lap.sh measure; the deleted-log defect is D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE.",
-      "next": "control batch of fsx laps at 2/net/mesh/direct with the fix taken out (tests/suite/fsx.sh drawing 4 random bytes again and deleting its logs, run.sh's pull without fsx logs): about half its laps must fail with fsx's usage; then the verification batch on the candidate, sized from it, and remove --fixed ===== 2026-10-22: control b20261022-4bf99d closed, 20 of 20 laps of tests/fsx_seed_lap.sh failed with the fix out (lap:fsx_seed at 2/net/mesh/direct). Next: the verification batch on the frozen candidate, 4 clean laps of the same lap (defects.py plan-verify ... --row lap:fsx_seed --at 2/net/mesh/direct --probe '^LAP fsx_seed start .* draw=4294967295 '), then remove --fixed with that control. ===== 2026-10-23: the seed defect alone. A verification batch of tests/fsx_seed_lap.sh on the next candidate attempt, sized from control b20261022-4bf99d, then remove --fixed with that control. ===== Removal P20261022-b2613a was rejected (data/reviews/P20261022-b2613a.md): the cited control logs show no usage message or rc=90, because tests/fsx_seed_lap.sh:43 deletes fsx's output. A resubmission cites tests/evidence/fsx_seed_int_max_repro_20261021.log (rc=90 with fsx's usage for seeds 3832054505 and 2147483648, rc=0 for 2147483647) and the review P20261021-676432, the fsx binary's hash and the fsx.c lines, or runs a control whose laps keep fsx's first output line and exit code; it cites the control's own harness output (or says none was kept; row 7700's lap log was overwritten) and drops 'each lap failing on the cause itself'. Rename the record first so its id no longer names the deleted logs, which are D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE.",
-      "reproducer": "tests/fsx_seed_lap.sh (host-local: /dev/urandom bound to four 0xff bytes in a private mount namespace, fsx.sh on tmpfs; every lap exposed)",
-      "cells": [
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "fsx",
-          "iso": "2026-10-21T19:36:37Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:28:04Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:28:03Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:28:02Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:28:01Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:28:00Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:59Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:58Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:57Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:56Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:55Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:54Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:53Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:52Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:51Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:50Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:49Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:48Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:47Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:46Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:fsx_seed",
-          "iso": "2026-10-22T23:27:45Z"
-        }
-      ],
-      "updated": "2026-10-23",
-      "batches": [
-        {
-          "id": "b20261022-4bf99d",
-          "kind": "control",
-          "row": "lap:fsx_seed",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 20,
-          "probe": "^LAP fsx_seed start .* draw=4294967295 ",
-          "candidate": "",
-          "build": "9594B08726D6732D2ED5E87",
-          "variant": "fix reverted: tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff sha256=8696fceaa6c7370480148efe459b824c241407ac3fda6c037ac4e664782ea61f",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "why": "the fix taken out: tests/suite/fsx.sh draws its seed from four random bytes again, and a draw past INT_MAX (here 4294967295, every lap) makes the vendored fsx print its usage and exit 90 in both checks"
-        },
-        {
-          "id": "b20261022-d1f171",
-          "kind": "verify",
-          "row": "lap:fsx_seed",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 4,
-          "probe": "^LAP fsx_seed start .* draw=4294967295 ",
-          "candidate": "0.90.134",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "",
-          "state": "open",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "rate": {
-            "row": "lap:fsx_seed",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261022-4bf99d",
-            "k": 20,
-            "n": 20,
-            "candidate": "",
-            "variant": "fix reverted: tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff sha256=8696fceaa6c7370480148efe459b824c241407ac3fda6c037ac4e664782ea61f",
-            "builds": [
-              "9594B08726D6732D2ED5E87"
-            ],
-            "date": "2026-10-22"
-          },
-          "transfer": "",
-          "lower_bound": 0.7672704990109255
-        },
-        {
-          "id": "b20261022-c54100",
-          "kind": "verify",
-          "row": "lap:fsx_seed",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 4,
-          "probe": "^LAP fsx_seed start .* draw=4294967295 ",
-          "candidate": "0.90.134",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "rate": {
-            "row": "lap:fsx_seed",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261022-4bf99d",
-            "k": 20,
-            "n": 20,
-            "candidate": "",
-            "variant": "fix reverted: tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff sha256=8696fceaa6c7370480148efe459b824c241407ac3fda6c037ac4e664782ea61f",
-            "builds": [
-              "9594B08726D6732D2ED5E87"
-            ],
-            "date": "2026-10-22"
-          },
-          "transfer": "",
-          "lower_bound": 0.7672704990109255
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:fsx_seed",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261022-4bf99d",
-          "k": 20,
-          "n": 20,
-          "candidate": "",
-          "variant": "fix reverted: tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff sha256=8696fceaa6c7370480148efe459b824c241407ac3fda6c037ac4e664782ea61f",
-          "builds": [
-            "9594B08726D6732D2ED5E87"
-          ],
-          "date": "2026-10-22"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T03:55:19Z",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "batch": "b20261022-c54100",
-          "approval": "P20261022-8a9584",
-          "date": "2026-10-23"
-        }
-      ]
-    },
-    {
       "id": "D-2NETMESH-DRBD-NODE-SYNC-WEDGED-AFTER-FIO-PERF-OVERRAN-RECORDED-AS-INFRA",
       "severity": "high",
       "nodes": 2,
@@ -3931,7 +3698,7 @@
       "opened": "2026-10-21",
       "summary": "A TCP node that dies holding an open EFI (rm of fragmented files, EFD held) is not recovered: the survivor's foreign replay refuses 37 of the 38 transactions in its slice as touching images the victim did not hold (not-held), the whole replay is refused (P241-RECOV-TERMINAL reason=1 POLICY_REFUSED_COMPLETE, refused=45), and the victim's domain is quarantined cluster-wide with its slot frozen until operator action, where the fix build is designed to complete the open obligation case (P226-FR-INTENTS-RECOVERABLE)",
       "evidence": "2026-10-22 0.90.134 build 0988C50EC610F82EE08D135, test1 (W) / test2 (V), 2/net/mesh/direct pool LUN eui.6664363939643231, fix build (obl_complete_enable=1): tests/d_intents_2tcp_open_efi.sh healthy lap through tests/capture_fault_gate.sh 0.90.134-harnessfix --healthy-only (evidence tests/evidence/20261022T040719Z_intents2tcp_0.90.134-harnessfix-d_intents_2tcp_open_efi-ok): V built 8 files of 4096 extents, W listed and read them (published), V entered the EFD hold with a durable EFI (P-EFD-HOLD start=3416125), virsh destroy test2, W elected to replay slot 1, census P226-ICENSUS victim_slot=1 intents=217 dones=216 ambiguous_dones=215 open=194 extents=389; then P-FR-CANCEL-PASS1 txns=38 refused=37 cancel_kept=1, P227-FR-REFUSED-WHY why: not-held=2 / not-held=8 (images class=3 res=18874496/18874498 gepoch 8/9), P241-RECOV-TERMINAL slot=1 reason=1 domain=1 refused=45, P241-RECOV-TERMINAL-IMPORT, P240-QUAR-IMPORT; FAIL replay SUCCEEDED with an OPEN obligation case got=no. P-TAUTH-SEAL for the victim at 1799.94, the replay at 1804.53. Probe counts in dmesg_test1.txt: P226-ICENSUS-DONE-AMBIGUOUS 109, -INTENT 91, -OPEN 16. This harness had measured nothing since its IMG precondition broke (D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG-AND-DIES-BEFORE-MEASURING), so when this began is not known. ===== ===== 2026-10-22 CAUSE PROVEN (instrumented): the refused tenures are inactivation tenures released unmarked. Reproduced on the 0.90.134 tree build 2446C4C6401FC9D9224650F through tests/capture_fault_gate.sh openefi_repro_20261022T180946Z --healthy-only --only d_intents_2tcp_open_efi (g2, test1 W / test2 V): FAIL replay SUCCEEDED with an OPEN obligation case got=no. The harness now keeps the victim's whole pre-kill log (it used to keep 7 probes and no release line): tests/evidence/20261022T181031Z_intents2tcp_openefi_repro_20261022T180946Z-d_intents_2tcp_open_efi-ok/dmesg_test2_prekill.txt holds P-RELMARK-OWED site=inact-exrel for exactly ino 2097280 gepoch 7, 2097284 gepoch 8, 2097285 gepoch 9 and 2097281 gepoch 10 (freed=0), and dmesg_test1.txt refuses exactly those four tenures not-held (94/90/81/86 images) with relmarks=0 REDUNDANT_CLEAN=0 notheld=351. Sequence for 2097280: P-INACT-EX epoch 7, truncate 0.81 s, P-UNLPRE-SKIP rc=-11 (deferred free), P-IFREE-DEFER-DIRTY drain=1 drained=1, P-RELMARK-OWED, P128-INACT-EXREL freed=0. The INACT-EXREL release in xfs/xfs_inode.c (the instrument-only block before the unlock) publishes no clean-release marker, and the held EFI keeps the tenure's transactions in the replay window, so the survivor can prove neither held-at-death (the manifest no longer lists it) nor clean release. ===== ===== 2026-10-22 FIX in the tree: xfs/xfs_inode.c, at the INACT-EXREL release, a tenure that stamped a token (the P-RELMARK-OWED condition), not ICLUS-routed, with the core home (!mxfs_inact_owes_home), not shut down or unmounting, gets blkdev_issue_flush then mxfs_inode_relmark_before_unlock(who inact/inact-free) before the unlock, probe P-RELMARK-INACT; module option inact_relmark (xfs/xfs_mxfs_dlm.c, 1 default, 0 the same-build control). Build 9594B08726D6732D2ED5E87. Fix-on lap: MXFS_GROUP=g2 tests/capture_fault_gate.sh openefi_fixon_20261022T183915Z --healthy-only --only d_intents_2tcp_open_efi: GATE rc=0 fails=0 -> OK, RESULT: PASS vacuous=0 (tests/evidence/20261022T183915Z_capture_gate_openefi_fixon_20261022T183915Z); victim dmesg_test2_prekill.txt P-RELMARK-OWED 5, P-RELMARK-INACT 5 all rc=0 us=452-619; survivor dmesg_test1.txt relmarks=5 REDUNDANT_CLEAN=339 notheld=0, P-FR-CANCEL-PASS1 txns=36 refused=0.",
-      "next": "control batch of the gate lap with MXFS_EXTRA_MODARGS=inact_relmark=0 (the same build, released unmarked as before): it must refuse the replay; then the verification batch on the candidate, sized from it",
+      "next": "control batch of the gate lap with MXFS_EXTRA_MODARGS=inact_relmark=0 (the same build, released unmarked as before): it must refuse the replay; then the verification batch on the candidate, sized from it ===== Verification b20261023-b40448 (7 laps, sized from control b20261023-e3ba0b, 9 of 9) ended at lap 7 on another defect: in every lap the replay succeeded with the open obligation completed (P226-FR-INTENTS-RECOVERABLE, P-OBL-COMPLETE, zero P241-RECOV-TERMINAL; lap 7 too, tests/evidence/20261023T061838Z_capture_gate_openefivc7/d_intents_2tcp_open_efi_ok.log:21,52,54), but lap 7's survivor read only 6 of the 8 files before the kill (:9), the stale extent-tree cache now recorded as D-SURVIVOR-CACHE-SERVES-A-DELETED-FILES-BMBT-BLOCK-FOR-A-PEERS-NEW-FILE, which names that run. Lap 1 had exposure=0. Next: fix that defect, then a new verification batch of the gate lap on the candidate sized from control b20261023-e3ba0b, then remove --fixed.",
       "reproducer": "tests/d_intents_2tcp_open_efi.sh <label> test1 test2 with CHURN=0 MODE=complete on a TCP pair on the fix build; reached on its first healthy lap after the IMG fix",
       "updated": "2026-10-23",
       "batches": [
@@ -5705,6 +5472,31 @@
           "config": "16/net/mesh/mpath",
           "row": "path_fence_degraded",
           "iso": "2026-10-20T13:42:36Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "path_fence_degraded",
+          "iso": "2026-10-23T06:02:47Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "path_all_lost",
+          "iso": "2026-10-23T06:06:00Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "path_fenced_return",
+          "iso": "2026-10-23T06:09:31Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "path_fence_degraded",
+          "iso": "2026-10-23T06:13:25Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "path_all_lost",
+          "iso": "2026-10-23T06:16:55Z"
         }
       ],
       "updated": "2026-10-23"
@@ -6004,6 +5796,24 @@
           "config": "8/net/mesh/mpath",
           "row": "path_peer_withdrawn",
           "iso": "2026-10-22T19:58:42Z"
+        }
+      ]
+    },
+    {
+      "id": "D-SURVIVOR-CACHE-SERVES-A-DELETED-FILES-BMBT-BLOCK-FOR-A-PEERS-NEW-FILE",
+      "severity": "critical",
+      "nodes": 2,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "On 2/net/mesh/direct (candidate 0.90.134, build 16A5F5DDDB4852C9D5DB236) test1 read 2 of 8 files its peer had just written and fsynced and got no data: test1's buffer cache served extent-tree (bmbt) blocks still carrying the owner of a file from the previous lap, deleted and its blocks reused for the new files' trees; the btree owner check refused them (P975-BMBT-LOOKUP-BAD same_image=0) and the reads failed. Had the inode number been reused too, the owner check would have matched and a stale extent map would have been served.",
+      "evidence": "Lap 7 of verification b20261023-b40448 (tests/capture_fault_gate.sh openefivc7 --only d_intents_2tcp_open_efi, W=test1 V=test2): tests/evidence/20261023T061838Z_capture_gate_openefivc7/d_intents_2tcp_open_efi_ok.log:8 'INFO published via test1: listed=8 read=6 (+7s)', :9 'FAIL W listed and read all 8 files (published before the rm) got=6 want=8'; the step is tests/d_intents_2tcp_open_efi.sh:172-190 (V writes 8 files of 4096 extents with fsync of each file and the directory; W counts the files whose 'head -c 4096' returns 4096 bytes), before any fault. W's kernel log tests/evidence/20261023T061841Z_intents2tcp_openefivc7-d_intents_2tcp_open_efi-ok/dmesg_test1.txt:251 and :258 'P975-BMBT-LOOKUP-BAD daddr=2106984 want_ino=2097296 want_level=0 cached_owner=2097287 cached_level=0 cached_nrecs=251 ... disk_rc=0 disk_owner=2097296 ... same_image=0 comm=head', :297 and :302 the same at daddr=2164704 want_ino=2097298 cached_owner=2097290 disk_owner=2097298; :17-20 ISTALE-CAW-EVICT ino=2097294 (V's directory) try=1..4; :53 'P212-RDRETRY-SKIP ino=2097294 fmt=1 ... serving consistent-stale'. The previous lap's W log (tests/evidence/20261023T061656Z_intents2tcp_openefivc6-d_intents_2tcp_open_efi-ok/dmesg_test1.txt:241-268) already shows test1 holding bmbt images of owner 2097287 at other addresses that differ from the LUN ('P77-SKIP-DIFFERS site=chokepoint owner=2097287 daddr=2115088 numrecs=251 same=0 ... skipped bmbt image differs from LUN', 'P61-CHOKEPOINT-SKIP-BMBT owner=2097287 ... NL-released dir, skipping stale leaf write at bio submit'). W stays mounted across the gate's laps; each lap V builds, removes and dies, and W replays V's slice and completes its open EFI (P226-FR-INTENTS-RECOVERABLE, P-OBL-ENGINE-EXTENT, P163-RECOVERY-COMPLETE). The 0.87.6 eviction (CHANGELOG.md 0.87.6, mxfs_bmbt_tenure_end_evict) drops an inode's cached bmbt images at the end of each tenure on that inode; the consult on that change named buffers left by log recovery of a dead peer's slice as not covered. 1 of the batch's 7 laps.",
+      "next": "Establish how test1's cache came to hold bmbt images owned by 2097287 and 2097290 at daddr 2106984 and 2164704 when lap 7 began: brought in by lap 6's replay of V's slice or by the obligation engine's completion, never read under a tenure and so never evicted; or read under a tenure whose end did not evict them. Instrument first: a probe where recovery completes listing every bmbt buffer (daddr, payload owner, XBF_DONE, dirty) it leaves in the cache, and the tenure-end eviction's decision for those daddrs; reproduce with open-EFI laps back to back on one W mount. Then fix at the proven cause with a knob for the control, the control with it off, and a verification batch on the candidate.",
+      "reproducer": "tests/capture_fault_gate.sh <label> --only d_intents_2tcp_open_efi, laps back to back on one survivor mount (as tools/harness_batch.py runs a batch): a lap whose 'published via' read count is below 8, with P975-BMBT-LOOKUP-BAD naming an owner from an earlier lap",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-23T06:20:27Z"
         }
       ]
     }
