@@ -23,6 +23,10 @@
 #                    step (A's hold went with it)
 #   FAIL             B ran its step while A held the configuration, or C was refused after A ended
 #
+# LANE_CONFIG_HOLD=0 in the lap's environment reaches every lane it starts, which then hold no
+# configuration, as before the fix: the control of
+# D-LANES-ON-ONE-CONFIGURATION-COLLIDE-AND-BATCHES-SPEND-THEIR-LAPS-INCOMPLETE.
+#
 # Bound, derived: A's step is 4 s, B and C a fraction of a second each, the wait for A's start
 # under 1 s; under 7 s, bounded at 20 s.
 #

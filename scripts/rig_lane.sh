@@ -25,6 +25,7 @@
 # configuration collided on run.sh's configuration lock, so one lane's pair was
 # never formed and its verification batches spent every lap on it, INCOMPLETE
 # (D-LANES-ON-ONE-CONFIGURATION-COLLIDE-AND-BATCHES-SPEND-THEIR-LAPS-INCOMPLETE).
+# LANE_CONFIG_HOLD=0 holds none, as before: the control of that fix.
 # A holder process keeps each lock (/tmp/mxfs_lane.<configuration>.lock) and
 # exits with the lane; the lane closes its own copy, so neither a step nor
 # anything a step leaves running keeps a configuration held after the lane.
@@ -64,8 +65,12 @@ release_holds() {
     done
 }
 trap release_holds EXIT
-for cfg in $(grep -v '^[[:space:]]*#' "$OUT/queue" \
-             | grep -oE '(run\.sh|--at)[[:space:]]+[0-9]+/[^[:space:]]+' | awk '{print $2}' | sort -u); do
+# LANE_CONFIG_HOLD=0 holds no configuration and refuses nothing, as before
+# that fix: its control.
+held=""
+[ "${LANE_CONFIG_HOLD:-1}" = 0 ] || held=$(grep -v '^[[:space:]]*#' "$OUT/queue" \
+    | grep -oE '(run\.sh|--at)[[:space:]]+[0-9]+/[^[:space:]]+' | awk '{print $2}' | sort -u)
+for cfg in $held; do
     lock=/tmp/mxfs_lane.${cfg//\//-}.lock
     exec {fd}>>"$lock"
     if ! flock -n "$fd"; then

@@ -324,6 +324,8 @@ NODE1="${NODES[0]}"
 # The stamp alone is one second wide, and group runs start side by side: the
 # group keeps two runs' coordination topics and evidence directories apart.
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)${GROUP:+-$GROUP}"
+# The kernel-log line that marks the current row's start (mark_row_start).
+ROW_MARK=""
 
 [ -s "$CRIT" ] || { echo "ERROR: $CRIT missing — the board is data/criteria.json, managed by tools/criteria.py"; exit 1; }
 [ -x "$CRITPY" ] || { echo "ERROR: $CRITPY missing or not executable — nothing can record a result"; exit 1; }
@@ -2067,7 +2069,22 @@ run_coord() {  # name cat budget scale
     # 0/8 cascade FAILs.  The timeout stays a FAIL for THIS test (budget); this
     # just kills the leftovers so the NEXT test's result is valid.
     if [ "$saw_noresult" -eq 1 ]; then
-        local kn
+        local kn ccsel
+        # The census reads only the markers this row wrote.  The ring keeps
+        # every earlier row's of this boot, and its newest one credited a row
+        # whose ranks wrote none with a phase they never reached
+        # (D-RUN-SH-TIMEOUT-CENSUS-READS-AN-EARLIER-ROWS-PHASE-MARKER-FROM-THE-BOOTS-RING),
+        # so it starts at the row's own kernel-log mark (mark_row_start); a
+        # node whose ring no longer holds that mark is read as nomark.
+        # MXFS_CENSUS_SINCE_ROW=0 reads the whole ring, as before: the control
+        # of that fix.
+        if [ "${MXFS_CENSUS_SINCE_ROW:-1}" = 0 ]; then
+            ccsel="dmesg | grep -o 'mxfs-CCph rank=[0-9]* PHASE=[a-z0-9-]*' | tail -1"
+        elif [ -z "$ROW_MARK" ]; then
+            ccsel="echo 'mxfs-CCph rank=- PHASE=nomark'"
+        else
+            ccsel="dmesg | awk -v m='$ROW_MARK' 'index(\$0, m) { seen = 1; last = \"\"; next } seen && match(\$0, /mxfs-CCph rank=[0-9]* PHASE=[a-z0-9-]*/) { last = substr(\$0, RSTART, RLENGTH) } END { if (!seen) print \"mxfs-CCph rank=- PHASE=nomark\"; else if (last != \"\") print last }'"
+        fi
         for kn in "${NODES[@]}"; do
             # pkill the script, then fuser -k -m the mount: the script's
             # CHILDREN (a mid-flight rm -rf) survive the pkill and keep
@@ -2091,7 +2108,7 @@ run_coord() {  # name cat budget scale
             # dmesg ran — every .ccph came back empty and /tmp/ccph_last was
             # never created (proven on test1 after the 0.51.0 board).  The
             # bracketed first character makes the pattern not match itself.
-            ( ssh_node "$kn" "pkill -f -- '[${script:0:1}]${script:1}' 2>/dev/null; dmesg | grep -o 'mxfs-CCph rank=[0-9]* PHASE=[a-z0-9-]*' | tail -1 > /tmp/ccph_last 2>/dev/null; sleep 1; fuser -k -m $MNT >/dev/null 2>&1; cat /tmp/ccph_last 2>/dev/null; true" 2>/dev/null | tail -1 > "$tmpd/$kn.ccph" ) &
+            ( ssh_node "$kn" "pkill -f -- '[${script:0:1}]${script:1}' 2>/dev/null; $ccsel > /tmp/ccph_last 2>/dev/null; sleep 1; fuser -k -m $MNT >/dev/null 2>&1; cat /tmp/ccph_last 2>/dev/null; true" 2>/dev/null | tail -1 > "$tmpd/$kn.ccph" ) &
         done
         wait
         echo "    (killed leftover $name processes on all nodes after timeout)"
@@ -2198,11 +2215,14 @@ run_coord() {  # name cat budget scale
 
 # mark_row_start <node>...: each node stamps the row's start on its own clock
 # (/root/.mxfs_row_mark), so the artifact pull takes the files the row wrote
-# and none an earlier row or boot left behind.
+# and none an earlier row or boot left behind; and in its kernel log with a
+# line no other row writes (ROW_MARK), so the timeout census reads the phase
+# markers the row wrote and none an earlier row of this boot left.
 mark_row_start() {
     local cn
+    ROW_MARK="mxfs-rowmark ${RUN_ID}-$(date +%s%N)"
     for cn in "$@"; do
-        ssh_node "$cn" "touch /root/.mxfs_row_mark" > /dev/null 2>&1 &
+        ssh_node "$cn" "touch /root/.mxfs_row_mark; echo '$ROW_MARK' > /dev/kmsg" > /dev/null 2>&1 &
     done
     wait
 }

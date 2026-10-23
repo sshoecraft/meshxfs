@@ -25,8 +25,8 @@
 #   ABORT    the row did not run, rank 2 never reached its fill, or the row ended before its
 #            budget (no census, nothing measured)
 #
-# The control is the candidate's source with only the fix reverted in tests/tooling/alloc_witness.sh
-# (tools/harness_batch.py control --revert, the diff removing ccph() and its calls).
+# The control is the fix's switch off, AW_PHASE_MARKS=0 in the lap's environment, which the lap
+# passes to the row's ranks: ccph() then writes no marker, as before the fix.
 #
 # Bound, derived: the row's budget in tests/tooling/manifest (120 s), which run.sh enforces and
 # which this lap runs out, plus run.sh's preflight and pre-assert (measured 20-30 s a row on 2
@@ -49,7 +49,7 @@ for n in $NODES; do
         < /dev/null 2>/dev/null | grep -q '^MARK-OK$' || { echo "LAP aw_census ABORT: cannot mark $n's kernel log"; exit 2; }
 done
 env -u MXFS_BATCH MXFS_CRIT="$S/criteria.json" \
-    MXFS_TEST_ENV="AW_ABORT_RANK=2 AW_ABORT_BROADCAST=0" \
+    MXFS_TEST_ENV="AW_ABORT_RANK=2 AW_ABORT_BROADCAST=0${AW_PHASE_MARKS:+ AW_PHASE_MARKS=$AW_PHASE_MARKS}" \
     ./run.sh "$AT" alloc_witness < /dev/null > "$S/run.out" 2>&1
 grep -aE '^\s+[A-Z]+\s+alloc_witness\s|ABORTED|^=== done' "$S/run.out" | cut -c1-300
 python3 - "$S/criteria.runs.jsonl" "$AT" $NODES <<'EOF'

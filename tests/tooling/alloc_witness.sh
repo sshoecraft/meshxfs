@@ -193,8 +193,10 @@ aw_barrier(){ # <tag>: rendezvous; 0 every rank arrived, 1 timed out, 2 a peer a
     return "$r"
 }
 # run.sh's timeout census reads the last of these from each node's kernel log,
-# so a lap its budget ends says which phase each rank was in
-ccph(){ echo "mxfs-CCph rank=$RANK PHASE=$1" > /dev/kmsg 2>/dev/null; }
+# so a lap its budget ends says which phase each rank was in.  AW_PHASE_MARKS=0
+# writes none: the switch of that fix, and the row with no marker of its own
+# that tests/census_scope_lap.sh runs out.
+ccph(){ [ "${AW_PHASE_MARKS:-1}" = 0 ] || echo "mxfs-CCph rank=$RANK PHASE=$1" > /dev/kmsg 2>/dev/null; }
 
 mountpoint -q "$MNT" || fail_out "mounted=0 rank=$RANK" "the filesystem is not mounted on this node"
 
