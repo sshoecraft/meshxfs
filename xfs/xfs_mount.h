@@ -1653,6 +1653,7 @@ int xfs_set_max_atomic_write_opt(struct xfs_mount *mp,
  * pal/linux/xfs_super.c.
  */
 bool mxfs_mount_write_admitted(struct xfs_mount *mp, const char *site);
+void mxfs_mount_auth_gate(struct xfs_mount *mp, const char *site);
 
 /*
  * The teardown tail, counted.  Once put_super detaches the DLM the mount can

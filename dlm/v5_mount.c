@@ -10421,15 +10421,18 @@ static int v5_acq_fallible_cb(void *data, const struct mxfs_resource_id *res)
  * stops waiting for a peer that can no longer help it.  Asking the authority
  * object rather than the disklock context is deliberate: the object outlives
  * the context, and the answer must stay available for as long as anything can
- * still be waiting.  mxfs_authority_ok() also CLOSES an expired lease from
- * whatever context noticed, which is exactly right here — a blocked acquire
- * may be the only thread running on a node whose timers have stalled.
+ * still be waiting.  mxfs_authority_closed() also CLOSES an expired lease
+ * from whatever context noticed, which is exactly right here — a blocked
+ * acquire may be the only thread running on a node whose timers have stalled.
+ * A SUSPENDED authority is not lost: a beat inside the peers' window readmits
+ * the same incarnation, and the request it waits on is still its own
+ * (disklock.h, MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS).
  */
 static int v5_authority_lost_cb(void *data)
 {
 	struct mxfs_v5_dlm *ctx = data;
 
-	return (ctx && !mxfs_authority_ok(ctx->authority)) ? 1 : 0;
+	return (ctx && mxfs_authority_closed(ctx->authority)) ? 1 : 0;
 }
 
 /*

@@ -2376,6 +2376,15 @@ mxfs_mount_write_admitted(
 		mxfs_pal_quorum_gate(site);
 
 	ok = mxfs_authority_ok(auth);
+	/*
+	 * SUSPENDED: the lease ran out, but a beat landing inside the peers' dead
+	 * window readmits this incarnation (dlm/disklock.h,
+	 * MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS).  A submission that may sleep waits
+	 * for that answer instead of failing; one that may not is refused, as a
+	 * closed authority's is.
+	 */
+	if (!ok && mxfs_pal_may_sleep() && mxfs_authority_suspended(auth))
+		ok = mxfs_authority_wait(auth, site);
 
 	/*
 	 * The teardown tail, traced.  These are submissions made after
@@ -2416,6 +2425,32 @@ mxfs_mount_write_admitted(
 			  site, current->comm);
 	}
 	return ok;
+}
+
+/*
+ * The read side of a SUSPENDED authority (dlm/disklock.h,
+ * MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS): no grant this node holds may be used,
+ * for reading either, until a beat inside the peers' dead window readmits the
+ * incarnation, because once that window has run out a peer may own what the
+ * grant covered.  Called where an operation takes a cluster lock
+ * (mxfs_dlm_ilock_begin) and from getattr.  It waits for the readmission or
+ * the close; after a close the operation goes on and fails as it does on a
+ * shut-down mount.
+ */
+void
+mxfs_mount_auth_gate(
+	struct xfs_mount	*mp,
+	const char		*site)
+{
+	struct mxfs_authority	*auth;
+
+	if (!mp || !READ_ONCE(mp->m_mxfs_clustered))
+		return;
+	auth = READ_ONCE(mp->m_mxfs_auth);
+	if (!auth || mxfs_authority_ok(auth))
+		return;
+	if (mxfs_pal_may_sleep() && mxfs_authority_suspended(auth))
+		(void)mxfs_authority_wait(auth, site);
 }
 
 /* The DRBD write bound's question for a write it held: the gate's, again. */

@@ -184,9 +184,20 @@ MODULE_PARM_DESC(hb_io_bound_ms,
 		 "without it while a worker waits the command out (8000, "
 		 "default); 0 issues them synchronously on the heartbeat thread "
 		 "(same-build control)");
+
+/* A SCSI attachment's lease deadline suspends this node's authority instead of
+ * closing it (disklock.h, MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS).  Read when the
+ * lease is derived, at mount. */
+static int mxfs_dl_auth_suspend = 1;
+module_param_named(dl_auth_suspend, mxfs_dl_auth_suspend, int, 0644);
+MODULE_PARM_DESC(dl_auth_suspend,
+		 "a SCSI attachment's lease deadline suspends the mount until a "
+		 "beat lands inside the peers' dead window (1, default); 0 closes "
+		 "its authority at the deadline (same-build control)");
 #else
 #define dl_instr_on() (0)
 #define dl_inject_take(k) (false)
+static int mxfs_dl_auth_suspend = 1;
 static unsigned int mxfs_hb_io_bound_ms = 8000;
 static int mxfs_dl_inject_hb_pause_ms;	/* user-mode: never armed */
 static int mxfs_dbg_hb_skip_auth_check;	/* user-mode: never armed */
@@ -2934,6 +2945,9 @@ struct mxfs_authority *mxfs_authority_alloc(void)
 	mxfs_atomic32_set(&auth->refcnt, 1);
 	auth->lease_ms = MXFS_DISKLOCK_AUTH_LEASE_MS;
 	auth->slot = -1;
+	/* without them a gate waiter polls on a short sleep instead */
+	auth->wait_lock = mxfs_pal_mutex_create();
+	auth->wait_cond = auth->wait_lock ? mxfs_pal_cond_create() : NULL;
 	return auth;
 }
 
@@ -2946,8 +2960,32 @@ struct mxfs_authority *mxfs_authority_get(struct mxfs_authority *auth)
 
 void mxfs_authority_put(struct mxfs_authority *auth)
 {
-	if (auth && mxfs_atomic32_dec(&auth->refcnt) == 0)
+	if (auth && mxfs_atomic32_dec(&auth->refcnt) == 0) {
+		if (auth->wait_cond)
+			mxfs_pal_cond_destroy(auth->wait_cond);
+		if (auth->wait_lock)
+			mxfs_pal_mutex_destroy(auth->wait_lock);
 		mxfs_pal_free(auth);
+	}
+}
+
+/* Wake every gate waiter: the state left SUSPENDED, one way or the other. */
+static void auth_wake(struct mxfs_authority *auth)
+{
+	if (!auth->wait_lock || !auth->wait_cond)
+		return;
+	mxfs_pal_mutex_lock(auth->wait_lock);
+	mxfs_pal_cond_broadcast(auth->wait_cond);
+	mxfs_pal_mutex_unlock(auth->wait_lock);
+}
+
+/* The window a revalidating beat must complete inside: the peers' window less
+ * the clock error across it (2 x MXFS_DISKLOCK_CLOCK_PPM, rounded up). */
+static uint64_t auth_window_eff_ms(const struct mxfs_authority *auth)
+{
+	uint64_t w = auth->window_ms;
+
+	return w - (w * 2 * MXFS_DISKLOCK_CLOCK_PPM + 999999) / 1000000;
 }
 
 static void auth_note_closed(struct mxfs_authority *auth, int reason,
@@ -2970,6 +3008,24 @@ static void auth_note_closed(struct mxfs_authority *auth, int reason,
 		     (unsigned long long)deadline, (unsigned long long)now,
 		     (long long)(deadline ? (int64_t)(now - deadline) : 0),
 		     (unsigned long long)auth->last_ok_ms, why);
+	auth_wake(auth);
+}
+
+/*
+ * SUSPENDED past revalidate_by_ms: no beat landed in time, so a peer may now
+ * have declared this node dead.  Close, exactly as an expired lease did before
+ * suspension existed.  Exactly one caller wins the transition and logs.
+ */
+static void auth_suspension_expire(struct mxfs_authority *auth, uint64_t now)
+{
+	if (now < auth->revalidate_by_ms)
+		return;
+	if (mxfs_atomic32_cmpxchg(&auth->state, MXFS_AUTH_SUSPENDED,
+				  MXFS_AUTH_CLOSED) == MXFS_AUTH_SUSPENDED)
+		auth_note_closed(auth, MXFS_SELF_FENCE_AUTHORITY_LEASE_EXPIRED,
+				 "no beat landed inside the peers' dead window after "
+				 "the lease suspended, so a peer may now declare this "
+				 "node dead", now, auth->deadline_ms);
 }
 
 bool mxfs_authority_ok(struct mxfs_authority *auth)
@@ -3002,6 +3058,9 @@ bool mxfs_authority_ok(struct mxfs_authority *auth)
 		 * about: once a beat has landed this state is never returned to.
 		 */
 		return true;
+	case MXFS_AUTH_SUSPENDED:
+		auth_suspension_expire(auth, mxfs_pal_time_ms());
+		return false;
 	default:
 		break;
 	}
@@ -3015,16 +3074,97 @@ bool mxfs_authority_ok(struct mxfs_authority *auth)
 	 * EXPIRED, AND THE CALLER IS THE ONE WHO FOUND OUT.  Correctness must not
 	 * depend on the pump having run — a timer and a heartbeat thread can be
 	 * stalled along with the rest of the VM, which is exactly the state this
-	 * gate exists for.  So close it here, from whatever context noticed.
-	 * Exactly one caller wins the transition and logs.
+	 * gate exists for.  So suspend or close it here, from whatever context
+	 * noticed.  Exactly one caller wins the transition and logs.
 	 */
+	if (auth->suspend_ok && now < auth->revalidate_by_ms) {
+		was = mxfs_atomic32_cmpxchg(&auth->state, MXFS_AUTH_ADMITTED,
+					    MXFS_AUTH_SUSPENDED);
+		if (was == MXFS_AUTH_ADMITTED) {
+			auth->suspended_at_ms = now;
+			mxfs_atomic32_inc(&auth->suspends);
+			mxfs_pal_log(MXFS_LOG_WARN,
+				     "mxfs: P290-AUTH-SUSPENDED node %u slot %d "
+				     "incarnation=%llu deadline_ms=%llu now_ms=%llu "
+				     "revalidate_by_ms=%llu last_ok_ms=%llu "
+				     "suspends=%d -- this node's lease ran out "
+				     "with no beat landed since; nothing is "
+				     "admitted until a beat lands before "
+				     "revalidate_by_ms, and the authority closes "
+				     "if none does",
+				     auth->node, auth->slot,
+				     (unsigned long long)auth->incarnation,
+				     (unsigned long long)deadline,
+				     (unsigned long long)now,
+				     (unsigned long long)auth->revalidate_by_ms,
+				     (unsigned long long)auth->last_ok_ms,
+				     mxfs_atomic32_get(&auth->suspends));
+		}
+		return false;
+	}
 	was = mxfs_atomic32_cmpxchg(&auth->state, MXFS_AUTH_ADMITTED,
 				    MXFS_AUTH_CLOSED);
 	if (was == MXFS_AUTH_ADMITTED)
 		auth_note_closed(auth, MXFS_SELF_FENCE_AUTHORITY_LEASE_EXPIRED,
 				 "the authority lease expired before this operation "
 				 "reached the device", now, deadline);
+	else if (was == MXFS_AUTH_SUSPENDED)
+		auth_suspension_expire(auth, now);
 	return false;
+}
+
+bool mxfs_authority_suspended(struct mxfs_authority *auth)
+{
+	if (!auth)
+		return false;
+	(void)mxfs_authority_ok(auth);          /* evaluates the deadline */
+	return mxfs_atomic32_get(&auth->state) == MXFS_AUTH_SUSPENDED;
+}
+
+bool mxfs_authority_closed(struct mxfs_authority *auth)
+{
+	if (!auth)
+		return true;
+	(void)mxfs_authority_ok(auth);          /* evaluates both deadlines */
+	return mxfs_atomic32_get(&auth->state) == MXFS_AUTH_CLOSED;
+}
+
+bool mxfs_authority_wait(struct mxfs_authority *auth, const char *site)
+{
+	uint64_t t0 = 0, now, by, wait;
+
+	for (;;) {
+		if (mxfs_authority_ok(auth)) {
+			if (t0)
+				mxfs_pal_log(MXFS_LOG_DEBUG,
+					     "mxfs: P290-AUTH-GATE-RESUMED node %u "
+					     "site=%s waited_ms=%llu -- admitted "
+					     "after the lease suspended",
+					     auth->node, site ? site : "?",
+					     (unsigned long long)(mxfs_pal_time_ms() - t0));
+			return true;
+		}
+		if (!auth || mxfs_atomic32_get(&auth->state) != MXFS_AUTH_SUSPENDED)
+			return false;           /* closed */
+		if (mxfs_pal_fatal_signal_pending())
+			return false;
+		now = mxfs_pal_time_ms();
+		if (!t0)
+			t0 = now;
+		by = auth->revalidate_by_ms;
+		wait = by > now ? by - now : 1;
+		if (wait > 250)
+			wait = 250;
+		if (auth->wait_lock && auth->wait_cond) {
+			mxfs_pal_mutex_lock(auth->wait_lock);
+			if (mxfs_atomic32_get(&auth->state) == MXFS_AUTH_SUSPENDED)
+				(void)mxfs_pal_cond_timedwait(auth->wait_cond,
+							      auth->wait_lock, wait);
+			mxfs_pal_mutex_unlock(auth->wait_lock);
+		} else {
+			mxfs_pal_sleep_ms((uint32_t)wait);
+		}
+	}
 }
 
 uint64_t mxfs_authority_remaining_ms(struct mxfs_authority *auth)
@@ -3036,6 +3176,91 @@ uint64_t mxfs_authority_remaining_ms(struct mxfs_authority *auth)
 	deadline = auth->deadline_ms;
 	now = mxfs_pal_time_ms();
 	return now < deadline ? deadline - now : 0;
+}
+
+/*
+ * A landed beat on an attachment whose deadline suspends (disklock.h,
+ * MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS).  It renews only if it completed before
+ * revalidate_by_ms, read now, after the completion; then its own anchor sets
+ * the next deadline and the next bound, and a suspended authority whose new
+ * deadline still lies ahead is readmitted.  The heartbeat thread and the
+ * heartbeat's I/O worker both renew; wait_lock makes each check and the state
+ * change it decides one step.
+ */
+static void auth_renew_bounded(struct mxfs_authority *auth, uint64_t anchor_ms)
+{
+	uint64_t deadline, now;
+	int32_t state;
+
+	if (auth->wait_lock)
+		mxfs_pal_mutex_lock(auth->wait_lock);
+	state = mxfs_atomic32_get(&auth->state);
+	now = mxfs_pal_time_ms();
+	if (state == MXFS_AUTH_CLOSED)
+		goto out;
+	if (now >= auth->revalidate_by_ms) {
+		if (mxfs_atomic32_cmpxchg(&auth->state, state,
+					  MXFS_AUTH_CLOSED) == state) {
+			if (auth->wait_lock)
+				mxfs_pal_mutex_unlock(auth->wait_lock);
+			auth_note_closed(auth, MXFS_SELF_FENCE_AUTHORITY_LEASE_EXPIRED,
+					 "a heartbeat landed, but only after the "
+					 "peers' dead window from the last landed one "
+					 "had run out, so a peer may already have "
+					 "declared this node dead; it renews nothing",
+					 now, auth->deadline_ms);
+			return;
+		}
+		goto out;
+	}
+	deadline = anchor_ms + (uint64_t)auth->lease_ms;
+	/* Never move a deadline backwards: a reordered renewal must not shorten
+	 * authority a later one already extended. */
+	if (deadline > auth->deadline_ms) {
+		auth->deadline_ms = deadline;
+		auth->anchor_ms = anchor_ms;
+		auth->revalidate_by_ms = anchor_ms + auth_window_eff_ms(auth);
+	}
+	if (state != MXFS_AUTH_SUSPENDED)
+		goto out;
+	if (auth->deadline_ms <= now) {
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "mxfs: P290-AUTH-SUSPENDED-BEAT node %u slot %d "
+			     "incarnation=%llu anchor_ms=%llu deadline_ms=%llu "
+			     "now_ms=%llu revalidate_by_ms=%llu -- a beat landed "
+			     "inside the window, so no peer can have declared "
+			     "this node dead, but the lease it buys is already "
+			     "over; still suspended until the next beat",
+			     auth->node, auth->slot,
+			     (unsigned long long)auth->incarnation,
+			     (unsigned long long)anchor_ms,
+			     (unsigned long long)auth->deadline_ms,
+			     (unsigned long long)now,
+			     (unsigned long long)auth->revalidate_by_ms);
+		goto out;
+	}
+	if (mxfs_atomic32_cmpxchg(&auth->state, MXFS_AUTH_SUSPENDED,
+				  MXFS_AUTH_ADMITTED) == MXFS_AUTH_SUSPENDED) {
+		mxfs_atomic32_inc(&auth->resumes);
+		mxfs_pal_log(MXFS_LOG_WARN,
+			     "mxfs: P290-AUTH-RESUMED node %u slot %d "
+			     "incarnation=%llu suspended_ms=%llu anchor_ms=%llu "
+			     "deadline_ms=%llu revalidate_by_ms=%llu resumes=%d -- "
+			     "a beat landed before any peer could declare this "
+			     "node dead; the same incarnation is admitted again",
+			     auth->node, auth->slot,
+			     (unsigned long long)auth->incarnation,
+			     (unsigned long long)(now - auth->suspended_at_ms),
+			     (unsigned long long)anchor_ms,
+			     (unsigned long long)auth->deadline_ms,
+			     (unsigned long long)auth->revalidate_by_ms,
+			     mxfs_atomic32_get(&auth->resumes));
+		if (auth->wait_cond)
+			mxfs_pal_cond_broadcast(auth->wait_cond);
+	}
+out:
+	if (auth->wait_lock)
+		mxfs_pal_mutex_unlock(auth->wait_lock);
 }
 
 void mxfs_authority_renew(struct mxfs_authority *auth, uint64_t anchor_ms,
@@ -3050,6 +3275,13 @@ void mxfs_authority_renew(struct mxfs_authority *auth, uint64_t anchor_ms,
 	state = mxfs_atomic32_get(&auth->state);
 	if (state == MXFS_AUTH_CLOSED)
 		return;                 /* sticky: a working heartbeat is not a grant */
+
+	/* past the first beat, an attachment whose deadline suspends renews only
+	 * inside the peers' window */
+	if (auth->suspend_ok && state != MXFS_AUTH_NOT_ADMITTED) {
+		auth_renew_bounded(auth, anchor_ms);
+		return;
+	}
 
 	/*
 	 * A RENEWAL IS ONLY ACCEPTED WHILE THE PREVIOUS AUTHORITY IS STILL VALID.
@@ -3076,6 +3308,7 @@ void mxfs_authority_renew(struct mxfs_authority *auth, uint64_t anchor_ms,
 	if (deadline > auth->deadline_ms) {
 		auth->deadline_ms = deadline;
 		auth->anchor_ms = anchor_ms;
+		auth->revalidate_by_ms = anchor_ms + auth_window_eff_ms(auth);
 	}
 	if (state == MXFS_AUTH_NOT_ADMITTED &&
 	    mxfs_atomic32_cmpxchg(&auth->state, MXFS_AUTH_NOT_ADMITTED,
@@ -3102,7 +3335,9 @@ void mxfs_authority_close(struct mxfs_authority *auth, int reason,
 	if (mxfs_atomic32_cmpxchg(&auth->state, MXFS_AUTH_NOT_ADMITTED,
 				  MXFS_AUTH_CLOSED) == MXFS_AUTH_NOT_ADMITTED ||
 		mxfs_atomic32_cmpxchg(&auth->state, MXFS_AUTH_ADMITTED,
-				      MXFS_AUTH_CLOSED) == MXFS_AUTH_ADMITTED)
+				      MXFS_AUTH_CLOSED) == MXFS_AUTH_ADMITTED ||
+		mxfs_atomic32_cmpxchg(&auth->state, MXFS_AUTH_SUSPENDED,
+				      MXFS_AUTH_CLOSED) == MXFS_AUTH_SUSPENDED)
 		auth_note_closed(auth, reason, why, mxfs_pal_time_ms(),
 				 auth->deadline_ms);
 }
@@ -3130,7 +3365,8 @@ void mxfs_authority_isolation_check(struct mxfs_authority *auth)
 	if (!auth || auth->lu_ident_len <= 0 ||
 	    !mxfs_pal_quorum_close_asked(auth->node, auth->incarnation))
 		return;
-	if (mxfs_atomic32_get(&auth->state) == MXFS_AUTH_ADMITTED) {
+	if (mxfs_atomic32_get(&auth->state) == MXFS_AUTH_ADMITTED ||
+	    mxfs_atomic32_get(&auth->state) == MXFS_AUTH_SUSPENDED) {
 		now = mxfs_pal_time_ms();
 		last_ok = auth->last_ok_ms;
 		if (!last_ok || now - last_ok < MXFS_DISKLOCK_ISOLATED_MS ||
@@ -3344,7 +3580,10 @@ int mxfs_disklock_beat_now(struct mxfs_disklock_ctx *ctx)
 	 * fenced this node and laid a recovery guard on this very slot.
 	 */
 	t0 = mxfs_pal_time_ms();
-	if (!mxfs_disklock_authority_ok(ctx)) {
+	/* a SUSPENDED authority still beats: a beat that lands inside the window
+	 * is what readmits it, and the CAS against this node's own last image
+	 * still refuses a slot a recovery has guarded */
+	if (mxfs_authority_closed(ctx->auth)) {
 		mxfs_pal_free(rhb);
 		mxfs_pal_free(hb);
 		return -EPERM;
@@ -3499,7 +3738,12 @@ static void disklock_hb_fn(void *arg)
 				     "one cycle, so a beat issued after the lease lapsed "
 				     "reaches the renewal guard",
 				     ctx->local_node, ctx->local_slot);
-		} else if (!mxfs_disklock_authority_ok(ctx)) {
+		} else if (mxfs_authority_closed(ctx->auth)) {
+			/* SUSPENDED goes on beating (disklock.h,
+			 * MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS): the CAS against
+			 * this node's own last image still refuses a slot a
+			 * recovery has guarded, and no peer can have declared
+			 * this node dead before revalidate_by_ms */
 			mxfs_pal_log(MXFS_LOG_ERR,
 				     "mxfs: P290-AUTH-HB-STOP node %u slot %d -- authority "
 				     "is closed; stopping the heartbeat rather than "
@@ -5063,19 +5307,35 @@ static void disklock_auth_lease_update(struct mxfs_disklock_ctx *ctx)
 {
 	uint64_t window = (uint64_t)ctx->dead_threshold * MXFS_DISKLOCK_HB_INTERVAL_MS;
 	uint32_t lease = MXFS_DISKLOCK_AUTH_LEASE_MS;
+	int suspend = 0;
 
 	/* the shared attachment too: a peer replays its slice only once its
 	 * node is stopped (kinds 28, 29), so its last term is zero as well */
 	if (ctx->attach_drbd &&
 	    window > (uint64_t)MXFS_DISKLOCK_AUTH_LEASE_MS + MXFS_DISKLOCK_HB_INTERVAL_MS)
 		lease = (uint32_t)(window - MXFS_DISKLOCK_HB_INTERVAL_MS);
-	if (lease != ctx->auth->lease_ms)
+	/* a SCSI attachment: the window less the reserve, and the deadline
+	 * suspends (disklock.h, MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS); a window
+	 * too short to hold the reserve and one interval keeps the 30 s lease
+	 * and closes at it, as before */
+	if (!ctx->attach_drbd &&
+	    window >= (uint64_t)MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS +
+		      MXFS_DISKLOCK_HB_INTERVAL_MS) {
+		lease = (uint32_t)(window - MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS);
+		suspend = mxfs_dl_auth_suspend ? 1 : 0;
+	}
+	if (lease != ctx->auth->lease_ms || suspend != ctx->auth->suspend_ok)
 		mxfs_pal_log(MXFS_LOG_INFO,
-			     "disklock: authority lease %u ms%s", lease,
-			     lease == MXFS_DISKLOCK_AUTH_LEASE_MS ? "" :
-			     " (DRBD or shared attachment: the death window less "
-			     "one heartbeat interval)");
+			     "disklock: authority lease %u ms, death window %llu ms, "
+			     "deadline %s%s", lease, (unsigned long long)window,
+			     suspend ? "suspends" : "closes",
+			     ctx->attach_drbd ? " (DRBD or shared attachment: the "
+			     "death window less one heartbeat interval)" :
+			     suspend ? " (SCSI attachment: the death window less "
+			     "the reserve)" : "");
+	ctx->auth->window_ms = (uint32_t)window;
 	ctx->auth->lease_ms = lease;
+	ctx->auth->suspend_ok = suspend;
 }
 
 void mxfs_disklock_set_attach_drbd(struct mxfs_disklock_ctx *ctx, bool drbd)

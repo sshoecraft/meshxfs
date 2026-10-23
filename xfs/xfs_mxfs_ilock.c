@@ -4578,6 +4578,10 @@ restart:
 		return;
 	}
 
+	/* a SUSPENDED authority admits no grant use, reads included, until a
+	 * beat readmits it (mxfs_mount_auth_gate) */
+	mxfs_mount_auth_gate(ip->i_mount, "ilock");
+
 	/* (ruling item 2): explicit WEDGED admission gate.
 	 * The mount-shutdown fence above is NOT sufficient — the wedge→
 	 * shutdown transition has a visibility window, and a teardown wedge

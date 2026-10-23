@@ -286,14 +286,68 @@
 #define MXFS_DISKLOCK_AUTH_LEASE_MS     30000
 
 /*
+ * THE LEASE ON A SCSI ATTACHMENT IS DERIVED FROM THE DEATH WINDOW, and its
+ * deadline SUSPENDS this node instead of closing its authority
+ * (D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S, ruled in
+ * docs/rulings/silent-peer-death-under-the-stall-limit.md, "Keeping the window
+ * longer than the lease").
+ *
+ * The lease is the window less MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS: 30 s at the
+ * 34 s window, as before.  The reserve is what lies between this node's last
+ * admission and the earliest instant a peer can declare it dead (the peer's
+ * count runs from its first sight of the last landed stamp, so at least the
+ * window after that beat's ISSUE): the guest clock error (+-500 ppm each way,
+ * 2 x 500 ppm of the window, 34 ms at 34 s) and the time the operations
+ * admitted before the deadline take to complete.  Admission itself is decided
+ * at the gate against the deadline (mxfs_authority_ok compares the clock), so no
+ * timer's lateness extends it.
+ *
+ * At the deadline the authority is SUSPENDED, not CLOSED: no mutation, no new
+ * grant use and no read under a held grant is admitted (the write gate, the
+ * cluster-lock admission and getattr wait at the gate), but the heartbeat goes
+ * on beating.  A beat that lands while it is suspended READMITS this
+ * incarnation when its completion comes before revalidate_by_ms, the last
+ * landed beat's anchor plus the window less the clock error: a peer declares
+ * only on the read that finds the old stamp for the window's last interval, that
+ * read is issued no earlier than the anchor plus the window on the peer's clock,
+ * and a write that completed before it was issued is what that read finds.  The
+ * check uses the old anchor; the beat's own anchor becomes the next one only
+ * once it qualifies.  A beat that completes later than that proves nothing (a
+ * peer may already have declared and fenced): the authority CLOSES, for good,
+ * exactly as an expired lease did before.  So does reaching revalidate_by_ms
+ * with no beat landed.  The same bound applies to a beat whose completion
+ * arrives late through the heartbeat's I/O worker while the state still reads
+ * admitted.
+ *
+ * Why suspend at all: closing at the deadline shuts the filesystem down, and a
+ * live node's landed beats were measured 15-17 s apart across a single-path
+ * failover (P-HB-SLOW write_ms=8064 rc=-110 then write_ms=4625 rc=0,
+ * tests/evidence/board_20261023T061016Z-g2b_path_fence_degraded).  A lease
+ * short enough for survivors to take over a dead peer inside the 30 s stall
+ * limit would close on that gap and shut a live node down.  Suspended, the node
+ * waits it out and resumes the same incarnation.
+ *
+ * DRBD and the shared attachment keep their own derivation (the lease is the
+ * window less one interval) and close at the deadline: their exclusion is not a
+ * SCSI reservation, and nothing here is qualified for them.
+ * dl_auth_suspend=0 closes a SCSI attachment's authority at the deadline, as
+ * before: the same-build control.
+ */
+#define MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS 4000
+#define MXFS_DISKLOCK_CLOCK_PPM         500
+
+/*
  * Authority is HELD UNTIL A DEADLINE, not discovered to be lost.  CLOSED is
  * terminal for this incarnation: nothing short of a fresh coordinated
- * admission under a new incarnation leaves it.
+ * admission under a new incarnation leaves it.  SUSPENDED is the stretch
+ * between the deadline and revalidate_by_ms on a SCSI attachment (above):
+ * nothing is admitted, and only a qualifying beat leaves it for ADMITTED.
  */
 enum mxfs_auth_state {
 	MXFS_AUTH_NOT_ADMITTED = 0,     /* mounting; no beat has landed yet */
 	MXFS_AUTH_ADMITTED,             /* a beat landed; deadline is in force */
 	MXFS_AUTH_CLOSED,               /* expired or revoked; sticky */
+	MXFS_AUTH_SUSPENDED,            /* past the deadline, inside the peers' window */
 };
 
 /*
@@ -328,6 +382,18 @@ struct mxfs_authority {
 	volatile int            close_reason;   /* enum mxfs_self_fence_reason */
 	mxfs_atomic32_t         withdraw_pending; /* a withdrawal is owed; taken by exchange, so exactly one consumer notifies (0.89.67) */
 	/*
+	 * Suspension (MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS).  revalidate_by_ms moves
+	 * with anchor_ms; window_ms and suspend_ok are set with lease_ms.
+	 */
+	volatile uint64_t       revalidate_by_ms; /* a beat completing before this readmits */
+	volatile uint32_t       window_ms;      /* the peers' dead window: dead_threshold x interval */
+	volatile int            suspend_ok;     /* 1: the deadline suspends; 0: it closes */
+	volatile uint64_t       suspended_at_ms;
+	mxfs_atomic32_t         suspends;       /* times the lease suspended */
+	mxfs_atomic32_t         resumes;        /* times a qualifying beat readmitted it */
+	mxfs_mutex_t            *wait_lock;     /* the gate's waiters sleep on wait_cond */
+	mxfs_cond_t             *wait_cond;
+	/*
 	 * Identity, for the trace.  A mount address is recycled; an incarnation
 	 * is drawn once and never reused, so it is what a lap can key on to say
 	 * WHICH incarnation an admission belonged to.
@@ -358,6 +424,17 @@ void mxfs_authority_put(struct mxfs_authority *auth);
 
 /* THE GATE.  Nothing here can reach the LUN, block, allocate, or reopen. */
 bool mxfs_authority_ok(struct mxfs_authority *auth);
+/*
+ * The gate for a caller that may sleep: true at once when mxfs_authority_ok is;
+ * while the authority is SUSPENDED, waits for a qualifying beat (true) or the
+ * close (false).  A fatal signal ends the wait (false).  Never call it from a
+ * context that may not sleep, nor from the heartbeat's own path.
+ */
+bool mxfs_authority_wait(struct mxfs_authority *auth, const char *site);
+/* CLOSED, once the deadline and the suspension's end have been evaluated. */
+bool mxfs_authority_closed(struct mxfs_authority *auth);
+/* SUSPENDED, once the deadline has been evaluated. */
+bool mxfs_authority_suspended(struct mxfs_authority *auth);
 /* Milliseconds of authority left: 0 unless admitted and before the deadline. */
 uint64_t mxfs_authority_remaining_ms(struct mxfs_authority *auth);
 void mxfs_authority_renew(struct mxfs_authority *auth, uint64_t anchor_ms,

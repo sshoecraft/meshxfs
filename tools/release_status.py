@@ -342,6 +342,31 @@ def table(rows: list) -> str:
     return "\n".join([rule, line(head), rule] + [line(r) for r in rows] + [rule])
 
 
+def table_rows(spec: dict) -> list:
+    """The release table's rows: data/release_table.json's own, then one per released platform
+    and kernel, listed from data/platforms.json, so a platform the release claims cannot be
+    missing from the table."""
+    rows = list(spec["rows"])
+    rounds = spec.get("platform_rounds")
+    if rounds:
+        plats = json.loads((REPO / "data" / "platforms.json").read_text())
+        plats = plats.get("platforms", plats)
+        for key, info in (plats.items() if isinstance(plats, dict) else []):
+            if not isinstance(info, dict) or info.get("status") != "released":
+                continue
+            name = info.get("name") or info.get("label") or key
+            kernels = info.get("kernels") or [""]
+            #: a platform verified on several kernels gets a row per kernel: one passing must
+            #: show, whatever the other is doing
+            for k in (kernels if len(kernels) > 1 else [""]):
+                prefix = re.match(r"\s*([0-9]+\.[0-9]+)", k) if k else None
+                label = f"{re.sub(r' *[(].*', '', name)}, kernel {prefix.group(1)}" if prefix else name
+                rows.append({"nodes": "2", "attachment": f"Platform: {label} (packaged install, hung-node test)",
+                             "configs": rounds["configs"], "platform": key, "_platform_round": True,
+                             "_kernel": prefix.group(1) if prefix else ""})
+    return rows
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("-v", "--verbose", action="store_true", help="every reason behind each row")
@@ -371,26 +396,8 @@ def main() -> int:
     queue = defects.load()["defects"]
     crit_cache: dict = {}
     out, notes = [], []
-    rows = list(spec["rows"])
-    #: every released platform gets a row of its own: listed from data/platforms.json, so a
-    #: platform the release claims cannot be missing from the table
+    rows = table_rows(spec)
     rounds = spec.get("platform_rounds")
-    if rounds:
-        plats = json.loads((REPO / "data" / "platforms.json").read_text())
-        plats = plats.get("platforms", plats)
-        for key, info in (plats.items() if isinstance(plats, dict) else []):
-            if not isinstance(info, dict) or info.get("status") != "released":
-                continue
-            name = info.get("name") or info.get("label") or key
-            kernels = info.get("kernels") or [""]
-            #: a platform verified on several kernels gets a row per kernel: one passing must
-            #: show, whatever the other is doing
-            for k in (kernels if len(kernels) > 1 else [""]):
-                prefix = re.match(r"\s*([0-9]+\.[0-9]+)", k) if k else None
-                label = f"{re.sub(r' *[(].*', '', name)}, kernel {prefix.group(1)}" if prefix else name
-                rows.append({"nodes": "2", "attachment": f"Platform: {label} (packaged install, hung-node test)",
-                             "configs": rounds["configs"], "platform": key, "_platform_round": True,
-                             "_kernel": prefix.group(1) if prefix else ""})
     if args.defects:
         #: release-blocking first, then noblock; each by severity
         rank = {s: i for i, s in enumerate(defects.SEVERITIES)}

@@ -902,6 +902,12 @@ xfs_vn_getattr(
 	if (xfs_is_shutdown(mp))
 		return -EIO;
 
+	/* attributes cached under a grant are not served while this node's
+	 * authority is suspended (mxfs_mount_auth_gate) */
+	mxfs_mount_auth_gate(mp, "getattr");
+	if (xfs_is_shutdown(mp))
+		return -EIO;
+
 	/* stale size/attrs from a poisoned dead incarnation are a
 	 * wrong-object answer; -ESTALE makes the VFS re-walk with LOOKUP_REVAL
 	 * (D-INCARN-STALE-SHELL-UNGATED-FILE-READS-512) */
