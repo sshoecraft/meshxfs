@@ -43,7 +43,8 @@
 # ssh in 40-90 s (tests/recov_bmbt_reuse.sh), so 120 s; prep_cluster bounds
 # itself with its manifest budget.  A pair that is still not formed after that
 # ends the gate as ABORT: every later lap would measure the rig, not its
-# harness.
+# harness.  GATE_PAIR_RESTORE=0 skips the check, as the gate ran before it:
+# the control of that fix (tests/capture_gate_pair_lap.sh).
 #
 # Manifest (tests/capture_gate.manifest): one entry per line,
 #     <harness> | <fault lap timeout s> | <healthy lap timeout s> | <env> | <args after the label>
@@ -108,6 +109,7 @@ pair_formed() {  # <pair_state output>
 # pair_ready <lap>: the pair is formed, or is formed again, or the gate ends
 pair_ready() {
     local st n s log
+    [ "${GATE_PAIR_RESTORE:-1}" = 0 ] && return 0
     st=$(pair_state)
     pair_formed "$st" && return 0
     restores=$((restores+1)); log=$OUT/pair_restore_$restores.log

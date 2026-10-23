@@ -28,6 +28,13 @@
 # A holder process keeps each lock (/tmp/mxfs_lane.<configuration>.lock) and
 # exits with the lane; the lane closes its own copy, so neither a step nor
 # anything a step leaves running keeps a configuration held after the lane.
+# The lane's EXIT trap ends each holder and waits for it, so the locks are free
+# before the lane's exit is seen: a holder that only polled for the lane noticed
+# it gone up to a second later, and a lane started in that second was refused as
+# if the ended one still ran
+# (D-LANE-HOLD-LINGERS-AFTER-ITS-LANE-SO-THE-NEXT-LANE-IS-REFUSED). The holder's
+# poll stays as the backstop for a lane killed outright. LANE_HOLD_RELEASE=0
+# leaves the release to that poll alone, as before: the control of that fix.
 #
 # Output, under tests/evidence/lanes/<name>_<stamp>/:
 #   summary.log    one line as each step starts and one as it ends: its number,
@@ -47,6 +54,16 @@ mkdir -p "$OUT" || exit 2
 cp "$QUEUE" "$OUT/queue"
 echo $$ > "$OUT/pid"
 SUM=$OUT/summary.log
+HOLDERS=()
+release_holds() {
+    [ "${LANE_HOLD_RELEASE:-1}" = 0 ] && return
+    local pid
+    for pid in "${HOLDERS[@]}"; do
+        kill "$pid" 2>/dev/null
+        wait "$pid" 2>/dev/null
+    done
+}
+trap release_holds EXIT
 for cfg in $(grep -v '^[[:space:]]*#' "$OUT/queue" \
              | grep -oE '(run\.sh|--at)[[:space:]]+[0-9]+/[^[:space:]]+' | awk '{print $2}' | sort -u); do
     lock=/tmp/mxfs_lane.${cfg//\//-}.lock
@@ -58,6 +75,7 @@ for cfg in $(grep -v '^[[:space:]]*#' "$OUT/queue" \
     fi
     echo "$$ $(date -u +%FT%TZ) lane $NAME" > "$lock"
     tail --pid=$$ -f /dev/null < /dev/null > /dev/null 2>&1 &
+    HOLDERS+=("$!")
     exec {fd}>&-
     echo "$(date -u +%FT%TZ) holds configuration $cfg" >> "$SUM"
 done

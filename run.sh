@@ -1478,6 +1478,7 @@ run_none() {  # name cat budget
     # on, before t0 so it never counts against the row's budget.
     preassert_probe "$NODE1"
     preassert_record "$name" "$real_budget" || return
+    mark_row_start "$NODE1"
     t0=$(date +%s)
     # 2026-07-20 (proven by instrument): "out=$(timeout ... | grep ...); rc=$?" captured
     # grep's exit status, not timeout's -- a killed ssh (rc=124) with empty
@@ -1526,12 +1527,24 @@ run_none() {  # name cat budget
                | grep -E '^RESULT:' | tail -1)
     fi
     t1=$(date +%s); elapsed=$(( t1 - t0 ))
+    # A row that did not pass keeps its node's kernel log and the files it left
+    # there, as a cluster row does: the fsx row runs here, and a failing fsx
+    # check's log (/root/fsx.<seed>.<ops>.log) reached no evidence before
+    # (D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE).
+    # MXFS_PULL_RUN_NONE=0 pulls nothing here, as before: the control of that fix.
+    local status reason tmpd
+    status=$(awk '{print $2}' <<<"$line")
+    if { [ -z "$line" ] || [ "$status" != PASS ] || [ -n "${MXFS_KEEP_ARTIFACTS:-}" ]; } \
+            && [ "${MXFS_PULL_RUN_NONE:-1}" != 0 ]; then
+        tmpd=$(mktemp -d)
+        pull_row_artifacts "$name" "$tmpd" "$NODE1"
+        rm -rf "$tmpd"
+    fi
     if [ -z "$line" ] && { [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; }; then
         record "$name" FAIL "elapsed>${kill_budget}s" "script wall-clock timeout (kill_budget=${kill_budget}s, rc=$rc, no record on stdout or in the node spool)" "$elapsed" "$real_budget"
         echo "  FAIL  $name (timeout >${kill_budget}s)"; return
     fi
     if [ -z "$line" ]; then record "$name" FAIL "no-result" "no RESULT line from $NODE1 after $attempt attempts" "$elapsed" "$real_budget"; echo "  FAIL  $name (no result)"; return; fi
-    local status reason; status=$(awk '{print $2}' <<<"$line")
     reason=$(echo "$line"|field reason)
     # tests/lib/rig.sh ends an unmeasurable lap with `RESULT: ABORT label= stage=
     # evidence=` and says what failed on the `ABORT:` line before it.
@@ -1830,6 +1843,7 @@ run_coord() {  # name cat budget scale
     fi
     i=0
 
+    mark_row_start "${NODES[@]}"
     t0=$(date +%s)
     # TERMINAL-RECORD GUARANTEE (sess384, D-CRASH-CONSISTENCY-NO-TERMINAL-
     # RECORD-CAPTURE-374).  Each node is told the exact wall-clock instant this
@@ -2169,63 +2183,93 @@ run_coord() {  # name cat budget scale
         fail_reason="${fail_reason## }"
     fi
     printf "  %-5s %s  (%s) [%ss/%ss]\n" "$agg" "$name" "$measured" "$elapsed" "$real_budget"
-    local art=""
     # sess392: MXFS_KEEP_ARTIFACTS=1 keeps the per-node raw output (and the
     # kernlog pull) for PASSING rows too — the per-node walls of a passing
     # rsync_paired are the 2x shared-vs-exclusive pace evidence at 25 AGs.
-    if [ "$agg" != PASS ] || [ -n "${MXFS_KEEP_ARTIFACTS:-}" ]; then
-        # sess10(a9a03929): capture every node's CURRENT-BOOT kernel log at
-        # the failure — VM destroy at the next cycle loses the runtime
-        # journal, which is how r8's forensics were nearly lost (recovered
-        # only via the test's own /root snapshots).
-        # sess3 (ccloop 46efd8b6): dmesg FIRST, journalctl only as fallback.
-        # journald rotates in ~85s under probe volume AND rate-limits kmsg
-        # ingestion, so `journalctl -k` LOST the 'XFS ... Shutting down
-        # filesystem' alert 2.5 min after it fired — two sessions hunted a
-        # "silent" shutdown that was only silent in the artifacts.  The 16M
-        # dmesg ring retains everything.
-        local cn
-        for cn in "${NODES[@]}"; do
-            ssh_node "$cn" "dmesg -T 2>/dev/null || journalctl -k -b 0 --no-pager" \
-                > "$tmpd/kernlog_$cn" 2>/dev/null &
-        done
-        wait
-        # sess13: pull the drc raw-block bins + dmesg snapshots (written to
-        # /root/drc_blkdump_* at RDMISS) into the artifact BEFORE the next VM
-        # recycle wipes them — the iter4 round-3 forensics were lost exactly
-        # this way (journald also rotates in ~85s under probe volume, so the
-        # kernlog pull above misses early rounds).  base64 shields the tar
-        # stream from ssh_node's line filter.  A failing fsx check keeps its
-        # log as /root/fsx.<seed>.<ops>.log (tests/suite/fsx.sh), and only this
-        # pull brings it into the run's evidence.
-        for cn in "${NODES[@]}"; do
-            ssh_node "$cn" "cd /root 2>/dev/null && { f=\$(ls -d drc_* fsx.*.log 2>/dev/null); [ -n \"\$f\" ]; } && tar -cf - \$f 2>/dev/null | base64" \
-                | base64 -d 2>/dev/null | tar -xf - -C "$tmpd" --transform "s,^,${cn}_," 2>/dev/null &
-        done
-        wait
-        # sess465: the artifact lives in the TREE (the source-tree rule), not /tmp, and the
-        # printed path is the one that survives.  Before this the log said
-        # 'logs: $tmpd' and then deleted $tmpd, keeping only an uncompressed
-        # copy in /tmp (378 MB for one 8-node failure; gone on a host
-        # reboot).  Kernel logs are gzipped in parallel — a 32-node pull is
-        # ~600 MB raw, ~35 MB compressed; everything else is copied as is.
-        art="$REPO/tests/evidence/run_${name}_${RUN_ID}"
-        mkdir -p "$art"
-        for cn in "${NODES[@]}"; do
-            [ -s "$tmpd/kernlog_$cn" ] && gzip -1 -c "$tmpd/kernlog_$cn" > "$art/kernlog_$cn.gz" &
-        done
-        wait
-        local af
-        for af in "$tmpd"/*; do
-            case "$(basename "$af")" in kernlog_*) ;; *) cp -r "$af" "$art/" 2>/dev/null ;; esac
-        done
-        echo "    logs: $art"
-    fi
     # Recorded after the artifact pull, so the result names the evidence
     # directory it can be checked against.
-    [ -n "$art" ] && RECORD_EVIDENCE="${art#"$REPO"/}"
+    if [ "$agg" != PASS ] || [ -n "${MXFS_KEEP_ARTIFACTS:-}" ]; then
+        pull_row_artifacts "$name" "$tmpd" "${NODES[@]}"
+    fi
     record "$name" "$agg" "$measured" "${fail_reason:0:400}" "$elapsed" "$real_budget"
     rm -rf "$tmpd"
+}
+
+# mark_row_start <node>...: each node stamps the row's start on its own clock
+# (/root/.mxfs_row_mark), so the artifact pull takes the files the row wrote
+# and none an earlier row or boot left behind.
+mark_row_start() {
+    local cn
+    for cn in "$@"; do
+        ssh_node "$cn" "touch /root/.mxfs_row_mark" > /dev/null 2>&1 &
+    done
+    wait
+}
+
+# pull_row_artifacts <name> <scratch dir> <node>...: every node's kernel log and
+# the files the row left on the node, into tests/evidence/run_<name>_<run id>/;
+# sets RECORD_EVIDENCE to that directory.
+pull_row_artifacts() {
+    local name=$1 tmpd=$2 cn art af sel
+    shift 2
+    # sess10(a9a03929): capture every node's CURRENT-BOOT kernel log at
+    # the failure — VM destroy at the next cycle loses the runtime
+    # journal, which is how r8's forensics were nearly lost (recovered
+    # only via the test's own /root snapshots).
+    # sess3 (ccloop 46efd8b6): dmesg FIRST, journalctl only as fallback.
+    # journald rotates in ~85s under probe volume AND rate-limits kmsg
+    # ingestion, so `journalctl -k` LOST the 'XFS ... Shutting down
+    # filesystem' alert 2.5 min after it fired — two sessions hunted a
+    # "silent" shutdown that was only silent in the artifacts.  The 16M
+    # dmesg ring retains everything.
+    for cn in "$@"; do
+        ssh_node "$cn" "dmesg -T 2>/dev/null || journalctl -k -b 0 --no-pager" \
+            > "$tmpd/kernlog_$cn" 2>/dev/null &
+    done
+    wait
+    # sess13: pull the drc raw-block bins + dmesg snapshots (written to
+    # /root/drc_blkdump_* at RDMISS) into the artifact BEFORE the next VM
+    # recycle wipes them — the iter4 round-3 forensics were lost exactly
+    # this way (journald also rotates in ~85s under probe volume, so the
+    # kernlog pull above misses early rounds).  base64 shields the tar
+    # stream from ssh_node's line filter.  A failing fsx check keeps its
+    # log as /root/fsx.<seed>.<ops>.log (tests/suite/fsx.sh), and only this
+    # pull brings it into the run's evidence.
+    # Only what the row wrote: the node's /root keeps every earlier row's and
+    # boot's files, and a pull by name alone copied a dmesg_at_fail.txt of
+    # August into an October run's evidence, its old-build corruption line
+    # read as that run's
+    # (D-DIRENT-DURABILITY-CAPTURE-COPIES-STALE-DMESG-AT-FAIL-FROM-EARLIER-BOOTS).
+    # The row's start mark is the node's own (mark_row_start), so no clock is
+    # compared across hosts.  MXFS_PULL_SINCE_ROW=0 pulls every such file,
+    # whatever its age, as before: the control of that fix.
+    if [ "${MXFS_PULL_SINCE_ROW:-1}" = 0 ]; then
+        sel="f=\$(ls -d drc_* fsx.*.log 2>/dev/null)"
+    else
+        sel="[ -e .mxfs_row_mark ] && f=\$(find . -maxdepth 3 \\( -path './drc_*' -o -name 'fsx.*.log' \\) -type f -newer .mxfs_row_mark 2>/dev/null | sed 's,^\\./,,')"
+    fi
+    for cn in "$@"; do
+        ssh_node "$cn" "cd /root 2>/dev/null && $sel && [ -n \"\$f\" ] && tar -cf - \$f 2>/dev/null | base64" \
+            | base64 -d 2>/dev/null | tar -xf - -C "$tmpd" --transform "s,^,${cn}_," 2>/dev/null &
+    done
+    wait
+    # sess465: the artifact lives in the TREE (the source-tree rule), not /tmp, and the
+    # printed path is the one that survives.  Before this the log said
+    # 'logs: $tmpd' and then deleted $tmpd, keeping only an uncompressed
+    # copy in /tmp (378 MB for one 8-node failure; gone on a host
+    # reboot).  Kernel logs are gzipped in parallel — a 32-node pull is
+    # ~600 MB raw, ~35 MB compressed; everything else is copied as is.
+    art="$REPO/tests/evidence/run_${name}_${RUN_ID}"
+    mkdir -p "$art"
+    for cn in "$@"; do
+        [ -s "$tmpd/kernlog_$cn" ] && gzip -1 -c "$tmpd/kernlog_$cn" > "$art/kernlog_$cn.gz" &
+    done
+    wait
+    for af in "$tmpd"/*; do
+        case "$(basename "$af")" in kernlog_*) ;; *) cp -r "$af" "$art/" 2>/dev/null ;; esac
+    done
+    echo "    logs: $art"
+    RECORD_EVIDENCE="${art#"$REPO"/}"
 }
 
 # Emit one TSV line per matrix test: cat \t transport \t name \t coord \t min \t max \t budget \t scale

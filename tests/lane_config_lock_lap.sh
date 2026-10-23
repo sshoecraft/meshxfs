@@ -8,17 +8,23 @@
 #
 # The lap starts lane A, whose one step names configuration 64/net/mesh/direct and holds for 4 s,
 # and once A's step has started, lane B, whose one step names the same configuration and only
-# records that it ran; when A has ended, lane C, the same as B. The steps touch no node, LUN or
-# board: a lane reads the configurations its steps name from the queue's text, and 64 nodes is a
-# configuration no rig lane runs, so the lap never holds up a real one.
+# records that it ran; the moment A's process has exited, lane C, the same as B. The steps touch no
+# node, LUN or board: a lane reads the configurations its steps name from the queue's text, and 64
+# nodes is a configuration no rig lane runs, so the lap never holds up a real one.
 #
-#   EXPOSED  lane B was started while lane A's step was running (the trigger)
-#   PASS     B refused to start, naming the configuration, and ran no step; and C, started 1.5 s
-#            after A ended, ran its step (A's hold went with it)
-#   FAIL     B ran its step while A held the configuration, or C was refused after A ended
+# C is also the lap of D-LANE-HOLD-LINGERS-AFTER-ITS-LANE-SO-THE-NEXT-LANE-IS-REFUSED: a lane's
+# holds used to end only when a holder process polling for the lane (once a second) noticed it
+# gone, so a lane started inside that second was refused. Started the moment A has exited, C meets
+# A's hold unless the lane released it on its way out (LANE_HOLD_RELEASE=0 is that fix's control).
+#
+#   EXPOSED          lane B was started while lane A's step was running (the trigger)
+#   EXPOSED-RELEASE  lane C was started within 1000 ms of lane A's exit, inside the holder's poll
+#   PASS             B refused to start, naming the configuration, and ran no step; and C ran its
+#                    step (A's hold went with it)
+#   FAIL             B ran its step while A held the configuration, or C was refused after A ended
 #
 # Bound, derived: A's step is 4 s, B and C a fraction of a second each, the wait for A's start
-# under 1 s and the 1.5 s before C; under 8 s, bounded at 20 s.
+# under 1 s; under 7 s, bounded at 20 s.
 #
 # Usage: tests/lane_config_lock_lap.sh [<lap tag>]
 # Exit: 0 PASS, 1 FAIL, 2 the lap could not measure.
@@ -34,6 +40,10 @@ cp "$Q/b" "$Q/c"
 lane_dir() {  # newest lane directory of a lane name
     ls -d tests/evidence/lanes/"$1"_* 2>/dev/null | tail -1
 }
+# Each lap measures only its own lanes: a hold an earlier lap's lane left (the defect, when the
+# release is off) is waited out first, for at most three of the holder's 1 s polls.
+flock -w 3 "/tmp/mxfs_lane.${CFG//\//-}.lock" true \
+    || { echo "ABORT: $CFG is still held 3 s on ($(head -c 200 "/tmp/mxfs_lane.${CFG//\//-}.lock"))"; exit 2; }
 scripts/rig_lane.sh "lanelockA$TAG" "$Q/a" > /dev/null 2>&1 &
 APID=$!
 A=""
@@ -55,11 +65,13 @@ B=$(lane_dir "lanelockB$TAG")
 grep -q ' step 1 end' "$A/summary.log" && a_running=0
 [ "$a_running" = 1 ] && echo "EXPOSED: lane B was started while lane A's step on $CFG was running"
 wait "$APID"
-# a lane's hold is a holder process that notices the lane has exited within its 1 s poll
-sleep 1.5
+A_END=$(date +%s%N)
 C_RC=0
+C_START=$(date +%s%N)
 scripts/rig_lane.sh "lanelockC$TAG" "$Q/c" > /dev/null 2>&1 || C_RC=$?
 C=$(lane_dir "lanelockC$TAG")
+GAP_MS=$(( (C_START - A_END) / 1000000 ))
+[ "$GAP_MS" -lt 1000 ] && echo "EXPOSED-RELEASE: lane C was started ${GAP_MS} ms after lane A exited"
 echo "INFO lane A: $(tr '\n' '|' < "$A/summary.log" | cut -c1-400)"
 echo "INFO lane B rc=$B_RC: $(tr '\n' '|' < "$B/summary.log" 2>/dev/null | cut -c1-400)"
 echo "INFO lane C rc=$C_RC: $(tr '\n' '|' < "$C/summary.log" 2>/dev/null | cut -c1-400)"

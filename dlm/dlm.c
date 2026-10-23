@@ -91,6 +91,24 @@ module_param_named(dl_relall_skip_unreachable, mxfs_dl_relall_skip_unreachable, 
 MODULE_PARM_DESC(dl_relall_skip_unreachable,
 		 "release-all skips a master a release could not reach (1, default); 0 = test control");
 /*
+ * Threads a clean departure's release-all commits the releases of the
+ * resources this node masters on.  Each such release is its own ledger
+ * transition, a page commit of about 0.9 ms, so one thread spent ~28 s
+ * releasing the ~32000 grants the last member held after
+ * join_during_takeover's 32000 creates (P-RELALL-WALL released=31946
+ * ms=27939, tests/last_member_umount_trace.sh), and that member's unmount
+ * crossed the 30 s stall limit
+ * (D-LAST-MEMBER-UMOUNT-AFTER-A-15K-PAGE-HANDBACK-TAKES-31S-OVER-THE-STALL-LIMIT).
+ * The releases are independent transitions of distinct resources, exactly
+ * what concurrent releases commit in normal operation; commits of one ledger
+ * page still serialise on that page's lock.  1 = one thread, the
+ * release-all as it was: the control arm, never a production value.
+ */
+unsigned int mxfs_dl_relall_threads = 8;
+module_param_named(dl_relall_threads, mxfs_dl_relall_threads, uint, 0644);
+MODULE_PARM_DESC(dl_relall_threads,
+		 "threads the departure release-all commits locally-mastered releases on (8, default); 1 = test control");
+/*
  * A request that asked not to queue answers would-block when this node, the
  * resource's master, cannot decide yet because the resource's ledger page is
  * not its own or is frozen in a hand-off (dlm_ledger_prepare -EAGAIN), as it
@@ -13344,11 +13362,41 @@ int mxfs_dlm_purge_stale_for_resource(struct mxfs_dlm_ctx *ctx,
  * grants AND our queued WAITING entries — nobody will ever consume those
  * either), then run the standard mxfs_dlm_unlock per resource (local:
  * remove + promote_waiters + post-promotion grants/BASTs; remote: send
- * LOCK_RELEASE).  Unlocks are done OUTSIDE the table lock. */
+ * LOCK_RELEASE).  Unlocks are done OUTSIDE the table lock.
+ *
+ * The remote masters' releases are sends, made first on this thread, which
+ * alone keeps the skip-unreachable bookkeeping (relall_active).  The
+ * resources this node masters are each a ledger transition and are committed
+ * on dl_relall_threads threads, each taking every nth resource; relall_active
+ * is off while they run, so a resource remastered meanwhile is released as
+ * any concurrent release is. */
+#define MXFS_DLM_RELALL_THREADS_MAX	32
+#define MXFS_DLM_RELALL_PER_THREAD_MIN	32	/* fewer releases a thread: one thread */
+struct dlm_relall_part {
+	struct mxfs_dlm_ctx		*ctx;
+	const struct mxfs_resource_id	*list;
+	uint32_t			n, first, stride;
+	unsigned int			step;
+	mxfs_thread_t			*thread;
+};
+
+static void dlm_relall_part_fn(void *arg)
+{
+	struct dlm_relall_part *part = arg;
+	uint32_t i;
+
+	for (i = part->first; i < part->n; i += part->stride) {
+		mxfs_dlm_unlock(part->ctx, &part->list[i]);
+		if (part->step)
+			mxfs_pal_sleep_ms(part->step);
+	}
+}
+
 static int dlm_wire_release_all(struct mxfs_dlm_ctx *ctx)
 {
 	struct mxfs_resource_id *list = NULL;
-	uint32_t i, n = 0, cap = 0;
+	struct dlm_relall_part *parts = NULL;
+	uint32_t i, n = 0, cap = 0, nlocal = 0, nthreads, started = 0;
 	int pass;
 
 	if (!ctx)
@@ -13391,27 +13439,80 @@ static int dlm_wire_release_all(struct mxfs_dlm_ctx *ctx)
 		}
 	}
 
+	/* the resources this node masters to the front, [0, nlocal) */
+	for (i = 0; i < n; i++) {
+		if (mxfs_dlm_resource_master(ctx, &list[i]) == ctx->local_node) {
+			struct mxfs_resource_id swap = list[nlocal];
+
+			list[nlocal++] = list[i];
+			list[i] = swap;
+		}
+	}
+	nthreads = READ_ONCE(mxfs_dl_relall_threads);
+	if (nthreads > MXFS_DLM_RELALL_THREADS_MAX)
+		nthreads = MXFS_DLM_RELALL_THREADS_MAX;
+	if (nthreads > nlocal / MXFS_DLM_RELALL_PER_THREAD_MIN)
+		nthreads = nlocal / MXFS_DLM_RELALL_PER_THREAD_MIN;
+	if (nthreads < 1)
+		nthreads = 1;
+
 	ctx->relall_unreachable_n = 0;
 	ctx->relall_unreachable_skips = 0;
 	ctx->relall_send_fail = 0;
-	ctx->relall_active = true;
 	{
 		uint64_t t0 = mxfs_pal_time_ms();
 		unsigned int step = READ_ONCE(mxfs_dl_relall_step_ms);
+		uint32_t k;
 
-		for (i = 0; i < n; i++) {
+		ctx->relall_active = true;
+		for (i = nlocal; i < n; i++) {
 			mxfs_dlm_unlock(ctx, &list[i]);
 			if (step)
 				mxfs_pal_sleep_ms(step);
 		}
+		ctx->relall_active = false;
+
+		if (nthreads > 1)
+			parts = mxfs_pal_alloc(nthreads * sizeof(*parts));
+		if (!parts)
+			nthreads = 1;
+		if (nthreads == 1) {
+			struct dlm_relall_part one = {
+				.ctx = ctx, .list = list, .n = nlocal, .first = 0, .stride = 1,
+				.step = step,
+			};
+
+			dlm_relall_part_fn(&one);
+		} else {
+			for (k = 0; k < nthreads; k++) {
+				parts[k] = (struct dlm_relall_part){
+					.ctx = ctx, .list = list, .n = nlocal, .first = k,
+					.stride = nthreads, .step = step,
+				};
+				/* part 0 is this thread's own */
+				if (k > 0) {
+					parts[k].thread = mxfs_pal_thread_create(dlm_relall_part_fn,
+										 &parts[k]);
+					if (parts[k].thread)
+						started++;
+				}
+			}
+			dlm_relall_part_fn(&parts[0]);
+			/* a part whose thread could not be started runs here too */
+			for (k = 1; k < nthreads; k++)
+				if (!parts[k].thread)
+					dlm_relall_part_fn(&parts[k]);
+			for (k = 1; k < nthreads; k++)
+				mxfs_pal_thread_join(parts[k].thread);
+			mxfs_pal_free(parts);
+		}
 		mxfs_pal_log(MXFS_LOG_WARN,
-			     "mxfs: P-RELALL-WALL released=%u ms=%llu send_failed=%llu skipped=%llu step_ms=%u skip_unreachable=%d",
-			     n, (unsigned long long)(mxfs_pal_time_ms() - t0),
-			     (unsigned long long)ctx->relall_send_fail,
+			     "mxfs: P-RELALL-WALL released=%u ms=%llu local=%u threads=%u started=%u send_failed=%llu skipped=%llu step_ms=%u skip_unreachable=%d",
+			     n, (unsigned long long)(mxfs_pal_time_ms() - t0), nlocal, nthreads,
+			     started, (unsigned long long)ctx->relall_send_fail,
 			     (unsigned long long)ctx->relall_unreachable_skips, step,
 			     READ_ONCE(mxfs_dl_relall_skip_unreachable));
 	}
-	ctx->relall_active = false;
 	if (ctx->relall_unreachable_n)
 		mxfs_pal_log(MXFS_LOG_WARN,
 			     "mxfs: P-RELALL-UNREACHABLE masters=%d skipped=%llu of %u -- "

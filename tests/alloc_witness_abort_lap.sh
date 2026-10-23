@@ -13,8 +13,9 @@
 # board (MXFS_CRIT), never on the release board: an injected abort is not a filesystem verdict.  The
 # lap reads that scratch ledger's run and rank 2's witness record.
 #
-#   PASS  the row ended inside its budget, named the abort (injected_abort), and no rank was
-#         recorded BUDGET_EXHAUSTED
+#   PASS  the row ended inside its budget, named the abort (its own text, `AW_ABORT_RANK=2`, which
+#         the aborting rank records and every peer it ended repeats), and no rank was recorded
+#         BUDGET_EXHAUSTED
 #   FAIL  a rank was recorded BUDGET_EXHAUSTED, or the row ran to its budget
 #   ABORT the row did not run or rank 2 never reached its fill (nothing measured)
 #
@@ -67,7 +68,11 @@ if "ABORT AW_ABORT_RANK=2" not in text:
     sys.exit(2)
 print("EXPOSED: rank2 aborted after its fill")
 exhausted = "BUDGET_EXHAUSTED" in measured or "BUDGET_EXHAUSTED" in reason
-named = "injected_abort" in measured or "injected_abort" in reason
+# the row's reason carries the first failing rank's text: the aborting rank's own (`injected_abort`,
+# then its message) or, when a peer recorded first, the peer's `another rank aborted the lap: rank 2:
+# AW_ABORT_RANK=2: ...`; either way the abort's message is in it
+named = any(mark in field for field in (measured, reason)
+            for mark in ("AW_ABORT_RANK=2", "injected_abort"))
 if not exhausted and named and (budget == 0 or elapsed < budget):
     print(f"LAP aw_abort PASS: the row ended in {elapsed}s of {budget}s and named the abort")
     sys.exit(0)
