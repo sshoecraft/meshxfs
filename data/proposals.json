@@ -98,6 +98,94 @@
         "verdict": "rejected",
         "date": "2026-10-22"
       }
+    },
+    {
+      "id": "P20261022-75e054",
+      "kind": "retire",
+      "record": "D-TCP-CAPACITY-WAIT-NEVER-ENDS-HANGS-JOIN-FREEZE",
+      "change": {
+        "runs": [
+          "2/net/mesh/mpath:path_all_lost:2026-10-20T14:55:39Z",
+          "2/net/mesh/mpath:path_peer_withdrawn:2026-10-20T14:55:39Z",
+          "2/net/mesh/mpath:crash_audit:2026-10-20T14:56:51Z"
+        ],
+        "disposition": "fixed",
+        "changelog_line": 1678
+      },
+      "argument": "The removal of D-TCP-CAPACITY-WAIT-NEVER-ENDS-HANGS-JOIN-FREEZE (CHANGELOG.md, 0.90.131 section, paragraph headed '**Removed from the queue, fixed and verified: D-TCP-CAPACITY-WAIT-NEVER-ENDS-HANGS-JOIN-FREEZE.**') names the 2/net/mesh/mpath board cells of run 20261020T142123Z-g2d it accounts for: path_fenced_return ABORTED 2026-10-20T14:55:38Z (the fenced peer's rejoin did not complete), path_all_lost 2026-10-20T14:55:39Z, path_peer_withdrawn 2026-10-20T14:55:39Z and crash_audit 2026-10-20T14:56:51Z, each a pre-assert: mxfs not mounted on test32. Those three runs reached data/criteria.runs.jsonl only on 2026-10-21 (their ledger lines carry migrated=2026-10-21, outcome INCOMPLETE, reason 'PRE-ASSERT: mxfs not mounted/readable on test32'), after the removal, so the removal's retirement found them absent and they stand as incidents with no open record to name them. The run's own evidence: tests/evidence/board_20261020T142123Z-g2d_path_fenced_return/row.log:28-29 (ABORT: the remount of test32 (rejoin) did not complete, rc=124) and tests/evidence/rejoin_mount_wedge_20261020T142123Z-g2d/ (the wedged rejoin's stacks and the full ledger page 3197 the entry names). tests/evidence/incident_preassert_sweep_20261022T2355Z.txt group b located them. The ABORTED path_fenced_return itself is not in the ledger and is not proposed.",
+      "evidence": [
+        "CHANGELOG.md",
+        "data/criteria.runs.jsonl",
+        "tests/evidence/board_20261020T142123Z-g2d_path_fenced_return",
+        "tests/evidence/rejoin_mount_wedge_20261020T142123Z-g2d",
+        "tests/evidence/incident_preassert_sweep_20261022T2355Z.txt"
+      ],
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-75e054.md",
+        "sha256": "b23f8b90a7e5d604a236fed22f67b8eff7e748bfac58481cb66f20cb3d18f813",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
+    },
+    {
+      "id": "P20261022-ddf434",
+      "kind": "retire",
+      "record": "D-FAILED-MOUNT-UNWIND-RACES-REAP-WORKER-FREES-AG-AND-HANGS",
+      "change": {
+        "runs": [
+          "2/net/mesh/mpath:tcp_dlm_scaling:2026-10-20T14:56:50Z"
+        ],
+        "disposition": "fixed",
+        "changelog_line": 1658
+      },
+      "argument": "The removal of D-FAILED-MOUNT-UNWIND-RACES-REAP-WORKER-FREES-AG-AND-HANGS (CHANGELOG.md, 0.90.131 section, paragraph headed '**Removed from the queue, fixed and verified: D-FAILED-MOUNT-UNWIND-RACES-REAP-WORKER-FREES-AG-AND-HANGS.**') names the board cells of run 20261020T142123Z-g2d it accounts for, test32 sync-wedged on the reap worker: alloc_witness 2026-10-20T14:56:03Z, chk_clean 2026-10-20T14:56:26Z and tcp_dlm_scaling 2026-10-20T14:56:50Z on 2/net/mesh/mpath (the entry names the configuration as the fenced peer's rejoin on 2/net/mesh/mpath). The tcp_dlm_scaling run reached data/criteria.runs.jsonl only on 2026-10-21 (migrated=2026-10-21, outcome FAIL, reason 'NODE FAULT (not a filesystem verdict): test32:sync-wedged[kworker/1:2+events{MXFS}[msleep]...dlm_lock_impl...'), after the removal, so it was never retired and stands as an incident. Its reason line is the sync-wedged node fault the entry describes. Only that one run is proposed: the alloc_witness and chk_clean runs of 14:56:03Z and 14:56:26Z are not incidents.",
+      "evidence": [
+        "CHANGELOG.md",
+        "data/criteria.runs.jsonl",
+        "tests/evidence/rejoin_mount_wedge_20261020T142123Z-g2d",
+        "tests/evidence/incident_preassert_sweep_20261022T2355Z.txt"
+      ],
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-ddf434.md",
+        "sha256": "a1be27ebaf143bc803b8d05cee0899cb577d0ba98626ed1c9ed92b3232e69960",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
+    },
+    {
+      "id": "P20261022-a9b14b",
+      "kind": "retire",
+      "record": "D-RIG-SCST-RECONFIG-SUSPENDS-EVERY-LUN-BEHIND-A-FROZEN-GUESTS-COMMAND",
+      "change": {
+        "runs": [
+          "8/disk/caw/direct:dirent_publish_integrity:2026-10-19T19:15:28Z",
+          "8/disk/caw/mpath:path_mount_degraded:2026-10-19T19:17:43Z",
+          "8/disk/caw/mpath:path_fence_degraded:2026-10-19T19:17:44Z",
+          "8/disk/caw/mpath:path_fenced_return:2026-10-19T19:17:45Z",
+          "8/disk/caw/mpath:path_all_lost:2026-10-19T19:17:46Z",
+          "8/disk/caw/mpath:path_peer_withdrawn:2026-10-19T19:17:47Z",
+          "8/disk/caw/mpath:path_answer_lost:2026-10-19T19:17:47Z",
+          "8/disk/caw/mpath:crash_audit:2026-10-19T19:17:57Z"
+        ],
+        "disposition": "fixed",
+        "changelog_line": 701
+      },
+      "argument": "The removal of D-RIG-SCST-RECONFIG-SUSPENDS-EVERY-LUN-BEHIND-A-FROZEN-GUESTS-COMMAND (CHANGELOG.md, 0.90.132 section, paragraph headed '**Removed from the queue, fixed and verified (the lab, not MeshXFS): D-RIG-SCST-RECONFIG-SUSPENDS-EVERY-LUN-BEHIND-A-FROZEN-GUESTS-COMMAND.**') states that the lab's SCST target suspended every LUN for 49 s (19:14:14Z-19:15:03Z on 2026-10-19), every node of the running groups self-fenced at 19:14:50-19:15:04Z, and lists the cells that outage failed, including 8/disk/caw/direct (run 20261019T191246Z-g8) dirent_publish_integrity 2026-10-19T19:15:28Z (PRE-ASSERT) and 8/disk/caw/mpath (run 20261019T184840Z-g8b) path_mount_degraded 19:17:43Z, path_fence_degraded 19:17:44Z, path_fenced_return 19:17:45Z, path_all_lost 19:17:46Z, path_peer_withdrawn and path_answer_lost 19:17:47Z and crash_audit 19:17:57Z (PRE-ASSERT after path_failover). These eight runs reached data/criteria.runs.jsonl only on 2026-10-21 (migrated=2026-10-21, outcome INCOMPLETE, reason PRE-ASSERT: mxfs not mounted/readable on the group's nodes), after the removal, so they were never retired. The runs' own evidence: tests/evidence/board_20261019T184840Z-g8b_path_failover/kern_test21.txt:2-5 (P-SESSION-POISON force-shutdown, then P-WITHDRAW -- FS shut down; declaring voluntary death) and row.log (stalls of about 61 s on every node, the path_failover row the entry names), and tests/evidence/run_dirent_durability_20261019T191246Z-g8/ (mkdir EIO after the self-fence; dmesg_at_fail.txt P-WITHDRAW). tests/evidence/incident_preassert_sweep_20261022T2355Z.txt groups f and g located them.",
+      "evidence": [
+        "CHANGELOG.md",
+        "data/criteria.runs.jsonl",
+        "tests/evidence/board_20261019T184840Z-g8b_path_failover",
+        "tests/evidence/run_dirent_durability_20261019T191246Z-g8",
+        "tests/evidence/incident_preassert_sweep_20261022T2355Z.txt"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
     }
   ]
 }

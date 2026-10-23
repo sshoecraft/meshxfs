@@ -51,6 +51,13 @@ Read the thresholds from `data/release_policy.json` (`stall_limit_s`, `delta`, `
   that control, passed every lap with exposure.
 - **remove --disproved**: direct evidence that the reported behaviour was not an MXFS
   defect.
+- **retire** (a removed record's disposition applied to runs its removal named but could
+  not retire, because they reached a run ledger only afterwards): the record is not in the
+  queue; the `CHANGELOG.md` paragraph headed `**Removed from the queue, <fixed and
+  verified|disproved>: <record>.**` names each run by its configuration, row and stamp as a
+  run the removed defect caused, not merely one that happened at the time; each run is in
+  its board's ledger and unsettled; and the run's own log agrees with the cause the entry
+  gives. A run the entry does not name is never retired by it.
 - **exception** (the owner let an open record stop blocking one configuration in one
   release): `data/release_policy.json` `exceptions` names exactly this record, this
   configuration and this release, and an `owner_approved` entry records the question the

@@ -199,7 +199,7 @@ FIELDS = {"severity": "s", "summary": "m", "next": "n", "evidence": "w",
 #: happened. Measured 2026-09-17 on a copy of the real ledger.
 LOCK = LEDGER.with_name(".defects.lock")
 MUTATORS = ("add", "update", "remove", "verify", "rename", "migrate-config", "batch", "measure",
-            "plan-verify", "propose", "review", "except")
+            "plan-verify", "propose", "review", "except", "retire")
 
 #: A save measures ~6 ms on the real 858 KB ledger, so anything still holding the lock after this
 #: long is wedged rather than busy, and saying so beats blocking a session forever.
@@ -221,7 +221,7 @@ BATCH_KINDS = ("calibrate", "control", "verify")
 
 #: What a proposal can ask for. Each is a decision that stops a defect, or a failure, blocking.
 PROPOSAL_KINDS = ("noblock", "narrow", "verify", "remove-fixed", "remove-disproved",
-                  "detector-defect", "infra-proven", "exception")
+                  "detector-defect", "infra-proven", "exception", "retire")
 
 
 #: The open lock file, kept for the process's lifetime so the lock is held until it exits. Nothing
@@ -1105,7 +1105,8 @@ def tree_build() -> str:
     return out.stdout.strip() if out.returncode == 0 else ""
 
 
-def retire_cells(entry: dict, disposition: str, why: str, configs=None) -> list:
+def retire_cells(entry: dict, disposition: str, why: str, configs=None,
+                 approval: dict | None = None) -> list:
     """Append a `retired_by` note for every board run the record names (at `configs`, or
     everywhere), to each board's run ledger, under each board's lock taken in path order.
     Returns the lines to report."""
@@ -1117,6 +1118,8 @@ def retire_cells(entry: dict, disposition: str, why: str, configs=None) -> list:
         by_board.setdefault(criteria.board_for(cell["config"]), []).append(cell)
     mark = {"defect": entry["id"], "disposition": disposition, "date": date.today().isoformat(),
             "why": why[:400]}
+    if approval:
+        mark["approval"] = approval
     handles, report = [], []
     for path in sorted(by_board, key=str):
         handles.append(criteria.lock_board(path))
@@ -1132,6 +1135,100 @@ def retire_cells(entry: dict, disposition: str, why: str, configs=None) -> list:
         criteria.append_ledger(path, notes)
     del handles
     return report
+
+
+# A removal retires the runs its record names, but only those already in a run ledger: the boards
+# were migrated into run ledgers after several removals, so the runs those removals named in
+# CHANGELOG.md arrived unretired and stand as incidents with nothing left to name them. A retire
+# proposal applies such a removal to the runs it named, once the reviewer has read the entry.
+
+def removed_record(data: dict, wanted) -> str:
+    """The id of a record that has left the queue. An open record names its runs with
+    `update --cell`; only a removed one has a disposition to apply."""
+    wanted = str(wanted or "").strip()
+    if not re.fullmatch(r"D-[A-Za-z0-9.][A-Za-z0-9.-]*", wanted):
+        sys.exit("defects: a retire proposal names the removed record by its full id (--record)")
+    if any(str(e.get("id", "")) == wanted for e in data["defects"]):
+        sys.exit("defects: %s is still in the queue; an open record names its runs with "
+                 "`update --cell`" % wanted)
+    return wanted
+
+
+def unsettled(runs: list) -> None:
+    """Every run is still an incident: no annotation settles it and no open record names it."""
+    criteria = board_tool()
+    named = criteria.named_runs()
+    for cell in runs:
+        board = criteria.SPEC if cell["row"].startswith("release:") \
+            else criteria.board_for(cell["config"])
+        key = (cell["config"], cell["row"], cell["iso"])
+        if criteria.settled(board, *key) or named.get(key):
+            sys.exit("defects: %s:%s:%s is already settled or named by an open record" % key)
+
+
+def removal_entry(record: str, runs: list) -> tuple:
+    """The CHANGELOG.md paragraph whose heading removed `record` and whose text names every run
+    (its configuration, its row and its stamp): (first line, disposition, text). A run the
+    removal never named is not retired by it."""
+    lines = (ROOT / "CHANGELOG.md").read_text().splitlines()
+    paragraphs, first, body = [], None, []
+    for number, text in enumerate(lines + [""], 1):
+        if text.strip():
+            if first is None:
+                first, body = number, []
+            body.append(text.strip())
+        elif first is not None:
+            paragraphs.append((first, " ".join(body)))
+            first = None
+    heading = re.compile(r"\*\*Removed from the queue, (?P<how>[^:*]+):\s*(?P<id>D-[A-Za-z0-9.-]+?)"
+                         r"\.?\*\*")
+    found = False
+    for first, text in paragraphs:
+        match = heading.match(text)
+        if not match or match.group("id") != record:
+            continue
+        found = True
+        how = match.group("how").lower()
+        disposition = "fixed" if "fixed and verified" in how else \
+            "disproved" if "disproved" in how else ""
+        if not disposition:
+            sys.exit("defects: CHANGELOG.md:%d removed %s as %r, neither fixed and verified nor "
+                     "disproved" % (first, record, match.group("how")))
+        missing = [c for c in runs if c["iso"] not in text or c["config"] not in text
+                   or not re.search(r"(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])" % re.escape(c["row"]),
+                                    text)]
+        if not missing:
+            return first, disposition, text
+    if not found:
+        sys.exit("defects: CHANGELOG.md has no paragraph headed **Removed from the queue, ...: "
+                 "%s.**" % record)
+    sys.exit("defects: no removal of %s in CHANGELOG.md names every run (configuration, row and "
+             "stamp); a run it never named is not retired by it" % record)
+
+
+def cmd_retire(data: dict, args) -> int:
+    """Apply an approved retire proposal: a `retired_by` note, carrying the removal's disposition
+    and the approval, on each run the removal named. Everything the proposal was checked against
+    is checked again first, and the approval is spent only when all of it still holds."""
+    record = removed_record(data, args.id)
+    proposal = find_proposal(load_proposals(), args.approval or "")
+    change = dict(proposal.get("change") or {})
+    runs = [parse_cell(text, False) for text in change.get("runs") or []]
+    if not runs:
+        sys.exit("defects: proposal %s names no runs" % args.approval)
+    check_cells(runs)
+    unsettled(runs)
+    line, disposition, text = removal_entry(record, runs)
+    if disposition != change.get("disposition"):
+        sys.exit("defects: CHANGELOG.md now removes %s as %s; the proposal was for %s"
+                 % (record, disposition, change.get("disposition")))
+    approval = require_approval(args.approval, "retire", record,
+                                {"runs": change["runs"], "disposition": disposition})
+    report = retire_cells({"id": record, "cells": runs}, disposition,
+                          "CHANGELOG.md:%d %s" % (line, text), approval=approval)
+    for entry in report:
+        print(entry)
+    return 0
 
 
 def cmd_verify(data: dict, args) -> int:
@@ -1320,6 +1417,16 @@ def cmd_propose(args) -> int:
         cell = parse_cell(args.target, False)
         check_cells([cell])
         change = {"config": cell["config"], "row": cell["row"], "iso": cell["iso"]}
+    elif args.kind == "retire":
+        record = removed_record(data, args.record)
+        if not args.run:
+            sys.exit("defects: a retire proposal names each run (--run CONFIG:ROW:ISO, repeat)")
+        runs = [parse_cell(text, False) for text in args.run]
+        check_cells(runs)
+        unsettled(runs)
+        line, disposition, _ = removal_entry(record, runs)
+        change = {"runs": ["%s:%s:%s" % (c["config"], c["row"], c["iso"]) for c in runs],
+                  "disposition": disposition, "changelog_line": line}
     elif args.kind == "exception":
         if not (args.exception_at and args.candidate):
             sys.exit("defects: an exception proposal names the configuration (--at) and the "
@@ -1822,6 +1929,9 @@ def main() -> int:
     propose.add_argument("--record", help="the defect record")
     propose.add_argument("--target", metavar="CONFIG:ROW:ISO",
                          help="the board run (detector-defect, infra-proven)")
+    propose.add_argument("--run", action="append", metavar="CONFIG:ROW:ISO",
+                         help="retire: a run the removed record's CHANGELOG.md removal names "
+                              "(repeat for each)")
     propose.add_argument("--batch", help="the verification batch (verify)")
     propose.add_argument("--control")
     propose.add_argument("--fixon")
@@ -1854,6 +1964,11 @@ def main() -> int:
     excepted.add_argument("--at", dest="except_at", metavar="CONFIGURATION", required=True)
     excepted.add_argument("--candidate", required=True, help="the release it is granted for")
     excepted.add_argument("--approval", help="the approved exception proposal")
+
+    retire = subs.add_parser("retire", help="apply a removed record's disposition to the runs "
+                                            "its removal named that reached a ledger later")
+    retire.add_argument("id", help="the removed record's full id")
+    retire.add_argument("--approval", required=True, help="the approved retire proposal")
 
     proposal = subs.add_parser("proposal", help="show a proposal")
     proposal_subs = proposal.add_subparsers(dest="proposal_command", required=True)
@@ -1898,6 +2013,8 @@ def main() -> int:
         return cmd_update(data, args)
     if args.command == "remove":
         return cmd_remove(data, args)
+    if args.command == "retire":
+        return cmd_retire(data, args)
     if args.command == "rename":
         return cmd_rename(data, args)
     if args.command == "verify":

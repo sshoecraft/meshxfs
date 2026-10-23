@@ -182,6 +182,11 @@ Every decision that stops something blocking a release goes through a proposal:
 | `detector-defect` | settles one run as the detector's fault | the run, the evidence, and the detector fix already in the tree |
 | `infra-proven` | settles one run as the rig's fault | the run and the positive evidence from outside MeshXFS |
 | `exception` | the record stops blocking one configuration in one release (it stays open) | the owner's exception in the policy file, naming the record, the configuration and the release, with the question and the owner's answer |
+| `retire` | settles runs a removed record's removal named but could not retire, because they reached a run ledger only after it (applied with `defects.py retire`) | the removed record, and runs its `CHANGELOG.md` removal names by configuration, row and stamp |
+
+A removal retires only the runs already in a ledger when it is made. The boards were moved into
+run ledgers after several removals, and the runs those removals named arrived unretired, with no
+open record left to name them; `retire` applies the removal to exactly the runs its entry names.
 
 1. `defects.py propose <kind> ... --argument "..." --evidence <path> ...` records the proposal as
    pending. Every evidence path must exist in the tree.

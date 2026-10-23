@@ -86,7 +86,15 @@ DM="dmesg | awk '/$MARK/{f=1} f'"
 #    shards are represented, keeps the first file in each as its candidate and
 #    removes the rest once every candidate exists, so a freed inode number is
 #    not drawn again.  None of 16 is remote from W with probability 2^-16.
-NSHARD=16; NMAKE=160
+#    SR_SHARD_SELECT=0 makes the candidates as the harness did before: eight
+#    files written back to back, every one a candidate whatever its shard (the
+#    same-build control of
+#    D-TCP-STALE-RESEND-CANDIDATES-SHARE-ONE-ROUTING-SHARD-SO-ONE-MASTER-DRAW,
+#    tests/stale_resend_shard_lap.sh).
+SR_SHARD_SELECT=${SR_SHARD_SELECT:-1}
+case "$SR_SHARD_SELECT" in 0|1) ;; *) echo "ABORT: SR_SHARD_SELECT must be 0 or 1"; exit 2;; esac
+if [ "$SR_SHARD_SELECT" = 1 ]; then NSHARD=16; NMAKE=160; else NSHARD=8; NMAKE=8; fi
+echo "  INFO candidates: shard_select=$SR_SHARD_SELECT want=$NSHARD from at most $NMAKE files"
 # bound: ssh connect (ConnectTimeout 10 s) + 2x the measured 0.9-1.2 s for 160
 # creates of 32 KiB, the removal and the sync (live_holder_wait.sh, test1,
 # 2026-10-22); these files are 16 KiB
@@ -96,8 +104,11 @@ timeout 13 $SSH "$H" "
         i=\$((i+1)); f='$MNT/.staleresend_${LABEL}_'\$i
         dd if=/dev/urandom of=\"\$f\" bs=4096 count=4 status=none || exit 1
         ino=\$(stat -c %i \"\$f\") || exit 1; s=\$((ino >> 3))
-        case \"\$seen\" in *\" \$s \"*) spare=\"\$spare \$f\"; continue ;; esac
-        seen=\"\$seen\$s \"; n=\$((n+1)); echo \$i \$ino \$(md5sum \"\$f\" | cut -d' ' -f1)
+        case \"\$seen\" in
+            *\" \$s \"*) if [ $SR_SHARD_SELECT = 1 ]; then spare=\"\$spare \$f\"; continue; fi ;;
+            *) seen=\"\$seen\$s \" ;;
+        esac
+        n=\$((n+1)); echo \$i \$ino \$(md5sum \"\$f\" | cut -d' ' -f1)
     done
     [ -z \"\$spare\" ] || rm -f \$spare
     sync

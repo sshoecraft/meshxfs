@@ -3760,7 +3760,26 @@
           "iso": "2026-10-22T03:48:37Z"
         }
       ],
-      "updated": "2026-10-22"
+      "updated": "2026-10-22",
+      "batches": [
+        {
+          "id": "b20261022-172c3f",
+          "kind": "control",
+          "row": "lap:jdt_gate_fault",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^GATE join_during_takeover fault: .*fault_line=1 ",
+          "candidate": "",
+          "build": "9594B08726D6732D2ED5E87",
+          "variant": "fix reverted: tests/evidence/controls/D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE.fix.diff sha256=480d32973e93a9ecf1302cacf2f38b35adea9b4fe4b167555a3ab005582bbd6d",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix taken out: join_during_takeover runs in the gate with NFILES=4000, its ~500-page takeover pass ends inside the lap's first 5 s sample, and the lap never reaches the injected first measurement"
+        }
+      ]
     },
     {
       "id": "D-OPEN-EFI-DEATH-REPLAY-REFUSED-NOT-HELD-VICTIM-DOMAIN-QUARANTINED-2TCP",
@@ -3870,8 +3889,8 @@
       "opened": "2026-10-22",
       "summary": "tests/tcp_stale_resend.sh writes its 8 candidate files back to back, so their inode numbers are consecutive. Under ledger routing version 2 an inode routes with the low three bits of its number cleared (include/mxfs/mxfs_tauth.h, MXFS_TAUTH_INO_SHARD), so all 8 share one master: the search for a candidate remotely mastered from W is one draw, not eight, and on a 2-node group it ABORTs whenever that draw is W. tests/pending_late_grant.sh has the same shape: NFILES defaults to 8 consecutive creates, and its premise that about half the files are remotely mastered from each node does not hold for one or two shards. tcp_lockreq_blackhole.sh already avoids it with seven spacer files between candidates; live_holder_wait.sh selects one candidate per distinct shard.",
       "evidence": "Gate run tests/evidence/presteps_harnessfix_20261022.log (capture_fault_gate label 0.90.134-harnessfix-full, test1/test2, 2/net/mesh/direct, srcversion A6239940FC6B66138D10442): \"GATE tcp_stale_resend fault: rc=2 wall=121s fault_line=0 abort=0 verdicts_after_fault=0 -> BROKEN\", the only broken entry of 60. Its log tests/evidence/20261022T042630Z_capture_gate_0.90.134-harnessfix-full/tcp_stale_resend_fault.log: candidates idx=1..8 are ino 8388736..8388743 (0x800080..0x800087, one shard), every one drop_hits=0, then \"ABORT: no candidate inode is remotely mastered from test2\". pending_late_grant.sh:63 NFILES=${NFILES:-8}, line 35 states the half-remote premise; its consequence for that harness verdict is not yet measured. ===== ===== 2026-10-22, fix in the tree: tests/tcp_stale_resend.sh creates files until 16 distinct routing shards (ino >> 3) are represented, keeps the first in each as a candidate, removes the spares once every candidate exists, and removes the candidates it made at the end and on the no-candidate ABORT (rm_cands). Setup bound 13 s. Verified on g2 (test1/test2, 2/net/mesh/direct, srcversion A6239940FC6B66138D10442) through tests/capture_fault_gate.sh 0.90.134-srshard --only tcp_stale_resend: fault lap 'rc=2 wall=21s fault_line=1 abort=1 -> OK' (tests/evidence/20261022T115448Z_capture_gate_0.90.134-srshard); healthy lap 'rc=0 wall=92s fails=0 -> OK' (tests/evidence/20261022T115629Z_capture_gate_0.90.134-srshard, lap dir tests/evidence/20261022T115631Z_staleresend_0.90.134-srshard-tcp_stale_resend-ok): 16 candidates in distinct shards at +2s; the first four shards (ino 8390849, 8390857, 8390865, 8390873) were local to W (drop_hits=0) and the fifth (8390881) remote (drop_hits=10), so the old 8-consecutive-file setup, one shard, would have ABORTed on this formation; all 7 verdicts PASS. Candidate idx 58 reused a freed lower number (8388737), which is why selection is by shard and not by spacing. pending_late_grant.sh: its verdict is a late-kept total over both nodes and both nodes append to every file, so the master's own appends complete by promotion and the other node's by a wire grant whatever the shard draw; only its comment's premise was false, now corrected (comment-only change, bash -n OK). ===== ===== 2026-10-22 full presteps sequence after the fix, g2 (test1/test2, 2/net/mesh/direct, srcversion A6239940FC6B66138D10442), as tools/release_run.py runs it: harness lint rc=0; tests/chk_oracle_calibration.sh PASS 5/5; prep_cluster OK (28s); tests/rig_lib_contract.sh PASS fails=0; tests/capture_fault_gate.sh 'RESULT: PASS label=0.90.134-presteps-full2 entries=60 broken=0 vacuous=0 restores=8 wall=1621s' (tests/evidence/20261022T120001Z_capture_gate_0.90.134-presteps-full2; log tests/evidence/presteps_full_20261022b.log). The earlier full run had tcp_stale_resend as its only broken entry.",
-      "next": "Space tcp_stale_resend candidates eight inode numbers apart as tcp_lockreq_blackhole.sh does (SPACERS), check each lands in a distinct shard, and rerun its fault and healthy laps through tests/capture_fault_gate.sh --only tcp_stale_resend on g2. For pending_late_grant.sh, read how its verdict depends on remote mastering, then size NFILES in shards.",
-      "reproducer": "MXFS_NODE_LIST=test1,test2 MXFS_GROUP=g2 MXFS_MARKER=$PWD/.cluster_marker.g2.json tests/capture_fault_gate.sh <label> --only tcp_stale_resend: ABORTs whenever the one shard the 8 candidates share is mastered by W",
+      "next": "The fix (16 candidates in distinct shards) is in the tree and passed the gate's fault and healthy laps (evidence above). Control batch with SR_SHARD_SELECT=0 (lane tests/evidence/lanes/queue_g2_srshard_control.txt, after the gate-controls lane frees g2): both precheck laps first (fix on PASS, off FAIL), then 10 laps that must fail; then the verification batch on the candidate sized from it.",
+      "reproducer": "tests/stale_resend_shard_lap.sh <label> on the formed g2 pair: runs tests/tcp_stale_resend.sh once and grades the candidates H made (its h_setup.txt) by distinct routing shards (ino >> 3): PASS at 8 or more, FAIL below. SR_SHARD_SELECT=0 is the harness's same-build control (eight files written back to back, one or two shards every lap).",
       "updated": "2026-10-22"
     },
     {
@@ -4387,15 +4406,16 @@
       "config": "*/*/*",
       "opened": "2026-10-22",
       "summary": "On 8/net/mesh/mpath, in the one-path phase of path_peer_withdrawn, after the second withdrawn peer was fenced and recovered and test21 took over its authority-ledger pages, test21's ledger refused 110 conflicting AG 6 EX grants to another survivor in six seconds (P-TAUTH-DOUBLE-GRANT ... vs record ex=<test21>), then test21 received a fresh CAW grant on AG 6 whose lineage was still open (P130-FALSE-FRESH), refused it as in-memory corruption and shut its filesystem down: a survivor of a clean peer departure crashed out of the cluster.",
-      "evidence": "Build 9594B08726D6732D2ED5E87, test21-test28, ledger run 8/net/mesh/mpath:path_peer_withdrawn:2026-10-22T19:58:42Z (FAIL, a lap of calibration b20261022-cd722e: 'one_path: no operation on test21 returned an error (got 2401226)'). test21's boot kernel log tests/evidence/flood_test21_20261022T200054Z/test21_kernlog_boot.gz (test21 = node 462431191 on its final mount, key 0x497c4f889aeb814d); lines of the decompressed log: 780715-781125 (19:54:41-47) test21 fences and recovers the first victim 2887508210; 811451-813287 (19:55:43-49) path sda ping timeout and multipath fails path 8:0 (the row takes network a down); 818124-818331 (19:55:58-19:56:04) peer 2676103764 departs, fenced by 4286002854, recovery complete; 818616 (19:56:05) P-TAUTH-TAKEOVER departed=2676103764 pages_prepared=49 by=462431191; 818747..818986 (19:56:05.321-19:56:11.079) 110 x 'P-TAUTH-DOUBLE-GRANT page=210 entry=30 type=3 ino=0 ag=6 req node=4286002854 ... mode=5 vs record ex=462431191/17939097982732513075 holders=0x0 -- the master decided a conflicting grant; refused'; 819004 (19:56:11.107) 'P130-FALSE-FRESH agno=6 fresh CAW grant with lineage still OPEN (no release ran) tenure=2'; 819047 'P130-FALSE-FRESH-REFUSED agno=6 -- refusing to invalidate un-landed local state; shutting down'; 819050 'Corruption of in-memory data (0x8) detected at __mxfs_ag_dlm_lock+0x14e8/0x1ab0 (xfs/xfs_mxfs_ag_lock.c:1130). Shutting down filesystem.'; 819053 P-WITHDRAW. Earlier in the lap: 780833-780890 P-LKTIMEOUT-REMOTE on ino 67110881 with master=2887508210 (the dead first victim) and P-PUB-DRAIN-STUCK; 780980 P218-WRITE-REFUSED with PROBE-A AG-META-WRITE-NOT-HELD agno=7. No BUG, Oops or hung_task in the file. Related, not the same outcome: D-SOLE-SURVIVOR-CREATES-FAIL-EBUSY-FROM-DIALLOC-AFTER-PEER-FENCE (the same refusal pattern after a peer fence at 2 nodes, ending in EBUSY creates).",
-      "next": "Read who decided the AG 6 grant to 4286002854: the ledger page 210 master after the takeover of 2676103764's pages, whether the takeover re-mastered page 210 while test21 still held AG 6 EX from before that departure, and the other seven nodes' kernel logs for 19:56:00-19:56:12 (the step-17 run artifacts, tests/evidence/run_path_peer_withdrawn_*195120Z-g8b*). Then measure how often an 8/net/mesh/mpath path_peer_withdrawn lap ends this way. This lap also counts in calibration b20261022-cd722e of D-NETMESH-SHARED-DIR-LOCK-QUEUE-JAMS-60S-AFTER-PEER-WITHDRAWS; its failure is this defect's, not that one's.",
+      "evidence": "Build 9594B08726D6732D2ED5E87, test21-test28, ledger run 8/net/mesh/mpath:path_peer_withdrawn:2026-10-22T19:58:42Z (FAIL, a lap of calibration b20261022-cd722e: 'one_path: no operation on test21 returned an error (got 2401226)'). test21's boot kernel log tests/evidence/flood_test21_20261022T200054Z/test21_kernlog_boot.gz (test21 = node 462431191 on its final mount, key 0x497c4f889aeb814d); lines of the decompressed log: 780715-781125 (19:54:41-47) test21 fences and recovers the first victim 2887508210; 811451-813287 (19:55:43-49) path sda ping timeout and multipath fails path 8:0 (the row takes network a down); 818124-818331 (19:55:58-19:56:04) peer 2676103764 departs, fenced by 4286002854, recovery complete; 818616 (19:56:05) P-TAUTH-TAKEOVER departed=2676103764 pages_prepared=49 by=462431191; 818747..818986 (19:56:05.321-19:56:11.079) 110 x 'P-TAUTH-DOUBLE-GRANT page=210 entry=30 type=3 ino=0 ag=6 req node=4286002854 ... mode=5 vs record ex=462431191/17939097982732513075 holders=0x0 -- the master decided a conflicting grant; refused'; 819004 (19:56:11.107) 'P130-FALSE-FRESH agno=6 fresh CAW grant with lineage still OPEN (no release ran) tenure=2'; 819047 'P130-FALSE-FRESH-REFUSED agno=6 -- refusing to invalidate un-landed local state; shutting down'; 819050 'Corruption of in-memory data (0x8) detected at __mxfs_ag_dlm_lock+0x14e8/0x1ab0 (xfs/xfs_mxfs_ag_lock.c:1130). Shutting down filesystem.'; 819053 P-WITHDRAW. Earlier in the lap: 780833-780890 P-LKTIMEOUT-REMOTE on ino 67110881 with master=2887508210 (the dead first victim) and P-PUB-DRAIN-STUCK; 780980 P218-WRITE-REFUSED with PROBE-A AG-META-WRITE-NOT-HELD agno=7. No BUG, Oops or hung_task in the file. Related, not the same outcome: D-SOLE-SURVIVOR-CREATES-FAIL-EBUSY-FROM-DIALLOC-AFTER-PEER-FENCE (the same refusal pattern after a peer fence at 2 nodes, ending in EBUSY creates). ===== 2026-10-22 (log extraction tests/evidence/ag6_false_grant_logs_20261022T1956Z.txt; node ids: test21=462431191, test23=4286002854, test24=1721954352, test28=2887508210 then 2676103764): the conflicting grant follows a live page hand-off, not the dead-peer takeover. test21_kernlog_boot.gz:818232 19:56:03.315 'P958-ACQ-GRANT-ADOPTED type=3 ino=0 ag=6 mode=EX gen=2731 master=1721954352 -- a grant arrived between two attempts of a live wait; kept for that wait'; :818576-818577 19:56:05.042 'P-TAUTH-ACTIVATE page=210 seq=16 from=PREPARED auth=462431191' and 'P-TAUTH-PAGE-MINE page=210 via=frozen-msg' (page 210 handed from test24 to test21 while test21 waited); :818616 19:56:05.119 P-TAUTH-TAKEOVER of 2676103764's 49 pages (separate); :818737 19:56:05.2996 'P-D7-SETTLEGATE type=3 ino=0 ag=6 mode=5 ... waited=6000ms confirmed=1'; :818738 'P958-ACQ-GRANT-RELEASED type=3 ino=0 ag=6 mode=EX gen=2731 master=462431191 why=unclaimed mirror_unlinked=1 -- an adopted grant no wait claimed is handed back to its master' (its master is now test21 itself); :818739 'P958-ACQ-LOCAL-ANSWER-END type=3 ino=0 ag=6 mode=EX site=shortcut n=1 -- a locally mastered request answered outside the promote path'; :818747 19:56:05.321 first 'P-TAUTH-DOUBLE-GRANT page=210 entry=30 ... req node=4286002854 (test23) mode=5 vs record ex=462431191' -- 22 ms after the hand-back.",
+      "next": "Read who decided the AG 6 grant to 4286002854: the ledger page 210 master after the takeover of 2676103764's pages, whether the takeover re-mastered page 210 while test21 still held AG 6 EX from before that departure, and the other seven nodes' kernel logs for 19:56:00-19:56:12 (the step-17 run artifacts, tests/evidence/run_path_peer_withdrawn_*195120Z-g8b*). Then measure how often an 8/net/mesh/mpath path_peer_withdrawn lap ends this way. This lap also counts in calibration b20261022-cd722e of D-NETMESH-SHARED-DIR-LOCK-QUEUE-JAMS-60S-AFTER-PEER-WITHDRAWS; its failure is this defect's, not that one's. ===== Hypothesis to test first (written before any patch): the adopted grant's unclaimed hand-back (P958-ACQ-GRANT-RELEASED why=unclaimed), sent to a master that is now this node, removes the master-side record of this node's own live EX on AG 6 -- the hold the shortcut answer (P958-ACQ-LOCAL-ANSWER-END site=shortcut) just gave the same wait -- so the master's table shows AG 6 free while the AG layer holds it, the master grants test23 EX (refused by the ledger, whose record is still gen 2731's ex=test21), and test21 is later handed a fresh grant over its open lineage (P130). Falsifier: the master-side entry of test21's EX survives the hand-back. Read the hand-back path and the shortcut in dlm/dlm.c (grep P958-ACQ-GRANT-RELEASED and P958-ACQ-LOCAL-ANSWER-END), then reproduce in process (tests/tauth, as fenced_node_ledger_test.sh does): node A waits for EX on R mastered by B; B grants A (record ex=A); R's page is handed B->A before A's wait claims the grant; A's wait is answered by the local shortcut; the unclaimed grant is released to master A; then B asks for EX on R and must be queued behind A, not granted.",
       "cells": [
         {
           "config": "8/net/mesh/mpath",
           "row": "path_peer_withdrawn",
           "iso": "2026-10-22T19:58:42Z"
         }
-      ]
+      ],
+      "updated": "2026-10-22"
     },
     {
       "id": "D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES-FOREVER-ON-RESERVATION-CONFLICT",
@@ -4548,6 +4568,129 @@
             "9594B08726D6732D2ED5E87"
           ],
           "date": "2026-10-22"
+        }
+      ]
+    },
+    {
+      "id": "D-CAWMPATH-NLINK1-FILE-NAMED-TWICE-AFTER-ANSWER-LOST",
+      "severity": "critical",
+      "nodes": 4,
+      "config": "disk/caw/mpath",
+      "opened": "2026-10-22",
+      "summary": "On the 4/ and 8/disk/caw/mpath boards of 2026-10-19 (runs 20261019T142249Z-g4b and -g8b, v0.90.131 tools), chk_clean's cold audit found the volume CORRUPT with one nlink mismatch each: a regular file with nlink 1 named by two directory entries. In both runs the row just before chk_clean was path_answer_lost, which reports COMPARE AND WRITE answers lost on purpose and has some resent swaps find a peer's write in between. The chk_clean FAIL never reached the ledger (the boards were migrated without it); the crash_audit rows after it found the audited node left unmounted and recorded PRE-ASSERT INCOMPLETE.",
+      "evidence": "tests/evidence/run_chk_clean_20261019T142249Z-g4b/test17:3 'RESULT: FAIL | test=chk_clean | nodes=4 | measured=verdict=CORRUPT release=CORRUPT rc=4 errors=3 remounted=0 icount=19328 ... evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261019T151341Z.log'; chk_clean_4node_20261019T151341Z.log:821 'ERROR: inode 6872560 (mode 0100644) has nlink 1 but 2 directory entries name it', :822 nlink_mismatch=1. tests/evidence/run_chk_clean_20261019T142249Z-g8b/test21:3 'verdict=CORRUPT release=CORRUPT rc=4 errors=3 ... chk_clean_8node_20261019T152029Z.log'; chk_clean_8node_20261019T152029Z.log:1045 'ERROR: inode 13147165 (mode 0100644) has nlink 1 but 2 directory entries name it', :1046 nlink_mismatch=1. Preceding rows: board_20261019T142249Z-g4b_path_answer_lost/row.log:129 'RESULT: PASS ... victim=test20 injected=40 landed=23 unresolved=17'; board_20261019T142249Z-g8b_path_answer_lost/row.log:241 'RESULT: PASS ... victim=test28 injected=40 landed=24 unresolved=16'. Located by tests/evidence/incident_preassert_sweep_20261022T2355Z.txt (groups d, e).",
+      "next": "Read both chk_clean logs in full and each run's path_answer_lost kernel logs for the two inodes (6872560, 13147165): which directory holds the two entries, their names, which node created and linked each, and whether a resent COMPARE AND WRITE of a directory block applied an entry insert twice. Then check whether a later version changed that path (0.90.131 was withdrawn; the 0.90.132 entry of CHANGELOG.md), and reproduce on the current build: 4/disk/caw/mpath path_answer_lost followed by chk_clean.",
+      "impact": "integrity",
+      "impact_why": "chk_mxfs found a structural violation of the directory tree: a file whose link count is 1 is named by two directory entries, so unlinking one name frees an inode the other still names",
+      "collateral": [
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "crash_audit",
+          "iso": "2026-10-19T15:13:57Z",
+          "why": "PRE-ASSERT on test17: chk_clean left test17 unmounted on its CORRUPT verdict (run_chk_clean_20261019T142249Z-g4b/test17:3)"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "crash_audit",
+          "iso": "2026-10-19T15:20:49Z",
+          "why": "PRE-ASSERT on test21: chk_clean left test21 unmounted on its CORRUPT verdict (run_chk_clean_20261019T142249Z-g8b/test21:3)"
+        }
+      ]
+    },
+    {
+      "id": "D-2CAWMPATH-FENCED-RETURN-FENCE-NEVER-LANDED-SURVIVOR-ERRORS-236S",
+      "severity": "critical",
+      "nodes": 2,
+      "config": "disk/caw/mpath",
+      "opened": "2026-10-22",
+      "summary": "On 2/disk/caw/mpath path_fenced_return (run 20261016T013801Z-g2b, build 1E9C0DE7364AD47BCDDE54A, 0.90.130), after test16 was frozen with one path failed, its registrations never left the target (the fence did not land within the 111 s bound, and after the thaw the target still held 4 registrations, not 2), the survivor test15 completed no operation for 236 s and its load counted 8,702,764 errors in the window, and test16 acknowledged 1638 fsynced writes it started after the point the others fenced it. The row's FAIL never reached the ledger (the boards were migrated without it); the four rows after it found test15 not mounted and recorded PRE-ASSERT INCOMPLETE.",
+      "evidence": "tests/evidence/board_20261016T013801Z-g2b_path_fenced_return/row.log:13 'FAIL the others fenced test16: its registrations left the target, seconds after the freeze got=999 bound=111', :18 'FAIL after_thaw: the target held exactly 2 registrations at every one of 8 samples over 40s got=1', :17 'after_thaw sample 0: 4 registrations, want 2', :20 'fence: test15 STALL max_ms=236242 ... completed_in_window=0 errors_in_window=8702764', :25 'FAIL fenced: no fsynced write that test16 started after it was fenced was acknowledged got=1638 want=0', :26 'FAIL fenced: a write on test16 is refused, and returns (it does not hang) got=0 want=1', :31 RESULT: FAIL measured=stage=rejoin. Build: tests/evidence/board_2-disk-caw-mpath_g2b_bL3_0.90.130.log:60 'build 1E9C0DE7364AD47BCDDE54A', :124 'FAIL path_fenced_return (294s/400s)'. Kernel logs in the directory hold none of the signatures searched (kern_recovered_test15.txt is '-- No entries --'; kern_recovered_test16.txt 02:26:48-02:31:59 has no shutdown, fence, withdraw, EIO or hung-task line). Since then 10 runs of the row passed at 2/disk/caw/mpath (2026-10-17 to 2026-10-21; data/criteria.runs.jsonl:3556-6613) and one ended INCOMPLETE. Collected in tests/evidence/incident_groups_ach_evidence_20261023.txt (group a, lines 470-603); located by tests/evidence/incident_preassert_sweep_20261022T2355Z.txt group a.",
+      "next": "Read test15's kernel log for 02:25:50-02:30:33Z from the netconsole log and test16's 13 MB recovered log for the PR preempt and fence lines: why the survivor neither fenced test16 nor kept completing operations, and what the 8.7 million errors were. Then run 2/disk/caw/mpath path_fenced_return on the current build with the kernel logs kept and measure the rate before any verification.",
+      "collateral": [
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "path_all_lost",
+          "iso": "2026-10-16T02:30:35Z",
+          "why": "row.log:20-23 of the path_fenced_return run just before: test15 completed no operation for 236 s with 8702764 errors; this row found mxfs not mounted/readable on test15"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "path_peer_withdrawn",
+          "iso": "2026-10-16T02:30:36Z",
+          "why": "row.log:20-23 of the path_fenced_return run just before: test15 completed no operation for 236 s with 8702764 errors; this row found mxfs not mounted/readable on test15"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "path_answer_lost",
+          "iso": "2026-10-16T02:30:37Z",
+          "why": "row.log:20-23 of the path_fenced_return run just before: test15 completed no operation for 236 s with 8702764 errors; this row found mxfs not mounted/readable on test15"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "crash_audit",
+          "iso": "2026-10-16T02:30:48Z",
+          "why": "row.log:20-23 of the path_fenced_return run just before: test15 completed no operation for 236 s with 8702764 errors; this row found mxfs not mounted/readable on test15"
+        }
+      ]
+    },
+    {
+      "id": "D-4NETMESH-MPATH-ALL-LOST-SURVIVORS-STALL-141S-ERRORS-REJOIN-MOUNT-32",
+      "severity": "critical",
+      "nodes": 4,
+      "config": "net/mesh/mpath",
+      "opened": "2026-10-22",
+      "summary": "On 4/net/mesh/mpath path_all_lost (run 20261015T022351Z-g4, build 4FD56D0D02CBB2D2A7CB8B6), test6 lost both paths and fenced itself as it should (AUTHORITY_LEASE_EXPIRED, then PR_KEY_PREEMPTED), but the survivors test3, test4 and test5 each went 141 s without a completed operation and their loads counted 2,494,343, 2,824,413 and 2,693,410 errors in the window, and test6's rejoin mount then failed with mount_rc=32. The row's FAIL never reached the ledger (the boards were migrated without it); the five rows after it found test3-test6 not mounted and recorded PRE-ASSERT INCOMPLETE.",
+      "evidence": "tests/evidence/board_20261015T022351Z-g4_path_all_lost/row.log:19 'PASS the others fenced test6 ... (36 < 111)', :20 'FAIL every other node's load completed operations again after the fence, seconds got=999 bound=61', :23 'loss: test3 STALL max_ms=141294 ... completed_in_window=0 errors_in_window=2494343', :27 test4 max_ms=140983 errors_in_window=2824413, :31 test5 max_ms=141239 errors_in_window=2693410, :39 'rejoin: test6 REMOUNT umount_rc=0 mount_rc=32 ms=5910 mounted=0', :41 RESULT: FAIL measured=stage=rejoin. stopped_test6_lost.txt:1-6: P290-AUTH-CLOSED reason=AUTHORITY_LEASE_EXPIRED, P131-SELF-FENCE, P-WITHDRAW, 'Metadata I/O Error (0x1) detected at mxfs_dlm_fence_notify+0x53/0x80 ... Shutting down filesystem', P131-SELF-FENCE [PR_KEY_PREEMPTED]. Survivors' kernel logs were not captured (kmsg_follow_test3..5 hold only FOLLOW_STARTED). Build: tests/evidence/board129_4mpath_g4.out:47 'build 4FD56D0D02CBB2D2A7CB8B6', :104 'FAIL path_all_lost (207s/380s)'. Since then 10 runs of the row passed at 4/net/mesh/mpath and one failed (2026-10-20T08:02:25Z, retired by a verification of D-TCP-4NODE-NOQUEUE-TRY-WAITS-9S-ON-FULL-LEDGER-PAGE-CREATES-STALL); data/criteria.runs.jsonl:2644-6696. Collected in tests/evidence/incident_groups_ach_evidence_20261023.txt (group c, lines 606-752); located by tests/evidence/incident_preassert_sweep_20261022T2355Z.txt group c.",
+      "next": "Find the survivors' kernel logs for 03:07-03:09:38Z (netconsole log, or the nodes' journals if still kept): what the 2.5 million errors were and what the 141 s waited on, and why test6's mount returned 32 after its fence. Then measure 4/net/mesh/mpath path_all_lost on the current build with kernel logs kept.",
+      "impact": "stability",
+      "impact_why": "the three survivors completed no operation for 141 s (over the 30 s stall_limit_s) and their loads counted 2.5-2.8 million errors while a peer lost every path, and the peer's rejoin mount failed (mount_rc=32)",
+      "collateral": [
+        {
+          "config": "4/net/mesh/mpath",
+          "row": "path_peer_withdrawn",
+          "iso": "2026-10-15T03:09:41Z",
+          "why": "row.log:23-34 and :39-40 of the path_all_lost run just before: test3-test5 completed no operation for 141 s with millions of errors and test6's rejoin mount returned 32; this row found mxfs not mounted on test3-test6"
+        },
+        {
+          "config": "4/net/mesh/mpath",
+          "row": "alloc_witness",
+          "iso": "2026-10-15T03:09:45Z",
+          "why": "row.log:23-34 and :39-40 of the path_all_lost run just before: test3-test5 completed no operation for 141 s with millions of errors and test6's rejoin mount returned 32; this row found mxfs not mounted on test3-test6"
+        },
+        {
+          "config": "4/net/mesh/mpath",
+          "row": "chk_clean",
+          "iso": "2026-10-15T03:09:48Z",
+          "why": "row.log:23-34 and :39-40 of the path_all_lost run just before: test3-test5 completed no operation for 141 s with millions of errors and test6's rejoin mount returned 32; this row found mxfs not mounted on test3-test6"
+        },
+        {
+          "config": "4/net/mesh/mpath",
+          "row": "tcp_dlm_scaling",
+          "iso": "2026-10-15T03:09:53Z",
+          "why": "row.log:23-34 and :39-40 of the path_all_lost run just before: test3-test5 completed no operation for 141 s with millions of errors and test6's rejoin mount returned 32; this row found mxfs not mounted on test3-test6"
+        },
+        {
+          "config": "4/net/mesh/mpath",
+          "row": "crash_audit",
+          "iso": "2026-10-15T03:09:54Z",
+          "why": "row.log:23-34 and :39-40 of the path_all_lost run just before: test3-test5 completed no operation for 141 s with millions of errors and test6's rejoin mount returned 32; this row found mxfs not mounted on test3-test6"
+        }
+      ]
+    },
+    {
+      "id": "D-XFS-BASELINE-4KN-CAPTURE-PREPS-1XFS-ON-TEST1-NOT-THE-POOL-PAIRS-NODE",
+      "severity": "minor",
+      "nodes": 1,
+      "config": "xfs",
+      "opened": "2026-10-22",
+      "summary": "tools/xfs_baseline_refresh.sh BLOCK_SIZE=4096 (the 4K-native yardstick capture) bound pool LUN 13 for test31/test32 and then ran './run.sh 1/xfs prep_cluster' on test1, the 1/xfs default node, which was powered off: the prep failed in 0 s on ssh name resolution, and each of the five fio_perf runs after it was refused because the marker still named the 2/net/mesh/direct cluster (0 of 5 runs wrote a baseline).",
+      "evidence": "tests/evidence/xfs_baseline_4kn_20261022T173149Z.log:4-6 (lun_pool binds lun13 for test31), :33 '--- prep: 1 node [xfs baseline: test1] ---', :34 'PREP FAIL (mkfs.xfs): ssh: Could not resolve hostname test1.vm.localdomain: Name or service not known', :35 'ABORT: cluster prep failed', :59/:84/:109/:134/:161 'ERROR: cluster is prepped for 2/net/mesh/direct (srcver=0988C50EC610F82EE08D135), you requested 1/xfs', :294 'net-mesh-direct4k: 0 of 5 runs wrote a baseline'. Ledger data/criteria.runs.jsonl:7270 1/xfs prep_cluster INCOMPLETE 'prep failed' elapsed 0 s, run_id 20261022T173209Z. 28 later 1/xfs prep runs passed (17:33:55Z-20:34:52Z), and the capture of 17:55:30Z kept 10 runs (xfs_baseline_4kn_20261022T175530Z_runs). Located by tests/evidence/incident_remaining_evidence_20261023.txt incident 1.",
+      "next": "Read how tools/xfs_baseline_refresh.sh picks the node its run.sh 1/xfs calls use for a pool-LUN capture and whether anything forms or powers that node first; compare the 17:31:49Z run with the 17:55:30Z run that kept 10 runs. Fix so the capture runs on the pool pair's own node and refuses when that node is not up.",
+      "cells": [
+        {
+          "config": "1/xfs",
+          "row": "prep_cluster",
+          "iso": "2026-10-22T17:32:16Z"
         }
       ]
     }
