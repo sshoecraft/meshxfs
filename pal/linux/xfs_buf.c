@@ -4929,6 +4929,9 @@ extern atomic_t mxfs_dbg_iwr_merge_hold_n;
 extern int mxfs_dbg_iwr_merge_hold_ms;
 extern int mxfs_dbg_iwr_merge_hold_peer_ms;
 extern atomic_t mxfs_iwr_merge_hold_landed;
+extern int mxfs_iwr_ra_partial;
+extern atomic_t mxfs_dbg_recov_iwr_hold_n;
+extern int mxfs_dbg_recov_iwr_hold_ms;
 
 /*
  * H-WW1 instrument (D-NETMESH-LIVE-FILE-INODE-FREED-UNDER-ITS-NAME-AFTER-
@@ -5160,11 +5163,18 @@ mxfs_dino_clobber_probe(
 	char			(*mdet)[112];
 	uint64_t		lba;
 
+	/*
+	 * A cluster a log recovery read still carries the readahead ops when it
+	 * is written back, and its write regresses a slot exactly as any other
+	 * cluster's does; with only xfs_inode_buf_ops admitted, a recovery's
+	 * whole write went out unmeasured.
+	 */
 	if (!(unlikely(mxfs_dino_clobber_check || mxfs_instr_enabled) &&
 	      (bp->b_flags & XBF_WRITE) && bp->b_addr && bp->b_mount &&
 	      bp->b_mount->m_mxfs_dlm && bp->b_map_count == 1 &&
 	      bp->b_target && bp->b_target->bt_bdev &&
-	      bp->b_ops == &xfs_inode_buf_ops))
+	      (bp->b_ops == &xfs_inode_buf_ops ||
+	       bp->b_ops == &xfs_inode_buf_ra_ops)))
 		return;
 	/*
 	 * A mount that has never had a peer has nobody to regress against and
@@ -5691,10 +5701,23 @@ mxfs_submit_partial_inode_write(
 	 * whole write below becomes a merge or a refusal, except a brand-new
 	 * chunk's (allocbuf), which no peer can hold a slot of yet.  A buffer
 	 * still carrying the readahead ops is an inode cluster like any other.
+	 *
+	 * On every other volume too.  Log recovery reads each cluster it replays
+	 * into through its readahead, xfs_buf_reverify keeps a buffer's first
+	 * ops, and the readahead ops are on no other inode cluster: sending them
+	 * whole sent every recovery write of a cluster whole, the slots the
+	 * replay skipped (its changecount gate found the platter newer) and the
+	 * ones it never touched as this node read them, past the mask below that
+	 * the recovery-owned slots (b_mxfs_recov_slots) are written through.  A
+	 * rejoin mount's adopted replay skipped a shared directory's inode and
+	 * then wrote its whole cluster, that directory's slot included, while the
+	 * survivors were creating and renaming in it.  iwr_ra_partial=0 is the
+	 * whole write, the same-build control.
 	 */
 	merged = mp->m_sb.sb_sectsize > mp->m_sb.sb_inodesize;
 	if (bp->b_ops != &xfs_inode_buf_ops &&
-	    !(merged && bp->b_ops == &xfs_inode_buf_ra_ops)) {
+	    !((merged || READ_ONCE(mxfs_iwr_ra_partial)) &&
+	      bp->b_ops == &xfs_inode_buf_ra_ops)) {
 		if (bp->b_ops == &xfs_inode_buf_ra_ops)
 			mxfs_iwr_whole_note(bp, "ops-ra", &mxfs_iwr_whole_early,
 					    0, 0, 0, 0);
@@ -8878,6 +8901,55 @@ mxfs_bmbt_chokepoint_covers(
  * the create-cost probe around its directory lookup. */
 atomic64_t mxfs_buf_read_bios = ATOMIC64_INIT(0);
 
+/*
+ * DEBUG (dbg_recov_iwr_hold_n, xfs/xfs_mxfs_dlm.c): hold a log recovery's
+ * write of an inode cluster holding a directory slot before the write decides
+ * which slots leave this node, so a test can land a peer's write of the same
+ * cluster in between.  Runs ahead of that decision so both arms of
+ * iwr_ra_partial are held alike.
+ */
+static void
+mxfs_recov_iwr_hold(
+	struct xfs_buf		*bp)
+{
+	struct xfs_mount	*mp = bp->b_mount;
+	unsigned int		isize, ni, s, ndir = 0;
+	char			dirs[96];
+	int			used = 0, ms;
+
+	if (likely(atomic_read(&mxfs_dbg_recov_iwr_hold_n) <= 0))
+		return;
+	if (!(bp->b_flags & XBF_WRITE) || !(bp->b_flags & _XBF_LOGRECOVERY) ||
+	    (bp->b_ops != &xfs_inode_buf_ops &&
+	     bp->b_ops != &xfs_inode_buf_ra_ops) ||
+	    !mp || !mp->m_sb.sb_inodesize || !bp->b_addr)
+		return;
+	isize = mp->m_sb.sb_inodesize;
+	ni = min_t(unsigned int, BBTOB(bp->b_length) / isize, 64);
+	dirs[0] = '\0';
+	for (s = 0; s < ni; s++) {
+		struct xfs_dinode *d = bp->b_addr + (size_t)s * isize;
+
+		if (be16_to_cpu(d->di_magic) != MXFS_DINODE_MAGIC ||
+		    (be16_to_cpu(d->di_mode) & S_IFMT) != S_IFDIR)
+			continue;
+		ndir++;
+		if (used < (int)sizeof(dirs) - 1)
+			used += scnprintf(dirs + used, sizeof(dirs) - used,
+					  "%s%llu", used ? "," : "",
+					  (unsigned long long)be64_to_cpu(d->di_ino));
+	}
+	if (!ndir || atomic_dec_if_positive(&mxfs_dbg_recov_iwr_hold_n) < 0)
+		return;
+	ms = READ_ONCE(mxfs_dbg_recov_iwr_hold_ms);
+	pr_warn("mxfs: P-RECOV-IWR-HOLD begin daddr=%lld ms=%d ra=%d dirs=[%s] comm=%s -- DEBUG: a log recovery's inode-cluster write waits before deciding its slots\n",
+		(long long)bp->b_maps[0].bm_bn, ms,
+		bp->b_ops == &xfs_inode_buf_ra_ops ? 1 : 0, dirs, current->comm);
+	msleep(ms);
+	pr_warn("mxfs: P-RECOV-IWR-HOLD end daddr=%lld\n",
+		(long long)bp->b_maps[0].bm_bn);
+}
+
 static void
 xfs_buf_submit_bio(
 	struct xfs_buf		*bp)
@@ -9212,6 +9284,7 @@ xfs_buf_submit_bio(
 	 * path out of here (whole buffer, partial inode write) completes
 	 * through __xfs_buf_ioend, whose terminal point retires it.
 	 */
+	mxfs_recov_iwr_hold(bp);
 	if (mxfs_submit_partial_inode_write(bp))
 		return;
 	mxfs_iwr_refuse_streak_end(bp, (bp->b_flags & XBF_WRITE) ?

@@ -695,14 +695,23 @@
           "status": "PASS",
           "measured": "elapsed=33s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-23T17:37:57Z",
+          "iso": "2026-10-23T18:04:45Z",
           "recorded": "2026-10-23",
           "elapsed_s": 33,
-          "build": "08D63764A9352FBDD5A76CD",
+          "build": "C54C14B681D148267D084FC",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261023T173715Z-g2",
+          "run_id": "20261023T180403Z-g2",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T17:37:57Z",
+              "measured": "elapsed=33s (fresh prep)",
+              "reason": "",
+              "build": "08D63764A9352FBDD5A76CD",
+              "outcome": "PASS",
+              "run_id": "20261023T173715Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T17:28:50Z",
@@ -782,12 +791,6 @@
               "status": "PASS",
               "iso": "2026-10-21T05:42:22Z",
               "measured": "elapsed=70s (fresh prep)",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-21T00:20:14Z",
-              "measured": "elapsed=28s (fresh prep)",
               "reason": ""
             }
           ]

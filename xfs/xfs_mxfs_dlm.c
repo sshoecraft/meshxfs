@@ -2654,6 +2654,39 @@ module_param_cb(iwr_merge_hold_landed, &mxfs_dbg_atomic_param_ops,
 MODULE_PARM_DESC(iwr_merge_hold_landed,
 		 "count of dbg_iwr_merge_hold_peer_ms holds that a peer's swap of the held block ended (write resets)");
 /*
+ * An inode cluster log recovery read through its readahead still carries
+ * xfs_inode_buf_ra_ops when the recovery writes it back, and on a volume whose
+ * sector holds one inode or less that buffer went out whole: every slot as the
+ * recovering node read it, the ones its replay skipped or never touched
+ * included, past the per-slot mask that keeps a node from publishing slots it
+ * neither logged nor holds (pal/linux/xfs_buf.c, mxfs_submit_partial_inode_write).
+ * 1 (default) sends it through that mask like any inode cluster; 0 is the
+ * whole write, the same-build control.
+ */
+int mxfs_iwr_ra_partial = 1;
+module_param_named(iwr_ra_partial, mxfs_iwr_ra_partial, int, 0644);
+MODULE_PARM_DESC(iwr_ra_partial,
+		 "an inode cluster still carrying the readahead ops goes through the per-slot write mask on every volume (1=default; 0=written whole on a 512-byte-sector volume, the same-build control)");
+/*
+ * DEBUG: the next dbg_recov_iwr_hold_n inode-cluster writes a log recovery
+ * queued, of clusters holding a directory slot, each wait
+ * dbg_recov_iwr_hold_ms at submission, before the write decides which slots
+ * leave this node, so a test can land a peer's write of the same cluster
+ * between the recovery's read and its write (tests/recov_iwr_revert_lap.sh).
+ * P-RECOV-IWR-HOLD marks each hold's start, with the directories in the
+ * cluster, and its end.  Each held write takes one from the count, which reads
+ * back what is left.  Never in production.
+ */
+atomic_t mxfs_dbg_recov_iwr_hold_n = ATOMIC_INIT(0);
+module_param_cb(dbg_recov_iwr_hold_n, &mxfs_dbg_atomic_param_ops,
+		&mxfs_dbg_recov_iwr_hold_n, 0644);
+MODULE_PARM_DESC(dbg_recov_iwr_hold_n,
+		 "DEBUG: the next N inode-cluster writes a log recovery queued, of clusters holding a directory, wait dbg_recov_iwr_hold_ms before deciding their slots (reads back the count left). Never enable in production.");
+int mxfs_dbg_recov_iwr_hold_ms = 10000;
+module_param_named(dbg_recov_iwr_hold_ms, mxfs_dbg_recov_iwr_hold_ms, int, 0644);
+MODULE_PARM_DESC(dbg_recov_iwr_hold_ms,
+		 "DEBUG: how long a write held by dbg_recov_iwr_hold_n waits, in ms. Never enable in production.");
+/*
  * D-PEER-OPEN-UNLINKED-CHAIN-REMOVE-FAILS-IFREE-SHUTDOWN-BOTH-NODES, H-U6:
  * xfs_inactive_ifree released its predecessor pin (H-U1) and hold (H-U4) with
  * a synchronous xfs_irele after the free committed.  When it is the
