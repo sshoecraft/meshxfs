@@ -4104,6 +4104,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-38cc61",
+          "kind": "control",
+          "row": "lap:row_pull",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: every node held",
+          "candidate": "",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "MXFS_PULL_SINCE_ROW=0 (run.sh pull_row_artifacts copies every capture and fsx log by name whatever its age, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: files an earlier row or boot left on a node are copied into a failed row's evidence"
         }
       ],
       "rates": [
@@ -5187,7 +5204,7 @@
           "candidate": "0.90.134",
           "build": "79779BEAECBEA94844FDC72",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -5343,6 +5360,18 @@
           "config": "2/net/mesh/direct",
           "row": "lap:release_step_cell",
           "iso": "2026-10-23T20:42:42Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T20:41:09Z",
+          "build": "79779BEAECBEA94844FDC72",
+          "batch": "b20261023-019d20",
+          "approval": "P20261023-99e51f",
+          "date": "2026-10-23"
         }
       ]
     },
@@ -5897,7 +5926,7 @@
           "candidate": "0.90.134",
           "build": "79779BEAECBEA94844FDC72",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -5938,7 +5967,19 @@
           "date": "2026-10-23"
         }
       ],
-      "reproducer": "tests/release_step_copy_race.py (about 6 s, host only: 200 copies of data/ the way tests/release_step_cell_lap.py makes them while a writer saves the queue through defects.save); MXFS_RELEASE_STEP_COPY=0 is the control"
+      "reproducer": "tests/release_step_copy_race.py (about 6 s, host only: 200 copies of data/ the way tests/release_step_cell_lap.py makes them while a writer saves the queue through defects.save); MXFS_RELEASE_STEP_COPY=0 is the control",
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T20:41:09Z",
+          "build": "79779BEAECBEA94844FDC72",
+          "batch": "b20261023-4f8a32",
+          "approval": "P20261023-dad4c3",
+          "date": "2026-10-23"
+        }
+      ]
     },
     {
       "id": "D-FSX-SH-EXIT-TRAP-REMOVES-FSX-OWN-FSXLOG-AND-FSXGOOD-WITH-THE-WORK-DIR",
