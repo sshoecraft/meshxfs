@@ -4327,8 +4327,14 @@
         "data/defects.json",
         "data/reviews/P20261023-8d639f.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-5c6d25.md",
+        "sha256": "be6b602779166531f8c07fd59a533178527d40e52b92c5546870639127d6a977",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-a252b4",
@@ -4383,8 +4389,15 @@
         "data/configurations.json",
         "data/defects.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-4036f9.md",
+        "sha256": "509c6a33cce21ffbe53531edffa3e995dcf3a60e9a73afa7cdb72ec0b7534f96",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }
