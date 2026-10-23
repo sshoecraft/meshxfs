@@ -4122,11 +4122,44 @@
           "candidate": "",
           "build": "79779BEAECBEA94844FDC72",
           "variant": "MXFS_PULL_SINCE_ROW=0 (run.sh pull_row_artifacts copies every capture and fsx log by name whatever its age, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: files an earlier row or boot left on a node are copied into a failed row's evidence"
+        },
+        {
+          "id": "b20261023-020a6a",
+          "kind": "verify",
+          "row": "lap:row_pull",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: every node held",
+          "candidate": "0.90.134",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:row_pull",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-38cc61",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_PULL_SINCE_ROW=0 (run.sh pull_row_artifacts copies every capture and fsx log by name whatever its age, as before the fix)",
+            "builds": [
+              "79779BEAECBEA94844FDC72"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -4157,6 +4190,21 @@
           "variant": "MXFS_PULL_SINCE_ROW=0 (run.sh's artifact pull takes every /root capture and fsx log whatever its age, as before the fix)",
           "builds": [
             "C54C14B681D148267D084FC"
+          ],
+          "date": "2026-10-23"
+        },
+        {
+          "row": "lap:row_pull",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-38cc61",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_PULL_SINCE_ROW=0 (run.sh pull_row_artifacts copies every capture and fsx log by name whatever its age, as before the fix)",
+          "builds": [
+            "79779BEAECBEA94844FDC72"
           ],
           "date": "2026-10-23"
         }
@@ -4211,6 +4259,56 @@
           "config": "2/disk/caw/direct",
           "row": "lap:row_pull",
           "iso": "2026-10-23T18:53:54Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T21:12:54Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T21:12:25Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T21:11:57Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T21:11:28Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T21:11:00Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T21:10:28Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T21:10:00Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T21:09:31Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T21:09:02Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:row_pull",
+          "iso": "2026-10-23T21:08:34Z"
         }
       ],
       "verified_at": [
@@ -5132,266 +5230,6 @@
       "reproducer": "tests/rejoin_modargs_lap.sh: runs tests/mpath/lib.sh pf_boot_rejoin and pf_rejoin_modargs on the host with ssh and virsh replaced by a recorder, and compares the insmod argv the rejoin would send with prep_node.sh's for the same environment (MXFS_CONFIG=8/net/mesh/mpath MXFS_EXTRA_MODARGS=dead_timeout_ms=12000); PF_REJOIN_PREP_ARGS=0 is the control"
     },
     {
-      "id": "D-RELEASE-STEP-ANNOTATION-LOOKS-THE-STEP-ROW-UP-AS-A-BOARD-CRITERION",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-23",
-      "summary": "tools/criteria.py annotated_run, which criteria.py infra, amend, unamend and unretire call first, looked every row up as a board criterion (find), but a release step's row (release:<step>) exists only in the run ledger: criteria.py infra and amend of a failed release step's run, and criteria.py unretire of its retirement, were refused \"criteria: nothing matches 'release:<step>'\" on every key shape, so a failed release step could be neither settled as infra-proven or a detector defect nor have its retirement taken back",
-      "evidence": "Read 2026-10-21 (D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED's evidence, part 3): cmd_amend, cmd_infra and withdraw start with find(data, args.id). Measured 2026-10-23 on the host with tests/release_step_cell_lap.py and only MXFS_RELEASE_STEP_ANNOTATE=0 (annotated_run's release-step branch off, the other parts on): FAIL 12 of 12, criteria.py infra and amend refused \"criteria: nothing matches 'release:boards'\" (release:platforms, release:drbd) on all three keys, and the take-back of each removal, criteria.py unretire, refused the same (tests/evidence/release_step_switches_20261023T171448Z/lap_MXFS_RELEASE_STEP_ANNOTATE.log); all on, PASS 12 of 12 (tests/evidence/release_step_switches_20261023T171448Z/lap_on.log). The fix: annotated_run returns a release step's row as it is and takes the placeholder 1/any (tools/criteria.py annotated_run, behind MXFS_RELEASE_STEP_ANNOTATE).",
-      "next": "On the next attempt: control batch of tests/release_step_cell_lap.py with MXFS_RELEASE_STEP_ANNOTATE=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 40 s, probe '^EXPOSED: the gate lists', pass '^STEP_CELL_LAP PASS'), the verification batch sized from it, then remove --fixed.",
-      "reproducer": "tests/release_step_cell_lap.py (about 20 s, host only, scratch trees); MXFS_RELEASE_STEP_ANNOTATE=0 is the control",
-      "batches": [
-        {
-          "id": "b20261023-9fdb1d",
-          "kind": "control",
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: the gate lists",
-          "candidate": "",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "MXFS_RELEASE_STEP_ANNOTATE=0 (tools/criteria.py looks a release step's row up as a board criterion, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix's annotation lookup taken out: infra, amend and every take-back of a release step's run refused"
-        },
-        {
-          "id": "b20261023-67d3e5",
-          "kind": "verify",
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: the gate lists",
-          "candidate": "0.90.134",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "",
-          "state": "open",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:release_step_cell",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-9fdb1d",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_RELEASE_STEP_ANNOTATE=0 (tools/criteria.py looks a release step's row up as a board criterion, as before the fix)",
-            "builds": [
-              "C54C14B681D148267D084FC"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        },
-        {
-          "id": "b20261023-c031e8",
-          "kind": "control",
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: the gate lists",
-          "candidate": "",
-          "build": "79779BEAECBEA94844FDC72",
-          "variant": "MXFS_RELEASE_STEP_ANNOTATE=0 (tools/criteria.py annotated_run looks a release step's row up as a board criterion, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: an infra or detector-defect annotation of a failed step's run, or the take-back of its retirement, is refused 'nothing matches'"
-        },
-        {
-          "id": "b20261023-019d20",
-          "kind": "verify",
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: the gate lists",
-          "candidate": "0.90.134",
-          "build": "79779BEAECBEA94844FDC72",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:release_step_cell",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-c031e8",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_RELEASE_STEP_ANNOTATE=0 (tools/criteria.py annotated_run looks a release step's row up as a board criterion, as before the fix)",
-            "builds": [
-              "79779BEAECBEA94844FDC72"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "updated": "2026-10-23",
-      "rates": [
-        {
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-9fdb1d",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_RELEASE_STEP_ANNOTATE=0 (tools/criteria.py looks a release step's row up as a board criterion, as before the fix)",
-          "builds": [
-            "C54C14B681D148267D084FC"
-          ],
-          "date": "2026-10-23"
-        },
-        {
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-c031e8",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_RELEASE_STEP_ANNOTATE=0 (tools/criteria.py annotated_run looks a release step's row up as a board criterion, as before the fix)",
-          "builds": [
-            "79779BEAECBEA94844FDC72"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:39:33Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:39:18Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:39:02Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:38:46Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:38:31Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:38:15Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:38:00Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:37:44Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:37:28Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:37:13Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T20:45:11Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T20:44:54Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T20:44:37Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T20:44:21Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T20:44:04Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T20:43:48Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T20:43:31Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T20:43:15Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T20:42:59Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T20:42:42Z"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T20:41:09Z",
-          "build": "79779BEAECBEA94844FDC72",
-          "batch": "b20261023-019d20",
-          "approval": "P20261023-99e51f",
-          "date": "2026-10-23"
-        }
-      ]
-    },
-    {
       "id": "D-4CAWMPATH-PATH-ALL-LOST-A-CHURN-FILE-NO-LONGER-NAMED-ITS-CREATED-INODE",
       "severity": "critical",
       "nodes": 1,
@@ -5839,173 +5677,6 @@
         }
       ],
       "updated": "2026-10-23"
-    },
-    {
-      "id": "D-RELEASE-STEP-CELL-LAP-COPIES-LIVE-DATA-DIR-AND-DIES-ON-A-VANISHED-TMP-FILE",
-      "severity": "minor",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-23",
-      "summary": "tests/release_step_cell_lap.py's scratch_tree copies the live tree's data/ with shutil.copytree while other processes write it; tools/defects.py replaces data/defects.json through data/defects.json.tmp and a rename, so a lap that lists the directory while that temp file exists and copies after the rename dies with shutil.Error (No such file or directory) and records no verdict",
-      "evidence": "Verification batch b20261023-67d3e5 (D-RELEASE-STEP-ANNOTATION-LOOKS-THE-STEP-ROW-UP-AS-A-BOARD-CRITERION, candidate 0.90.134 attempt 2026-10-23T18:32:24Z, lane tests/evidence/lanes/local_a12_tooling_20261023T183240Z step4.log:6): lap 4/6 'INCOMPLETE 2/net/mesh/direct:lap:release_step_cell:2026-10-23T18:40:54Z rc=1 elapsed_s=10 exposure=6 -- no verdict line'; its log tests/evidence/batch_laps/b20261023-67d3e5/20261023T184043Z-412940c2.log:23-37 'Traceback ... release_step_cell_lap.py, line 244, in main / tree = scratch_tree(base / f\"{number:02d}\") / line 98, in scratch_tree / shutil.copytree(ROOT / \"data\", base / \"data\", symlinks=True) ... shutil.Error: [(\\'/home/steve/src/mxfs/data/defects.json.tmp\\', ..., \"[Errno 2] No such file or directory: \\'/home/steve/src/mxfs/data/defects.json.tmp\\'\")]'. Six dispositions had settled before it (lines 7-22). The g2 and g2d rig lanes were writing data/defects.json through tools/harness_batch.py at the same time. The batch closed 5 PASS of 6 planned, so the record has no complete verification on this attempt. ===== 2026-10-23: no longer names 2/net/mesh/direct:lap:release_step_copy_race:2026-10-23T20:42:11Z, named by D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING; 2/net/mesh/direct:lap:release_step_copy_race:2026-10-23T20:42:12Z, named by D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING; 2/net/mesh/direct:lap:release_step_copy_race:2026-10-23T20:42:13Z, named by D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING; 2/net/mesh/direct:lap:release_step_copy_race:2026-10-23T20:42:14Z, named by D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING; 2/net/mesh/direct:lap:release_step_copy_race:2026-10-23T20:42:15Z, named by D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING; 2/net/mesh/direct:lap:release_step_copy_race:2026-10-23T20:42:16Z, named by D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING; 2/net/mesh/direct:lap:release_step_copy_race:2026-10-23T20:42:17Z, named by D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING; 2/net/mesh/direct:lap:release_step_copy_race:2026-10-23T20:42:18Z, named by D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING; 2/net/mesh/direct:lap:release_step_copy_race:2026-10-23T20:42:19Z, named by D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING; 2/net/mesh/direct:lap:release_step_copy_race:2026-10-23T20:42:20Z, named by D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING: these ten laps of control b20261023-a60598 never ran the lap: the file had no execute bit and env refused it (rc=126); D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING names each of them",
-      "next": "Copy data/ so a file that vanishes between the listing and the copy cannot end the lap (ignore the atomic writers' *.tmp files, which no lap reads), after the attempt's reviews are done (the lap is a frozen file); then a lap that writes data/defects.json in a loop while the lap copies, fix out and fix in, and the ANNOTATE record's verification again on the next attempt.",
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:40:54Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:46:28Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:46:17Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:46:07Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:45:56Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:45:46Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:45:36Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:45:25Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:45:14Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:45:03Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:44:53Z"
-        }
-      ],
-      "batches": [
-        {
-          "id": "b20261023-a60598",
-          "kind": "control",
-          "row": "lap:release_step_copy_race",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: ",
-          "candidate": "",
-          "build": "79779BEAECBEA94844FDC72",
-          "variant": "MXFS_RELEASE_STEP_COPY=0 (tests/release_step_cell_lap.py copies data/ whole, as before the fix)",
-          "state": "open",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: a copy of data/ that lists a writer's temporary file dies when the file is renamed away"
-        },
-        {
-          "id": "b20261023-cdcdc6",
-          "kind": "control",
-          "row": "lap:release_step_copy_race",
-          "config": "2/net/mesh/direct4k",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: ",
-          "candidate": "",
-          "build": "79779BEAECBEA94844FDC72",
-          "variant": "MXFS_RELEASE_STEP_COPY=0 (tests/release_step_cell_lap.py copies data/ whole, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: a copy of data/ that lists a writer's temporary file dies when the file is renamed away"
-        },
-        {
-          "id": "b20261023-4f8a32",
-          "kind": "verify",
-          "row": "lap:release_step_copy_race",
-          "config": "2/net/mesh/direct4k",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "79779BEAECBEA94844FDC72",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:release_step_copy_race",
-            "config": "2/net/mesh/direct4k",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-cdcdc6",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_RELEASE_STEP_COPY=0 (tests/release_step_cell_lap.py copies data/ whole, as before the fix)",
-            "builds": [
-              "79779BEAECBEA94844FDC72"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "updated": "2026-10-23",
-      "rates": [
-        {
-          "row": "lap:release_step_copy_race",
-          "config": "2/net/mesh/direct4k",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-cdcdc6",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_RELEASE_STEP_COPY=0 (tests/release_step_cell_lap.py copies data/ whole, as before the fix)",
-          "builds": [
-            "79779BEAECBEA94844FDC72"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "reproducer": "tests/release_step_copy_race.py (about 6 s, host only: 200 copies of data/ the way tests/release_step_cell_lap.py makes them while a writer saves the queue through defects.save); MXFS_RELEASE_STEP_COPY=0 is the control",
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct4k",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T20:41:09Z",
-          "build": "79779BEAECBEA94844FDC72",
-          "batch": "b20261023-4f8a32",
-          "approval": "P20261023-dad4c3",
-          "date": "2026-10-23"
-        }
-      ]
     },
     {
       "id": "D-FSX-SH-EXIT-TRAP-REMOVES-FSX-OWN-FSXLOG-AND-FSXGOOD-WITH-THE-WORK-DIR",

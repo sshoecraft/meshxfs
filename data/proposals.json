@@ -5289,8 +5289,15 @@
         "data/reviews/P20261023-9b6f3f.md",
         "data/reviews/P20261023-99e51f.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-8b1048.md",
+        "sha256": "5797a92923cb852ffb3ab5c4d1652d68621f14701e35fe355bef331a246e2a84",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-b51942",
@@ -5322,8 +5329,15 @@
         "data/reviews/P20261023-1bcf31.md",
         "data/reviews/P20261023-dad4c3.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-b51942.md",
+        "sha256": "22d3f32351a1602ba65363ad64a72c84d0e1350be7ccaf45c83d1ce9f159d70a",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-22efac",
