@@ -3534,6 +3534,42 @@
         "data/criteria.runs.jsonl",
         "data/reviews/P20261023-175966.md"
       ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-d3a418.md",
+        "sha256": "45b8aa48752d7daab1936356db61c1ddf5862ed8cfe52c5756f0a9a737c4a942",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-4e9693",
+      "kind": "remove-fixed",
+      "record": "D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE",
+      "change": {
+        "control": "b20261023-6f28c5",
+        "fixon": "b20261023-877d3c",
+        "cause": "run.sh run_none, which runs the fsx row, pulled nothing from the node for a row that did not pass, so a failing fsx check's log, which tests/suite/fsx.sh keeps on the node as /root/fsx.<seed>.<ops>.log and names in the row's measured text, never reached the run's evidence; run_none now pulls the row's artifacts (pull_row_artifacts, which selects fsx.*.log) for a row that did not pass"
+      },
+      "argument": "FIXED AND VERIFIED, resubmitted on the current attempt as the rejection of P20261023-175966 required (data/reviews/P20261023-175966.md): the record is now the run_none cause alone (the fsx.sh EXIT-trap half is D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED), and the control and fix-on batches were rerun on attempt 2026-10-23T15:56:24Z, whose run.sh (sha256 5e37f48c...) is the tree's.\n\nThe defect: a failing fsx row kept no fsx log in its evidence. tests/suite/fsx.sh keeps a failing check's log on the node (/root/fsx.<seed>.<ops>.log, tests/suite/fsx.sh:38, :41-42) and names it in the row's measured text; the fsx row runs through run.sh run_none, which before the fix pulled nothing for a row that did not pass.\n\nThe fix, one site: run.sh:1535-1543. A row run by run_none that did not pass calls pull_row_artifacts for its node (run.sh:2213), whose selection names fsx.*.log (run.sh:2248, :2250). MXFS_PULL_RUN_NONE=0 skips that pull (run.sh:1539), the pre-fix path: run_none had no pull.\n\nThe lap: tests/fsx_log_pull_lap.sh runs the fsx row through run.sh on a scratch board with FSX_SEED=-1, so fsx exits with its usage on both checks and the row fails with both logs named (EXPOSED); PASS only if the run's evidence directory holds both logs with fsx's usage text in them.\n\nControl b20261023-6f28c5: candidate 0.90.134, attempt 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), pair g2b (test15/test16) at 2/disk/caw/direct, the frozen tree with only MXFS_PULL_RUN_NONE=0 in the lap's own environment: 10 of 10 exposed laps FAIL, each 'LAP fsx_pull FAIL: not in the run's evidence: tests/evidence/run_fsx_<run>-g2b/test15_fsx.-1.100000.log ...' (tests/evidence/lanes/g2b_a11_fsx_20261023T161533Z/step3.log:5-14, the tally :17 and :29), inputs before and after alike, 2564 files, 'content=0; touched=0; added=0; gone=0' (tests/evidence/lanes/g2b_a11_fsx_20261023T161533Z/step3.log:3, :15-16; tests/evidence/controls/b20261023-6f28c5.20261023T161641Z.inputs.before.json, .after.json).\n\nFix-on batch b20261023-877d3c, same attempt and pair, switch at its default, sized from that control (N=6 at delta=alpha=0.005, tests/evidence/lanes/g2b_a11_fsx_20261023T161533Z/step4.log:1): 6 of 6 PASS with exposure, each 'LAP fsx_pull PASS: both failing checks' logs are in tests/evidence/run_fsx_<run>-g2b' (tests/evidence/lanes/g2b_a11_fsx_20261023T161533Z/step4.log:3-8, tally :9). Its verify P20261023-d3a418 was approved and applied (data/reviews/P20261023-d3a418.md).\n\nCells: the record names the 10 laps of this control and the 10 of the earlier control b20261023-0934e6 (attempt 2026-10-23T10:11:20Z, the same switch, tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step6.log), each a lap:fsx_pull at 2/disk/caw/direct whose own log shows the run_none pull missing both logs. No product code is involved; the module is not a fix site.",
+      "evidence": [
+        "run.sh",
+        "tests/suite/fsx.sh",
+        "tests/fsx_log_pull_lap.sh",
+        "tests/evidence/lanes/g2b_a11_fsx_20261023T161533Z/step3.log",
+        "tests/evidence/lanes/g2b_a11_fsx_20261023T161533Z/step4.log",
+        "tests/evidence/batch_laps/b20261023-6f28c5",
+        "tests/evidence/batch_laps/b20261023-877d3c",
+        "tests/evidence/controls/b20261023-6f28c5.20261023T161641Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-6f28c5.20261023T161641Z.inputs.after.json",
+        "tests/evidence/candidates/0.90.134_20261023T155624Z.files.json",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step6.log",
+        "data/reviews/P20261023-175966.md",
+        "data/reviews/P20261023-d3a418.md",
+        "data/defects.json"
+      ],
       "state": "pending",
       "created": "2026-10-23"
     }
