@@ -192,6 +192,9 @@ aw_barrier(){ # <tag>: rendezvous; 0 every rank arrived, 1 timed out, 2 a peer a
     r=$(cat "$f"); rm -f "$f"
     return "$r"
 }
+# run.sh's timeout census reads the last of these from each node's kernel log,
+# so a lap its budget ends says which phase each rank was in
+ccph(){ echo "mxfs-CCph rank=$RANK PHASE=$1" > /dev/kmsg 2>/dev/null; }
 
 mountpoint -q "$MNT" || fail_out "mounted=0 rank=$RANK" "the filesystem is not mounted on this node"
 
@@ -287,6 +290,7 @@ partcarves(){ # <witness text>: carves summed over this node's partition
 # 1's partition, and made after, it would take one inode out of the reserve the
 # fill has just exhausted
 [ "$RANK" = 1 ] && { mkdir -p "$D/shared" 2>/dev/null; sync -f "$MNT" 2>/dev/null; }
+ccph fill
 mkdir -p "$D/fill_r$RANK" || fail_out "fill_mkdir=failed rank=$RANK" "mkdir of the node's fill directory failed"
 echo 1 > "$WIT" 2>/dev/null || fail_out "clear=failed rank=$RANK" "the witness counters could not be cleared before the fill"
 fill=0; fcarved=0; fstart=$(date +%s%N); fdeadline=$(( $(date +%s) + FILL_S ))
@@ -355,6 +359,7 @@ AGCOUNT=$(field "$S_S0" agcount)
 rec "FSID $FSID"
 rec "NODE rank=$RANK host=$(hostname) module=$(cat /sys/module/mxfs/srcversion 2>/dev/null) slot=$SLOT stride=$STRIDE multi=$MULTI agcount=$AGCOUNT affine_ag=$(( SLOT % AGCOUNT ))"
 
+ccph start
 r=$(aw_barrier aw_start)
 case $? in 0) ;; 2) peer_out "$r" ;; *) fail_out "barrier=aw_start rank=$RANK" "not every node reached the start rendezvous" ;; esac
 
@@ -382,6 +387,7 @@ if [ "$NODES" -ge 2 ]; then
 fi
 
 # ---- 1. the free-running burst in one shared directory ----------------------
+ccph p1
 r=$(aw_barrier aw_p1)
 case $? in 0) ;; 2) peer_out "$r" ;; *) fail_out "barrier=aw_p1 rank=$RANK" "not every node reached the burst rendezvous" ;; esac
 [ -d "$D/shared" ] || fail_out "shared_dir=missing rank=$RANK" "the shared directory rank 1 created is not visible here"
@@ -396,6 +402,7 @@ rec "PHASE1 end_ns=$(date +%s%N) files=$i"
 snap S1
 r=$(aw_barrier aw_p2)
 case $? in 0) ;; 2) peer_out "$r" ;; *) fail_out "barrier=aw_p2 rank=$RANK" "not every node finished the burst" ;; esac
+ccph p2
 
 # ---- 2. breadth: a directory of this node's own -----------------------------
 mkdir -p "$D/own_r$RANK" || fail_out "phase2_mkdir=failed rank=$RANK" "mkdir of the node's own directory failed"
@@ -405,6 +412,7 @@ sync -f "$MNT"
 rec "PHASE2 files=200 end_ns=$(date +%s%N)"
 
 # ---- 3. finobt lifecycle on an existing full chunk -------------------------
+ccph p3
 # f5 sits in the first chunk of own_r<rank>, which 200 creates filled; its
 # unlink turns that chunk full->partial, and the next create takes the freed
 # inode back (the finobt is searched first), partial->full.
@@ -415,6 +423,7 @@ sync -f "$MNT"
 rec "PHASE3 end_ns=$(date +%s%N)"
 
 # ---- 4. empty-retain-reuse: a disposable cohort, its chunks, its return -----
+ccph p4
 mkdir -p "$D/disp_r$RANK" || fail_out "phase4_mkdir=failed rank=$RANK" "mkdir of the disposable directory failed"
 i=0
 while [ "$i" -lt 256 ]; do : > "$D/disp_r$RANK/d$i" || fail_out "phase4_create=failed i=$i rank=$RANK" "a create in the disposable directory failed"; i=$((i + 1)); done
@@ -499,8 +508,10 @@ rec "RELAXED end=$(field "$S_SEND" relaxed)"
 rec "DONE rank=$RANK end_ns=$(date +%s%N)"
 sync -f "$MNT"
 
+ccph written
 r=$(aw_barrier aw_written)
 case $? in 0) ;; 2) peer_out "$r" ;; *) emit FAIL "barrier=aw_written rank=$RANK" "not every node wrote its record"; exit 1 ;; esac
+[ "$RANK" = 1 ] && ccph eval
 
 # ---- rank 1: every node's record -> the floors -> the sealed witness --------
 if [ "$RANK" != 1 ]; then
