@@ -4634,7 +4634,7 @@
           "candidate": "0.90.134",
           "build": "79779BEAECBEA94844FDC72",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -4861,10 +4861,10 @@
           "config": "2/net/mesh/direct",
           "platform": "any",
           "candidate": "0.90.134",
-          "attempt": "2026-10-23T18:32:24Z",
-          "build": "C54C14B681D148267D084FC",
-          "batch": "b20261023-193240",
-          "approval": "P20261023-516c9b",
+          "attempt": "2026-10-23T20:41:09Z",
+          "build": "79779BEAECBEA94844FDC72",
+          "batch": "b20261023-ab170a",
+          "approval": "P20261023-590193",
           "date": "2026-10-23"
         }
       ]
