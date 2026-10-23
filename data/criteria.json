@@ -873,16 +873,36 @@
         },
         "2/net/mesh/direct": {
           "status": "PASS",
-          "measured": "elapsed=30s (fresh prep)",
+          "measured": "elapsed=28s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-23T07:12:35Z",
+          "iso": "2026-10-23T07:36:05Z",
           "recorded": "2026-10-23",
-          "elapsed_s": 30,
+          "elapsed_s": 28,
           "build": "B155E10D900872E6CE36289",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261023T071156Z-g2",
+          "run_id": "20261023T073528Z-g2",
+          "variant": "MXFS_EXTRA_MODARGS=bmbt_skip_reads=1",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T07:24:21Z",
+              "measured": "elapsed=31s (fresh prep)",
+              "reason": "",
+              "build": "B155E10D900872E6CE36289",
+              "outcome": "PASS",
+              "run_id": "20261023T072341Z-g2",
+              "variant": "MXFS_EXTRA_MODARGS=bmbt_skip_reads=1"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T07:12:35Z",
+              "measured": "elapsed=30s (fresh prep)",
+              "reason": "",
+              "build": "B155E10D900872E6CE36289",
+              "outcome": "PASS",
+              "run_id": "20261023T071156Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T07:06:36Z",
@@ -963,28 +983,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261023T055651Z-g2",
-              "variant": "MXFS_EXTRA_MODARGS=inact_relmark=0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-23T05:54:07Z",
-              "measured": "elapsed=31s (fresh prep)",
-              "reason": "",
-              "build": "16A5F5DDDB4852C9D5DB236",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261023T055327Z-g2",
-              "variant": "MXFS_EXTRA_MODARGS=inact_relmark=0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-23T05:50:42Z",
-              "measured": "elapsed=31s (fresh prep)",
-              "reason": "",
-              "build": "16A5F5DDDB4852C9D5DB236",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261023T055002Z-g2",
               "variant": "MXFS_EXTRA_MODARGS=inact_relmark=0"
             }
           ]
@@ -1337,18 +1335,36 @@
         },
         "2/net/mesh/mpath": {
           "status": "PASS",
-          "measured": "skipped (marker matched 2/net/mesh/mpath)",
+          "measured": "elapsed=31s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-23T06:13:34Z",
+          "iso": "2026-10-23T07:40:43Z",
           "recorded": "2026-10-23",
-          "elapsed_s": 0,
-          "build": "16A5F5DDDB4852C9D5DB236",
+          "elapsed_s": 31,
+          "build": "B155E10D900872E6CE36289",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261023T061326Z-g2b",
-          "candidate": "0.90.134",
-          "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
+          "run_id": "20261023T074003Z-g2b",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T07:30:57Z",
+              "measured": "elapsed=31s (fresh prep)",
+              "reason": "",
+              "build": "B155E10D900872E6CE36289",
+              "outcome": "PASS",
+              "run_id": "20261023T073017Z-g2b"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T06:13:34Z",
+              "measured": "skipped (marker matched 2/net/mesh/mpath)",
+              "reason": "",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261023T061326Z-g2b",
+              "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T06:10:25Z",
@@ -1405,18 +1421,6 @@
               "status": "PASS",
               "iso": "2026-10-21T01:24:27Z",
               "measured": "elapsed=36s (fresh prep)",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-21T01:18:18Z",
-              "measured": "skipped (marker matched 2/net/mesh/mpath)",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-21T01:18:09Z",
-              "measured": "elapsed=35s (fresh prep)",
               "reason": ""
             }
           ]

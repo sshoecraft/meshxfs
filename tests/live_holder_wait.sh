@@ -63,7 +63,14 @@
 # Usage: tests/live_holder_wait.sh <label> [H=test1] [W=test2]
 # Env:   MXFS_MNT (default /mnt/shared), PAUSE_MS (default 240000),
 #        MASTER=remote|local|any (default remote), READERS (default 1),
-#        GAP_MS (default 0 = off; 10000 is the between-attempt adoption lap).
+#        GAP_MS (default 0 = off; 10000 is the between-attempt adoption lap),
+#        LH_SHARD_SELECT=0 (H makes eight candidates back to back and keeps them
+#        all, whatever shards they fall in, as before one per shard was kept: the
+#        same-build control of
+#        D-LIVE-HOLDER-WAIT-FINDS-NO-REMOTE-MASTERED-INODE-AND-ABORTS-BEFORE-MEASURING),
+#        LH_SETUP_ONLY=1 (stop once H's candidates are made, listing them as
+#        `CANDIDATE <idx> <ino>`, remove them and exit 0: the shard lap,
+#        tests/live_holder_shard_lap.sh).
 # Leaves both nodes mounted and clears the pause knobs.  Exit 0 PASS, 1 FAIL,
 # 2 INFRA/ABORT.
 set -u
@@ -325,7 +332,12 @@ dgst() { if [ "$TARGET" = dir ]; then echo "ls -1A '$1' | sort | md5sum | cut -d
 # H's re-dirty of a target (takes EX): a rewrite of the file, or a new entry
 # in the directory.  $2 names the entry so repeated re-dirties are distinct.
 redirty() { if [ "$TARGET" = dir ]; then echo ": > '$1/$2'"; elif [ "$RW" = dio_unaligned ]; then echo "dd if=/dev/urandom of='$1' bs=4096 count=1 conv=notrunc status=none"; else echo "dd if=/dev/urandom of='$1' bs=4096 count=8 status=none"; fi; }
-NSHARD=16; NMAKE=160
+if [ "${LH_SHARD_SELECT:-1}" = 0 ]; then
+    # control: every object is its own entry in the seen-list, so all eight are kept
+    NSHARD=8; NMAKE=8; shard_of='s=$i'
+else
+    NSHARD=16; NMAKE=160; shard_of='s=$((ino >> 3))'
+fi
 if [ "$RW" = dio_unaligned ]; then
     # 64 KiB fallocated, first block written: the region past it stays unwritten
     # so W's unaligned overwrite-only attempt answers -EAGAIN and retries EX.
@@ -342,7 +354,7 @@ timeout 13 $SSH "$H" "
     while [ \$n -lt $NSHARD ] && [ \$i -lt $NMAKE ]; do
         i=\$((i+1)); f='$MNT/.livewait_${LABEL}_'\$i
         $mk || exit 1
-        ino=\$(stat -c %i \"\$f\") || exit 1; s=\$((ino >> 3))
+        ino=\$(stat -c %i \"\$f\") || exit 1; $shard_of
         case \"\$seen\" in *\" \$s \"*) spare=\"\$spare \$f\"; continue ;; esac
         seen=\"\$seen\$s \"; n=\$((n+1)); echo \$i \$ino
     done
@@ -356,6 +368,11 @@ rm_cands() {
 [ "$(grep -ac . "$OUT/h_cands.txt")" = "$NSHARD" ] || {
     echo "ABORT: H made candidates in $(grep -ac . "$OUT/h_cands.txt") of $NSHARD distinct shards from $NMAKE objects: [$(filt < "$OUT/h_setup.err" | tail -3 | tr '\n' ' ')]"
     rm_cands; clear_knobs; exit 2; }
+if [ "${LH_SETUP_ONLY:-0}" = 1 ]; then
+    while read -r idx cino; do echo "CANDIDATE $idx $cino"; done < "$OUT/h_cands.txt"
+    echo "SETUP-ONLY: $NSHARD candidates made (shard_select=${LH_SHARD_SELECT:-1}); removed, nothing measured"
+    rm_cands; clear_knobs; exit 0
+fi
 
 ino=""; CAND=""; MLOC=""
 if [ "$CAW" = 1 ]; then

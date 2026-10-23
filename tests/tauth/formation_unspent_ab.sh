@@ -28,7 +28,13 @@ case "$blocks$per" in *[!0-9]*) echo "formation_unspent_ab: blocks and runs must
 here=$(cd "$(dirname -- "${BASH_SOURCE[0]}")" && pwd) || exit 2
 mkdir -p "$out" || exit 2
 out=$(cd "$out" && pwd) || exit 2
-[ -x "$here/formation_test" ] || { echo "formation_unspent_ab: build tests/tauth first (make -C tests/tauth all)"; exit 2; }
+# The binary is built here, every object it links included (make -B): built by a plain make it could
+# link objects older than a header they include, which the Makefile's rules do not all list
+# (D-TAUTH-TEST-OBJECTS-OMIT-INCLUDED-HEADERS-SO-A-HEADER-CHANGE-LINKS-STALE-CODE).  The binary sits
+# in the tree, a frozen file of a release candidate, so the build is refused while one is qualified.
+python3 "$here/../../tools/release_candidate.py" frozen "$here/formation_test" > /dev/null 2>&1
+[ $? = 1 ] || { echo "formation_unspent_ab: a release candidate freezes tests/tauth/formation_test (or that could not be read); run this A/B on an unfrozen tree"; exit 2; }
+make -B -C "$here" formation_test > /dev/null || { echo "formation_unspent_ab: building tests/tauth/formation_test failed"; exit 2; }
 export PIN_CPUS=${PIN_CPUS:-54,55} BUSY=${BUSY:-4}
 # what follows the budget on each arm's command line: by default the
 # view_unspent knob, 0 for arm k0 and 1 for arm k1; another knob's A/B names

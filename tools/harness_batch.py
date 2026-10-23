@@ -36,6 +36,17 @@ environment (a module argument through MXFS_EXTRA_MODARGS, a row's MXFS_TEST_ENV
 as the batch's variant, and nothing in the tree is taken out or put back. --batch B continues a
 control already declared with this record, row, configuration and variant, for its laps left.
 
+A control records every file a candidate frozen at that moment would hold (tools/release_candidate.py
+frozen_paths, with the stamp its manifest keeps: sha256, inode, size, mtime, ctime), under
+tests/evidence/controls/<batch>.inputs.<phase>.json: `before` the fix is taken out, `during` the laps,
+`after` it is put back (a --knob control: before and after). It prints which files differ between the
+phases, so the control's tree is measured, not asserted. A control run in place just before a freeze
+is then the candidate's source with only the fix reverted when `proof` finds that the files differing
+during the laps are exactly the diff's, and that the attempt's frozen file list holds the `after`
+content of every file with only the diff's files touched since:
+
+    tools/harness_batch.py proof <control batch> <tests/evidence/candidates/<attempt>.files.json>
+
 --board makes each lap a board row instead: `MXFS_BATCH=<batch> ./run.sh <at> <row>`, which
 records the lap itself (run.sh enforces the row's budget from tests/suite/manifest, so --bound and
 --pass are not used and no command follows `--`). The rig group comes from the caller's
@@ -52,19 +63,23 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import re
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import criteria  # noqa: E402
+import release_candidate  # noqa: E402
 
 DEFECTS = [sys.executable, str(ROOT / "tools" / "defects.py")]
 LAP = [sys.executable, str(ROOT / "tools" / "batch_lap.py")]
+CONTROLS = ROOT / "tests" / "evidence" / "controls"
 BATCH_ID = re.compile(r"\bb\d{8}-[0-9a-f]{6}\b")
 LAP_LINE = re.compile(r"^(PASS|FAIL|INCOMPLETE) (\S+:\S+:\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ) ")
 
@@ -101,6 +116,38 @@ def diff_files(diff: Path) -> list:
     if not files:
         sys.exit(f"harness_batch: {diff} names no file (+++ b/<path>)")
     return files
+
+
+def snapshot_inputs(bid: str, phase: str) -> dict:
+    """Every file a candidate frozen now would hold, with its manifest stamp, kept as evidence."""
+    stamps = {}
+    for rel in release_candidate.frozen_paths():
+        try:
+            stamps[rel] = release_candidate.stamp_of(rel)
+        except OSError:
+            stamps[rel] = ["absent"]
+    path = CONTROLS / f"{bid}.inputs.{phase}.json"
+    path.write_text(json.dumps(stamps, indent=1, sort_keys=True) + "\n")
+    print(f"inputs {phase}: {len(stamps)} files, {path.relative_to(ROOT)}", flush=True)
+    return stamps
+
+
+def compare_inputs(first: dict, second: dict) -> dict:
+    """What differs between two stamp maps: content, inode change time alone, added, gone."""
+    both = first.keys() & second.keys()
+    return {
+        "content": sorted(p for p in both if first[p][0] != second[p][0]),
+        "touched": sorted(p for p in both
+                          if first[p][0] == second[p][0] and first[p][4:5] != second[p][4:5]),
+        "added": sorted(second.keys() - first.keys()),
+        "gone": sorted(first.keys() - second.keys()),
+    }
+
+
+def report_inputs(label: str, found: dict) -> None:
+    parts = [f"{kind}={len(paths)} {' '.join(paths[:12])}".rstrip()
+             for kind, paths in found.items()]
+    print(f"inputs {label}: {'; '.join(parts)}", flush=True)
 
 
 def lap_args(args, bid: str) -> list:
@@ -179,6 +226,15 @@ def run_laps(args, bid: str, count: int, stop_on_fail: bool) -> list:
     return results
 
 
+def find_batch(bid: str) -> tuple:
+    """(record id, batch) of a declared batch."""
+    queue = json.loads((ROOT / "data" / "defects.json").read_text())["defects"]
+    found = [(e["id"], b) for e in queue for b in e.get("batches") or [] if b.get("id") == bid]
+    if not found:
+        sys.exit(f"harness_batch: no batch {bid}")
+    return found[0]
+
+
 def cmd_control(args) -> int:
     if bool(args.revert) == bool(args.knob):
         sys.exit("harness_batch: a control takes the fix out one way: --revert DIFF or --knob TEXT")
@@ -202,13 +258,7 @@ def cmd_control(args) -> int:
         variant = f"fix reverted: {diff.relative_to(ROOT)} sha256={sha256(diff)}"
     if args.batch:
         # the rest of a control already declared: same record, row, configuration, variant
-        import json
-        queue = json.loads((ROOT / "data" / "defects.json").read_text())["defects"]
-        found = [(e["id"], b) for e in queue for b in e.get("batches") or []
-                 if b.get("id") == args.batch]
-        if not found:
-            sys.exit(f"harness_batch: no batch {args.batch}")
-        owner, batch = found[0]
+        owner, batch = find_batch(args.batch)
         wrong = [k for k, want in (("record", args.record), ("kind", "control"),
                                    ("state", "open"), ("row", args.row), ("variant", variant))
                  if (owner if k == "record" else batch.get(k)) != want]
@@ -230,6 +280,8 @@ def cmd_control(args) -> int:
             sys.exit("harness_batch: no batch id in the declaration above")
         bid = match.group(0)
 
+    call = f"{bid}.{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}"
+    inputs_before = snapshot_inputs(call, "before")
     restored = False
 
     def restore(*caught) -> None:
@@ -269,12 +321,16 @@ def cmd_control(args) -> int:
     print(f"--- control {bid}: the fix is out ({variant}) ---", flush=True)
     try:
         rebuild(args, "with the fix out")
+        if diff is not None:
+            report_inputs("before -> during",
+                          compare_inputs(inputs_before, snapshot_inputs(call, "during")))
         results = run_laps(args, bid, args.runs, stop_on_fail=False)
     except RuntimeError as exc:
         print(f"harness_batch: {exc}; no lap ran", flush=True)
         results = []
     finally:
         restore()
+    report_inputs("before -> after", compare_inputs(inputs_before, snapshot_inputs(call, "after")))
     run(DEFECTS + ["measure", args.record, "--batch", bid], check=False)
     # every lap of the batch, a continued one's earlier laps too, from the ledger
     config = criteria.parse_at(args.at)
@@ -312,7 +368,66 @@ def cmd_verify(args) -> int:
     return 1 if fails else 0
 
 
+def cmd_proof(argv: list) -> int:
+    """Whether a control ran on an attempt's frozen source with only its fix taken out."""
+    parser = argparse.ArgumentParser(prog="harness_batch.py proof")
+    parser.add_argument("batch", help="the control batch")
+    parser.add_argument("files", help="the attempt's frozen file list (<attempt>.files.json)")
+    parser.add_argument("--built", action="append", default=[],
+                        help="a file the control's --rebuild wrote (repeat)")
+    args = parser.parse_args(argv)
+    _, batch = find_batch(args.batch)
+    manifest = json.loads(Path(args.files).read_text())
+    named = re.search(r"fix reverted: (\S+\.diff)", str(batch.get("variant", "")))
+    fix = sorted(str(p.relative_to(ROOT)) for p in diff_files(ROOT / named.group(1))) \
+        if named else []
+    calls = sorted({p.name.split(".inputs.")[0]
+                    for p in CONTROLS.glob(f"{args.batch}.*.inputs.before.json")})
+    if not calls:
+        print(f"proof {args.batch}: no inputs were recorded for this control")
+        return 2
+    held = True
+    for call in calls:
+        phases = {}
+        for phase in ("before", "during", "after"):
+            path = CONTROLS / f"{call}.inputs.{phase}.json"
+            phases[phase] = json.loads(path.read_text()) if path.exists() else None
+        checks = []
+        if phases["after"] is None:
+            checks.append((False, "the call recorded no `after`: it did not end"))
+        else:
+            frozen = compare_inputs(phases["after"], manifest)
+            checks.append((not (frozen["content"] or frozen["added"] or frozen["gone"]),
+                           f"the attempt froze every file as it was after the restore "
+                           f"(content {frozen['content'][:8]}, added {frozen['added'][:8]}, "
+                           f"gone {frozen['gone'][:8]})"))
+            checks.append((not frozen["touched"],
+                           f"nothing was touched between the restore and the freeze "
+                           f"({frozen['touched'][:8]})"))
+            back = compare_inputs(phases["before"], phases["after"])
+            checks.append((not (back["content"] or back["added"] or back["gone"]),
+                           f"the restore put back every file (content {back['content'][:8]})"))
+        if fix:
+            if phases["during"] is None:
+                checks.append((False, "the call recorded no `during`"))
+            else:
+                out = compare_inputs(phases["before"], phases["during"])
+                extra = sorted(set(out["content"]) - set(fix) - set(args.built))
+                checks.append((set(fix) <= set(out["content"]) and not extra
+                               and not (out["added"] or out["gone"]),
+                               f"during the laps the fix's files differed {fix} and nothing "
+                               f"else ({extra[:8]}, added {out['added'][:8]}, "
+                               f"gone {out['gone'][:8]})"))
+        for ok, text in checks:
+            held = held and ok
+            print(f"{'HOLDS' if ok else 'FAILS'} {call}: {text}")
+    print(f"proof {args.batch} against {args.files}: {'HOLDS' if held else 'FAILS'}")
+    return 0 if held else 1
+
+
 def main() -> int:
+    if sys.argv[1:2] == ["proof"]:
+        return cmd_proof(sys.argv[2:])
     # The harness command is everything after `--`, split off before parsing: a REMAINDER
     # positional after the record would swallow every option that follows it.
     argv = sys.argv[1:]
