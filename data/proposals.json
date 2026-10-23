@@ -1100,8 +1100,14 @@
         "tests/evidence/controls/D-PRESTEPS-FORM-PAIR-UNDER-G2-MARKER.fix.diff",
         "tests/presteps_env_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "rejected",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-a6f02f.md",
+        "sha256": "0c8458beb859264ce624cb14e90b541280316b7ec17439faee0111f4e7180947",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261022-aac779",
@@ -1436,8 +1442,15 @@
         "tests/evidence/controls/D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK.fix.diff",
         "tests/rig_tag_dev_host_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-c565ec.md",
+        "sha256": "80ff13c124b0460b9d6c36f1a304698e68e758e88e378a41228dbf2ae2282766",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261022-cfe8ac",
@@ -1542,8 +1555,15 @@
         "tests/evidence/candidates/0.90.134_check_20261023T041628Z.txt",
         "tests/vmhold_reaper_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-2e5d32.md",
+        "sha256": "77a91e0358ecdbee815197f383907cf018a55cf60543d90a2f9c2fd367b2997c",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261022-6a7040",
@@ -1955,14 +1975,15 @@
         "tests/recov_bmbt_reuse.sh",
         "tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-22",
       "review": {
         "file": "data/reviews/P20261022-aa3c94.md",
         "sha256": "0abe2737a5f601ea0ca6f44121aafa29b59516e0ccac23ed1c18eef722ecdd44",
         "verdict": "approved",
         "date": "2026-10-23"
-      }
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261022-a44f67",
@@ -1984,8 +2005,15 @@
         "tests/recov_bmbt_reuse.sh",
         "tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-a44f67.md",
+        "sha256": "60f7304ead2ed3bb2bce40357f3152d8e398648483eb1603fee85262b0fb518d",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261022-8a9584",
@@ -2006,8 +2034,15 @@
         "tests/suite/fsx.sh",
         "data/reviews/P20261022-fa5891.md"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-8a9584.md",
+        "sha256": "f04d77ab06eb97d23ad9754ddb4110c2bca9d3555252c3f228950ce5a2998d04",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261022-b2613a",
@@ -2029,8 +2064,14 @@
         "tests/fsx_seed_lap.sh",
         "data/reviews/P20261022-fa5891.md"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "rejected",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-b2613a.md",
+        "sha256": "8db58306ad64e0b9da772c5745e7138d5bb6c3639c529848e4530ed0b31d1205",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     }
   ]
 }

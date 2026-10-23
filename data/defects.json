@@ -2558,7 +2558,7 @@
       "opened": "2026-10-21",
       "summary": "tests/suite/fsx.sh draws its seed from 4 random bytes (0..2^32-1), but the vendored fsx stores -S in an int and calls usage() when it is negative, so about half of all runs exit 90 at once and record a FAIL that exercised nothing. (Its second half, the deleted failure logs, is now D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE.)",
       "evidence": "2/net/mesh/drbd fsx 2026-10-21T19:36:37Z (dry-run candidate 0.90.133-2, build 71AC6107043DD5BE3D9181A): FAIL checks=2 passed=0 failed=2 seed=3832054505, both checks in 2 s of an 88 s budget (tests/evidence/drbd_rig/criteria.runs.jsonl). Code: tests/suite/fsx.sh:27 SEED=$(od -An -N4 -tu4 /dev/urandom); tests/suite/tools/fsx.c:186 'int seed = 1;', :3397 'seed = getnum(optarg, &endp);', :3402-3403 'if (seed < 0) usage();'; tests/suite/fsx.sh:22 trap 'rm -rf \"$W\" /tmp/fsx.$$.*'. Reproduced on clyde 2026-10-21 with the vendored binary: 'tests/suite/tools/fsx -S 3832054505 -N 200 <file>' rc=90 'usage: fsx ...'; -S 2147483648 rc=90; -S 2147483647 rc=0 'Seed set to 2147483647'. ===== ===== 2026-10-22, the rest of the fix: run.sh's artifact pull for a row that did not pass (the one that already brings /root/drc_* from every node) now takes /root/fsx.<seed>.<ops>.log too, so a failing fsx check's log lands in tests/evidence/run_fsx_<run id>/ as <node>_fsx.<seed>.<ops>.log. Exercised on the host with the same remote command: a /root holding fsx.123.100000.log came back as test1_fsx.123.100000.log; a /root holding neither drc_* nor fsx logs sends nothing (rc 1, as before). The seed range (1..2^31-1) and the kept log were already in the tree. ===== 2026-10-23: split. Review data/reviews/P20261022-fa5891.md rejected verify b20261022-c54100 because this record named two defects and the batch measured one: control b20261022-4bf99d reverted only fsx.sh's SEED= line (tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff, one hunk), so the deleted-log half never had a control. This record keeps the seed defect, which that control and tests/fsx_seed_lap.sh measure; the deleted-log defect is D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE.",
-      "next": "control batch of fsx laps at 2/net/mesh/direct with the fix taken out (tests/suite/fsx.sh drawing 4 random bytes again and deleting its logs, run.sh's pull without fsx logs): about half its laps must fail with fsx's usage; then the verification batch on the candidate, sized from it, and remove --fixed ===== 2026-10-22: control b20261022-4bf99d closed, 20 of 20 laps of tests/fsx_seed_lap.sh failed with the fix out (lap:fsx_seed at 2/net/mesh/direct). Next: the verification batch on the frozen candidate, 4 clean laps of the same lap (defects.py plan-verify ... --row lap:fsx_seed --at 2/net/mesh/direct --probe '^LAP fsx_seed start .* draw=4294967295 '), then remove --fixed with that control. ===== 2026-10-23: the seed defect alone. A verification batch of tests/fsx_seed_lap.sh on the next candidate attempt, sized from control b20261022-4bf99d, then remove --fixed with that control.",
+      "next": "control batch of fsx laps at 2/net/mesh/direct with the fix taken out (tests/suite/fsx.sh drawing 4 random bytes again and deleting its logs, run.sh's pull without fsx logs): about half its laps must fail with fsx's usage; then the verification batch on the candidate, sized from it, and remove --fixed ===== 2026-10-22: control b20261022-4bf99d closed, 20 of 20 laps of tests/fsx_seed_lap.sh failed with the fix out (lap:fsx_seed at 2/net/mesh/direct). Next: the verification batch on the frozen candidate, 4 clean laps of the same lap (defects.py plan-verify ... --row lap:fsx_seed --at 2/net/mesh/direct --probe '^LAP fsx_seed start .* draw=4294967295 '), then remove --fixed with that control. ===== 2026-10-23: the seed defect alone. A verification batch of tests/fsx_seed_lap.sh on the next candidate attempt, sized from control b20261022-4bf99d, then remove --fixed with that control. ===== Removal P20261022-b2613a was rejected (data/reviews/P20261022-b2613a.md): the cited control logs show no usage message or rc=90, because tests/fsx_seed_lap.sh:43 deletes fsx's output. A resubmission cites tests/evidence/fsx_seed_int_max_repro_20261021.log (rc=90 with fsx's usage for seeds 3832054505 and 2147483648, rc=0 for 2147483647) and the review P20261021-676432, the fsx binary's hash and the fsx.c lines, or runs a control whose laps keep fsx's first output line and exit code; it cites the control's own harness output (or says none was kept; row 7700's lap log was overwritten) and drops 'each lap failing on the cause itself'. Rename the record first so its id no longer names the deleted logs, which are D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE.",
       "reproducer": "tests/fsx_seed_lap.sh (host-local: /dev/urandom bound to four 0xff bytes in a private mount namespace, fsx.sh on tmpfs; every lap exposed)",
       "cells": [
         {
@@ -2667,7 +2667,7 @@
           "iso": "2026-10-22T23:27:45Z"
         }
       ],
-      "updated": "2026-10-22",
+      "updated": "2026-10-23",
       "batches": [
         {
           "id": "b20261022-4bf99d",
@@ -2730,7 +2730,7 @@
           "candidate": "0.90.134",
           "build": "16A5F5DDDB4852C9D5DB236",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
@@ -2768,6 +2768,18 @@
             "9594B08726D6732D2ED5E87"
           ],
           "date": "2026-10-22"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T03:55:19Z",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "batch": "b20261022-c54100",
+          "approval": "P20261022-8a9584",
+          "date": "2026-10-23"
         }
       ]
     },
@@ -3082,249 +3094,6 @@
       ]
     },
     {
-      "id": "D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK-FOR-A-NODE-DEVICE-PATH",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-21",
-      "summary": "tools/mxfs_rig_tag.sh step 4 reads the SCSI vendor of the device path on the host it runs on first (vendor_of, :133); on the dev host a node path such as /dev/sda names the host own disk, so the rig is tagged ata and every harness resolving its LUN aborts rig ata declares no LUN",
-      "evidence": "MXFS_MARKER=/dev/null MXFS_DEV=/dev/sda tools/mxfs_rig_tag.sh on clyde prints ata (clyde /sys/block/sda/device/vendor is ATA). The comment at :98 assumes the device is not present on the dev host. capture gate 0.90.134: d0940_unknown_blocker_probe, agmeta_shutdown_retire, ghost_slot_restart_probe, d0944_unpub_forms_probe, pr_session_drop_probe ABORT rig ata declares no LUN in data/rigs.json (rig.sh:491); 0.90.133-2 gate line 212 the same. ===== ===== 2026-10-22, fix in the tree: tools/mxfs_rig_tag.sh step 4 reads a device locally only on a host without the lab's node credentials (a node); the dev host always asks a node. Reproduced before the fix on clyde: MXFS_RIG_TAG_FRESH=1 MXFS_RIG_NODE=test1 MXFS_DEV=/dev/sda -> ata (clyde sda vendor ATA; test1's sda is SCST_FIO, wwid eui.6664363939643231). After it: the same call -> scst-fio; with no node named (MXFS_MARKER=/dev/null) -> rc=1, no tag; run on test1 (creds_rc=1, no passfile) -> scst-fio. Dry run attempt 20261022T031549Z gate (tests/evidence/20261022T031739Z_capture_gate_0.90.134_20261022T031549Z): d0521 re-prepped with MXFS_DEV=/dev/sda as on every earlier gate, both markers then recorded rig=scst-fio, and the five entries that had aborted rig 'ata' (d0940_unknown_blocker_probe, agmeta_shutdown_retire, ghost_slot_restart_probe, d0944_unpub_forms_probe, pr_session_drop_probe) each reached their injected fault: fault laps OK.",
-      "next": "on the dev host never read a node device path locally: ask the node (the ssh path) unless the path is a device of this host by identity; rerun the gate",
-      "cells": [
-        {
-          "config": "1/any",
-          "row": "release:presteps",
-          "iso": "2026-10-21T21:43:30Z"
-        },
-        {
-          "config": "1/any",
-          "row": "release:presteps",
-          "iso": "2026-10-21T19:05:47Z"
-        },
-        {
-          "config": "1/any",
-          "row": "release:presteps",
-          "iso": "2026-10-21T23:22:19Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:20Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:19Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:18Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:17Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:16Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:15Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:14Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:13Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:12Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:11Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:10Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:09Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:08Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:07Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:06Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:05Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:04Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:03Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:02Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rig_tag_dev_host",
-          "iso": "2026-10-22T19:59:01Z"
-        }
-      ],
-      "updated": "2026-10-22",
-      "batches": [
-        {
-          "id": "b20261022-ba4c55",
-          "kind": "control",
-          "row": "lap:rig_tag_dev_host",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 20,
-          "probe": "^EXPOSED: ",
-          "candidate": "",
-          "build": "9594B08726D6732D2ED5E87",
-          "variant": "fix reverted: tests/evidence/controls/D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK.fix.diff sha256=ceb7e822f9f19cdb2e879620c2cbb764a2fc6838bed120349aaabed2becacef6",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "why": "the fix taken out: the dev host reads a node device path locally again; every exposed lap must tag the dev host's own disk"
-        },
-        {
-          "id": "b20261022-7742a9",
-          "kind": "verify",
-          "row": "lap:rig_tag_dev_host",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 4,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "rate": {
-            "row": "lap:rig_tag_dev_host",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261022-ba4c55",
-            "k": 20,
-            "n": 20,
-            "candidate": "",
-            "variant": "fix reverted: tests/evidence/controls/D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK.fix.diff sha256=ceb7e822f9f19cdb2e879620c2cbb764a2fc6838bed120349aaabed2becacef6",
-            "builds": [
-              "9594B08726D6732D2ED5E87"
-            ],
-            "date": "2026-10-22"
-          },
-          "transfer": "",
-          "lower_bound": 0.7672704990109255
-        },
-        {
-          "id": "b20261022-28a11c",
-          "kind": "verify",
-          "row": "lap:rig_tag_dev_host",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 4,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "rate": {
-            "row": "lap:rig_tag_dev_host",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261022-ba4c55",
-            "k": 20,
-            "n": 20,
-            "candidate": "",
-            "variant": "fix reverted: tests/evidence/controls/D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK.fix.diff sha256=ceb7e822f9f19cdb2e879620c2cbb764a2fc6838bed120349aaabed2becacef6",
-            "builds": [
-              "9594B08726D6732D2ED5E87"
-            ],
-            "date": "2026-10-22"
-          },
-          "transfer": "",
-          "lower_bound": 0.7672704990109255
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:rig_tag_dev_host",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261022-ba4c55",
-          "k": 20,
-          "n": 20,
-          "candidate": "",
-          "variant": "fix reverted: tests/evidence/controls/D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK.fix.diff sha256=ceb7e822f9f19cdb2e879620c2cbb764a2fc6838bed120349aaabed2becacef6",
-          "builds": [
-            "9594B08726D6732D2ED5E87"
-          ],
-          "date": "2026-10-22"
-        }
-      ],
-      "reproducer": "tests/rig_tag_dev_host_lap.sh <node> (the node up): resolves <node>:/dev/sda through tools/mxfs_rig_tag.sh from the dev host and compares the tag with the array the node itself reports; EXPOSED when the dev host's own /dev/sda is another array. With the fix taken out the tag is the dev host's disk ('ata'): RIG_TAG_LAP FAIL",
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T03:55:19Z",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "batch": "b20261022-28a11c",
-          "approval": "P20261022-c0b24c",
-          "date": "2026-10-22"
-        }
-      ]
-    },
-    {
       "id": "D-PRESTEPS-FORM-PAIR-UNDER-G2-MARKER-BUT-SELF-TESTS-READ-DEFAULT-MARKER",
       "severity": "major",
       "nodes": 1,
@@ -3332,7 +3101,7 @@
       "opened": "2026-10-21",
       "summary": "tools/release_run.py presteps form the pair with run.sh --group g2, which records .cluster_marker.g2.json (run.sh:209), then run rig_lib_contract and capture_fault_gate without MXFS_MARKER, so every harness and tools/mxfs_rig_tag.sh read the default .cluster_marker.json, whatever an earlier unrelated run left there",
       "evidence": "release_run.py step_presteps: run.sh ... --group g2 prep_cluster, then tests/rig_lib_contract.sh and tests/capture_fault_gate.sh with only MXFS_NODE_LIST added; grep of capture_fault_gate.sh for MXFS_MARKER: none; mxfs_rig_tag.sh:45 defaults to .cluster_marker.json. The in-gate preps (d0940:114, d0944:66, fence_crash_cuts:336, ...) run run.sh without --group and rewrite the default marker mid-gate. The default marker content during the 0.90.134 gate before 21:43:22Z was not kept. ===== ===== 2026-10-22, fix in the tree: tools/release_run.py step_presteps passes MXFS_GROUP=g2 and MXFS_MARKER=<repo>/.cluster_marker.g2.json (with MXFS_NODE_LIST) to tests/rig_lib_contract.sh and tests/capture_fault_gate.sh, so an in-gate run.sh prep forms the pair under the group and every tool reads the group's marker. Dry run attempt 20261022T031549Z: .cluster_marker.g2.json went from gen 309 to 333 across the presteps, which is exactly 1 presteps prep + 15 in-gate preps + 8 gate restores; the default .cluster_marker.json stayed at gen 1042 through the gate (1043 now, from a later plain prep at 03:52:09Z). Contract PASS fails=0; gate 59/60 OK, the one broken entry a different cause (D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE). ===== 2026-10-23: tests/presteps_env_lap.py read each marker's configuration as 'config', a key run.sh never writes ('configuration'), so both sides were empty and only the node lists were compared (review data/reviews/P20261022-0b1720.md, Observation 2). It reads 'configuration' now. The control's exposure came from the node list (default marker test15, the g2 marker test1,test2), which the change leaves as it was.",
-      "next": "form the presteps pair the way the self-test harnesses expect it (the default marker), or export the group marker to every self-test and make the in-gate preps use it; rerun the presteps",
+      "next": "form the presteps pair the way the self-test harnesses expect it (the default marker), or export the group marker to every self-test and make the in-gate preps use it; rerun the presteps ===== Removal P20261022-a6f02f was rejected (data/reviews/P20261022-a6f02f.md): only the first link of the cause is measured (presteps_env gives the self-tests the node list without marker or group); that the self-tests then read .cluster_marker.json is the lap's own computation (tests/presteps_env_lap.py:77), and nothing ties the three presteps failures (data/criteria.runs.jsonl:6835, :6961, :7052) to it. Needed: a run where the self-tests or their tools (tools/mxfs_rig_tag.sh, tests/lib/rig.sh) are seen opening the default marker with the fix out and which pair they then check; a line of each failing presteps run's own evidence showing this cause; a control on the current reproducer with only the fix reverted from the candidate's tools/release_run.py.",
       "cells": [
         {
           "config": "1/any",
@@ -3450,7 +3219,7 @@
           "iso": "2026-10-22T20:08:46Z"
         }
       ],
-      "updated": "2026-10-22",
+      "updated": "2026-10-23",
       "batches": [
         {
           "id": "b20261022-12fbb7",
@@ -3563,187 +3332,6 @@
           "build": "16A5F5DDDB4852C9D5DB236",
           "batch": "b20261022-825560",
           "approval": "P20261022-8d103a",
-          "date": "2026-10-22"
-        }
-      ]
-    },
-    {
-      "id": "D-RECOV-BMBT-REUSE-ABORT-LEAVES-THE-DESTROYED-VICTIM-POWERED-OFF",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-21",
-      "summary": "tests/recov_bmbt_reuse.sh destroys its victim (:134) and restarts it only at :159/:162; an ABORT in between (the capture gate injected fault at :143) exits with the victim off, and the harness has no EXIT trap, so every later harness finds test2 down",
-      "evidence": "capture gate 0.90.134 recov_bmbt_reuse_fault.log: INFO virsh destroy test2 rc=0 ... ABORT: the kernel log on test1 from the lap marker did not complete. Next entries: tcp_death_replay ABORT test2 srcversion != tree (INFO test2 empty), lone_mount_crash_replay ABORT /src with the tree is not reachable on test2. grep -c trap tests/recov_bmbt_reuse.sh: 0. 0.90.133-2 gate: lone_mount_crash_replay the same. ===== ===== 2026-10-22, fix in the tree: tests/recov_bmbt_reuse.sh arms an EXIT trap (rbr_cleanup) before the destroy and clears it once V has rejoined; the trap starts V and mounts /src on it. Dry run attempt 20261022T031549Z gate (tests/evidence/20261022T031739Z_capture_gate_0.90.134_20261022T031549Z/recov_bmbt_reuse_fault.log): virsh destroy test2 at +21s, STAGE FAULT at the first capture, RESULT ABORT, then 'CLEANUP: starting test2, which this lap destroyed and did not get back' and 'CLEANUP: test2 is up with /src'; the next entry, tcp_death_replay, found test2 up with /src (src=1, module not loaded: the gate re-formed the pair) and its fault lap was OK, as was lone_mount_crash_replay's.",
-      "next": "an EXIT trap that starts a destroyed victim and remounts /src on it, as fence_lost_response flr_cleanup does; rerun the gate ===== 2026-10-22: precheck OK (fix in PASS, fix out FAIL: test2 shut off); control b20261022-f49ba8 (10 laps, fix diff tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff) running in lane tests/evidence/lanes/g2_rbr_control_20261022T233020Z. Next: read its result; then the verification batch on the candidate, sized from it, and remove --fixed.",
-      "cells": [
-        {
-          "config": "1/any",
-          "row": "release:presteps",
-          "iso": "2026-10-21T21:43:30Z"
-        },
-        {
-          "config": "1/any",
-          "row": "release:presteps",
-          "iso": "2026-10-21T19:05:47Z"
-        },
-        {
-          "config": "1/any",
-          "row": "release:presteps",
-          "iso": "2026-10-21T23:22:19Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rbr_abort",
-          "iso": "2026-10-23T00:00:05Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rbr_abort",
-          "iso": "2026-10-22T23:57:34Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rbr_abort",
-          "iso": "2026-10-22T23:55:03Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rbr_abort",
-          "iso": "2026-10-22T23:52:29Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rbr_abort",
-          "iso": "2026-10-22T23:49:54Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rbr_abort",
-          "iso": "2026-10-22T23:47:19Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rbr_abort",
-          "iso": "2026-10-22T23:44:55Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rbr_abort",
-          "iso": "2026-10-22T23:42:32Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rbr_abort",
-          "iso": "2026-10-22T23:39:48Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rbr_abort",
-          "iso": "2026-10-22T23:37:05Z"
-        }
-      ],
-      "updated": "2026-10-22",
-      "batches": [
-        {
-          "id": "b20261022-f49ba8",
-          "kind": "control",
-          "row": "lap:rbr_abort",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^LAP rbr_abort exposed: ",
-          "candidate": "",
-          "build": "9594B08726D6732D2ED5E87",
-          "variant": "fix reverted: tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff sha256=c5887bb0786fa3d5d44336542dc0472bc25a968d64fb80822fd0eb87b508c905",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "why": "the fix taken out: tests/recov_bmbt_reuse.sh has no EXIT trap, so a lap that aborts after destroying its victim exits with the victim powered off"
-        },
-        {
-          "id": "b20261022-80174d",
-          "kind": "verify",
-          "row": "lap:rbr_abort",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^LAP rbr_abort exposed: ",
-          "candidate": "0.90.134",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "",
-          "state": "open",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "rate": {
-            "row": "lap:rbr_abort",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261022-f49ba8",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "fix reverted: tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff sha256=c5887bb0786fa3d5d44336542dc0472bc25a968d64fb80822fd0eb87b508c905",
-            "builds": [
-              "9594B08726D6732D2ED5E87"
-            ],
-            "date": "2026-10-22"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        },
-        {
-          "id": "b20261022-2bb429",
-          "kind": "verify",
-          "row": "lap:rbr_abort",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^LAP rbr_abort exposed: ",
-          "candidate": "0.90.134",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "",
-          "state": "open",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "rate": {
-            "row": "lap:rbr_abort",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261022-f49ba8",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "fix reverted: tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff sha256=c5887bb0786fa3d5d44336542dc0472bc25a968d64fb80822fd0eb87b508c905",
-            "builds": [
-              "9594B08726D6732D2ED5E87"
-            ],
-            "date": "2026-10-22"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "reproducer": "tests/recov_bmbt_reuse_abort_lap.sh <label> on g2 (the gate's fault lap of recov_bmbt_reuse alone, tests/recov_bmbt_reuse_abort.manifest; exposure: the destroy before the injection)",
-      "rates": [
-        {
-          "row": "lap:rbr_abort",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261022-f49ba8",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "fix reverted: tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff sha256=c5887bb0786fa3d5d44336542dc0472bc25a968d64fb80822fd0eb87b508c905",
-          "builds": [
-            "9594B08726D6732D2ED5E87"
-          ],
           "date": "2026-10-22"
         }
       ]
@@ -4506,7 +4094,7 @@
       "evidence": "Gate run tests/evidence/presteps_harnessfix_20261022.log (capture_fault_gate label 0.90.134-harnessfix-full, test1/test2, 2/net/mesh/direct, srcversion A6239940FC6B66138D10442): \"GATE tcp_stale_resend fault: rc=2 wall=121s fault_line=0 abort=0 verdicts_after_fault=0 -> BROKEN\", the only broken entry of 60. Its log tests/evidence/20261022T042630Z_capture_gate_0.90.134-harnessfix-full/tcp_stale_resend_fault.log: candidates idx=1..8 are ino 8388736..8388743 (0x800080..0x800087, one shard), every one drop_hits=0, then \"ABORT: no candidate inode is remotely mastered from test2\". pending_late_grant.sh:63 NFILES=${NFILES:-8}, line 35 states the half-remote premise; its consequence for that harness verdict is not yet measured. ===== ===== 2026-10-22, fix in the tree: tests/tcp_stale_resend.sh creates files until 16 distinct routing shards (ino >> 3) are represented, keeps the first in each as a candidate, removes the spares once every candidate exists, and removes the candidates it made at the end and on the no-candidate ABORT (rm_cands). Setup bound 13 s. Verified on g2 (test1/test2, 2/net/mesh/direct, srcversion A6239940FC6B66138D10442) through tests/capture_fault_gate.sh 0.90.134-srshard --only tcp_stale_resend: fault lap 'rc=2 wall=21s fault_line=1 abort=1 -> OK' (tests/evidence/20261022T115448Z_capture_gate_0.90.134-srshard); healthy lap 'rc=0 wall=92s fails=0 -> OK' (tests/evidence/20261022T115629Z_capture_gate_0.90.134-srshard, lap dir tests/evidence/20261022T115631Z_staleresend_0.90.134-srshard-tcp_stale_resend-ok): 16 candidates in distinct shards at +2s; the first four shards (ino 8390849, 8390857, 8390865, 8390873) were local to W (drop_hits=0) and the fifth (8390881) remote (drop_hits=10), so the old 8-consecutive-file setup, one shard, would have ABORTed on this formation; all 7 verdicts PASS. Candidate idx 58 reused a freed lower number (8388737), which is why selection is by shard and not by spacing. pending_late_grant.sh: its verdict is a late-kept total over both nodes and both nodes append to every file, so the master's own appends complete by promotion and the other node's by a wire grant whatever the shard draw; only its comment's premise was false, now corrected (comment-only change, bash -n OK). ===== ===== 2026-10-22 full presteps sequence after the fix, g2 (test1/test2, 2/net/mesh/direct, srcversion A6239940FC6B66138D10442), as tools/release_run.py runs it: harness lint rc=0; tests/chk_oracle_calibration.sh PASS 5/5; prep_cluster OK (28s); tests/rig_lib_contract.sh PASS fails=0; tests/capture_fault_gate.sh 'RESULT: PASS label=0.90.134-presteps-full2 entries=60 broken=0 vacuous=0 restores=8 wall=1621s' (tests/evidence/20261022T120001Z_capture_gate_0.90.134-presteps-full2; log tests/evidence/presteps_full_20261022b.log). The earlier full run had tcp_stale_resend as its only broken entry.",
       "next": "The fix (16 candidates in distinct shards) is in the tree and passed the gate's fault and healthy laps (evidence above). Control batch with SR_SHARD_SELECT=0 (lane tests/evidence/lanes/queue_g2_srshard_control.txt, after the gate-controls lane frees g2): both precheck laps first (fix on PASS, off FAIL), then 10 laps that must fail; then the verification batch on the candidate sized from it.",
       "reproducer": "tests/stale_resend_shard_lap.sh <label> on the formed g2 pair: runs tests/tcp_stale_resend.sh once and grades the candidates H made (its h_setup.txt) by distinct routing shards (ino >> 3): PASS at 8 or more, FAIL below. SR_SHARD_SELECT=0 is the harness's same-build control (eight files written back to back, one or two shards every lap).",
-      "updated": "2026-10-22",
+      "updated": "2026-10-23",
       "batches": [
         {
           "id": "b20261022-e9be03",
@@ -4523,6 +4111,23 @@
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-22",
+          "why": "the fix's switch off: the harness's eight candidates are written back to back, one or two routing shards, so its search for a candidate remotely mastered from W is one or two draws"
+        },
+        {
+          "id": "b20261023-720c28",
+          "kind": "control",
+          "row": "lap:sr_shard",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^LAP sr_shard candidates=",
+          "candidate": "",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "SR_SHARD_SELECT=0 (tests/tcp_stale_resend.sh makes its candidates as before the fix: eight files written back to back)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
           "why": "the fix's switch off: the harness's eight candidates are written back to back, one or two routing shards, so its search for a candidate remotely mastered from W is one or two draws"
         }
       ],
@@ -5607,214 +5212,6 @@
           "row": "path_peer_withdrawn",
           "iso": "2026-10-11T23:29:12Z",
           "why": "tests/evidence/board_20261011T225324Z-g16_path_peer_withdrawn/row.log:1-2: the row aborted on test16's load from path_all_lost, still running (STRAY killed=1 left=1), the load this record's open spin kept from ending"
-        }
-      ]
-    },
-    {
-      "id": "D-BATCH-LAP-HOLDS-NO-VM-SO-RUN-SH-REAPER-POWERS-ITS-NODES-OFF-MID-LAP",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-22",
-      "summary": "tools/batch_lap.py runs a batch's harness lap without holding the lab VMs it uses, so the reaper run.sh leaves behind (tools/vm_pool.sh release --after <run.sh pid>, run.sh:378) shuts those VMs off once they have gone unheld for its 600 s grace after the run.sh exits, under whatever lap is running then. A lane that forms its pair with run.sh prep_cluster and then runs plain harness laps (no run.sh) loses its nodes 600 s after the prep.",
-      "evidence": "Lane tests/evidence/lanes/g2_srshard_control_20261023T003853Z: step 3 run.sh 2/net/mesh/direct --group g2 prep_cluster ended 00:56:02Z (summary.log:7); the host journal then shows sudo virsh domstate test1 and test2 every 30 s from 00:56:02 to 01:06:03Z (vm_pool.sh state(), the reaper's idle_set loop, tools/vm_pool.sh:107-122) and nothing after; 01:06:05.849Z iscsi-scst logout from test1, 01:06:06.281Z from test2 (journal, kernel); /var/log/libvirt/qemu/test1.log:11286-11287 and test2.log:14180-14181 'terminating on signal 15 from pid 2771155 (/usr/sbin/libvirtd)', 'shutting down, reason=shutdown' (a guest ACPI poweroff, as scripts/lab_power.sh down issues it with virsh shutdown and no sudo); test2-serial.log:16524-16661 a clean systemd poweroff ending 'reboot: Power down' at uptime 653 s. No session, subagent or lane step issued a power command between 00:55 and 01:09Z (their transcripts and every lane summary). Lap 4 of control b20261022-e9be03 (lap:sr_shard) ran 185 s instead of 120 and laps 5-10 ended INCOMPLETE in 3 s each: 'ABORT: test2 srcversion != tree ... ()' (tests/evidence/batch_laps/b20261022-e9be03/20261023T010748Z.log:4); lane step7.log 'test1: already off', 'test2: already off'. tools/batch_lap.py takes no lock of tests/lib/runlock.sh (no vmhold_take, no node lock).",
-      "next": "Hold the lap's VMs in tools/batch_lap.py for the lap's duration (shared flock of /tmp/mxfs_vmhold.<vm>.lock, as vmhold_take), the VMs named by MXFS_NODE_LIST and MXFS_GROUP; MXFS_BATCH_LAP_HOLD=0 as the same-build control. Reproducer tests/vmhold_reaper_lap.sh <node>: starts the reaper on a running node with a 30 s grace and requires the node still running when the reaper exits. Then a control batch with the knob off, the verification on the candidate, remove --fixed.",
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:07:52Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:07:56Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:07:59Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:08:03Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:08:07Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:08:11Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:vmhold_reaper",
-          "iso": "2026-10-23T01:51:45Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:vmhold_reaper",
-          "iso": "2026-10-23T01:50:55Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:vmhold_reaper",
-          "iso": "2026-10-23T01:50:05Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:vmhold_reaper",
-          "iso": "2026-10-23T01:49:15Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:vmhold_reaper",
-          "iso": "2026-10-23T01:48:24Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:vmhold_reaper",
-          "iso": "2026-10-23T01:47:35Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:vmhold_reaper",
-          "iso": "2026-10-23T01:46:44Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:vmhold_reaper",
-          "iso": "2026-10-23T01:45:54Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:vmhold_reaper",
-          "iso": "2026-10-23T01:45:04Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:vmhold_reaper",
-          "iso": "2026-10-23T01:44:14Z"
-        }
-      ],
-      "batches": [
-        {
-          "id": "b20261022-50c5dc",
-          "kind": "control",
-          "row": "lap:vmhold_reaper",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: ",
-          "candidate": "",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "MXFS_BATCH_LAP_HOLD=0 (tools/batch_lap.py holds no VM for the lap, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "why": "the fix's switch off: the lap runs with no VM held, so the reaper of a run.sh that exited shuts its node off once its grace ends"
-        },
-        {
-          "id": "b20261022-7e7690",
-          "kind": "verify",
-          "row": "lap:vmhold_reaper",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "",
-          "state": "open",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "rate": {
-            "row": "lap:vmhold_reaper",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261022-50c5dc",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_BATCH_LAP_HOLD=0 (tools/batch_lap.py holds no VM for the lap, as before the fix)",
-            "builds": [
-              "16A5F5DDDB4852C9D5DB236"
-            ],
-            "date": "2026-10-22"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        },
-        {
-          "id": "b20261022-3a54cc",
-          "kind": "verify",
-          "row": "lap:vmhold_reaper",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "rate": {
-            "row": "lap:vmhold_reaper",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261022-50c5dc",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_BATCH_LAP_HOLD=0 (tools/batch_lap.py holds no VM for the lap, as before the fix)",
-            "builds": [
-              "16A5F5DDDB4852C9D5DB236"
-            ],
-            "date": "2026-10-22"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "updated": "2026-10-22",
-      "reproducer": "tests/vmhold_reaper_lap.sh <node> run through tools/batch_lap.py with MXFS_NODE_LIST=<node> (a node nothing else uses, about 2 s with the fix, 40 s without): starts the reaper run.sh leaves behind (tools/vm_pool.sh release --after <pid>) on the running node with a 30 s grace and requires the node still running when it exits. MXFS_BATCH_LAP_HOLD=0 (no VM held, as before the fix) -> the reaper shuts it off: LAP vmhold_reaper FAIL. Precheck 2026-10-23T01:42Z on test17: held -> PASS, not held -> FAIL (off after 3 s)",
-      "rates": [
-        {
-          "row": "lap:vmhold_reaper",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261022-50c5dc",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_BATCH_LAP_HOLD=0 (tools/batch_lap.py holds no VM for the lap, as before the fix)",
-          "builds": [
-            "16A5F5DDDB4852C9D5DB236"
-          ],
-          "date": "2026-10-22"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T03:55:19Z",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "batch": "b20261022-3a54cc",
-          "approval": "P20261022-1e240a",
-          "date": "2026-10-22"
         }
       ]
     },
