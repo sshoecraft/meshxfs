@@ -2072,6 +2072,44 @@
         "verdict": "rejected",
         "date": "2026-10-23"
       }
+    },
+    {
+      "id": "P20261023-128f2f",
+      "kind": "verify",
+      "record": "D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE",
+      "change": {
+        "batch": "b20261022-548ef2"
+      },
+      "argument": "Fix-on batch b20261022-548ef2 was declared by tools/harness_batch.py verify (plan-verify --control b20261022-4d455b --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 25 started 2026-10-23T04:39:48Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step25.log:1 is the declaration. Control b20261022-4d455b on the candidate's build 16A5F5DDDB4852C9D5DB236 with the fix reverted (fix reverted: tests/evidence/controls/D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE.fix.diff sha256=480d32973e93a9ecf1302cacf2f38b35adea9b4fe4b167555a3ab005582bbd6d): 9 of 10 laps failed; N = 9 at delta = alpha = 0.005. All 9 planned laps PASS with the batch's exposure probe matched, none failed or dropped, every row with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:42:35Z exposure=1; 2026-10-23T04:45:24Z exposure=1; 2026-10-23T04:48:19Z exposure=1; 2026-10-23T04:51:15Z exposure=1; 2026-10-23T04:54:16Z exposure=1; 2026-10-23T04:57:09Z exposure=1; 2026-10-23T05:00:00Z exposure=1; 2026-10-23T05:02:55Z exposure=1; 2026-10-23T05:05:46Z exposure=1 (tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step25.log; logs in tests/evidence/batch_laps/b20261022-548ef2/).",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step25.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/batch_laps/b20261022-548ef2",
+        "tests/evidence/batch_laps/b20261022-4d455b"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-c99297",
+      "kind": "remove-fixed",
+      "record": "D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE",
+      "change": {
+        "control": "b20261022-4d455b",
+        "fixon": "b20261022-548ef2",
+        "cause": "tests/capture_gate.manifest runs join_during_takeover with NFILES=4000; under routing hash v2 (eight inode numbers to a ledger page) that authority is about 500 pages, the takeover pass finished in 5.1 s, inside the lap's first 5 s in-flight sample, and the lap aborted before its first measurement, so the gate read it BROKEN without testing its capture handling"
+      },
+      "argument": "FIXED AND VERIFIED. The cause: tests/capture_gate.manifest runs join_during_takeover with NFILES=4000; under routing hash v2 (eight inode numbers to a ledger page) that authority is about 500 pages, the takeover pass finished in 5.1 s, inside the lap's first 5 s in-flight sample, and the lap aborted before its first measurement, so the gate read it BROKEN without testing its capture handling. Reproducer: tests/capture_fault_gate.sh <label> --only join_during_takeover on the g2 pair (the gate's fault lap of the entry, with the manifest's NFILES): with the fix taken out (NFILES=4000) the takeover pass is over before the harness's first in-flight sample and the sampling loop runs until the gate's 228 s fault-lap bound ends it (RESULT: FAIL); with NFILES=32000 the pass is seen in flight and the injected first measurement ABORTs the lap (RESULT: PASS). Exposure: the harness's 'INFO A's lone remount: A_MOUNT_RC=0' line in the gate's evidence (join_during_takeover_fault.log), which every lap that reaches the takeover pass prints. Fix-on batch b20261022-548ef2 was declared by tools/harness_batch.py verify (plan-verify --control b20261022-4d455b --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 25 started 2026-10-23T04:39:48Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step25.log:1 is the declaration. Control b20261022-4d455b on the candidate's build 16A5F5DDDB4852C9D5DB236 with the fix reverted (fix reverted: tests/evidence/controls/D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE.fix.diff sha256=480d32973e93a9ecf1302cacf2f38b35adea9b4fe4b167555a3ab005582bbd6d): 9 of 10 laps failed; N = 9 at delta = alpha = 0.005. All 9 planned laps PASS with the batch's exposure probe matched, none failed or dropped, every row with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:42:35Z exposure=1; 2026-10-23T04:45:24Z exposure=1; 2026-10-23T04:48:19Z exposure=1; 2026-10-23T04:51:15Z exposure=1; 2026-10-23T04:54:16Z exposure=1; 2026-10-23T04:57:09Z exposure=1; 2026-10-23T05:00:00Z exposure=1; 2026-10-23T05:02:55Z exposure=1; 2026-10-23T05:05:46Z exposure=1 (tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step25.log; logs in tests/evidence/batch_laps/b20261022-548ef2/). The verify proposal for this batch is reviewed separately; this removal is applied only after it.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step25.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/batch_laps/b20261022-548ef2",
+        "tests/evidence/batch_laps/b20261022-4d455b"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
     }
   ]
 }
