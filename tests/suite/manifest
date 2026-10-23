@@ -168,12 +168,14 @@ P6  fault_netpartition    fault     2   60
 # run on the host (COORD host).  fourkn_merge: infrastructure measured on the
 # 4096-byte LUN (both unmounts 2-3 s, the check 1-2 s, both mounts 9-14 s,
 # creates 1 s, arming and reads ~6 s: 26 s) + the workload, 2x what it should
-# take (6 s) + 10 s ssh = 16 s, + the hold's worst case, 2 x 8 blocks x 1 s =
-# 16 s: 58 s -> 60.  fourkn_cdb: eleven ssh round trips at ~1 s and SCSI
+# take (6 s) + 10 s ssh = 16 s, + the forced overlap: the two settling passes
+# ~2 s, the changes, arming and poll ~3 s, node 1's hold FORCE_MS (5 s) at
+# most: 52 s -> 55 (measured 29-31 s a lap on the TCP lock network, 37 s on
+# COMPARE AND WRITE).  fourkn_cdb: eleven ssh round trips at ~1 s and SCSI
 # commands of a millisecond, ~12 s, twice that 24 s -> 30.  fourkn_lbs_refusal:
 # five ssh round trips at ~1 s, each mkfs of a 2 GiB image and each refused
 # mount under 1 s, ~10 s, twice that 20 s.  Derivations in each script's header.
-P6  fourkn_merge          host      2   60
+P6  fourkn_merge          host      2   55
 P6  fourkn_cdb            host      2   30
 P6  fourkn_lbs_refusal    host      2   20
 

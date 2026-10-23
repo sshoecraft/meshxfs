@@ -1732,16 +1732,25 @@
         },
         "2/disk/caw/direct4k": {
           "status": "PASS",
-          "measured": "elapsed=41s (fresh prep)",
+          "measured": "elapsed=40s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-22T19:03:57Z",
+          "iso": "2026-10-23T03:52:15Z",
           "recorded": "2026-10-22",
-          "elapsed_s": 41,
-          "build": "9594B08726D6732D2ED5E87",
+          "elapsed_s": 40,
+          "build": "16A5F5DDDB4852C9D5DB236",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261022T190307Z-g2d",
+          "run_id": "20261023T035126Z-g2d",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-22T19:03:57Z",
+              "measured": "elapsed=41s (fresh prep)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261022T190307Z-g2d"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-22T17:09:23Z",
@@ -1755,17 +1764,26 @@
         },
         "2/net/mesh/direct4k": {
           "status": "PASS",
-          "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+          "measured": "elapsed=35s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-23T02:43:03Z",
+          "iso": "2026-10-23T03:49:27Z",
           "recorded": "2026-10-22",
-          "elapsed_s": 0,
+          "elapsed_s": 35,
           "build": "16A5F5DDDB4852C9D5DB236",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261023T024253Z-g2d",
-          "candidate": "0.90.134",
+          "run_id": "20261023T034827Z-g2d",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T02:43:03Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
+              "reason": "",
+              "build": "16A5F5DDDB4852C9D5DB236",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261023T024253Z-g2d"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T02:42:02Z",
@@ -1852,15 +1870,6 @@
               "build": "9594B08726D6732D2ED5E87",
               "outcome": "PASS",
               "run_id": "20261022T234151Z-g2d"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T23:41:18Z",
-              "measured": "skipped (marker matched 2/net/mesh/direct4k)",
-              "reason": "",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T234109Z-g2d"
             }
           ]
         }
