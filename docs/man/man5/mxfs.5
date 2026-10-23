@@ -208,7 +208,8 @@ Per-mount cache caps; 0 sizes them from
 .BR cache_mem_pct .
 .TP
 .BI dead_timeout_ms= N
-Dead-node detection window in milliseconds (0 = the 62 s default).
+Dead-node detection window in milliseconds (0 = the attachment's default:
+34 s on a SCSI LUN, 62 s on DRBD or a shared attachment).
 .TP
 .BI dirshard_mkdir_enable= 0|1
 Allow directory sharding's mkdir ioctl (default 0).  Experimental; also

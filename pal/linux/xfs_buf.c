@@ -2666,6 +2666,64 @@ xfs_buf_read_map(
 }
 
 /*
+ * TEST ONLY (D-SURVIVOR-CACHE-SERVES-A-DELETED-FILES-BMBT-BLOCK-FOR-A-PEERS-NEW-FILE):
+ * keep each extent-tree readahead's buffer referenced for dbg_bmbt_ra_hold_ms
+ * after its submission, whatever its read did.  The failure needs the
+ * synchronous read that follows a readahead to find the readahead's own buffer
+ * still alive: on the 2-node TCP rig it did in 3 of 12 open-EFI laps with
+ * bmbt_skip_reads=1 (the matched readahead and the matched synchronous read
+ * 0.4 ms apart, both hold=2), and in none of tests/bmbt_read_skip_lap.sh's
+ * rounds, where the readahead's buffer was always freed first.  Held, the
+ * synchronous read finds it every time and in both arms: after an issued read
+ * it holds the LUN's image, after a skipped one the image of the tree the block
+ * belonged to before.  Taken before the submission, because a skipped read
+ * completes inside it.  Clamped to 1000 ms; 0 = off (default).
+ */
+static int mxfs_dbg_bmbt_ra_hold_ms;
+module_param_named(dbg_bmbt_ra_hold_ms, mxfs_dbg_bmbt_ra_hold_ms, int, 0644);
+MODULE_PARM_DESC(dbg_bmbt_ra_hold_ms,
+		 "TEST ONLY: keep each bmbt readahead's buffer referenced for N ms "
+		 "after its submission (max 1000; 0=off default)");
+
+struct mxfs_bmbt_ra_hold {
+	struct delayed_work	work;
+	struct xfs_buf		*bp;
+};
+
+static void
+mxfs_bmbt_ra_hold_end(
+	struct work_struct	*work)
+{
+	struct mxfs_bmbt_ra_hold *h = container_of(to_delayed_work(work),
+						   struct mxfs_bmbt_ra_hold, work);
+
+	xfs_buf_rele(h->bp);
+	kfree(h);
+}
+
+static void
+mxfs_bmbt_ra_hold(
+	struct xfs_buf		*bp,
+	int			ms)
+{
+	static atomic_t		p_n = ATOMIC_INIT(0);
+	struct mxfs_bmbt_ra_hold *h;
+
+	if (ms > 1000)
+		ms = 1000;
+	h = kmalloc(sizeof(*h), GFP_NOFS);
+	if (!h)
+		return;
+	xfs_buf_hold(bp);
+	h->bp = bp;
+	INIT_DELAYED_WORK(&h->work, mxfs_bmbt_ra_hold_end);
+	if (atomic_inc_return(&p_n) <= 50)
+		pr_warn("mxfs: P-BMBT-RA-HOLD daddr=%lld ms=%d -- TEST: this bmbt readahead's buffer stays referenced after its submission\n",
+			(long long)bp->b_maps[0].bm_bn, ms);
+	queue_delayed_work(system_wq, &h->work, msecs_to_jiffies(ms));
+}
+
+/*
  *	If we are not low on memory then do the readahead in a deadlock
  *	safe manner.
  */
@@ -2724,6 +2782,9 @@ xfs_buf_readahead_map(
 	bp->b_flags &= ~(XBF_WRITE | XBF_DONE);
 	bp->b_flags |= flags;
 	percpu_counter_inc(&target->bt_readahead_count);
+	if (unlikely(READ_ONCE(mxfs_dbg_bmbt_ra_hold_ms) > 0) &&
+	    ops == &xfs_bmbt_buf_ops)
+		mxfs_bmbt_ra_hold(bp, READ_ONCE(mxfs_dbg_bmbt_ra_hold_ms));
 	xfs_buf_submit(bp);
 }
 

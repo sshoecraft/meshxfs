@@ -37,11 +37,19 @@
 # a round), so the caller bound is 15 s a round plus 30 s for the checks and
 # captures: 75 s for ROUNDS=3, 330 s for ROUNDS=20.  A timeout IS a failure.
 #
-# Usage: [ROUNDS=3] [BMBT_SKIP_READS=0|1] tests/bmbt_read_skip_lap.sh <label> [W=test1] [V=test2]
+# The rounds above reach the matched read every round, but with the knob on
+# they never failed: the readahead's buffer was freed before the synchronous
+# read of the same block, which then read fresh pages.  The open-EFI laps that
+# failed show that read finding the readahead's own buffer 0.4 ms later.
+# BMBT_RA_HOLD_MS=<ms> sets dbg_bmbt_ra_hold_ms on W for the lap (restored at
+# exit): every bmbt readahead's buffer stays referenced that long after its
+# submission, so the synchronous read finds it in both arms.
+#
+# Usage: [ROUNDS=3] [BMBT_SKIP_READS=0|1] [BMBT_RA_HOLD_MS=0] tests/bmbt_read_skip_lap.sh <label> [W=test1] [V=test2]
 # Exit 0 = PASS, 1 = FAIL, 2 = ABORT (precondition).
 set -u
 LABEL=${1:?label}; W=${2:-test1}; V=${3:-test2}
-ROUNDS=${ROUNDS:-3}; BMBT_SKIP_READS=${BMBT_SKIP_READS:-0}
+ROUNDS=${ROUNDS:-3}; BMBT_SKIP_READS=${BMBT_SKIP_READS:-0}; BMBT_RA_HOLD_MS=${BMBT_RA_HOLD_MS:-0}
 cd "$(dirname "$0")/.." || exit 2
 SSH=tools/mxfs_sshpass.sh
 MNT=${MXFS_MNT:-/mnt/shared}
@@ -53,25 +61,32 @@ fails=0
 t0=$(date +%s); el() { echo $(( $(date +%s) - t0 )); }
 SV=$(modinfo mxfs.ko 2>/dev/null | sed -n 's/^srcversion: *//p')
 MARK="BRS-$LABEL-$$"
-echo "=== bmbt_read_skip_lap label=$LABEL W=$W V=$V rounds=$ROUNDS skip_reads=$BMBT_SKIP_READS sv=$SV out=$OUT $(date -u +%FT%TZ) ==="
+echo "=== bmbt_read_skip_lap label=$LABEL W=$W V=$V rounds=$ROUNDS skip_reads=$BMBT_SKIP_READS ra_hold_ms=$BMBT_RA_HOLD_MS sv=$SV out=$OUT $(date -u +%FT%TZ) ==="
 
 for n in $W $V; do
-    info=$(rs 20 "$n" "echo sv=\$(cat /sys/module/mxfs/srcversion) ft=\$(cat $P/force_transport) m=\$(grep -c ' $MNT mxfs ' /proc/mounts) knob=\$(test -w $P/bmbt_skip_reads && echo 1 || echo 0)" | tr -d '\n')
+    info=$(rs 20 "$n" "echo sv=\$(cat /sys/module/mxfs/srcversion) ft=\$(cat $P/force_transport) m=\$(grep -c ' $MNT mxfs ' /proc/mounts) knob=\$(test -w $P/bmbt_skip_reads && echo 1 || echo 0) hold=\$(test -w $P/dbg_bmbt_ra_hold_ms && echo 1 || echo 0)" | tr -d '\n')
     echo "  INFO $n $info"
     [[ "$info" == *"sv=$SV"* ]] || { echo "ABORT: $n srcversion != tree $SV"; echo "RESULT: ABORT label=$LABEL stage=build evidence=$OUT"; exit 2; }
     [[ "$info" == *"ft=1"* ]]  || { echo "ABORT: $n not on TCP"; echo "RESULT: ABORT label=$LABEL stage=transport evidence=$OUT"; exit 2; }
     [[ "$info" == *"m=1"* ]]   || { echo "ABORT: $n not mounted"; echo "RESULT: ABORT label=$LABEL stage=mount evidence=$OUT"; exit 2; }
     [[ "$info" == *"knob=1"* ]] || { echo "ABORT: $n lacks mxfs.bmbt_skip_reads"; echo "RESULT: ABORT label=$LABEL stage=knob evidence=$OUT"; exit 2; }
+    [ "$BMBT_RA_HOLD_MS" = 0 ] || [[ "$info" == *"hold=1"* ]] || { echo "ABORT: $n lacks mxfs.dbg_bmbt_ra_hold_ms"; echo "RESULT: ABORT label=$LABEL stage=knob evidence=$OUT"; exit 2; }
 done
 
 rs 15 "$W" "echo $BMBT_SKIP_READS > $P/bmbt_skip_reads" >/dev/null
 value_now_into knob "$W" 15 "$OUT/rv_knob.txt" '^knob=[01]$' "bmbt_skip_reads on $W" "echo knob=\$(cat $P/bmbt_skip_reads)"
 ck "W's bmbt_skip_reads is the lap's" "${knob#knob=}" "$BMBT_SKIP_READS"
+if [ "$BMBT_RA_HOLD_MS" != 0 ]; then
+    rs 15 "$W" "echo $BMBT_RA_HOLD_MS > $P/dbg_bmbt_ra_hold_ms" >/dev/null
+    value_now_into hold "$W" 15 "$OUT/rv_hold.txt" '^hold=[0-9]+$' "dbg_bmbt_ra_hold_ms on $W" "echo hold=\$(cat $P/dbg_bmbt_ra_hold_ms)"
+    ck "W's dbg_bmbt_ra_hold_ms is the lap's" "${hold#hold=}" "$BMBT_RA_HOLD_MS"
+fi
 for n in $W $V; do rs 12 "$n" "echo '$MARK' > /dev/kmsg" >/dev/null; done
 capture() {
     rs 40 "$W" "dmesg | sed -n \"/$MARK/,\\\$p\"" > "$OUT/dmesg_W.txt" 2>/dev/null
     rs 40 "$V" "dmesg | sed -n \"/$MARK/,\\\$p\"" > "$OUT/dmesg_V.txt" 2>/dev/null
     [ "$BMBT_SKIP_READS" = 0 ] || rs 15 "$W" "echo 0 > $P/bmbt_skip_reads" >/dev/null
+    [ "$BMBT_RA_HOLD_MS" = 0 ] || rs 15 "$W" "echo 0 > $P/dbg_bmbt_ra_hold_ms; sleep 1" >/dev/null
     echo "  INFO capture: W=$(wc -l < "$OUT/dmesg_W.txt") V=$(wc -l < "$OUT/dmesg_V.txt") lines (+$(el)s)"
 }
 trap capture EXIT
@@ -125,7 +140,8 @@ matched=$(grep -ac 'P61-CHOKEPOINT-READ ' "$OUT/dmesg_W.txt")
 skipped=$(grep -a 'P61-CHOKEPOINT-READ ' "$OUT/dmesg_W.txt" | grep -ac 'skipped, the old image')
 bad=$(grep -ac 'P975-BMBT-LOOKUP-BAD' "$OUT/dmesg_W.txt")
 shut=$(grep -ac 'Shutting down filesystem\|BUG:\|Oops' "$OUT/dmesg_W.txt")
-echo "  INFO W kernel log: P61-CHOKEPOINT-READ=$matched (skipped=$skipped) P975-BMBT-LOOKUP-BAD=$bad shutdown_or_oops=$shut"
+held=$(grep -ac 'P-BMBT-RA-HOLD ' "$OUT/dmesg_W.txt")
+echo "  INFO W kernel log: P61-CHOKEPOINT-READ=$matched (skipped=$skipped) P975-BMBT-LOOKUP-BAD=$bad shutdown_or_oops=$shut readahead_holds=$held"
 echo "LAP bmbt_read_skip exposed: matched_reads=$matched"
 ck "W read every new file's head whole (short reads)" "$total_short" "0"
 ck "W logged no P975-BMBT-LOOKUP-BAD" "$bad" "0"

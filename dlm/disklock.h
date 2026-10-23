@@ -203,6 +203,17 @@
  *   pump's lateness (one 250 ms tick) and guest clock rate error (±500 ppm
  *   each way is 34 ms across the window), with 3.7 s to spare.
  *
+ * WHY THE WINDOW IS NOT SHORTER YET (D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-
+ * SURVIVORS-STALL-OVER-30S, docs/rulings/silent-peer-death-under-the-stall-limit.md).
+ * A window longer than a LIVE node's longest gap between landed beats is what
+ * keeps a live node from being declared dead and fenced.  At 10 checks (20 s,
+ * dead_timeout_ms=20000) survivors stalled 25.7-28.8 s on a silent death at 2
+ * and 4 nodes, but across a single-path failover every live survivor's beats
+ * landed 18.2-19.1 s apart at 4 and 8 nodes (the beat's COMPARE AND WRITE kept
+ * failing on the dead path until multipathd failed it), 0.9-1.7 s inside the
+ * 20 s bound: every one suspended and resumed, and a slower failover would have
+ * had a live node fenced.  The gap has to shrink before the window can.
+ *
  * What made the other 28 s of the 62 s window necessary there is the term the
  * lease comment below cannot bound: commands the node submitted that may still
  * execute after its lease closed.  On a SCSI attachment nothing a death hands
@@ -249,10 +260,10 @@
  *   commands take to become incapable of executing.
  *
  *   That is the window on a DRBD or shared attachment.  On a SCSI attachment
- *   the window is 34 s (MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD), the 4 s below it
- *   covers the first two terms, and the third is closed by the fence
- *   certificate's reservation rather than by time — derived where that
- *   constant is defined.
+ *   the window is 34 s (MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD) and the lease is
+ *   derived from it: the 4 s below it covers the first two terms, and the
+ *   third is closed by the fence certificate's reservation rather than by
+ *   time — derived where that constant is defined.
  *
  * THE LAST TERM IS NOT BOUNDED BY ANYTHING THIS CODE CAN SEE, and 31.7 s of
  * unallocated budget is not a proof that it fits.  Completing a Linux request
@@ -293,7 +304,7 @@
  * longer than the lease").
  *
  * The lease is the window less MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS: 30 s at the
- * 34 s window, as before.  The reserve is what lies between this node's last
+ * 34 s window.  The reserve is what lies between this node's last
  * admission and the earliest instant a peer can declare it dead (the peer's
  * count runs from its first sight of the last landed stamp, so at least the
  * window after that beat's ISSUE): the guest clock error (+-500 ppm each way,
