@@ -7032,13 +7032,52 @@ EXPORT_SYMBOL_GPL(mxfs_pal_scsi_pr_collapse_to_one_nexus);
  * Only this function adds registrations after a mount, and it takes one
  * path at a time; a path it has not verified is never counted on.
  *
+ * That check orders a REGISTER that answered.  One that did not (timed out,
+ * or its transport failed) can still execute at the target later, after a
+ * peer's PREEMPT AND ABORT, whose abort does not reach a nexus that held no
+ * registration, and register the fenced node on that path again.  So with
+ * fence_ms (the earliest time a peer may fence this node) a REGISTER is
+ * issued only if its timeout ends before it, and a path whose REGISTER, or
+ * the unregister after it, has no known outcome is QUARANTINED: taken
+ * offline, so that neither multipath nor this function sends anything down
+ * it again until someone sets it running (docs/rulings/
+ * silent-peer-death-under-the-stall-limit.md, 'Registering a late path under
+ * a short lease').  fence_ms 0: no bound and no quarantine, as before.
+ *
  * Returns 0 when there was nothing to do or every late path was registered
  * and verified; -ESTALE when `key` was found registered nowhere, or was
  * found alone on the late path after registering it (the caller treats
  * that as a fence); -EAGAIN when something could not be decided and a later
  * call should try again.  *added: paths registered by this call.
  */
-int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key, int *added)
+#define MXFS_PR_PATH_TIMEOUT_MS	5000	/* MXFS_PR_PATH_TIMEOUT */
+#define MXFS_PR_FILL_MARGIN_MS	1000	/* dispatch, error handling, clocks */
+/* a PR OUT whose execution at the target is unknown: neither answered nor
+ * refused, nor never sent (-ENOLINK, an offline path) */
+#define MXFS_PR_OUTCOME_UNKNOWN(r) \
+	((r) != 0 && (r) != SAM_STAT_RESERVATION_CONFLICT && (r) != -ENOLINK)
+
+static void mxfs_pr_path_quarantine(struct scsi_device *p, const char *disk,
+				    u64 key, int register_rc, int unregister_rc)
+{
+	int rc;
+
+#if MXFS_EFFECTIVE_VERSION >= KERNEL_VERSION(5, 0, 0)
+	mutex_lock(&p->state_mutex);
+	rc = scsi_device_set_state(p, SDEV_OFFLINE);
+	mutex_unlock(&p->state_mutex);
+#else
+	rc = scsi_device_set_state(p, SDEV_OFFLINE);
+#endif
+	pr_err("mxfs: P-PR-PATH-QUARANTINED %s path %d:%d:%d:%llu key=0x%llx register_rc=%d unregister_rc=%d offline_rc=%d -- a late REGISTER of this node's key has no known outcome and may still execute after a fence, so the path is taken offline and never used or counted again by this mount; echo running > /sys/class/scsi_device/%d:%d:%d:%llu/device/state returns it\n",
+	       disk, p->host->host_no, p->channel, p->id,
+	       (unsigned long long)p->lun, (unsigned long long)key,
+	       register_rc, unregister_rc, rc, p->host->host_no, p->channel,
+	       p->id, (unsigned long long)p->lun);
+}
+
+int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key,
+				uint64_t fence_ms, int *added)
 {
 	struct scsi_device *drop[MXFS_PR_MAX_PATHS];
 	struct mxfs_pr_paths t;
@@ -7092,7 +7131,8 @@ int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key, int *added)
 
 	for (i = 0; i < t.n; i++) {
 		struct scsi_device *p = t.p[i];
-		int r, c;
+		uint64_t issued_ms = 0, register_ms = 0;
+		int r, c, u;
 
 		if (t.r[i] == 0 || !scsi_device_online(p))
 			continue;
@@ -7140,7 +7180,42 @@ int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key, int *added)
 				(unsigned long long)key, ms);
 			msleep(ms);
 		}
+		/* admitted only if the command's timeout ends before a peer may
+		 * fence this node; the next landed beat moves fence_ms on */
+		if (fence_ms) {
+			uint64_t now = mxfs_pal_time_ms();
+
+			if (now + MXFS_PR_PATH_TIMEOUT_MS + MXFS_PR_FILL_MARGIN_MS >=
+			    fence_ms) {
+				pr_info_ratelimited("mxfs: P-PR-PATH-FILL-DEFERRED %s path %d:%d:%d:%llu key=0x%llx ms_to_fence=%lld -- a REGISTER issued now could still be outstanding when a peer may fence this node; it waits for a later beat\n",
+					dev->bdev->bd_disk->disk_name,
+					p->host->host_no, p->channel, p->id,
+					(unsigned long long)p->lun,
+					(unsigned long long)key,
+					(long long)(fence_ms - now));
+				if (!ret)
+					ret = -EAGAIN;
+				continue;
+			}
+		}
+		issued_ms = mxfs_pal_time_ms();
 		r = mxfs_prout_path(p, 0x00, 0, 0, key);
+		register_ms = mxfs_pal_time_ms() - issued_ms;
+		if (fence_ms && MXFS_PR_OUTCOME_UNKNOWN(r)) {
+			/* it may still execute at the target, after a fence:
+			 * nothing may use or count this path again */
+			u = mxfs_prout_path(p, 0x00, 0, key, 0);
+			mxfs_pr_path_quarantine(p, dev->bdev->bd_disk->disk_name,
+						key, r, u);
+			if (!ret)
+				ret = -EAGAIN;
+			continue;
+		}
+		if (fence_ms && mxfs_pal_time_ms() + MXFS_PR_FILL_MARGIN_MS >= fence_ms)
+			pr_warn("mxfs: P-PR-PATH-FILL-LATE %s path %d:%d:%d:%llu key=0x%llx register_rc=%d -- the REGISTER answered only after a peer may fence this node; the key count below decides it\n",
+				dev->bdev->bd_disk->disk_name, p->host->host_no,
+				p->channel, p->id, (unsigned long long)p->lun,
+				(unsigned long long)key, r);
 		if (r == SAM_STAT_RESERVATION_CONFLICT) {
 			pr_warn_ratelimited("mxfs: P-PR-PATH-FILL-FOREIGN %s path %d:%d:%d:%llu -- this path's nexus holds a registration that is not key 0x%llx; it is left alone and stays unusable\n",
 				dev->bdev->bd_disk->disk_name, p->host->host_no,
@@ -7152,8 +7227,11 @@ int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key, int *added)
 		}
 		c = r ? -EIO : mxfs_prin_key_count(p, key);
 		if (r || c < 2) {
-			int u = mxfs_prout_path(p, 0x00, 0, key, 0);
+			u = mxfs_prout_path(p, 0x00, 0, key, 0);
 
+			if (fence_ms && MXFS_PR_OUTCOME_UNKNOWN(u))
+				mxfs_pr_path_quarantine(p,
+					dev->bdev->bd_disk->disk_name, key, r, u);
 			if (u && u != SAM_STAT_RESERVATION_CONFLICT) {
 				spin_lock(&mxfs_pr_map_lock);
 				m = mxfs_pr_map_find(devt);
@@ -7175,10 +7253,12 @@ int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key, int *added)
 				ret = -EAGAIN;
 			continue;
 		}
-		pr_info("mxfs: P-PR-PATH-FILLED %s path %d:%d:%d:%llu key=0x%llx registrations_of_key=%d -- a path that held no registration now does, verified against the key's other registrations\n",
+		pr_info("mxfs: P-PR-PATH-FILLED %s path %d:%d:%d:%llu key=0x%llx registrations_of_key=%d register_ms=%llu ms_to_fence_at_issue=%lld -- a path that held no registration now does, verified against the key's other registrations\n",
 			dev->bdev->bd_disk->disk_name, p->host->host_no,
 			p->channel, p->id, (unsigned long long)p->lun,
-			(unsigned long long)key, c);
+			(unsigned long long)key, c,
+			(unsigned long long)register_ms,
+			fence_ms ? (long long)(fence_ms - issued_ms) : -1LL);
 		if (added)
 			(*added)++;
 known:

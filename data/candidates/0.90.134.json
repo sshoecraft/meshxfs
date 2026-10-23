@@ -1,7 +1,7 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-23T18:32:24Z",
+  "created": "2026-10-23T20:41:09Z",
   "state": "RUNNING",
   "attempts": [
     {
@@ -302,14 +302,36 @@
       "dist": "",
       "packages": {},
       "steps": {}
+    },
+    {
+      "created": "2026-10-23T18:32:24Z",
+      "state": "ABANDONED",
+      "dry_run": false,
+      "srcversion": "C54C14B681D148267D084FC",
+      "files": "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-23T18:32:25Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-23T20:41:07Z",
+          "why": "the sibling tree's fixes land in the source (late-path fill under a short lease, peer death windows published, batch-lap stall lap, release-step copy, fsx fail files, rejoin module arguments, row-pull fresh captures, jdt worst operation); their controls and verifications run on the next attempt"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
-  "srcversion": "C54C14B681D148267D084FC",
-  "module_sha256": "1e4ce3fc8e26c83b51b9743c9dac0fdaa1090306e992a02b8792a0c4ecba515d",
-  "files": "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
-  "files_count": 2569,
-  "files_digest": "ba38cd177d065f973b767f7b24d38f398654114e314f03bc6eaca73e12886d00",
+  "srcversion": "79779BEAECBEA94844FDC72",
+  "module_sha256": "1109bd68a94cdce50d24dd0fa695966caa6cd86d6d10cf23ea6966bbd9995a06",
+  "files": "tests/evidence/candidates/0.90.134_20261023T204109Z.files.json",
+  "files_count": 2574,
+  "files_digest": "480bb0fc75feefc404ad1a1edcb8684aff39838196badb3d6191de8239807791",
   "spec": "ec57ce06eb09c644b368cde523dfd4fa03e87d54b80a4bee31602c59f3ec175b",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
@@ -319,7 +341,7 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-23T18:32:25Z",
+      "at": "2026-10-23T20:41:09Z",
       "why": "created"
     }
   ]

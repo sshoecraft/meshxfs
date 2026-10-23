@@ -73,6 +73,16 @@
 #        ARM=ondemand|nodemand|stall (default ondemand; clean only).
 #        WANT=A|B|any (default A: the measured defect shape), ITER_MAX
 #        (default 6: a coin flip six times).
+#        JDT_MAX_STALL=0 prints no max_stall_ms= line (default 1; 0 is the
+#        control of the stall grading below).
+#
+# STALLS.  A lap run through tools/batch_lap.py is held to the release
+# policy's stall limit only by the max_stall_ms= lines it prints; the ms= of
+# each operation's own line is not read.  So after every timed mount and
+# unmount the lap prints max_stall_ms=<the worst so far>, and a lap that ends
+# early (an ABORT) still carries every operation it timed.  A 31 s last-member
+# unmount inside a gate lap was recorded PASS for want of it (batch
+# b20261022-548ef2).
 # Leaves both nodes mounted.  Exit 0 PASS, 1 FAIL, 2 INFRA/ABORT.
 set -u
 LABEL=${1:?label}
@@ -144,6 +154,20 @@ abort_reform() {
     exit 2
 }
 cnt() { local n; n=$(grep -ac "$2" "$1" 2>/dev/null); echo "${n:-0}"; }
+# op_ms <operation> <its command's output> <wall of the call in ms>: the worst
+# single operation so far.  Only the mounts and unmounts count: the create or
+# stat of NFILES entries and the directory reads each time NFILES operations at
+# once.  An operation whose command did not return inside its call's bound
+# counts the call's wall, since it was stalled at least that long.
+worst_ms=0; worst_op=none
+now_ms() { date +%s%3N; }
+op_ms() {
+    local v
+    v=$(echo "$2" | grep -ao 'ms=[0-9]*' | head -1 | cut -d= -f2)
+    v=${v:-$3}
+    [ "$v" -gt "$worst_ms" ] && { worst_ms=$v; worst_op=$1; }
+    [ "${JDT_MAX_STALL:-1}" = 0 ] || echo "  INFO max_stall_ms=$worst_ms (worst timed operation so far: $worst_op)"
+}
 case "$EXPECT:$ARM" in
     clean:ondemand) MB=90 ;;
     clean:nodemand) MB=$(( NFILES / 50 + 60 )) ;;
@@ -160,7 +184,7 @@ esac
 # remounts alone, B mounts inside the pass, evidence is captured, and the
 # shape is classified.  Sets the globals the verdict reads.
 iteration() {
-    local it=$1 MARK MARKA DMA bu have cb au am tmount mine0 mine1 c i kn bm pb summ bm2
+    local it=$1 MARK MARKA DMA bu have cb au am tmount mine0 mine1 c i kn bm pb summ bm2 tc
     MARK="JOINTK-$LABEL-$$-$it"
     for n in "$A" "$B"; do
         rs 15 "$n" "echo '$MARK' > /dev/kmsg" >/dev/null
@@ -196,12 +220,16 @@ iteration() {
     fi
     # 2. B leaves, cleanly, so A is the last member: B's pages are handed to
     #    A at the departure and what A serves stays A's when A unmounts.
+    tc=$(now_ms)
     bu=$(rs 120 "$B" "s=\$(date +%s%N); umount $MNT; rc=\$?; e=\$(date +%s%N); echo B_UMOUNT_RC=\$rc ms=\$(( (e-s)/1000000 ))")
     echo "  INFO B unmounted first: ${bu:-no result} at +$(el)s"
+    op_ms "B's unmount" "$bu" $(( $(now_ms) - tc ))
     [[ "$bu" == *"B_UMOUNT_RC=0"* ]] || { echo "ABORT: B's unmount did not return 0 ($bu)"; exit 2; }
     # 3. A unmounts as the last member: its pages stay under its authority.
+    tc=$(now_ms)
     au=$(rs 180 "$A" "s=\$(date +%s%N); umount $MNT; rc=\$?; e=\$(date +%s%N); echo A_UMOUNT_RC=\$rc ms=\$(( (e-s)/1000000 )); grep -c ' mxfs ' /proc/mounts")
     echo "  INFO A's last-member unmount: $(echo "$au" | tr '\n' ' ') at +$(el)s"
+    op_ms "A's last-member unmount" "$au" $(( $(now_ms) - tc ))
     [[ "$au" == *"A_UMOUNT_RC=0"* ]] || { echo "ABORT: A's unmount did not return 0 ($au)"; exit 2; }
     # 4. A mounts again, alone: its previous incarnation is a dead authority
     #    holding every page, and the takeover-only pass runs on the worker.
@@ -218,8 +246,10 @@ iteration() {
     MARKA="$MARK-A2"
     rs 15 "$A" "echo '$MARKA' > /dev/kmsg" >/dev/null
     DMA="awk '/$MARKA/{f=1} f' /tmp/jointk_dmesg.txt"
+    tc=$(now_ms)
     am=$(rs 180 "$A" "s=\$(date +%s%N); mount -t mxfs $DEV $MNT; rc=\$?; e=\$(date +%s%N); echo A_MOUNT_RC=\$rc ms=\$(( (e-s)/1000000 ))")
     echo "  INFO A's lone remount: ${am:-no result} at +$(el)s"
+    op_ms "A's lone remount" "$am" $(( $(now_ms) - tc ))
     [[ "$am" == *"A_MOUNT_RC=0"* ]] || { echo "ABORT: A's lone remount did not return 0 ($am)"; exit 2; }
     tmount=$(date +%s)
     # 5. The pass, seen IN FLIGHT: the per-page activation count grew between
@@ -253,6 +283,7 @@ iteration() {
     #    SB summary lock until the knobs were cleared, s590j).
     value_now_into mine_at_issue "$A" 20 "$OUT/rv_mine_at_issue_1.txt" '^[0-9]+$' "mine_at_issue on $A" "$DMA | grep -ac 'P-TAUTH-PAGE-MINE page=[0-9]* via=takeover' || [ \$? = 1 ]"
     refused_s=""; unwind_s=""
+    tc=$(now_ms)
     if [ "$ARM" = "stall" ] && [ "$EXPECT" = "clean" ]; then
         local ti tr rf
         rs 20 "$B" "rm -f /tmp/jointk_mount.txt; nohup sh -c 's=\$(date +%s%N); mount -t mxfs $DEV $MNT; rc=\$?; e=\$(date +%s%N); { echo B_MOUNT_RC=\$rc ms=\$(( (e-s)/1000000 )); grep -c \" mxfs \" /proc/mounts; } > /tmp/jointk_mount.txt.tmp; mv /tmp/jointk_mount.txt.tmp /tmp/jointk_mount.txt' >/dev/null 2>&1 & echo issued" >/dev/null
@@ -281,6 +312,7 @@ iteration() {
     else
         bm=$(rs "$MB" "$B" "s=\$(date +%s%N); mount -t mxfs $DEV $MNT; rc=\$?; e=\$(date +%s%N); echo B_MOUNT_RC=\$rc ms=\$(( (e-s)/1000000 )); grep -c ' mxfs ' /proc/mounts")
     fi
+    op_ms "B's mount inside the pass" "$bm" $(( $(now_ms) - tc ))
     mine_at_return=$(rs 20 "$A" "$DMA | grep -ac 'P-TAUTH-PAGE-MINE page=[0-9]* via=takeover'")
     echo "  INFO B's mount inside the pass: $(echo "$bm" | tr '\n' ' ') (activations at issue=$mine_at_issue at return=$mine_at_return, bound ${MB}s) at +$(el)s"
     bm_rc=$(echo "$bm" | grep -ao 'B_MOUNT_RC=[0-9]*' | cut -d= -f2)
@@ -301,8 +333,10 @@ iteration() {
             sleep 5
         done
         echo "  INFO pass summary after the stall: [${summ:-not seen inside ${pb}s}] at +$(el)s"
+        tc=$(now_ms)
         bm2=$(rs 90 "$B" "grep -q ' mxfs ' /proc/mounts && echo ALREADY; s=\$(date +%s%N); mount -t mxfs $DEV $MNT; rc=\$?; e=\$(date +%s%N); echo B_MOUNT2_RC=\$rc ms=\$(( (e-s)/1000000 )); grep -c ' mxfs ' /proc/mounts")
         echo "  INFO B's mount after the pass: $(echo "$bm2" | tr '\n' ' ') at +$(el)s"
+        op_ms "B's mount after the pass" "$bm2" $(( $(now_ms) - tc ))
         bm2_rc=$(echo "$bm2" | grep -ao 'B_MOUNT2_RC=[0-9]*' | cut -d= -f2)
         bm2_ms=$(echo "$bm2" | grep -ao 'ms=[0-9]*' | cut -d= -f2)
     fi

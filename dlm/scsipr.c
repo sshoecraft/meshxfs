@@ -189,16 +189,19 @@ int mxfs_scsipr_register_succeed(struct mxfs_scsipr_ctx *ctx, uint64_t old_key)
  * it yet.  The caller is the reservation worker, alone, and only while the
  * node still has authority over the LUN: this is a REGISTER made after the
  * mount, and one made by a node whose authority has lapsed could follow its
- * own fence.  -ESTALE: the key was found registered nowhere else.
+ * own fence.  fence_ms: the earliest time a peer may fence this node (0:
+ * unbounded), as mxfs_pal_scsi_pr_fill_paths takes it.  -ESTALE: the key was
+ * found registered nowhere else.
  */
-int mxfs_scsipr_fill_paths(struct mxfs_scsipr_ctx *ctx)
+int mxfs_scsipr_fill_paths(struct mxfs_scsipr_ctx *ctx, uint64_t fence_ms)
 {
 	int rc, added = 0;
 
 	if (!ctx || !ctx->dev || !ctx->registered || !ctx->local_key)
 		return 0;
 	mxfs_scsipr_departure_lock();
-	rc = mxfs_pal_scsi_pr_fill_paths(ctx->dev, ctx->local_key, &added);
+	rc = mxfs_pal_scsi_pr_fill_paths(ctx->dev, ctx->local_key, fence_ms,
+					 &added);
 	if (added || rc == -ESTALE)
 		mxfs_scsipr_snap_invalidate(ctx, "fill-paths");
 	mxfs_scsipr_departure_unlock();

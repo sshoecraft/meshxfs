@@ -198,7 +198,18 @@ MODULE_PARM_DESC(dl_auth_suspend,
 		 "a SCSI attachment's lease deadline suspends the mount until a "
 		 "beat lands inside the peers' dead window (1, default); 0 closes "
 		 "its authority at the deadline (same-build control)");
+
+/* A silent peer is declared only after the longer of this node's death window
+ * and the one the peer published (hb_dead_threshold_for). */
+static int mxfs_dl_peer_window = 1;
+module_param_named(dl_peer_window, mxfs_dl_peer_window, int, 0644);
+MODULE_PARM_DESC(dl_peer_window,
+		 "declare a silent peer dead only after the longer of this node's "
+		 "death window and the one it published, a peer that published "
+		 "none held to its attachment's default (1, default); 0 holds "
+		 "every peer to this node's own window (same-build control)");
 #else
+static int mxfs_dl_peer_window = 1;
 #define dl_instr_on() (0)
 #define dl_inject_take(k) (false)
 static int mxfs_dl_auth_suspend = 1;
@@ -557,6 +568,18 @@ static void hb_ident_fill(const struct mxfs_disklock_ctx *ctx,
 	hb->ident = ctx->own_ident;
 	hb->ident.crc32c = hb_ident_crc(slot, hb->flags, hb->fs_gen, hb->node_id,
 					hb->epoch, &hb->ident);
+	hb->ident.window_ms = (uint32_t)ctx->dead_threshold *
+			      MXFS_DISKLOCK_HB_INTERVAL_MS;
+	hb->ident.window_ms_inv = ~hb->ident.window_ms;
+}
+
+/* The death window a record's writer published, ms; 0 when it published none
+ * (a module before the field wrote zeros there) or the check does not hold. */
+static uint32_t hb_published_window(const struct mxfs_disklock_heartbeat *hb)
+{
+	if (!hb->ident.window_ms || hb->ident.window_ms_inv != ~hb->ident.window_ms)
+		return 0;
+	return hb->ident.window_ms;
 }
 
 bool mxfs_hb_identity_valid(const struct mxfs_disklock_heartbeat *hb,
@@ -632,6 +655,9 @@ static void hb_ident_observe(struct mxfs_disklock_ctx *ctx, uint32_t slot,
 		!mxfs_hb_identity_valid(rhb, slot))
 		return;
 	if (o->valid && o->node == rhb->node_id && inc_eq(o->epoch, rhb->epoch)) {
+		/* a published window only ever lengthens what this node waits */
+		if (hb_published_window(rhb) > o->window_ms)
+			o->window_ms = hb_published_window(rhb);
 		if (o->key != rhb->ident.pr_key || o->key_gen != rhb->ident.key_gen) {
 			if (!o->conflict)
 				mxfs_pal_log(MXFS_LOG_ERR,
@@ -653,6 +679,7 @@ static void hb_ident_observe(struct mxfs_disklock_ctx *ctx, uint32_t slot,
 	o->key_gen = rhb->ident.key_gen;
 	memcpy(o->host_uuid, rhb->ident.host_uuid, 16);   /* */
 	memcpy(o->boot_uuid, rhb->ident.boot_uuid, 16);
+	o->window_ms = hb_published_window(rhb);
 	o->valid = true;
 	o->conflict = false;
 }
@@ -690,6 +717,43 @@ static void hb_ident_freeze_victim(struct mxfs_disklock_ctx *ctx,
 }
 
 /*
+ * THE DEAD WINDOW IS THE LONGER OF THE TWO NODES'.  A node's lease is derived
+ * from its own window (disklock_auth_lease_update), and the window outlasts the
+ * lease so that a node whose beats stopped landing has stopped writing before a
+ * peer declares it.  That holds between two nodes only if the declaring one
+ * waits at least the dead node's window: on a cluster whose nodes run
+ * different windows (a dead_timeout_ms on some nodes only, modules of
+ * different defaults), nodes with a 12 s window declared a node with the 30 s
+ * lease of the default window dead 12.3 s after its last landed beat.  So the
+ * checks a silent peer's stamp must stand for are the longer of this node's
+ * window and the one the peer publishes in its identity block; a peer that
+ * publishes none is held to the default window of the attachment.
+ * dl_peer_window=0 holds every peer to this node's own window, as before: the
+ * same-build control.
+ */
+static uint32_t disklock_default_dead_threshold(const struct mxfs_disklock_ctx *ctx);
+
+static int hb_dead_threshold_for(const struct mxfs_disklock_ctx *ctx,
+				 uint32_t slot,
+				 const struct mxfs_disklock_node_track *nt,
+				 mxfs_node_id_t node)
+{
+	const struct mxfs_disklock_ident_obs *o = &ctx->ident_obs[slot];
+	uint32_t w = 0, k;
+
+	if (!mxfs_dl_peer_window)
+		return (int)ctx->dead_threshold;
+	if (o->valid && !o->conflict && o->node == node &&
+	    inc_eq(o->epoch, nt->last_epoch))
+		w = o->window_ms;
+	if (!w)
+		w = disklock_default_dead_threshold(ctx) *
+		    MXFS_DISKLOCK_HB_INTERVAL_MS;
+	k = (w + MXFS_DISKLOCK_HB_INTERVAL_MS - 1) / MXFS_DISKLOCK_HB_INTERVAL_MS;
+	return (int)(k > ctx->dead_threshold ? k : ctx->dead_threshold);
+}
+
+/*
  * THE DEAD WINDOW, SHORTENED BY COROSYNC.  The full window (dead_threshold
  * checks, 34 s on SCSI) exists so that a live node whose heartbeat writes
  * stall, in a path failover or a SCSI error-handling ladder, is not declared
@@ -722,7 +786,7 @@ static bool hb_member_gone(struct mxfs_disklock_ctx *ctx, uint32_t slot,
 
 	if (ctx->attach_drbd || !nt->live ||
 	    nt->equal_samples < MXFS_DISKLOCK_MEMBER_GONE_SAMPLES ||
-	    nt->equal_samples >= ctx->dead_threshold)
+	    nt->equal_samples >= hb_dead_threshold_for(ctx, slot, nt, node))
 		return false;
 	if (!o->valid || o->conflict || o->node != node ||
 	    !inc_eq(o->epoch, nt->last_epoch))
@@ -757,7 +821,7 @@ static bool hb_peer_closed(struct mxfs_disklock_ctx *ctx, uint32_t slot,
 
 	if (ctx->attach_drbd || !nt->live ||
 	    nt->equal_samples < MXFS_DISKLOCK_CLOSED_SAMPLES ||
-	    nt->equal_samples >= ctx->dead_threshold)
+	    nt->equal_samples >= hb_dead_threshold_for(ctx, slot, nt, node))
 		return false;
 	if (!o->valid || o->conflict || o->node != node ||
 	    !inc_eq(o->epoch, nt->last_epoch))
@@ -3181,6 +3245,13 @@ uint64_t mxfs_authority_remaining_ms(struct mxfs_authority *auth)
 	return now < deadline ? deadline - now : 0;
 }
 
+uint64_t mxfs_authority_fence_earliest_ms(struct mxfs_authority *auth)
+{
+	if (!auth || mxfs_atomic32_get(&auth->state) != MXFS_AUTH_ADMITTED)
+		return 0;
+	return auth->revalidate_by_ms;
+}
+
 /*
  * A landed beat on an attachment whose deadline suspends (disklock.h,
  * MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS).  It renews only if it completed before
@@ -3908,6 +3979,7 @@ static void disklock_hb_fn(void *arg)
 				 */
 				mxfs_node_id_t victim_node;
 				mxfs_epoch_t victim_epoch = 0;
+				int dead_k = (int)ctx->dead_threshold;
 				/* Rebase state: the successor incarnation to resume tracking
 				 * once the predecessor's death has been dispatched. */
 				bool rebase_inc = false;
@@ -4835,7 +4907,22 @@ check_dead:
 				 * stop; the baseline (last_timestamp) must exist, and the
 				 * FUA confirm below still applies.
 				 */
-				if (nt->equal_samples >= ctx->dead_threshold &&
+				dead_k = hb_dead_threshold_for(ctx, slot, nt,
+							       victim_node);
+				if (nt->equal_samples == (int)ctx->dead_threshold &&
+				    dead_k > (int)ctx->dead_threshold)
+					mxfs_pal_log(MXFS_LOG_WARN,
+					    "mxfs: P-HB-PEER-WINDOW slot=%u node=%u inc=%llu "
+					    "eq=%d own_threshold=%u peer_threshold=%d "
+					    "published_ms=%u -- this node's own window has "
+					    "run out on a silent peer whose window is longer; "
+					    "it is held to the peer's, inside which its lease "
+					    "may still be running",
+					    slot, victim_node,
+					    (unsigned long long)victim_epoch,
+					    nt->equal_samples, ctx->dead_threshold, dead_k,
+					    ctx->ident_obs[slot].window_ms);
+				if (nt->equal_samples >= dead_k &&
 				    !nt->live && nt->last_timestamp != 0)
 					mxfs_pal_log(MXFS_LOG_WARN,
 					    "mxfs: P-HB-GHOST-DEAD slot=%u node=%u inc=%llu eq=%d -- "
@@ -4843,7 +4930,7 @@ check_dead:
 					    "death on the ordinary path",
 					    slot, victim_node, (unsigned long long)victim_epoch,
 					    nt->equal_samples);
-				if ((nt->equal_samples >= ctx->dead_threshold ||
+				if ((nt->equal_samples >= dead_k ||
 				     hb_member_gone(ctx, slot, nt, victim_node) ||
 				     hb_peer_closed(ctx, slot, nt, victim_node)) &&
 				    (nt->live || nt->last_timestamp != 0)) {
@@ -4960,9 +5047,10 @@ fire_dead:
 					mxfs_pal_log(MXFS_LOG_WARN,
 					    "mxfs: node in slot %u is no longer responding "
 					    "(heartbeat expired after %d checks), initiating "
-					    "recovery [threshold=%u last_stamp_ms=%llu "
-					    "last_seen_ms=%llu now_ms=%llu]",
-					    slot, nt->equal_samples, ctx->dead_threshold,
+					    "recovery [threshold=%d own_threshold=%u "
+					    "last_stamp_ms=%llu last_seen_ms=%llu now_ms=%llu]",
+					    slot, nt->equal_samples, dead_k,
+					    ctx->dead_threshold,
 					    (unsigned long long)nt->last_timestamp,
 					    (unsigned long long)nt->last_change_ms,
 					    (unsigned long long)mxfs_pal_time_ms());

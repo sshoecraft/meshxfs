@@ -498,12 +498,38 @@ pf_remount() {
     echo "  INFO $tag: $n $(grep -a '^REMOUNT ' "$OUT/remount_${n}_$tag.txt" | head -1)"
     ck "$tag: $n unmounted and mounted again (rc 0, 0)" "$(grep -a '^REMOUNT ' "$OUT/remount_${n}_$tag.txt" | head -1 | sed 's/ ms=[0-9]*//')" "REMOUNT umount_rc=0 mount_rc=0 mounted=1"
 }
+# pf_rejoin_modargs <insmod|modprobe>: the arguments a rejoin loads the module
+# with, the ones tests/setup/prep_node.sh loaded it with on every other node:
+# the configuration's transport, target_cache_protected=1, log_repeat_limit=0,
+# dyndbg=+p, the lane's MXFS_EXTRA_MODARGS, then the retirement contract run.sh
+# hands the prep (MXFS_RETIRE_CONTRACT verbatim when it is set, even empty;
+# the rig's declaration otherwise), in that order, since a later argument
+# overrides an earlier one.  A rejoin that loaded mxfs_rig_modargs alone ran
+# the victim on the default death window (dead_timeout_ms=0, 34 s) while every
+# other node of a lane with MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 ran 12 s,
+# and run.sh's marker carried that mixed cluster into every later row
+# (D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS).
+# PF_REJOIN_PREP_ARGS=0 loads what the rejoin loaded before, for the control:
+# dyndbg=+p and mxfs_rig_modargs to insmod, nothing to modprobe.
+pf_rejoin_modargs() {
+    local rig ft c
+    rig=$(mxfs_rig_modargs) || return 1
+    if [ "${PF_REJOIN_PREP_ARGS:-1}" = 0 ]; then
+        [ "$1" = insmod ] && printf '%s\n' "dyndbg=+p $rig" || printf '\n'
+        return 0
+    fi
+    case " $rig " in *" force_transport=0 "*) ft=0 ;; *) ft=1 ;; esac
+    if [ "${MXFS_RETIRE_CONTRACT+set}" = set ]; then c=$MXFS_RETIRE_CONTRACT; else c=$(mxfs_rig_retirement_contract); fi
+    printf '%s\n' "force_transport=$ft target_cache_protected=1 log_repeat_limit=0 dyndbg=+p${MXFS_EXTRA_MODARGS:+ $MXFS_EXTRA_MODARGS}${c:+ 'target_retire_contract=\"$c\"'}"
+}
 # pf_boot_rejoin <node> <tag>: start a killed node and bring it back into the
 # cluster: it logs in on its paths by itself (node.startup automatic), then
-# the module the prep left on it is loaded and the filesystem mounted
+# the module the prep left on it is loaded, with the prep's arguments
+# (pf_rejoin_modargs), and the filesystem mounted
 pf_boot_rejoin() {
-    local n=$1 tag=$2 i=0 up=0 args
-    args=$(mxfs_rig_modargs) || { why="no module arguments for ${MXFS_CONFIG:-?}"; finish FAIL "stage=rejoin"; exit 1; }
+    local n=$1 tag=$2 i=0 up=0 args margs
+    args=$(pf_rejoin_modargs insmod) && margs=$(pf_rejoin_modargs modprobe) \
+        || { why="no module arguments for ${MXFS_CONFIG:-?}"; finish FAIL "stage=rejoin"; exit 1; }
     timeout 60 $VIRSH start "$n" >/dev/null 2>&1
     while [ $i -lt 180 ]; do
         [ "$(rs 8 "$n" "test -e /run/nologin || echo SSH_UP" | tail -1)" = SSH_UP ] && { up=1; break; }
@@ -516,7 +542,7 @@ pf_boot_rejoin() {
          j=0; while [ \$j -lt 90 ] && ! [ -e $DEV ]; do multipath >/dev/null 2>&1; sleep 3; j=\$((j+3)); done
          [ -e $DEV ] && d=1 || d=0
          j=0; while [ \$j -lt 40 ] && [ \"\$(multipathd show paths format '%t %T' 2>/dev/null | grep -c 'active ready')\" -lt 2 ]; do sleep 2; j=\$((j+2)); done
-         modprobe libcrc32c 2>/dev/null; i=0; if ! lsmod | grep -q '^mxfs '; then if [ -e /root/mxfs.ko.prep ]; then insmod /root/mxfs.ko.prep dyndbg=+p $args; else modprobe mxfs; fi; i=\$?; fi
+         modprobe libcrc32c 2>/dev/null; i=0; if ! lsmod | grep -q '^mxfs '; then if [ -e /root/mxfs.ko.prep ]; then insmod /root/mxfs.ko.prep $args; else modprobe mxfs $margs; fi; i=\$?; fi
          s=\$(date +%s%3N); timeout 60 mount -t mxfs $MOPT $DEV $MNT; m=\$?; e=\$(date +%s%3N)
          grep -q ' $MNT mxfs ' /proc/mounts && k=1 || k=0
          echo REJOIN dev=\$d insmod_rc=\$i mount_rc=\$m ms=\$((e-s)) mounted=\$k"

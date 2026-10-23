@@ -454,6 +454,13 @@ bool mxfs_authority_closed(struct mxfs_authority *auth);
 bool mxfs_authority_suspended(struct mxfs_authority *auth);
 /* Milliseconds of authority left: 0 unless admitted and before the deadline. */
 uint64_t mxfs_authority_remaining_ms(struct mxfs_authority *auth);
+/*
+ * The earliest time, on this node's clock, at which a peer can count the
+ * death window from this incarnation's last landed beat: its anchor plus the
+ * window less the clock error (revalidate_by_ms).  0 unless admitted.  What a
+ * command this node issues must have finished by, if no fence may follow it.
+ */
+uint64_t mxfs_authority_fence_earliest_ms(struct mxfs_authority *auth);
 void mxfs_authority_renew(struct mxfs_authority *auth, uint64_t anchor_ms,
 			  uint64_t last_ok_ms);
 void mxfs_authority_close(struct mxfs_authority *auth, int reason,
@@ -1562,7 +1569,17 @@ struct mxfs_hb_identity {
 	uint64_t                pr_key;         /* 64-bit per-boot PR key */
 	uint32_t                host_src;       /* MXFS_HOSTID_SRC_* */
 	uint32_t                crc32c;         /* see block comment */
-	uint8_t                 reserved[8];
+	/*
+	 * The writer's death window, ms (dead_threshold x the heartbeat
+	 * interval), and its complement as its check.  Outside the crc: these
+	 * were reserved bytes, zero in every record a module before them
+	 * wrote, which reads as "published none".  A peer declares this
+	 * incarnation dead only after the longer of its own window and this
+	 * one, so no node is declared inside its own lease when the nodes'
+	 * windows differ (disklock.c, hb_dead_threshold_for).
+	 */
+	uint32_t                window_ms;
+	uint32_t                window_ms_inv;
 };                                          /* 64 bytes */
 
 /*
@@ -2270,6 +2287,7 @@ struct mxfs_disklock_ctx {
 		uint32_t        key_gen;
 		uint8_t         host_uuid[16];  /* frozen with the key */
 		uint8_t         boot_uuid[16];
+		uint32_t        window_ms;      /* its published death window, 0 = none */
 		bool            valid;
 		bool            conflict;
 	}                                ident_obs[MXFS_DISKLOCK_HB_SLOTS];

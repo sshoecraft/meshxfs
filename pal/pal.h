@@ -975,11 +975,16 @@ int mxfs_pal_scsi_pr_unregister(mxfs_bdev_t *dev, uint64_t key);
  * each verified against the key's other registrations so that a registration
  * made after a peer preempted the key is undone at once.  The caller must
  * still hold its authority over the LUN and must serialise calls.
+ * fence_ms (mxfs_pal_time_ms clock, 0 = unbounded): the earliest time a peer
+ * may fence this node.  A REGISTER is issued only if its command timeout ends
+ * before it, and one whose outcome is unknown, or that answers only after it,
+ * takes its path out of service (quarantine).
  * Returns 0 (nothing to do, or done), -ESTALE (the key is registered nowhere
  * else: treat as fenced), -EAGAIN (undecided; call again).  *added: paths
  * registered by this call.
  */
-int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key, int *added);
+int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key,
+				uint64_t fence_ms, int *added);
 
 /*
  * Watch `dev`'s SCSI paths for a reset another initiator issues (on: from the

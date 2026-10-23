@@ -2759,7 +2759,7 @@
           "iso": "2026-10-23T18:32:54Z"
         }
       ],
-      "reproducer": "tests/release_step_cell_lap.py (host only, under 1 s): takes a recorded release step FAIL from the primary ledger and requires it to parse as a cell (tools/criteria.py parse_cell), to be found in the ledger and to take an annotation; prints EXPOSED for the recorded step FAIL it uses. With the fix taken out parse_cell refuses the step's key ('criteria: 1/any: wanted <nodes>/<class>/<method>/<attach>'): STEP_CELL_LAP FAIL",
+      "reproducer": "tests/release_step_cell_lap.py (host only; 11 s with the parse out, 21 s with it in; batch bound 40 s): takes three recorded release step FAILs from the primary ledger, one per key shape (1/any:release:boards:2026-10-21T19:29:49Z, 2/net/mesh/direct:release:platforms:2026-10-21T20:12:33Z, 2/net/mesh/drbd:release:drbd:2026-10-22T00:35:43Z), and in a scratch copy of the tools and data settles each four ways (infra and amend through defects.py propose --target, removal through defects.py update --cell, and the removal of a record already naming the run, which bypasses parse_cell), printing 'EXPOSED: the gate lists' before each of the twelve. With MXFS_RELEASE_STEP_SETTLE=0 in the lap's own environment, parse_cell refuses the six propose --target and three update --cell on all three keys ('wanted <nodes>/<class>/<method>/<attach>', 'records no run stamped platforms:2026-10-21T20:12:33Z', 'verified on a rig of its own'): STEP_CELL_LAP FAIL 9 of 12; with the switch at its default: STEP_CELL_LAP PASS all 12",
       "verified_at": [
         {
           "config": "2/net/mesh/direct",
@@ -5063,6 +5063,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-84d4a5",
+          "kind": "control",
+          "row": "lap:batch_lap_stall",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py measures and grades no stall, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a lap whose own output holds an operation over the stall limit is recorded PASS"
         }
       ],
       "rates": [
@@ -5409,14 +5426,81 @@
           "candidate": "",
           "build": "C54C14B681D148267D084FC",
           "variant": "FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0 (the lap as it was before the forced overlap: its first 64 merged blocks held 20 ms on each node, no overlap forced, plain unmounts)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: a lap whose holds catch no peer write retries no MISCOMPARE and ends VACUOUS"
+        },
+        {
+          "id": "b20261023-a26306",
+          "kind": "verify",
+          "row": "lap:fourkn_merge_2node",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "planned": 298,
+          "probe": "INFO forced overlap in inode block",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:fourkn_merge_2node",
+            "config": "2/disk/caw/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-5362ec",
+            "k": 3,
+            "n": 20,
+            "candidate": "",
+            "variant": "FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0 (the lap as it was before the forced overlap: its first 64 merged blocks held 20 ms on each node, no overlap forced, plain unmounts)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.01764263795419471
         }
       ],
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "rates": [
+        {
+          "row": "lap:fourkn_merge_2node",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-5362ec",
+          "k": 3,
+          "n": 20,
+          "candidate": "",
+          "variant": "FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0 (the lap as it was before the forced overlap: its first 64 merged blocks held 20 ms on each node, no overlap forced, plain unmounts)",
+          "builds": [
+            "C54C14B681D148267D084FC"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T20:34:15Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T20:26:23Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T20:21:55Z"
+        }
+      ]
     },
     {
       "id": "D-CAPTURE-GATE-PAIR-REBUILD-TOOK-207S-AND-THE-LAP-OVERRAN-ITS-360S-BOUND",

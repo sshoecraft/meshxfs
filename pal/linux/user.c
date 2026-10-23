@@ -1482,9 +1482,10 @@ int mxfs_pal_scsi_pr_register(mxfs_bdev_t *dev, uint64_t key)
 }
 
 /* One file descriptor is one path: there is never a late path to fill. */
-int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key, int *added)
+int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key,
+				uint64_t fence_ms, int *added)
 {
-	(void)dev; (void)key;
+	(void)dev; (void)key; (void)fence_ms;
 	if (added)
 		*added = 0;
 	return 0;

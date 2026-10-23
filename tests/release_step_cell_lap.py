@@ -90,12 +90,34 @@ def own_boards() -> list:
                    if isinstance(spec, dict) and spec.get("board")})
 
 
+def copy_present(source: str, target: str) -> str:
+    """shutil.copy2, except that a file gone since copytree listed its directory is left out."""
+    try:
+        return shutil.copy2(source, target)
+    except FileNotFoundError:
+        if os.path.lexists(source):
+            raise
+        return target
+
+
 def scratch_tree(base: Path) -> Path:
-    """A tree holding copies of the tools and of every file they read or write."""
+    """A tree holding copies of the tools and of every file they read or write.
+
+    data/ is live while the lap copies it: tools/defects.py and tools/criteria.py replace the
+    queue, the proposals and the boards by writing <name>.json.tmp and renaming it over the file,
+    so a temporary file copytree listed could be gone by the time it was copied, and the lap died
+    on shutil.Error with no verdict
+    (D-RELEASE-STEP-CELL-LAP-COPIES-LIVE-DATA-DIR-AND-DIES-ON-A-VANISHED-TMP-FILE). No tool reads
+    a *.tmp, so they are not copied, and a file that vanishes between the listing and the copy is
+    left out. MXFS_RELEASE_STEP_COPY=0 copies data/ whole, as before: the same-build control."""
     (base / "tools").mkdir(parents=True)
     for source in (ROOT / "tools").glob("*.py"):
         shutil.copy2(source, base / "tools" / source.name)
-    shutil.copytree(ROOT / "data", base / "data", symlinks=True)
+    if os.environ.get("MXFS_RELEASE_STEP_COPY", "1") == "0":
+        shutil.copytree(ROOT / "data", base / "data", symlinks=True)
+    else:
+        shutil.copytree(ROOT / "data", base / "data", symlinks=True,
+                        ignore=shutil.ignore_patterns("*.tmp"), copy_function=copy_present)
     for board in own_boards():
         source = ROOT / board
         target = base / board
@@ -226,7 +248,7 @@ def live_run(key: tuple) -> dict | None:
 
 
 def main() -> int:
-    for switch in SWITCHES:
+    for switch in SWITCHES + ("MXFS_RELEASE_STEP_COPY",):
         print(f"INFO {switch}={os.environ.get(switch) or '(unset)'}")
     keys = {}
     for run in RUNS:

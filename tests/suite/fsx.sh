@@ -33,13 +33,29 @@ SUITE_MEASURED_EXTRA="${SUITE_MEASURED_EXTRA:+$SUITE_MEASURED_EXTRA }seed=$SEED"
 # run_fsx <ops> [extra args]  — fsx exits nonzero on any verify miscompare.  A
 # failing run's log stays on the node and its path goes into the record, with
 # its last lines in the kernel log the harness captures; a passing run's log is
-# removed.
+# removed.  FSX_LOG_DIR moves the logs off /root for a run that is not root.
+#
+# fsx writes its own files beside the test file in $W: .fsxlog (every line it
+# printed), .fsxops (the operation history a miscompare dumps, replayable with
+# --replay-ops) and .fsxgood (the image the file should have held).  The EXIT
+# trap removes $W, so a failing check's copies of them are moved out first, to
+# the kept log's name with fsx's suffix in place of .log, and the suffixes kept
+# go into the record.  FSX_KEEP_FAIL_FILES=0 leaves them in $W to be removed
+# with it, as before: the control.
 run_fsx() {
-    local log="/root/fsx.$SEED.$1.log" rc
+    local base="${FSX_LOG_DIR:-/root}/fsx.$SEED.$1" log rc f kept=""
+    log="$base.log"
     "$FSX" -S "$SEED" -N "$1" ${2:-} "$W/fsxfile_$1" > "$log" 2>&1
     rc=$?
     if [ "$rc" -ne 0 ]; then
         SUITE_MEASURED_EXTRA="$SUITE_MEASURED_EXTRA fsx_fail_log=$(hostname):$log"
+        if [ "${FSX_KEEP_FAIL_FILES:-1}" != 0 ]; then
+            for f in fsxlog fsxops fsxgood; do
+                [ -e "$W/fsxfile_$1.$f" ] && mv -f "$W/fsxfile_$1.$f" "$base.$f" 2>/dev/null &&
+                    kept="${kept:+$kept,}$f"
+            done
+            SUITE_MEASURED_EXTRA="$SUITE_MEASURED_EXTRA fsx_fail_kept=${kept:-none}"
+        fi
         echo "mxfs-FSXfail seed=$SEED ops=$1 rc=$rc $(tail -n 3 "$log" | tr '\n' ' ' | cut -c1-300)" > /dev/kmsg 2>/dev/null
     else
         rm -f "$log"

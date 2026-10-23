@@ -10929,26 +10929,48 @@ static bool v5_resv_health_tick(struct mxfs_v5_dlm *ctx, uint64_t now)
  * that it can carry I/O when the path in use fails.  Looking costs no I/O;
  * the commands are sent only when such a path exists.
  *
- * It runs only with a good part of the authority lease left.  A peer fences
- * this node no sooner than the death window after its last heartbeat, and
- * the lease ends well before that, so a REGISTER issued under this margin
- * (5 s timeout, never reissued) reaches the target before any fence can.
- * The check inside (mxfs_pal_scsi_pr_fill_paths) covers the case this margin
- * cannot: a node fenced while its lease is still good, as a partitioned
- * net/mesh node is.
+ * A peer fences this node no sooner than the death window after its last
+ * landed heartbeat (mxfs_authority_fence_earliest_ms).  The fill hands that
+ * time down, and each REGISTER is issued only if its command timeout ends
+ * before it; one whose outcome is unknown, or that answers only after it,
+ * takes its path out of service, since it may still execute at the target
+ * after a fence (docs/rulings/silent-peer-death-under-the-stall-limit.md,
+ * 'Registering a late path under a short lease').  The fill runs whenever the
+ * authority admits writes, so a late path is registered under any lease the
+ * death window allows.  The check inside (mxfs_pal_scsi_pr_fill_paths) covers
+ * the case no time bound can: a node fenced while its lease is still good, as
+ * a partitioned net/mesh node is.
+ *
+ * pr_fill_bounded=0 is the same-build control: the fill runs only with
+ * V5_PR_FILL_MIN_LEASE_MS of the lease left and hands down no bound, as
+ * before, which no lease of a 12 s death window (8 s) ever has.
  */
 #define V5_PR_FILL_PERIOD_MS	500
 #define V5_PR_FILL_MIN_LEASE_MS	15000
+static int mxfs_pr_fill_bounded = 1;
+#ifdef __KERNEL__
+module_param_named(pr_fill_bounded, mxfs_pr_fill_bounded, int, 0644);
+MODULE_PARM_DESC(pr_fill_bounded,
+		 "late-path registration: 1 issues each REGISTER only if it ends before the earliest fence and quarantines a path whose REGISTER is unresolved (default); 0 runs only with 15 s of lease left (same-build control)");
+#endif
 static void v5_resv_inspect_launch(struct mxfs_v5_dlm *ctx, const char *why);
 
 static void v5_pr_fill_tick(struct mxfs_v5_dlm *ctx, uint64_t now)
 {
+	uint64_t fence_ms = 0;
+
 	if (!ctx->scsipr || now < ctx->pr_fill_next_ms)
 		return;
 	ctx->pr_fill_next_ms = now + V5_PR_FILL_PERIOD_MS;
-	if (mxfs_authority_remaining_ms(ctx->authority) < V5_PR_FILL_MIN_LEASE_MS)
+	if (mxfs_pr_fill_bounded) {
+		fence_ms = mxfs_authority_fence_earliest_ms(ctx->authority);
+		if (!fence_ms || !mxfs_authority_ok(ctx->authority))
+			return;
+	} else if (mxfs_authority_remaining_ms(ctx->authority) <
+		   V5_PR_FILL_MIN_LEASE_MS) {
 		return;
-	if (mxfs_scsipr_fill_paths(ctx->scsipr) == -ESTALE) {
+	}
+	if (mxfs_scsipr_fill_paths(ctx->scsipr, fence_ms) == -ESTALE) {
 		mxfs_pal_log(MXFS_LOG_ERR,
 			     "mxfs: P-PR-FILL-FENCED node=%u -- a path was not "
 			     "registered because this node's key is registered "
