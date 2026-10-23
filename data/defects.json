@@ -2407,7 +2407,7 @@
           "candidate": "0.90.134",
           "build": "08D63764A9352FBDD5A76CD",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -2444,6 +2444,18 @@
           "builds": [
             "08D63764A9352FBDD5A76CD"
           ],
+          "date": "2026-10-23"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T10:11:20Z",
+          "build": "08D63764A9352FBDD5A76CD",
+          "batch": "b20261023-2baa2a",
+          "approval": "P20261023-26297c",
           "date": "2026-10-23"
         }
       ]
@@ -3779,7 +3791,7 @@
           "candidate": "0.90.134",
           "build": "08D63764A9352FBDD5A76CD",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -3816,6 +3828,18 @@
           "builds": [
             "08D63764A9352FBDD5A76CD"
           ],
+          "date": "2026-10-23"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T10:11:20Z",
+          "build": "08D63764A9352FBDD5A76CD",
+          "batch": "b20261023-174417",
+          "approval": "P20261023-e0ffbe",
           "date": "2026-10-23"
         }
       ]
@@ -5437,8 +5461,8 @@
       "config": "disk/caw/mpath",
       "opened": "2026-10-22",
       "summary": "On the 4/ and 8/disk/caw/mpath boards of 2026-10-19 (runs 20261019T142249Z-g4b and -g8b, v0.90.131 tools), chk_clean's cold audit found the volume CORRUPT with one nlink mismatch each: a regular file with nlink 1 named by two directory entries. In both runs the row just before chk_clean was path_answer_lost, which reports COMPARE AND WRITE answers lost on purpose and has some resent swaps find a peer's write in between. The chk_clean FAIL never reached the ledger (the boards were migrated without it); the crash_audit rows after it found the audited node left unmounted and recorded PRE-ASSERT INCOMPLETE.",
-      "evidence": "tests/evidence/run_chk_clean_20261019T142249Z-g4b/test17:3 'RESULT: FAIL | test=chk_clean | nodes=4 | measured=verdict=CORRUPT release=CORRUPT rc=4 errors=3 remounted=0 icount=19328 ... evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261019T151341Z.log'; chk_clean_4node_20261019T151341Z.log:821 'ERROR: inode 6872560 (mode 0100644) has nlink 1 but 2 directory entries name it', :822 nlink_mismatch=1. tests/evidence/run_chk_clean_20261019T142249Z-g8b/test21:3 'verdict=CORRUPT release=CORRUPT rc=4 errors=3 ... chk_clean_8node_20261019T152029Z.log'; chk_clean_8node_20261019T152029Z.log:1045 'ERROR: inode 13147165 (mode 0100644) has nlink 1 but 2 directory entries name it', :1046 nlink_mismatch=1. Preceding rows: board_20261019T142249Z-g4b_path_answer_lost/row.log:129 'RESULT: PASS ... victim=test20 injected=40 landed=23 unresolved=17'; board_20261019T142249Z-g8b_path_answer_lost/row.log:241 'RESULT: PASS ... victim=test28 injected=40 landed=24 unresolved=16'. Located by tests/evidence/incident_preassert_sweep_20261022T2355Z.txt (groups d, e). ===== 2026-10-23 sweep of both runs' kept files (run_chk_clean_20261019T142249Z-g4b and -g8b kernlog_test*.gz, the path_answer_lost rows' load_* files): neither chk log names the two entries or their directories (chk_clean_4node_20261019T151341Z.log:821 and chk_clean_8node_20261019T152029Z.log:1045 are each log's only ERROR line and its only mention of the inode), and no image of either volume was kept. 8 nodes, inode 13147165 (agno 3, agino 0x89c1d): test28's churn (tests/mpath/pathload.py churn: create shared/<node>.<lap>, rename to .r, unlink the previous lap's .r) was handed that number for 59 creates, shared/test28.406 to shared/test28.806, 15:17:40-15:18:28Z (board_20261019T142249Z-g8b_path_answer_lost/load_test28/inos.log:814-1614), then its private write for test28/f0000811 at 15:18:33.790Z (inos.log:1623; directory 13121792, chk log :894). At 15:18:33 test28 logged 'P26-DSCAN-MISS ino=13121792 ndb=5 scanned=813 name=\"f0000811\" (not in any data block ...)' twice (run_chk_clean_20261019T142249Z-g8b/kernlog_test28.gz:93041, :93191). At 15:19:22 test27 still held an in-core directory incarnation of the number (P-RELOAD-XINCARN-POISON ino=13147165 incore_mode=040755 disk_mode=0100644, kernlog_test27.gz:140806; INODE-REUSE-EVICT incore_ftype=2 dirent_ftype=1 name=f0000811, :140768), the mutex's lock directory being the workload's only mkdir. chk found no ftype mismatch, so the second entry names a regular file. The 40 injected lost answers were all swaps of one lock slot (P-CAW-ANSWER-LOST-* slot=27793 in answer_lost_test28.txt: 24 LANDED, 16 UNRESOLVED), the lock of ino 25704706: every node logged P-ACQ-STUCK on it at 15:17:20 and 15:18:16-18, and test28 'P-ACQ-SELF-ORPHAN ino=25704706 slot=27793 ... sole wire holder is THIS node while this waiter starves' (kernlog_test28.gz:86021-86022). 4 nodes, inode 6872560 (agno 3, agino 0x8ddf0): no file names it besides the chk log and four lock lines (kernlog_test17.gz:45478, test18 :40251 :40264, test19 :47553); the injected swaps were slot 21417, the lock of ino 2636354 (P-ACQ-STUCK and P-ACQ-SELF-ORPHAN on test20 at 15:11:36, kernlog_test20.gz:53569-53570).",
-      "next": "Read both chk_clean logs in full and each run's path_answer_lost kernel logs for the two inodes (6872560, 13147165): which directory holds the two entries, their names, which node created and linked each, and whether a resent COMPARE AND WRITE of a directory block applied an entry insert twice. Then check whether a later version changed that path (0.90.131 was withdrawn; the 0.90.132 entry of CHANGELOG.md), and reproduce on the current build: 4/disk/caw/mpath path_answer_lost followed by chk_clean. ===== 2026-10-23: the kept files cannot name the second entry, so the cause has to come from a run on the current build: 4/disk/caw/mpath and 8/disk/caw/mpath path_answer_lost followed by chk_clean, with the rows' kernel logs kept (PF_KEEP_KMSG=1) and, on a CORRUPT verdict, the volume read before anything remounts it, so the two entries, their directories and the lock ino 25704706 is (whether it is the shared directory) are known.",
+      "evidence": "tests/evidence/run_chk_clean_20261019T142249Z-g4b/test17:3 'RESULT: FAIL | test=chk_clean | nodes=4 | measured=verdict=CORRUPT release=CORRUPT rc=4 errors=3 remounted=0 icount=19328 ... evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261019T151341Z.log'; chk_clean_4node_20261019T151341Z.log:821 'ERROR: inode 6872560 (mode 0100644) has nlink 1 but 2 directory entries name it', :822 nlink_mismatch=1. tests/evidence/run_chk_clean_20261019T142249Z-g8b/test21:3 'verdict=CORRUPT release=CORRUPT rc=4 errors=3 ... chk_clean_8node_20261019T152029Z.log'; chk_clean_8node_20261019T152029Z.log:1045 'ERROR: inode 13147165 (mode 0100644) has nlink 1 but 2 directory entries name it', :1046 nlink_mismatch=1. Preceding rows: board_20261019T142249Z-g4b_path_answer_lost/row.log:129 'RESULT: PASS ... victim=test20 injected=40 landed=23 unresolved=17'; board_20261019T142249Z-g8b_path_answer_lost/row.log:241 'RESULT: PASS ... victim=test28 injected=40 landed=24 unresolved=16'. Located by tests/evidence/incident_preassert_sweep_20261022T2355Z.txt (groups d, e). ===== 2026-10-23 sweep of both runs' kept files (run_chk_clean_20261019T142249Z-g4b and -g8b kernlog_test*.gz, the path_answer_lost rows' load_* files): neither chk log names the two entries or their directories (chk_clean_4node_20261019T151341Z.log:821 and chk_clean_8node_20261019T152029Z.log:1045 are each log's only ERROR line and its only mention of the inode), and no image of either volume was kept. 8 nodes, inode 13147165 (agno 3, agino 0x89c1d): test28's churn (tests/mpath/pathload.py churn: create shared/<node>.<lap>, rename to .r, unlink the previous lap's .r) was handed that number for 59 creates, shared/test28.406 to shared/test28.806, 15:17:40-15:18:28Z (board_20261019T142249Z-g8b_path_answer_lost/load_test28/inos.log:814-1614), then its private write for test28/f0000811 at 15:18:33.790Z (inos.log:1623; directory 13121792, chk log :894). At 15:18:33 test28 logged 'P26-DSCAN-MISS ino=13121792 ndb=5 scanned=813 name=\"f0000811\" (not in any data block ...)' twice (run_chk_clean_20261019T142249Z-g8b/kernlog_test28.gz:93041, :93191). At 15:19:22 test27 still held an in-core directory incarnation of the number (P-RELOAD-XINCARN-POISON ino=13147165 incore_mode=040755 disk_mode=0100644, kernlog_test27.gz:140806; INODE-REUSE-EVICT incore_ftype=2 dirent_ftype=1 name=f0000811, :140768), the mutex's lock directory being the workload's only mkdir. chk found no ftype mismatch, so the second entry names a regular file. The 40 injected lost answers were all swaps of one lock slot (P-CAW-ANSWER-LOST-* slot=27793 in answer_lost_test28.txt: 24 LANDED, 16 UNRESOLVED), the lock of ino 25704706: every node logged P-ACQ-STUCK on it at 15:17:20 and 15:18:16-18, and test28 'P-ACQ-SELF-ORPHAN ino=25704706 slot=27793 ... sole wire holder is THIS node while this waiter starves' (kernlog_test28.gz:86021-86022). 4 nodes, inode 6872560 (agno 3, agino 0x8ddf0): no file names it besides the chk log and four lock lines (kernlog_test17.gz:45478, test18 :40251 :40264, test19 :47553); the injected swaps were slot 21417, the lock of ino 2636354 (P-ACQ-STUCK and P-ACQ-SELF-ORPHAN on test20 at 15:11:36, kernlog_test20.gz:53569-53570). ===== 2026-10-23, on build 08D63764A9352FBDD5A76CD (tree of the 0.90.134 attempt frozen 10:11:20Z), one run each of path_answer_lost then chk_clean with every node's kernel log kept (PF_KEEP_KMSG=1, lanes tests/evidence/lanes/g4_nlink_repro_20261023T102759Z and g8_nlink_repro_20261023T102802Z, step4.log): 4/disk/caw/mpath 'RESULT: PASS ... victim=test6 injected=40 landed=15 unresolved=25 ... max_stall_ms=17445' (board_20261023T105528Z-g4_path_answer_lost/row.log), chk_clean CLEAN 'nlink_mismatch=0' (chk_clean_4node_20261023T105949Z.log); 8/disk/caw/mpath 'RESULT: PASS ... victim=test14 injected=40 landed=24 unresolved=16 ... max_stall_ms=18098' (board_20261023T105719Z-g8_path_answer_lost/row.log), chk_clean CLEAN 'nlink_mismatch=0' (chk_clean_8node_20261023T110155Z.log). The trigger's conditions were present: the kept kmsg dumps hold 8 (g4) and 15 (g8) P-ACQ-STUCK/P-ACQ-SELF-ORPHAN lines. 0 of 2 runs failed on this build against 2 of 2 on 2026-10-19 (v0.90.131 tools); two clean runs dispose of nothing.",
+      "next": "Read both chk_clean logs in full and each run's path_answer_lost kernel logs for the two inodes (6872560, 13147165): which directory holds the two entries, their names, which node created and linked each, and whether a resent COMPARE AND WRITE of a directory block applied an entry insert twice. Then check whether a later version changed that path (0.90.131 was withdrawn; the 0.90.132 entry of CHANGELOG.md), and reproduce on the current build: 4/disk/caw/mpath path_answer_lost followed by chk_clean. ===== 2026-10-23: the kept files cannot name the second entry, so the cause has to come from a run on the current build: 4/disk/caw/mpath and 8/disk/caw/mpath path_answer_lost followed by chk_clean, with the rows' kernel logs kept (PF_KEEP_KMSG=1) and, on a CORRUPT verdict, the volume read before anything remounts it, so the two entries, their directories and the lock ino 25704706 is (whether it is the shared directory) are known. ===== 2026-10-23: the current build did not reproduce in one run at 4 and one at 8 nodes, with the trigger's stuck acquisitions present. Next: diff the inode-reuse and directory-entry paths between the 2026-10-19 build and this one (the 0.90.132 entry of CHANGELOG.md, the P-RELOAD-XINCARN-POISON and INODE-REUSE-EVICT sites) to find a change that would explain it; if one does, a control with that change reverted at 8/disk/caw/mpath must reproduce before a verification batch can be sized; if none does, a calibration batch of path_answer_lost+chk_clean at 8/disk/caw/mpath on this build measures the rate.",
       "impact": "integrity",
       "impact_why": "chk_mxfs found a structural violation of the directory tree: a file whose link count is 1 is named by two directory entries, so unlinking one name frees an inode the other still names",
       "collateral": [
@@ -6123,11 +6147,113 @@
           "candidate": "",
           "build": "08D63764A9352FBDD5A76CD",
           "variant": "dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the last member's release-all on one thread, as before the fix",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: the defect must reproduce"
+        },
+        {
+          "id": "b20261023-dff6ea",
+          "kind": "verify",
+          "row": "lap:lmu",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: A's last-member unmount released",
+          "candidate": "0.90.134",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:lmu",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-9a3afc",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the last member's release-all on one thread, as before the fix",
+            "builds": [
+              "08D63764A9352FBDD5A76CD"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:lmu",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-9a3afc",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the last member's release-all on one thread, as before the fix",
+          "builds": [
+            "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T11:11:14Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T11:08:24Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T11:05:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T11:02:42Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T10:58:59Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T10:55:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T10:51:33Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T10:48:35Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T10:45:44Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T10:42:47Z"
         }
       ]
     },
@@ -6302,156 +6428,6 @@
           "config": "8/net/mesh/mpath",
           "row": "path_peer_withdrawn",
           "iso": "2026-10-22T19:58:42Z"
-        }
-      ]
-    },
-    {
-      "id": "D-SURVIVOR-CACHE-SERVES-A-DELETED-FILES-BMBT-BLOCK-FOR-A-PEERS-NEW-FILE",
-      "severity": "critical",
-      "nodes": 2,
-      "config": "*/*/*",
-      "opened": "2026-10-23",
-      "summary": "On 2/net/mesh/direct (candidate 0.90.134, build 16A5F5DDDB4852C9D5DB236) test1 read 2 of 8 files its peer had just written and fsynced and got no data: test1's buffer cache served extent-tree (bmbt) blocks still carrying the owner of a file from the previous lap, deleted and its blocks reused for the new files' trees; the btree owner check refused them (P975-BMBT-LOOKUP-BAD same_image=0) and the reads failed. Had the inode number been reused too, the owner check would have matched and a stale extent map would have been served.",
-      "evidence": "Lap 7 of verification b20261023-b40448 (tests/capture_fault_gate.sh openefivc7 --only d_intents_2tcp_open_efi, W=test1 V=test2): tests/evidence/20261023T061838Z_capture_gate_openefivc7/d_intents_2tcp_open_efi_ok.log:8 'INFO published via test1: listed=8 read=6 (+7s)', :9 'FAIL W listed and read all 8 files (published before the rm) got=6 want=8'; the step is tests/d_intents_2tcp_open_efi.sh:172-190 (V writes 8 files of 4096 extents with fsync of each file and the directory; W counts the files whose 'head -c 4096' returns 4096 bytes), before any fault. W's kernel log tests/evidence/20261023T061841Z_intents2tcp_openefivc7-d_intents_2tcp_open_efi-ok/dmesg_test1.txt:251 and :258 'P975-BMBT-LOOKUP-BAD daddr=2106984 want_ino=2097296 want_level=0 cached_owner=2097287 cached_level=0 cached_nrecs=251 ... disk_rc=0 disk_owner=2097296 ... same_image=0 comm=head', :297 and :302 the same at daddr=2164704 want_ino=2097298 cached_owner=2097290 disk_owner=2097298; :17-20 ISTALE-CAW-EVICT ino=2097294 (V's directory) try=1..4; :53 'P212-RDRETRY-SKIP ino=2097294 fmt=1 ... serving consistent-stale'. The previous lap's W log (tests/evidence/20261023T061656Z_intents2tcp_openefivc6-d_intents_2tcp_open_efi-ok/dmesg_test1.txt:241-268) already shows test1 holding bmbt images of owner 2097287 at other addresses that differ from the LUN ('P77-SKIP-DIFFERS site=chokepoint owner=2097287 daddr=2115088 numrecs=251 same=0 ... skipped bmbt image differs from LUN', 'P61-CHOKEPOINT-SKIP-BMBT owner=2097287 ... NL-released dir, skipping stale leaf write at bio submit'). W stays mounted across the gate's laps; each lap V builds, removes and dies, and W replays V's slice and completes its open EFI (P226-FR-INTENTS-RECOVERABLE, P-OBL-ENGINE-EXTENT, P163-RECOVERY-COMPLETE). The 0.87.6 eviction (CHANGELOG.md 0.87.6, mxfs_bmbt_tenure_end_evict) drops an inode's cached bmbt images at the end of each tenure on that inode; the consult on that change named buffers left by log recovery of a dead peer's slice as not covered. 1 of the batch's 7 laps. ===== 2026-10-23, the old read behaviour reproduces the failure: lane tests/evidence/lanes/g2_bmbt_openefi_diag_20261023T072311Z (g2, build B155E10D900872E6CE36289, MXFS_EXTRA_MODARGS=bmbt_skip_reads=1, 12 open-EFI gate laps back to back on one survivor mount, not a batch): laps 4, 5 and 12 FAIL 'W listed and read all 8 files ... got=7 want=8', 9 PASS. In lap 4 (tests/evidence/20261023T072927Z_intents2tcp_brsoe4_20261023-d_intents_2tcp_open_efi-ok/dmesg_test1.txt:297-300) 'P61-CHOKEPOINT-READ n=3 owner=10485892 daddr=10368248 ... flags=0x15 hold=2 ... skip_reads=1 -- ... skipped, the old image is served with no read' and n=4 at flags=0x1 hold=2, then :294/:396 'P975-BMBT-LOOKUP-BAD daddr=10368248 want_ino=10485899 ... cached_owner=10485892 ... flags=0x60 ... disk_owner=10485899 same_image=0 comm=head'; lap 5 the same at daddr=10393016 (P61 n=21-23 hold=2, P975 :385/:476). Every P975 follows a matched read of that daddr: the skipped read is the cause, and hold=2 is the second reference that kept the buffer alive between the readahead's skip and the synchronous read. Rate with the fix out: 3 of 12 (not a declared batch). ===== 2026-10-23: tests/bmbt_read_skip_lap.sh with each bmbt readahead's buffer held 300 ms (BMBT_RA_HOLD_MS=300, dbg_bmbt_ra_hold_ms; build 906689DFC7F6D5B9FB0C922, g2, 2/net/mesh/direct, ROUNDS=3; lane tests/evidence/lanes/g2_bmbt_hold_drbd_fio_20261023T092758Z). The fix taken out (BMBT_SKIP_READS=1), twice: FAIL, W read 18 and 17 of the 24 new files' heads short and logged P975-BMBT-LOOKUP-BAD 29 and 22 times (tests/evidence/20261023T092914Z_bmbtrdskip_brshold1a: matched=74 skipped=74; 20261023T093029Z_bmbtrdskip_brshold1b). The fix in (BMBT_SKIP_READS=0), twice: PASS, every head whole, no P975, no read skipped (20261023T092952Z_bmbtrdskip_brshold0a: matched=126; 20261023T093105Z_bmbtrdskip_brshold0b). With the hold the lap reproduces the failure every time with the fix out, where it never did without it. The second lap of each arm counted matched=0: P61-CHOKEPOINT-READ prints at most 200 times per module load (pal/linux/xfs_buf.c mxfs_bmbt_chokepoint_covers) and the first two laps printed 74 + 126, so on one load the line cannot show exposure lap after lap.",
-      "next": "Establish how test1's cache came to hold bmbt images owned by 2097287 and 2097290 at daddr 2106984 and 2164704 when lap 7 began: brought in by lap 6's replay of V's slice or by the obligation engine's completion, never read under a tenure and so never evicted; or read under a tenure whose end did not evict them. Instrument first: a probe where recovery completes listing every bmbt buffer (daddr, payload owner, XBF_DONE, dirty) it leaves in the cache, and the tenure-end eviction's decision for those daddrs; reproduce with open-EFI laps back to back on one W mount. Then fix at the proven cause with a knob for the control, the control with it off, and a verification batch on the candidate. ===== HYPOTHESIS (from lap 7's own log and the code; not yet instrumented): the stale image was not served from the cache, it was served by a READ that was never issued. The bmbt write chokepoint in xfs_buf_submit_bio (pal/linux/xfs_buf.c:9570, mxfs_buf_xfsaild_skip_bmbt_write, xfs/xfs_mxfs_buf.c:1032) has no direction test, so it judges read bios too, and it reads the owner from the buffer's memory, which for an evicted buffer (XBF_DONE cleared by the tenure-end evict) still holds the previous tree's image. In lap 7 that previous owner, 2097287, had been reused as a directory that is in core on test1 and NL-released, so the predicate returned skip for head's read of daddr 2106984: mxfs_bmbt_skip_preserve_truth read the LUN, found it different (P77-SKIP-DIFFERS same=0, owner=2097287), and staled the buffer (pal/linux/xfs_buf.c:8751); the chokepoint printed P61-CHOKEPOINT-SKIP-BMBT and completed the bio with xfs_buf_ioend and no I/O (:9603); for an XBF_READ buffer that runs verify_read on the old image and sets XBF_DONE, so the lookup got the old leaf with flags=0x60 = XBF_DONE|XBF_STALE, exactly what P975-BMBT-LOOKUP-BAD printed (dmesg_test1.txt:247-251, and :293-297 for daddr 2164704, owner 2097290). The cache find cannot hand out a stale buffer (xfs_buf_find_lock resets one, pal/linux/xfs_buf.c:1068-1101), and P975 prints before xfs_buf_mark_corrupt (xfs/libxfs/xfs_btree.c:1978-1982), so XBF_STALE was set inside the lookup's own read. The recovery retirement is not involved: lap 6's replay tagged one bmbt image and retired it (P-RECOV-IMAGE-EVICT ... bmbt=1 ... evicted=5 local=0 busy=0, lap 6 dmesg_test1.txt:901). The chokepoint's second arm (b_tenure_id != i_mxfs_ex_grant_seq) can suppress a read of the owner directory's own leaf under a later tenure, and that image carries the right owner, so the owner check cannot refuse it. Falsifiable: with the chokepoint's skip printing the bio direction, every P61 that precedes a P975 must be a READ; with the skip limited to write bios, no read is ever skipped and the lookup reads the LUN. The directory-block skip at :9848 (mxfs_buf_xfsaild_skip_dir_write) has no direction test either and sets XBF_DONE itself; it is a suspected sibling to instrument separately, not part of this change. ===== 2026-10-23: give the lap an exposure count that holds across laps on one module load (a counter of the reads the chokepoint matches, read and reset by the lap, instead of the capped P61-CHOKEPOINT-READ line); then, on the frozen candidate, the control batch with BMBT_SKIP_READS=1 BMBT_RA_HOLD_MS=300 (10 laps, the knob as the fix's switch), the verification batch with BMBT_SKIP_READS=0 sized from it, and remove --fixed; then rerun D-OPEN-EFI-DEATH-REPLAY-REFUSED-NOT-HELD-VICTIM-DOMAIN-QUARANTINED-2TCP's verification, which this defect ended.",
-      "reproducer": "tests/capture_fault_gate.sh <label> --only d_intents_2tcp_open_efi, laps back to back on one survivor mount (as tools/harness_batch.py runs a batch): a lap whose 'published via' read count is below 8, with P975-BMBT-LOOKUP-BAD naming an owner from an earlier lap",
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "gate:d_intents_2tcp_open_efi",
-          "iso": "2026-10-23T06:20:27Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:bmbt_read_skip",
-          "iso": "2026-10-23T10:27:13Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:bmbt_read_skip",
-          "iso": "2026-10-23T10:26:34Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:bmbt_read_skip",
-          "iso": "2026-10-23T10:25:54Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:bmbt_read_skip",
-          "iso": "2026-10-23T10:25:14Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:bmbt_read_skip",
-          "iso": "2026-10-23T10:24:36Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:bmbt_read_skip",
-          "iso": "2026-10-23T10:23:57Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:bmbt_read_skip",
-          "iso": "2026-10-23T10:23:18Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:bmbt_read_skip",
-          "iso": "2026-10-23T10:22:40Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:bmbt_read_skip",
-          "iso": "2026-10-23T10:22:03Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:bmbt_read_skip",
-          "iso": "2026-10-23T10:21:24Z"
-        }
-      ],
-      "updated": "2026-10-23",
-      "batches": [
-        {
-          "id": "b20261023-573c14",
-          "kind": "control",
-          "row": "lap:bmbt_read_skip",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^LAP bmbt_read_skip exposed: matched_reads=[1-9]",
-          "candidate": "",
-          "build": "08D63764A9352FBDD5A76CD",
-          "variant": "bmbt_skip_reads=1 on W for the lap (BMBT_SKIP_READS=1): the chokepoint completes a matched read with the buffer's old image and issues no I/O, as before the fix; BMBT_RA_HOLD_MS=300 in both arms",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: the defect must reproduce"
-        },
-        {
-          "id": "b20261023-8b466e",
-          "kind": "verify",
-          "row": "lap:bmbt_read_skip",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^LAP bmbt_read_skip exposed: matched_reads=[1-9]",
-          "candidate": "0.90.134",
-          "build": "08D63764A9352FBDD5A76CD",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:bmbt_read_skip",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-573c14",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "bmbt_skip_reads=1 on W for the lap (BMBT_SKIP_READS=1): the chokepoint completes a matched read with the buffer's old image and issues no I/O, as before the fix; BMBT_RA_HOLD_MS=300 in both arms",
-            "builds": [
-              "08D63764A9352FBDD5A76CD"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:bmbt_read_skip",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-573c14",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "bmbt_skip_reads=1 on W for the lap (BMBT_SKIP_READS=1): the chokepoint completes a matched read with the buffer's old image and issues no I/O, as before the fix; BMBT_RA_HOLD_MS=300 in both arms",
-          "builds": [
-            "08D63764A9352FBDD5A76CD"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T10:11:20Z",
-          "build": "08D63764A9352FBDD5A76CD",
-          "batch": "b20261023-8b466e",
-          "approval": "P20261023-624ee6",
-          "date": "2026-10-23"
         }
       ]
     },

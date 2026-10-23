@@ -2536,8 +2536,15 @@
         "tests/live_holder_shard_lap.sh",
         "tests/live_holder_wait.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-e0ffbe.md",
+        "sha256": "dc404eb346d878df76a6c341692a1d9f4df4a47fc891a54c8e1e0c045f015fb7",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-0a1c5a",
@@ -2585,8 +2592,15 @@
         "tests/alloc_witness_abort_lap.sh",
         "tests/tooling/alloc_witness.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-26297c.md",
+        "sha256": "4e3177533b2c8c4f9dc68e7d6f8b0b2f82b764e54e3969eb1d37370854242133",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-fbab9c",
@@ -2614,6 +2628,109 @@
         "data/reviews/P20261023-624ee6.md",
         "xfs/xfs_mxfs_buf.c",
         "xfs/xfs_mxfs_debug.c"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-fbab9c.md",
+        "sha256": "f9344277ffe8ebbba59975b5576b0f6fe4720f77965e31d96511cc9c266417fe",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-c062a3",
+      "kind": "remove-fixed",
+      "record": "D-TAUTH-TEST-OBJECTS-OMIT-INCLUDED-HEADERS-SO-A-HEADER-CHANGE-LINKS-STALE-CODE",
+      "change": {
+        "control": "b20261023-c75499",
+        "fixon": "b20261023-613125",
+        "cause": "the tauth lap scripts built the five objects their binaries link (dlm.o, dlm_shared.o, tauth_ledger.o, tauth_store.o, pal_user.o) with a plain make in tests/tauth, whose rules omit headers those sources include (pal/pal.h, included by all five, is listed by none), so after a change to an omitted header make kept the objects compiled before it and the lap linked code that was not the tree under test; the lap scripts now compile the five from clean into their own scratch directory (tests/tauth/shared_objs.sh) and the two A/B scripts build with make -B"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: tests/tauth/Makefile's rules for the five shared objects list some of the headers each source includes and not others (tests/tauth/Makefile:131-132 dlm_shared.o lists only dlm/dlm_shared.c; :146-147 and :149-150 tauth_store.o and tauth_ledger.o omit pal/pal.h and dlm/dlm.h). A lap script that built them with a plain make (tests/tauth/adopted_grant_handoff_test.sh did 'make obj/dlm.o obj/dlm_shared.o obj/tauth_ledger.o obj/tauth_store.o obj/pal_user.o') linked, after a change to an omitted header, the objects compiled before the change: the review of P20261023-867053 found exactly that in a verification's binary.\n\nThe fix, every site:\n- tests/tauth/shared_objs.sh:15-35, tauth_shared_objs <top> <outdir>: compiles the five from clean into the caller's directory with the Makefile's flags (:27-32) and prints their paths. TAUTH_SHARED_FROM_CLEAN=0 (:18-24) runs the plain make in tests/tauth as before the fix, the same-build control.\n- Its three callers link only what it prints, built into a fresh mktemp directory: tests/tauth/adopted_grant_handoff_test.sh:27-35, tests/tauth/fenced_node_ledger_test.sh:25-33, tests/tauth/capacity_park_test.sh:19-27 (objs=$(tauth_shared_objs \"$TOP\" \"$BIN/obj\"), then cc ... $objs). capacity_park_test.sh also links its binary into that scratch directory instead of the tree.\n- The two A/B scripts that build a whole binary with the Makefile use make -B, which remakes every target and so every object whatever the rules list: tests/tauth/env_knob_ab.sh:27 and tests/tauth/formation_unspent_ab.sh:37; each refuses while a release candidate freezes its binary (:25-26 and :35-36), which is why neither ran on this attempt.\n- Every other build of tests/tauth in the tree is 'make -C tests/tauth clean test' (tests/full_verify.sh:206 and the old sess4xx chain scripts), whose clean removes the objects first, so no stale object can be linked there; the Makefile itself is unchanged.\n\nControl b20261023-c75499 (candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z; tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step3.log): the frozen tree with TAUTH_SHARED_FROM_CLEAN=0 in the lap's environment, the helper's own switch back to the plain make. 10 of 10 exposed laps of tests/tauth_shared_objs_lap.sh FAIL 'LAP tauth_objs FAIL: built before pal/pal.h changed and linked as they were: dlm.o dlm_shared.o tauth_ledger.o tauth_store.o pal_user.o' (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step3.log:5-14); inputs before and after hash alike, 2559 files ('inputs before -> after: content=0; touched=0; added=0; gone=0', :16; tests/evidence/controls/b20261023-c75499.20261023T101535Z.inputs.before.json and .after.json).\n\nFix-on verification b20261023-613125 sized from it (k=n=10, L=0.5887, N=6), applied by verify proposal P20261023-cf21fb (data/reviews/P20261023-cf21fb.md): 6 of 6 laps PASS 'all 5 objects carry the mark: compiled from pal/pal.h as it now is' with exposure (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step4.log:3-9).\n\nThe callers, run on the frozen tree today (tests/evidence/tauth_callers_20261023T110957Z): tests/tauth_freeze_lap.py built and ran adopted_grant_handoff_test.sh and fenced_node_ledger_test.sh through the helper, both rc=0, 'TAUTH_FREEZE_LAP PASS none of the 2559 frozen files changed' (freeze_lap.log); capacity_park_test.sh 'RESULT PASS fails=0' rc=0 (capacity_park.log); tools/release_candidate.py check after them: 'every frozen file is as it was frozen' (candidate_check.log). The review of the verification asked whether testing exercises the callers: these runs show each caller builds and links through the helper on the candidate's tree without touching it; the header-change property itself is the helper's, which the two batches measured.\n\nCells: the record names only the ten control laps (2/net/mesh/direct:lap:tauth_shared_objs 2026-10-23T10:15:47Z .. 10:17:20Z), each failing on this cause in its own log (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step3.log:5-14; tests/evidence/batch_laps/b20261023-c75499/), already retired at 2/net/mesh/direct by the applied verification.",
+      "evidence": [
+        "tests/tauth/shared_objs.sh",
+        "tests/tauth/adopted_grant_handoff_test.sh",
+        "tests/tauth/fenced_node_ledger_test.sh",
+        "tests/tauth/capacity_park_test.sh",
+        "tests/tauth/env_knob_ab.sh",
+        "tests/tauth/formation_unspent_ab.sh",
+        "tests/tauth/Makefile",
+        "tests/full_verify.sh",
+        "tests/tauth_shared_objs_lap.sh",
+        "tests/tauth_freeze_lap.py",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step3.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step4.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-c75499",
+        "tests/evidence/batch_laps/b20261023-613125",
+        "tests/evidence/controls/b20261023-c75499.20261023T101535Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-c75499.20261023T101535Z.inputs.after.json",
+        "tests/evidence/tauth_callers_20261023T110957Z",
+        "data/reviews/P20261023-cf21fb.md",
+        "data/reviews/P20261023-867053.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-5e015a",
+      "kind": "remove-fixed",
+      "record": "D-ALLOC-WITNESS-RANK-ABORT-RECORDED-AS-BUDGET-EXHAUSTED",
+      "change": {
+        "control": "b20261023-5c1522",
+        "fixon": "b20261023-2baa2a",
+        "cause": "tests/tooling/alloc_witness.sh: a rank that aborted its own precondition wrote ABORT to its rank file and then waited at the final rendezvous while its peer waited at the next one; run.sh hands the row its whole budget as COORD_TIMEOUT, so both waited until the budget killed them and the board recorded BUDGET_EXHAUSTED on both ranks with the abort nowhere in it; an aborting rank now broadcasts its abort (coord_signal_abort) and every rendezvous returns the moment one has (aw_barrier), so the peer records ABORTED_BY_PEER with the reason and the row ends at once"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: when one rank of the alloc_witness row aborted its own precondition, the other rank waited for it until the row's 120 s budget killed both, and the board recorded FAIL BUDGET_EXHAUSTED on both ranks instead of the abort that ended the lap.\n\nThe fix, one file: tests/tooling/alloc_witness.sh:148-194. fail_out (:158-167) records the abort and, with AW_ABORT_BROADCAST=1 (the default, :157), broadcasts it through the row's coordination channel (coord_signal_abort, tests/suite/coord.sh:182-193, which predates the fix and dir_reuse_coherency.sh already uses); peer_out (:168-172) records ABORTED_BY_PEER with the aborting rank's reason; aw_barrier (:173-194) runs each rendezvous in the background and returns 2 the moment coord_check_abort sees a peer's abort. AW_ABORT_BROADCAST=0 restores both pre-fix paths exactly: fail_out goes to the final rendezvous (:163) and aw_barrier is the plain coord_barrier (:174-176). This record's census half (the script wrote no mxfs-CCph phase marker) was split into D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE, which stays open: this removal claims only the abort broadcast, the one fix its control turns off.\n\nControl b20261023-5c1522 (candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD; tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step8.log): the frozen tree with AW_ABORT_BROADCAST=0 in the lap's environment. 10 of 10 exposed laps of tests/alloc_witness_abort_lap.sh FAIL 'LAP aw_abort FAIL: budget_exhausted=1 abort_named=0 elapsed=120s of 120s' (:5-14), each with rank 2 made to abort after its fill (AW_ABORT_RANK=2) and its witness record holding the injected ABORT; inputs before and after hash alike, 2559 files ('content=0; touched=0; added=0; gone=0', :16; tests/evidence/controls/b20261023-5c1522.20261023T102614Z.inputs.before.json and .after.json).\n\nFix-on verification b20261023-2baa2a sized from it (k=n=10, L=0.5887, N=6), applied by verify proposal P20261023-26297c (data/reviews/P20261023-26297c.md): 6 of 6 laps PASS 'the row ended in 1s of 120s and named the abort' (2 s on lap 2) with exposure (tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step9.log:3-9); the review read rank 2's injected ABORT and rank 1's ABORTED_BY_PEER in every run.\n\nConfigurations: the defect is in the row's script and its coordination channel, which run the same on every configuration; the lap's two nodes coordinate exactly as the row's ranks do on 2/net/mesh/direct and 2/net/mesh/drbd (the script never reads the lock manager or the attachment).\n\nCells:\n- The ten control laps (2/disk/caw/direct:lap:aw_abort 2026-10-23T10:28:43Z .. 10:50:49Z), each failing on this cause in its own log (tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step8.log:5-14; tests/evidence/batch_laps/b20261023-5c1522/), already retired at 2/disk/caw/direct by the applied verification.\n- 2/net/mesh/drbd:alloc_witness:2026-10-21T22:35:00Z (tests/evidence/drbd_rig/criteria.runs.jsonl:3262 'measured: nodes_pass=0/2 states:BUDGET_EXHAUSTED=2', reason 'test1:BUDGET_EXHAUSTED:rc=124(tail:) test2:BUDGET_EXHAUSTED:rc=124(tail:) last_phase_census[none=2]') shows this cause in its own files: tests/evidence/alloc_witness/20261021T221943Z-g2/rank2.txt:1 'ABORT 14336 creates in 60 s in the node's AG partition never carved a chunk ...', rank1.txt holds its FILL line and its S0 snapshot and nothing after (it waited), and tests/evidence/run_alloc_witness_20261021T221943Z-g2/test1.rc and test2.rc are both 124: rank 2 aborted, the abort reached neither the peer nor the ledger, and both were killed at the budget. That run's failure itself, rank 2's fill carving nothing, is D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION's, and its census reading none is D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE's; both records name the same run and stay open, so removing this one leaves it accounted for by them. With this fix in, that run would have ended at once with rank 1 ABORTED_BY_PEER and rank 2's ABORT reason on the ledger, a FAIL that names its cause instead of BUDGET_EXHAUSTED.",
+      "evidence": [
+        "tests/tooling/alloc_witness.sh",
+        "tests/suite/coord.sh",
+        "tests/alloc_witness_abort_lap.sh",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step8.log",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step9.log",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-5c1522",
+        "tests/evidence/batch_laps/b20261023-2baa2a",
+        "tests/evidence/controls/b20261023-5c1522.20261023T102614Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-5c1522.20261023T102614Z.inputs.after.json",
+        "data/reviews/P20261023-26297c.md",
+        "tests/evidence/alloc_witness/20261021T221943Z-g2/rank1.txt",
+        "tests/evidence/alloc_witness/20261021T221943Z-g2/rank2.txt",
+        "tests/evidence/run_alloc_witness_20261021T221943Z-g2/test1.rc",
+        "tests/evidence/run_alloc_witness_20261021T221943Z-g2/test2.rc",
+        "tests/evidence/drbd_rig/criteria.runs.jsonl"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-b3dddc",
+      "kind": "remove-fixed",
+      "record": "D-LIVE-HOLDER-WAIT-FINDS-NO-REMOTE-MASTERED-INODE-AND-ABORTS-BEFORE-MEASURING",
+      "change": {
+        "control": "b20261023-3f3289",
+        "fixon": "b20261023-174417",
+        "cause": "tests/live_holder_wait.sh made its eight candidate inodes back to back, so their numbers were consecutive, and under ledger routing version 2 an inode routes with the low three bits of its number cleared (MXFS_TAUTH_INO_SHARD): the eight were one or two routing shards and so one or two mastership draws, and on a formation where those drew H itself none was remote-mastered from W and the harness aborted before measuring; H now creates objects until 16 distinct routing shards are represented and keeps the first in each as a candidate"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: tests/live_holder_wait.sh aborts before measuring ('ABORT: none of the eight candidates is remote-mastered from test2') when none of its candidates is mastered by the other node. It made its eight candidates back to back, so they were consecutive inode numbers.\n\nThe cause, from the routing code: a resource's master is active_nodes[page % N] (dlm/dlm.c:2445-2454), where page is its routing hash modulo the page count (dlm/dlm.c:2436-2443), and for an inode under routing version 2 the hash is taken with the low MXFS_TAUTH_INO_SHARD_BITS (3) of the number cleared (include/mxfs/mxfs_tauth.h:131-132, :498-508). So all eight inodes of one aligned group of eight share one master: eight consecutive numbers are one or two draws, and whenever those landed on H the lap could not run. Measured on the dry-run attempt's gate: candidates 8389321-8389328, all local.\n\nThe fix, one site: tests/live_holder_wait.sh:311-370. H creates objects (at most 160) until 16 distinct shards (ino >> 3) are represented, keeps the first object in each as a candidate, and removes the spares only after every candidate exists, since a freed number is taken by the next create and would draw the same shard again (:322-328, :339, :352-363). Each candidate is then its own draw: different shard numbers hash to independent pages through the hash's final avalanche (include/mxfs/mxfs_tauth.h:471-475), so on two nodes all 16 land on H with probability 2^-16, where the eight consecutive candidates did with probability 1/2 or 1/4. In that case the harness still refuses with its ABORT line, the honest answer for a formation it cannot measure, never a measurement of the wrong path. LH_SHARD_SELECT=0 (:335-337) keeps eight objects back to back, all of them, as before the fix: the same-build control.\n\nControl b20261023-3f3289 (candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD; tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step9.log): the frozen tree with LH_SHARD_SELECT=0. 10 of 10 exposed laps of tests/live_holder_shard_lap.sh FAIL 'LAP lh_shard FAIL: 8 candidates in 1 distinct routing shards: the search is 1 draw(s), not 8' (:5-14); inputs before and after hash alike, 2559 files (:16; tests/evidence/controls/b20261023-3f3289.20261023T103113Z.inputs.before.json and .after.json).\n\nFix-on verification b20261023-174417 sized from it (k=n=10, L=0.5887, N=6), applied by verify proposal P20261023-e0ffbe (data/reviews/P20261023-e0ffbe.md): 6 of 6 laps PASS '16 candidates in 16 distinct routing shards (16 draws for a remotely mastered one)' with 'EXPOSED: candidates=16' (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step10.log; e.g. tests/evidence/batch_laps/b20261023-174417/20261023T103203Z-6b319cfc.log: candidates 8388736 .. 8392952, one per shard). The lap grades the shard count because that is what the fix changes and what made the search one draw; mastership itself is the routing code's, read above.\n\nCells:\n- The ten control laps (2/net/mesh/direct:lap:lh_shard 2026-10-23T10:31:19Z .. 10:31:58Z), each failing on this cause in its own log (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step9.log:5-14), already retired at 2/net/mesh/direct by the applied verification.\n- 1/any:release:presteps:2026-10-21T23:22:19Z (data/criteria.runs.jsonl:7052, the dry-run attempt frozen 2026-10-21T23:03:33Z): its own log shows this abort, tests/evidence/candidates/0.90.134_20261021T230333Z.presteps.log:195 'GATE live_holder_wait fault: rc=2 wall=48s fault_line=0 abort=0 verdicts_after_fault=0 -> BROKEN', and the entry's log tests/evidence/20261021T230509Z_capture_gate_0.90.134_20261021T230333Z/live_holder_wait_fault.log:13 'ABORT: none of the eight candidates is remote-mastered from test2 - this lap cannot measure the path it names'. That step run failed on several entries at once; removals of other records have already retired it for their own entries (data/criteria.runs.jsonl:8555, :8677, :8700), and the records that name its other failures stay open.",
+      "evidence": [
+        "tests/live_holder_wait.sh",
+        "tests/live_holder_shard_lap.sh",
+        "include/mxfs/mxfs_tauth.h",
+        "dlm/dlm.c",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step9.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step10.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-3f3289",
+        "tests/evidence/batch_laps/b20261023-174417",
+        "tests/evidence/controls/b20261023-3f3289.20261023T103113Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-3f3289.20261023T103113Z.inputs.after.json",
+        "data/reviews/P20261023-e0ffbe.md",
+        "tests/evidence/candidates/0.90.134_20261021T230333Z.presteps.log",
+        "tests/evidence/20261021T230509Z_capture_gate_0.90.134_20261021T230333Z/live_holder_wait_fault.log",
+        "data/criteria.runs.jsonl"
       ],
       "state": "pending",
       "created": "2026-10-23"
