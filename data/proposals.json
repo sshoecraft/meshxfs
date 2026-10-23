@@ -5013,8 +5013,14 @@
         "data/reviews/P20261023-b5509f.md",
         "data/reviews/P20261022-93477b.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-9b6f3f.md",
+        "sha256": "4f462170cd7b7f06a6802ac718d1e2cd28c63c4d22422867a62a0d699d8c6813",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-1bcf31",
@@ -5045,8 +5051,14 @@
         "data/candidates/0.90.134.json",
         "data/release_policy.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-1bcf31.md",
+        "sha256": "46fe51a5b730a1a95ab7c5a4ed62539955bc2cb0ac3ccf904be135905c6adc1a",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-b32dc8",

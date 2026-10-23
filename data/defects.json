@@ -5937,7 +5937,8 @@
           ],
           "date": "2026-10-23"
         }
-      ]
+      ],
+      "reproducer": "tests/release_step_copy_race.py (about 6 s, host only: 200 copies of data/ the way tests/release_step_cell_lap.py makes them while a writer saves the queue through defects.save); MXFS_RELEASE_STEP_COPY=0 is the control"
     },
     {
       "id": "D-FSX-SH-EXIT-TRAP-REMOVES-FSX-OWN-FSXLOG-AND-FSXGOOD-WITH-THE-WORK-DIR",
@@ -6173,7 +6174,9 @@
       "opened": "2026-10-23",
       "summary": "tools/criteria.py incidents --at hands its argument to parse_at (tools/criteria.py:1616), which accepts only <nodes>/<class>/<method>/<attach>, so the listing cannot be narrowed to the configuration a release step's run is recorded under: 'criteria.py incidents --at 1/any' exits with \"criteria: '1/any': wanted <nodes>/<class>/<method>/<attach>, e.g. 8/net/mesh/direct\" and lists nothing",
       "evidence": "Reproduced 2026-10-23 on candidate 0.90.134's tree: 'timeout 30 python3 tools/criteria.py incidents --at 1/any' printed \"criteria: '1/any': wanted <nodes>/<class>/<method>/<attach>, e.g. 8/net/mesh/direct\". It was in the evidence of D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED, whose removal (review data/reviews/P20261023-b5509f.md) fixed parse_cell only and named this as not covered. It is a listing filter only: no disposition goes through it, and the unfiltered 'criteria.py incidents' lists release-step runs.",
-      "next": "Let incidents --at take a release step's configuration (1/any, and an own-rig key) as parse_cell now does, with a switch for the control; a lap that lists a release-step FAIL with --at 1/any, fix out (refused) and in (listed)."
+      "next": "Let incidents --at take a release step's configuration (1/any, and an own-rig key) as parse_cell now does, with a switch for the control; a lap that lists a release-step FAIL with --at 1/any, fix out (refused) and in (listed). ===== ===== 2026-10-23: FIX in the sibling tree /home/steve/src/mxfs-a15 for the next frozen attempt (the main tree is frozen): tools/criteria.py cmd_incidents keeps --at 1/any as the placeholder configuration instead of handing it to parse_at (2/net/mesh/drbd and every configuration parse_at takes already worked: probed on the tree, 'incidents --at 2/net/mesh/drbd' and '--at 3/disk/caw/mpath' answer, '--at 1/any' exits \"criteria: '1/any': wanted ...\"); MXFS_RELEASE_STEP_LIST=0 hands it to parse_at as before. New lap tests/release_step_incidents_at_lap.py (scratch tree from tests/release_step_cell_lap.py; EXPOSED when the unfiltered gate lists 1/any:release:boards:2026-10-21T19:29:49Z; PASS when --at 1/any exits 1, lists it and nothing of another configuration). Precheck on the host in the sibling tree: fix in PASS (0.81 s), MXFS_RELEASE_STEP_LIST=0 FAIL 'does not list' (0.66 s). Next: land it in the main tree when the attempt is next refrozen, control batch (10 laps, bound 6 s, probe '^EXPOSED: '), verification, remove --fixed.",
+      "reproducer": "tests/release_step_incidents_at_lap.py (under 1 s, host only, one scratch tree); MXFS_RELEASE_STEP_LIST=0 is the control",
+      "updated": "2026-10-23"
     },
     {
       "id": "D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS",
