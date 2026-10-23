@@ -3688,8 +3688,15 @@
         "data/reviews/P20261023-b45350.md",
         "data/defects.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-093564.md",
+        "sha256": "faa06f9ccfa4ccaf9b9cbefd946aedd30d95b84196fb34ab54e4eb7580d93699",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }
