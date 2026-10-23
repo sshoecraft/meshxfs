@@ -12,7 +12,7 @@ The lap takes three recorded step FAILs, one of each shape:
     2/net/mesh/direct:release:platforms:2026-10-21T20:12:33Z   a configuration parse_at takes
     2/net/mesh/drbd:release:drbd:2026-10-22T00:35:43Z          an own-rig configuration
 
-and settles each in the three ways a session settles one:
+and settles each in the four ways a session settles one:
 
     infra    defects.py propose infra-proven --target, review --approve, criteria.py infra
     amend    defects.py propose detector-defect --target, review --approve, criteria.py amend;
@@ -20,26 +20,37 @@ and settles each in the three ways a session settles one:
     removal  defects.py update <record> --cell, propose remove-disproved, review --approve,
              defects.py remove --disproved, whose retire_cells retires the run; then
              criteria.py unretire takes the retirement back
+    named    the removal of a record that already names the run: the scratch queue names it
+             through its own load and save, so update --cell (check_cells) is not run and the
+             removal's retire_cells is reached on every key; then criteria.py unretire
 
-Each of the nine runs in a scratch tree of its own: a copy of tools/*.py and of everything those
+Each of the twelve runs in a scratch tree of its own: a copy of tools/*.py and of everything those
 tools read or write (data/, the DRBD board and its ledger, CHANGELOG.md), so the lap writes nothing
 to the live queue, proposals, reviews or ledgers. The copy's queue first stops naming the run, so
 the copy's gate reads it as unaccounted for. The approvals are the scratch tree's own, written
 only to drive the commands there.
 
     EXPOSED   in a scratch tree, before its disposition, the gate lists the run
-    PASS      after each of the nine dispositions the gate no longer lists its run, and after
+    PASS      after each of the twelve dispositions the gate no longer lists its run, and after
               each take-back (unamend, unretire) it lists the run again
     FAIL      a command refused, the gate still lists the run after its disposition, or no
               longer lists it after the take-back
 
-MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py) reads and routes a release step's run as any other
-run, as before the fix: the fix's control. The lap hands its environment to every command.
+Each part of the fix has a switch (tools/criteria.py), and each switch off is that part as before
+the fix, the control of one record: MXFS_RELEASE_STEP_SETTLE=0 parses a step's run as any other
+(every disposition refused at the parse); MXFS_RELEASE_STEP_ANNOTATE=0 looks a step's row up as a
+board criterion (infra, amend and every take-back refused by find on every key);
+MXFS_RELEASE_STEP_BOARD=0 gives criteria.py the DRBD board for a command naming the drbd key (its
+infra and amend refused "records no run stamped", and the take-back of each removal refused);
+MXFS_RELEASE_STEP_ROUTE=0 looks a named run up and retires it on its configuration's board (the
+drbd key's propose --target and update --cell refused "records no run stamped", and its named
+removal leaving it listed). The lap hands its environment to every command.
 
 Bound, derived: each command is one interpreter reading the queue (1.5 MB), the proposals and the
 primary board and ledger (6 MB); a disposition is 3-5 commands and the gate twice. Measured on the
-tree of 2026-10-23 with every disposition settling: all nine with their copies (~10 MB each) in
-15.1 s. A batch lap is bounded at 2x that, 30 s; each command at 20 s.
+tree of 2026-10-23 with every disposition settling: all nine of the first three ways with their
+copies (~10 MB each) in 15.1 s, so about 20 s for twelve. A batch lap is bounded at 2x that, 40 s;
+each command at 20 s.
 
 Usage: tests/release_step_cell_lap.py
 Exit: 0 PASS, 1 FAIL, 2 the lap could not measure.
@@ -57,9 +68,12 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNS = ("1/any:release:boards:2026-10-21T19:29:49Z",
         "2/net/mesh/direct:release:platforms:2026-10-21T20:12:33Z",
         "2/net/mesh/drbd:release:drbd:2026-10-22T00:35:43Z")
-DISPOSITIONS = ("infra", "amend", "removal")
+DISPOSITIONS = ("infra", "amend", "removal", "named")
 #: the command that takes a disposition back (criteria.py withdraw); infra has none
-TAKE_BACK = {"amend": "unamend", "removal": "unretire"}
+TAKE_BACK = {"amend": "unamend", "removal": "unretire", "named": "unretire"}
+#: the fix's switches (tools/criteria.py), one per part
+SWITCHES = ("MXFS_RELEASE_STEP_SETTLE", "MXFS_RELEASE_STEP_ANNOTATE", "MXFS_RELEASE_STEP_BOARD",
+            "MXFS_RELEASE_STEP_ROUTE")
 #: the record the removal disposition names the run in and removes, in the scratch tree only
 RECORD = "D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED"
 COMMAND_BOUND = 20
@@ -126,6 +140,21 @@ def unname(tree: Path, key: tuple) -> None:
         raise RuntimeError(f"unname rc={out.returncode}: {(out.stdout + out.stderr).strip()[-300:]}")
 
 
+def name(tree: Path, key: tuple) -> None:
+    """The scratch queue's record names the run, through the queue's own load and save, as a
+    record that named it before update --cell checked a named run: its removal then reaches
+    retire_cells without check_cells."""
+    probe = ("import sys; sys.path.insert(0, 'tools'); import defects\n"
+             "config, row, iso = sys.argv[1:4]\n"
+             "data = defects.load()\n"
+             "record = next(r for r in data['defects'] if r['id'] == sys.argv[4])\n"
+             "record.setdefault('cells', []).append({'config': config, 'row': row, 'iso': iso})\n"
+             "defects.save(data)\n")
+    out = command(tree, ["-c", probe] + list(key) + [RECORD])
+    if out.returncode != 0:
+        raise RuntimeError(f"name rc={out.returncode}: {(out.stdout + out.stderr).strip()[-300:]}")
+
+
 def step(tree: Path, argv: list, label: str) -> str:
     out = command(tree, argv)
     text = (out.stdout + out.stderr).strip()
@@ -168,7 +197,11 @@ def dispose(tree: Path, how: str, run: str, key: tuple) -> None:
                     "--detector-defect", "release_step_cell_lap scratch disposition",
                     "--approval", pid], "criteria.py amend")
     else:
-        step(tree, ["tools/defects.py", "update", RECORD, "--cell", run], "defects.py update --cell")
+        if how == "named":
+            name(tree, key)
+        else:
+            step(tree, ["tools/defects.py", "update", RECORD, "--cell", run],
+                 "defects.py update --cell")
         pid = approved(tree, ["remove-disproved", "--record", RECORD])
         step(tree, ["tools/defects.py", "remove", RECORD, "--disproved", "--why",
                     "release_step_cell_lap scratch disposition", "--approval", pid],
@@ -193,8 +226,8 @@ def live_run(key: tuple) -> dict | None:
 
 
 def main() -> int:
-    switch = os.environ.get("MXFS_RELEASE_STEP_SETTLE", "")
-    print(f"INFO MXFS_RELEASE_STEP_SETTLE={switch or '(unset)'}")
+    for switch in SWITCHES:
+        print(f"INFO {switch}={os.environ.get(switch) or '(unset)'}")
     keys = {}
     for run in RUNS:
         match = KEY.fullmatch(run)
@@ -268,7 +301,8 @@ def main() -> int:
               "run: " + "; ".join(w[:220] for w in wrong))
         return 1
     print(f"STEP_CELL_LAP PASS all {exposed} dispositions settled their run "
-          "(3 key shapes x infra, amend, removal) and both take-backs listed it again")
+          "(3 key shapes x infra, amend, removal, named removal) and every take-back listed it "
+          "again")
     return 0
 
 

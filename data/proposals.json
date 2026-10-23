@@ -3647,6 +3647,36 @@
       ],
       "state": "pending",
       "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-093564",
+      "kind": "remove-fixed",
+      "record": "D-OPEN-EFI-DEATH-REPLAY-REFUSED-NOT-HELD-VICTIM-DOMAIN-QUARANTINED-2TCP",
+      "change": {
+        "control": "b20261023-dc6d35",
+        "fixon": "b20261023-30233a",
+        "cause": "An inactivation that released an inode's tenure after stamping a token (the INACT-EXREL release in xfs/xfs_inode.c) published no clean-release marker, so when the node died with a deferred free's EFI held, that tenure's transactions stayed in the replay window and the survivor could prove neither that the victim held the image at death nor that it released it clean: it refused them not-held, refused the whole replay (P241-RECOV-TERMINAL) and quarantined the victim's domain. The release now flushes the device and publishes the marker before the unlock (P-RELMARK-INACT); inact_relmark=0 releases unmarked, as before."
+      },
+      "argument": "FIXED AND VERIFIED. The verification this removal uses was approved and applied (P20261023-f2db37, data/reviews/P20261023-f2db37.md).\n\nThe defect: a TCP node that dies holding an open EFI is not recovered. The survivor's foreign replay refuses the inactivation tenures the victim released unmarked as not-held, refuses the replay and quarantines the victim's domain, where the open obligation should be completed (P226-FR-INTENTS-RECOVERABLE). Cause instrumented on 2026-10-22 (record evidence): the victim's P-RELMARK-OWED lines name exactly the tenures the survivor refused, with relmarks=0 on the survivor.\n\nThe fix, one site: xfs/xfs_inode.c:8060-8087. A tenure that owes a marker (the P-RELMARK-OWED condition, :7998-8016), not ICLUS-routed, with the core home, on a mount neither shut down nor unmounting, gets blkdev_issue_flush and then mxfs_inode_relmark_before_unlock before the unlock. The knob is xfs/xfs_mxfs_dlm.c:2260 (inact_relmark, 1 by default). With inact_relmark=0 the whole block, flush, marker and probe, is skipped (:8061), which is the pre-fix release; the P-RELMARK-OWED count above it is instrumentation and runs in both arms (:7996). xfs/xfs_inode.c, xfs/xfs_mxfs_dlm.c, tests/d_intents_2tcp_open_efi.sh and tests/capture_fault_gate.sh hash the same now as in the attempt's frozen list (tests/evidence/candidates/0.90.134_20261023T101120Z.files.json), and the tree builds the same module, 08D63764A9352FBDD5A76CD.\n\nThe lap: the capture gate's d_intents_2tcp_open_efi entry on pair g2 (test1 survivor, test2 victim) at 2/net/mesh/direct; its exposure is the victim's owed tenures.\n\nControl b20261023-dc6d35 on candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD, with only inact_relmark=0 (sysfs on the formed pair, MXFS_EXTRA_MODARGS on every re-formed one): 10 of 10 exposed laps FAIL, replay SUCCEEDED with an OPEN obligation case got=no (tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step6.log:17, :29); frozen inputs unchanged across it (:16, content=0; touched=0; added=0; gone=0).\n\nFix-on b20261023-30233a, sized from that control (10 of 10, lower bound 0.5887 at delta 0.005, 6 laps, tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step9.log:1): 6 PASS, 0 FAIL of 6 planned (:9), each exposed, the victim publishing a marker for every owed tenure and the survivor refusing nothing and completing the open obligation.\n\nThe cells: all 30 are laps of the three control batches (b20261022-8375dc, b20261023-e3ba0b, b20261023-dc6d35) with the fix switched off, and each shows this cause: the verification review lists every one with its owed and refused tenures (data/reviews/P20261023-f2db37.md:243-285). One of them, 2/net/mesh/direct:gate:d_intents_2tcp_open_efi:2026-10-22T19:14:48Z, also overran its bound after a 207 s pair rebuild; that overrun is D-CAPTURE-GATE-PAIR-REBUILD-TOOK-207S-AND-THE-LAP-OVERRAN-ITS-360S-BOUND's, which names the run and stays open, so the run stays named after this removal.\n\nStalls: the lap times the survivor's operations after the verdict, 7-23 ms (review :226). The survivor's wait across the silent death is D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S's. The AG-metadata write probe that fires during every foreign replay, in both arms, is D-FOREIGN-REPLAY-WRITES-AG-HEADERS-WITHOUT-THE-AG-LOCK's. Neither comes from this fix. The open verification batches of earlier attempts (b20261022-1c2336, b20261022-b6f805, b20261023-b40448) count for no attempt; b20261023-b40448's FAIL is retired by the removal of D-SURVIVOR-CACHE-SERVES-A-DELETED-FILES-BMBT-BLOCK-FOR-A-PEERS-NEW-FILE.",
+      "evidence": [
+        "xfs/xfs_inode.c",
+        "xfs/xfs_mxfs_dlm.c",
+        "tests/d_intents_2tcp_open_efi.sh",
+        "tests/capture_fault_gate.sh",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step6.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step9.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-dc6d35",
+        "tests/evidence/batch_laps/b20261023-30233a",
+        "tests/evidence/controls/b20261023-dc6d35.20261023T112904Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-dc6d35.20261023T112904Z.inputs.after.json",
+        "tests/evidence/candidates/0.90.134_20261023T101120Z.files.json",
+        "data/reviews/P20261023-f2db37.md",
+        "data/reviews/P20261023-b45350.md",
+        "data/defects.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
     }
   ]
 }

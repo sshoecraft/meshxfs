@@ -800,8 +800,7 @@ def check_cells(cells: list) -> None:
         # tools/release_run.py writes every release step's run into the primary ledger, whatever
         # configuration it files it under: the drbd step's, under 2/net/mesh/drbd, was looked for
         # in the DRBD board's and could never be named
-        board = criteria.SPEC if cell["row"].startswith("release:") \
-            else criteria.board_for(cell["config"])
+        board = criteria.run_board(cell["config"], cell["row"])
         run = criteria.ledger_run(board, cell["config"], cell["row"], cell["iso"])
         if run is None:
             sys.exit("defects: %s at %s records no run stamped %s (recorded: %s)"
@@ -859,8 +858,7 @@ def drop_cells(data: dict, entry: dict, args) -> list:
                              for c in entry.get(f) or [])), None)
         if field is None:
             sys.exit("defects: %s does not name %s" % (entry["id"], text))
-        board = criteria.SPEC if cell["row"].startswith("release:") \
-            else criteria.board_for(cell["config"])
+        board = criteria.run_board(cell["config"], cell["row"])
         others = [x["id"] for x in data["defects"] if x is not entry and any(
             (c["config"], c["row"], c["iso"]) == key
             for c in (x.get("cells") or []) + (x.get("collateral") or []))]
@@ -1228,8 +1226,7 @@ def unsettled(runs: list) -> None:
     criteria = board_tool()
     named = criteria.named_runs()
     for cell in runs:
-        board = criteria.SPEC if cell["row"].startswith("release:") \
-            else criteria.board_for(cell["config"])
+        board = criteria.run_board(cell["config"], cell["row"])
         key = (cell["config"], cell["row"], cell["iso"])
         if criteria.settled(board, *key) or named.get(key):
             sys.exit("defects: %s:%s:%s is already settled or named by an open record" % key)
