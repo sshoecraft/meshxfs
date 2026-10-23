@@ -1983,6 +1983,13 @@ int mxfs_pal_lu_paths_offline(const uint8_t *ident, int len, int *npaths)
 	return 0;
 }
 
+/* user mode: one file or device, no paths to choose between */
+int mxfs_pal_bdev_path_unanswered(mxfs_bdev_t *dev)
+{
+	(void)dev;
+	return 0;
+}
+
 bool mxfs_pal_ipv4_is_local(const char *addr)
 {
 	struct ifaddrs *ifa, *i;

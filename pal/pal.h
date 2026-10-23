@@ -1576,6 +1576,15 @@ int mxfs_pal_quorum_peer_closed(uint32_t node, uint64_t incarnation);
 int mxfs_pal_bdev_lu_ident(mxfs_bdev_t *dev, uint8_t *out, int max);
 int mxfs_pal_lu_paths_offline(const uint8_t *ident, int len, int *npaths);
 /*
+ * A command to `dev` got no answer within the caller's bound: when `dev` is a
+ * multipath map, the path its passthroughs go to is passed over, and the next
+ * passthrough moves to another path of the same logical unit while one is
+ * online.  1 = a path was passed over; 0 = `dev` has no resolved path (a plain
+ * disk, a stack of no SCSI disks, or the kernel's path_avoid=0).  Sends no
+ * command; the unanswered one is left to its transport.
+ */
+int mxfs_pal_bdev_path_unanswered(mxfs_bdev_t *dev);
+/*
  * The host and boot named in the peer's register of a shared attachment, as
  * read from the disk now: 1 = a valid register of the peer naming both; 0 =
  * none (never written, or not valid); <0 = the read failed.

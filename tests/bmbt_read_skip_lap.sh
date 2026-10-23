@@ -30,7 +30,11 @@
 #
 # Verdict per lap: FAIL when any of W's reads of a new file returned fewer than
 # 4096 bytes or W logged P975-BMBT-LOOKUP-BAD; PASS otherwise.  Exposure is the
-# P61-CHOKEPOINT-READ count in the lap's own W log (dmesg_W.txt).
+# number of reads the predicate matched on W during the lap: the module's
+# bmbt_chokepoint_reads counter, reset when the lap arms and read at capture.
+# The P61-CHOKEPOINT-READ lines in the lap's own W log (dmesg_W.txt) are counted
+# too, but they stop after 200 a module load, so a second lap on one load
+# printed none while its reads still matched (brshold1b, 2026-10-23).
 #
 # Derived bound: measured 34-35 s for ROUNDS=3 on 2/net/mesh/direct (test1,
 # test2; two builds of 8 files, the reads, removals and directories take 11-12 s
@@ -64,12 +68,12 @@ MARK="BRS-$LABEL-$$"
 echo "=== bmbt_read_skip_lap label=$LABEL W=$W V=$V rounds=$ROUNDS skip_reads=$BMBT_SKIP_READS ra_hold_ms=$BMBT_RA_HOLD_MS sv=$SV out=$OUT $(date -u +%FT%TZ) ==="
 
 for n in $W $V; do
-    info=$(rs 20 "$n" "echo sv=\$(cat /sys/module/mxfs/srcversion) ft=\$(cat $P/force_transport) m=\$(grep -c ' $MNT mxfs ' /proc/mounts) knob=\$(test -w $P/bmbt_skip_reads && echo 1 || echo 0) hold=\$(test -w $P/dbg_bmbt_ra_hold_ms && echo 1 || echo 0)" | tr -d '\n')
+    info=$(rs 20 "$n" "echo sv=\$(cat /sys/module/mxfs/srcversion) ft=\$(cat $P/force_transport) m=\$(grep -c ' $MNT mxfs ' /proc/mounts) knob=\$(test -w $P/bmbt_skip_reads && test -w $P/bmbt_chokepoint_reads && echo 1 || echo 0) hold=\$(test -w $P/dbg_bmbt_ra_hold_ms && echo 1 || echo 0)" | tr -d '\n')
     echo "  INFO $n $info"
     [[ "$info" == *"sv=$SV"* ]] || { echo "ABORT: $n srcversion != tree $SV"; echo "RESULT: ABORT label=$LABEL stage=build evidence=$OUT"; exit 2; }
     [[ "$info" == *"ft=1"* ]]  || { echo "ABORT: $n not on TCP"; echo "RESULT: ABORT label=$LABEL stage=transport evidence=$OUT"; exit 2; }
     [[ "$info" == *"m=1"* ]]   || { echo "ABORT: $n not mounted"; echo "RESULT: ABORT label=$LABEL stage=mount evidence=$OUT"; exit 2; }
-    [[ "$info" == *"knob=1"* ]] || { echo "ABORT: $n lacks mxfs.bmbt_skip_reads"; echo "RESULT: ABORT label=$LABEL stage=knob evidence=$OUT"; exit 2; }
+    [[ "$info" == *"knob=1"* ]] || { echo "ABORT: $n lacks mxfs.bmbt_skip_reads or mxfs.bmbt_chokepoint_reads"; echo "RESULT: ABORT label=$LABEL stage=knob evidence=$OUT"; exit 2; }
     [ "$BMBT_RA_HOLD_MS" = 0 ] || [[ "$info" == *"hold=1"* ]] || { echo "ABORT: $n lacks mxfs.dbg_bmbt_ra_hold_ms"; echo "RESULT: ABORT label=$LABEL stage=knob evidence=$OUT"; exit 2; }
 done
 
@@ -81,8 +85,12 @@ if [ "$BMBT_RA_HOLD_MS" != 0 ]; then
     value_now_into hold "$W" 15 "$OUT/rv_hold.txt" '^hold=[0-9]+$' "dbg_bmbt_ra_hold_ms on $W" "echo hold=\$(cat $P/dbg_bmbt_ra_hold_ms)"
     ck "W's dbg_bmbt_ra_hold_ms is the lap's" "${hold#hold=}" "$BMBT_RA_HOLD_MS"
 fi
+rs 15 "$W" "echo 0 > $P/bmbt_chokepoint_reads" >/dev/null
+value_now_into ctr0 "$W" 15 "$OUT/rv_ctr0.txt" '^ctr=[0-9]+$' "bmbt_chokepoint_reads on $W" "echo ctr=\$(cat $P/bmbt_chokepoint_reads)"
+ck "W's bmbt_chokepoint_reads starts the lap at 0" "${ctr0#ctr=}" "0"
 for n in $W $V; do rs 12 "$n" "echo '$MARK' > /dev/kmsg" >/dev/null; done
 capture() {
+    rs 15 "$W" "echo ctr=\$(cat $P/bmbt_chokepoint_reads)" > "$OUT/rv_ctr.txt" 2>/dev/null
     rs 40 "$W" "dmesg | sed -n \"/$MARK/,\\\$p\"" > "$OUT/dmesg_W.txt" 2>/dev/null
     rs 40 "$V" "dmesg | sed -n \"/$MARK/,\\\$p\"" > "$OUT/dmesg_V.txt" 2>/dev/null
     [ "$BMBT_SKIP_READS" = 0 ] || rs 15 "$W" "echo 0 > $P/bmbt_skip_reads" >/dev/null
@@ -136,12 +144,14 @@ for r in $(seq 1 "$ROUNDS"); do
 done
 
 capture; trap - EXIT
-matched=$(grep -ac 'P61-CHOKEPOINT-READ ' "$OUT/dmesg_W.txt")
+matched=$(sed -n 's/^ctr=\([0-9][0-9]*\)$/\1/p' "$OUT/rv_ctr.txt" | head -1)
+[ -n "$matched" ] || { echo "ABORT: no bmbt_chokepoint_reads read back from $W at capture"; echo "RESULT: ABORT label=$LABEL stage=capture evidence=$OUT"; exit 2; }
+printed=$(grep -ac 'P61-CHOKEPOINT-READ ' "$OUT/dmesg_W.txt")
 skipped=$(grep -a 'P61-CHOKEPOINT-READ ' "$OUT/dmesg_W.txt" | grep -ac 'skipped, the old image')
 bad=$(grep -ac 'P975-BMBT-LOOKUP-BAD' "$OUT/dmesg_W.txt")
 shut=$(grep -ac 'Shutting down filesystem\|BUG:\|Oops' "$OUT/dmesg_W.txt")
 held=$(grep -ac 'P-BMBT-RA-HOLD ' "$OUT/dmesg_W.txt")
-echo "  INFO W kernel log: P61-CHOKEPOINT-READ=$matched (skipped=$skipped) P975-BMBT-LOOKUP-BAD=$bad shutdown_or_oops=$shut readahead_holds=$held"
+echo "  INFO W kernel log: P61-CHOKEPOINT-READ printed=$printed (skipped=$skipped, at most 200 a module load) bmbt_chokepoint_reads=$matched P975-BMBT-LOOKUP-BAD=$bad shutdown_or_oops=$shut readahead_holds=$held"
 echo "LAP bmbt_read_skip exposed: matched_reads=$matched"
 ck "W read every new file's head whole (short reads)" "$total_short" "0"
 ck "W logged no P975-BMBT-LOOKUP-BAD" "$bad" "0"

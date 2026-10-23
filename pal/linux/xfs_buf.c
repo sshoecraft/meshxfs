@@ -8835,6 +8835,8 @@ MODULE_PARM_DESC(bmbt_skip_reads,
 		 "evicted buffer's old image with no read (control only; "
 		 "0=off default)");
 
+extern atomic_t mxfs_bmbt_chokepoint_reads;
+
 static bool
 mxfs_bmbt_chokepoint_covers(
 	struct xfs_buf		*bp)
@@ -8844,6 +8846,7 @@ mxfs_bmbt_chokepoint_covers(
 
 	if (bp->b_flags & XBF_WRITE)
 		return true;
+	atomic_inc(&mxfs_bmbt_chokepoint_reads);
 	n = atomic_inc_return(&p61r_n);
 	if (n <= 200)
 		pr_warn("mxfs: P61-CHOKEPOINT-READ n=%d owner=%llu daddr=%lld numrecs=%u flags=0x%x hold=%u bli=%d skip_reads=%d -- the bmbt write chokepoint matched a read whose in-memory image names an NL-released directory: %s\n",

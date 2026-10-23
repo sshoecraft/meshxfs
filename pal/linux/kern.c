@@ -1068,6 +1068,154 @@ struct mxfs_sdev_cache_ent {
 static struct mxfs_sdev_cache_ent mxfs_sdev_cache[MXFS_SDEV_CACHE_SIZE];
 static DEFINE_SPINLOCK(mxfs_sdev_cache_lock);
 
+/*
+ * A PATH THAT IS DEAD BUT STILL ONLINE.  A path of a multipath map whose
+ * session has died stays online to the SCSI midlayer until its transport gives
+ * up on it (an iSCSI session's no-op timeout and then its replacement timeout,
+ * a Fibre Channel port's dev_loss_tmo), and every passthrough sent to it in
+ * that time waits or fails, while the map's other path answers at once.  The
+ * cache below kept such a path because it was online.  Measured on
+ * 8/disk/caw/mpath path_fence_degraded with a 20 s death window
+ * (tests/evidence/board_20261023T090913Z-g8_path_fence_degraded,
+ * kmsg_test8_fromnode.gz): the heartbeat's identity read waited its whole 8 s
+ * bound on the dead path, the beat after it failed there when the session's
+ * error was finally detected, the path went offline 15 s after the death, and
+ * the next beat landed 18.7 s after the last one, 1.3 s inside the window.
+ *
+ * So a path is passed over for MXFS_SDEV_AVOID when a command came back from it
+ * with a transport host byte, or when the heartbeat waited hb_io_bound_ms on one
+ * of its commands with no answer (mxfs_pal_bdev_path_unanswered), and every
+ * passthrough moves to another path of the same logical unit with no command
+ * sent through the map (mxfs_sdev_resolve_sibling).  A passed-over path is
+ * chosen again when it is the only one left, and once its time is up.  Only the
+ * choice of path changes: a command already sent to the dead path is left to
+ * its transport, and a COMPARE AND WRITE whose answer was lost stays outcome
+ * unknown to its caller.  path_avoid=0 passes no path over (same-build control).
+ */
+#define MXFS_SDEV_AVOID_MAX	8
+#define MXFS_SDEV_AVOID		(30 * HZ)
+
+struct mxfs_sdev_avoid_ent {
+	unsigned int	host, channel, id;
+	u64		lun;
+	unsigned long	until;		/* jiffies; 0 = unused */
+};
+
+static struct mxfs_sdev_avoid_ent mxfs_sdev_avoid_tab[MXFS_SDEV_AVOID_MAX];
+static DEFINE_SPINLOCK(mxfs_sdev_avoid_lock);
+
+static int mxfs_path_avoid = 1;
+module_param_named(path_avoid, mxfs_path_avoid, int, 0644);
+MODULE_PARM_DESC(path_avoid,
+		 "pass over a multipath path that went unanswered or failed in its "
+		 "transport while another path of the logical unit is online, for "
+		 "30 s: 1 (default); 0 keeps a path until its transport takes it "
+		 "offline (same-build control)");
+
+static bool mxfs_sdev_avoid_match(const struct mxfs_sdev_avoid_ent *a,
+				  const struct scsi_device *sdev)
+{
+	return a->until && a->host == sdev->host->host_no &&
+	       a->channel == sdev->channel && a->id == sdev->id &&
+	       a->lun == sdev->lun;
+}
+
+/* Is `sdev` passed over now?  An entry whose time is up is cleared. */
+static bool mxfs_sdev_avoided(struct scsi_device *sdev)
+{
+	bool hit = false;
+	int i;
+
+	if (!READ_ONCE(mxfs_path_avoid))
+		return false;
+	spin_lock(&mxfs_sdev_avoid_lock);
+	for (i = 0; i < MXFS_SDEV_AVOID_MAX; i++) {
+		struct mxfs_sdev_avoid_ent *a = &mxfs_sdev_avoid_tab[i];
+
+		if (a->until && time_after_eq(jiffies, a->until))
+			a->until = 0;
+		if (mxfs_sdev_avoid_match(a, sdev))
+			hit = true;
+	}
+	spin_unlock(&mxfs_sdev_avoid_lock);
+	return hit;
+}
+
+/* Pass `sdev` over for MXFS_SDEV_AVOID; `why` names what showed it dead. */
+static void mxfs_sdev_avoid(struct scsi_device *sdev, const char *why)
+{
+	static atomic_t p_n = ATOMIC_INIT(0);
+	unsigned long until = jiffies + MXFS_SDEV_AVOID;
+	struct mxfs_sdev_avoid_ent *a;
+	int i, slot = -1;
+
+	if (!READ_ONCE(mxfs_path_avoid))
+		return;
+	if (!until)
+		until = 1;
+	spin_lock(&mxfs_sdev_avoid_lock);
+	for (i = 0; i < MXFS_SDEV_AVOID_MAX; i++) {
+		a = &mxfs_sdev_avoid_tab[i];
+		if (mxfs_sdev_avoid_match(a, sdev)) {
+			slot = i;
+			break;
+		}
+		if (slot < 0 && (!a->until || time_after_eq(jiffies, a->until)))
+			slot = i;
+	}
+	if (slot < 0) {
+		/* every entry in use: the one ending soonest makes room */
+		slot = 0;
+		for (i = 1; i < MXFS_SDEV_AVOID_MAX; i++)
+			if (time_before(mxfs_sdev_avoid_tab[i].until,
+					mxfs_sdev_avoid_tab[slot].until))
+				slot = i;
+	}
+	a = &mxfs_sdev_avoid_tab[slot];
+	a->host = sdev->host->host_no;
+	a->channel = sdev->channel;
+	a->id = sdev->id;
+	a->lun = sdev->lun;
+	a->until = until;
+	spin_unlock(&mxfs_sdev_avoid_lock);
+	if (atomic_inc_return(&p_n) <= 400)
+		mxfs_probe("mxfs: P-PATH-AVOID sdev %d:%d:%d:%llu why=%s ms=%u -- passed over while another path of its logical unit is online\n",
+			   sdev->host->host_no, sdev->channel, sdev->id,
+			   (unsigned long long)sdev->lun, why,
+			   jiffies_to_msecs(MXFS_SDEV_AVOID));
+}
+
+/* The only path left: being passed over buys nothing, and a cached path still
+ * marked would be dropped and looked for again on every command. */
+static void mxfs_sdev_avoid_clear(struct scsi_device *sdev)
+{
+	int i;
+
+	spin_lock(&mxfs_sdev_avoid_lock);
+	for (i = 0; i < MXFS_SDEV_AVOID_MAX; i++)
+		if (mxfs_sdev_avoid_match(&mxfs_sdev_avoid_tab[i], sdev))
+			mxfs_sdev_avoid_tab[i].until = 0;
+	spin_unlock(&mxfs_sdev_avoid_lock);
+}
+
+/* A passthrough's raw result: a transport host byte, or an error from a path
+ * no longer online, is the path dead in its transport. */
+static void mxfs_sdev_note_result(struct scsi_device *sdev, int result,
+				  const char *op)
+{
+	if (result == 0)
+		return;
+	if (!scsi_device_online(sdev) ||
+	    (result > 0 && (host_byte(result) == DID_NO_CONNECT ||
+			    host_byte(result) == DID_TRANSPORT_FAILFAST ||
+			    host_byte(result) == DID_TRANSPORT_DISRUPTED ||
+			    host_byte(result) == DID_TRANSPORT_MARGINAL)))
+		mxfs_sdev_avoid(sdev, op);
+}
+
+static struct scsi_device *mxfs_sdev_resolve_sibling(struct block_device *bdev,
+						     struct scsi_device *was);
+
 /* A path of a multipath map that is not known to hold this node's
  * reservation key (defined with the per-path reservation commands). */
 static bool mxfs_pr_path_refused(dev_t devt, struct scsi_device *sdev);
@@ -1178,7 +1326,10 @@ static bool mxfs_sdev_is_slave_of(struct gendisk *holder,
 
 /* Scan every SCSI disk in the system for one whose LBA 0 matches the
  * identity sector read through `bdev` and that is a direct slave of it.
- * Returns a referenced scsi_device (caller puts), or NULL. */
+ * Returns a referenced scsi_device (caller puts), or NULL.  The first pass
+ * skips a passed-over path before reading it, since a dead one holds the scan
+ * for the read's timeout; the second, only when the first found nothing,
+ * takes one. */
 static struct scsi_device *mxfs_sdev_resolve_by_content(struct block_device *bdev)
 {
 	struct scsi_device *found = NULL;
@@ -1186,7 +1337,7 @@ static struct scsi_device *mxfs_sdev_resolve_by_content(struct block_device *bde
 	char name[32];
 	unsigned int hostno;
 	bool zero = true;
-	int i;
+	int i, pass;
 
 	ident = kmalloc(1024, GFP_KERNEL);
 	if (!ident)
@@ -1209,6 +1360,7 @@ static struct scsi_device *mxfs_sdev_resolve_by_content(struct block_device *bde
 		return NULL;
 	}
 
+	for (pass = 0; pass < 2 && !found; pass++)
 	for (hostno = 0; hostno < MXFS_SDEV_HOST_SCAN_MAX && !found; hostno++) {
 		struct Scsi_Host *shost = scsi_host_lookup(hostno);
 		struct scsi_device *sdev;
@@ -1220,6 +1372,8 @@ static struct scsi_device *mxfs_sdev_resolve_by_content(struct block_device *bde
 				continue;	/* run the iterator out to balance its refs */
 			if (sdev->type != TYPE_DISK ||
 			    !scsi_device_online(sdev))
+				continue;
+			if (mxfs_sdev_avoided(sdev) != (pass == 1))
 				continue;
 			if (mxfs_sdev_read_lba(sdev, 0, probe))
 				continue;
@@ -1242,6 +1396,9 @@ static struct scsi_device *mxfs_sdev_resolve_by_content(struct block_device *bde
 		}
 		scsi_host_put(shost);
 	}
+	/* found on the second pass: the passed-over path is the only one */
+	if (found && pass == 2)
+		mxfs_sdev_avoid_clear(found);
 
 	kfree(ident);
 	return found;
@@ -1255,6 +1412,7 @@ static struct scsi_device *mxfs_sdev_resolve_by_content(struct block_device *bde
 static struct scsi_device *mxfs_bdev_to_sdev(struct block_device *bdev)
 {
 	struct scsi_device *sdev = NULL, *stale = NULL, *spare = NULL;
+	struct scsi_device *was = NULL;
 	struct device *parent;
 	char name[32];
 	int i, slot;
@@ -1334,8 +1492,10 @@ static struct scsi_device *mxfs_bdev_to_sdev(struct block_device *bdev)
 	 * slave of the device asking.
 	 */
 	if (sdev) {
-		if (mxfs_sdev_is_slave_of(bdev->bd_disk, sdev, name) &&
-		    !mxfs_pr_path_refused(bdev->bd_dev, sdev))
+		bool slave = mxfs_sdev_is_slave_of(bdev->bd_disk, sdev, name);
+		bool passed = slave && mxfs_sdev_avoided(sdev);
+
+		if (slave && !passed && !mxfs_pr_path_refused(bdev->bd_dev, sdev))
 			return sdev;
 		spin_lock(&mxfs_sdev_cache_lock);
 		for (i = 0; i < MXFS_SDEV_CACHE_SIZE; i++) {
@@ -1349,10 +1509,15 @@ static struct scsi_device *mxfs_bdev_to_sdev(struct block_device *bdev)
 			}
 		}
 		spin_unlock(&mxfs_sdev_cache_lock);
-		mxfs_probe("mxfs: P-MPATH-RESOLVE cached disk %s for %u:%u (%s) is not one of its slaves -- re-resolving\n",
-			name[0] ? name : "?", MAJOR(bdev->bd_dev),
-			MINOR(bdev->bd_dev), bdev->bd_disk->disk_name);
-		scsi_device_put(sdev);			/* the reference taken above */
+		if (passed) {
+			/* the reference taken above stays for the sibling scan */
+			was = sdev;
+		} else {
+			mxfs_probe("mxfs: P-MPATH-RESOLVE cached disk %s for %u:%u (%s) is not one of its slaves -- re-resolving\n",
+				name[0] ? name : "?", MAJOR(bdev->bd_dev),
+				MINOR(bdev->bd_dev), bdev->bd_disk->disk_name);
+			scsi_device_put(sdev);		/* the reference taken above */
+		}
 		sdev = NULL;
 		if (stale) {
 			scsi_device_put(stale);
@@ -1362,10 +1527,36 @@ static struct scsi_device *mxfs_bdev_to_sdev(struct block_device *bdev)
 	if (stale) {
 		mxfs_probe("mxfs: P-MPATH-RESOLVE cached backing path for %u:%u went offline -- re-resolving\n",
 			MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev));
-		scsi_device_put(stale);
+		was = stale;				/* the cache's reference */
 	}
 
-	sdev = mxfs_sdev_resolve_by_content(bdev);	/* caller's reference */
+	/* the cached path is passed over or offline: another path of the same
+	 * logical unit, found with no command through the map, which may still
+	 * route to the dead one (see A PATH THAT IS DEAD BUT STILL ONLINE) */
+	if (was) {
+		static atomic_t p_sib_n = ATOMIC_INIT(0);
+
+		if (READ_ONCE(mxfs_path_avoid)) {
+			sdev = mxfs_sdev_resolve_sibling(bdev, was);	/* caller's reference */
+			if (atomic_inc_return(&p_sib_n) <= 400 && sdev)
+				mxfs_probe("mxfs: P-MPATH-SIBLING %u:%u moves from %d:%d:%d:%llu (%s) to %d:%d:%d:%llu\n",
+					MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev),
+					was->host->host_no, was->channel, was->id,
+					(unsigned long long)was->lun,
+					scsi_device_online(was) ? "passed over" : "offline",
+					sdev->host->host_no, sdev->channel, sdev->id,
+					(unsigned long long)sdev->lun);
+			else if (atomic_read(&p_sib_n) <= 400)
+				mxfs_probe("mxfs: P-MPATH-SIBLING %u:%u: no other path of the logical unit %d:%d:%d:%llu (%s) reaches -- resolving by content\n",
+					MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev),
+					was->host->host_no, was->channel, was->id,
+					(unsigned long long)was->lun,
+					scsi_device_online(was) ? "passed over" : "offline");
+		}
+		scsi_device_put(was);
+	}
+	if (!sdev)
+		sdev = mxfs_sdev_resolve_by_content(bdev);	/* caller's reference */
 	if (sdev && scsi_device_get(sdev) == 0)
 		spare = sdev;				/* the cache's reference */
 
@@ -1432,6 +1623,32 @@ void mxfs_pal_sdev_cache_release(void)
 	mxfs_sra_release();
 }
 EXPORT_SYMBOL_GPL(mxfs_pal_sdev_cache_release);
+
+int mxfs_pal_bdev_path_unanswered(mxfs_bdev_t *dev)
+{
+	struct scsi_device *sdev = NULL;
+	int i;
+
+	if (!dev || !dev->bdev || !READ_ONCE(mxfs_path_avoid))
+		return 0;
+	spin_lock(&mxfs_sdev_cache_lock);
+	for (i = 0; i < MXFS_SDEV_CACHE_SIZE; i++) {
+		struct mxfs_sdev_cache_ent *e = &mxfs_sdev_cache[i];
+
+		if (e->devt == dev->bdev->bd_dev && e->sdev) {
+			if (scsi_device_get(e->sdev) == 0)
+				sdev = e->sdev;
+			break;
+		}
+	}
+	spin_unlock(&mxfs_sdev_cache_lock);
+	if (!sdev)
+		return 0;
+	mxfs_sdev_avoid(sdev, "unanswered");
+	scsi_device_put(sdev);
+	return 1;
+}
+EXPORT_SYMBOL_GPL(mxfs_pal_bdev_path_unanswered);
 
 /*
  * Writing a device path to /proc/fs/mxfs/sdev_resolve_probe runs that
@@ -1894,6 +2111,9 @@ static int mxfs_pal_scsi_read_fua_bdev_body(struct block_device *bdev,
 				struct scsi_device *nsdev;
 				int ohost = sdev->host->host_no;
 
+				/* passed over, or the resolver hands back this path
+				 * for as long as its transport keeps it online */
+				mxfs_sdev_avoid(sdev, "read");
 				scsi_device_put(sdev);
 				nsdev = mxfs_bdev_to_sdev(bdev);
 				{
@@ -2143,6 +2363,7 @@ wfua_submit:
 				   (void *)buf, len, NULL, &sshdr,
 				   30 * HZ, 1, 0, 0, &resid);
 #endif
+		mxfs_sdev_note_result(sdev, ret, "write");
 		/* a write that returns GOOD having transferred less than len
 		 * did not write what the caller asked */
 		if (ret == 0 && resid != 0) {
@@ -5450,6 +5671,59 @@ static int mxfs_sdev_lu_ident(struct scsi_device *sdev, u8 *out, int max)
 	}
 	rcu_read_unlock();
 	return len;
+}
+
+/*
+ * Another path of the logical unit `was` reaches (passed over or offline): an
+ * online direct slave of `bdev`'s disk naming the same logical unit (VPD page
+ * 0x83, from the device's state), holding this node's registration and not
+ * passed over.  No command is sent, through the map or down a path: the map may
+ * still route to the dead path, and the content match that resolved `was`
+ * already showed that the map hands LBAs through to the logical unit, whose
+ * every path reaches the same blocks.  Returns a referenced scsi_device, or
+ * NULL.
+ */
+static struct scsi_device *mxfs_sdev_resolve_sibling(struct block_device *bdev,
+						     struct scsi_device *was)
+{
+	struct scsi_device *found = NULL;
+	unsigned int hostno;
+	char name[32];
+	u8 *ident, *probe;
+	int len;
+
+	ident = kmalloc(2 * MXFS_PR_IDENT_MAX, GFP_KERNEL);
+	if (!ident)
+		return NULL;
+	probe = ident + MXFS_PR_IDENT_MAX;
+	len = mxfs_sdev_lu_ident(was, ident, MXFS_PR_IDENT_MAX);
+	if (len <= 0) {
+		kfree(ident);
+		return NULL;
+	}
+	for (hostno = 0; hostno < MXFS_SDEV_HOST_SCAN_MAX && !found; hostno++) {
+		struct Scsi_Host *shost = scsi_host_lookup(hostno);
+		struct scsi_device *sdev;
+
+		if (!shost)
+			continue;
+		shost_for_each_device(sdev, shost) {
+			if (found || sdev == was)
+				continue;	/* run the iterator out to balance its refs */
+			if (sdev->type != TYPE_DISK || !scsi_device_online(sdev) ||
+			    mxfs_sdev_lu_ident(sdev, probe, MXFS_PR_IDENT_MAX) != len ||
+			    memcmp(ident, probe, len) ||
+			    !mxfs_sdev_is_slave_of(bdev->bd_disk, sdev, name) ||
+			    mxfs_pr_path_refused(bdev->bd_dev, sdev) ||
+			    mxfs_sdev_avoided(sdev))
+				continue;
+			if (scsi_device_get(sdev) == 0)
+				found = sdev;
+		}
+		scsi_host_put(shost);
+	}
+	kfree(ident);
+	return found;
 }
 
 static void mxfs_pr_paths_put(struct mxfs_pr_paths *t)
@@ -8766,6 +9040,7 @@ static int caw_manual_bio(struct scsi_device *sdev, u64 lba, unsigned int nsect,
 
 	ret = scsi_req(req)->result;
 #endif
+	mxfs_sdev_note_result(sdev, ret, "caw");
 
 	blk_mq_free_request(req);
 out_pages:

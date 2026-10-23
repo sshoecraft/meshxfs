@@ -175,15 +175,19 @@ static inline bool dl_inject_take(int *knob)
 }
 
 /* how long the heartbeat thread waits on one of its own I/Os before it goes
- * on without it (see HEARTBEAT I/O THAT A TARGET NEVER ANSWERS) */
-static unsigned int mxfs_hb_io_bound_ms = 8000;
+ * on without it and passes over the path it went to (see HEARTBEAT I/O THAT A
+ * TARGET NEVER ANSWERS).  One heartbeat interval: an I/O unanswered for a whole
+ * cycle has already made the cycle late, and the next one goes to another path,
+ * so a live node's beat lands within about two intervals of a path's death. */
+static unsigned int mxfs_hb_io_bound_ms = MXFS_DISKLOCK_HB_INTERVAL_MS;
 module_param_named(hb_io_bound_ms, mxfs_hb_io_bound_ms, uint, 0644);
 MODULE_PARM_DESC(hb_io_bound_ms,
 		 "The heartbeat thread waits at most this long (ms) for one of "
 		 "its own reads or its beat's compare-and-write, then goes on "
-		 "without it while a worker waits the command out (8000, "
-		 "default); 0 issues them synchronously on the heartbeat thread "
-		 "(same-build control)");
+		 "without it while a worker waits the command out, and the next "
+		 "one goes to another path of the LUN (2000, one heartbeat "
+		 "interval, default); 0 issues them synchronously on the "
+		 "heartbeat thread (same-build control)");
 
 /* A SCSI attachment's lease deadline suspends this node's authority instead of
  * closing it (disklock.h, MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS).  Read when the
@@ -198,7 +202,7 @@ MODULE_PARM_DESC(dl_auth_suspend,
 #define dl_instr_on() (0)
 #define dl_inject_take(k) (false)
 static int mxfs_dl_auth_suspend = 1;
-static unsigned int mxfs_hb_io_bound_ms = 8000;
+static unsigned int mxfs_hb_io_bound_ms = MXFS_DISKLOCK_HB_INTERVAL_MS;
 static int mxfs_dl_inject_hb_pause_ms;	/* user-mode: never armed */
 static int mxfs_dbg_hb_skip_auth_check;	/* user-mode: never armed */
 static int mxfs_dbg_hb_completion_delay_ms;	/* user-mode: never armed */
@@ -1384,7 +1388,18 @@ static int hb_caw(struct mxfs_disklock_ctx *ctx, unsigned int op,
  */
 #define MXFS_HB_IO_WORKERS	4
 
-enum { HB_IO_READ, HB_IO_READ_PRIO, HB_IO_BEAT };
+/*
+ * Every heartbeat I/O is a passthrough command on the path the PAL resolved,
+ * never a read through the multipath map.  A path whose session has died stays
+ * online until its transport gives up on it, 10-20 s on the rig, and the map
+ * goes on routing to it until then; the heartbeat thread waited on it read by
+ * read, and a live node's beats landed 18.7 s apart across a single-path
+ * failover (pal/linux/kern.c, A PATH THAT IS DEAD BUT STILL ONLINE).  So an I/O
+ * the thread stops waiting for also passes over the path it went to
+ * (mxfs_pal_bdev_path_unanswered), and the next one, beat or read, goes to
+ * another path of the same logical unit.
+ */
+enum { HB_IO_READ_PRIO, HB_IO_BEAT };
 
 struct hb_io {
 	struct hb_io    *next;
@@ -1417,24 +1432,15 @@ struct mxfs_disklock_hbio {
 
 static const char *hb_io_op_name(int op)
 {
-	switch (op) {
-	case HB_IO_READ:      return "read";
-	case HB_IO_READ_PRIO: return "read_prio";
-	default:              return "beat";
-	}
+	return op == HB_IO_READ_PRIO ? "read_prio" : "beat";
 }
 
 static int hb_io_exec(struct mxfs_disklock_ctx *ctx, int op, uint64_t off,
 		      void *buf, const void *want, uint32_t len)
 {
-	switch (op) {
-	case HB_IO_READ:
-		return mxfs_pal_bdev_read(ctx->dev, off, buf, len);
-	case HB_IO_READ_PRIO:
+	if (op == HB_IO_READ_PRIO)
 		return mxfs_pal_bdev_read_prio(ctx->dev, off, buf, len);
-	default:
-		return mxfs_pal_bdev_compare_and_write(ctx->dev, off, buf, want);
-	}
+	return mxfs_pal_bdev_compare_and_write(ctx->dev, off, buf, want);
 }
 
 static void hb_io_free(struct hb_io *r)
@@ -1665,15 +1671,18 @@ static int hb_io_run(struct mxfs_disklock_ctx *ctx, int op, uint64_t off,
 		mxfs_pal_cond_timedwait(p->done, p->lock, bound - waited);
 	}
 	if (r->abandoned) {
+		int moved;
+
 		outstanding = p->outstanding;
 		mxfs_pal_mutex_unlock(p->lock);
+		moved = mxfs_pal_bdev_path_unanswered(ctx->dev);
 		mxfs_pal_log(MXFS_LOG_WARN,
 			     "mxfs: P-HB-IO-ABANDON node %u slot %d op=%s off=%llu "
-			     "bound_ms=%u outstanding=%d -- no answer in time; the "
-			     "heartbeat goes on without it and a worker waits the "
-			     "command out",
+			     "bound_ms=%u outstanding=%d path_passed_over=%d -- no "
+			     "answer in time; the heartbeat goes on without it and a "
+			     "worker waits the command out",
 			     ctx->local_node, ctx->local_slot, hb_io_op_name(op),
-			     (unsigned long long)off, bound, outstanding);
+			     (unsigned long long)off, bound, outstanding, moved);
 		return -ETIMEDOUT;
 	}
 	mxfs_pal_mutex_unlock(p->lock);
@@ -1695,12 +1704,6 @@ int mxfs_disklock_beats_unresolved(struct mxfs_disklock_ctx *ctx)
 	n = p->beats_unresolved;
 	mxfs_pal_mutex_unlock(p->lock);
 	return n;
-}
-
-static int hb_read(struct mxfs_disklock_ctx *ctx, uint64_t off, void *buf,
-		   uint32_t len)
-{
-	return hb_io_run(ctx, HB_IO_READ, off, buf, NULL, len, 0);
 }
 
 static int hb_read_prio(struct mxfs_disklock_ctx *ctx, uint64_t off,
@@ -2552,7 +2555,7 @@ static int fs_identity_changed(struct mxfs_disklock_ctx *ctx, void *buf)
 	const struct mxfs_ondisk_super *sup = buf;
 	int rc;
 
-	rc = hb_read(ctx, 0, buf, MXFS_DISKLOCK_RECORD_SIZE);
+	rc = hb_read_prio(ctx, 0, buf, MXFS_DISKLOCK_RECORD_SIZE);
 	if (rc < 0)
 		return rc;
 
@@ -3926,8 +3929,9 @@ static void disklock_hb_fn(void *arg)
 				off = ctx->base_offset + (uint64_t)slot * MXFS_DISKLOCK_RECORD_SIZE;
 
 				mxfs_pal_mutex_lock(ctx->lock);
-				rr = hb_read(ctx, off,
-							 rhb, sizeof(*rhb));
+				/* on the PAL's path, never through the map (see
+				 * HB_IO_READ_PRIO) */
+				rr = hb_read_prio(ctx, off, rhb, sizeof(*rhb));
 				/* observe the writer's PR key while the record is
 				 * fresh; frozen per exact incarnation (see hb_ident_observe). */
 				if (rr == 0)

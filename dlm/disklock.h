@@ -209,10 +209,16 @@
  * keeps a live node from being declared dead and fenced.  At 10 checks (20 s,
  * dead_timeout_ms=20000) survivors stalled 25.7-28.8 s on a silent death at 2
  * and 4 nodes, but across a single-path failover every live survivor's beats
- * landed 18.2-19.1 s apart at 4 and 8 nodes (the beat's COMPARE AND WRITE kept
- * failing on the dead path until multipathd failed it), 0.9-1.7 s inside the
- * 20 s bound: every one suspended and resumed, and a slower failover would have
- * had a live node fenced.  The gap has to shrink before the window can.
+ * landed 18.2-19.1 s apart at 4 and 8 nodes, 0.9-1.7 s inside the 20 s bound:
+ * every one suspended and resumed, and a slower failover would have had a live
+ * node fenced.  The gap has to shrink before the window can.  Its cause, read
+ * from one node's whole kernel log of that run: the path, dead but still online
+ * until its session's replacement timeout, held each heartbeat I/O in turn (the
+ * identity read for its 8 s bound, then the beat, then the monitor's reads
+ * through the map) for 15 s after the death.  Heartbeat I/O now passes over a
+ * path it got no answer from within one interval and moves to another path of
+ * the LU (dlm/disklock.c, HB_IO_READ_PRIO; pal/linux/kern.c, A PATH THAT IS DEAD
+ * BUT STILL ONLINE), which is to be measured before the window moves.
  *
  * What made the other 28 s of the 62 s window necessary there is the term the
  * lease comment below cannot bound: commands the node submitted that may still

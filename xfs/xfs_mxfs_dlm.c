@@ -2585,6 +2585,18 @@ MODULE_PARM_DESC(iwr_empty_refused,
  * not merge), and the cluster writes that owed nothing and completed with no
  * I/O.  A harness writes 0 to each and reads it at the end.
  */
+/*
+ * The reads the bmbt write chokepoint matched (pal/linux/xfs_buf.c,
+ * mxfs_bmbt_chokepoint_covers), in either arm of bmbt_skip_reads: the exposure
+ * tests/bmbt_read_skip_lap.sh counts, lap after lap on one module load, where
+ * the P61-CHOKEPOINT-READ line stops after 200.  A harness writes 0 and reads
+ * it at the end.
+ */
+atomic_t mxfs_bmbt_chokepoint_reads = ATOMIC_INIT(0);
+module_param_cb(bmbt_chokepoint_reads, &mxfs_dbg_atomic_param_ops,
+		&mxfs_bmbt_chokepoint_reads, 0644);
+MODULE_PARM_DESC(bmbt_chokepoint_reads,
+		 "count of bmbt reads the write chokepoint matched, in either arm of bmbt_skip_reads (write resets)");
 atomic_t mxfs_iwr_merge_blocks = ATOMIC_INIT(0);
 module_param_cb(iwr_merge_blocks, &mxfs_dbg_atomic_param_ops,
 		&mxfs_iwr_merge_blocks, 0644);
