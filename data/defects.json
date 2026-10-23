@@ -4495,381 +4495,6 @@
       ]
     },
     {
-      "id": "D-BATCH-LAP-RECORDS-NO-STALL-SO-A-HARNESS-LAP-OVER-THE-STALL-LIMIT-GRADES-PASS",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-23",
-      "summary": "tools/batch_lap.py recorded a harness lap on its verdict line alone: a lap whose own output printed an operation over stall_limit_s (30 s), as max_stall_ms= or through a declared --stall pattern, and then its PASS line was recorded PASS with no max_stall_ms= in the run, so it could count toward a verification batch (control b20261023-d0af77, 10 of 10, MXFS_BATCH_LAP_STALL=0)",
-      "evidence": "Verification batch b20261022-548ef2 (lap:jdt_gate_fault at 2/net/mesh/direct, candidate 0.90.134): 7 of its 9 laps timed A's last-member umount at 30.9-32.7 s on the node (row.log 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=31006' in tests/evidence/20261023T043949Z_capture_gate_jdtv1, and the same in jdtv2, 4, 5, 6, 8, 9), and every lap was recorded PASS in data/criteria.runs.jsonl. The review data/reviews/P20261023-128f2f.md traced why: the stall check in tools/criteria.py reads only a max_stall_ms= field, which tools/batch_lap.py never writes, and the harness bounds that step at 180 s.",
-      "next": "Give batch laps a stall measurement the ledger grades: either batch_lap.py extracts each harness's timed operations (a declared pattern per lap, like the probe) and records the largest as max_stall_ms, or the harnesses print a 'max_stall_ms=' line batch_lap.py copies; make criteria.py grade a batch lap over stall_limit_s FAIL as it does a board row. Reproduce with a lap that prints an operation over 30 s and passes its verdict line; control with the change out (graded PASS), verification with it in (graded FAIL). ===== FIX in the tree (not yet controlled or verified): tools/batch_lap.py stall_graded() reads every max_stall_ms=<ms> line and every match of each --stall pattern (one capture group, milliseconds; tools/harness_batch.py passes --stall through) in the lap's output and the evidence files it wrote, appends max_stall_ms=<worst> to measured, and turns a PASS over the policy's stall_limit_s into a FAIL with criteria.stall_over_limit, the function that grades a board row's stall; MXFS_BATCH_LAP_STALL=0 measures and grades nothing, as before. verdict() is the old verdict-line code moved out of main() unchanged. First runs on the tree: fix on, 'graded FAIL: rc=0 elapsed_s=0 max_stall_ms=31500 -- operation stall 31500 ms is over the 30 s limit'; switch off, 'graded PASS: rc=0 elapsed_s=0 -- RESULT: PASS label=stall'. Next: on the next attempt, a control batch with MXFS_BATCH_LAP_STALL=0 (lap:batch_lap_stall at 1/any or the configuration the batch names), then a verification batch sized from it, then remove --fixed. ===== 2026-10-23, read before any batch: the lap cannot pass a verification batch as written. tests/batch_lap_stall_lap.py:58 prints 'graded {outcome}: {measured} -- {reason}', and with the fix on, measured carries 'max_stall_ms=31500' (tools/batch_lap.py:194). tools/harness_batch.py runs each lap through tools/batch_lap.py, whose stall_graded() reads every max_stall_ms= in the lap's own output (STALL_LINE, :178, :269-272), so the outer grading turns the lap's PASS into a FAIL on every verification lap; in the control (MXFS_BATCH_LAP_STALL=0 in the lap's environment, inherited by the outer batch_lap.py too) neither grading runs and the lap fails as a control should. Before the control: print the inner measured value without the max_stall_ms= token (e.g. 'worst_ms=31500'), then the control and the verification batch on the next attempt. ===== 2026-10-23: control b20261023-572eb1 (10/10 failed, MXFS_BATCH_LAP_STALL=0 in the lap's env) and verification b20261023-f16825 (6/6) on attempt 2026-10-23T15:56:24Z; verify P20261023-d6265d approved and applied. Before remove --fixed (data/reviews/P20261023-d6265d.md): the lap calls batch_lap.verdict() and stall_graded() directly and never runs batch_lap.py main(), so no lap has shown a recorded run carrying max_stall_ms= graded FAIL (the wiring at tools/batch_lap.py:326, :334-335); make the lap run batch_lap.py main() on a harness that prints the stall and read the recorded run.",
-      "reproducer": "tests/batch_lap_stall_lap.py (a harness that prints an operation one second over stall_limit_s as max_stall_ms= and another through a declared --stall pattern, then RESULT: PASS, graded as tools/batch_lap.py grades a lap; EXPOSED line each lap; MXFS_BATCH_LAP_STALL=0 is the fix's switch off)",
-      "updated": "2026-10-23",
-      "batches": [
-        {
-          "id": "b20261023-572eb1",
-          "kind": "control",
-          "row": "lap:batch_lap_stall",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: a lap printed operations",
-          "candidate": "",
-          "build": "08D63764A9352FBDD5A76CD",
-          "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py grades a lap from its verdict line alone and records no stall, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: a lap whose operation stalled over the limit and that printed PASS records a PASS"
-        },
-        {
-          "id": "b20261023-f16825",
-          "kind": "verify",
-          "row": "lap:batch_lap_stall",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: a lap printed operations",
-          "candidate": "0.90.134",
-          "build": "08D63764A9352FBDD5A76CD",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:batch_lap_stall",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-572eb1",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py grades a lap from its verdict line alone and records no stall, as before the fix)",
-            "builds": [
-              "08D63764A9352FBDD5A76CD"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        },
-        {
-          "id": "b20261023-d0af77",
-          "kind": "control",
-          "row": "lap:batch_lap_stall_main",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: the run batch_lap.py recorded",
-          "candidate": "",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py main() grades a lap from its verdict line alone and records no stall, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: a lap whose operation stalled over the limit and that printed its PASS line is recorded PASS by batch_lap.py main()"
-        },
-        {
-          "id": "b20261023-193240",
-          "kind": "verify",
-          "row": "lap:batch_lap_stall_main",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: the run batch_lap.py recorded",
-          "candidate": "0.90.134",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:batch_lap_stall_main",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-d0af77",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py main() grades a lap from its verdict line alone and records no stall, as before the fix)",
-            "builds": [
-              "C54C14B681D148267D084FC"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        },
-        {
-          "id": "b20261023-84d4a5",
-          "kind": "control",
-          "row": "lap:batch_lap_stall",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: ",
-          "candidate": "",
-          "build": "79779BEAECBEA94844FDC72",
-          "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py measures and grades no stall, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: a lap whose own output holds an operation over the stall limit is recorded PASS"
-        },
-        {
-          "id": "b20261023-ab170a",
-          "kind": "verify",
-          "row": "lap:batch_lap_stall",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "79779BEAECBEA94844FDC72",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:batch_lap_stall",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-84d4a5",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py measures and grades no stall, as before the fix)",
-            "builds": [
-              "79779BEAECBEA94844FDC72"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:batch_lap_stall",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-572eb1",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py grades a lap from its verdict line alone and records no stall, as before the fix)",
-          "builds": [
-            "08D63764A9352FBDD5A76CD"
-          ],
-          "date": "2026-10-23"
-        },
-        {
-          "row": "lap:batch_lap_stall_main",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-d0af77",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py main() grades a lap from its verdict line alone and records no stall, as before the fix)",
-          "builds": [
-            "C54C14B681D148267D084FC"
-          ],
-          "date": "2026-10-23"
-        },
-        {
-          "row": "lap:batch_lap_stall",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-84d4a5",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py measures and grades no stall, as before the fix)",
-          "builds": [
-            "79779BEAECBEA94844FDC72"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T16:02:43Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T16:02:42Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T16:02:41Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T16:02:40Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T16:02:39Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T16:02:38Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T16:02:37Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T16:02:36Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T16:02:35Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T16:02:34Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall_main",
-          "iso": "2026-10-23T18:57:41Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall_main",
-          "iso": "2026-10-23T18:57:40Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall_main",
-          "iso": "2026-10-23T18:57:39Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall_main",
-          "iso": "2026-10-23T18:57:38Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall_main",
-          "iso": "2026-10-23T18:57:37Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall_main",
-          "iso": "2026-10-23T18:57:36Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall_main",
-          "iso": "2026-10-23T18:57:35Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall_main",
-          "iso": "2026-10-23T18:57:34Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall_main",
-          "iso": "2026-10-23T18:57:33Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall_main",
-          "iso": "2026-10-23T18:57:32Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T20:41:53Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T20:41:51Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T20:41:49Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T20:41:47Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T20:41:45Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T20:41:43Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T20:41:40Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T20:41:38Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T20:41:36Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:batch_lap_stall",
-          "iso": "2026-10-23T20:41:34Z"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T20:41:09Z",
-          "build": "79779BEAECBEA94844FDC72",
-          "batch": "b20261023-ab170a",
-          "approval": "P20261023-590193",
-          "date": "2026-10-23"
-        }
-      ]
-    },
-    {
       "id": "D-TAUTH-TEST-OBJECTS-OMIT-INCLUDED-HEADERS-SO-A-HEADER-CHANGE-LINKS-STALE-CODE",
       "severity": "major",
       "nodes": 1,
@@ -5230,11 +4855,113 @@
           "candidate": "",
           "build": "79779BEAECBEA94844FDC72",
           "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: a node on a short window declares a silent peer dead inside the peer's longer lease"
+        },
+        {
+          "id": "b20261023-3ad6d0",
+          "kind": "verify",
+          "row": "lap:peer_window",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:peer_window",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-fc852f",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
+            "builds": [
+              "79779BEAECBEA94844FDC72"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:peer_window",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-fc852f",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
+          "builds": [
+            "79779BEAECBEA94844FDC72"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T20:58:29Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T20:57:04Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T20:55:38Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T20:54:13Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T20:52:38Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T20:51:08Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T20:49:43Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T20:48:17Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T20:46:48Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:peer_window",
+          "iso": "2026-10-23T20:45:20Z"
         }
       ]
     },
@@ -5244,9 +4971,9 @@
       "nodes": 1,
       "config": "*/*/*",
       "opened": "2026-10-23",
-      "summary": "A path row that kills its victim brings it back through tests/mpath/lib.sh's rejoin, which loads mxfs with the configuration's module arguments only (mxfs_rig_modargs, lib.sh:506, :519), not the lane's MXFS_EXTRA_MODARGS, and run.sh skips the next row's prep because the marker matches the configuration and srcversion (run.sh:2619-2621), so after the first death row the victim runs the default death window while every other node runs the variant's.",
+      "summary": "A path row that kills its victim brings it back through tests/mpath/lib.sh pf_boot_rejoin, which loaded mxfs with the configuration's module arguments only (mxfs_rig_modargs: target_cache_protected, force_transport and the rig's contract), not prep_node.sh's set (log_repeat_limit=0 and the lane's MXFS_EXTRA_MODARGS among them; tests/setup/prep_node.sh:242, :248), and sent modprobe no arguments at all, so a rejoined victim ran the default death window while every other node of the lane ran the variant's. That the mismatch then carried into the following rows, because run.sh's marker match reads no loaded parameter, is its own record, D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS.",
       "evidence": "Sweep of lanes tests/evidence/lanes/g8_mpathtmo2_20261023T143444Z and g16b_mpathtmo2_20261023T143733Z (both exporting MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, summary.log:6): board_20261023T144020Z-g8_path_fence_degraded kmsg_test14_fromnode.gz:665 'mxfs: dead_timeout_ms=0 (0 = 34 s on SCSI, 62 s on DRBD or shared)', :701 'authority lease 30000 ms, death window 34000 ms', against test7-test13 '=12000' and 'authority lease 8000 ms, death window 12000 ms'; the same for test14 in 144327Z path_all_lost, 144649Z path_peer_withdrawn, 151409Z path_fence_degraded, 151713Z path_all_lost, and for test32 in 144449Z, 144842Z, 150343Z, 150725Z and 151125Z (16 nodes). The step logs of every row after a lane's first prep print '--- cluster already prepped for <config> (srcver=08D63764A9352FBDD5A76CD) \u2014 skipping prep ---' (g8 step4-12 and step14-22, g16b step4-7 and step9-12). test14 came back on 12000 only after a forced prep (151048Z path_fenced_return kmsg_test14 :157277). Every row passed; the runs were variants and grade nothing. The survivors declared on their own 12 s window, so the stalls those rows measured are the survivors' at that window.",
-      "next": "Make the rejoin load the module with the lane's arguments as prep does (MXFS_EXTRA_MODARGS appended to mxfs_rig_modargs in tests/mpath/lib.sh, and wherever else a row reloads mxfs on a node it restarted), and make run.sh's marker match also compare each node's loaded parameters with the ones requested, so a mismatch re-preps instead of skipping; a lap that kills a victim in one row and reads every node's /sys/module/mxfs/parameters/dead_timeout_ms in the next; control with the fix's switch off, verification sized from it, remove --fixed. ===== ===== 2026-10-23: tests/mpath/lib.sh is sourced by every row of the running lanes g4_mpathtmo2_k6 and g2e_mpathtmo2_k6, so the edit waits until both have ended (an edit mid-lane changes what the rest of the lane measures). The two halves each cure the symptom alone (the rejoin loading the lane's arguments, or run.sh re-prepping on a mismatch), so a control with one switch off would still pass the next-row read: give each half its own switch and its own lap. The rejoin half: pf_boot_rejoin's insmod (tests/mpath/lib.sh:519) takes mxfs_rig_modargs only, while prep_node.sh loads $MODARGS ${MXFS_EXTRA_MODARGS} and the retire_contract argument (tests/setup/prep_node.sh:242, :248); its lap reads the victim's /sys/module/mxfs/parameters inside the same row, right after the rejoin. The marker half: a lap that reloads mxfs on one node of a formed pair with other arguments, then runs a row and requires the row to re-prep (run.sh marker_matches compares only the arguments requested at prep, run.sh:299-302).",
+      "next": "Make the rejoin load the module with the lane's arguments as prep does (MXFS_EXTRA_MODARGS appended to mxfs_rig_modargs in tests/mpath/lib.sh, and wherever else a row reloads mxfs on a node it restarted), and make run.sh's marker match also compare each node's loaded parameters with the ones requested, so a mismatch re-preps instead of skipping; a lap that kills a victim in one row and reads every node's /sys/module/mxfs/parameters/dead_timeout_ms in the next; control with the fix's switch off, verification sized from it, remove --fixed. ===== ===== 2026-10-23: tests/mpath/lib.sh is sourced by every row of the running lanes g4_mpathtmo2_k6 and g2e_mpathtmo2_k6, so the edit waits until both have ended (an edit mid-lane changes what the rest of the lane measures). The two halves each cure the symptom alone (the rejoin loading the lane's arguments, or run.sh re-prepping on a mismatch), so a control with one switch off would still pass the next-row read: give each half its own switch and its own lap. The rejoin half: pf_boot_rejoin's insmod (tests/mpath/lib.sh:519) takes mxfs_rig_modargs only, while prep_node.sh loads $MODARGS ${MXFS_EXTRA_MODARGS} and the retire_contract argument (tests/setup/prep_node.sh:242, :248); its lap reads the victim's /sys/module/mxfs/parameters inside the same row, right after the rejoin. The marker half: a lap that reloads mxfs on one node of a formed pair with other arguments, then runs a row and requires the row to re-prep (run.sh marker_matches compares only the arguments requested at prep, run.sh:299-302). ===== 2026-10-23: the marker half (run.sh marker_matches/marker_live_ok, run.sh:286-303, reading no node's loaded parameters) is split out as D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS, because rows other than the rejoin still leave parameters changed (path_fenced_return.sh:65-69, crash_consistency.sh:41, :58); this record is the rejoin half alone, measured by control b20261023-c6d354 and verification b20261023-abfebf.",
       "updated": "2026-10-23",
       "batches": [
         {
@@ -5368,7 +5095,8 @@
           "row": "lap:rejoin_modargs",
           "iso": "2026-10-23T20:48:00Z"
         }
-      ]
+      ],
+      "reproducer": "tests/rejoin_modargs_lap.sh: runs tests/mpath/lib.sh pf_boot_rejoin and pf_rejoin_modargs on the host with ssh and virsh replaced by a recorder, and compares the insmod argv the rejoin would send with prep_node.sh's for the same environment (MXFS_CONFIG=8/net/mesh/mpath MXFS_EXTRA_MODARGS=dead_timeout_ms=12000); PF_REJOIN_PREP_ARGS=0 is the control"
     },
     {
       "id": "D-RELEASE-STEP-ANNOTATION-LOOKS-THE-STEP-ROW-UP-AS-A-BOARD-CRITERION",
@@ -5376,7 +5104,7 @@
       "nodes": 1,
       "config": "*/*/*",
       "opened": "2026-10-23",
-      "summary": "tools/criteria.py annotated_run, which infra, amend, unamend and unretire call first, looked every row up as a board criterion (find) and passed every configuration to parse_at, but a release step's row (release:<step>) exists only in the run ledger: infra-proven and detector-defect annotations of a failed step's run, and the take-back of its retirement, were refused 'nothing matches', so no reviewed disposition could settle a failed release step.",
+      "summary": "tools/criteria.py annotated_run, which criteria.py infra, amend, unamend and unretire call first, looked every row up as a board criterion (find), but a release step's row (release:<step>) exists only in the run ledger: criteria.py infra and amend of a failed release step's run, and criteria.py unretire of its retirement, were refused \"criteria: nothing matches 'release:<step>'\" on every key shape, so a failed release step could be neither settled as infra-proven or a detector defect nor have its retirement taken back",
       "evidence": "Read 2026-10-21 (D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED's evidence, part 3): cmd_amend, cmd_infra and withdraw start with find(data, args.id). Measured 2026-10-23 on the host with tests/release_step_cell_lap.py and only MXFS_RELEASE_STEP_ANNOTATE=0 (annotated_run's release-step branch off, the other parts on): FAIL 12 of 12, criteria.py infra and amend refused \"criteria: nothing matches 'release:boards'\" (release:platforms, release:drbd) on all three keys, and the take-back of each removal, criteria.py unretire, refused the same (tests/evidence/release_step_switches_20261023T171448Z/lap_MXFS_RELEASE_STEP_ANNOTATE.log); all on, PASS 12 of 12 (tests/evidence/release_step_switches_20261023T171448Z/lap_on.log). The fix: annotated_run returns a release step's row as it is and takes the placeholder 1/any (tools/criteria.py annotated_run, behind MXFS_RELEASE_STEP_ANNOTATE).",
       "next": "On the next attempt: control batch of tests/release_step_cell_lap.py with MXFS_RELEASE_STEP_ANNOTATE=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 40 s, probe '^EXPOSED: the gate lists', pass '^STEP_CELL_LAP PASS'), the verification batch sized from it, then remove --fixed.",
       "reproducer": "tests/release_step_cell_lap.py (about 20 s, host only, scratch trees); MXFS_RELEASE_STEP_ANNOTATE=0 is the control",
@@ -5915,6 +5643,56 @@
           "config": "4/disk/caw/mpath",
           "row": "path_mount_degraded",
           "iso": "2026-10-23T16:58:04Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "lap:late_fill",
+          "iso": "2026-10-23T20:56:19Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "lap:late_fill",
+          "iso": "2026-10-23T20:55:04Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "lap:late_fill",
+          "iso": "2026-10-23T20:53:38Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "lap:late_fill",
+          "iso": "2026-10-23T20:52:22Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "lap:late_fill",
+          "iso": "2026-10-23T20:51:09Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "lap:late_fill",
+          "iso": "2026-10-23T20:49:56Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "lap:late_fill",
+          "iso": "2026-10-23T20:48:38Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "lap:late_fill",
+          "iso": "2026-10-23T20:47:24Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "lap:late_fill",
+          "iso": "2026-10-23T20:46:05Z"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "row": "lap:late_fill",
+          "iso": "2026-10-23T20:44:50Z"
         }
       ],
       "updated": "2026-10-23",
@@ -5930,11 +5708,61 @@
           "candidate": "",
           "build": "79779BEAECBEA94844FDC72",
           "variant": "pr_fill_bounded=0 (arm 0: the late-path fill runs only with 15 s of the authority lease left, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: a path that was down at mount comes back unregistered under an 8 s lease"
+        },
+        {
+          "id": "b20261023-dc75f9",
+          "kind": "verify",
+          "row": "lap:late_fill",
+          "config": "2/disk/caw/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:late_fill",
+            "config": "2/disk/caw/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-d5c90b",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "pr_fill_bounded=0 (arm 0: the late-path fill runs only with 15 s of the authority lease left, as before the fix)",
+            "builds": [
+              "79779BEAECBEA94844FDC72"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:late_fill",
+          "config": "2/disk/caw/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-d5c90b",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "pr_fill_bounded=0 (arm 0: the late-path fill runs only with 15 s of the authority lease left, as before the fix)",
+          "builds": [
+            "79779BEAECBEA94844FDC72"
+          ],
+          "date": "2026-10-23"
         }
       ]
     },
@@ -6241,7 +6069,8 @@
           "row": "lap:fsx_fail_files",
           "iso": "2026-10-23T20:47:39Z"
         }
-      ]
+      ],
+      "reproducer": "tests/fsx_fail_files_lap.sh: runs tests/suite/fsx.sh (MXFS_NODES=1) on a /dev/shm scratch directory in place of the mount, with FSX_LOG_DIR in that directory, while a second writer overwrites each fsxfile_<ops> so both checks miscompare, then lists what survived the row; FSX_KEEP_FAIL_FILES=0 is the control"
     },
     {
       "id": "D-DISKLOCK-VALIDATE-READS-CAW-SLOT-0-AND-LOGS-A-CORRUPT-LOCK-RECORD",
@@ -6345,6 +6174,16 @@
       "summary": "tools/criteria.py incidents --at hands its argument to parse_at (tools/criteria.py:1616), which accepts only <nodes>/<class>/<method>/<attach>, so the listing cannot be narrowed to the configuration a release step's run is recorded under: 'criteria.py incidents --at 1/any' exits with \"criteria: '1/any': wanted <nodes>/<class>/<method>/<attach>, e.g. 8/net/mesh/direct\" and lists nothing",
       "evidence": "Reproduced 2026-10-23 on candidate 0.90.134's tree: 'timeout 30 python3 tools/criteria.py incidents --at 1/any' printed \"criteria: '1/any': wanted <nodes>/<class>/<method>/<attach>, e.g. 8/net/mesh/direct\". It was in the evidence of D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED, whose removal (review data/reviews/P20261023-b5509f.md) fixed parse_cell only and named this as not covered. It is a listing filter only: no disposition goes through it, and the unfiltered 'criteria.py incidents' lists release-step runs.",
       "next": "Let incidents --at take a release step's configuration (1/any, and an own-rig key) as parse_cell now does, with a switch for the control; a lap that lists a release-step FAIL with --at 1/any, fix out (refused) and in (listed)."
+    },
+    {
+      "id": "D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS",
+      "severity": "medium",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "run.sh's marker match (marker_matches, run.sh:299-303) compares the prep arguments the marker recorded with the ones requested, and its live check (marker_live_ok, run.sh:286-298) reads only each node's srcversion and whether /mnt/shared is mounted, never the module parameters the node is running; so after a row leaves a parameter changed on a node (written at runtime, or the module reloaded with other arguments), every following row skips prep (run.sh:2639-2640) on a cluster other than the one the marker records.",
+      "evidence": "Code, read 2026-10-23. run.sh:290 marker_live_ok reads 'cat /sys/module/mxfs/srcversion; mountpoint -q /mnt/shared' per node and nothing else; run.sh:302 '[ \"$MK_MODARGS\" = \"$(prep_modargs)\" ]' compares two requests, not a node. Observed once, through the rejoin half of D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS: tests/evidence/board_20261023T144020Z-g8_path_fence_degraded rejoined test14 (row.log 'INFO rejoin: test14 REJOIN dev=1 insmod_rc=0'), kmsg_test14_fromnode.gz:665 '[   11.885338] mxfs: dead_timeout_ms=0', and the next row tests/evidence/board_20261023T144327Z-g8_path_all_lost shows the same boot's load line (kmsg_test14_fromnode.gz:665, same uptime 11.885338, so no reload) after tests/evidence/lanes/g8_mpathtmo2_20261023T143444Z/step4.log '--- cluster already prepped for 8/disk/caw/mpath (srcver=08D63764A9352FBDD5A76CD) \u2014 skipping prep ---'. The rejoin fix (tests/mpath/lib.sh:514-524) removes that one source; of the 44 detector scripts named by data/criteria.json and data/criteria.pvephys.json, only tests/mpath/path_fence_degraded.sh:85 calls pf_boot_rejoin and none other insmods/modprobes mxfs in its own text. Rows that still leave a parameter changed, with no restore: tests/mpath/path_fenced_return.sh:65-69 writes PF_FREEZE_KNOBS on the victim and returns it by pf_remount (:135, no reload), its EXIT trap (:46) restoring none of them; dbg_admit_park_ms clears itself only once it fires (pal/linux/xfs_super.c:2414-2418) and dbg_admit_park_site never does; tests/suite/crash_consistency.sh:41 sets dirshard_mkdir_enable=1 under CC_SHARDED; watch_ino is armed by default (MXFS_WATCH_ARM=1) at tests/suite/crash_consistency.sh:58 and :155, tests/suite/dir_reuse_coherency.sh:240 and tests/suite/fence_during_write.sh:51. Not yet measured: a later row run on one of these leftovers (code-read only), and what each leftover changes in that row.",
+      "next": "A host-and-pair lap: on a formed pair, change one node's parameter the way a row does (write watch_ino, or reload with other arguments), then run a filtered row and require run.sh to re-prep or refuse, not print 'skipping prep'; control with the fix's switch off. Fix candidates: marker_live_ok reads each node's /sys/module/mxfs/parameters for the requested arguments and the knobs rows write, against what prep loaded, so a mismatch re-preps; or every row that writes a parameter restores it on exit. Then a control sized from the lap's rate, a verification, remove --fixed."
     }
   ]
 }

@@ -1,39 +1,183 @@
-SCST: hand a PR registrant to the new session of an I_T nexus when that session is created.
+SCST +caw-abort-reclaim.6: hand a PR registrant to the new session of an I_T nexus, and keep the
+old session's commands inside PREEMPT AND ABORT's reach.
 
 A persistent-reservation registration belongs to the I_T nexus, which iSCSI names by initiator
 name and ISID; SPC keeps it across the loss of the nexus and the session's reinstatement. When an
-initiator logs in again with the same ISID after iscsi-scst has already freed the old session in
-user space, the login is a new session, and scst_pr_init_tgt_dev() left the registrant on the old
-session's per-device state (it only assigns a registrant that no tgt_dev holds). The registrant
-moved only when the old tgt_dev was freed (scst_pr_clear_tgt_dev()), asynchronously, so for the
-6-14 ms between the new session's creation and that free every command of the registered nexus
-was refused RESERVATION CONFLICT (measured on the MXFS lab target, 2026-10-23: the five refused
-writes of a 4 s path cut all fell inside that window).
+initiator logs in again with the same ISID after iscsi-scst has already started shutting the old
+session down, the login is a new session, and scst_pr_init_tgt_dev() left the registrant on the
+old session's per-device state (it only assigns a registrant that no tgt_dev holds). The
+registrant moved only when the old tgt_dev was freed (scst_pr_clear_tgt_dev() from
+scst_free_session(), after the old session's refcount reached zero), so between the new session's
+creation and that free every command of the registered nexus was refused RESERVATION CONFLICT
+(measured on the MXFS lab target, 2026-10-23: the five refused writes of a 4 s path cut all fell
+6-14 ms after the login).
 
-Two sessions with one initiator name, ISID and relative target port cannot both be current (a
-login with the same ISID reinstates the earlier session), so the new tgt_dev takes the registrant
-under the PR write lock; the old tgt_dev's later clear then finds none to hand over.
+Part 1, scst_pr_init_tgt_dev(): the new tgt_dev takes the registrant under dev_pr_mutex when the
+tgt_dev holding it belongs to a session that is no longer SCST_SESS_SPH_READY. Two READY sessions
+never trade it.
 
-Not applied. Applying it means rebuilding SCST's modules and reloading them on the lab host,
-which takes every target's LUNs away from the lab VMs while it runs: the owner's decision.
+Part 2, scst_pr_abort_reg(): moving the registrant alone would put the old session's commands out
+of PREEMPT AND ABORT's reach, because the abort was queued only on reg->tgt_dev's session, and the
+old session may still hold writes it admitted while it held the registrant. The new
+scst_pr_abort_nexus_sessions() also queues SCST_PR_ABORT_ALL on every other session of the
+registrant's nexus (same TransportID and relative target port) on the device whose refcount is
+not yet zero. A tgt_dev leaves dev_tgt_dev_list only in scst_free_session(), after its session's
+refcount reached zero, so every session of the nexus that still holds a command is found. The
+sessions are pinned with percpu_ref_tryget() under dev_lock and aborted after it is dropped
+(scst_rx_mgmt_fn_lun(SCST_NON_ATOMIC) may sleep); +caw-abort-reclaim.5 already admits a
+core-originated PR_ABORT_ALL on a session in SCST_SESS_SPH_SHUTDOWN.
 
+Both parts print one PRINT_INFO line when they act (not trace-mask controlled), so a run's host
+kernel log shows each handoff and each extra abort.
+
+Applied to /src/scst (the tree the installed modules are built from). Installing it is a reload of
+SCST on the lab host: every rig VM is powered off first, the target is rebuilt with
+scripts/scst_setup.sh afterwards, and tests/scst_pr_bounds_check.sh and
+tests/scst_pr_abort_shutdown_race.sh must pass on the installed .6.
+
+--- a/scst/include/scst_const.h
++++ b/scst/include/scst_const.h
+@@ -103,8 +103,19 @@
+  *      counters back on every post failure (previously the PR command
+  *      would wait forever).  Test-only module parameter
+  *      pr_abort_shutdown_delay_ms widens both windows deterministically.
++ *  .6  A registered I_T nexus refused RESERVATION CONFLICT after its
++ *      session's re-login (measured 2026-10-23: every refused write of a
++ *      4 s path cut fell 6-14 ms after the login).  When an initiator logs
++ *      in again with the same ISID after the old session has started
++ *      shutting down, the login is a new session, and
++ *      scst_pr_init_tgt_dev() left the registrant on the old session's
++ *      tgt_dev until scst_free_session() freed it.  The new tgt_dev now
++ *      takes the registrant from a tgt_dev whose session is no longer
++ *      READY, and scst_pr_abort_reg() also aborts every other live
++ *      session of the registrant's nexus on the device, so commands the
++ *      old session admitted stay inside PREEMPT AND ABORT's reach.
+  */
+-#define SCST_VERSION_STRING_SUFFIX	"+caw-abort-reclaim.5"
++#define SCST_VERSION_STRING_SUFFIX	"+caw-abort-reclaim.6"
+ #define SCST_VERSION_STRING		SCST_VERSION_NAME SCST_VERSION_STRING_SUFFIX
+ 
+ #ifdef SCST_BUILD_DATE
 --- a/scst/src/scst_pres.c
 +++ b/scst/src/scst_pres.c
-@@ -1191,12 +1191,25 @@ int scst_pr_init_tgt_dev(struct scst_tgt_dev *tgt_dev)
+@@ -554,6 +554,83 @@
+ 	TRACE_EXIT();
+ }
+ 
++/*
++ * +caw-abort-reclaim.6: abort the commands of every session of the
++ * registrant's I_T nexus on this device other than reg->tgt_dev's.
++ *
++ * scst_pr_init_tgt_dev() hands the registrant to a new session of the nexus
++ * while an earlier one is still shutting down, and that earlier session may
++ * still hold commands it admitted while it held the registrant.  PREEMPT AND
++ * ABORT guarantees that no command of the preempted nexus completes after the
++ * PR command does, so those must be aborted too.
++ *
++ * Must be called under dev_pr_mutex.  A tgt_dev leaves dev_tgt_dev_list only
++ * in scst_free_session(), after its session's refcount reached zero, so every
++ * session of the nexus that still holds a command is on the list.  A tgt_dev
++ * added to the list after the count below belongs to a session that has sent
++ * no command to this device yet (scst_pr_init_tgt_dev() precedes the list add
++ * and waits for dev_pr_mutex), so it holds nothing to abort.
++ */
++static void scst_pr_abort_nexus_sessions(struct scst_device *dev,
++					 struct scst_cmd *pr_cmd,
++					 struct scst_dev_registrant *reg)
++{
++	struct scst_tgt_dev *t;
++	struct scst_session **sessions;
++	uint64_t *luns;
++	int count = 0, n = 0, i, rc;
++
++	spin_lock_bh(&dev->dev_lock);
++	list_for_each_entry(t, &dev->dev_tgt_dev_list, dev_tgt_dev_list_entry) {
++		if (t != reg->tgt_dev && t->sess->transport_id &&
++		    t->sess->tgt->rel_tgt_id == reg->rel_tgt_id &&
++		    tid_equal(t->sess->transport_id, reg->transport_id))
++			count++;
++	}
++	spin_unlock_bh(&dev->dev_lock);
++
++	if (count == 0)
++		return;
++
++	sessions = kmalloc_array(count, sizeof(*sessions), GFP_KERNEL | __GFP_NOFAIL);
++	luns = kmalloc_array(count, sizeof(*luns), GFP_KERNEL | __GFP_NOFAIL);
++
++	spin_lock_bh(&dev->dev_lock);
++	list_for_each_entry(t, &dev->dev_tgt_dev_list, dev_tgt_dev_list_entry) {
++		if (n == count)
++			break;
++		if (t == reg->tgt_dev || !t->sess->transport_id ||
++		    t->sess->tgt->rel_tgt_id != reg->rel_tgt_id ||
++		    !tid_equal(t->sess->transport_id, reg->transport_id))
++			continue;
++		/* Zero: every command of that session has been released. */
++		if (!percpu_ref_tryget(&t->sess->refcnt))
++			continue;
++		sessions[n] = t->sess;
++		luns[n] = t->lun;
++		n++;
++	}
++	spin_unlock_bh(&dev->dev_lock);
++
++	for (i = 0; i < n; i++) {
++		__be64 packed_lun = scst_pack_lun(luns[i], sessions[i]->acg->addr_method);
++
++		PRINT_INFO("PR ABORT: registrant %s/%d (key 0x%016llx) earlier session %p of the nexus (shut_phase %ld): aborting its commands",
++			   debug_transport_id_to_initiator_name(reg->transport_id),
++			   reg->rel_tgt_id, be64_to_cpu(reg->key), sessions[i],
++			   sessions[i]->shut_phase);
++		rc = scst_rx_mgmt_fn_lun(sessions[i], SCST_PR_ABORT_ALL, &packed_lun,
++					 sizeof(packed_lun), SCST_NON_ATOMIC, pr_cmd);
++		percpu_ref_put(&sessions[i]->refcnt);
++		if (rc != 0)
++			PRINT_ERROR("SCST_PR_ABORT_ALL failed %d (earlier sess %p of the nexus)",
++				    rc, sessions[i]);
++	}
++
++	kfree(luns);
++	kfree(sessions);
++}
++
+ /* Must be called under dev_pr_mutex */
+ static void scst_pr_abort_reg(struct scst_device *dev, struct scst_cmd *pr_cmd,
+ 			      struct scst_dev_registrant *reg)
+@@ -566,6 +643,8 @@
+ 
+ 	scst_assert_pr_mutex_held(dev);
+ 
++	scst_pr_abort_nexus_sessions(dev, pr_cmd, reg);
++
+ 	if (!reg->tgt_dev) {
+ 		TRACE_PR("Registrant %s/%d (%p, key 0x%016llx) has no session",
+ 			 debug_transport_id_to_initiator_name(reg->transport_id),
+@@ -1191,7 +1270,30 @@
  	scst_pr_write_lock(dev);
-
+ 
  	reg = scst_pr_find_reg(dev, transport_id, rel_tgt_id);
 -	if (reg && !reg->tgt_dev) {
-+	if (reg && reg->tgt_dev && reg->tgt_dev != tgt_dev) {
++	if (reg && reg->tgt_dev && reg->tgt_dev != tgt_dev &&
++	    READ_ONCE(reg->tgt_dev->sess->shut_phase) != SCST_SESS_SPH_READY) {
 +		/*
-+		 * The registrant is still linked to the per-device state of an
-+		 * earlier session of the same I_T nexus, which is being freed.
-+		 * The new session is the nexus now: take the registrant, so its
-+		 * commands are not refused until the old state is gone.
++		 * +caw-abort-reclaim.6: the registrant is still linked to the
++		 * per-device state of an earlier session of this I_T nexus, and
++		 * that session is already shutting down: it is freed (and the
++		 * registrant moved by scst_pr_clear_tgt_dev()) only once its
++		 * refcount drops, on the management thread.  A registration
++		 * belongs to the nexus and survives its loss, so the new session
++		 * is the nexus now: take the registrant, or every command it sends
++		 * until that free is refused RESERVATION CONFLICT although the
++		 * nexus is registered.  The earlier session's commands still in
++		 * flight are reached by PREEMPT AND ABORT through
++		 * scst_pr_abort_nexus_sessions().
 +		 */
-+		TRACE_PR("Moving reg %s/%d (%p) from tgt_dev %p to new tgt_dev %p (dev %s)",
-+			 debug_transport_id_to_initiator_name(transport_id),
-+			 rel_tgt_id, reg, reg->tgt_dev, tgt_dev, dev->virt_name);
++		PRINT_INFO("PR: moving reg %s/%d (%p, key 0x%016llx) from shutting-down sess %p (tgt_dev %p) to new tgt_dev %p (dev %s)",
++			   debug_transport_id_to_initiator_name(transport_id),
++			   rel_tgt_id, reg, be64_to_cpu(reg->key),
++			   reg->tgt_dev->sess, reg->tgt_dev, tgt_dev,
++			   dev->virt_name);
 +		reg->tgt_dev->registrant = NULL;
 +		tgt_dev->registrant = reg;
 +		reg->tgt_dev = tgt_dev;
@@ -41,8 +185,3 @@ which takes every target's LUNs away from the lab VMs while it runs: the owner's
  		TRACE_PR("Assigning reg %s/%d (%p) to tgt_dev %p (dev %s)",
  			 debug_transport_id_to_initiator_name(transport_id),
  			 rel_tgt_id, reg, tgt_dev, dev->virt_name);
- 		tgt_dev->registrant = reg;
- 		reg->tgt_dev = tgt_dev;
- 	}
-
- 	scst_pr_write_unlock(dev);
