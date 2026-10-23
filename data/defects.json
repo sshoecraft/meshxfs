@@ -4717,11 +4717,44 @@
           "candidate": "",
           "build": "08D63764A9352FBDD5A76CD",
           "variant": "HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=1000 FORCE_MS=0 (MXFS_TEST_ENV): the row as the fix found it, hold=8x1000ms (data/criteria.runs.jsonl:8051, :8054): each node's first 8 merged blocks held between read and swap until the peer writes the block, at most 1000 ms, and no forced overlap (both unmounts plain)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the row as the fix found it: laps with no MISCOMPARE retried (VACUOUS) must come back"
+        },
+        {
+          "id": "b20261023-fa1878",
+          "kind": "verify",
+          "row": "fourkn_merge",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "planned": 13,
+          "probe": "FOURKN-MERGE-[^ ]+ counted miscompares=[1-9].*forced=landed",
+          "candidate": "0.90.134",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "fourkn_merge",
+            "config": "2/disk/caw/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-78831e",
+            "k": 13,
+            "n": 20,
+            "candidate": "",
+            "variant": "HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=1000 FORCE_MS=0 (MXFS_TEST_ENV): the row as the fix found it, hold=8x1000ms (data/criteria.runs.jsonl:8051, :8054): each node's first 8 merged blocks held between read and swap until the peer writes the block, at most 1000 ms, and no forced overlap (both unmounts plain)",
+            "builds": [
+              "08D63764A9352FBDD5A76CD"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.3434314157680786
         }
       ],
       "updated": "2026-10-23",
@@ -4778,6 +4811,21 @@
           "kind": "control",
           "batch": "b20261023-2cdd94",
           "k": 12,
+          "n": 20,
+          "candidate": "",
+          "variant": "HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=1000 FORCE_MS=0 (MXFS_TEST_ENV): the row as the fix found it, hold=8x1000ms (data/criteria.runs.jsonl:8051, :8054): each node's first 8 merged blocks held between read and swap until the peer writes the block, at most 1000 ms, and no forced overlap (both unmounts plain)",
+          "builds": [
+            "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
+        },
+        {
+          "row": "fourkn_merge",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-78831e",
+          "k": 13,
           "n": 20,
           "candidate": "",
           "variant": "HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=1000 FORCE_MS=0 (MXFS_TEST_ENV): the row as the fix found it, hold=8x1000ms (data/criteria.runs.jsonl:8051, :8054): each node's first 8 merged blocks held between read and swap until the peer writes the block, at most 1000 ms, and no forced overlap (both unmounts plain)",
@@ -4992,6 +5040,71 @@
           "config": "2/net/mesh/direct4k",
           "row": "fourkn_merge",
           "iso": "2026-10-23T12:09:31Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T13:28:27Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T13:27:19Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T13:25:06Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T13:23:59Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T13:22:53Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T13:21:47Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T13:19:32Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T13:18:25Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T13:16:12Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T13:15:06Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T13:14:00Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T13:12:56Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T13:11:51Z"
         }
       ],
       "verified_at": [
