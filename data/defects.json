@@ -4655,11 +4655,44 @@
           "candidate": "",
           "build": "08D63764A9352FBDD5A76CD",
           "variant": "HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=1000 FORCE_MS=0 (MXFS_TEST_ENV): the row as the fix found it, hold=8x1000ms (data/criteria.runs.jsonl:8051, :8054): each node's first 8 merged blocks held between read and swap until the peer writes the block, at most 1000 ms, and no forced overlap (both unmounts plain)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the row as the fix found it: laps with no MISCOMPARE retried (VACUOUS) must come back"
+        },
+        {
+          "id": "b20261023-a3e72f",
+          "kind": "verify",
+          "row": "fourkn_merge",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 15,
+          "probe": "FOURKN-MERGE-[^ ]+ counted miscompares=[1-9].*forced=landed",
+          "candidate": "0.90.134",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "fourkn_merge",
+            "config": "2/net/mesh/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-2cdd94",
+            "k": 12,
+            "n": 20,
+            "candidate": "",
+            "variant": "HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=1000 FORCE_MS=0 (MXFS_TEST_ENV): the row as the fix found it, hold=8x1000ms (data/criteria.runs.jsonl:8051, :8054): each node's first 8 merged blocks held between read and swap until the peer writes the block, at most 1000 ms, and no forced overlap (both unmounts plain)",
+            "builds": [
+              "08D63764A9352FBDD5A76CD"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.299094724757627
         }
       ],
       "updated": "2026-10-23",
@@ -4704,6 +4737,21 @@
           "n": 20,
           "candidate": "",
           "variant": "HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=0 FORCE_MS=0 (MXFS_TEST_ENV): the row's held window back, each node's first 8 merged blocks held a fixed 20 ms between read and swap, and its forced overlap left out (both unmounts plain), as the record found it",
+          "builds": [
+            "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
+        },
+        {
+          "row": "fourkn_merge",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-2cdd94",
+          "k": 12,
+          "n": 20,
+          "candidate": "",
+          "variant": "HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=1000 FORCE_MS=0 (MXFS_TEST_ENV): the row as the fix found it, hold=8x1000ms (data/criteria.runs.jsonl:8051, :8054): each node's first 8 merged blocks held between read and swap until the peer writes the block, at most 1000 ms, and no forced overlap (both unmounts plain)",
           "builds": [
             "08D63764A9352FBDD5A76CD"
           ],
@@ -4855,6 +4903,66 @@
           "config": "2/net/mesh/direct4k",
           "row": "fourkn_merge",
           "iso": "2026-10-23T11:32:27Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T12:26:48Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T12:23:54Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T12:22:56Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T12:21:57Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T12:20:03Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T12:19:04Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T12:17:09Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T12:15:14Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T12:14:16Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T12:12:22Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T12:11:25Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T12:09:31Z"
         }
       ],
       "verified_at": [
@@ -6384,7 +6492,7 @@
       "opened": "2026-10-23",
       "summary": "After join_during_takeover's peer B hands its ~15k authority-ledger pages back (NFILES=32000), the last member A's umount takes 29-33 s, timed on the node around umount alone; at NFILES=4000 the same unmount takes 4.3-7.8 s, so its wall grows with the authority A holds and crosses the 30 s stall_limit_s",
       "evidence": "Candidate 0.90.134 (build 16A5F5DDDB4852C9D5DB236), g2 test1/test2, verification batch b20261022-548ef2 of D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE, laps run by tests/capture_fault_gate.sh jdtv<N> --only join_during_takeover; tests/join_during_takeover.sh:203 times 'umount $MNT' on node A. Each lap's row.log line 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=<N>': tests/evidence/20261023T043949Z_capture_gate_jdtv1 ms=31006, 20261023T044235Z_capture_gate_jdtv2 ms=30935, 20261023T044525Z_capture_gate_jdtv3 ms=29484, 20261023T044820Z_capture_gate_jdtv4 ms=32719, 20261023T045115Z_capture_gate_jdtv5 ms=32245, 20261023T045417Z_capture_gate_jdtv6 ms=31214, 20261023T045710Z_capture_gate_jdtv7 ms=29253, 20261023T050000Z_capture_gate_jdtv8 ms=31309, 20261023T050255Z_capture_gate_jdtv9 ms=31134 (ledger runs 2/net/mesh/direct:lap:jdt_gate_fault 2026-10-23T04:42:35Z..05:05:46Z, graded PASS). Control b20261022-4d455b at NFILES=4000 measured 4.3-7.8 s for the same step (jdtcta1 ':8 INFO A's last-member unmount: A_UMOUNT_RC=0 ms=4907'). The ledger graded these laps PASS: tools/criteria.py reads a stall only from a max_stall_ms= field, tools/batch_lap.py writes none, and the harness bounds the step at 180 s. Found by the review data/reviews/P20261023-128f2f.md, which rejected that verify for this stall. ===== 2026-10-23, cause measured (lane tests/evidence/lanes/g2_lmu_trace_20261023T075544Z, build B155E10D900872E6CE36289): at NFILES=32000 A's unmount took 30972 and 31746 ms, of which the clean departure's release-all took 27939 and 28708 ms releasing 31946 and 31962 grants one ledger transition at a time (tests/evidence/20261023T075654Z_lmutrace_lmu32k1/a_kmsg.txt 'P-RELALL-WALL released=31946 ms=27939', 20261023T080029Z_lmutrace_lmu32k2 'released=31962 ms=28708'; the stack samples are FUA reads, CAW writes and flushes under mxfs_tauth_page_write, 3342 distinct pages re-read once each as P-TAUTH-COMMIT-STALE-IMAGE after B's departure moved the ownership generation); at NFILES=4000, 4573 and 3977 ms with 'released=4001 ms=3684'. The wall is one ~0.9 ms page commit per grant held, serial. Fix (build E7B6958F435B9792735556D): dlm_wire_release_all sends the remote masters' releases first on its own thread and commits the locally-mastered ones on dl_relall_threads threads (default 8, each every nth resource; relall_active off while they run so a remastered resource is released as any concurrent release); dl_relall_threads=1 is the old serial release-all, the control. Precheck running: lane tests/evidence/lanes/g2_relall_prechecks_20261023T080727Z (default 8 twice, 1 once).",
-      "next": "Read lane tests/evidence/lanes/g2_relall_prechecks_20261023T080727Z: A's unmount and P-RELALL-WALL with 8 threads against 1. If 8 threads holds A's unmount well under 30 s at NFILES=32000, the control batch with dl_relall_threads=1 (the trace as a lap) and the verification batch on the frozen candidate; then rerun D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE's verification, which this stall failed.",
+      "next": "Read lane tests/evidence/lanes/g2_relall_prechecks_20261023T080727Z: A's unmount and P-RELALL-WALL with 8 threads against 1. If 8 threads holds A's unmount well under 30 s at NFILES=32000, the control batch with dl_relall_threads=1 (the trace as a lap) and the verification batch on the frozen candidate; then rerun D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE's verification, which this stall failed. ===== Removal P20261023-2ed8d3 was rejected (data/reviews/P20261023-2ed8d3.md): cause, control (10 of 10, dl_relall_threads=1) and fix-on (6 of 6, 10.3-12.9 s) hold at 2/net/mesh/direct only, which the applied verification already covers on 0.90.134. A removal needs: a control and fix-on pair at each other net/mesh attachment it reaches (DRBD, multipath, 4K-native at least), or a checkable --transfer of this control's rate; on disk/caw a measured run showing the slow release-all path never runs there, then narrow to net/mesh; evidence beyond two nodes; and the cause restated to the measured numbers (27.9 and 28.7 s were the release-all alone; three single-thread unmounts at 32,000 grants took 29.3-29.5 s). Two fix-off-lap findings no open record names: A's unmount interrupted its takeover of B's ledger pages (P-TAUTH-TAKEOVER-INTERRUPTED, 759 left) and B's departed slot stalled on its key (P304-RETIRE-UNKNOWN-STALLED after 30.8 s).",
       "reproducer": "tests/last_member_umount_trace.sh <label> [A] [B] on a formed pair (about 110 s at NFILES=32000): join_during_takeover's first three steps (A's authority over NFILES entries, B's clean unmount, A's last-member unmount), sampling the umount task's kernel stack every 200 ms and keeping A's kernel log of the unmount; the RESULT line carries A_UMOUNT_RC and ms. Control: MXFS_EXTRA_MODARGS=dl_relall_threads=1 at prep.",
       "updated": "2026-10-23",
       "batches": [
@@ -6735,6 +6843,33 @@
       "evidence": "Held laps (HOLD_N=64 HOLD_MS=20), module 2666D8544F367E3B7424B60, test31/test32: tests/evidence/20261022T135408Z_fourkn_merge_2-net-mesh-direct miscompares 1 (PASS); 20261022T135619Z_fourkn_merge_2-disk-caw-direct 1 (PASS); 20261022T145928Z_fourkn_merge_2-disk-caw-direct 0 (VACUOUS: lap.log:13-14 iwr_merge_blocks 247 and 214, iwr_merge_miscompares=0, dbg_iwr_merge_hold_left=0 on both, so every hold was spent with no peer write inside it; :36 'VACUOUS no swap miscompared'); 20261022T154721Z_fourkn_merge_2-disk-caw-direct 2 (PASS). Unheld, 0 MISCOMPAREs in ~480 merged writes a lap (20261022T133714Z, 134001Z, 134249Z). Every VACUOUS lap passed every correctness check; the lap never reads one as PASS. The board row's fix (tests/suite/fourkn_merge.sh, forced overlap at the unmount) did not change this script: data/reviews/P20261022-68ebdb.md Check 1 (tests/fourkn_merge_2node.sh:89-91 HOLD_N 64, HOLD_MS 20, HOLD_PEER_MS 0; :201 the VACUOUS exit; frozen with sha256 783e549811440c52852786b6283438bdfd542a3f87b1d03c6a5368f8266382dd, the same hash today). Split out of D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS, which now covers the board row only.",
       "next": "Make the lap force the overlap once a lap as tests/suite/fourkn_merge.sh does (the workload unheld; at the unmount node 1 armed with one held merged write of up to FORCE_MS while node 2 writes its own slot of the same block), so a lap whose forced overlap does not land is VACUOUS and every other lap retries a MISCOMPARE. Then a control with the old hold (HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0, no forced overlap) on the candidate's tree, a verification batch sized from it, and remove --fixed.",
       "reproducer": "tests/fourkn_merge_2node.sh <4096-byte pool LUN device> test31 test32 with its default hold (about 30-40 s a lap): a lap whose holds catch no peer write exits VACUOUS (exit 3, 'VACUOUS no swap miscompared')"
+    },
+    {
+      "id": "D-CAPTURE-GATE-PAIR-REBUILD-TOOK-207S-AND-THE-LAP-OVERRAN-ITS-360S-BOUND",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "A capture-gate lap that found its pair unformed rebuilt it with run.sh prep_cluster in 207 s, against 30-35 s for 26 of the 28 such rebuilds in the open-EFI controls, so the lap ran past its 360 s bound and was recorded FAIL (rc=124) after its entry had run; where the 207 s went is not known",
+      "evidence": "2/net/mesh/direct:gate:d_intents_2tcp_open_efi:2026-10-22T19:14:48Z (lap 7 of control b20261022-8375dc, build 9594B08726D6732D2ED5E87, test1/test2): tests/evidence/batch_laps/b20261022-8375dc/20261022T190848Z.log:4 'PAIR before d_intents_2tcp_open_efi healthy: not formed [test1 src=1 sv=9594B08726D6732D2ED5E87 ft=1 m=1;] -> forming it again', :5 'PAIR formed again before d_intents_2tcp_open_efi healthy in 246s', then '=== rc=124 elapsed=360s (2026-10-22T19:14:48Z) ==='; tests/evidence/20261022T190848Z_capture_gate_openefictl7_20261022b/pair_restore_1.log:5 clyde_preflight at 19:09:23Z, :33 'clyde_preflight: PASS (0 warning)', :34 prep of test1 test2 at 2/net/mesh/direct, :38 'prep OK ... build 9594B08726D6732D2ED5E87', :40 '=== prep_cluster OK @ 2/net/mesh/direct (207s) \u2014 marker updated ==='; the log has no per-step times between :34 and :38. The entry itself then ran and logged the replay refused (d_intents_2tcp_open_efi_ok.log:20-21 in the same directory), but the bound had run out. The count of rebuilds (26 of 28 at 30-35 s) is the review of P20261023-b45350.",
+      "next": "Find where the 207 s went: the run's own logs and both nodes' journals for 19:08:48-19:12:15Z (power-on of the destroyed victim, the pool bind, mkfs, mount, convergence); if prep_cluster logs no per-step times, give it some. Then whether it recurs: the rebuild time of every later gate lap that restores a pair.",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-22T19:14:48Z"
+        }
+      ]
+    },
+    {
+      "id": "D-BATCH-LAP-TIMEOUT-KILLS-ONLY-THE-DIRECT-CHILD-SO-THE-HARNESS-WRITES-ON",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "tools/batch_lap.py bounds a lap with subprocess.run(timeout=bound), which on expiry kills only the process it started, so a harness's own children outlive the lap: they go on writing after the lap is recorded and while the next lap runs on the same nodes",
+      "evidence": "tools/batch_lap.py:259-262 'rc = subprocess.run(command, cwd=ROOT, stdout=handle, stderr=subprocess.STDOUT, timeout=args.bound).returncode' / 'except subprocess.TimeoutExpired: rc = 124'. Control b20261022-8375dc lap 7 (2/net/mesh/direct:gate:d_intents_2tcp_open_efi:2026-10-22T19:14:48Z) was recorded at 19:14:48Z with rc=124 while its harness kept writing until 19:15:08Z, 20 s later, after lap 8 had started (review of P20261023-b45350, 'Other findings').",
+      "next": "Start each lap in its own session (start_new_session=True) and on expiry kill the whole process group and wait for it before recording the lap; reproduce with a lap whose command forks a child that sleeps past a short bound and then writes a marker: unfixed the marker lands after the lap's record line, fixed it never does."
     }
   ]
 }

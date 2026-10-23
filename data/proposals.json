@@ -2807,6 +2807,129 @@
         "dlm/v5_mount.c",
         "data/reviews/P20261023-8226ea.md"
       ],
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-2ed8d3.md",
+        "sha256": "30093bc09f20e3a61c5de1acc5569f174d15917b10f2f3ec9f4b570713627e7d",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
+    },
+    {
+      "id": "P20261023-b45350",
+      "kind": "verify",
+      "record": "D-OPEN-EFI-DEATH-REPLAY-REFUSED-NOT-HELD-VICTIM-DOMAIN-QUARANTINED-2TCP",
+      "change": {
+        "batch": "b20261023-30233a"
+      },
+      "argument": "Verification batch b20261023-30233a (gate:d_intents_2tcp_open_efi at 2/net/mesh/direct on the g2 pair, test1 W and test2 V; candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD: tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step8.log '--- prep OK: mxfs mounted on all 2 node(s), build 08D63764A9352FBDD5A76CD ---', the prep that re-formed the pair after the control, with the knob back at its default, tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step7.log 'KNOB-AFTER test1 inact_relmark=1') was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step9.log first line: 'declared verification batch b20261023-30233a ... 6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)'). It is sized from the control closed just before it on the same attempt, build and pair, b20261023-dc6d35 (tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step6.log): inact_relmark=0 on the candidate's module (tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step5.log 'KNOB test1 inact_relmark=0 sv=08D63764A9352FBDD5A76CD', the same for test2; MXFS_EXTRA_MODARGS on every re-formed pair), the inactivation tenure released unmarked as before the fix; 10 of 10 exposed laps FAIL (tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step6.log 'control b20261023-dc6d35: 10 of 10 laps failed with the fix out'). With k=n=10, L = 0.005^(1/10) = 0.5887 and N = ceil(ln 0.005 / ln(1 - 0.5887)) = 6. Each of the 6 laps is PASS with its probe matched (exposure=4 or 5 on every lap line of step9.log), and each lap's own log reads 'PASS replay SUCCEEDED with an OPEN obligation case (P226-FR-INTENTS-RECOVERABLE ...)', 'PASS engine completed the case (P-OBL-COMPLETE ...)', 'PASS ZERO P241-RECOV-TERMINAL on test1 (nothing quarantined) (0)' and 'PASS test1 not shut down (0)' (tests/evidence/20261023T120439Z_capture_gate_openefivd1/d_intents_2tcp_open_efi_ok.log:21, :33, :54, :58; the same checks in vd2 to vd6). No lap failed and none was INCOMPLETE: step9.log ends 'verify b20261023-30233a: 6 PASS, 0 FAIL of 6 planned'. The lap times no survivor file operation across the death (its steps are checks of the census, the replay and the obligation engine, d_intents_2tcp_open_efi_ok.log:7-58), so it grades no stall; a survivor operation's stall across a silent death belongs to D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S.",
+      "evidence": [
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step4.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step5.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step6.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step7.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step8.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step9.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-30233a",
+        "tests/evidence/batch_laps/b20261023-dc6d35",
+        "tests/evidence/20261023T120439Z_capture_gate_openefivd1",
+        "tests/evidence/20261023T120627Z_capture_gate_openefivd2",
+        "tests/evidence/20261023T120816Z_capture_gate_openefivd3",
+        "tests/evidence/20261023T121006Z_capture_gate_openefivd4",
+        "tests/evidence/20261023T121155Z_capture_gate_openefivd5",
+        "tests/evidence/20261023T121345Z_capture_gate_openefivd6",
+        "tests/d_intents_2tcp_open_efi.sh",
+        "tests/capture_fault_gate.sh"
+      ],
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-b45350.md",
+        "sha256": "46f25c86c97d64b79165b1d129c5a7017062499f4af0d0021a67c64cdfe7d0b2",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
+    },
+    {
+      "id": "P20261023-fce738",
+      "kind": "verify",
+      "record": "D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS",
+      "change": {
+        "batch": "b20261023-a3e72f"
+      },
+      "argument": "Verification batch b20261023-a3e72f (fourkn_merge at 2/net/mesh/direct4k on the g2d pair test31/test32, 4096-byte pool LUN; candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD: tests/evidence/lanes/g2d_fourkn_peerhold_control_20261023T120738Z/step4.log '--- prep OK: mxfs mounted on all 2 node(s), build 08D63764A9352FBDD5A76CD ---') was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2d_fourkn_peerhold_control_20261023T120738Z/step6.log first line: 'declared verification batch b20261023-a3e72f ... 15 clean laps (rate 12/20, lower bound 0.2991, delta 0.005, alpha 0.005)'). It is sized from the control closed just before it on the same attempt, build and pair, b20261023-2cdd94 (tests/evidence/lanes/g2d_fourkn_peerhold_control_20261023T120738Z/step5.log), which ran the row as the fix found it, the workload the review of P20261022-68ebdb named from the ledger: MXFS_TEST_ENV HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=1000 FORCE_MS=0, each node's first 8 merged blocks held between read and swap until the peer writes the block (at most 1000 ms) and both unmounts plain. Every one of its 20 lap lines reads 'hold=8x1000ms forced=off' with workload_ms 20360-20577 (laps 1-3), as the pre-fix row on build 16A5F5DDDB4852C9D5DB236 measured 'hold=8x1000ms' with workload_ms 19278 and 21882 (data/criteria.runs.jsonl:8051 and :8054, batch b20261022-7effb7). 12 of 20 exposed laps failed VACUOUS (miscompares=0 hold_landed=0, e.g. lap 1 '2026-10-23T12:09:31Z miscompares=0 hold_landed=0 merged_blocks=391'; step5.log last line 'control b20261023-2cdd94: 12 of 20 laps failed with the fix out'). With k=12 of n=20, L = BetaQuantile(0.005; 12, 9) = 0.2991 and N = ceil(ln 0.005 / ln(1 - 0.2991)) = 15. Each of the 15 laps, the row as it ships (FORCE_MS 5000, HOLD_N 0), is PASS with the probe 'FOURKN-MERGE-[^ ]+ counted miscompares=[1-9].*forced=landed' matched (exposure=1 and 'hold=0x1000ms forced=landed' on all 15 lap lines, miscompares 1-2 each). No lap failed and none was INCOMPLETE: step6.log ends 'verify b20261023-a3e72f: 15 PASS, 0 FAIL of 15 planned'. The row bounds its two workers at WBOUND, 16 s with no hold (tests/suite/fourkn_merge.sh:107, :155-156), and each lap at its manifest budget, so an operation of 30 s or more cannot pass a lap; the laps took 28-32 s of their budget.",
+      "evidence": [
+        "tests/evidence/lanes/g2d_fourkn_peerhold_control_20261023T120738Z/step3.log",
+        "tests/evidence/lanes/g2d_fourkn_peerhold_control_20261023T120738Z/step4.log",
+        "tests/evidence/lanes/g2d_fourkn_peerhold_control_20261023T120738Z/step5.log",
+        "tests/evidence/lanes/g2d_fourkn_peerhold_control_20261023T120738Z/step6.log",
+        "tests/evidence/lanes/g2d_fourkn_peerhold_control_20261023T120738Z/summary.log",
+        "tests/suite/fourkn_merge.sh",
+        "tests/suite/manifest",
+        "data/criteria.runs.jsonl"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-0230e2",
+      "kind": "verify",
+      "record": "D-OPEN-EFI-DEATH-REPLAY-REFUSED-NOT-HELD-VICTIM-DOMAIN-QUARANTINED-2TCP",
+      "change": {
+        "batch": "b20261023-30233a"
+      },
+      "argument": "Resubmission of P20261023-b45350 for the same open batch, which that review found meets every verify check (data/reviews/P20261023-b45350.md). It was rejected only because applying the verify retires every run this record names at 2/net/mesh/direct, and one of them, 2/net/mesh/direct:gate:d_intents_2tcp_open_efi:2026-10-22T19:14:48Z, failed on its 360 s bound after a 207 s pair rebuild nothing measured ties to this defect. That run is now named by its own record, D-CAPTURE-GATE-PAIR-REBUILD-TOOK-207S-AND-THE-LAP-OVERRAN-ITS-360S-BOUND, citing tests/evidence/20261022T190848Z_capture_gate_openefictl7_20261022b/pair_restore_1.log:40 '=== prep_cluster OK @ 2/net/mesh/direct (207s) \u2014 marker updated ===' and the lap log tests/evidence/batch_laps/b20261022-8375dc/20261022T190848Z.log:4-5, so the timeout stays an open defect of its own and is not settled as verified by this one. The other finding of that review (a lap's bound kills only the harness's direct child, tools/batch_lap.py:259-262) is D-BATCH-LAP-TIMEOUT-KILLS-ONLY-THE-DIRECT-CHILD-SO-THE-HARNESS-WRITES-ON; no lap of this batch hit its bound. The batch: b20261023-30233a, gate:d_intents_2tcp_open_efi at 2/net/mesh/direct on test1 W / test2 V, candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD (tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step8.log 'prep OK ... build 08D63764A9352FBDD5A76CD'), declared before its first lap (tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step9.log first line, '6 clean laps (rate 10/10, lower bound 0.5887 ...)'), sized from control b20261023-dc6d35 on the same attempt and module (inact_relmark=0, tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step5.log; 10 of 10 failed, tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step6.log); 6 of 6 laps PASS with exposure 4-5 (tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step9.log, 'verify b20261023-30233a: 6 PASS, 0 FAIL of 6 planned'). The knob was on in every verification lap: tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step7.log restored it on test1 only and exited rc=1, but the re-formed pair loaded the module with its default (tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step8.log), and P-RELMARK-INACT, which prints only with the knob on, fires on the victim in every lap (that review, Check 3).",
+      "evidence": [
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step5.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step6.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step7.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step8.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step9.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/summary.log",
+        "data/reviews/P20261023-b45350.md",
+        "tests/evidence/20261022T190848Z_capture_gate_openefictl7_20261022b/pair_restore_1.log",
+        "tests/evidence/batch_laps/b20261022-8375dc/20261022T190848Z.log",
+        "tests/evidence/batch_laps/b20261023-30233a",
+        "tests/evidence/batch_laps/b20261023-dc6d35",
+        "tests/evidence/20261023T120439Z_capture_gate_openefivd1",
+        "tests/evidence/20261023T120627Z_capture_gate_openefivd2",
+        "tests/evidence/20261023T120816Z_capture_gate_openefivd3",
+        "tests/evidence/20261023T121006Z_capture_gate_openefivd4",
+        "tests/evidence/20261023T121155Z_capture_gate_openefivd5",
+        "tests/evidence/20261023T121345Z_capture_gate_openefivd6"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-f2db37",
+      "kind": "verify",
+      "record": "D-OPEN-EFI-DEATH-REPLAY-REFUSED-NOT-HELD-VICTIM-DOMAIN-QUARANTINED-2TCP",
+      "change": {
+        "batch": "b20261023-30233a"
+      },
+      "argument": "Resubmission of P20261023-b45350 for the same open batch, which that review found meets every verify check (data/reviews/P20261023-b45350.md); this replaces P20261023-0230e2, which carried a claim about the module reload that step8.log does not show. P20261023-b45350 was rejected only because applying the verify retires every run this record names at 2/net/mesh/direct, and one of them, 2/net/mesh/direct:gate:d_intents_2tcp_open_efi:2026-10-22T19:14:48Z, failed on its 360 s bound after a 207 s pair rebuild nothing measured ties to this defect. That run is now named by its own record, D-CAPTURE-GATE-PAIR-REBUILD-TOOK-207S-AND-THE-LAP-OVERRAN-ITS-360S-BOUND, citing tests/evidence/20261022T190848Z_capture_gate_openefictl7_20261022b/pair_restore_1.log:40 '=== prep_cluster OK @ 2/net/mesh/direct (207s) \u2014 marker updated ===' and the lap log tests/evidence/batch_laps/b20261022-8375dc/20261022T190848Z.log:4-5, so the timeout stays an open defect of its own and is not settled as verified by this one. The other finding of that review (a lap's bound kills only the harness's direct child, tools/batch_lap.py:259-262) is D-BATCH-LAP-TIMEOUT-KILLS-ONLY-THE-DIRECT-CHILD-SO-THE-HARNESS-WRITES-ON; no lap of this batch hit its bound. The batch: b20261023-30233a, gate:d_intents_2tcp_open_efi at 2/net/mesh/direct on test1 W / test2 V, candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD (tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step8.log 'prep OK ... build 08D63764A9352FBDD5A76CD'), declared before its first lap (tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step9.log first line, '6 clean laps (rate 10/10, lower bound 0.5887 ...)'), sized from control b20261023-dc6d35 on the same attempt and module (inact_relmark=0, tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step5.log; 10 of 10 failed, tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step6.log); 6 of 6 laps PASS with exposure 4-5 (tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step9.log, 'verify b20261023-30233a: 6 PASS, 0 FAIL of 6 planned'). On the knob: tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step7.log restored inact_relmark on test1 only and exited rc=1; what shows it on in the verification laps is P-RELMARK-INACT, which prints only with the knob on, firing on the victim in every lap (that review, Check 3).",
+      "evidence": [
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step5.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step6.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step7.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step8.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/step9.log",
+        "tests/evidence/lanes/g2_openefi_attempt1011_20261023T112754Z/summary.log",
+        "data/reviews/P20261023-b45350.md",
+        "tests/evidence/20261022T190848Z_capture_gate_openefictl7_20261022b/pair_restore_1.log",
+        "tests/evidence/batch_laps/b20261022-8375dc/20261022T190848Z.log",
+        "tests/evidence/batch_laps/b20261023-30233a",
+        "tests/evidence/batch_laps/b20261023-dc6d35",
+        "tests/evidence/20261023T120439Z_capture_gate_openefivd1",
+        "tests/evidence/20261023T120627Z_capture_gate_openefivd2",
+        "tests/evidence/20261023T120816Z_capture_gate_openefivd3",
+        "tests/evidence/20261023T121006Z_capture_gate_openefivd4",
+        "tests/evidence/20261023T121155Z_capture_gate_openefivd5",
+        "tests/evidence/20261023T121345Z_capture_gate_openefivd6"
+      ],
       "state": "pending",
       "created": "2026-10-23"
     }
