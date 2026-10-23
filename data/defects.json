@@ -6214,7 +6214,58 @@
       "summary": "tests/tooling/alloc_witness.sh wrote no mxfs-CCph phase marker, so when the alloc_witness row ran out its budget, run.sh's timeout census (run.sh:2061-2071, each node's last 'mxfs-CCph rank=N PHASE=' kernel-log line) recorded last_phase_census[none=N] and the board kept no phase of the ranks the budget killed",
       "evidence": "Run 20261021T190943Z-g2b (2/net/mesh/direct) and the DRBD board's alloc_witness row of 2026-10-21T22:35:00Z recorded last_phase_census[none=2] on both ranks (evidence of D-ALLOC-WITNESS-RANK-ABORT-RECORDED-AS-BUDGET-EXHAUSTED, which first described this and from which it is split, since that record's control turns off only the abort broadcast); the script then contained no CCph and no PHASE= (grep -c 0 each). FIX in the tree, not controlled or verified: ccph() (tests/tooling/alloc_witness.sh:195-197) writes 'mxfs-CCph rank=$RANK PHASE=<phase>' to /dev/kmsg at fill, start, p1-p4, written and eval (:293, :362, :390, :405, :415, :426, :511, :514). With it, the 2026-10-23 precheck (lane tests/evidence/lanes/g2b_awabort_precheck_20261023T073948Z, AW_ABORT_BROADCAST=0) and all ten laps of control b20261023-5c1522 recorded last_phase_census[fill=1,start=1] (tests/evidence/batch_laps/b20261023-5c1522/*.log). ===== 2026-10-23: no longer names 2/net/mesh/drbd:alloc_witness:2026-10-21T22:35:00Z, named by D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION: the run fails with or without this record's fix: rank 2's fill carved nothing in its partition, which is D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION's failure and stays named there; this record's fix changes only how that FAIL is recorded (data/reviews/P20261023-5e015a.md:7, :150-156, :169-175) ===== 2026-10-23: lap tests/alloc_witness_census_lap.sh and fix diff tests/evidence/controls/D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE.fix.diff (the 11 lines of ccph(), its comment and its calls; the reversed diff leaves no ccph in the script). Precheck both ways (tools/control_precheck.sh) in lane tests/evidence/lanes/g2_awcensus_precheck_20261023T172736Z. ===== 2026-10-23 precheck, lane tests/evidence/lanes/g2_awcensus_precheck_20261023T172736Z: with the fix in PASS (last_phase_census[fill=1,start=1]); with ccph() removed also [fill=1,start=1], PASS, because run.sh's census read the first lap's markers from the same boot's kernel ring (D-RUN-SH-TIMEOUT-CENSUS-READS-AN-EARLIER-ROWS-PHASE-MARKER-FROM-THE-BOOTS-RING). The lap as written does not measure this record's defect. ===== 2026-10-23, second precheck with the lap writing its own PHASE=lapmark line on each node before the row (lane tests/evidence/lanes/g2_awcensus_precheck2_20261023T173646Z, step3.log, 2/disk/caw/direct): fix in, the row ran out its 120 s budget and the census read [fill=1,start=1], LAP aw_census PASS; fix out (tests/evidence/controls/D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE.fix.diff reversed), census [lapmark=2], LAP aw_census FAIL '2 of 2 nodes left no phase of the row'; control_precheck restored tests/tooling/alloc_witness.sh to its hash. The lap now tells the fix apart. ===== 2026-10-23: the fix has a switch now, AW_PHASE_MARKS=0 (tests/tooling/alloc_witness.sh: ccph() writes no marker, as before the fix), which tests/alloc_witness_census_lap.sh passes to the row's ranks from its own environment, and run.sh's census is scoped to the row (D-RUN-SH-TIMEOUT-CENSUS-READS-AN-EARLIER-ROWS-PHASE-MARKER-FROM-THE-BOOTS-RING fixed in the tree), so no earlier row's marker can stand in. Precheck both ways, lane tests/evidence/lanes/g2_census_scope_precheck_20261023T181453Z (g2 test1/test2, 2/disk/caw/direct, module C54C14B681D148267D084FC): step 5 with AW_PHASE_MARKS=0 'LAP aw_census FAIL: 2 of 2 nodes left no phase of the row (census [none=2] ...)' (run 20261023T182059Z-g2); step 6 with the fix 'LAP aw_census PASS: every node's rank left its phase: [fill=1,start=1]' (run 20261023T182327Z-g2).",
       "next": "On the next attempt: control batch of tests/alloc_witness_census_lap.sh with AW_PHASE_MARKS=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 180 s, probe '^EXPOSED: the row ran out its budget', pass '^LAP aw_census PASS', fail '^LAP aw_census FAIL'), the verification batch sized from it, then remove --fixed.",
-      "cells": [],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:aw_census",
+          "iso": "2026-10-23T19:38:19Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:aw_census",
+          "iso": "2026-10-23T19:35:50Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:aw_census",
+          "iso": "2026-10-23T19:33:21Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:aw_census",
+          "iso": "2026-10-23T19:30:52Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:aw_census",
+          "iso": "2026-10-23T19:28:23Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:aw_census",
+          "iso": "2026-10-23T19:25:54Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:aw_census",
+          "iso": "2026-10-23T19:23:25Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:aw_census",
+          "iso": "2026-10-23T19:20:56Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:aw_census",
+          "iso": "2026-10-23T19:18:28Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:aw_census",
+          "iso": "2026-10-23T19:15:59Z"
+        }
+      ],
       "updated": "2026-10-23",
       "reproducer": "tests/alloc_witness_census_lap.sh <label> <configuration> on a formed pair (about 2.5 min): the alloc_witness row through run.sh on a scratch board with AW_ABORT_RANK=2 and AW_ABORT_BROADCAST=0, so rank 1 waits until the row's 120 s budget ends it and run.sh takes its timeout census; PASS when last_phase_census names a phase for every node and none is 'none'. Control: tools/harness_batch.py control --revert tests/evidence/controls/D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE.fix.diff (removes ccph() and its eight calls).",
       "batches": [
@@ -6229,11 +6280,61 @@
           "candidate": "",
           "build": "C54C14B681D148267D084FC",
           "variant": "AW_PHASE_MARKS=0 (tests/tooling/alloc_witness.sh writes no phase marker, as before the fix; the lap passes it to the row's ranks)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: a timed-out alloc_witness row leaves no phase of its ranks for run.sh's census"
+        },
+        {
+          "id": "b20261023-222cd3",
+          "kind": "verify",
+          "row": "lap:aw_census",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: the row ran out its budget",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:aw_census",
+            "config": "2/disk/caw/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-ad4da0",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "AW_PHASE_MARKS=0 (tests/tooling/alloc_witness.sh writes no phase marker, as before the fix; the lap passes it to the row's ranks)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:aw_census",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-ad4da0",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "AW_PHASE_MARKS=0 (tests/tooling/alloc_witness.sh writes no phase marker, as before the fix; the lap passes it to the row's ranks)",
+          "builds": [
+            "C54C14B681D148267D084FC"
+          ],
+          "date": "2026-10-23"
         }
       ]
     },
@@ -6732,151 +6833,6 @@
           "config": "2/net/mesh/direct",
           "row": "lap:release_step_cell",
           "iso": "2026-10-23T18:37:13Z"
-        }
-      ]
-    },
-    {
-      "id": "D-RELEASE-STEP-RUN-LOOKUP-AND-RETIREMENT-ROUTED-TO-THE-RIG-BOARD",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-23",
-      "summary": "tools/defects.py check_cells (propose --target, update --cell) and retire_cells (every removal) took a named run's board from its configuration; with that routing (MXFS_RELEASE_STEP_ROUTE=0) the drbd release step's run 2/net/mesh/drbd:release:drbd:2026-10-22T00:35:43Z, which is in the primary ledger, could not be named ('records no run stamped 2026-10-22T00:35:43Z'), and removing a record that already named it left the gate listing it (control b20261023-356bc4, 10 of 10)",
-      "evidence": "Measured 2026-10-23 on the tree before the fix: the removal left the run listed (D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED's evidence); check_cells' part came from D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD (data/reviews/P20261022-dcd1a8.md, requirement 4). Measured again 2026-10-23 with tests/release_step_cell_lap.py and only MXFS_RELEASE_STEP_ROUTE=0 (criteria.run_board's release-step branch off, the other parts on): FAIL 4 of 12, the drbd key's propose --target (infra, amend) and update --cell refused 'defects: release:drbd at 2/net/mesh/drbd records no run stamped 2026-10-22T00:35:43Z', and its named removal left the run listed ('the gate still lists it after the disposition'), while the other two keys settled (tests/evidence/release_step_switches_20261023T171448Z/lap_MXFS_RELEASE_STEP_ROUTE.log); all on, PASS 12 of 12 (tests/evidence/release_step_switches_20261023T171448Z/lap_on.log). The fix: criteria.run_board gives a release step's run the primary board (behind MXFS_RELEASE_STEP_ROUTE), and check_cells, drop_cells, unsettled and retire_cells all take the board from it; the lap exercises check_cells and retire_cells, not drop_cells or unsettled.",
-      "next": "On the next attempt: control batch of tests/release_step_cell_lap.py with MXFS_RELEASE_STEP_ROUTE=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 40 s, probe '^EXPOSED: the gate lists', pass '^STEP_CELL_LAP PASS'), the verification batch sized from it, then remove --fixed.",
-      "reproducer": "tests/release_step_cell_lap.py (about 20 s, host only, scratch trees); MXFS_RELEASE_STEP_ROUTE=0 is the control",
-      "batches": [
-        {
-          "id": "b20261023-356bc4",
-          "kind": "control",
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: the gate lists",
-          "candidate": "",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "MXFS_RELEASE_STEP_ROUTE=0 (tools/defects.py looks a named run up and retires it on its configuration's board, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix's routing taken out: the drbd release step's run is looked up and retired on the DRBD board, where it is not"
-        },
-        {
-          "id": "b20261023-08d2f4",
-          "kind": "verify",
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: the gate lists",
-          "candidate": "0.90.134",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:release_step_cell",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-356bc4",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_RELEASE_STEP_ROUTE=0 (tools/defects.py looks a named run up and retires it on its configuration's board, as before the fix)",
-            "builds": [
-              "C54C14B681D148267D084FC"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "updated": "2026-10-23",
-      "rates": [
-        {
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-356bc4",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_RELEASE_STEP_ROUTE=0 (tools/defects.py looks a named run up and retires it on its configuration's board, as before the fix)",
-          "builds": [
-            "C54C14B681D148267D084FC"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:50:13Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:49:55Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:49:37Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:49:19Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:49:01Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:48:43Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:48:25Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:48:07Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:47:49Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:47:31Z"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T18:32:24Z",
-          "build": "C54C14B681D148267D084FC",
-          "batch": "b20261023-08d2f4",
-          "approval": "P20261023-171e79",
-          "date": "2026-10-23"
         }
       ]
     },
