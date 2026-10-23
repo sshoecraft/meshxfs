@@ -4041,7 +4041,7 @@
       "summary": "run.sh pull_row_artifacts, which copies a failed row's node files into tests/evidence/run_<row>_<run id>/, took every /root/drc_* capture and /root/fsx.*.log by name whatever its age (run.sh:2268, kept as the MXFS_PULL_SINCE_ROW=0 branch), so a run's evidence carried files an earlier row or boot left on the node: run_dirent_durability_20261019T191246Z-g8 holds three dmesg_at_fail.txt copies from boots of 2026-07-26 and 2026-08-20, test11's with an old-build 'Corruption of in-memory data ... xfs_trans_cancel' shutdown (data/reviews/P20261022-a9b14b.md:350-351), and an alloc_witness row made to fail copied the /root/drc_blkdump_planted_<label> capture and /root/fsx.planted_<label>.log, dated 2026-07-26, from both nodes into its evidence (control b20261023-32a609, 10 of 10, 2/disk/caw/direct)",
       "evidence": "Found by the release-reviewer's review of proposal P20261022-a9b14b (data/reviews/P20261022-a9b14b.md): the three dmesg_at_fail.txt copies under tests/evidence/run_dirent_durability_20261019T191246Z-g8/*_drc_blkdump_dsc_node*/ date from earlier boots (2026-07-26, 2026-08-20); that run's own self-fence lines are in the kernlog_test*.gz files of the same directory. A reader of the directory (a person, a reviewer, a sweep) takes an August corruption line for an October one. ===== 2026-10-23, cause read: the only writer of dmesg_at_fail.txt in the tree is tests/suite/dlm_scaling.sh:101, under /root/drc_*; run.sh's artifact pull took every /root/drc_* and /root/fsx.*.log by name, whatever its age. Fix (run.sh): mark_row_start touches /root/.mxfs_row_mark on each node before the row's t0, and pull_row_artifacts takes only files under /root/drc_* and fsx.*.log newer than that mark (the node's own clock against itself); MXFS_PULL_SINCE_ROW=0 pulls by name as before (the control). Precheck running in lane tests/evidence/lanes/g2_relall_prechecks_20261023T080727Z. ===== 2026-10-23, control b20261023-191fef (MXFS_PULL_SINCE_ROW=0, lap:row_pull at 2/disk/caw/direct on test15/test16, attempt frozen 10:11:20Z) closed 0 of 10: every lap 'LAP row_pull PASS: no capture older than the row is in tests/evidence/run_alloc_witness_<run>-g2b' with its exposure line (tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step4.log). The knob's pull is run.sh:2247 'f=$(ls -d drc_* fsx.*.log 2>/dev/null)' followed by '&& [ -n \"$f\" ] && tar ...' (run.sh:2252): ls exits 2 when /root holds no fsx.*.log, so the assignment fails and nothing at all is pulled. test15 and test16 held no fsx log. In the precheck that failed (tests/evidence/lanes/g2_relall_prechecks_20261023T080727Z step19.log) only test1's planted capture was copied ('tests/evidence/run_alloc_witness_20261023T081919Z-g2/test1_drc_blkdump_planted_rowpull0a'): test1 held the fsx logs steps 16-17 left, test2 none. The lap's EXPOSED line (every node held the planted capture and the pull ran) does not show that the fix-out pull would copy anything, so the control measured nothing. ===== 2026-10-23 (after attempt 11): tests/row_pull_since_start_lap.sh already plants both a stale capture and a stale fsx log (/root/fsx.planted_<label>.log, dated 2026-07-26) on every node, so the pull by name lists both globs and copies on every node with the fix out. Precheck at 2/net/mesh/direct on g2, the fix in then MXFS_PULL_SINCE_ROW=0 in the lap's own environment: lane tests/evidence/lanes/g2_rowpull_precheck_20261023T172408Z (steps 6 and 7). ===== 2026-10-23 precheck, lane tests/evidence/lanes/g2_rowpull_precheck_20261023T172408Z (g2 test1/test2 at 2/net/mesh/direct, build 08D63764A9352FBDD5A76CD): step 4 with the fix in, EXPOSED on both nodes and 'LAP row_pull PASS: no capture or fsx log older than the row is in tests/evidence/run_alloc_witness_20261023T172625Z-g2'; step 5 with MXFS_PULL_SINCE_ROW=0 in the lap's own environment, EXPOSED and 'LAP row_pull FAIL: files an earlier row or boot left were copied into the run's evidence', the planted capture and fsx log of each node in tests/evidence/run_alloc_witness_20261023T172654Z-g2.",
       "next": "On the next attempt: control batch with MXFS_PULL_SINCE_ROW=0 in the lap's own environment (tools/harness_batch.py control --knob, lap:row_pull at 2/disk/caw/direct, 10 laps, bound 200 s, probe '^EXPOSED: every node held', pass '^LAP row_pull PASS', fail '^LAP row_pull FAIL'), the verification batch sized from it, remove --fixed. ===== 2026-10-23: the removal is held for one measurement the verify review asks for (data/reviews/P20261023-f47dcb.md:88): tests/row_pull_since_start_lap.sh plants only stale files (:11-17), so no lap shows a capture written after the row's mark still being pulled. On the next attempt the lap also writes a fresh capture after the mark and requires it pulled while the stale ones are not; then a control with MXFS_PULL_SINCE_ROW=0, a verification sized from it, and remove --fixed.",
-      "reproducer": "tests/row_pull_since_start_lap.sh <label> <configuration> on a formed pair (about 1 min): plants /root/drc_blkdump_planted_<label>/dmesg_at_fail.txt dated 2026-07-26 on each node, runs alloc_witness made to fail at once (AW_ABORT_RANK=2) on a scratch board, and checks the run's evidence; 'EXPOSED: every node held /root/<planted> from 2026-07-26 and the row's pull ran'; PASS when no planted capture was copied, FAIL when one was. Control: MXFS_PULL_SINCE_ROW=0.",
+      "reproducer": "tests/row_pull_since_start_lap.sh <label> <configuration> on a formed pair (about 30 s): plants /root/drc_blkdump_planted_<label>/dmesg_at_fail.txt and /root/fsx.planted_<label>.log dated 2026-07-26 on each node, then, once the node's row mark /root/.mxfs_row_mark is newer than the plant, writes /root/drc_blkdump_fresh_<label>/dmesg_at_fail.txt and /root/fsx.fresh_<label>.log and logs 'mxfs-rowpull-fresh <label>'; runs alloc_witness made to fail at once (AW_ABORT_RANK=2) on a scratch board and checks the run's evidence; 'EXPOSED: every node held' the planted files and the pull ran; PASS when no planted file was copied and every fresh one was, FAIL otherwise. Control: MXFS_PULL_SINCE_ROW=0.",
       "updated": "2026-10-23",
       "batches": [
         {
@@ -4139,7 +4139,7 @@
           "candidate": "0.90.134",
           "build": "79779BEAECBEA94844FDC72",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -4316,10 +4316,10 @@
           "config": "2/disk/caw/direct",
           "platform": "any",
           "candidate": "0.90.134",
-          "attempt": "2026-10-23T18:32:24Z",
-          "build": "C54C14B681D148267D084FC",
-          "batch": "b20261023-5a85e4",
-          "approval": "P20261023-f47dcb",
+          "attempt": "2026-10-23T20:41:09Z",
+          "build": "79779BEAECBEA94844FDC72",
+          "batch": "b20261023-020a6a",
+          "approval": "P20261023-b2585c",
           "date": "2026-10-23"
         }
       ]
@@ -5003,7 +5003,7 @@
           "candidate": "0.90.134",
           "build": "79779BEAECBEA94844FDC72",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -5093,6 +5093,18 @@
           "config": "2/disk/caw/direct",
           "row": "lap:peer_window",
           "iso": "2026-10-23T20:45:20Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T20:41:09Z",
+          "build": "79779BEAECBEA94844FDC72",
+          "batch": "b20261023-3ad6d0",
+          "approval": "P20261023-25f136",
+          "date": "2026-10-23"
         }
       ]
     },
@@ -5937,6 +5949,109 @@
       "evidence": "Found by the review of P20261023-22efac (data/reviews/P20261023-22efac.md): batch b20261023-dc75f9 (lap:late_fill at 2/disk/caw/mpath) ran on a pair prepped with MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 (lane tests/evidence/lanes/g2b_a14_latefill_20261023T204131Z/summary.log:10), every lap read dead_timeout_ms=12000 from sysfs, and its six ledger rows (data/criteria.runs.jsonl:11104-11119) carry no variant, while the record's own failing board run with the same argument did (criteria.runs.jsonl:10137). The review caught it by reading the lane; nothing in the ledger or the tool would have.",
       "next": "Make tools/batch_lap.py record a variant for a lap whose pair runs non-default module arguments the way run.sh does (MXFS_EXTRA_MODARGS in the lap's environment, and the marker's recorded modargs for the group), so defects.py refuses to count it; switch for the control; a host lap that runs batch_lap.py on a scratch queue with MXFS_EXTRA_MODARGS set and reads back the recorded run's variant (switch off: none).",
       "reproducer": "tools/batch_lap.py on a scratch queue and board (as tests/batch_lap_stall_lap.py does) with MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 in the environment: the recorded run carries no variant"
+    },
+    {
+      "id": "D-FOURKN-MERGE-LAP-OVERRUN-LEAVES-ITS-WORKER-HOLDING-THE-MOUNT",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "tests/fourkn_merge_2node.sh bounds each node's workload only on the ssh client (on ... \"$WBOUND\", :177-178), so a workload that overruns its bound leaves tests/fourkn_merge_worker.sh running on the node with /mnt/fourkn open: the lap's unmount fails 'target is busy', and every following lap aborts at its own unmount-and-rmmod before insmod (rc=2, INCOMPLETE) until the leftover worker finishes",
+      "evidence": "Control batch b20261023-777805 (lane tests/evidence/lanes/g2d_a14_merge2node_20261023T204131Z, step4.log, 2/disk/caw/direct4k, test31/test32, build 79779BEAECBEA94844FDC72): lap 29 (tests/evidence/20261023T211446Z_fourkn_merge_2-disk-caw-direct4k) overran at 130 s after its workload started 21:16:45Z; laps 30-45 then each ended in 8-9 s with lap.log 'ABORT insmod test31: [umount: /mnt/fourkn: target is busy. rmmod: ERROR: Module mxfs is in use ...' (e.g. 20261023T211656Z_..., 20261023T212144Z_...). test31's kernel log (tests/evidence/merge_stall_20261023T2114Z_g2d/test31.kmsg.txt) shows the lap-29 mount's merged-write traffic continuing at 3-6k lines per 30 s from 21:16:30 to 21:19:30Z and the unmount seal only at 21:19:32.970 (P-SB-SEAL-OK), so the worker kept the mount for 2.75 min after the client gave up. Lap 46 (20261023T211924Z_...) repeated it: 'workload wall 19019 ms; test31: rc=1 ; test32: rc=1', w1.txt/w2.txt empty, 'FAIL umount test31: umount: /mnt/fourkn: target is busy.|umount_rc=32|', then laps 47-48 aborted the same way. The overruns themselves came from host-disk saturation (sar sda 100 %util, 450-527 MB/s reads, 16:15-16:22 CDT; the lap's mean CAW service time 0.5 ms healthy, 15.0 ms in that window), recorded separately; this record is the lap leaving its worker behind.",
+      "next": "Fix built in the sibling tree /home/steve/src/mxfs-a15 for the next attempt: the worker runs on the node under 'timeout --foreground $((WBOUND - 3))', so it stops itself after the step in hand (WORKER_STOPPED, its SIGTERM trap) before the client's bound runs out. Then a precheck that forces an overrun (e.g. ROUNDS large enough to pass WBOUND) and requires the next lap to start clean, a control with the node bound off, a verification sized from it, and remove --fixed.",
+      "reproducer": "tests/fourkn_merge_2node.sh <4096-byte pool LUN> test31 test32 with ROUNDS raised so the workload passes its bound (WBOUND 16 s unheld): the lap FAILs its workload checks, its unmount reports 'target is busy', and an immediately following lap ABORTs at insmod",
+      "cells": [
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:17:05Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:17:14Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:17:24Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:17:33Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:17:43Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:17:52Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:01Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:10Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:19Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:28Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:38Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:47Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:56Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:19:05Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:19:14Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:19:24Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:21:44Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:21:53Z"
+        }
+      ]
     }
   ]
 }
