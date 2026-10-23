@@ -1729,17 +1729,28 @@
         },
         "4/net/mesh/mpath": {
           "status": "PASS",
-          "measured": "elapsed=41s (fresh prep)",
+          "measured": "skipped (marker matched 4/net/mesh/mpath)",
           "reason": "",
-          "iso": "2026-10-23T19:52:57Z",
+          "iso": "2026-10-23T19:53:07Z",
           "recorded": "2026-10-23",
-          "elapsed_s": 41,
+          "elapsed_s": 0,
           "build": "C54C14B681D148267D084FC",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261023T195206Z-g4",
+          "run_id": "20261023T195257Z-g4",
           "candidate": "0.90.134",
+          "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T19:52:57Z",
+              "measured": "elapsed=41s (fresh prep)",
+              "reason": "",
+              "build": "C54C14B681D148267D084FC",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261023T195206Z-g4"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T19:48:53Z",
@@ -1830,16 +1841,6 @@
               "outcome": "PASS",
               "run_id": "20261023T171526Z-g4",
               "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-23T17:15:25Z",
-              "measured": "elapsed=40s (fresh prep)",
-              "reason": "",
-              "build": "08D63764A9352FBDD5A76CD",
-              "outcome": "PASS",
-              "run_id": "20261023T171436Z-g4",
-              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_MPATH_TMO=2"
             }
           ]
         },
@@ -41830,20 +41831,27 @@
           ]
         },
         "4/net/mesh/mpath": {
-          "status": "FAIL",
-          "measured": "victim=test6 fenced_s=35 resumed_s=6 reinstate_s=20 other_stall_ms=39673 acked=7852 elapsed=184s fails=0 max_stall_ms=40898",
-          "reason": "operation stall 40898 ms is over the 30 s limit (data/release_policy.json stall_limit_s): a stability defect;  (evidence tests/evidence/board_20261023T194844Z-g4_path_all_lost)",
-          "iso": "2026-10-23T19:52:06Z",
+          "status": "PENDING",
+          "measured": "",
+          "reason": "executing 20261023T195257Z-g4",
+          "iso": "2026-10-23T19:53:12Z",
           "recorded": "2026-10-23",
-          "elapsed_s": 187,
           "build": "C54C14B681D148267D084FC",
-          "outcome": "FAIL",
-          "raw_status": "PASS",
-          "budget_s": 380,
-          "run_id": "20261023T194844Z-g4",
           "candidate": "0.90.134",
           "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
+          "run_id": "20261023T195257Z-g4",
           "history": [
+            {
+              "status": "FAIL",
+              "iso": "2026-10-23T19:52:06Z",
+              "measured": "victim=test6 fenced_s=35 resumed_s=6 reinstate_s=20 other_stall_ms=39673 acked=7852 elapsed=184s fails=0 max_stall_ms=40898",
+              "reason": "operation stall 40898 ms is over the 30 s limit (data/release_policy.json stall_limit_s): a stability defect;  (evidence tests/evidence/board_20261023T194844Z-g4_path_all_lost)",
+              "build": "C54C14B681D148267D084FC",
+              "outcome": "FAIL",
+              "candidate": "0.90.134",
+              "run_id": "20261023T194844Z-g4",
+              "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T17:09:26Z",
@@ -41932,12 +41940,6 @@
                 "date": "2026-10-21",
                 "why": "On build B0D2E3F5A70C96237681DF2 every net/mesh board at 4, 8 and 16 nodes failed alloc_witness with every node BUDGET_EXHAUSTED (7 of 7 boards: 16/direct twice, 8/direct, 8/mpath twice, 4/direct, 4/mpath; P-TAUTH-PAGE-FULL with P-CAP-PARK and capacity=60 give-ups in their kernel logs); 0.90.130 and the earlier 0.90.131 build 8DAEC6B8 passed the same rows"
               }
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-16T06:16:53Z",
-              "measured": "victim=test6 fenced_s=35 resumed_s=8 reinstate_s=18 other_stall_ms=42683 acked=3341 elapsed=180s fails=0",
-              "reason": " (evidence tests/evidence/board_20261016T061334Z-g4_path_all_lost)"
             }
           ]
         },

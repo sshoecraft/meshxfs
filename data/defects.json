@@ -6494,7 +6494,7 @@
           "candidate": "0.90.134",
           "build": "C54C14B681D148267D084FC",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -6531,6 +6531,18 @@
           "builds": [
             "C54C14B681D148267D084FC"
           ],
+          "date": "2026-10-23"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-0ed2d5",
+          "approval": "P20261023-fe83ad",
           "date": "2026-10-23"
         }
       ]
@@ -6891,7 +6903,7 @@
           "candidate": "0.90.134",
           "build": "C54C14B681D148267D084FC",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -6955,6 +6967,16 @@
           "build": "C54C14B681D148267D084FC",
           "batch": "b20261023-024fe9",
           "approval": "P20261023-7d22e1",
+          "date": "2026-10-23"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-0e9203",
+          "approval": "P20261023-83a494",
           "date": "2026-10-23"
         }
       ]

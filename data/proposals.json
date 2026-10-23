@@ -4568,8 +4568,15 @@
         "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
         "data/candidates/0.90.134.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-83a494.md",
+        "sha256": "73671d953473c7adcddfbc89ac148ae2b05423a4e2d71381e514f15e80f8d8f5",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-fe83ad",
@@ -4592,8 +4599,15 @@
         "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
         "data/candidates/0.90.134.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-fe83ad.md",
+        "sha256": "7effb7ac808059caa9751a83da33e34974a08f730058ebba3048bd482b5eb7df",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }
