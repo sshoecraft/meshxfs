@@ -3702,7 +3702,7 @@
       "opened": "2026-10-21",
       "summary": "tests/live_holder_wait.sh aborts before measuring when none of its eight candidate inodes is remote-mastered from test2; master locality is a hash re-decided at every cluster formation, so whether the lap can run depends on the formation it lands on, and the capture gate read it BROKEN",
       "evidence": "capture gate, 0.90.134 dry run attempt 20261021T230333Z: GATE live_holder_wait fault: rc=2 fault_line=0 -> BROKEN, ABORT: none of the eight candidates is remote-mastered from test2 - this lap cannot measure the path it names. The same entry was OK in attempt 20261021T212712Z the same evening. ===== ===== 2026-10-22, cause: routing hash v2 clears an inode number's low three bits before hashing (include/mxfs/mxfs_tauth.h:505-507, MXFS_TAUTH_INO_SHARD 8), so mastership is per eight-inode shard and the lap's eight consecutive candidates (8389321-8389328 on attempt 20261021T230333Z, all local) were two draws. Fix in the tree: H creates objects until 16 distinct shards are represented (cap 160; spares kept until all exist, then removed), one candidate per shard, so on two nodes none remote is 2^-16 per lap; candidates removed at the end and on the no-match abort; setup bound 13 s from 0.9-1.2 s measured for 160 creates + removal + sync in each mode. Dry run attempt 20261022T031549Z gate: candidates in shards 1048640..1048643 (inodes 8389121, 8389128, 8389136, 8389144): three local, the fourth remote, target chosen remote at +35s, STAGE FAULT, ABORT, fault lap OK. The old eight (8389121-8389128) span only shards 1048640 and 1048641, both local on this formation: it would have aborted again. ===== ===== 2026-10-22 healthy lap through tests/capture_fault_gate.sh 0.90.134-harnessfix --healthy-only (tests/evidence/20261022T040204Z_capture_gate_0.90.134-harnessfix): GATE live_holder_wait healthy: rc=0 wall=268s fails=0 -> OK (bound 400 s). ===== 2026-10-23: tests/live_holder_wait.sh gained LH_SHARD_SELECT=0 (the control: eight candidates back to back, all kept) and LH_SETUP_ONLY=1 (stop after the candidates); the lap is tests/live_holder_shard_lap.sh. Precheck on g2b (test15/test16, 2/net/mesh/mpath, build B155E10D900872E6CE36289, lane tests/evidence/lanes/g2b_lhshard_precheck_20261023T072946Z): fix in, 16 candidates in 16 distinct shards twice (PASS); LH_SHARD_SELECT=0, 8 candidates in 2 and in 1 distinct shards (FAIL), e.g. inodes 8392896-8392903, one shard.",
-      "next": "Control batch of tests/live_holder_shard_lap.sh with LH_SHARD_SELECT=0 (tools/harness_batch.py control --knob, 10 laps, bound 50 s, probe '^EXPOSED: candidates='), then the verification batch on the frozen candidate sized from it, then remove --fixed. The removal may retire 1/any:release:presteps:2026-10-21T23:22:19Z only with that run's own log line showing this abort (GATE live_holder_wait fault: ... ABORT: none of the eight candidates is remote-mastered).",
+      "next": "Control batch of tests/live_holder_shard_lap.sh with LH_SHARD_SELECT=0 (tools/harness_batch.py control --knob, 10 laps, bound 50 s, probe '^EXPOSED: candidates='), then the verification batch on the frozen candidate sized from it, then remove --fixed. The removal may retire 1/any:release:presteps:2026-10-21T23:22:19Z only with that run's own log line showing this abort (GATE live_holder_wait fault: ... ABORT: none of the eight candidates is remote-mastered). ===== Removal P20261023-b3dddc was rejected (data/reviews/P20261023-b3dddc.md): (1) the shard-to-master cause was read from the routing code, not measured; the failing run (live_holder_wait_fault.log:5-12, all eight candidates mastered by W across two shards) fits a formation where W masters everything as well; (2) the cause text has the node backwards: the harness aborts when the draws land on W (tests/live_holder_wait.sh:402-403, 'master=local (P7S-BAST-FIRE test1=0 test2=1)' with W=test2), not on H; (3) neither batch could discriminate: all 16 laps ran LH_SETUP_ONLY=1, which exits at :371-374 before the master probe at :381, and the lap's shard arithmetic int($3/8) and the fix's ino>>3 are both hard-coded, so the control reproduced the lap's own arithmetic, not the abort; (4) only two nodes are covered while the record reaches every configuration (on N nodes the fixed harness still aborts with probability (1-1/N)^16 by the proposal's own model: 0.118 at 8, 0.60 at 32). Approvable: a measured link from shard to master (several inodes in each of two or more adjacent shards on formations where their masters differ, or chk_mxfs -v plus tests/tauth/pageof.c predicting each probed master), the cause naming W, a verification resting on that measurement through the master probe (not setup-only), and evidence beyond two nodes.",
       "cells": [
         {
           "config": "1/any",
@@ -4231,6 +4231,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5550473077848115
+        },
+        {
+          "id": "b20261023-dc6d35",
+          "kind": "control",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "P-RELMARK-OWED site=inact-exrel",
+          "candidate": "",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "inact_relmark=0 on the candidate's module 08D63764A9352FBDD5A76CD (sysfs on the formed pair, MXFS_EXTRA_MODARGS on every re-formed one): the same build releasing an inactivation's tenure unmarked, as before the fix",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the clean-release marker at the inactivation's release switched off on the candidate's own module: the survivor must refuse the replay not-held again"
         }
       ],
       "rates": [
@@ -4478,9 +4495,26 @@
           },
           "transfer": "",
           "lower_bound": 0.45571294310031313
+        },
+        {
+          "id": "b20261023-fe3eb3",
+          "kind": "control",
+          "row": "fourkn_merge",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 20,
+          "probe": "FOURKN-MERGE-[^ ]+ counted ",
+          "candidate": "",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=0 FORCE_MS=0 (MXFS_TEST_ENV): the row's held window back, each node's first 8 merged blocks held a fixed 20 ms between read and swap, and its forced overlap left out (both unmounts plain), as the record found it",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the held window without the forced overlap: laps with no MISCOMPARE retried (VACUOUS) must come back"
         }
       ],
-      "updated": "2026-10-22",
+      "updated": "2026-10-23",
       "rates": [
         {
           "row": "fourkn_merge",
@@ -6277,7 +6311,7 @@
       "opened": "2026-10-23",
       "summary": "tests/tauth/Makefile builds tauth_store.o, tauth_ledger.o and dlm_shared.o with prerequisites that omit headers those sources include (pal/pal.h, dlm/dlm.h; dlm_shared.o lists only dlm/dlm_shared.c), so after a change to one of those headers make links the old objects into the tauth harness binaries, and a lap run through them (tests/tauth/adopted_grant_handoff_test.sh builds them with a plain make of those objects) measures code that is not the tree under test",
       "evidence": "tests/tauth/Makefile:131-132 '$(OBJDIR)/dlm_shared.o: $(TOP)/dlm/dlm_shared.c | $(OBJDIR)'; :146-147 tauth_store.o prerequisites tauth_store.c tauth_store.h mxfs_tauth.h; :149-150 tauth_ledger.o prerequisites tauth_ledger.c tauth_ledger.h tauth_store.h mxfs_tauth.h; tests/tauth/adopted_grant_handoff_test.sh:27 'make obj/dlm.o obj/dlm_shared.o obj/tauth_ledger.o obj/tauth_store.o obj/pal_user.o'. Found by the review of P20261023-867053 (data/reviews/P20261023-867053.md): the three objects linked into that verification's binary were built before the last write of pal/pal.h and dlm/dlm.h, which they include. ===== 2026-10-23, FIX in the tree (not yet controlled or verified): tests/tauth/shared_objs.sh tauth_shared_objs <top> <outdir> compiles dlm.o, dlm_shared.o, tauth_ledger.o, tauth_store.o and pal_user.o from clean into the caller's scratch directory with the Makefile's flags; adopted_grant_handoff_test.sh, fenced_node_ledger_test.sh and capacity_park_test.sh link those (capacity_park_test.sh also linked its binary into the tree, a frozen file; it now links into its scratch directory); env_knob_ab.sh and formation_unspent_ab.sh build their binary with make -B (every object recompiled) and refuse while a candidate freezes it. The Makefile is unchanged. Precheck on the host: fix in PASS (all 5 objects carry the mark, 19 s); TAUTH_SHARED_FROM_CLEAN=0 FAIL (dlm.o dlm_shared.o tauth_ledger.o tauth_store.o pal_user.o all stale, 10 s). The three scripts pass on the fix (adopted_grant_handoff 25 s, fenced_node_ledger 19 s, capacity_park 20 s) and tests/tauth_freeze_lap.py PASS: none of the 2550 frozen files changed.",
-      "next": "Control batch of tests/tauth_shared_objs_lap.sh with TAUTH_SHARED_FROM_CLEAN=0 (tools/harness_batch.py control --knob, 10 laps, bound 60 s, probe '^EXPOSED: header-changed'), then the verification batch on the frozen candidate sized from it, then remove --fixed.",
+      "next": "Control batch of tests/tauth_shared_objs_lap.sh with TAUTH_SHARED_FROM_CLEAN=0 (tools/harness_batch.py control --knob, 10 laps, bound 60 s, probe '^EXPOSED: header-changed'), then the verification batch on the frozen candidate sized from it, then remove --fixed. ===== Removal P20261023-c062a3 was rejected (data/reviews/P20261023-c062a3.md): the defect is tests/tauth/Makefile's object rules, which do not list the headers each object includes, and the fix left them unchanged (tests/tauth/shared_objs.sh compiles around them into an empty directory, so its PASS is true by construction); a plain 'make -C tests/tauth test', the Makefile's own usage line and the gate .claude/awareness/subsystems/dlm.md:1571 names, still links stale objects. What would be approved: the Makefile's rules made to rebuild each object when any header it includes changes, a control with that change taken out and a verification sized from it, both building through a plain make (build, mark pal/pal.h and dlm/dlm.h, plain make again, require the mark in every object and in a linked binary), and the make -B sites in env_knob_ab.sh:27 and formation_unspent_ab.sh:37 measured or dropped from the claim. That fix edits a Makefile, which a session may do only when the owner directs it in that turn: the owner's direction to change tests/tauth/Makefile is what unblocks this record. Also found by the review: the Makefile's default target is obj/unowned_page_test.o, so 'make -C tests/tauth && ./tauth_test' never rebuilds tauth_test; clean misses seal_barrier_test and capacity_park_test.",
       "reproducer": "tests/tauth_shared_objs_lap.sh (host only, about 20 s): copies dlm/, include/, pal/ and tests/tauth/'s Makefile and sources to a scratch directory, builds the five shared objects there with the tree's tests/tauth/shared_objs.sh, appends a definition carrying a lap-unique mark to the copy's pal/pal.h (included by all five sources, listed by none of the Makefile's rules), builds again and requires the mark in every object. EXPOSED: on every lap. TAUTH_SHARED_FROM_CLEAN=0 is the helper's same-build control (make in the copy's tests/tauth).",
       "updated": "2026-10-23",
       "batches": [

@@ -2671,8 +2671,14 @@
         "data/reviews/P20261023-cf21fb.md",
         "data/reviews/P20261023-867053.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-c062a3.md",
+        "sha256": "ac76d2d76fd745e36a7ef13987994a5200616eda5448df555a37efa68e54853e",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-5e015a",
@@ -2731,6 +2737,33 @@
         "tests/evidence/candidates/0.90.134_20261021T230333Z.presteps.log",
         "tests/evidence/20261021T230509Z_capture_gate_0.90.134_20261021T230333Z/live_holder_wait_fault.log",
         "data/criteria.runs.jsonl"
+      ],
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-b3dddc.md",
+        "sha256": "4312b3c869ba770ec7e38eb528a30fcba1c81bd9f9b4b3fbd563e3a5e604f122",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
+    },
+    {
+      "id": "P20261023-8226ea",
+      "kind": "verify",
+      "record": "D-LAST-MEMBER-UMOUNT-AFTER-A-15K-PAGE-HANDBACK-TAKES-31S-OVER-THE-STALL-LIMIT",
+      "change": {
+        "batch": "b20261023-dff6ea"
+      },
+      "argument": "Verification batch b20261023-dff6ea (lap:lmu at 2/net/mesh/direct on the g2 pair test1/test2, candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD: tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step2.log '--- prep OK: mxfs mounted on all 2 node(s), build 08D63764A9352FBDD5A76CD ---') was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step14.log first line: 'declared verification batch b20261023-dff6ea ... 6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)'). It is sized from the control closed just before it on the same attempt, build and pair, b20261023-9a3afc (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step13.log): dl_relall_threads=1 through MXFS_EXTRA_MODARGS on each lap's own prep, the last member's release-all on one thread as before the fix; 10 of 10 exposed laps FAIL, A's last-member unmount 37573-61378 ms against the 30000 ms limit ('LAP lmu FAIL: A's last-member unmount rc=0 took 40825 ms, limit 30000 (threads=1)'). With k=n=10, L = 0.005^(1/10) = 0.5887 and N = ceil(ln 0.005 / ln(1 - 0.5887)) = 6. Each of the 6 laps (tests/last_member_umount_lap.sh lmuv<n> 2/net/mesh/direct, NFILES=32000 as the control) is PASS with the probe '^EXPOSED: A's last-member unmount released' matched (exposure=1 on every lap line of step14.log), A's unmount 10256-12906 ms of 30000 with threads=8, the module default. No lap failed, none INCOMPLETE, none dropped: step14.log ends 'verify b20261023-dff6ea: 6 PASS, 0 FAIL of 6 planned'. The lap grades the stall itself: it fails any unmount over 30000 ms (tests/last_member_umount_lap.sh), so a slow PASS cannot hide behind the ledger's missing max_stall_ms.",
+      "evidence": [
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step2.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step13.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step14.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-dff6ea",
+        "tests/evidence/batch_laps/b20261023-9a3afc",
+        "tests/last_member_umount_lap.sh",
+        "tests/last_member_umount_trace.sh"
       ],
       "state": "pending",
       "created": "2026-10-23"
