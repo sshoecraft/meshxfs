@@ -55,7 +55,9 @@ def main() -> int:
     outcome, reason = batch_lap.verdict(run.returncode, text, r"^RESULT: PASS", r"^RESULT: FAIL", 10)
     outcome, reason, measured = batch_lap.stall_graded(
         outcome, reason, f"rc={run.returncode} elapsed_s=0", [text], [r"\bop_ms=(\d+)"])
-    print(f"graded {outcome}: {measured} -- {reason}")
+    # printed with the stall token renamed: this lap's own output is read by the tools/batch_lap.py
+    # that runs it, and a max_stall_ms= in it would grade the lap itself as the stall
+    print(f"graded {outcome}: {measured.replace('max_stall_ms=', 'worst_ms=')} -- {reason}")
     if outcome == "FAIL" and f"max_stall_ms={over_ms + 500}" in measured:
         print("PASS: the stall over the limit made the passing lap a FAIL")
         return 0

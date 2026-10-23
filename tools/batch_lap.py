@@ -218,7 +218,9 @@ def run_bounded(command: list, cwd, handle, bound: int) -> int:
         except ProcessLookupError:
             break
         deadline = time.monotonic() + KILL_GRACE_S
-        while time.monotonic() < deadline and group_alive(pgid):
+        # the leader is this process's own child: until it is reaped it stays in the group as a
+        # zombie, and the group reads alive through both grace periods
+        while time.monotonic() < deadline and (proc.poll() is None or group_alive(pgid)):
             time.sleep(0.1)
         if not group_alive(pgid):
             break

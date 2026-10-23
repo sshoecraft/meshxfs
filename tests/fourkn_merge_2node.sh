@@ -22,28 +22,45 @@
 #   - chk_mxfs finds nothing, with both unmounted;
 #   - no merged write failed or was refused (iwr_merge_failed 0 on both) and
 #     no node logged a corruption, a shutdown, a BUG or an Oops;
-#   - the merged write ran (iwr_merge_blocks > 0 on both).
-# A lap in which no swap miscompared (iwr_merge_miscompares 0 on both) did not
-# exercise the retry, and exits VACUOUS rather than PASS.
+#   - the merged write ran (iwr_merge_blocks > 0 on both);
+#   - the forced overlap below landed: node 1's held write of the block began,
+#     node 2's swap of it landed inside the hold, and node 1's swap after it
+#     miscompared and was retried.
+# A lap in which no swap miscompared (iwr_merge_miscompares 0 on both), or
+# whose forced overlap did not land, did not exercise the retry, and exits
+# VACUOUS rather than PASS.
 #
 # THE WINDOW.  Unwidened, the two nodes' writes of a block never overlapped:
 # 0 MISCOMPAREs in ~480 merged writes a lap, on the TCP lock network and on
 # COMPARE AND WRITE alike (tests/evidence/20261022T133714Z_fourkn_merge_2-net-mesh-direct,
 # 20261022T134001Z_fourkn_merge_2-net-mesh-direct,
-# 20261022T134249Z_fourkn_merge_2-disk-caw-direct).  So each node holds the
-# first HOLD_N blocks it merges HOLD_MS between the block's read and its swap
-# (dbg_iwr_merge_hold_n, dbg_iwr_merge_hold_ms), long enough for the peer's
-# write of the same block to land in between.  The MISCOMPARE that follows is
-# a real peer's write, and the retry must keep it.  HOLD_N=0 runs unwidened.
-#
-# A fixed hold catches the peer only when the peer happens to write the block
-# inside it: of four laps held 20 ms, one saw no MISCOMPARE and was VACUOUS
-# (D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS).  HOLD_PEER_MS
-# (dbg_iwr_merge_hold_peer_ms) makes each held block wait instead until the
-# block on the device no longer matches the image it read, which is the peer's
-# swap of it landing, or HOLD_PEER_MS at most: the swap that follows is then a
-# MISCOMPARE whenever the peer wrote the block at all.  iwr_merge_hold_landed
-# counts the holds a peer's swap ended.  HOLD_PEER_MS=0 keeps the fixed hold.
+# 20261022T134249Z_fourkn_merge_2-disk-caw-direct).  Holding each node's first
+# HOLD_N merged blocks HOLD_MS between the block's read and its swap
+# (dbg_iwr_merge_hold_n, dbg_iwr_merge_hold_ms) catches the peer only when the
+# peer happens to write the block inside the hold: of four laps held 64 x 20
+# ms, one saw no MISCOMPARE and was VACUOUS
+# (D-FOURKN-MERGE-2NODE-LAP-HOLD-CATCHES-THE-PEER-ONLY-BY-CHANCE).  So the
+# overlap is made, once a lap, at the unmount, as tests/suite/fourkn_merge.sh
+# makes it:
+#   - each node stats the other's half, so the other writes back every inode it
+#     changed;
+#   - in a block holding a file of each half, node 2 changes its file (fb);
+#   - node 1 is armed to hold its next merged write between the block's read
+#     and its swap until the block on the device changes, FORCE_MS at most
+#     (dbg_iwr_merge_hold_n 1, dbg_iwr_merge_hold_peer_ms), changes its file
+#     (fa) and unmounts.  fa is the only inode node 1 has to write back, so
+#     the merged write the unmount makes of fa's block is the one held;
+#   - once the hold has begun (dbg_iwr_merge_hold_n back to 0), node 2 changes
+#     fb again and unmounts, which writes fb's slot into that block with a swap
+#     of its own: the block on the device changes under node 1's hold
+#     (iwr_merge_hold_landed), node 1's swap miscompares, and its retry must
+#     keep node 2's slot.
+# fa must then read node 1's mode (605) and fb node 2's (606).  The workload
+# runs unheld (HOLD_N 0); HOLD_N, HOLD_MS and HOLD_PEER_MS
+# (dbg_iwr_merge_hold_peer_ms: wait until the peer's swap of the held block
+# lands, at most that long) still hold its first blocks when set.  FORCE_MS=0
+# leaves the overlap out and the unmounts are plain ones: with HOLD_N=64 it is
+# the lap as it was before the forced overlap, its control.
 #
 # Bounds, from what each step should take: insmod 30 s, mkfs 300 s, mount and
 # umount as tests/fourkn_mount_probe.sh (120 s, 60 s); the 64 creates 10 s of
@@ -56,9 +73,13 @@
 # connect: 16 s.  Measured unwidened: 5.9-7.9 s of workload a node.  Each held
 # block can keep a worker of either node waiting its HOLD_MS, so the bound
 # adds 2 x HOLD_N x HOLD_MS, or 2 x HOLD_N x HOLD_PEER_MS for holds that wait
-# for the peer.  chk_mxfs of a 20 GiB 4K-native volume over iSCSI 60 s.
+# for the peer.  The forced overlap: the two settling passes 30 s each (32
+# stats of a peer-held inode, ~4 ms each, and an ssh), the changes of fb and
+# fa 15 s each, the poll for the hold 10 s, node 1's unmount 60 s, during which
+# node 2's change and unmount 60 s, the counters 10 s.  chk_mxfs of a 20 GiB
+# 4K-native volume over iSCSI 60 s.
 #
-# Usage: [MXFS_CONFIG=<configuration>] [ROUNDS=20] [NF=64] [HOLD_N=64] [HOLD_MS=20] [HOLD_PEER_MS=0] tests/fourkn_merge_2node.sh <dev> <node1> <node2>
+# Usage: [MXFS_CONFIG=<configuration>] [ROUNDS=20] [NF=64] [FORCE_MS=5000] [HOLD_N=0] [HOLD_MS=20] [HOLD_PEER_MS=0] tests/fourkn_merge_2node.sh <dev> <node1> <node2>
 # The module is loaded with the rig's parameters, as tests/setup/prep_node.sh
 # loads it for MXFS_CONFIG's transport (2/net/mesh/direct, the TCP lock
 # network, when unset; 2/disk/caw/direct for COMPARE AND WRITE): the transport
@@ -86,7 +107,8 @@ MODARGS="$RIGARGS log_repeat_limit=0 dyndbg=+p ${MXFS_EXTRA_MODARGS:-}"
 KOMD5=$(md5sum < "$HERE/mxfs.ko" | cut -d' ' -f1)
 ROUNDS=${ROUNDS:-20}
 NF=${NF:-64}
-HOLD_N=${HOLD_N:-64}
+FORCE_MS=${FORCE_MS:-5000}
+HOLD_N=${HOLD_N:-0}
 HOLD_MS=${HOLD_MS:-20}
 HOLD_PEER_MS=${HOLD_PEER_MS:-0}
 HOLD_EACH=$HOLD_MS; [ "$HOLD_PEER_MS" -gt 0 ] && HOLD_EACH=$HOLD_PEER_MS
@@ -121,7 +143,7 @@ umount_all() {
     mounted=""
 }
 
-echo "=== fourkn_merge_2node dev=$DEV nodes=$N1,$N2 config=$MXFS_CONFIG modargs='$MODARGS' rounds=$ROUNDS nf=$NF out=$OUT $(date -u +%FT%TZ) ==="
+echo "=== fourkn_merge_2node dev=$DEV nodes=$N1,$N2 config=$MXFS_CONFIG modargs='$MODARGS' rounds=$ROUNDS nf=$NF force_ms=$FORCE_MS out=$OUT $(date -u +%FT%TZ) ==="
 "$HERE/scripts/clyde_preflight.sh" > "$OUT/preflight.txt" 2>&1 || abort "host preflight failed: $(tail -1 "$OUT/preflight.txt")"
 step "OK host preflight: $(tail -1 "$OUT/preflight.txt")"
 for n in "$N1" "$N2"; do
@@ -166,7 +188,45 @@ for n in "$N1" "$N2"; do
     on "$n" "echo dbg_iwr_merge_hold_left=\$(cat $P/dbg_iwr_merge_hold_n); echo 0 > $P/dbg_iwr_merge_hold_n; echo 0 > $P/dbg_iwr_merge_hold_peer_ms; for c in $CTRS; do echo \$c=\$(cat $P/\$c); done" 10 > "$OUT/ctr_$n.txt"
     step "INFO $n after the workload: $(tr '\n' ' ' < "$OUT/ctr_$n.txt")"
 done
-umount_all
+
+# THE FORCED OVERLAP (header): a block holding a file of each half
+read -r fa fb fblk <<< "$(awk '{b = int($2 / 8); if ($1 % 2) { if (!(b in o)) o[b] = $1 } else if (!(b in e)) e[b] = $1}
+                              END {for (b in o) if (b in e) {print o[b], e[b], b; exit}}' "$OUT/inodes.txt")"
+forced=off
+if [ "$FORCE_MS" -gt 0 ]; then
+    forced=missed
+    # each node stats the other's half, so the other writes back every inode it changed
+    s1=$(on "$N1" "for i in \$(seq 2 2 $NF); do stat -c %a $DIR/f\$i > /dev/null || exit 1; done; echo settled" 30)
+    s2=$(on "$N2" "for i in \$(seq 1 2 $NF); do stat -c %a $DIR/f\$i > /dev/null || exit 1; done; echo settled" 30)
+    ck "both nodes wrote back the inodes they changed (each stat'ed the other's half)" "$s1 $s2" "settled settled"
+    ck "$N2 took f$fb for writing" "$(on "$N2" "chmod 607 $DIR/f$fb && echo ok" 15)" ok
+    before=$(on "$N1" "echo \$(cat $P/iwr_merge_miscompares) \$(cat $P/iwr_merge_hold_landed); echo $FORCE_MS > $P/dbg_iwr_merge_hold_peer_ms; echo 1 > $P/dbg_iwr_merge_hold_n; chmod 605 $DIR/f$fa || echo chmod_failed" 15)
+    ck "$N1 changed f$fa armed" "$(grep -c chmod_failed <<< "$before")" 0
+    before=$(head -1 <<< "$before")
+    step "INFO forced overlap in inode block $fblk: f$fa ($N1) and f$fb ($N2); $N1 armed, miscompares and hold_landed before: $before"
+    on "$N1" "timeout 55 umount $MNT; echo umount_rc=\$?" 60 > "$OUT/force_umount_$N1.txt" & pu=$!
+    began=$(on "$N1" "for i in \$(seq 1 60); do [ \$(cat $P/dbg_iwr_merge_hold_n) = 0 ] && { echo began; break; }; sleep 0.05; done" 10)
+    on "$N2" "chmod 606 $DIR/f$fb || echo chmod_failed; timeout 55 umount $MNT; echo umount_rc=\$?" 60 > "$OUT/force_umount_$N2.txt"
+    wait $pu
+    after=$(on "$N1" "echo \$(cat $P/iwr_merge_miscompares) \$(cat $P/iwr_merge_hold_landed); echo 0 > $P/dbg_iwr_merge_hold_n; echo 0 > $P/dbg_iwr_merge_hold_peer_ms" 10)
+    step "INFO forced overlap: hold ${began:-never began}; $N1 miscompares and hold_landed after: $after"
+    for n in "$N2" "$N1"; do
+        case $(cat "$OUT/force_umount_$n.txt") in
+            *chmod_failed*) step "FAIL $n's change of its file in the forced overlap"; fails=$((fails+1)) ;;
+        esac
+        case $(cat "$OUT/force_umount_$n.txt") in
+            *umount_rc=0*) step "OK umount $n" ;;
+            *) step "FAIL umount $n: $(tr '\n' '|' < "$OUT/force_umount_$n.txt")"; fails=$((fails+1)) ;;
+        esac
+    done
+    mounted=""
+    read -r c0 l0 <<< "$before"; read -r c1 l1 <<< "$after"
+    if [ "$began" = began ] && [ "$(( ${l1:-0} - ${l0:-0} ))" -ge 1 ] && [ "$(( ${c1:-0} - ${c0:-0} ))" -ge 1 ]; then
+        forced=landed
+    fi
+else
+    umount_all
+fi
 for n in "$N1" "$N2"; do
     on "$n" "for c in $CTRS; do echo \$c=\$(cat $P/\$c); done" 10 > "$OUT/ctr_${n}_end.txt"
     step "INFO $n after the unmount: $(tr '\n' ' ' < "$OUT/ctr_${n}_end.txt")"
@@ -179,8 +239,14 @@ ck "chk_mxfs finds nothing on the volume both nodes wrote" "$(grep -c '^chk_rc=0
 mount_both
 for n in "$N1" "$N2"; do
     on "$n" "echo 3 > /proc/sys/vm/drop_caches; for i in \$(seq 1 $NF); do echo \$i \$(stat -c %a $DIR/f\$i); done" 30 > "$OUT/modes_$n.txt"
-    bad=$(awk -v a="$m1" -v b="$m2" '{w = ($1 % 2) ? a : b; if ($2 != w) n++} END {print n + 0}' "$OUT/modes_$n.txt")
-    ck "every file reads its own writer's last mode on $n ($m1 odd, $m2 even)" "$(grep -cE '^[0-9]+ [0-9]+$' "$OUT/modes_$n.txt"):$bad" "$NF:0"
+    if [ "$FORCE_MS" -gt 0 ]; then
+        bad=$(awk -v a="$m1" -v b="$m2" -v fa="$fa" -v fb="$fb" \
+                  '{w = ($1 == fa) ? 605 : ($1 == fb) ? 606 : ($1 % 2) ? a : b; if ($2 != w) n++} END {print n + 0}' "$OUT/modes_$n.txt")
+        ck "every file reads its own writer's last mode on $n ($m1 odd, $m2 even, f$fa 605, f$fb 606)" "$(grep -cE '^[0-9]+ [0-9]+$' "$OUT/modes_$n.txt"):$bad" "$NF:0"
+    else
+        bad=$(awk -v a="$m1" -v b="$m2" '{w = ($1 % 2) ? a : b; if ($2 != w) n++} END {print n + 0}' "$OUT/modes_$n.txt")
+        ck "every file reads its own writer's last mode on $n ($m1 odd, $m2 even)" "$(grep -cE '^[0-9]+ [0-9]+$' "$OUT/modes_$n.txt"):$bad" "$NF:0"
+    fi
 done
 umount_all
 
@@ -196,7 +262,8 @@ for n in "$N1" "$N2"; do
 done
 mis=$(cat "$OUT"/ctr_*_end.txt | awk -F= '$1 == "iwr_merge_miscompares" {s += $2} END {print s + 0}')
 step "INFO MISCOMPARE retries, both nodes: $mis"
-echo "=== fourkn_merge_2node: fails=$fails miscompares=$mis out=$OUT $(date -u +%FT%TZ) ==="
+echo "=== fourkn_merge_2node: fails=$fails miscompares=$mis forced=$forced out=$OUT $(date -u +%FT%TZ) ==="
 [ "$fails" -eq 0 ] || exit 1
+[ "$forced" != missed ] || { step "VACUOUS the forced overlap did not land (hold ${began:-never began}; $N1 miscompares and hold_landed $before -> $after): the lap did not exercise the merged write's retry"; exit 3; }
 [ "$mis" -ge 1 ] || { step "VACUOUS no swap miscompared: the lap did not exercise the merged write's retry"; exit 3; }
 exit 0

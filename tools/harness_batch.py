@@ -162,19 +162,39 @@ def lap_args(args, bid: str) -> list:
     return cmd + ["--"]
 
 
+def ledger_reread(board) -> None:
+    """Drop this process's copy of a board's ledger, so the next read sees what other processes
+    appended since. tools/criteria.py reads a ledger once per process; run.sh appends to it in
+    another, so a lap's run was read from the copy taken before the lap and was not found: the
+    control b20261022-545d6a stopped after its first lap with 'recorded no run of the batch'
+    though run.sh had recorded it (D-TOOLS-HARNESS-BATCH-PY-CONTROL-STOPPED-A-CONTROL-BATCH).
+    MXFS_HARNESS_BATCH_REREAD=0 keeps the copy, as before: the same-build control."""
+    if os.environ.get("MXFS_HARNESS_BATCH_REREAD", "1") != "0":
+        criteria.ledger_cache.pop(str(Path(board).resolve()), None)
+
+
+def stamps_before(board, config: str, row: str) -> set:
+    """The stamps of the row's runs at the configuration, read before a lap."""
+    ledger_reread(board)
+    return {str(r.get("iso")) for r in criteria.ledger_runs(board, config, row)}
+
+
+def lap_runs(board, config: str, row: str, bid: str, before: set) -> list:
+    """The batch's runs of the row that were not there before the lap."""
+    ledger_reread(board)
+    return [r for r in criteria.ledger_runs(board, config, row)
+            if r.get("batch") == bid and str(r.get("iso")) not in before]
+
+
 def board_lap(args, bid: str, lap: int, count: int) -> tuple | None:
     """One lap as a board row; (outcome, CONFIG:ROW:ISO) from the ledger line run.sh wrote."""
     config = criteria.parse_at(args.at)
     board = criteria.board_for(config)
-    # criteria reads a ledger once per process; run.sh appends to it in another
-    criteria.ledger_cache.clear()
-    before = {str(r.get("iso")) for r in criteria.ledger_runs(board, config, args.row)}
+    before = stamps_before(board, config, args.row)
     env = dict(os.environ, MXFS_BATCH=bid)
     out = subprocess.run(["./run.sh", args.at, args.row], cwd=ROOT, env=env,
                          capture_output=True, text=True)
-    criteria.ledger_cache.clear()
-    runs = [r for r in criteria.ledger_runs(board, config, args.row)
-            if r.get("batch") == bid and str(r.get("iso")) not in before]
+    runs = lap_runs(board, config, args.row, bid, before)
     row_line = next((l.strip() for l in out.stdout.splitlines()
                      if re.match(rf"^\s+\S+\s+{re.escape(args.row)}\b", l)), "")
     if not runs:
