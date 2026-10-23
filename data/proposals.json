@@ -4840,14 +4840,15 @@
         "CHANGELOG.md",
         "data/release_policy.json"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-23",
       "review": {
         "file": "data/reviews/P20261023-49c3f9.md",
         "sha256": "33d2fd8aaecf5c95c0db7b46e826cd37741f1f7c7d987ad804a42b31f4546408",
         "verdict": "approved",
         "date": "2026-10-23"
-      }
+      },
+      "applied": "2026-10-23"
     }
   ]
 }
