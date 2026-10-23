@@ -2375,6 +2375,148 @@
         "date": "2026-10-23"
       },
       "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-8b376d",
+      "kind": "verify",
+      "record": "D-LANE-HOLD-LINGERS-AFTER-ITS-LANE-SO-THE-NEXT-LANE-IS-REFUSED",
+      "change": {
+        "batch": "b20261023-7c523f"
+      },
+      "argument": "Verification batch b20261023-7c523f (lap:lane_config_lock at 2/net/mesh/direct, candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD) was declared by tools/harness_batch.py verify before its first lap (lane tests/evidence/lanes/g2_attempt1011_20261023T101421Z step6.log, first line 'declared verification batch b20261023-7c523f ... 6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)'). Its size comes from the control batch closed just before it on the same attempt, b20261023-b2850e (step5.log): 10 of 10 exposed laps failed with LANE_HOLD_RELEASE=0, each 'LANE_LOCK_LAP FAIL lane C, started after lane A ended, did not run its step'. With k=n=10 the lower bound is L = 0.005^(1/10) = 0.5887 and N = ceil(ln 0.005 / ln(1 - 0.5887)) = ceil(5.96) = 6. All 6 laps ran on the candidate, each PASS with the exposure probe '^EXPOSED-RELEASE: ' matched (exposure=1 on every lap line of step6.log, lap logs tests/evidence/batch_laps/b20261023-7c523f/*.log, 6 files): 'LANE_LOCK_LAP PASS lane B refused 64/net/mesh/direct while lane A held it, and lane C ran once A had ended'. No lap failed, none was INCOMPLETE, none was dropped: step6.log ends 'verify b20261023-7c523f: 6 PASS, 0 FAIL of 6 planned'. The lap is host only (scripts/rig_lane.sh's configuration locks), so the configuration named is the lock it takes, 64/net/mesh/direct inside the lap and 2/net/mesh/direct as the batch's key.",
+      "evidence": [
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step5.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step6.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-7c523f",
+        "tests/evidence/batch_laps/b20261023-b2850e",
+        "tests/lane_config_lock_lap.sh"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-8b376d.md",
+        "sha256": "2f7a116cc62137bfc2ac7f14aba0f96d9af6a4d98b8dcb9e5114bad353e65c29",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-cf21fb",
+      "kind": "verify",
+      "record": "D-TAUTH-TEST-OBJECTS-OMIT-INCLUDED-HEADERS-SO-A-HEADER-CHANGE-LINKS-STALE-CODE",
+      "change": {
+        "batch": "b20261023-613125"
+      },
+      "argument": "Verification batch b20261023-613125 (lap:tauth_shared_objs at 2/net/mesh/direct, candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD) was declared by tools/harness_batch.py verify before its first lap (lane tests/evidence/lanes/g2_attempt1011_20261023T101421Z step4.log, first line 'declared verification batch b20261023-613125 ... 6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005'). Its size comes from the control batch closed just before it on the same attempt, b20261023-c75499 (step3.log): 10 of 10 exposed laps failed with TAUTH_SHARED_FROM_CLEAN=0, each 'LAP tauth_objs FAIL: built before pal/pal.h changed and linked as they were: dlm.o dlm_shared.o tauth_ledger.o tauth_store...'. With k=n=10, L = 0.005^(1/10) = 0.5887 and N = ceil(ln 0.005 / ln(1 - 0.5887)) = ceil(5.96) = 6. All 6 laps ran on the candidate, each PASS with the probe '^EXPOSED: header-changed' matched (exposure=1 on every lap line of step4.log; lap logs tests/evidence/batch_laps/b20261023-613125/*.log, 6 files): 'LAP tauth_objs PASS: all 5 objects carry the mark: compiled from pal/pal.h as it now is'. No lap failed, none was INCOMPLETE or dropped: step4.log ends 'verify b20261023-613125: 6 PASS, 0 FAIL of 6 planned'. The lap is host only: it builds the tauth harness objects from a scratch copy of the frozen tree with the frozen tests/tauth/shared_objs.sh.",
+      "evidence": [
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step3.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step4.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-613125",
+        "tests/evidence/batch_laps/b20261023-c75499",
+        "tests/tauth_shared_objs_lap.sh",
+        "tests/tauth/shared_objs.sh"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-cf21fb.md",
+        "sha256": "279f032c82c16bc3d727666eaeb3a6e0b725a60666c2f57c0e01950b677652f0",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-624ee6",
+      "kind": "verify",
+      "record": "D-SURVIVOR-CACHE-SERVES-A-DELETED-FILES-BMBT-BLOCK-FOR-A-PEERS-NEW-FILE",
+      "change": {
+        "batch": "b20261023-8b466e"
+      },
+      "argument": "Verification batch b20261023-8b466e (lap:bmbt_read_skip at 2/net/mesh/direct on the g2 pair test1/test2, candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD loaded on both nodes by the lane's prep, tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step2.log) was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step8.log, first line 'declared verification batch b20261023-8b466e ... 6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005'). It is sized from the control closed just before it on the same attempt and pair, b20261023-573c14 (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step7.log): bmbt_skip_reads=1 on W for each lap (BMBT_SKIP_READS=1, the chokepoint completes a matched read with the buffer's old image and issues no I/O, as before the fix), BMBT_RA_HOLD_MS=300 in both arms; 10 of 10 exposed laps failed, each 'RESULT: FAIL label=brsc<n> fails=2..4 matched=56..96 ... bad=20..30 short=13..24'. With k=n=10, L = 0.005^(1/10) = 0.5887 and N = ceil(ln 0.005 / ln(1 - 0.5887)) = ceil(5.96) = 6. Each of the 6 laps (env ROUNDS=3 BMBT_SKIP_READS=0 BMBT_RA_HOLD_MS=300 tests/bmbt_read_skip_lap.sh brsv<n>) is PASS with exposure: the probe '^LAP bmbt_read_skip exposed: matched_reads=[1-9]' (the module's bmbt_chokepoint_reads counter, reset at arm and read at capture) matched on every lap (exposure=1 on each lap line of step8.log; per-lap logs tests/evidence/batch_laps/b20261023-8b466e/*.log and the lap evidence directories tests/evidence/*_bmbtrdskip_brsv[1-6]). No lap failed, none INCOMPLETE, none dropped: step8.log ends 'verify b20261023-8b466e: 6 PASS, 0 FAIL of 6 planned'.",
+      "evidence": [
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step2.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step7.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step8.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-8b466e",
+        "tests/evidence/batch_laps/b20261023-573c14",
+        "tests/bmbt_read_skip_lap.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-8efcf4",
+      "kind": "verify",
+      "record": "D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE",
+      "change": {
+        "batch": "b20261023-707d51"
+      },
+      "argument": "Verification batch b20261023-707d51 (lap:fsx_pull at 2/disk/caw/direct on the g2b pair test15/test16, candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD from the lane's prep, tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step3.log) was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step7.log, first line 'declared verification batch b20261023-707d51 ... 6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)'). It is sized from the control closed just before it on the same attempt and pair, b20261023-0934e6 (tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step6.log): MXFS_PULL_RUN_NONE=0 (run.sh's artifact pull for a row that did not pass leaves the fsx logs on the node, as before the fix); 10 of 10 exposed laps failed, each 'LAP fsx_pull FAIL: not in the run's evidence: tests/evidence/run_fsx_<run>-g2b/test15_fsx.-1.100000.log ...'. With k=n=10, L = 0.5887 and N = ceil(ln 0.005 / ln(1 - 0.5887)) = 6. Each of the 6 laps (tests/fsx_log_pull_lap.sh fpv<n> 2/disk/caw/direct) is PASS with the probe '^EXPOSED: the fsx row failed both checks' matched (exposure=1 on every lap line of step7.log; per-lap logs tests/evidence/batch_laps/b20261023-707d51/*.log). No lap failed, none INCOMPLETE, none dropped: step7.log ends 'verify b20261023-707d51: 6 PASS, 0 FAIL of 6 planned'.",
+      "evidence": [
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step3.log",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step6.log",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step7.log",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-707d51",
+        "tests/evidence/batch_laps/b20261023-0934e6",
+        "tests/fsx_log_pull_lap.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-b23ee9",
+      "kind": "remove-fixed",
+      "record": "D-LANE-HOLD-LINGERS-AFTER-ITS-LANE-SO-THE-NEXT-LANE-IS-REFUSED",
+      "change": {
+        "control": "b20261023-b2850e",
+        "fixon": "b20261023-7c523f",
+        "cause": "scripts/rig_lane.sh released a lane's configuration locks only through each holder's 1 s poll of the lane's pid (tail --pid), so for up to a second after a lane ended a lane started on the same configuration was refused as if the ended lane still ran; the lane's EXIT trap now kills and waits for every holder (release_holds), so the locks are free before its exit is seen"
+      },
+      "argument": "FIXED AND VERIFIED. The defect: scripts/rig_lane.sh held each configuration a lane names with a holder process (`tail --pid=$$ -f /dev/null`, scripts/rig_lane.sh:77) that sees the lane's exit only at its next 1 s poll, so for up to a second after a lane ended its configuration lock (/tmp/mxfs_lane.<configuration>.lock, flock -n at :70-71) was still held, and a lane started in that second on the same configuration was refused (rc 3) as if the ended lane still ran.\n\nThe fix (one site): the lane records each holder's pid (HOLDERS, :57 and :78) and its EXIT trap release_holds (:58-66) kills and waits for every holder, so the locks are free before the lane's exit can be seen. LANE_HOLD_RELEASE=0 makes release_holds return at once (:59), leaving the release to the holder's poll alone, which is the behaviour before the fix; recording the pids changes nothing else.\n\nCause, instrumented: the reproducer tests/lane_config_lock_lap.sh starts lane A (holds 64/net/mesh/direct 4 s), lane B while A runs (must be refused) and lane C the moment A's process has exited, and prints 'EXPOSED-RELEASE: lane C was started N ms after lane A exited' (N under the holder's 1 s poll) on every lap.\n\nControl b20261023-b2850e (same attempt of candidate 0.90.134, frozen 2026-10-23T10:11:20Z, the frozen rig_lane.sh with LANE_HOLD_RELEASE=0 in the lap's environment; tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step5.log): 10 of 10 exposed laps FAIL 'LANE_LOCK_LAP FAIL lane C, started after lane A ended, did not run its step'. Inputs before and after the batch hash alike (tests/evidence/controls/b20261023-b2850e.20261023T101920Z.inputs.before.json and .after.json).\n\nFix-on verification b20261023-7c523f, sized from that control (k=n=10, L = 0.5887, N = 6) and applied by verify proposal P20261023-8b376d: 6 of 6 laps PASS with the exposure probe '^EXPOSED-RELEASE: ' matched, 'LANE_LOCK_LAP PASS lane B refused 64/net/mesh/direct while lane A held it, and lane C ran once A had ended' (step6.log).\n\nCells: every run the record names shows this cause in its own log. The ten control laps (2/net/mesh/direct:lap:lane_config_lock 2026-10-23T10:19:26Z .. 10:20:11Z) each end 'lane C, started after lane A ended, did not run its step' (tests/evidence/batch_laps/b20261023-b2850e/*.log). The three INCOMPLETE laps of D-LANES-ON-ONE-CONFIGURATION-COLLIDE-AND-BATCHES-SPEND-THEIR-LAPS-INCOMPLETE's verification b20261022-5921cd (2026-10-23T03:58:27Z, :36Z, :46Z; data/criteria.runs.jsonl:8164, :8166, :8169) each logged 'ABORT: lane A's step did not start (... lane lanelockAv<n> refused: configuration 64/net/mesh/direct is held by another lane (<pid> ... lane lanelockCv<n-1>))' (tests/evidence/batch_laps/b20261022-5921cd/20261023T035823Z-978640ad.log:3, 20261023T035833Z-a87cda41.log:3, 20261023T035843Z-a2533991.log:3): each lap's lane A started within the second after the previous lap's lane C ended, inside the holder's poll.",
+      "evidence": [
+        "scripts/rig_lane.sh",
+        "tests/lane_config_lock_lap.sh",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step5.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step6.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-b2850e",
+        "tests/evidence/batch_laps/b20261023-7c523f",
+        "tests/evidence/batch_laps/b20261022-5921cd/20261023T035823Z-978640ad.log",
+        "tests/evidence/batch_laps/b20261022-5921cd/20261023T035833Z-a87cda41.log",
+        "tests/evidence/batch_laps/b20261022-5921cd/20261023T035843Z-a2533991.log",
+        "tests/evidence/controls/b20261023-b2850e.20261023T101920Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-b2850e.20261023T101920Z.inputs.after.json",
+        "data/reviews/P20261023-8b376d.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-e0ffbe",
+      "kind": "verify",
+      "record": "D-LIVE-HOLDER-WAIT-FINDS-NO-REMOTE-MASTERED-INODE-AND-ABORTS-BEFORE-MEASURING",
+      "change": {
+        "batch": "b20261023-174417"
+      },
+      "argument": "Verification batch b20261023-174417 (lap:lh_shard at 2/net/mesh/direct on the g2 pair test1/test2, candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD loaded by the lane's prep, tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step2.log) was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step10.log, first line 'declared verification batch b20261023-174417 ... 6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)'). It is sized from the control closed just before it on the same attempt and pair, b20261023-3f3289 (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step9.log): LH_SHARD_SELECT=0 (tests/live_holder_wait.sh makes eight candidates back to back and keeps them all, as before the fix); 10 of 10 exposed laps FAIL, each 'LAP lh_shard FAIL: 8 candidates in 1 distinct routing shards: the search is 1 draw(s), not 8'. With k=n=10, L = 0.005^(1/10) = 0.5887 and N = ceil(ln 0.005 / ln(1 - 0.5887)) = 6. Each of the 6 laps (tests/live_holder_shard_lap.sh lhsv<n>) is PASS with the probe '^EXPOSED: candidates=' matched (exposure=1 on every lap line of step10.log; per-lap logs tests/evidence/batch_laps/b20261023-174417/*.log). No lap failed, none INCOMPLETE, none dropped: step10.log ends 'verify b20261023-174417: 6 PASS, 0 FAIL of 6 planned'.",
+      "evidence": [
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step2.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step9.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step10.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-174417",
+        "tests/evidence/batch_laps/b20261023-3f3289",
+        "tests/live_holder_shard_lap.sh",
+        "tests/live_holder_wait.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
     }
   ]
 }
