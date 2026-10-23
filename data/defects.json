@@ -4585,6 +4585,39 @@
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: a lap whose holds catch no peer write retries no MISCOMPARE and ends VACUOUS"
+        },
+        {
+          "id": "b20261023-6ff87e",
+          "kind": "verify",
+          "row": "lap:fourkn_merge_2node",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "planned": 298,
+          "probe": "INFO forced overlap in inode block",
+          "candidate": "0.90.134",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:fourkn_merge_2node",
+            "config": "2/disk/caw/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-5362ec",
+            "k": 3,
+            "n": 20,
+            "candidate": "",
+            "variant": "FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0 (the lap as it was before the forced overlap: its first 64 merged blocks held 20 ms on each node, no overlap forced, plain unmounts)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.01764263795419471
         }
       ],
       "updated": "2026-10-23",
@@ -4620,6 +4653,171 @@
           "config": "2/disk/caw/direct4k",
           "row": "lap:fourkn_merge_2node",
           "iso": "2026-10-23T20:21:55Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:48:54Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:43:16Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:39:51Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:37:36Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:35:23Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:30:55Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:27:36Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:26:28Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:23:02Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:21:53Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:21:44Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:21:34Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:19:24Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:19:14Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:19:05Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:56Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:47Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:38Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:28Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:19Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:10Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:18:01Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:17:52Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:17:43Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:17:33Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:17:24Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:17:14Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:17:05Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:16:56Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T20:58:34Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T20:51:38Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T20:50:27Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T20:43:32Z"
         }
       ]
     },
@@ -4649,7 +4847,7 @@
       "opened": "2026-10-23",
       "summary": "During a foreign replay the surviving node writes allocation-group header blocks (AGF) without holding that group's lock: PROBE-A AG-META-WRITE-NOT-HELD fires 4-10 times in every lap of the open-EFI gate, fix on and fix off; the probe exists because such a write can erase a live peer's change to the header, which no record has shown cannot happen here",
       "evidence": "Review of P20261023-f2db37 (data/reviews/P20261023-f2db37.md:290-291): 10 and 7 times in the verification laps of b20261023-30233a and 4 to 9 in the control laps of b20261023-dc6d35, each on the survivor during the replay's writes; e.g. tests/evidence/20261023T120439Z_capture_gate_openefivd1 dmesg_test1.txt:2296 '[ 2234.539643] mxfs: PROBE-A AG-META-WRITE-NOT-HELD agno=1 daddr=2065329 ops=agf comm=kworker/u5:2 pid=5401 cached=0 holders=0 demoting=0 relpend=0 bflags=0x240022', with its stack from :2300 through xlog_do_recovery_pass and mxfs_xlog_recover_foreign_slice. The probe: pal/linux/xfs_buf.c:11925. On these 2-node laps the only peer is the dead victim. ===== 2026-10-23 code read (frozen tree of attempt 2026-10-23T18:32:24Z): pal/linux/xfs_buf_item_recover.c:1353-1420: on an untrusted (foreign or adopted) replay an image whose on-disk LSN would veto it is applied (OVERRIDE-APPLY) only when its item's token verdict is APPLY and its class is AG or INODE; the comment states APPLY for class AG means the fence-time manifest shows the victim held that AG at death and the live CAW slot still carries the victim's bit with unchanged lineage (P-RMAN live check, a mismatch aborts the attempt), and that the dead slot is zeroed only after P163-RECOVERY-COMPLETE, so no later tenure can have written the block. A foreign replay's AG buffer write is tagged b_mxfs_recov_image (:1570-1578). PROBE-A (pal/linux/xfs_buf.c:11965-12012) tests only this node's own grant (pag_dlm_cached, pag_dlm_holders, pag_dlm_demoting, pag_dlm_release_pending) and reads neither b_mxfs_recov_image nor the replay's verdict, so it fires on every foreign replay write of an AG header whatever authorised it.",
-      "next": "Read the probe's own comment and conditions (pal/linux/xfs_buf.c near :11925) and the foreign replay's AG header writes (mxfs_xlog_recover_foreign_slice): which lock or recovery barrier stands in for the AG lock during a replay, and whether a live third node could hold that AG and change its header meanwhile. Then a 3-node or larger death with a live peer allocating in the replayed AG, the probe and the AG headers checked on every node. ===== Not yet read: where ri_mxfs_verdict is set for class AG (the fence-time manifest and the live check) and whether an image whose AG the victim did not hold at death can reach pass 2 by any path; and, on the TCP lock manager (net/mesh), what holds a dead node's AG grant against a live node's acquire until P163-RECOVERY-COMPLETE, as the CAW slot's bit does on disk/caw. If both hold, PROBE-A is a detector that cannot tell an authorised replay write from an unauthorised one; the 3-node lap (a live peer allocating while a third node's death is replayed) then tests the claim.",
+      "next": "Read the probe's own comment and conditions (pal/linux/xfs_buf.c near :11925) and the foreign replay's AG header writes (mxfs_xlog_recover_foreign_slice): which lock or recovery barrier stands in for the AG lock during a replay, and whether a live third node could hold that AG and change its header meanwhile. Then a 3-node or larger death with a live peer allocating in the replayed AG, the probe and the AG headers checked on every node. ===== Not yet read: where ri_mxfs_verdict is set for class AG (the fence-time manifest and the live check) and whether an image whose AG the victim did not hold at death can reach pass 2 by any path; and, on the TCP lock manager (net/mesh), what holds a dead node's AG grant against a live node's acquire until P163-RECOVERY-COMPLETE, as the CAW slot's bit does on disk/caw. If both hold, PROBE-A is a detector that cannot tell an authorised replay write from an unauthorised one; the 3-node lap (a live peer allocating while a third node's death is replayed) then tests the claim. ===== ===== 2026-10-23 code read (candidate attempt 2026-10-23T20:41:09Z tree), the two questions the next step left open. (1) Which images reach pass 2: xfs/xfs_log_recover.c mxfs_report_replay_authority (:3802) sets every buf item REFUSE by default (:3912) and replaces it with mxfs_shadow_eval_token's verdict (:3965-3969); for class AG that is APPLY only when the block's AG is the token's resource (:3439-3456), the owner slot is the victim's (:3478), the epoch matches or an earlier-lineage pair applies (:3483-3521), and mxfs_shadow_manifest_lookup (:3230-3407) finds the AG in the fence-time manifest with holds, the grant epoch and lineage (:3541), the live CAW slot read agreeing with the manifest entry or the attempt aborting (P-RMAN-POSTSEAL-MUTATION, :3321-3377); REDUNDANT items are skipped in pass 2 (:5377). So an AG image reaches pass 2 only for an AG the victim held at death. (2) What keeps a live node out of that AG until the replay is done: on TCP, v5_tcp_declare_dead (dlm/v5_mount.c:14073, comment :14048-14072) never purges a slotted victim; its grants stay frozen in the master table until v5_dead_grants_retire (:18436) runs in the recovery-complete ladder (:19090), so a live node's conflicting acquire queues behind the frozen grant (or is refused while the recovery is blocked, dlm/dlm.c:15603-15620); on CAW the victim's slot bits stay until the ladder's step 1, mxfs_dlm_caw_purge_node (dlm/v5_mount.c:18959-18972), and a live acquire past the base timeout only gives up when its blockers are dead (dlm/dlm_caw.c:7194-7216: the break leaves the wait for the timeout path, it grants nothing). PROBE-A (pal/linux/xfs_buf.c:11965-12012, inline in xfs_buf_submit_ex) tests only this node's in-core grant fields and reads neither b_mxfs_recov_image (set for a foreign replay's pass-2 buffers, pal/linux/xfs_buf_item_recover.c:1570-1578) nor the verdict, so by this read it cannot tell an authorised replay write from an unauthorised one. This is a code read, not a measurement: the record is disposed of only by the 3-node lap (a live peer allocating in the replayed AG while a third node's death is replayed, the peer's acquire timed against P163-RECOVERY-COMPLETE, the AG headers checked on every node and by chk_mxfs), and the detector then tells replay writes apart (b_mxfs_recov_image and the replay task) instead of firing on them.",
       "updated": "2026-10-23"
     },
     {
@@ -4948,283 +5146,6 @@
         }
       ],
       "reproducer": "tests/rejoin_modargs_lap.sh: runs tests/mpath/lib.sh pf_boot_rejoin and pf_rejoin_modargs on the host with ssh and virsh replaced by a recorder, and compares the insmod argv the rejoin would send with prep_node.sh's for the same environment (MXFS_CONFIG=8/net/mesh/mpath MXFS_EXTRA_MODARGS=dead_timeout_ms=12000); PF_REJOIN_PREP_ARGS=0 is the control"
-    },
-    {
-      "id": "D-4CAWMPATH-PATH-ALL-LOST-A-CHURN-FILE-NO-LONGER-NAMED-ITS-CREATED-INODE",
-      "severity": "critical",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-23",
-      "summary": "On 4/disk/caw/mpath path_all_lost (2026-10-23T16:32:35Z) test3 created test3.756 and renamed it test3.756.r in the shared shortform directory (ino 4194433), and its release drain found its 120-byte post-rename image on the cluster it read (P146-RELDUR dsize=120 flushed=1); the rejoining victim test6's log recovery, which had read that cluster at the 118-byte pre-rename image (P77-FRINODE adopted disk_cc=8381 disk_size=118) and skipped the directory's slot, then wrote the whole cluster (P-IWR-WHOLE why=ops-ra), and the next node to read the directory found test3.756 un-renamed, so test3's churn check found test3.756.r gone (ENOENT). The node clocks are known only to about +/-190 ms, so the order of test6's read and test3's write comes from the images read, not the timestamps. With the switch iwr_ra_partial=0, a rejoin's recovery wrote a skipped directory's cluster whole over a survivor's newer image (P-IWR-WHOLE why=ops-ra, P-DINO-CLOBBER path=whole) and the survivor's entry 'late' was missing from the platter in 10 of 10 laps at 2/disk/caw/direct and 10 of 10 at 4/disk/caw/mpath; with it at 1 the write skipped the directory's slot and 'late' survived in 6 of 6 at each",
-      "evidence": "Run 4/disk/caw/mpath:path_all_lost:2026-10-23T16:32:35Z (FAIL, 148 s), a variant run (MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, MXFS_MPATH_TMO=2, MXFS_TEST_ENV=PF_KEEP_KMSG=1: a 12 s death window and the 2 s path timescale under evaluation for D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S), build 08D63764A9352FBDD5A76CD, lane tests/evidence/lanes/g4_mpathtmo2_k6_20261023T162032Z. Reason: 'test3: every churn file still named the inode its create was handed (verify_fail, tests/evidence/board_20261023T162952Z-g4_path_all_lost/load_test3/verify.log) (got 1)'; measured 'victim=test6 fenced_s=14 resumed_s=2 reinstate_s=8 other_stall_ms=16701 acked=2594 elapsed=142s fails=1 max_stall_ms=16770'. Each node's kernel log is kept in the run's evidence (PF_KEEP_KMSG=1). ===== 2026-10-23 evidence read (tests/evidence/board_20261023T162952Z-g4_path_all_lost): load_test3/verify.log:1 'VERIFY_FAIL /mnt/shared/pathload/shared/test3.756.r want_ino=23100 err=ENOENT' on test3, a survivor; load_test3/inos.log:1508 '.../test3.753 23100' at 1792773117112 and :1514 '.../test3.756 23100' at 1792773117414, so two creates 302 ms apart were handed inode 23100; ops.log:2349 the verify ERR. The victim test6 also logged 'VERIFY_FAIL .../test6.170.r want_ino=6295599 err=EIO' (load_test6/verify.log:1), after its fence. No 'Corruption', BUG, oops or hung task on any node in the row's window; the victim test6 logged P290-AUTH-CLOSED (AUTHORITY_LEASE_EXPIRED, overdue_ms=4144), P131-SELF-FENCE and 'Fenced by the cluster ... Shutting down filesystem' (kmsg_test6_fromnode.gz:71750-71756). ===== 2026-10-23 evidence read, second pass. (1) Inode reuse is legitimate: load_test3/inos.log shows the churn handing the same numbers out repeatedly (test3.752 and test3.754 both 23094), and the churn unlinks lap k-1's file every lap, so test3.753 freeing 23100 before test3.756 took it is the load's own cycle. (2) The lost name was renamed, not missing at create: tests/mpath/pathload.py:159-161 records churn_ino[756] only after os.rename succeeded, and verify_prev(757) found test3.756.r ENOENT. (3) test3's own kernel log (kmsg_test3_fromnode.gz, test3 boot clock): 665.202 test3 took the shared directory 4194433 EX; 665.238 P9-NLEDGE reinit0 ino=23100 (test3.756's create); 665.243 released (P146-RELDUR chg=8382) and handed it to slot 2 before the rename; 665.389-665.405 EX tenure (cnt=7, released chg=8396); 665.450-665.455 re-read: disk_cnt=5, 99 bytes; 665.457 and 665.461 P186-NLINK-REVERT ino=4194433 daddr=4130784 out_nlink=2 seen_disk_nlink=3 ('publishing a dinode whose link count is BELOW one already durable on the platter'); the verify ENOENT is at 665.461 on the same clock (ops.log 1792773117636). (4) The victim test6's rejoin mount (kmsg_test6_fromnode.gz:77435-77438, adopted replay of its own slice): P77-FRINODE adopted ino=4194433 txn_lsn=0x100001197 disk_cc=8381 log_cc=2433 verdict=SKIP, then 0.4 ms later 'P-IWR-WHOLE why=ops-ra daddr=4130784 dirs=2 logged=0x0 bli=0x0 skip=0x0 pr_skip=0x0 comm=mount [s0 ino=4194432 ...] [s1 ino=4194433 fmt=1 cnt=6 cc=8381 incore=0 mode=-1]': the mount wrote the WHOLE inode cluster holding the shared directory, a slot its replay had just skipped and that it neither logged nor held, during the survivors' churn of that directory. (5) Code: the only producer of xfs_inode_buf_ra_ops buffers is log recovery's readahead (xfs/xfs_inode_item_recover.c:37,42), and xfs_buf_reverify keeps a buffer's first ops, so every recovery-read inode cluster carries the readahead ops; mxfs_submit_partial_inode_write (pal/linux/xfs_buf.c:5695-5701) sends such a buffer whole unless the volume is merged (sectsize > inodesize, 4K-native), before the per-slot authority mask that the recovery-owned-slot rule (xfs/xfs_inode_item_recover.c:769-790, only slots whose image was applied) relies on. The whole-write clobber detector (mxfs_dino_clobber_probe, pal/linux/xfs_buf.c:9218) runs only with dino_clobber_check=1 (xfs/xfs_mxfs_dir_evict.c:1795), which the run did not set. (6) The cross-node wall clocks carry up to about +/-200 ms of ssh round-trip error (row.log: test3 193 ms, RTT 405 ms), so the run alone does not order test6's write against test3's flushes; the revert of this particular entry by that write is the leading hypothesis, not yet proven. ===== 2026-10-23, reproduced and the fix told apart, same build C54C14B681D148267D084FC, lane tests/evidence/lanes/g2_recoviwr_precheck_20261023T180334Z (2/disk/caw/direct, 512-byte pool LUN, g2), tests/recov_iwr_revert_lap.sh: B (test2) renamed in a shared shortform directory D, died by injected log error, and rejoined with its recovery's write of D's cluster held 15 s (dbg_recov_iwr_hold_n=1); inside the hold A (test1) created 'late' in D and unmounted cleanly. Arm iwr_ra_partial=0 (step3.log, evidence tests/evidence/20261023T180446Z_recoviwr_riwr_pre_arm0): P77-FRINODE adopted ino=8388736 disk_cc=7 log_cc=6 (SKIP), 'P-IWR-WHOLE why=ops-ra daddr=8261440 ... comm=mount [s0 ino=8388736 fmt=1 cnt=4 cc=7]', 'P-DINO-CLOBBER#1 path=whole daddr=8261440 ... regress=1', and 'late' missing from D on B and, after its remount, on A: LAP recov_iwr FAIL. Arm 1 (step4.log, tests/evidence/20261023T180545Z_recoviwr_riwr_pre_arm1): the same trigger (P77 SKIP of D=133, the hold on D's cluster, A's unmount inside it), the write skipped D's slot (P56-CORESIDENT-DIR-SKIP), no whole write, no clobber, 'late' present on both nodes: LAP recov_iwr PASS. The failing run's own victim mount carries the same signature (P77-FRINODE adopted SKIP of the shared directory, then P-IWR-WHOLE why=ops-ra comm=mount of its cluster). Fix: pal/linux/xfs_buf.c mxfs_submit_partial_inode_write sends readahead-ops inode clusters through the per-slot mask on every volume, switch iwr_ra_partial (xfs/xfs_mxfs_dlm.c; 0 restores the old condition exactly).",
-      "next": "On the next attempt, on the frozen candidate with g2 formed at 2/disk/caw/direct: tools/harness_batch.py control with --knob 'iwr_ra_partial=0 (...)' -- tests/recov_iwr_revert_lap.sh <label> 0 (10 laps, bound 240 s, probe '^EXPOSED: ', pass '^LAP recov_iwr PASS', fail '^LAP recov_iwr FAIL'), the verification batch sized from it with arm 1, then remove --fixed with a --transfer for the record's 4/disk/caw/mpath cell (the whole write depends only on the buffer's ops and the volume's sector size, not on the lock manager, the attachment or the node count).",
-      "reproducer": "tests/recov_iwr_revert_lap.sh <label> 0 on a formed 2-node pair on a 512-byte LUN (g2, MXFS_NODE_LIST=test1,test2; about 60 s): FAIL with 'late' missing; arm 1 PASS",
-      "cells": [
-        {
-          "config": "4/disk/caw/mpath",
-          "row": "path_all_lost",
-          "iso": "2026-10-23T16:32:35Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T18:47:10Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T18:46:09Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T18:45:06Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T18:44:06Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T18:43:04Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T18:42:04Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T18:41:06Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T18:40:06Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T18:39:07Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T18:38:07Z"
-        },
-        {
-          "config": "4/disk/caw/mpath",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T19:21:40Z"
-        },
-        {
-          "config": "4/disk/caw/mpath",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T19:20:36Z"
-        },
-        {
-          "config": "4/disk/caw/mpath",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T19:19:32Z"
-        },
-        {
-          "config": "4/disk/caw/mpath",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T19:18:29Z"
-        },
-        {
-          "config": "4/disk/caw/mpath",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T19:17:29Z"
-        },
-        {
-          "config": "4/disk/caw/mpath",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T19:16:27Z"
-        },
-        {
-          "config": "4/disk/caw/mpath",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T19:15:26Z"
-        },
-        {
-          "config": "4/disk/caw/mpath",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T19:14:24Z"
-        },
-        {
-          "config": "4/disk/caw/mpath",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T19:13:23Z"
-        },
-        {
-          "config": "4/disk/caw/mpath",
-          "row": "lap:recov_iwr",
-          "iso": "2026-10-23T19:12:22Z"
-        }
-      ],
-      "updated": "2026-10-23",
-      "impact": "integrity",
-      "impact_why": "a survivor's own acknowledged directory entry (test3.756.r) is gone from the shared directory after the victim's rejoin mount; the leading cause is a recovery write that reverted the directory's inode-cluster slot",
-      "batches": [
-        {
-          "id": "b20261023-346edb",
-          "kind": "control",
-          "row": "lap:recov_iwr",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: ",
-          "candidate": "",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "iwr_ra_partial=0 (set on both nodes by the lap's arm 0: a recovery write of an inode cluster that still carries the readahead ops goes out whole on a 512-byte-sector volume, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix switched off: the rejoin's recovery writes the whole cluster of the directory it skipped, over the survivor's newer image"
-        },
-        {
-          "id": "b20261023-024fe9",
-          "kind": "verify",
-          "row": "lap:recov_iwr",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:recov_iwr",
-            "config": "2/disk/caw/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-346edb",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "iwr_ra_partial=0 (set on both nodes by the lap's arm 0: a recovery write of an inode cluster that still carries the readahead ops goes out whole on a 512-byte-sector volume, as before the fix)",
-            "builds": [
-              "C54C14B681D148267D084FC"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        },
-        {
-          "id": "b20261023-a06f82",
-          "kind": "control",
-          "row": "lap:recov_iwr",
-          "config": "4/disk/caw/mpath",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: ",
-          "candidate": "",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "iwr_ra_partial=0 (set on both nodes by the lap's arm 0: a recovery write of an inode cluster that still carries the readahead ops goes out whole on a 512-byte-sector volume, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix switched off: the rejoin's recovery writes the whole cluster of the directory it skipped, over the survivor's newer image"
-        },
-        {
-          "id": "b20261023-0e9203",
-          "kind": "verify",
-          "row": "lap:recov_iwr",
-          "config": "4/disk/caw/mpath",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:recov_iwr",
-            "config": "4/disk/caw/mpath",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-a06f82",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "iwr_ra_partial=0 (set on both nodes by the lap's arm 0: a recovery write of an inode cluster that still carries the readahead ops goes out whole on a 512-byte-sector volume, as before the fix)",
-            "builds": [
-              "C54C14B681D148267D084FC"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:recov_iwr",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-346edb",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "iwr_ra_partial=0 (set on both nodes by the lap's arm 0: a recovery write of an inode cluster that still carries the readahead ops goes out whole on a 512-byte-sector volume, as before the fix)",
-          "builds": [
-            "C54C14B681D148267D084FC"
-          ],
-          "date": "2026-10-23"
-        },
-        {
-          "row": "lap:recov_iwr",
-          "config": "4/disk/caw/mpath",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-a06f82",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "iwr_ra_partial=0 (set on both nodes by the lap's arm 0: a recovery write of an inode cluster that still carries the readahead ops goes out whole on a 512-byte-sector volume, as before the fix)",
-          "builds": [
-            "C54C14B681D148267D084FC"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T18:32:24Z",
-          "build": "C54C14B681D148267D084FC",
-          "batch": "b20261023-024fe9",
-          "approval": "P20261023-7d22e1",
-          "date": "2026-10-23"
-        },
-        {
-          "config": "4/disk/caw/mpath",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T18:32:24Z",
-          "build": "C54C14B681D148267D084FC",
-          "batch": "b20261023-0e9203",
-          "approval": "P20261023-83a494",
-          "date": "2026-10-23"
-        }
-      ]
     },
     {
       "id": "D-MPATH-MOUNT-DEGRADED-12S-WINDOW-REGISTRATION-MISSING-AND-SHUTDOWNS",
