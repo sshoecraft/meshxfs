@@ -3079,8 +3079,14 @@
         "data/reviews/P20261023-8efcf4.md",
         "data/defects.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-175966.md",
+        "sha256": "4fc3da4a14bcc6f4f1577eee909219b627a5f8669190fca4c0913dc76d6aa068",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-591bf8",
@@ -3236,8 +3242,14 @@
         "tools/batch_lap.py",
         "data/candidates/0.90.134.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "approved",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-d6265d.md",
+        "sha256": "0a8c5efb64db8eb3327af05ef9572f70355acf3631720266bbda8db794f282fe",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-463c4c",

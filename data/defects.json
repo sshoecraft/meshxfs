@@ -2839,6 +2839,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:rig_eui64_resolve",
           "iso": "2026-10-22T20:21:01Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-23T16:05:00Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-23T16:04:57Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-23T16:04:55Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-23T16:04:53Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-23T16:04:51Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-23T16:04:49Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-23T16:04:46Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-23T16:04:44Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-23T16:04:42Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rig_eui64_resolve",
+          "iso": "2026-10-23T16:04:40Z"
         }
       ],
       "updated": "2026-10-23",
@@ -2925,6 +2975,56 @@
           },
           "transfer": "",
           "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261023-92db3a",
+          "kind": "control",
+          "row": "lap:rig_eui64_resolve",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "MXFS_RIG_EUI64=0 (tests/lib/rig.sh normalises naa. only and looks the LUN up as wwn-0x<id> only, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: the WWID normaliser keeps the e of eui. and the no-mount fallback looks only for wwn-0x<id>, which udev never makes for an EUI-64 LUN"
+        },
+        {
+          "id": "b20261023-4b50c2",
+          "kind": "verify",
+          "row": "lap:rig_eui64_resolve",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:rig_eui64_resolve",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-92db3a",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_RIG_EUI64=0 (tests/lib/rig.sh normalises naa. only and looks the LUN up as wwn-0x<id> only, as before the fix)",
+            "builds": [
+              "08D63764A9352FBDD5A76CD"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -2942,6 +3042,21 @@
             "9594B08726D6732D2ED5E87"
           ],
           "date": "2026-10-22"
+        },
+        {
+          "row": "lap:rig_eui64_resolve",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-92db3a",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_RIG_EUI64=0 (tests/lib/rig.sh normalises naa. only and looks the LUN up as wwn-0x<id> only, as before the fix)",
+          "builds": [
+            "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
         }
       ],
       "reproducer": "tests/rig_eui64_resolve_lap.sh <node1>,<node2> <group> (a pool pair whose LUN is EUI-64, no mxfs mount on the node): resolves the pair's LUN by its identifier through tests/lib/rig.sh as the capture-gate entries do; EXPOSED when the LUN's wwid is eui.*. With the fix taken out: 'ABORT: no MXFS device basis ... no /dev/disk/by-id/{wwn-0x,scsi-3,scsi-2}e3837...': RIG_EUI64_LAP FAIL",
@@ -5952,9 +6067,9 @@
       "nodes": 1,
       "config": "*/*/*",
       "opened": "2026-10-22",
-      "summary": "tests/suite/fsx.sh wrote fsx's output to /tmp/fsx.$$.*.log on the node and deleted it in its EXIT trap, and run.sh's artifact pull for a row that did not pass brought no fsx log, so no failing fsx check kept its evidence: a FAIL of the fsx row could not be diagnosed from what the run kept.",
+      "summary": "run.sh run_none, which runs the fsx row, pulled nothing from the node for a row that did not pass, so a failing fsx check's log kept on the node never reached the run's evidence and no FAIL of the fsx row could be diagnosed from what the run kept.",
       "evidence": "Split from D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED on 2026-10-23 (review data/reviews/P20261022-fa5891.md: that record's control reverted only the seed line). Code before the fix: tests/suite/fsx.sh:22 trap 'rm -rf \"$W\" /tmp/fsx.$$.*' deleted every fsx log. Fix in the tree (0.90.134): fsx.sh keeps a failing check's log on the node as /root/fsx.<seed>.<ops>.log (a passing check's log is still deleted, tests/suite/fsx.sh:44-45), and run.sh's pull for a row that did not pass (the one that brings /root/drc_* from every node, run.sh:2202) takes /root/fsx.<seed>.<ops>.log too, so it lands in tests/evidence/run_fsx_<run id>/ as <node>_fsx.<seed>.<ops>.log. Exercised on the host with the same remote command only: a /root holding fsx.123.100000.log came back as test1_fsx.123.100000.log. No lap has measured it through run.sh, and no control has taken it out. ===== 2026-10-23, read: the run.sh half of the fix cannot reach the fsx row. fsx is a coord=none row (tests/suite/manifest:62 'P1  fsx  none  1  88'), dispatched by run_none (run.sh:2775 -> run.sh:1462-1543), which pulls no node file at all: it records the RESULT line and returns. The pull the fix extended with fsx.*.log is run_coord's (run.sh:2193-2205), which only coord rows reach. So a failing fsx check's log now stays on the node as /root/fsx.<seed>.<ops>.log, and nothing brings it into the run's evidence. ===== 2026-10-23, fix (run.sh): the artifact pull is one function, pull_row_artifacts, which run_coord and now run_none call for a row that did not pass (run_none: its node's kernel log and the files the row left there, before the row is recorded, so the record names the evidence directory); MXFS_PULL_RUN_NONE=0 pulls nothing in run_none, as before (the control). Precheck running in lane tests/evidence/lanes/g2_relall_prechecks_20261023T080727Z.",
-      "next": "Read the precheck in lane tests/evidence/lanes/g2_relall_prechecks_20261023T080727Z; then the control batch with MXFS_PULL_RUN_NONE=0 (10 laps, bound 150 s, probe '^EXPOSED: the fsx row failed both checks', pass '^LAP fsx_pull PASS'), the verification batch on the frozen candidate, remove --fixed.",
+      "next": "Read the precheck in lane tests/evidence/lanes/g2_relall_prechecks_20261023T080727Z; then the control batch with MXFS_PULL_RUN_NONE=0 (10 laps, bound 150 s, probe '^EXPOSED: the fsx row failed both checks', pass '^LAP fsx_pull PASS'), the verification batch on the frozen candidate, remove --fixed. ===== 2026-10-23: removal P20261023-175966 rejected (data/reviews/P20261023-175966.md): the run_none cause, its 10/10 control and 6/6 fix-on hold, but the record also named the fsx.sh EXIT-trap deletion, which no control took out; that half is now D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED and this record is the run_none cause alone. The batches ran on attempt 2026-10-23T10:11:20Z, whose run.sh (sha256 c832ae8a...) differs from attempt 2026-10-23T15:56:24Z's (5e37f48c...; the VARIANT block at run.sh:594-600 changed): rerun the control (MXFS_PULL_RUN_NONE=0 in the lap's own env) and the verification on the current attempt at 2/disk/caw/direct, then propose remove --fixed again.",
       "updated": "2026-10-23",
       "reproducer": "tests/fsx_log_pull_lap.sh <label> <configuration> on a formed pair (about 1-2 min): runs the fsx row through run.sh with FSX_SEED=-1 on a scratch board (MXFS_CRIT), so both checks fail at once and each leaves /root/fsx.-1.<ops>.log; 'EXPOSED: the fsx row failed both checks, logs named: ...'; PASS when both logs (with fsx's usage text) are in tests/evidence/run_fsx_<run id>/, FAIL otherwise. Control: MXFS_PULL_RUN_NONE=0.",
       "batches": [
@@ -6915,7 +7030,38 @@
           "row": "release:presteps",
           "iso": "2026-10-21T23:22:19Z"
         }
-      ]
+      ],
+      "batches": [
+        {
+          "id": "b20261023-31a7bd",
+          "kind": "control",
+          "row": "lap:rig_pool_default_resolve",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "MXFS_RIG_POOL_DEFAULT=0 (tests/lib/rig.sh takes the configuration's device path as the no-mount candidate on a pool rig, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: on a pool rig the resolver's configuration-default candidate is the fixed rig LUN's path, which no pool node has, so it aborts 'is not a block device' without checking the bound LUN's identity"
+        }
+      ],
+      "updated": "2026-10-23"
+    },
+    {
+      "id": "D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "tests/suite/fsx.sh sent fsx's output to /tmp/fsx.$$.*.log on the node and deleted it in its EXIT trap, so a failing fsx check's log did not survive the row on the node for any pull to collect; fsx.sh now keeps a failing check's log as /root/fsx.<seed>.<ops>.log (tests/suite/fsx.sh:38, :45) and names it in the row's measured text.",
+      "evidence": "Split out of D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE at its reviewer's request (data/reviews/P20261023-175966.md:218-232): that record's control (MXFS_PULL_RUN_NONE=0, b20261023-0934e6) took out only run.sh's run_none pull and every lap ran the fixed fsx.sh, so this half rests on a reading of the old code and no control has taken its fix out. The fix is in the tree; it is not proven.",
+      "next": "Write that lap (or extend tests/fsx_log_pull_lap.sh with a probe independent of the measured-text name), run the --revert control immediately before a fresh freeze (harness_batch.py proof), then the verification batch on that attempt, then remove --fixed.",
+      "reproducer": "Needed: a lap that runs the fsx row through run.sh with the fsx checks forced to fail (FSX_SEED=-1) under the old fsx.sh (the candidate's source with only that change reverted, the reverted diff's sha256 in the variant) with a probe that does not depend on the fixed fsx.sh naming its log, measuring the log lost; tests/fsx_log_pull_lap.sh aborts without the name (:60-61)."
     }
   ]
 }
