@@ -2316,464 +2316,6 @@
       ]
     },
     {
-      "id": "D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-21",
-      "summary": "tools/defects.py parse_cell split CONFIG:ROW:ISO at its first two colons and passed every configuration to criteria.parse_at; with that parse (MXFS_RELEASE_STEP_SETTLE=0), propose --target (infra, amend) and update --cell were refused on all three release-step keys: 1/any ('wanted <nodes>/<class>/<method>/<attach>'), 2/net/mesh/direct ('records no run stamped platforms:2026-10-21T20:12:33Z') and 2/net/mesh/drbd ('verified on a rig of its own'); in control b20261023-0be094 9 of 12 dispositions were refused, and only the removals of a record already naming the run cleared it",
-      "evidence": "Read 2026-10-21: (1) criteria.parse_at('1/any') exits \"wanted <nodes>/<class>/<method>/<attach>\", so criteria.py amend/infra/incidents --at and defects.py propose --target refuse it; (2) the row contains a colon, and tools/defects.py parse_cell (lines 714-726) and propose --target (1241-1242) split CONFIG:ROW:ISO at the first two colons, reading row 'release' and iso 'presteps:2026-...'; (3) criteria.py cmd_amend/cmd_infra/withdraw (1427-1489) start with find(data, args.id), which needs a board criterion of that name, and release:* rows exist only in the ledger. The ledger already holds four such FAILs from dry-run candidate 0.90.133-2: release:presteps 2026-10-21T19:05:47Z, release:build 19:05:48Z, release:packages 19:08:29Z, release:boards 19:29:49Z (data/criteria.runs.jsonl), and later steps of that run will add more. The ledger is append-only, so the fix must make these existing keys settleable. ===== 2026-10-23: the own-rig key cause, measured with tests/release_step_cell_lap.py on the tree before this change: infra and amend of 2/net/mesh/drbd:release:drbd:2026-10-22T00:35:43Z refused 'criteria: release:drbd [2/net/mesh/drbd] records no run stamped 2026-10-22T00:35:43Z' (tools/criteria.py switched to the DRBD board because its argv named 2/net/mesh/drbd, while tools/release_run.py writes every step's run into the primary ledger), and the removal left the run listed (defects.py retire_cells routed the cell by configuration, board_for, to the DRBD ledger, where the run is not); the 1/any and 2/net/mesh/direct shapes settled. Fix: criteria.py keeps the primary board when its argv names a release step's row (release:<step>), and retire_cells routes a release step's cell to the primary ledger (criteria.run_board), with the parse and annotation hunks, all behind MXFS_RELEASE_STEP_SETTLE (0 = as before). Lap with the switch on: 'STEP_CELL_LAP PASS all 9 dispositions settled their run (3 key shapes x infra, amend, removal) and both take-backs listed it again'; off: 'STEP_CELL_LAP FAIL 9 of 9 dispositions did not settle their run' (propose and update --cell refused on all three shapes). ===== 2026-10-23: the defects.py check_cells routing joins this record from D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD (data/reviews/P20261022-dcd1a8.md, requirement 4: that removal's batches do not exercise it). It is the same cause at one more site: tools/release_run.py writes every release step's run into the primary ledger, but check_cells looked a release:<step> cell up in criteria.board_for(config), so a release:drbd run filed under 2/net/mesh/drbd was searched for in the DRBD board's ledger and could never be named with update --cell ('records no run stamped'); tools/defects.py:800-804 now reads a release step's run from criteria.SPEC. The fix is in the tree and not yet switched, controlled or verified. ===== 2026-10-23 (after attempt 11): the fix's four parts now have a switch each in tools/criteria.py (MXFS_RELEASE_STEP_SETTLE the parse, _ANNOTATE annotated_run, _BOARD a command's board choice, _ROUTE run_board), and this record keeps the parse part alone: parse_cell's stamp anchored at the end, and a release step's configuration not passed to parse_at (tools/defects.py parse_cell). The other three parts are D-RELEASE-STEP-ANNOTATION-LOOKS-THE-STEP-ROW-UP-AS-A-BOARD-CRITERION, D-RELEASE-STEP-COMMAND-NAMING-AN-OWN-RIG-KEY-READS-THE-RIG-BOARD and D-RELEASE-STEP-RUN-LOOKUP-AND-RETIREMENT-ROUTED-TO-THE-RIG-BOARD. tests/release_step_cell_lap.py now settles each key four ways (infra, amend, removal, and the removal of a record already naming the run). On the host (tests/evidence/release_step_switches_20261023T171448Z, inputs hashed in inputs.sha256): all on, PASS 12 of 12 in 21 s (lap_on.log); MXFS_RELEASE_STEP_SETTLE=0, FAIL 9 of 12, every propose --target and update --cell refused at the parse on all three keys while the three named removals settled (lap_MXFS_RELEASE_STEP_SETTLE.log). The 30 cells are control laps with every part off (b20261022-3f5a50, b20261023-e1901e), each refused at the parse, so they stay here.",
-      "next": "On the next attempt: control batch of tests/release_step_cell_lap.py with MXFS_RELEASE_STEP_SETTLE=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 40 s, probe '^EXPOSED: the gate lists', pass '^STEP_CELL_LAP PASS'), the verification batch sized from it, then remove --fixed naming the parse cause only. The dry-run step FAILs the evidence lists are settled through the reviewer path by the records of their own causes.",
-      "batches": [
-        {
-          "id": "b20261022-3f5a50",
-          "kind": "control",
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 20,
-          "probe": "^EXPOSED: ",
-          "candidate": "",
-          "build": "9594B08726D6732D2ED5E87",
-          "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED.fix.diff sha256=d047663cb6c5df48da3dfdf0c4ed479b9fc43e646644a4f28d920324a57cd688",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "why": "the fix taken out: parse_cell splits at the first two colons and parses the configuration, and annotated_run looks the row up on the board; every exposed lap must refuse a recorded release step FAIL"
-        },
-        {
-          "id": "b20261022-332c20",
-          "kind": "verify",
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 4,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "",
-          "state": "open",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "rate": {
-            "row": "lap:release_step_cell",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261022-3f5a50",
-            "k": 20,
-            "n": 20,
-            "candidate": "",
-            "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED.fix.diff sha256=d047663cb6c5df48da3dfdf0c4ed479b9fc43e646644a4f28d920324a57cd688",
-            "builds": [
-              "9594B08726D6732D2ED5E87"
-            ],
-            "date": "2026-10-22"
-          },
-          "transfer": "",
-          "lower_bound": 0.7672704990109255
-        },
-        {
-          "id": "b20261022-db370d",
-          "kind": "verify",
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 4,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "rate": {
-            "row": "lap:release_step_cell",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261022-3f5a50",
-            "k": 20,
-            "n": 20,
-            "candidate": "",
-            "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED.fix.diff sha256=d047663cb6c5df48da3dfdf0c4ed479b9fc43e646644a4f28d920324a57cd688",
-            "builds": [
-              "9594B08726D6732D2ED5E87"
-            ],
-            "date": "2026-10-22"
-          },
-          "transfer": "",
-          "lower_bound": 0.7672704990109255
-        },
-        {
-          "id": "b20261023-e1901e",
-          "kind": "control",
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: the gate lists",
-          "candidate": "",
-          "build": "08D63764A9352FBDD5A76CD",
-          "variant": "MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py and tools/defects.py read and route a release step's run as any other run, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: a release step's FAIL cannot be named, annotated or retired on any of the three key shapes"
-        },
-        {
-          "id": "b20261023-8f5476",
-          "kind": "verify",
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: the gate lists",
-          "candidate": "0.90.134",
-          "build": "08D63764A9352FBDD5A76CD",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:release_step_cell",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-e1901e",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py and tools/defects.py read and route a release step's run as any other run, as before the fix)",
-            "builds": [
-              "08D63764A9352FBDD5A76CD"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        },
-        {
-          "id": "b20261023-0be094",
-          "kind": "control",
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: the gate lists",
-          "candidate": "",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py and tools/defects.py parse a release step's run as any other run, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix's parse taken out: a release step's FAIL cannot be named, annotated or retired"
-        },
-        {
-          "id": "b20261023-0efa95",
-          "kind": "verify",
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: the gate lists",
-          "candidate": "0.90.134",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:release_step_cell",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-0be094",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py and tools/defects.py parse a release step's run as any other run, as before the fix)",
-            "builds": [
-              "C54C14B681D148267D084FC"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "updated": "2026-10-23",
-      "rates": [
-        {
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261022-3f5a50",
-          "k": 20,
-          "n": 20,
-          "candidate": "",
-          "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED.fix.diff sha256=d047663cb6c5df48da3dfdf0c4ed479b9fc43e646644a4f28d920324a57cd688",
-          "builds": [
-            "9594B08726D6732D2ED5E87"
-          ],
-          "date": "2026-10-22"
-        },
-        {
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-e1901e",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py and tools/defects.py read and route a release step's run as any other run, as before the fix)",
-          "builds": [
-            "08D63764A9352FBDD5A76CD"
-          ],
-          "date": "2026-10-23"
-        },
-        {
-          "row": "lap:release_step_cell",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-0be094",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py and tools/defects.py parse a release step's run as any other run, as before the fix)",
-          "builds": [
-            "C54C14B681D148267D084FC"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:07:11Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:07:10Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:07:09Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:07:08Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:07:07Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:07:06Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:07:05Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:07:04Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:07:03Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:07:02Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:07:01Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:07:00Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:06:59Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:06:58Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:06:57Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:06:56Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:06:55Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:06:54Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:06:53Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-22T20:06:52Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T15:58:37Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T15:58:31Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T15:58:25Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T15:58:19Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T15:58:13Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T15:58:07Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T15:58:01Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T15:57:55Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T15:57:49Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T15:57:43Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:34:41Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:34:29Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:34:17Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:34:05Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:33:53Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:33:41Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:33:29Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:33:18Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:33:06Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-23T18:32:54Z"
-        }
-      ],
-      "reproducer": "tests/release_step_cell_lap.py (host only; 11 s with the parse out, 21 s with it in; batch bound 40 s): takes three recorded release step FAILs from the primary ledger, one per key shape (1/any:release:boards:2026-10-21T19:29:49Z, 2/net/mesh/direct:release:platforms:2026-10-21T20:12:33Z, 2/net/mesh/drbd:release:drbd:2026-10-22T00:35:43Z), and in a scratch copy of the tools and data settles each four ways (infra and amend through defects.py propose --target, removal through defects.py update --cell, and the removal of a record already naming the run, which bypasses parse_cell), printing 'EXPOSED: the gate lists' before each of the twelve. With MXFS_RELEASE_STEP_SETTLE=0 in the lap's own environment, parse_cell refuses the six propose --target and three update --cell on all three keys ('wanted <nodes>/<class>/<method>/<attach>', 'records no run stamped platforms:2026-10-21T20:12:33Z', 'verified on a rig of its own'): STEP_CELL_LAP FAIL 9 of 12; with the switch at its default: STEP_CELL_LAP PASS all 12",
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T18:32:24Z",
-          "build": "C54C14B681D148267D084FC",
-          "batch": "b20261023-0efa95",
-          "approval": "P20261023-b955fd",
-          "date": "2026-10-23"
-        }
-      ]
-    },
-    {
       "id": "D-2NETMESH-DRBD-NODE-SYNC-WEDGED-AFTER-FIO-PERF-OVERRAN-RECORDED-AS-INFRA",
       "severity": "high",
       "nodes": 2,
@@ -5705,7 +5247,26 @@
       "summary": "A path row that kills its victim brings it back through tests/mpath/lib.sh's rejoin, which loads mxfs with the configuration's module arguments only (mxfs_rig_modargs, lib.sh:506, :519), not the lane's MXFS_EXTRA_MODARGS, and run.sh skips the next row's prep because the marker matches the configuration and srcversion (run.sh:2619-2621), so after the first death row the victim runs the default death window while every other node runs the variant's.",
       "evidence": "Sweep of lanes tests/evidence/lanes/g8_mpathtmo2_20261023T143444Z and g16b_mpathtmo2_20261023T143733Z (both exporting MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, summary.log:6): board_20261023T144020Z-g8_path_fence_degraded kmsg_test14_fromnode.gz:665 'mxfs: dead_timeout_ms=0 (0 = 34 s on SCSI, 62 s on DRBD or shared)', :701 'authority lease 30000 ms, death window 34000 ms', against test7-test13 '=12000' and 'authority lease 8000 ms, death window 12000 ms'; the same for test14 in 144327Z path_all_lost, 144649Z path_peer_withdrawn, 151409Z path_fence_degraded, 151713Z path_all_lost, and for test32 in 144449Z, 144842Z, 150343Z, 150725Z and 151125Z (16 nodes). The step logs of every row after a lane's first prep print '--- cluster already prepped for <config> (srcver=08D63764A9352FBDD5A76CD) \u2014 skipping prep ---' (g8 step4-12 and step14-22, g16b step4-7 and step9-12). test14 came back on 12000 only after a forced prep (151048Z path_fenced_return kmsg_test14 :157277). Every row passed; the runs were variants and grade nothing. The survivors declared on their own 12 s window, so the stalls those rows measured are the survivors' at that window.",
       "next": "Make the rejoin load the module with the lane's arguments as prep does (MXFS_EXTRA_MODARGS appended to mxfs_rig_modargs in tests/mpath/lib.sh, and wherever else a row reloads mxfs on a node it restarted), and make run.sh's marker match also compare each node's loaded parameters with the ones requested, so a mismatch re-preps instead of skipping; a lap that kills a victim in one row and reads every node's /sys/module/mxfs/parameters/dead_timeout_ms in the next; control with the fix's switch off, verification sized from it, remove --fixed. ===== ===== 2026-10-23: tests/mpath/lib.sh is sourced by every row of the running lanes g4_mpathtmo2_k6 and g2e_mpathtmo2_k6, so the edit waits until both have ended (an edit mid-lane changes what the rest of the lane measures). The two halves each cure the symptom alone (the rejoin loading the lane's arguments, or run.sh re-prepping on a mismatch), so a control with one switch off would still pass the next-row read: give each half its own switch and its own lap. The rejoin half: pf_boot_rejoin's insmod (tests/mpath/lib.sh:519) takes mxfs_rig_modargs only, while prep_node.sh loads $MODARGS ${MXFS_EXTRA_MODARGS} and the retire_contract argument (tests/setup/prep_node.sh:242, :248); its lap reads the victim's /sys/module/mxfs/parameters inside the same row, right after the rejoin. The marker half: a lap that reloads mxfs on one node of a formed pair with other arguments, then runs a row and requires the row to re-prep (run.sh marker_matches compares only the arguments requested at prep, run.sh:299-302).",
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "batches": [
+        {
+          "id": "b20261023-c6d354",
+          "kind": "control",
+          "row": "lap:rejoin_modargs",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^LAP rejoin_modargs INSMOD-LINE: ",
+          "candidate": "",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "PF_REJOIN_PREP_ARGS=0 (tests/mpath/lib.sh pf_boot_rejoin loads mxfs with the configuration's transport arguments only, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a rejoined victim is loaded without the prep's arguments, the lane's death window among them"
+        }
+      ]
     },
     {
       "id": "D-RELEASE-STEP-ANNOTATION-LOOKS-THE-STEP-ROW-UP-AS-A-BOARD-CRITERION",
@@ -6308,6 +5869,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:release_step_cell",
           "iso": "2026-10-23T18:40:54Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:release_step_copy_race",
+          "iso": "2026-10-23T20:46:28Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:release_step_copy_race",
+          "iso": "2026-10-23T20:46:17Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:release_step_copy_race",
+          "iso": "2026-10-23T20:46:07Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:release_step_copy_race",
+          "iso": "2026-10-23T20:45:56Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:release_step_copy_race",
+          "iso": "2026-10-23T20:45:46Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:release_step_copy_race",
+          "iso": "2026-10-23T20:45:36Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:release_step_copy_race",
+          "iso": "2026-10-23T20:45:25Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:release_step_copy_race",
+          "iso": "2026-10-23T20:45:14Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:release_step_copy_race",
+          "iso": "2026-10-23T20:45:03Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:release_step_copy_race",
+          "iso": "2026-10-23T20:44:53Z"
         }
       ],
       "batches": [
@@ -6339,14 +5950,64 @@
           "candidate": "",
           "build": "79779BEAECBEA94844FDC72",
           "variant": "MXFS_RELEASE_STEP_COPY=0 (tests/release_step_cell_lap.py copies data/ whole, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: a copy of data/ that lists a writer's temporary file dies when the file is renamed away"
+        },
+        {
+          "id": "b20261023-4f8a32",
+          "kind": "verify",
+          "row": "lap:release_step_copy_race",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:release_step_copy_race",
+            "config": "2/net/mesh/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-cdcdc6",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_RELEASE_STEP_COPY=0 (tests/release_step_cell_lap.py copies data/ whole, as before the fix)",
+            "builds": [
+              "79779BEAECBEA94844FDC72"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "rates": [
+        {
+          "row": "lap:release_step_copy_race",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-cdcdc6",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_RELEASE_STEP_COPY=0 (tests/release_step_cell_lap.py copies data/ whole, as before the fix)",
+          "builds": [
+            "79779BEAECBEA94844FDC72"
+          ],
+          "date": "2026-10-23"
+        }
+      ]
     },
     {
       "id": "D-FSX-SH-EXIT-TRAP-REMOVES-FSX-OWN-FSXLOG-AND-FSXGOOD-WITH-THE-WORK-DIR",
@@ -6356,7 +6017,129 @@
       "opened": "2026-10-23",
       "summary": "tests/suite/fsx.sh runs fsx on a test file inside its work directory $W on the mxfs mount, where fsx writes its own .fsxlog (the operation log) and .fsxgood (the expected file image), and its EXIT trap removes $W however the row ends, so a real fsx miscompare leaves neither file for diagnosis; only fsx's stdout is kept (/root/fsx.<seed>.<ops>.log)",
       "evidence": "Code, read 2026-10-23 (session 48): tests/suite/fsx.sh:19 'W=\"$MNT/.suite_fsx.$(hostname).$$\"', :22 \"trap 'rm -rf \\\"$W\\\" 2>/dev/null' EXIT\"; tests/suite/tools/fsx.c:204 'int fsxgoodfd', :239 'FILE * fsxlogf', :285-287 (prt also writes each line to fsxlogf), :635 and :662 (save_buffer writes the .fsxgood image). Found by the review of P20261023-0a53fb (data/reviews/P20261023-0a53fb.md) and noted again in data/reviews/P20261023-44869d.md: neither batch of D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED reached these files, because FSX_SEED=-1 makes fsx exit at its usage before creating them. Not yet measured: whether a miscompare's stdout already carries everything .fsxlog does, and what .fsxgood would add.",
-      "next": "Measure first: a lap that makes fsx miscompare for certain on a scratch file (a second writer changing the file under it), runs the fsx row's own code, and lists what survives the row on the node; then keep .fsxlog/.fsxgood/.fsxops of a failing check beside the kept stdout log, with a switch for the control."
+      "next": "Measure first: a lap that makes fsx miscompare for certain on a scratch file (a second writer changing the file under it), runs the fsx row's own code, and lists what survives the row on the node; then keep .fsxlog/.fsxgood/.fsxops of a failing check beside the kept stdout log, with a switch for the control.",
+      "batches": [
+        {
+          "id": "b20261023-565089",
+          "kind": "control",
+          "row": "lap:fsx_fail_files",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "FSX_KEEP_FAIL_FILES=0 (tests/suite/fsx.sh leaves a failing check's .fsxlog, .fsxops and .fsxgood in the work directory its EXIT trap removes, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a failing fsx check's own files are removed with the row's work directory"
+        },
+        {
+          "id": "b20261023-cff97e",
+          "kind": "verify",
+          "row": "lap:fsx_fail_files",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:fsx_fail_files",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-565089",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "FSX_KEEP_FAIL_FILES=0 (tests/suite/fsx.sh leaves a failing check's .fsxlog, .fsxops and .fsxgood in the work directory its EXIT trap removes, as before the fix)",
+            "builds": [
+              "79779BEAECBEA94844FDC72"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "updated": "2026-10-23",
+      "rates": [
+        {
+          "row": "lap:fsx_fail_files",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-565089",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "FSX_KEEP_FAIL_FILES=0 (tests/suite/fsx.sh leaves a failing check's .fsxlog, .fsxops and .fsxgood in the work directory its EXIT trap removes, as before the fix)",
+          "builds": [
+            "79779BEAECBEA94844FDC72"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-23T20:47:48Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-23T20:47:47Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-23T20:47:46Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-23T20:47:45Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-23T20:47:44Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-23T20:47:43Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-23T20:47:42Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-23T20:47:41Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-23T20:47:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-23T20:47:39Z"
+        }
+      ]
     },
     {
       "id": "D-DISKLOCK-VALIDATE-READS-CAW-SLOT-0-AND-LOGS-A-CORRUPT-LOCK-RECORD",
@@ -6450,6 +6233,16 @@
           "iso": "2026-10-23T20:42:20Z"
         }
       ]
+    },
+    {
+      "id": "D-CRITERIA-INCIDENTS-AT-REFUSES-A-RELEASE-STEP-CONFIGURATION-1-ANY",
+      "severity": "minor",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "tools/criteria.py incidents --at hands its argument to parse_at (tools/criteria.py:1616), which accepts only <nodes>/<class>/<method>/<attach>, so the listing cannot be narrowed to the configuration a release step's run is recorded under: 'criteria.py incidents --at 1/any' exits with \"criteria: '1/any': wanted <nodes>/<class>/<method>/<attach>, e.g. 8/net/mesh/direct\" and lists nothing",
+      "evidence": "Reproduced 2026-10-23 on candidate 0.90.134's tree: 'timeout 30 python3 tools/criteria.py incidents --at 1/any' printed \"criteria: '1/any': wanted <nodes>/<class>/<method>/<attach>, e.g. 8/net/mesh/direct\". It was in the evidence of D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED, whose removal (review data/reviews/P20261023-b5509f.md) fixed parse_cell only and named this as not covered. It is a listing filter only: no disposition goes through it, and the unfiltered 'criteria.py incidents' lists release-step runs.",
+      "next": "Let incidents --at take a release step's configuration (1/any, and an own-rig key) as parse_cell now does, with a switch for the control; a lap that lists a release-step FAIL with --at 1/any, fix out (refused) and in (listed)."
     }
   ]
 }
