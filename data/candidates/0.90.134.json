@@ -2,7 +2,7 @@
   "candidate": "0.90.134",
   "version": "0.90.134",
   "created": "2026-10-23T20:41:09Z",
-  "state": "RUNNING",
+  "state": "INVALID",
   "attempts": [
     {
       "created": "2026-10-21T21:26:41Z",
@@ -343,6 +343,11 @@
       "state": "RUNNING",
       "at": "2026-10-23T20:41:09Z",
       "why": "created"
+    },
+    {
+      "state": "INVALID",
+      "at": "2026-10-23T23:48:05Z",
+      "why": "5 frozen file(s) changed: added: scripts/scst_reload.sh; added: tests/lanes/queue_g2_lmu_caw_measure.txt; added: tests/lanes/queue_g2_peerwin_netmesh.txt; added: tests/lanes/queue_g2e_lmu_mpath.txt; added: tests/lanes/queue_g4_nlink_relabort_off.txt"
     }
   ]
 }
