@@ -3121,8 +3121,14 @@
         "data/reviews/P20261023-0a1c5a.md",
         "data/defects.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "approved",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-591bf8.md",
+        "sha256": "4e1f41422b3c1d5fa2787742ef4e86f1d7c49757dd65a1a9c9d14d233b0ae3ea",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-e3cea7",
@@ -3320,8 +3326,15 @@
         "data/reviews/P20261023-ba31ad.md",
         "data/defects.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-6d07f5.md",
+        "sha256": "1563474c30ffca3e6eddb3fa02763064eb4cedc77ab26abcd05aa760ca661364",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-3a597a",
@@ -3402,6 +3415,33 @@
         "data/criteria.runs.jsonl",
         "data/reviews/P20261023-6dae93.md",
         "CHANGELOG.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-f07942",
+      "kind": "remove-fixed",
+      "record": "D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD",
+      "change": {
+        "control": "b20261023-b9400f",
+        "fixon": "b20261023-45c118",
+        "cause": "tools/release_run.py board_verdict graded the own-rig 2/net/mesh/drbd board without MXFS_OWN_RIG, which that configuration needs to parse and which criteria.py sets only when its own command line names an own-rig configuration, so in the orchestrator no row of the specification applied, the verdict was an empty list, and an empty list read as clean: the DRBD step's second check graded nothing; board_verdict now sets the flag for an own-rig attachment for the duration of the grading and refuses a verdict that graded no row"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: tools/release_run.py board_verdict(candidate, config, board), the orchestrator's own check of a board (step_boards, and the DRBD step's second check of tests/evidence/drbd_rig/criteria.json), returned [] for 2/net/mesh/drbd on candidate 0.90.134 while that board held fio_perf_vs_xfs=SKIP, alloc_witness=FAIL and chk_clean=FAIL (the record's evidence). configuration.parse refuses an own-rig attachment unless MXFS_OWN_RIG=1, which tools/criteria.py sets at import only when its own argv names an own-rig configuration (criteria.py:111); in the orchestrator it is unset, so criteria.applies() matched no row, graded stayed 0, and the empty list was read as a clean board.\n\nThe fix, one function, tools/release_run.py board_verdict (:404-431), both hunks behind BOARD_VERDICT_OWN_RIG (:65-69, MXFS_BOARD_VERDICT_OWN_RIG, default on): (a) for an attachment configuration.ATTACHES marks own_rig it sets MXFS_OWN_RIG=1 while it grades and restores the caller's value after (:411-413, :424-428); (b) a verdict that graded no row is returned as a refusal, 'no row of the specification applies at <config>: nothing was graded' (:429-430). With the switch off both hunks are out and the function is the pre-fix one: the flag as its caller has it, and [] returned as clean.\n\nThe reproducer, tests/release_board_verdict_lap.py: it computes the board's rows not green for the candidate as an own-rig run sees them (MXFS_OWN_RIG set) and calls release_run.board_verdict in a child process with MXFS_OWN_RIG dropped from its environment and its inputs taken from the environment rather than argv (:34-54, so criteria.py's argv rule cannot set the flag for it, which is what made control b20261022-ec8648 vacuous); EXPOSED when that board has rows not green (:74), PASS when the orchestrator's verdict names the same rows (:76), FAIL otherwise (:78). Hunk (a) is what the lap exercises: with it in, rows are graded and named; with the switch off the verdict is the empty list. Hunk (b) never fires in a fix-on lap, because with (a) in the board's rows are graded; it is the second half of the same fix, refusing the empty verdict the control laps show being read as clean, should any other cause leave no row applying.\n\nControl b20261023-b9400f, candidate 0.90.134 attempt 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), the frozen tree with only MXFS_BOARD_VERDICT_OWN_RIG=0 in the lap's own environment (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/summary.log, step 3 '-- env MXFS_BOARD_VERDICT_OWN_RIG=0 tests/release_board_verdict_lap.py'): 10 of 10 exposed laps FAIL (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step3.log:17 'failed 10 of 10 exposed laps', :29; tests/evidence/drbd_rig/criteria.runs.jsonl:3371-3380), inputs before and after alike (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step3.log:16 'content=0; touched=0; added=0; gone=0'; tests/evidence/controls/b20261023-b9400f.20261023T160016Z.inputs.before.json and .after.json). This answers requirements 1-2 of data/reviews/P20261022-dcd1a8.md: a knob control on the frozen candidate replaces the development-tree diff control b20261022-4233e9, with every frozen input hashed before and after.\n\nFix-on batch b20261023-45c118, same attempt, switch at its default: sized from the control's 10 of 10 (N = 6 at delta = alpha = 0.005, tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step4.log:1), 6 of 6 PASS with exposure (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step4.log:9; tests/evidence/drbd_rig/criteria.runs.jsonl:3381-3386), approved and applied (data/reviews/P20261023-e629b4.md).\n\nRequirement 3: the release:drbd run of 2026-10-21T22:56:58Z is no longer a cell of this record; it failed on the DRBD board's alloc_witness overrun and chk_clean (tests/evidence/drbd_release_verify_0.90.134_20261021T212712Z.out:114-128) and is named by D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION and D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN. Requirement 4: the defects.py check_cells routing fix is part of D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED now (the same cause, a release step's run routed by configuration instead of to the primary ledger), which stays open with its next step a control under its routing switch; this removal does not dispose of it.\n\nCells: the 30 the record names are the 20 laps of control b20261022-4233e9 (2026-10-22T20:05:12Z-20:05:31Z, the fix diff reversed) and the 10 of b20261023-b9400f (2026-10-23T16:00:18Z-16:00:27Z), each a lap of this reproducer failing on this cause; all 30 were retired by the applied verify. Reach: a defect of the orchestrator's verdict function, which grades every configuration's board; the fix is in that one function, and the own-rig branch is the only one whose grading changed.",
+      "evidence": [
+        "tools/release_run.py",
+        "tests/release_board_verdict_lap.py",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/summary.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step3.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step4.log",
+        "tests/evidence/controls/b20261023-b9400f.20261023T160016Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-b9400f.20261023T160016Z.inputs.after.json",
+        "tests/evidence/drbd_rig/criteria.runs.jsonl",
+        "tests/evidence/drbd_release_verify_0.90.134_20261021T212712Z.out",
+        "data/reviews/P20261022-dcd1a8.md",
+        "data/reviews/P20261023-e629b4.md",
+        "data/defects.json"
       ],
       "state": "pending",
       "created": "2026-10-23"
