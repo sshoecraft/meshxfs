@@ -4029,11 +4029,44 @@
           "candidate": "",
           "build": "16A5F5DDDB4852C9D5DB236",
           "variant": "inact_relmark=0 on the candidate's module 16A5F5DDDB4852C9D5DB236 (sysfs on the formed pair, MXFS_EXTRA_MODARGS on every re-formed one): the same build releasing an inactivation's tenure unmarked, as before the fix",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the clean-release marker at the inactivation's release switched off on the candidate's own module: the survivor must refuse the replay not-held again"
+        },
+        {
+          "id": "b20261023-b40448",
+          "kind": "verify",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 7,
+          "probe": "P-RELMARK-OWED site=inact-exrel",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "gate:d_intents_2tcp_open_efi",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-e3ba0b",
+            "k": 9,
+            "n": 9,
+            "candidate": "",
+            "variant": "inact_relmark=0 on the candidate's module 16A5F5DDDB4852C9D5DB236 (sysfs on the formed pair, MXFS_EXTRA_MODARGS on every re-formed one): the same build releasing an inactivation's tenure unmarked, as before the fix",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5550473077848115
         }
       ],
       "rates": [
@@ -4051,6 +4084,21 @@
             "9594B08726D6732D2ED5E87"
           ],
           "date": "2026-10-22"
+        },
+        {
+          "row": "gate:d_intents_2tcp_open_efi",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-e3ba0b",
+          "k": 9,
+          "n": 9,
+          "candidate": "",
+          "variant": "inact_relmark=0 on the candidate's module 16A5F5DDDB4852C9D5DB236 (sysfs on the formed pair, MXFS_EXTRA_MODARGS on every re-formed one): the same build releasing an inactivation's tenure unmarked, as before the fix",
+          "builds": [
+            "16A5F5DDDB4852C9D5DB236"
+          ],
+          "date": "2026-10-23"
         }
       ],
       "cells": [
@@ -4103,6 +4151,56 @@
           "config": "2/net/mesh/direct",
           "row": "gate:d_intents_2tcp_open_efi",
           "iso": "2026-10-22T18:50:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-23T06:06:42Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-23T06:03:14Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-23T05:59:45Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-23T05:56:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-23T05:52:53Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-23T05:49:26Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-23T05:46:02Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-23T05:42:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-23T05:39:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-23T05:36:01Z"
         }
       ]
     },
