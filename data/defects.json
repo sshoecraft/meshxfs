@@ -4583,9 +4583,9 @@
       "config": "*/*/*",
       "opened": "2026-10-22",
       "summary": "tests/evidence is a symlink to /mxfs/evidence, a disk of the lab host only; the nodes see the tree through the NFS export of /src, where the link resolves to a /mxfs/evidence the node does not have, so every row that writes its evidence from a node fails: alloc_witness cannot create its witness directory and chk_clean, which needs that sealed witness, can grade no CLEAN",
-      "evidence": "2/net/mesh/direct4k board run 20261022T180946Z-g2d (build 2446C4C6401FC9D9224650F): alloc_witness FAIL on both nodes 'witness_dir=unwritable rank=1' (tests/tooling/alloc_witness.sh:138 WDIR=$TREE/tests/evidence/alloc_witness/$RUN_ID); chk_clean FAIL on test31 'verdict=CLEAN release=INDETERMINATE ... evidence=(evidence copy failed) ... no sealed witness for run 20261022T180946Z-g2d' (tests/evidence/run_chk_clean_20261022T180946Z-g2d/test31.raw). On test31: 'ls -la /src/mxfs/tests/evidence' -> '/src/mxfs/tests/evidence -> /mxfs/evidence' and 'ls -ld /mxfs/evidence' -> 'No such file or directory'. /etc/exports exports /src to 192.168.120.0/24 and nothing under /mxfs. The newest alloc_witness witness directory on the host is from 2026-10-21 22:55, before the evidence moved to /mxfs. ===== ===== 2026-10-22 the fix, on the rig host: /mxfs/evidence bind-mounted at /home/steve/src/mxfs-evidence (/etc/fstab line '/mxfs/evidence /home/steve/src/mxfs-evidence none bind,nofail,x-systemd.requires-mounts-for=/mxfs 0 0'; /etc/fstab.backup kept), both /src lines of /etc/exports given crossmnt (/etc/exports.backup kept; exportfs -v shows crossmnt), and tests/evidence relinked to /src/mxfs-evidence by an atomic rename. On test31: /src/mxfs-evidence lists the evidence, and a root write to /src/mxfs/tests/evidence/alloc_witness/node_write_probe/w.txt read back on the host from /mxfs/evidence (probe removed). Control: the link pointed back at /mxfs/evidence (a knob, no tree diff), alloc_witness laps must record witness_dir=unwritable.",
-      "next": "control batch of alloc_witness laps with tests/evidence linked straight to /mxfs/evidence again (nothing else on the rig writing evidence from a node while it runs), then the verification batch on the candidate, sized from it",
-      "reproducer": "./run.sh 2/net/mesh/direct4k alloc_witness chk_clean (any configuration): alloc_witness on a node writes $TREE/tests/evidence/alloc_witness/<run>/; with the link unresolvable on the node it records witness_dir=unwritable, and chk_clean then finds no sealed witness",
+      "evidence": "2/net/mesh/direct4k board run 20261022T180946Z-g2d (build 2446C4C6401FC9D9224650F): alloc_witness FAIL on both nodes 'witness_dir=unwritable rank=1' (tests/tooling/alloc_witness.sh:138 WDIR=$TREE/tests/evidence/alloc_witness/$RUN_ID); chk_clean FAIL on test31 'verdict=CLEAN release=INDETERMINATE ... evidence=(evidence copy failed) ... no sealed witness for run 20261022T180946Z-g2d' (tests/evidence/run_chk_clean_20261022T180946Z-g2d/test31.raw). On test31: 'ls -la /src/mxfs/tests/evidence' -> '/src/mxfs/tests/evidence -> /mxfs/evidence' and 'ls -ld /mxfs/evidence' -> 'No such file or directory'. /etc/exports exports /src to 192.168.120.0/24 and nothing under /mxfs. The newest alloc_witness witness directory on the host is from 2026-10-21 22:55, before the evidence moved to /mxfs. ===== ===== 2026-10-22 the fix, on the rig host: /mxfs/evidence bind-mounted at /home/steve/src/mxfs-evidence (/etc/fstab line '/mxfs/evidence /home/steve/src/mxfs-evidence none bind,nofail,x-systemd.requires-mounts-for=/mxfs 0 0'; /etc/fstab.backup kept), both /src lines of /etc/exports given crossmnt (/etc/exports.backup kept; exportfs -v shows crossmnt), and tests/evidence relinked to /src/mxfs-evidence by an atomic rename. On test31: /src/mxfs-evidence lists the evidence, and a root write to /src/mxfs/tests/evidence/alloc_witness/node_write_probe/w.txt read back on the host from /mxfs/evidence (probe removed). Control: the link pointed back at /mxfs/evidence (a knob, no tree diff), alloc_witness laps must record witness_dir=unwritable. ===== Reproducer and control (2026-10-23, lane g2_evidence_link_control_20261023T011401Z): tests/evidence_link_lap.sh on test1 passed with the tree as it is and failed with EVIDENCE_LINK_TARGET=/mxfs/evidence ('test1 could not write through tests/.evidence_link_lap...'); control batch b20261022-86f27f with that knob, 10 laps at 2/net/mesh/direct (lap:evidence_link).",
+      "next": "Verification batch on the frozen candidate, sized from control b20261022-86f27f (tools/harness_batch.py verify with MXFS_CANDIDATE, a node of a formed pair up), then remove as FIXED AND VERIFIED.",
+      "reproducer": "tests/evidence_link_lap.sh <label> <node> on a formed pair (host and node, about 2 s): the node writes through a link of the lap's own in the exported tree, with the target tests/evidence has, and through tests/evidence itself; the host reads both back. EVIDENCE_LINK_TARGET=/mxfs/evidence gives the lap's link the target the defect had (the control); exposure is the line 'EXPOSED: <node> writes ...'",
       "cells": [
         {
           "config": "2/net/mesh/direct4k",
@@ -4596,9 +4596,95 @@
           "config": "2/net/mesh/direct4k",
           "row": "chk_clean",
           "iso": "2026-10-22T18:24:30Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T01:15:17Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T01:15:15Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T01:15:12Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T01:15:10Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T01:15:07Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T01:15:04Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T01:15:02Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T01:14:59Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T01:14:58Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T01:14:56Z"
         }
       ],
-      "updated": "2026-10-22"
+      "updated": "2026-10-22",
+      "batches": [
+        {
+          "id": "b20261022-86f27f",
+          "kind": "control",
+          "row": "lap:evidence_link",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "EVIDENCE_LINK_TARGET=/mxfs/evidence (the lap's own link gets the target tests/evidence had before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "why": "the fix taken out: a link in the exported tree to /mxfs/evidence, a disk only the host has, so a node cannot create its evidence directory through it"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:evidence_link",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261022-86f27f",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "EVIDENCE_LINK_TARGET=/mxfs/evidence (the lap's own link gets the target tests/evidence had before the fix)",
+          "builds": [
+            "16A5F5DDDB4852C9D5DB236"
+          ],
+          "date": "2026-10-22"
+        }
+      ]
     },
     {
       "id": "D-2NETMESH-4K-PRE-ROW-SYNC-OVER-12S-NO-DSTATE-DIAG-SB-SUMMARY-LOCK-WAIT",
@@ -5026,6 +5112,26 @@
       "summary": "The dirent_durability failure capture (the *_drc_blkdump_dsc_node*/dmesg_at_fail.txt files of run_dirent_durability_<run>) copies a dmesg_at_fail.txt the node kept from an earlier boot into the new run's evidence directory, so a run's evidence carries kernel lines that are not its own: run_dirent_durability_20261019T191246Z-g8 holds copies from boots of 2026-07-26 and 2026-08-20, test11's with an old-build 'Corruption of in-memory data ... xfs_trans_cancel' shutdown.",
       "evidence": "Found by the release-reviewer's review of proposal P20261022-a9b14b (data/reviews/P20261022-a9b14b.md): the three dmesg_at_fail.txt copies under tests/evidence/run_dirent_durability_20261019T191246Z-g8/*_drc_blkdump_dsc_node*/ date from earlier boots (2026-07-26, 2026-08-20); that run's own self-fence lines are in the kernlog_test*.gz files of the same directory. A reader of the directory (a person, a reviewer, a sweep) takes an August corruption line for an October one.",
       "next": "Read where the dirent_durability harness writes and collects dmesg_at_fail.txt on the node (tests/ and its node-side helper): make it write the file per run (named by the run id or after removing the old one), and refuse to copy a file older than the run's start mark; then check the other captures that pull node files by fixed name."
+    },
+    {
+      "id": "D-16CAWMPATH-REJOINED-NODE-OPEN-SPINS-ON-WEDGED-INODE-AFTER-PATH-ALL-LOST",
+      "severity": "critical",
+      "nodes": 16,
+      "config": "disk/caw/mpath",
+      "opened": "2026-10-22",
+      "summary": "On 16/disk/caw/mpath path_all_lost (run 20261011T225324Z-g16, build not recorded), test16 lost both paths, was fenced, unmounted and mounted again (REMOUNT umount_rc=0 mount_rc=0), and its load after rejoining never reported: an open of ino 125829259 spun in mxfs_dlm_open_protect (load pid 11788 in state R) -- 2000 P95-OPEN-PROTECT-RESTART in 85 ms, then 'P-INODE-WEDGE-FENCE ino=125829259 mode=5 -- release wedged; refusing DLM acquire' with about 13 million refused acquires suppressed over 65 s -- instead of failing the open. The load was still running when the next row started, which aborted on it (STRAY killed=1 left=1). The row's FAIL never reached the run ledger (the boards were migrated without it).",
+      "evidence": "tests/evidence/board_20261011T225324Z-g16_path_all_lost/row.log:135-136 'rejoin: test16 REMOUNT umount_rc=0 mount_rc=0 ms=8241 mounted=1'; :200-203 'test16 after rejoining: no PATHLOAD line', 'FAIL test16's load after rejoining completed operations and returned no error got=0 want=1', 'FAIL test16: the mutual-exclusion witness saw no double grant after rejoining got= want=0'; :301 RESULT: FAIL ... reason=test16's load after rejoining completed operations and returned no error (got 0). tests/evidence/board_20261011T225324Z-g16_path_all_lost/stuck_stacks_test16.txt:1-16 '== load pid=11788 state=R at 2026-10-11T23:24:27Z' ktime_get <- mxfs_ilk_note_unlock <- xfs_iunlock <- mxfs_dlm_open_protect+0x454 <- xfs_file_open <- do_sys_openat2. tests/evidence/board_20261011T225324Z-g16_path_all_lost/stuck_kmsg_test16.txt (last 60000 lines of test16's kernel log): :37575 '[389.398228] XFS (dm-1): Metadata I/O Error (0x1) detected at mxfs_dlm_fence_notify+0x53/0x80 ... Shutting down filesystem' (the fence before the rejoin); :54794 first '[506.969596] mxfs: P-INODE-WEDGE-FENCE ino=125829259 mode=5 -- release wedged; refusing DLM acquire'; :54795-57113 2000 P95-OPEN-PROTECT-RESTART ino=125829259 try=1..2000 (506.969-507.054 s) each after 'P71-UNDERFLOW ino=125829259 mode=EX state=0 dlm_mode=0 comm=python3 un=mxfs_dlm_open_protect+0x454/0xcf0'; :59961-59999 'mxfs_dlm_ilock_begin: 12932628 callbacks suppressed' .. '13249126 callbacks suppressed' with P-INODE-WEDGE-FENCE ino=125829259 to 571.98 s; no BUG, Oops, hung_task or Corruption line in the file. Follow-on: tests/evidence/board_20261011T225324Z-g16_path_peer_withdrawn/row.log:1-2 'INFO test16: load left running by an earlier run: STRAY killed=1 left=1', 'RESULT: ABORT ... stage=stray-load node=test16'. The gate is xfs/xfs_mxfs_ilock.c:4587-4593 (MXFS_RELSTATE_WEDGED: 'Terminal ... no new acquire may be built on it; the op dies at the trans/buffer layer like any shutdown'); the restart is xfs/xfs_mxfs_open.c:640. Extraction: the 2026-10-23 log sweep of these files.",
+      "next": "Read whether today's mxfs_dlm_open_protect (xfs/xfs_mxfs_open.c) ends an open whose inode's release state is WEDGED with an error or restarts it for ever, and why ino 125829259's release wedged on the rejoined mount (stuck_kmsg_test16.txt before line 54794: the release-proof lines for that inode). Then a reproducer: an inode whose release is forced WEDGED, opened on a mounted node, must fail the open within stall_limit_s; and 16/disk/caw/mpath path_all_lost on the current build with kernel logs kept.",
+      "impact": "stability",
+      "impact_why": "a rejoined node's open spun without end, 13 million refused acquires in 65 s, and its load never completed: a hung operation on a live node",
+      "collateral": [
+        {
+          "config": "16/disk/caw/mpath",
+          "row": "path_peer_withdrawn",
+          "iso": "2026-10-11T23:29:12Z",
+          "why": "tests/evidence/board_20261011T225324Z-g16_path_peer_withdrawn/row.log:1-2: the row aborted on test16's load from path_all_lost, still running (STRAY killed=1 left=1), the load this record's open spin kept from ending"
+        }
+      ]
     }
   ]
 }
