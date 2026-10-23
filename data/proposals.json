@@ -1151,14 +1151,15 @@
         "tests/evidence/controls/D-VERIFIED-AT-MATCHED-BY-VERSION-ALONE.fix.diff",
         "tests/verified_at_attempt_lap.py"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-22",
       "review": {
         "file": "data/reviews/P20261022-7c82d2.md",
         "sha256": "ebe82f00391ed88045b4a3711f020bbd08947574200e5a3e9490a8d990bf8c90",
         "verdict": "approved",
         "date": "2026-10-22"
-      }
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-6eee93",
@@ -1322,8 +1323,14 @@
         "tests/evidence/controls/D-CHK-FREESPACE-REBUILD-DECLARES-OWNED-BLOCKS-FREE.fix.diff",
         "tests/chk_freespace_rebuild_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "approved",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-1ac314.md",
+        "sha256": "6eeef43718df01fc217f52ea33675196fa29a24a28d8b462937a15f1be739cf2",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261022-5b07e9",
@@ -1479,8 +1486,14 @@
         "tests/lun_pool_shutdown_lap.sh",
         "tests/evidence/controls/D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT.fix.diff"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "rejected",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-f1425f.md",
+        "sha256": "3dfb7aa938b836ad27520d1c5cfb72ba4039f1ddf83d3228a328d4ebdb33b599",
+        "verdict": "rejected",
+        "date": "2026-10-22"
+      }
     },
     {
       "id": "P20261022-1e240a",
@@ -1579,8 +1592,15 @@
         "scripts/vm_package_build.sh",
         "tests/evidence/controls/D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C.fix.diff"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-ce5f04.md",
+        "sha256": "c83cfd265b825fb2a3f3588ac45098a0f1e231e418d7de4b26a9c09b276a478d",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-b56e26",
@@ -1695,8 +1715,15 @@
         "tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt",
         "tests/suite/fourkn_merge.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-85a0b8.md",
+        "sha256": "326508c70ee24fe2b1e6a9b38fc55922254d3907b695b85c9e015d766c943bc5",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-68ebdb",
@@ -1715,8 +1742,14 @@
         "tests/evidence/candidates/0.90.134_check_20261023T042454Z.txt",
         "tests/suite/fourkn_merge.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "rejected",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-68ebdb.md",
+        "sha256": "00b2852ae6538acfd4cc9bb22b1591920a03e057c015c7abd09048a0826b1935",
+        "verdict": "rejected",
+        "date": "2026-10-22"
+      }
     },
     {
       "id": "P20261022-800972",
@@ -1738,8 +1771,15 @@
         "tests/evidence/batch_laps/b20261022-0ec0b9",
         "tests/evidence/batch_laps/b20261022-86f27f"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-800972.md",
+        "sha256": "49da39aa3dc94d6ba841ba06be78b7ff22e2f2cc187625b4addbfa15134ef98c",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-78d4cf",
@@ -1763,8 +1803,15 @@
         "tests/evidence/batch_laps/b20261022-0ec0b9",
         "tests/evidence/batch_laps/b20261022-86f27f"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-78d4cf.md",
+        "sha256": "8d766f25d01b231b005f25310dcaea309a9ad36b9b95b64553d35ebe20eb7f84",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-c77f10",
@@ -1787,8 +1834,15 @@
         "tests/evidence/batch_laps/b20261022-228bd7",
         "tests/evidence/batch_laps/b20261022-601b13"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-c77f10.md",
+        "sha256": "916c4194874ba53f25725fe6dc6304db14683340e0498dc3c93546992d6f1e80",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     },
     {
       "id": "P20261022-8ba001",
@@ -1812,6 +1866,161 @@
         "tests/evidence/controls/D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG.fix.diff",
         "tests/evidence/batch_laps/b20261022-228bd7",
         "tests/evidence/batch_laps/b20261022-601b13"
+      ],
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-8ba001.md",
+        "sha256": "80e7271bc9930a05b4ceddd104ed991ec1909d418ce40c24b27882e9aeff90c6",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
+    },
+    {
+      "id": "P20261022-466daa",
+      "kind": "verify",
+      "record": "D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0-SO-AB-WRITES-ZEROS",
+      "change": {
+        "batch": "b20261022-7c9f88"
+      },
+      "argument": "Fix-on batch b20261022-7c9f88 was declared by tools/harness_batch.py verify --board (defects.py plan-verify --control b20261022-545d6a --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/summary.log step 2 started 2026-10-23T03:58:38Z, tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/step2.log:1 is the batch's declaration and its first lap is 2026-10-23T03:59:05Z. Its size comes from control b20261022-545d6a: with the fix reverted (tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c) 20 of 20 laps failed; the lower bound 0.7673 at delta 0.005 gives N = 4 at alpha 0.005 (data/release_policy.json). All 4 planned laps ran on that attempt as board rows (MXFS_BATCH=b20261022-7c9f88 MXFS_CANDIDATE=0.90.134 ./run.sh 2/net/mesh/direct4k fourkn_cdb, tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/step2.log:2), each PASS with the batch's exposure probe 'FOURKN-CDB-[^ ]+ fua_verify write' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/step2.log:3-6; their rows are in data/criteria.runs.jsonl (row fourkn_cdb at 2/net/mesh/direct4k, batch b20261022-7c9f88), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T03:59:05Z exposure=1; 2026-10-23T03:59:30Z exposure=1; 2026-10-23T03:59:54Z exposure=1; 2026-10-23T04:00:19Z exposure=1. Drift checks of the candidate after the batch's last lap: tests/evidence/candidates/0.90.134_check_20261023T040532Z.txt and tests/evidence/candidates/0.90.134_check_20261023T044203Z.txt, each 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/step2.log",
+        "tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T040532Z.txt",
+        "tests/evidence/candidates/0.90.134_check_20261023T044203Z.txt",
+        "tests/suite/fourkn_cdb.sh",
+        "tests/evidence/controls/fua_control_20261022T184149Z.log"
+      ],
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-466daa.md",
+        "sha256": "3cc12ea1615c868464c86ee32b5875dfa1c8fe243d50b60067601f755dac5c56",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
+    },
+    {
+      "id": "P20261022-4f49ad",
+      "kind": "remove-fixed",
+      "record": "D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0-SO-AB-WRITES-ZEROS",
+      "change": {
+        "control": "b20261022-545d6a",
+        "fixon": "b20261022-7c9f88",
+        "cause": "tools/fua_verify write parses its byte pattern with strtol(argv[4], NULL, 0) (fua_verify.c:186) although its usage names it <byte_pattern_hex> (:136) and caw_verify parses its pattern in base 16 (caw_verify.c:222): a bare hex pattern is read as decimal digits up to the first letter, so 'ab' writes 0x00 and the documented example '5a' (docs/iscsi_setup.md:161) writes 0x05"
+      },
+      "argument": "FIXED AND VERIFIED. The cause: tools/fua_verify write parses its byte pattern with strtol(argv[4], NULL, 0) (fua_verify.c:186) although its usage names it <byte_pattern_hex> (:136) and caw_verify parses its pattern in base 16 (caw_verify.c:222): a bare hex pattern is read as decimal digits up to the first letter, so 'ab' writes 0x00 and the documented example '5a' (docs/iscsi_setup.md:161) writes 0x05. Reproducer: ./run.sh 2/net/mesh/direct4k fourkn_cdb (tests/suite/fourkn_cdb.sh has node 1 write LBA disklock_offset/4096-1 with 'fua_verify write $DEV $S ab' and node 2 check the block reads back 0xab whole; a tool that reads 'ab' as 0 writes 0x00 and the three FUA checks fail). The fix parses the pattern in base 16 (tools/fua_verify.c). Control b20261022-545d6a: with the fix taken out (fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c, the tool rebuilt from it) 20 of 20 laps failed (tests/evidence/controls/fua_control_20261022T184149Z.log; the record's cells 2026-10-22T18:40:25Z..18:48:28Z), each failing its three FUA checks on a 0x00 write. Fix-on batch b20261022-7c9f88, sized from that control (plan-verify --control b20261022-545d6a): 4 of 4 laps PASS with exposure on the frozen candidate 0.90.134 (attempt frozen 2026-10-23T03:55:19Z): 2026-10-23T03:59:05Z exposure=1; 2026-10-23T03:59:30Z exposure=1; 2026-10-23T03:59:54Z exposure=1; 2026-10-23T04:00:19Z exposure=1 (tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/step2.log). Drift checks after the last lap: tests/evidence/candidates/0.90.134_check_20261023T040532Z.txt, tests/evidence/candidates/0.90.134_check_20261023T044203Z.txt. The verify proposal for this batch is reviewed separately; this removal is applied only after that verify is applied.",
+      "evidence": [
+        "tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/step2.log",
+        "tests/evidence/lanes/g2d_verify_round2_20261023T035741Z/summary.log",
+        "tests/evidence/controls/fua_control_20261022T184149Z.log",
+        "tests/evidence/controls/fua_control_20261022T183902Z.log",
+        "tests/evidence/controls/fua_prep_20261022T183902Z.log",
+        "tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff",
+        "tools/fua_verify.c",
+        "tests/suite/fourkn_cdb.sh",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T044203Z.txt"
+      ],
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-4f49ad.md",
+        "sha256": "8bd283bba560c71a1372e818c8d11db6baa2333300191b97ab719f66ea0e4a53",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
+    },
+    {
+      "id": "P20261022-aa3c94",
+      "kind": "verify",
+      "record": "D-RECOV-BMBT-REUSE-ABORT-LEAVES-THE-DESTROYED-VICTIM-POWERED-OFF",
+      "change": {
+        "batch": "b20261022-2bb429"
+      },
+      "argument": "Fix-on batch b20261022-2bb429 was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-f49ba8 --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 24 started 2026-10-23T04:26:14Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step24.log:1 is the batch's declaration and its first lap is 2026-10-23T04:27:57Z. Its size comes from control b20261022-f49ba8: with the fix reverted (fix reverted: tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff sha256=c5887bb0786fa3d5d44336542dc0472bc25a968d64fb80822fd0eb87b508c905) 10 of 10 laps failed; the lower bound 0.5887 at delta 0.005 gives N = 6 at alpha 0.005 (data/release_policy.json). All 6 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^LAP rbr_abort exposed: ' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step24.log lists laps 1..6; their logs are in tests/evidence/batch_laps/b20261022-2bb429/ and their rows in data/criteria.runs.jsonl (row lap:rbr_abort at 2/net/mesh/direct, batch b20261022-2bb429), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T04:27:57Z exposure=1; 2026-10-23T04:30:19Z exposure=1; 2026-10-23T04:32:39Z exposure=1; 2026-10-23T04:35:04Z exposure=1; 2026-10-23T04:37:26Z exposure=1; 2026-10-23T04:39:48Z exposure=1. A drift check of the candidate after the batch's last lap (04:39:48Z), tests/evidence/candidates/0.90.134_check_20261023T044203Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step24.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T044203Z.txt",
+        "tests/evidence/batch_laps/b20261022-2bb429",
+        "tests/evidence/batch_laps/b20261022-f49ba8",
+        "tests/recov_bmbt_reuse.sh",
+        "tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-a44f67",
+      "kind": "remove-fixed",
+      "record": "D-RECOV-BMBT-REUSE-ABORT-LEAVES-THE-DESTROYED-VICTIM-POWERED-OFF",
+      "change": {
+        "control": "b20261022-f49ba8",
+        "fixon": "b20261022-2bb429",
+        "cause": "tests/recov_bmbt_reuse.sh destroys its victim (:134) and restarts it only at :159/:162; an ABORT in between (the capture gate injected fault at :143) exits with the victim off, and the harness has no EXIT trap, so every later harness finds test2 down"
+      },
+      "argument": "FIXED AND VERIFIED. The cause: tests/recov_bmbt_reuse.sh destroys its victim (:134) and restarts it only at :159/:162; an ABORT in between (the capture gate injected fault at :143) exits with the victim off, and the harness has no EXIT trap, so every later harness finds test2 down. Reproducer: tests/recov_bmbt_reuse_abort_lap.sh <label> on g2 (the gate's fault lap of recov_bmbt_reuse alone, tests/recov_bmbt_reuse_abort.manifest; exposure: the destroy before the injection). Control b20261022-f49ba8: with the fix taken out (fix reverted: tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff sha256=c5887bb0786fa3d5d44336542dc0472bc25a968d64fb80822fd0eb87b508c905) 10 of 10 laps failed (tests/evidence/batch_laps/b20261022-f49ba8/). Fix-on batch b20261022-2bb429, sized from that control (plan-verify --control b20261022-f49ba8): 6 of 6 laps PASS with exposure on the frozen candidate 0.90.134 (attempt frozen 2026-10-23T03:55:19Z): 2026-10-23T04:27:57Z exposure=1; 2026-10-23T04:30:19Z exposure=1; 2026-10-23T04:32:39Z exposure=1; 2026-10-23T04:35:04Z exposure=1; 2026-10-23T04:37:26Z exposure=1; 2026-10-23T04:39:48Z exposure=1 (tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step24.log). Drift check after the last lap: tests/evidence/candidates/0.90.134_check_20261023T044203Z.txt. The verify proposal for this batch is reviewed separately; this removal is applied only after that verify is applied.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step24.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T044203Z.txt",
+        "tests/evidence/batch_laps/b20261022-2bb429",
+        "tests/evidence/batch_laps/b20261022-f49ba8",
+        "tests/recov_bmbt_reuse.sh",
+        "tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-8a9584",
+      "kind": "verify",
+      "record": "D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED",
+      "change": {
+        "batch": "b20261022-c54100"
+      },
+      "argument": "Fix-on batch b20261022-c54100 was declared by tools/harness_batch.py verify (defects.py plan-verify --control b20261022-4bf99d --candidate 0.90.134) after the current attempt of candidate 0.90.134 was frozen (data/candidates/0.90.134.json: created 2026-10-23T03:55:19Z, srcversion 16A5F5DDDB4852C9D5DB236) and before its first lap: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log step 2 started 2026-10-23T03:57:45Z, tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step2.log:1 is the batch's declaration. Its size comes from control b20261022-4bf99d: with the fix reverted (fix reverted: tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff sha256=8696fceaa6c7370480148efe459b824c241407ac3fda6c037ac4e664782ea61f) 20 of 20 laps failed; the lower bound 0.7673 at delta 0.005 gives N = 4 at alpha 0.005 (data/release_policy.json). All 4 planned laps ran on that attempt with MXFS_CANDIDATE=0.90.134, each PASS with the batch's exposure probe '^LAP fsx_seed start .* draw=4294967295 ' matched; no lap failed and none was dropped. Laps: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step2.log; their logs are in tests/evidence/batch_laps/b20261022-c54100/ and their rows in data/criteria.runs.jsonl (row lap:fsx_seed at 2/net/mesh/direct, batch b20261022-c54100), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T03:57:48Z exposure=1; 2026-10-23T03:57:50Z exposure=1; 2026-10-23T03:57:53Z exposure=1; 2026-10-23T03:57:56Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T040141Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'. The record now holds only the seed defect: the deleted-log half the earlier review P20261022-fa5891 found it also described is the separate record D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step2.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T040141Z.txt",
+        "tests/evidence/batch_laps/b20261022-c54100",
+        "tests/evidence/batch_laps/b20261022-4bf99d",
+        "tests/fsx_seed_lap.sh",
+        "tests/suite/fsx.sh",
+        "data/reviews/P20261022-fa5891.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-22"
+    },
+    {
+      "id": "P20261022-b2613a",
+      "kind": "remove-fixed",
+      "record": "D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED",
+      "change": {
+        "control": "b20261022-4bf99d",
+        "fixon": "b20261022-c54100",
+        "cause": "tests/suite/fsx.sh draws its seed from 4 random bytes (0..2^32-1), but the vendored fsx stores -S in an int and calls usage() when it is negative, so about half of all runs exit 90 at once and record a FAIL that exercised nothing."
+      },
+      "argument": "FIXED AND VERIFIED. The cause: tests/suite/fsx.sh draws its seed from 4 random bytes (0..2^32-1), but the vendored fsx stores -S in an int and calls usage() when it is negative, so about half of all runs exit 90 at once and record a FAIL that exercised nothing Reproducer: tests/fsx_seed_lap.sh (host-local: /dev/urandom bound to four 0xff bytes in a private mount namespace, fsx.sh on tmpfs; every lap exposed) Control b20261022-4bf99d: with the fix taken out (fix reverted: tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff sha256=8696fceaa6c7370480148efe459b824c241407ac3fda6c037ac4e664782ea61f) 20 of 20 laps failed (tests/evidence/batch_laps/b20261022-4bf99d/; its lane log), each lap failing on the cause itself as the reproducer describes. Fix-on batch b20261022-c54100, sized from that control (plan-verify --control b20261022-4bf99d): 4 of 4 laps PASS with exposure on the frozen candidate 0.90.134 (attempt frozen 2026-10-23T03:55:19Z). Laps: tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step2.log lists laps 1..4; their logs are in tests/evidence/batch_laps/b20261022-c54100/ and their rows in data/criteria.runs.jsonl (row lap:fsx_seed at 2/net/mesh/direct, batch b20261022-c54100), every one with candidate 0.90.134 and build 16A5F5DDDB4852C9D5DB236: 2026-10-23T03:57:56Z exposure=1; 2026-10-23T03:57:53Z exposure=1; 2026-10-23T03:57:50Z exposure=1; 2026-10-23T03:57:48Z exposure=1. A drift check of the candidate after the batch's last lap, tests/evidence/candidates/0.90.134_check_20261023T040141Z.txt: 'candidate 0.90.134: every frozen file is as it was frozen'. The record holds only this seed defect since the split recorded on it: the deleted-log half the review P20261022-fa5891 found is the separate record D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE, and this removal claims nothing about it. The verify proposal for this batch, P20261022-8a9584, is reviewed separately; this removal is applied only after that verify is applied.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step2.log",
+        "tests/evidence/batch_laps/b20261022-c54100",
+        "tests/evidence/batch_laps/b20261022-4bf99d",
+        "data/candidates/0.90.134.json",
+        "tests/evidence/candidates/0.90.134_check_20261023T040141Z.txt",
+        "tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff",
+        "tests/fsx_seed_lap.sh",
+        "data/reviews/P20261022-fa5891.md"
       ],
       "state": "pending",
       "created": "2026-10-22"

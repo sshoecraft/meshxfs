@@ -1,0 +1,144 @@
+# A silent peer death inside the stall limit
+
+How long survivors may take to carry on after a peer dies without a goodbye (its VM killed, or every
+storage path lost), what makes taking over early safe, and what has to change before the death window
+can shrink. Record: `D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S`.
+
+## The question
+
+On the SCSI attachments a peer declares a node dead after 17 unchanged reads of its disk heartbeat
+(2 s apart, 34.8 s measured). That window exists only so that a node whose beats stopped landing has
+closed its own 30 s authority lease before anyone declares it dead (`dlm/disklock.h`, the comment above
+`MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD`). Survivors resume 7-9 s after the declaration, so a survivor
+operation that needs a lock the dead node held stalls 37-61 s, measured at 2, 4, 8 and 16 nodes on both
+lock managers. A file operation stall over 30 s is a stability failure (`stall_limit_s`,
+`data/release_policy.json`).
+
+The takeover proof was never the lease: replay needs a verified fence certificate (READ KEYS, READ
+RESERVATION, PREEMPT AND ABORT of the victim's key, READ KEYS again, the certificate published). The
+question put to gpt-6-astra on 2026-10-23, with these numbers and the project's earlier fencing rulings
+(`docs/fencing.md`, `docs/pr-fencing-departure.md`), was whether the death window can be decoupled from the lease, what an early
+PREEMPT AND ABORT proves, and what that leaves unprotected.
+
+## The ruling
+
+**Suspicion is decoupled from the lease. Taking over is not decoupled from proof that the victim can
+no longer write, and can no longer serve cached reads under the grants it held.**
+
+1. **Writes.** A target-confirmed PREEMPT AND ABORT can replace lease expiry as the proof that the
+   victim's writes are retired, provided all of this holds for the target, backend and topology
+   actually qualified (never "SCST" or "an array family" in general):
+   - one PR key per node incarnation, registered on every I_T nexus the victim has (every path, every
+     session), with a reservation of a type that rejects an unregistered initiator's writes in place;
+     removing a key without a protecting reservation is not a fence;
+   - the abort covers every task of every removed nexus, and a write the target already passed to a
+     backend that cannot cancel it completes before the fence completes;
+   - a command still in the fabric, or queued in the victim's own multipath queue and released later,
+     meets the reservation and is rejected. The victim's queue need not drain; whatever leaves it later
+     must be harmless;
+   - nothing re-registers the victim's key after the preempt (multipathd's registration on path
+     restore, reconnect and restart handling included). Registration again is a new incarnation, never
+     the old mount carrying on;
+   - the survivor that recovers holds the serialized recovery authority; "lowest live slot" is an
+     election preference, not partition arbitration.
+
+   With those, no logical victim mutation lands after the certificate. A Linux timeout or EIO proves
+   none of it, and a key found already absent is not evidence that the victim's tasks were aborted.
+
+2. **Cached reads.** A PR fence revokes no page cache. A victim cut off from storage keeps serving
+   cache hits under grants it still believes it holds, until its own lease closes; if survivors grant a
+   conflicting lock first, the victim serves data another node has since changed. That breaks the
+   coherence the filesystem promises. **Conflicting recovery mutations and new grants of the victim's
+   resources wait for the storage fence certificate AND one of:**
+   - the victim's acknowledged read-stop: over the TCP mesh, the victim confirms an epoch-specific
+     quiesced state it cannot leave without a new grant (a "you are fenced" message sent is not proof;
+     the acknowledgment is);
+   - a read-authority lease provably expired: the survivor saw heartbeat value h at its time t0, a read
+     after the fence still finds h, beats are serialized and sequence-protected so no newer renewal can
+     hide, and the victim renews only from the issue time of a landed beat; then the victim's authority
+     ends no later than t0 + lease x 1.001 (two clocks at +-500 ppm) plus the proven time its readers
+     take to quiesce. If the final read finds a different value, this proof does not apply;
+   - a confirmed host stop (a power-off request is not completion).
+
+   Non-mutating preparation (reading the victim's slice, planning the replay) may start before both
+   conditions hold.
+
+3. **The lease.** It has to expire before conflicting access, not before suspicion. Its closure must
+   **suspend** the mount (no operation admitted under the old grants, reads included, and no reopening
+   because a late beat finally lands), never force an XFS shutdown: shortening a lease whose closure
+   shuts the filesystem down only turns path failovers on live nodes into shut-down nodes. Suspension
+   has to cover buffered and direct reads, directory and metadata operations, operations that wake after
+   the closure, mappings already installed, and asynchronous completions.
+
+4. **The window K is an availability number, not a safety one.** It sets how often a live node is
+   wrongly suspected and appears nowhere in the safety argument. No finite K separates an
+   indefinitely delayed live node from a dead one. It must exceed the longest supported gap between a
+   live node's landed beats, which has not been measured: one hung beat is bounded at 8 s and beats are
+   2 s apart, so K = 4 (about 8.2 s) is already inside a single hung beat's reach.
+
+5. **The live loser** is a state machine, ACTIVE -> SUSPENDED -> REVALIDATED or EVICTED, not "abort and
+   remount": SUSPENDED keeps the node's state while it is decided whether the same incarnation may
+   continue; REVALIDATED resumes only once ownership and dirty state are proven still valid; EVICTED
+   invalidates the old grants for good, quarantines old dirty state so it can never flush into a later
+   epoch, fails the affected operations and rejoins under control. Losing data a live node accepted
+   with `write()` but never made durable is a failure the application must see, never something
+   presented as a transparent failover; completed `fsync` guarantees always hold.
+
+6. **The 7-9 s after the declaration** is mostly fixed waits, to be traced before being cut, in this
+   order: the TCP lock manager's disconnect-driven 20 s non-NL freeze and its 40 s reconnect grace come
+   out of the takeover's critical path (a disconnect is suspicion, not a membership change, and the
+   view is confirmed among the new member set); the fixed 3 s seal settle becomes an acknowledged epoch
+   barrier with the same correctness condition; certificate publication is one bounded durable write in
+   the normal case (its five tries spend 3 s on backoff alone); replay work is bounded by journal and
+   admission policy; independent steps run in parallel; PR round trips last. A 60 s PR command timeout
+   cannot support a sub-30 s claim, and a shorter Linux timeout proves no retirement: an unresolved
+   fence attempt fails closed and keeps reconciling, it never replays.
+
+7. **DRBD and the shared attachment.** A witness naming a winner excludes nothing: the loser may still
+   write its replica, serve cached reads or reconnect diverged. Shortening the DRBD window needs the
+   witness path to deliver an exclusion as rigorous as the SCSI fence, and read-stop proof unless a
+   confirmed host fence supplies it. Manual fencing has no unattended bound at all.
+
+## The safety argument
+
+1. A serialized membership and recovery authority chooses the transition.
+2. A verified fence retires every old victim write and blocks every later write of that incarnation.
+3. The victim's read authority has provably stopped before any conflicting recovery mutation or grant.
+4. Recovery completes durably before the dead node's grants are released and new owners proceed.
+5. The loser cannot re-register, expose old caches or flush old dirty state without a validated rejoin.
+
+The death window appears in none of the five.
+
+## The budget it allows
+
+A first shape to measure against, not yet a qualified one: suspicion at K = 5 (10.25 s at the measured
+lap); a 12 s read and write authority counted from the beat's issue time, whose closure suspends;
+fence, verification and certificate within 2 s; recovery, flush, grant release and membership within
+5 s; first unblocked survivor operation by max(11 + 2, 12.6) + 5 = 18 s. The 4 s the current window
+allows for the heartbeat pump's lateness does not vanish by itself: either admission and expiry are
+enforced where they are used, so a late timer cannot extend authority, or the allowance stays in the
+budget (12 + 4 + 5 s is over 20).
+
+## What is measured before K and the lease are chosen
+
+- Each node's beat issue, landing, completion and peer observation at 2, 4, 8 and 16 nodes: the gap
+  between landed beats as a distribution with its maximum, not a mean.
+- Those gaps on a live node under a single-path failover, path restoration, multipath queueing, a host
+  I/O storm, memory or CPU pressure, and a VM pause and resume.
+- PR retirement under attack: old writes executing in the target, delayed in the fabric and queued in
+  multipath; restored paths; controller failover; no old write over a post-certificate survivor write.
+- Cached-read revocation on a victim cut off from storage with its TCP links up: buffered and metadata
+  reads and existing mappings against a conflicting survivor change.
+- The recovery phases of one unfiltered run of each silent-death row, with a busy victim journal: PR,
+  publication, seal, replay size, flushes, membership and the first unblocked operation.
+- Detection from the moment of failure, not from the last beat seen: a pre-failure beat that lands late
+  resets the stale count and extends detection.
+
+## Open
+
+- The read-stop acknowledgment protocol over the TCP mesh, and what CAW, which has no network between
+  nodes, uses instead (a small control channel, a witness, or the conservative lease proof alone).
+- How a suspended mount revalidates when a closed authority lease never reopens (a beat that lands
+  after the closure is not a grant): resuming the same incarnation needs proof that no peer has fenced
+  it and none can be part way through doing so.
+- Revoking installed mappings within a bounded time, and clock behaviour across a VM pause.
