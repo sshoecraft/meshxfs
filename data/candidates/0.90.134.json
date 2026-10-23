@@ -1,8 +1,8 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-23T10:11:20Z",
-  "state": "ABANDONED",
+  "created": "2026-10-23T15:56:24Z",
+  "state": "RUNNING",
   "attempts": [
     {
       "created": "2026-10-21T21:26:41Z",
@@ -258,15 +258,37 @@
       "dist": "",
       "packages": {},
       "steps": {}
+    },
+    {
+      "created": "2026-10-23T10:11:20Z",
+      "state": "ABANDONED",
+      "dry_run": false,
+      "srcversion": "08D63764A9352FBDD5A76CD",
+      "files": "tests/evidence/candidates/0.90.134_20261023T101120Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-23T10:11:20Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-23T14:18:43Z",
+          "why": "attempt 2026-10-23T10:11:20Z retired for changes it cannot take: the silent peer death fix needs the path timescale made a setting the pool records with each binding (tools/mpath_settings.sh, tools/lun_pool.sh, run.sh) and the death window chosen from the 2 s measurement; tools/batch_lap.py ends a timed-out lap's whole process group; tests/mpath/lib.sh keeps an ABORTed path row's kernel logs; tools/defects.py can drop a run another disposition already accounts for; the 512-byte native-XFS yardsticks are re-captured. Every verification that passed on it is applied."
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
   "srcversion": "08D63764A9352FBDD5A76CD",
   "module_sha256": "2d563ca5f424423d3c0c482e02e9280273ca87ea2da8a5c0a40e5f1406e7189c",
-  "files": "tests/evidence/candidates/0.90.134_20261023T101120Z.files.json",
-  "files_count": 2559,
-  "files_digest": "540cc45c86a220b367e2301d9bc14ba154b5570e172e6600f12917d247a05c1c",
-  "spec": "239edd020f1a096365b741c3102e0e052eec58ebe70c3d53dd631e5aa7a81ea8",
+  "files": "tests/evidence/candidates/0.90.134_20261023T155624Z.files.json",
+  "files_count": 2564,
+  "files_digest": "fa008d0a48b01209a3daf5fe1ccfbaf5b136d650b9ab2c1b9fd0eae6c6f4e488",
+  "spec": "ec57ce06eb09c644b368cde523dfd4fa03e87d54b80a4bee31602c59f3ec175b",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
   "packages": {},
@@ -275,13 +297,8 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-23T10:11:20Z",
+      "at": "2026-10-23T15:56:25Z",
       "why": "created"
-    },
-    {
-      "state": "ABANDONED",
-      "at": "2026-10-23T14:18:43Z",
-      "why": "attempt 2026-10-23T10:11:20Z retired for changes it cannot take: the silent peer death fix needs the path timescale made a setting the pool records with each binding (tools/mpath_settings.sh, tools/lun_pool.sh, run.sh) and the death window chosen from the 2 s measurement; tools/batch_lap.py ends a timed-out lap's whole process group; tests/mpath/lib.sh keeps an ABORTed path row's kernel logs; tools/defects.py can drop a run another disposition already accounts for; the 512-byte native-XFS yardsticks are re-captured. Every verification that passed on it is applied."
     }
   ]
 }

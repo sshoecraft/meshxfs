@@ -2402,6 +2402,56 @@
           },
           "transfer": "",
           "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261023-e1901e",
+          "kind": "control",
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the gate lists",
+          "candidate": "",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py and tools/defects.py read and route a release step's run as any other run, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a release step's FAIL cannot be named, annotated or retired on any of the three key shapes"
+        },
+        {
+          "id": "b20261023-8f5476",
+          "kind": "verify",
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: the gate lists",
+          "candidate": "0.90.134",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:release_step_cell",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-e1901e",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py and tools/defects.py read and route a release step's run as any other run, as before the fix)",
+            "builds": [
+              "08D63764A9352FBDD5A76CD"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "updated": "2026-10-23",
@@ -2420,6 +2470,21 @@
             "9594B08726D6732D2ED5E87"
           ],
           "date": "2026-10-22"
+        },
+        {
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-e1901e",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_RELEASE_STEP_SETTLE=0 (tools/criteria.py and tools/defects.py read and route a release step's run as any other run, as before the fix)",
+          "builds": [
+            "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
         }
       ],
       "cells": [
@@ -2522,6 +2587,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:release_step_cell",
           "iso": "2026-10-22T20:06:52Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T15:58:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T15:58:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T15:58:25Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T15:58:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T15:58:13Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T15:58:07Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T15:58:01Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T15:57:55Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T15:57:49Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-23T15:57:43Z"
         }
       ],
       "reproducer": "tests/release_step_cell_lap.py (host only, under 1 s): takes a recorded release step FAIL from the primary ledger and requires it to parse as a cell (tools/criteria.py parse_cell), to be found in the ledger and to take an annotation; prints EXPOSED for the recorded step FAIL it uses. With the fix taken out parse_cell refuses the step's key ('criteria: 1/any: wanted <nodes>/<class>/<method>/<attach>'): STEP_CELL_LAP FAIL",
@@ -2530,11 +2645,11 @@
           "config": "2/net/mesh/direct",
           "platform": "any",
           "candidate": "0.90.134",
-          "attempt": "2026-10-23T03:55:19Z",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "batch": "b20261022-db370d",
-          "approval": "P20261022-d6567c",
-          "date": "2026-10-22"
+          "attempt": "2026-10-23T15:56:24Z",
+          "build": "08D63764A9352FBDD5A76CD",
+          "batch": "b20261023-8f5476",
+          "approval": "P20261023-e3cea7",
+          "date": "2026-10-23"
         }
       ]
     },
@@ -3360,6 +3475,56 @@
           "config": "2/net/mesh/drbd",
           "row": "lap:release_board_verdict",
           "iso": "2026-10-22T20:05:12Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T16:00:27Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T16:00:26Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T16:00:25Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T16:00:24Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T16:00:23Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T16:00:22Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T16:00:21Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T16:00:20Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T16:00:19Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:release_board_verdict",
+          "iso": "2026-10-23T16:00:18Z"
         }
       ],
       "batches": [
@@ -3462,6 +3627,56 @@
           },
           "transfer": "",
           "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261023-b9400f",
+          "kind": "control",
+          "row": "lap:release_board_verdict",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "MXFS_BOARD_VERDICT_OWN_RIG=0 (tools/release_run.py board_verdict grades an own-rig board with the own-rig flag as its caller has it, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: the orchestrator's verdict on the DRBD board grades no row"
+        },
+        {
+          "id": "b20261023-45c118",
+          "kind": "verify",
+          "row": "lap:release_board_verdict",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:release_board_verdict",
+            "config": "2/net/mesh/drbd",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-b9400f",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_BOARD_VERDICT_OWN_RIG=0 (tools/release_run.py board_verdict grades an own-rig board with the own-rig flag as its caller has it, as before the fix)",
+            "builds": [
+              "08D63764A9352FBDD5A76CD"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "updated": "2026-10-23",
@@ -3495,6 +3710,21 @@
             "9594B08726D6732D2ED5E87"
           ],
           "date": "2026-10-22"
+        },
+        {
+          "row": "lap:release_board_verdict",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-b9400f",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_BOARD_VERDICT_OWN_RIG=0 (tools/release_run.py board_verdict grades an own-rig board with the own-rig flag as its caller has it, as before the fix)",
+          "builds": [
+            "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
         }
       ],
       "reproducer": "tests/release_board_verdict_lap.py <candidate> (host only): grades the 2/net/mesh/drbd board for the candidate as tools/release_run.py does (MXFS_OWN_RIG unset) and as an own-rig run does (set), taking its inputs from the environment and dropping MXFS_OWN_RIG from the orchestrator's call, and requires the orchestrator's verdict to name every row that is not green; EXPOSED when the board has rows not green. With the fix taken out the orchestrator's verdict names 0 rows: BOARD_VERDICT_LAP FAIL",
@@ -3503,11 +3733,11 @@
           "config": "2/net/mesh/drbd",
           "platform": "any",
           "candidate": "0.90.134",
-          "attempt": "2026-10-23T03:55:19Z",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "batch": "b20261022-d569c5",
-          "approval": "P20261022-6c4776",
-          "date": "2026-10-22"
+          "attempt": "2026-10-23T15:56:24Z",
+          "build": "08D63764A9352FBDD5A76CD",
+          "batch": "b20261023-45c118",
+          "approval": "P20261023-e629b4",
+          "date": "2026-10-23"
         }
       ]
     },
@@ -5871,7 +6101,140 @@
       "evidence": "tests/evidence/controls/fua_control_20261022T183902Z.log:9-19 (2026-10-22, 2/net/mesh/direct4k fourkn_cdb, control b20261022-545d6a): lap 1 'run.sh rc=0 recorded no run of the batch', :13 'harness_batch: the lap recorded nothing (refused?); stopping', :18 'defects: batch b20261022-545d6a planned 20 laps and has 1; run the rest first', :19 'control b20261022-545d6a: 0 of 0 laps failed with the fix out'; the ledger row is data/criteria.runs.jsonl:7378 (review data/reviews/P20261022-4f49ad.md, observation 3). The same lap printed clyde_preflight.sh:151 '/proc/<pid>/stat: No such file or directory' four times. The control's second call (fua_control_20261022T184149Z.log) ran the other 19 laps normally. ===== 2026-10-23, CAUSE: tools/criteria.py reads a board's run ledger once per process (read_ledger, ledger_cache, tools/criteria.py:528-558), and harness_batch.py board_lap read the ledger before the lap (the stamps already there) and again after run.sh, which appends in another process; the second read returned the copy taken before the lap, so the lap's run was not found. The transcript of the session that ran the control (~/.claude/projects/-home-steve-src-mxfs/9fb41984-a0e7-4039-b541-344e1e2da14c.jsonl line 1124, 2026-10-22T18:41:05Z) shows the edit that added criteria.ledger_cache.clear() before both reads, 40 s after lap 1 recorded its run (data/criteria.runs.jsonl:7378, iso 18:40:25Z, batch b20261022-545d6a) and before the control's second call (fua_control_20261022T184149Z.log), which found all 19 laps. The edit's old text has no clear at either read. FIX, in the tree since then and now behind its own switch: tools/harness_batch.py ledger_reread() drops the board's ledger copy before each read (stamps_before, lap_runs); MXFS_HARNESS_BATCH_REREAD=0 keeps the copy, the pre-fix reads exactly. Precheck on the host: tests/harness_batch_reread_lap.py fix on PASS (the run another process appended found), MXFS_HARNESS_BATCH_REREAD=0 FAIL (0 runs found), each with EXPOSED.",
       "next": "Control batch on the frozen candidate with MXFS_HARNESS_BATCH_REREAD=0 (tools/harness_batch.py control --knob, 10 laps, bound 10 s, probe '^EXPOSED: another process appended', pass '^PASS: harness_batch.py found'), the verification batch sized from it, then remove --fixed.",
       "reproducer": "tests/harness_batch_reread_lap.py (host only, under 1 s): reads a scratch board's ledger through harness_batch.py as a board lap does, appends a run of a lap-unique batch from another process through tools/criteria.py append_ledger (as run.sh records), then asks harness_batch.py for the lap's runs. EXPOSED: the run is in the ledger file; PASS when harness_batch.py finds it, FAIL when not. MXFS_HARNESS_BATCH_REREAD=0 is the fix's own switch off (the control).",
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "batches": [
+        {
+          "id": "b20261023-73db4c",
+          "kind": "control",
+          "row": "lap:harness_batch_reread",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: another process appended",
+          "candidate": "",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "MXFS_HARNESS_BATCH_REREAD=0 (tools/harness_batch.py keeps the ledger copy it read before the lap, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: the read after a lap returns the copy taken before it, so the lap's run is not found"
+        },
+        {
+          "id": "b20261023-f17d93",
+          "kind": "verify",
+          "row": "lap:harness_batch_reread",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: another process appended",
+          "candidate": "0.90.134",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:harness_batch_reread",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-73db4c",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_HARNESS_BATCH_REREAD=0 (tools/harness_batch.py keeps the ledger copy it read before the lap, as before the fix)",
+            "builds": [
+              "08D63764A9352FBDD5A76CD"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:harness_batch_reread",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-73db4c",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_HARNESS_BATCH_REREAD=0 (tools/harness_batch.py keeps the ledger copy it read before the lap, as before the fix)",
+          "builds": [
+            "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:harness_batch_reread",
+          "iso": "2026-10-23T16:00:47Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:harness_batch_reread",
+          "iso": "2026-10-23T16:00:46Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:harness_batch_reread",
+          "iso": "2026-10-23T16:00:45Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:harness_batch_reread",
+          "iso": "2026-10-23T16:00:44Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:harness_batch_reread",
+          "iso": "2026-10-23T16:00:43Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:harness_batch_reread",
+          "iso": "2026-10-23T16:00:42Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:harness_batch_reread",
+          "iso": "2026-10-23T16:00:41Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:harness_batch_reread",
+          "iso": "2026-10-23T16:00:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:harness_batch_reread",
+          "iso": "2026-10-23T16:00:39Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:harness_batch_reread",
+          "iso": "2026-10-23T16:00:38Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T15:56:24Z",
+          "build": "08D63764A9352FBDD5A76CD",
+          "batch": "b20261023-f17d93",
+          "approval": "P20261023-ba31ad",
+          "date": "2026-10-23"
+        }
+      ]
     },
     {
       "id": "D-LAST-MEMBER-UMOUNT-AFTER-A-15K-PAGE-HANDBACK-TAKES-31S-OVER-THE-STALL-LIMIT",
@@ -6028,7 +6391,128 @@
       "evidence": "Verification batch b20261022-548ef2 (lap:jdt_gate_fault at 2/net/mesh/direct, candidate 0.90.134): 7 of its 9 laps timed A's last-member umount at 30.9-32.7 s on the node (row.log 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=31006' in tests/evidence/20261023T043949Z_capture_gate_jdtv1, and the same in jdtv2, 4, 5, 6, 8, 9), and every lap was recorded PASS in data/criteria.runs.jsonl. The review data/reviews/P20261023-128f2f.md traced why: the stall check in tools/criteria.py reads only a max_stall_ms= field, which tools/batch_lap.py never writes, and the harness bounds that step at 180 s.",
       "next": "Give batch laps a stall measurement the ledger grades: either batch_lap.py extracts each harness's timed operations (a declared pattern per lap, like the probe) and records the largest as max_stall_ms, or the harnesses print a 'max_stall_ms=' line batch_lap.py copies; make criteria.py grade a batch lap over stall_limit_s FAIL as it does a board row. Reproduce with a lap that prints an operation over 30 s and passes its verdict line; control with the change out (graded PASS), verification with it in (graded FAIL). ===== FIX in the tree (not yet controlled or verified): tools/batch_lap.py stall_graded() reads every max_stall_ms=<ms> line and every match of each --stall pattern (one capture group, milliseconds; tools/harness_batch.py passes --stall through) in the lap's output and the evidence files it wrote, appends max_stall_ms=<worst> to measured, and turns a PASS over the policy's stall_limit_s into a FAIL with criteria.stall_over_limit, the function that grades a board row's stall; MXFS_BATCH_LAP_STALL=0 measures and grades nothing, as before. verdict() is the old verdict-line code moved out of main() unchanged. First runs on the tree: fix on, 'graded FAIL: rc=0 elapsed_s=0 max_stall_ms=31500 -- operation stall 31500 ms is over the 30 s limit'; switch off, 'graded PASS: rc=0 elapsed_s=0 -- RESULT: PASS label=stall'. Next: on the next attempt, a control batch with MXFS_BATCH_LAP_STALL=0 (lap:batch_lap_stall at 1/any or the configuration the batch names), then a verification batch sized from it, then remove --fixed. ===== 2026-10-23, read before any batch: the lap cannot pass a verification batch as written. tests/batch_lap_stall_lap.py:58 prints 'graded {outcome}: {measured} -- {reason}', and with the fix on, measured carries 'max_stall_ms=31500' (tools/batch_lap.py:194). tools/harness_batch.py runs each lap through tools/batch_lap.py, whose stall_graded() reads every max_stall_ms= in the lap's own output (STALL_LINE, :178, :269-272), so the outer grading turns the lap's PASS into a FAIL on every verification lap; in the control (MXFS_BATCH_LAP_STALL=0 in the lap's environment, inherited by the outer batch_lap.py too) neither grading runs and the lap fails as a control should. Before the control: print the inner measured value without the max_stall_ms= token (e.g. 'worst_ms=31500'), then the control and the verification batch on the next attempt.",
       "reproducer": "tests/batch_lap_stall_lap.py (a harness that prints an operation one second over stall_limit_s as max_stall_ms= and another through a declared --stall pattern, then RESULT: PASS, graded as tools/batch_lap.py grades a lap; EXPOSED line each lap; MXFS_BATCH_LAP_STALL=0 is the fix's switch off)",
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "batches": [
+        {
+          "id": "b20261023-572eb1",
+          "kind": "control",
+          "row": "lap:batch_lap_stall",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: a lap printed operations",
+          "candidate": "",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py grades a lap from its verdict line alone and records no stall, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a lap whose operation stalled over the limit and that printed PASS records a PASS"
+        },
+        {
+          "id": "b20261023-f16825",
+          "kind": "verify",
+          "row": "lap:batch_lap_stall",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: a lap printed operations",
+          "candidate": "0.90.134",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:batch_lap_stall",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-572eb1",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py grades a lap from its verdict line alone and records no stall, as before the fix)",
+            "builds": [
+              "08D63764A9352FBDD5A76CD"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:batch_lap_stall",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-572eb1",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_BATCH_LAP_STALL=0 (tools/batch_lap.py grades a lap from its verdict line alone and records no stall, as before the fix)",
+          "builds": [
+            "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall",
+          "iso": "2026-10-23T16:02:43Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall",
+          "iso": "2026-10-23T16:02:42Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall",
+          "iso": "2026-10-23T16:02:41Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall",
+          "iso": "2026-10-23T16:02:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall",
+          "iso": "2026-10-23T16:02:39Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall",
+          "iso": "2026-10-23T16:02:38Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall",
+          "iso": "2026-10-23T16:02:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall",
+          "iso": "2026-10-23T16:02:36Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall",
+          "iso": "2026-10-23T16:02:35Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_stall",
+          "iso": "2026-10-23T16:02:34Z"
+        }
+      ]
     },
     {
       "id": "D-TAUTH-TEST-OBJECTS-OMIT-INCLUDED-HEADERS-SO-A-HEADER-CHANGE-LINKS-STALE-CODE",
@@ -6253,7 +6737,129 @@
       "opened": "2026-10-23",
       "summary": "tools/batch_lap.py bounds a lap with subprocess.run(timeout=bound), which on expiry kills only the process it started, so a harness's own children outlive the lap: they go on writing after the lap is recorded and while the next lap runs on the same nodes",
       "evidence": "tools/batch_lap.py:259-262 'rc = subprocess.run(command, cwd=ROOT, stdout=handle, stderr=subprocess.STDOUT, timeout=args.bound).returncode' / 'except subprocess.TimeoutExpired: rc = 124'. Control b20261022-8375dc lap 7 (2/net/mesh/direct:gate:d_intents_2tcp_open_efi:2026-10-22T19:14:48Z) was recorded at 19:14:48Z with rc=124 while its harness kept writing until 19:15:08Z, 20 s later, after lap 8 had started (review of P20261023-b45350, 'Other findings').",
-      "next": "Start each lap in its own session (start_new_session=True) and on expiry kill the whole process group and wait for it before recording the lap; reproduce with a lap whose command forks a child that sleeps past a short bound and then writes a marker: unfixed the marker lands after the lap's record line, fixed it never does."
+      "next": "Start each lap in its own session (start_new_session=True) and on expiry kill the whole process group and wait for it before recording the lap; reproduce with a lap whose command forks a child that sleeps past a short bound and then writes a marker: unfixed the marker lands after the lap's record line, fixed it never does.",
+      "batches": [
+        {
+          "id": "b20261023-1d7216",
+          "kind": "control",
+          "row": "lap:batch_lap_killpg",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the bound ran out",
+          "candidate": "",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "MXFS_BATCH_LAP_KILLPG=0 (tools/batch_lap.py ends only the process it started when a lap's bound runs out, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a bounded lap's harness child outlives the bound and writes after the lap is recorded"
+        },
+        {
+          "id": "b20261023-8e8ccd",
+          "kind": "verify",
+          "row": "lap:batch_lap_killpg",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: the bound ran out",
+          "candidate": "0.90.134",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:batch_lap_killpg",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-1d7216",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_BATCH_LAP_KILLPG=0 (tools/batch_lap.py ends only the process it started when a lap's bound runs out, as before the fix)",
+            "builds": [
+              "08D63764A9352FBDD5A76CD"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "updated": "2026-10-23",
+      "rates": [
+        {
+          "row": "lap:batch_lap_killpg",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-1d7216",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_BATCH_LAP_KILLPG=0 (tools/batch_lap.py ends only the process it started when a lap's bound runs out, as before the fix)",
+          "builds": [
+            "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killpg",
+          "iso": "2026-10-23T16:01:53Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killpg",
+          "iso": "2026-10-23T16:01:48Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killpg",
+          "iso": "2026-10-23T16:01:42Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killpg",
+          "iso": "2026-10-23T16:01:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killpg",
+          "iso": "2026-10-23T16:01:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killpg",
+          "iso": "2026-10-23T16:01:26Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killpg",
+          "iso": "2026-10-23T16:01:20Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killpg",
+          "iso": "2026-10-23T16:01:15Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killpg",
+          "iso": "2026-10-23T16:01:09Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:batch_lap_killpg",
+          "iso": "2026-10-23T16:01:04Z"
+        }
+      ]
     },
     {
       "id": "D-FOREIGN-REPLAY-WRITES-AG-HEADERS-WITHOUT-THE-AG-LOCK",

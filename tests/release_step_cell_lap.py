@@ -38,8 +38,8 @@ run, as before the fix: the fix's control. The lap hands its environment to ever
 
 Bound, derived: each command is one interpreter reading the queue (1.5 MB), the proposals and the
 primary board and ledger (6 MB); a disposition is 3-5 commands and the gate twice. Measured on the
-tree of 2026-10-23: all nine with their copies (~10 MB each) in 11.8 s. A batch lap is bounded at
-2x that, 24 s; each command at 20 s.
+tree of 2026-10-23 with every disposition settling: all nine with their copies (~10 MB each) in
+15.1 s. A batch lap is bounded at 2x that, 30 s; each command at 20 s.
 
 Usage: tests/release_step_cell_lap.py
 Exit: 0 PASS, 1 FAIL, 2 the lap could not measure.

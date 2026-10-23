@@ -3054,6 +3054,242 @@
         "date": "2026-10-23"
       },
       "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-175966",
+      "kind": "remove-fixed",
+      "record": "D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE",
+      "change": {
+        "control": "b20261023-0934e6",
+        "fixon": "b20261023-707d51",
+        "cause": "run.sh run_none, which runs the fsx row, pulled nothing from the node for a row that did not pass, so a failing fsx check's log, which tests/suite/fsx.sh keeps on the node as /root/fsx.<seed>.<ops>.log and names in the row's measured text, never reached the run's evidence; run_none now pulls the row's artifacts (pull_row_artifacts, which selects fsx.*.log) for a row that did not pass"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: a failing fsx row kept no fsx log in its evidence, so no FAIL of the fsx row could be diagnosed from what the run kept. tests/suite/fsx.sh keeps a failing check's log on the node (/root/fsx.<seed>.<ops>.log, tests/suite/fsx.sh:38; it deletes the log only for a check that passed, :45) and names it in the row's measured text; the fsx row runs through run.sh run_none, which before the fix pulled nothing for a row that did not pass.\n\nThe fix, one site: run.sh:1531-1543. A row run by run_none that did not pass (no RESULT line, or a status other than PASS) calls pull_row_artifacts for its node; that pull's selection names fsx.*.log (run.sh:2248, :2250). MXFS_PULL_RUN_NONE=0 skips that pull (:1539), which is exactly the pre-fix path: before the fix run_none had no pull.\n\nThe lap: tests/fsx_log_pull_lap.sh runs the fsx row through run.sh with FSX_SEED=-1, so fsx exits with its usage on both checks and the row fails with both logs named (EXPOSED), and passes only if the run's evidence directory holds both logs with fsx's usage text in them.\n\nControl b20261023-0934e6: the frozen tree of candidate 0.90.134's attempt 2026-10-23T10:11:20Z (module 08D63764A9352FBDD5A76CD) with MXFS_PULL_RUN_NONE=0, run from tests/evidence/lanes/g2b_attempt1011_20261023T101423Z (step6.log). 10 of 10 laps failed, each with its EXPOSED line and the missing logs named, e.g. tests/evidence/batch_laps/b20261023-0934e6/20261023T102136Z-fc63e6a9.log: 'EXPOSED: the fsx row failed both checks, logs named: test15:/root/fsx.-1.100000.log test15:/root/fsx.-1.50000.log' and 'LAP fsx_pull FAIL: not in the run's evidence: tests/evidence/run_fsx_20261023T102136Z-g2b/test15_fsx.-1.100000.log ...'. tools/harness_batch.py proof b20261023-0934e6 tests/evidence/candidates/0.90.134_20261023T101120Z.files.json: HOLDS (the attempt froze every file as it was after the restore; nothing touched between; inputs before/after in tests/evidence/controls/b20261023-0934e6.20261023T102134Z.inputs.*.json).\n\nFix-on b20261023-707d51 (candidate 0.90.134, the same attempt, module 08D63764A9352FBDD5A76CD, step7.log of the same lane): 6 of 6 laps PASS, each with its EXPOSED line; its verify proposal P20261023-8efcf4 was approved and applied. N=6 is the plan-verify size from the control's 10 of 10 (lower bound 0.5887).\n\nCells: the record names only the control's own 10 laps (2/disk/caw/direct:lap:fsx_pull), each of which shows this cause in its own log. No product code is involved; the module is not a fix site.",
+      "evidence": [
+        "run.sh",
+        "tests/suite/fsx.sh",
+        "tests/fsx_log_pull_lap.sh",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step6.log",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step7.log",
+        "tests/evidence/batch_laps/b20261023-0934e6",
+        "tests/evidence/batch_laps/b20261023-707d51",
+        "tests/evidence/controls/b20261023-0934e6.20261023T102134Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-0934e6.20261023T102134Z.inputs.after.json",
+        "tests/evidence/candidates/0.90.134_20261023T101120Z.files.json",
+        "data/reviews/P20261023-8efcf4.md",
+        "data/defects.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-591bf8",
+      "kind": "remove-fixed",
+      "record": "D-CAPTURE-GATE-ENTRIES-INHERIT-THE-CLUSTER-STATE-AN-EARLIER-FAULT-LEFT",
+      "change": {
+        "control": "b20261023-bff4eb",
+        "fixon": "b20261023-621a18",
+        "cause": "tests/capture_fault_gate.sh ran its entries back to back and never re-formed the pair, so an entry that does not prep the cluster itself started on whatever the previous injected fault left (a node unmounted, without its module, or destroyed) and aborted before its fault line, which the gate read BROKEN; pair_ready now checks the pair before every lap and forms it again (or ends the gate ABORT) when it is not formed"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: capture-gate entries that do not prep the cluster themselves started on the state the previous entry's fault left and aborted before reaching their own fault, so the gate read them BROKEN without measuring them.\n\nThe fix, one site: tests/capture_fault_gate.sh pair_ready (:109-:150), called before every fault lap (:151) and healthy lap (:170): each node must answer with /src, the tree's srcversion, the configuration's force_transport and one mxfs mount (pair_formed, :105-:108); a pair that is not formed is powered, waited for and formed again with run.sh prep_cluster, and a pair that cannot be formed ends the gate ABORT. GATE_PAIR_RESTORE=0 returns from pair_ready at once (:112), which is exactly the gate before the fix: it had no check (:46).\n\nThe lap: tests/capture_gate_pair_lap.sh unmounts test1 (a pair as an earlier fault leaves it), prints 'EXPOSED: test1 holds no mxfs mount as the gate starts', runs one entry that does not prep, and passes only when the entry reached its fault on a formed pair.\n\nControl b20261023-bff4eb: the frozen tree of candidate 0.90.134's attempt 2026-10-23T10:11:20Z (module 08D63764A9352FBDD5A76CD) with GATE_PAIR_RESTORE=0, tests/evidence/lanes/g2_attempt1011_20261023T101421Z step 11 (summary.log:26-27). 10 of 10 laps failed, each with its own EXPOSED line and the cause, e.g. tests/evidence/batch_laps/b20261023-bff4eb/20261023T103236Z-2fb3aaaf.log: 'EXPOSED: test1 holds no mxfs mount as the gate starts (restore=0)' and 'LAP gate_pair FAIL: the entry was BROKEN on the pair an earlier lap left'. tools/harness_batch.py proof b20261023-bff4eb tests/evidence/candidates/0.90.134_20261023T101120Z.files.json: HOLDS (inputs before/after: tests/evidence/controls/b20261023-bff4eb.20261023T103234Z.inputs.*.json).\n\nFix-on b20261023-621a18 (same attempt and module, step 12, summary.log:28-29): 6 of 6 laps PASS, each with its EXPOSED line; its verify proposal P20261023-0a1c5a was approved and applied. N=6 is the plan-verify size from the control's 10 of 10.\n\nCells: the control's own 10 laps (2/net/mesh/direct:lap:gate_pair), and three presteps runs whose capture gate had entries start on an unformed pair: 1/any:release:presteps:2026-10-21T19:05:47Z (tests/evidence/candidates/0.90.133-2.presteps.log:219 'ABORT: test2 not mounted (sv=71AC6107043DD5BE3D9181A m=0 ...)'), 21:43:30Z (0.90.134_20261021T212712Z.presteps.log:217, the same abort, m=0) and 23:22:19Z (0.90.134_20261021T230333Z.presteps.log:238, the same abort, m=0); the record's evidence lists the entries that found no live mount or a node down (d0980, d0981, prep_heartbeat_writer_guard, chk_mounted_node_reads_platter, join_during_takeover, tcp_death_replay, lone_mount_crash_replay). Those runs' other broken entries are other records' causes (the EUI-64 resolver's, D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E-AND-NO-WWN-BYID-LINK, for the 'no MXFS device basis' fallback those four entries then took; live_holder_wait and join_during_takeover their own records), and all three runs are already retired by D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK-FOR-A-NODE-DEVICE-PATH and D-RECOV-BMBT-REUSE-ABORT-LEAVES-THE-DESTROYED-VICTIM-POWERED-OFF (data/criteria.runs.jsonl retired_by notes), so this removal changes no incident.",
+      "evidence": [
+        "tests/capture_fault_gate.sh",
+        "tests/capture_gate_pair_lap.sh",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/summary.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step11.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step12.log",
+        "tests/evidence/batch_laps/b20261023-bff4eb",
+        "tests/evidence/batch_laps/b20261023-621a18",
+        "tests/evidence/controls/b20261023-bff4eb.20261023T103234Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-bff4eb.20261023T103234Z.inputs.after.json",
+        "tests/evidence/candidates/0.90.134_20261023T101120Z.files.json",
+        "tests/evidence/candidates/0.90.133-2.presteps.log",
+        "tests/evidence/candidates/0.90.134_20261021T212712Z.presteps.log",
+        "tests/evidence/candidates/0.90.134_20261021T230333Z.presteps.log",
+        "data/reviews/P20261023-0a1c5a.md",
+        "data/defects.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-e3cea7",
+      "kind": "verify",
+      "record": "D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED",
+      "change": {
+        "batch": "b20261023-8f5476"
+      },
+      "argument": "Verification batch b20261023-8f5476 on candidate 0.90.134, attempt frozen 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), declared by tools/harness_batch.py verify before its first lap and sized from control b20261023-e1901e (10 of 10 laps failed with MXFS_RELEASE_STEP_SETTLE=0 set in the lap's own environment, same attempt, tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step1.log). 6 of 6 laps PASS ('STEP_CELL_LAP PASS all 9 dispositions settled their run (3 key shapes x infra, amend, removal) and both take-backs listed it again'), each with its exposure probe '^EXPOSED: the gate lists' (9 per lap), no lap failed or dropped (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step2.log, tests/evidence/batch_laps/b20261023-8f5476). The lap runs on the dev host only; the switch is in tools/criteria.py (RELEASE_STEP_SETTLE) and tools/defects.py (parse_cell, retire_cells via criteria.run_board), both frozen files of the attempt.",
+      "evidence": [
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/summary.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step1.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step2.log",
+        "tests/evidence/batch_laps/b20261023-e1901e",
+        "tests/evidence/batch_laps/b20261023-8f5476",
+        "tests/release_step_cell_lap.py",
+        "tools/criteria.py",
+        "tools/defects.py",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-e3cea7.md",
+        "sha256": "d639e294df58f10fa0c62420ca150aa359a031143373d82b679a298722d325f3",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-e629b4",
+      "kind": "verify",
+      "record": "D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD",
+      "change": {
+        "batch": "b20261023-45c118"
+      },
+      "argument": "Verification batch b20261023-45c118 on candidate 0.90.134, attempt frozen 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), declared by tools/harness_batch.py verify before its first lap and sized from control b20261023-b9400f on the same attempt (10 of 10 laps failed with MXFS_BOARD_VERDICT_OWN_RIG=0 in the lap's own environment, tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step3.log). 6 of 6 laps PASS, each 'BOARD_VERDICT_LAP PASS the orchestrator's verdict names the 35 row(s)' with its exposure line '^EXPOSED: ' (2/net/mesh/drbd has 35 rows not green for 0.90.134), none failed or dropped (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step4.log, tests/evidence/batch_laps/b20261023-45c118). The lap grades the DRBD board as tools/release_run.py board_verdict does and as an own-rig run does and compares the two; each lap is two interpreter starts (~1 s), inside its 30 s bound. The switch is tools/release_run.py BOARD_VERDICT_OWN_RIG (:67-69), a frozen file of the attempt.",
+      "evidence": [
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/summary.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step3.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step4.log",
+        "tests/evidence/batch_laps/b20261023-b9400f",
+        "tests/evidence/batch_laps/b20261023-45c118",
+        "tests/release_board_verdict_lap.py",
+        "tools/release_run.py",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-e629b4.md",
+        "sha256": "191dc6ffe459890999ecd7e9e960f291dee2bc858fee818a4c3eb836f073a7f7",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-ba31ad",
+      "kind": "verify",
+      "record": "D-TOOLS-HARNESS-BATCH-PY-CONTROL-STOPPED-A-CONTROL-BATCH",
+      "change": {
+        "batch": "b20261023-f17d93"
+      },
+      "argument": "Verification batch b20261023-f17d93 on candidate 0.90.134, attempt frozen 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), declared by tools/harness_batch.py verify before its first lap and sized from control b20261023-73db4c on the same attempt (10 of 10 laps failed with MXFS_HARNESS_BATCH_REREAD=0 in the lap's own environment only, so the harness_batch.py recording the control kept its re-read, tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step5.log). 6 of 6 laps PASS ('PASS: harness_batch.py found the lap's run ...'), each with its exposure line '^EXPOSED: another process appended', none failed or dropped (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step6.log, tests/evidence/batch_laps/b20261023-f17d93). The lap reads a scratch board's ledger (MXFS_CRIT) through harness_batch.py, appends a run from another process and asks for it again; the switch is tools/harness_batch.py:171-172, a frozen file of the attempt.",
+      "evidence": [
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/summary.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step5.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step6.log",
+        "tests/evidence/batch_laps/b20261023-73db4c",
+        "tests/evidence/batch_laps/b20261023-f17d93",
+        "tests/harness_batch_reread_lap.py",
+        "tools/harness_batch.py",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-ba31ad.md",
+        "sha256": "089d37dbd80efcedc3d06ed104c6503f2cf23c739e58eefe3ab1c946d822d33d",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-6dae93",
+      "kind": "verify",
+      "record": "D-BATCH-LAP-TIMEOUT-KILLS-ONLY-THE-DIRECT-CHILD-SO-THE-HARNESS-WRITES-ON",
+      "change": {
+        "batch": "b20261023-8e8ccd"
+      },
+      "argument": "Verification batch b20261023-8e8ccd on candidate 0.90.134, attempt frozen 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), declared by tools/harness_batch.py verify before its first lap and sized from control b20261023-1d7216 on the same attempt (10 of 10 laps failed 'FAIL: the harness's child wrote after the lap was bounded and recorded', each with 'EXPOSED: the bound ran out with the harness's child alive (rc=124)', MXFS_BATCH_LAP_KILLPG=0 set in the lap's own environment only, so the tools/batch_lap.py running the batch kept its fix, tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step7.log). 6 of 6 laps PASS ('PASS: nothing the lap started wrote after its bound ended it'), each with its exposure line, none failed or dropped (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step8.log, tests/evidence/batch_laps/b20261023-8e8ccd). The switch is tools/batch_lap.py:202, a frozen file of the attempt.",
+      "evidence": [
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/summary.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step7.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step8.log",
+        "tests/evidence/batch_laps/b20261023-1d7216",
+        "tests/evidence/batch_laps/b20261023-8e8ccd",
+        "tests/batch_lap_killpg_lap.py",
+        "tools/batch_lap.py",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-d6265d",
+      "kind": "verify",
+      "record": "D-BATCH-LAP-RECORDS-NO-STALL-SO-A-HARNESS-LAP-OVER-THE-STALL-LIMIT-GRADES-PASS",
+      "change": {
+        "batch": "b20261023-f16825"
+      },
+      "argument": "Verification batch b20261023-f16825 on candidate 0.90.134, attempt frozen 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), declared by tools/harness_batch.py verify before its first lap and sized from control b20261023-572eb1 on the same attempt (10 of 10 laps failed 'FAIL: a lap with an operation of 31500 ms was graded PASS', each with its EXPOSED line, MXFS_BATCH_LAP_STALL=0 set in the lap's own environment only, so the tools/batch_lap.py running the batch kept its stall grading, tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step9.log). 6 of 6 laps PASS ('PASS: the stall over the limit made the passing lap a FAIL'), each with its exposure line, none failed or dropped (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step10.log, tests/evidence/batch_laps/b20261023-f16825). The lap prints its inner grade with the stall token renamed (tests/batch_lap_stall_lap.py:58-60), so the outer batch_lap.py grades the lap by its own verdict. The switch is tools/batch_lap.py:243, a frozen file of the attempt.",
+      "evidence": [
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/summary.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step9.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step10.log",
+        "tests/evidence/batch_laps/b20261023-572eb1",
+        "tests/evidence/batch_laps/b20261023-f16825",
+        "tests/batch_lap_stall_lap.py",
+        "tools/batch_lap.py",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-463c4c",
+      "kind": "remove-fixed",
+      "record": "D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED",
+      "change": {
+        "control": "b20261023-e1901e",
+        "fixon": "b20261023-8f5476",
+        "cause": "a release step's run (row release:<step>, written by tools/release_run.py into the primary ledger under 1/any or the step's configuration) could not be named, annotated or retired: tools/defects.py parse_cell split CONFIG:ROW:ISO at its first two colons and parse_at refused 1/any, tools/criteria.py annotated_run looked the row up as a criterion, and for the own-rig key 2/net/mesh/drbd criteria.py switched to the DRBD board because its argv named that configuration while retire_cells routed the cell by configuration to the DRBD ledger, where the run is not"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: the first release step that failed on any candidate left an incident no disposition could settle, on every shape of key a step's run is filed under.\n\nThe fix, behind one switch, MXFS_RELEASE_STEP_SETTLE (tools/criteria.py:107, RELEASE_STEP_SETTLE; 0 restores every hunk below to its pre-fix path):\n- tools/defects.py parse_cell (:767-:787): the stamp anchored at the end, and a release step's configuration kept as given (1/any); off: the first-two-colons split and parse_at, as before.\n- tools/criteria.py annotated_run (:1455-:1460): a release:<step> id is the step's row; off: find() as a criterion, as before.\n- tools/criteria.py import (:106-:122): a command whose argv names a release:<step> row keeps the primary board even when it also names an own-rig configuration; off: the own-rig board, as before.\n- tools/criteria.py run_board (:184-:191) used by tools/defects.py retire_cells (:1194): a release step's cell retires in the primary ledger; off: board_for, as before.\ncheck_cells, drop_cells and unsettled route a release step's cell to the primary ledger (tools/defects.py:794, :853, :1222); that routing predates this fix (CHANGELOG 'A failed DRBD release step could never be named by a record') and is not behind the switch; with the switch off the lap is refused before it reaches it.\n\nThe cause, measured before the fix with tests/release_step_cell_lap.py on the tree of 2026-10-23 (recorded in the record's evidence): the 1/any and 2/net/mesh/direct shapes settled with the parse/annotate hunks, and on 2/net/mesh/drbd:release:drbd:2026-10-22T00:35:43Z infra and amend refused 'criteria: release:drbd [2/net/mesh/drbd] records no run stamped 2026-10-22T00:35:43Z' and the removal left the run listed.\n\nThe lap runs each real disposition command (infra, amend then unamend, update --cell plus remove --disproved then unretire) in a scratch copy of the tools and their data, on three recorded step FAILs, one per key shape, and requires the scratch gate to drop each run after its disposition and list it again after each take-back.\n\nControl b20261023-e1901e: candidate 0.90.134, attempt frozen 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), the switch off in the lap's own environment only (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step1.log): 10 of 10 laps failed, each with its EXPOSED lines and the refusals. Fix-on b20261023-8f5476 on the same attempt (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step2.log): 6 of 6 PASS, 9 exposures each; its verify P20261023-e3cea7 was approved (data/reviews/P20261023-e3cea7.md, which hashed the lap's inputs against the freeze) and applied.\n\nCells: only this record's own lap runs, the earlier control's 20 (2026-10-22T20:06:52Z-20:07:11Z, 'parse_cell refused it', already retired) and this control's 10, each showing this cause in its own log. The record names no release step run of another cause. No product code is a fix site.",
+      "evidence": [
+        "tools/criteria.py",
+        "tools/defects.py",
+        "tests/release_step_cell_lap.py",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/summary.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step1.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step2.log",
+        "tests/evidence/batch_laps/b20261023-e1901e",
+        "tests/evidence/batch_laps/b20261023-8f5476",
+        "tests/evidence/candidates/0.90.134_20261023T155624Z.files.json",
+        "data/reviews/P20261023-e3cea7.md",
+        "data/defects.json",
+        "CHANGELOG.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-6d07f5",
+      "kind": "remove-fixed",
+      "record": "D-TOOLS-HARNESS-BATCH-PY-CONTROL-STOPPED-A-CONTROL-BATCH",
+      "change": {
+        "control": "b20261023-73db4c",
+        "fixon": "b20261023-f17d93",
+        "cause": "tools/harness_batch.py found a board lap's run by reading the board's run ledger before and after the lap, but tools/criteria.py reads a ledger once per process and run.sh appends to it in another, so the read after the lap returned the copy taken before it and the lap's run was not there; ledger_reread drops that copy before each read"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: tools/harness_batch.py control stopped control b20261022-545d6a after its first lap ('run.sh rc=0 recorded no run of the batch', then '0 of 0 laps failed with the fix out') although run.sh had recorded the lap's run (data/criteria.runs.jsonl:7378): the ledger read after the lap came from the per-process cache filled before it.\n\nThe fix, one site: tools/harness_batch.py ledger_reread (:165-:173), called by stamps_before (:176-:179) and the read after the lap, pops this process's cached copy of the board's ledger (criteria.ledger_cache) so the read sees other processes' appends. MXFS_HARNESS_BATCH_REREAD=0 keeps the copy (:172), exactly the pre-fix read.\n\nThe lap, tests/harness_batch_reread_lap.py, reads a scratch board's ledger (MXFS_CRIT, a copy) through harness_batch.py as a board lap does, appends a run of a lap-unique batch from another process through criteria.append_ledger (as run.sh's record does), prints EXPOSED once that run is in the file, and asks harness_batch.py for the lap's runs.\n\nControl b20261023-73db4c: candidate 0.90.134, attempt frozen 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), the switch off in the lap's own environment only, so the harness_batch.py recording the control kept its fix (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/summary.log:12, tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step5.log): 10 of 10 laps failed ('FAIL: harness_batch.py found 0 run(s) of the batch after the lap'), each exposed. Fix-on b20261023-f17d93 on the same attempt (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step6.log): 6 of 6 PASS, each exposed; its verify P20261023-ba31ad was approved (data/reviews/P20261023-ba31ad.md, which matched the lap's inputs to the freeze by hash and inode) and applied.\n\nCells: only this control's own 10 laps (2/net/mesh/direct:lap:harness_batch_reread), each showing this cause. The 545d6a lap's run passed and is not a cell. No product code is a fix site.",
+      "evidence": [
+        "tools/harness_batch.py",
+        "tests/harness_batch_reread_lap.py",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/summary.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step5.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step6.log",
+        "tests/evidence/batch_laps/b20261023-73db4c",
+        "tests/evidence/batch_laps/b20261023-f17d93",
+        "tests/evidence/candidates/0.90.134_20261023T155624Z.files.json",
+        "data/reviews/P20261023-ba31ad.md",
+        "data/defects.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
     }
   ]
 }
