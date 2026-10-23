@@ -3617,8 +3617,15 @@
         "data/reviews/P20261023-3a597a.md",
         "data/defects.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-36616a.md",
+        "sha256": "7e59f4ba26bdb4e5b3a7722d00fdbae8eb2d1637726d8d2baf146392aef9b322",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-63aa62",
