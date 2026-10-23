@@ -6146,7 +6146,26 @@
       "evidence": "Candidate 0.90.134 (build 16A5F5DDDB4852C9D5DB236), g2 test1/test2, verification batch b20261022-548ef2 of D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE, laps run by tests/capture_fault_gate.sh jdtv<N> --only join_during_takeover; tests/join_during_takeover.sh:203 times 'umount $MNT' on node A. Each lap's row.log line 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=<N>': tests/evidence/20261023T043949Z_capture_gate_jdtv1 ms=31006, 20261023T044235Z_capture_gate_jdtv2 ms=30935, 20261023T044525Z_capture_gate_jdtv3 ms=29484, 20261023T044820Z_capture_gate_jdtv4 ms=32719, 20261023T045115Z_capture_gate_jdtv5 ms=32245, 20261023T045417Z_capture_gate_jdtv6 ms=31214, 20261023T045710Z_capture_gate_jdtv7 ms=29253, 20261023T050000Z_capture_gate_jdtv8 ms=31309, 20261023T050255Z_capture_gate_jdtv9 ms=31134 (ledger runs 2/net/mesh/direct:lap:jdt_gate_fault 2026-10-23T04:42:35Z..05:05:46Z, graded PASS). Control b20261022-4d455b at NFILES=4000 measured 4.3-7.8 s for the same step (jdtcta1 ':8 INFO A's last-member unmount: A_UMOUNT_RC=0 ms=4907'). The ledger graded these laps PASS: tools/criteria.py reads a stall only from a max_stall_ms= field, tools/batch_lap.py writes none, and the harness bounds the step at 180 s. Found by the review data/reviews/P20261023-128f2f.md, which rejected that verify for this stall. ===== 2026-10-23, cause measured (lane tests/evidence/lanes/g2_lmu_trace_20261023T075544Z, build B155E10D900872E6CE36289): at NFILES=32000 A's unmount took 30972 and 31746 ms, of which the clean departure's release-all took 27939 and 28708 ms releasing 31946 and 31962 grants one ledger transition at a time (tests/evidence/20261023T075654Z_lmutrace_lmu32k1/a_kmsg.txt 'P-RELALL-WALL released=31946 ms=27939', 20261023T080029Z_lmutrace_lmu32k2 'released=31962 ms=28708'; the stack samples are FUA reads, CAW writes and flushes under mxfs_tauth_page_write, 3342 distinct pages re-read once each as P-TAUTH-COMMIT-STALE-IMAGE after B's departure moved the ownership generation); at NFILES=4000, 4573 and 3977 ms with 'released=4001 ms=3684'. The wall is one ~0.9 ms page commit per grant held, serial. Fix (build E7B6958F435B9792735556D): dlm_wire_release_all sends the remote masters' releases first on its own thread and commits the locally-mastered ones on dl_relall_threads threads (default 8, each every nth resource; relall_active off while they run so a remastered resource is released as any concurrent release); dl_relall_threads=1 is the old serial release-all, the control. Precheck running: lane tests/evidence/lanes/g2_relall_prechecks_20261023T080727Z (default 8 twice, 1 once).",
       "next": "Read lane tests/evidence/lanes/g2_relall_prechecks_20261023T080727Z: A's unmount and P-RELALL-WALL with 8 threads against 1. If 8 threads holds A's unmount well under 30 s at NFILES=32000, the control batch with dl_relall_threads=1 (the trace as a lap) and the verification batch on the frozen candidate; then rerun D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE's verification, which this stall failed.",
       "reproducer": "tests/last_member_umount_trace.sh <label> [A] [B] on a formed pair (about 110 s at NFILES=32000): join_during_takeover's first three steps (A's authority over NFILES entries, B's clean unmount, A's last-member unmount), sampling the umount task's kernel stack every 200 ms and keeping A's kernel log of the unmount; the RESULT line carries A_UMOUNT_RC and ms. Control: MXFS_EXTRA_MODARGS=dl_relall_threads=1 at prep.",
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "batches": [
+        {
+          "id": "b20261023-9a3afc",
+          "kind": "control",
+          "row": "lap:lmu",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: A's last-member unmount released",
+          "candidate": "",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the last member's release-all on one thread, as before the fix",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: the defect must reproduce"
+        }
+      ]
     },
     {
       "id": "D-BATCH-LAP-RECORDS-NO-STALL-SO-A-HARNESS-LAP-OVER-THE-STALL-LIMIT-GRADES-PASS",
