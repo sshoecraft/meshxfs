@@ -172,6 +172,56 @@ The verdict was **unsound as stated**. It can be made sound only on these condit
 - **The reservation.** A successful CAS proves registration only under the reservation type and nexus
   coverage actually configured. It is never by itself a membership or no-pending-fence certificate.
 
+## A holder's path failover followed by its death
+
+With the window at 7 checks (14 s, a 10 s lease), every path row whose waiting operation began after
+the fault stalled 19.6-24.2 s at 4 and 8 nodes on both lock managers. The one row over the limit was
+a compound: at 8 nodes a survivor's operation needed a lock whose holder lost one path, could not
+hand the lock back while the flush that must precede the unlock was stuck on the dead path, and then
+died. It waited 17.5 s of the holder's failover (NOP-Out 5 s with a 5 s answer, replacement timeout
+5 s, polling 5 s: the settings `tools/mpath_settings.sh` recommends), 14.3 s of detection and about
+6 s of recovery: 38 s. The question put to gpt-6-astra the same day was whether that sequence is
+inside the requirement and how to bound it.
+
+- **It is a defect.** Two faults in a row are not an exception to "every file operation", and a
+  holder dying while it recovers from a path failure is foreseeable. Excluding overlapping faults
+  would change the release contract, not pass it. A window longer than the lease protects
+  authority; it bounds no accumulated waiting, and beats can keep landing while the holder's flush
+  is stuck.
+- **The budget.** An operation's stall is S <= b + F + D + R: b what it had already waited before
+  the path fault, F the holder's path delay until it finally stops making progress, D from then to
+  the declaration (late beat completions and the detector's scheduling included), R from the
+  declaration through fence, slice proof, replay, membership, lock grant and the operation's
+  completion (the TCP lock manager's ledger takeover and orphan sweep belong inside R). The target
+  to qualify: b 0.5 s, F 6 s, D 12.5 s, R 10 s on either lock manager, 29 s at 2, 4, 8 and 16 nodes.
+  These are required bounds, not measured worst cases. At 7 checks the same budget is 31 s, so
+  keeping 7 needs F <= 4 s or R <= 8 s.
+- **Tighter path timeouts** are sound inside a documented load and latency envelope, but the
+  settings alone bound nothing: what has to be bounded is the blocking data I/O, outstanding
+  commands, error handling, retries and multipath queueing included. False path failures under load,
+  and both paths of a node failed together, have to be tested.
+- **A shorter window.** 6 checks (12 s, an 8 s lease) is a candidate against the measured 4.1 s
+  live gap; 5 leaves 1.9 s and comes only after 6 is qualified. The supported worst-case live gap,
+  scheduling and timer uncertainty included, has to stay well below the lease under I/O storms,
+  memory pressure and a VM pause.
+- **The slice proof.** Matching re-reads are not a stability proof without a bound on how late a
+  write the target accepted before PREEMPT AND ABORT can land: three equal reads can all precede a
+  delayed backing write. Shortening it needs a target-side drain acknowledgement covering every
+  write accepted before the fence, or an enforceable maximum post-fence write latency followed by a
+  complete read after that deadline; the drain's own worst case stays in R.
+- **The holder** may use its heartbeat's 2 s view of a dead path to speed up its real failover, but
+  failing a multipath path does not release commands already issued on it: the transport has to
+  bound their resolution, and the normal unlock still waits for a completed flush that orders every
+  protected write, those still outstanding on the dead path included. A stronger route is an
+  acknowledged early surrender of authority followed by fence, drain and replay, which starts
+  recovery before the window ends; it needs a protocol that proves quiescence, which one missed
+  path is not.
+- **Qualifying it** means forcing a waiter across the holder's path failure and death at 2, 4, 8 and
+  16 nodes on both lock managers, sweeping the fault's timing against the beat, NOP-Out, polling,
+  flush and recovery phases, under maximum journal occupancy, contention, CPU and I/O saturation,
+  memory pressure and VM pauses, with every phase timestamped; and injecting backing writes delayed
+  past the slice proof.
+
 ## Open
 
 - The read-stop acknowledgment protocol over the TCP mesh, and what CAW, which has no network between
