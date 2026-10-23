@@ -6,7 +6,7 @@ metadata:
 tags: [compiled, defects-py, verify, release-candidate, release-gate, drift, budget, tree-ownership, harness, sg-io, yardstick, sata-870, fencing, netconsole, vcenter, trap]
 ---
 
-Assorted group: release-gate, release-candidate and rig-evidence traps that share no single subsystem. What they have in common is that gate or rig evidence looks valid while bound to the wrong attempt, tree, binary, disk or capture path. Merged from `compiled-release-candidate-freeze-drift-and-budget-spec` and [[compiled-release-gate-and-rig-evidence-traps]] into the original article on the order of `tools/defects.py verify` against re-freezing an attempt.
+Assorted group: release-gate, release-candidate and rig-evidence traps that share no single subsystem. What they have in common is that gate or rig evidence looks valid while bound to the wrong attempt, tree, binary, disk or capture path. Merged from `compiled-release-candidate-freeze-drift-and-budget-spec` and `compiled-release-gate-and-rig-evidence-traps` into the original article on the order of `tools/defects.py verify` against re-freezing an attempt.
 
 # A. Verify order, attempts and removals
 
@@ -33,7 +33,7 @@ Source: [[trap-apply-a-verify-before-refreezing-or-its-laps-stop-counting]].
 
 # B. Verification batches need a frozen candidate
 
-Source: [[trap-verification-batches-count-only-on-a-frozen-candidate-controls-may-run-before]] (via [[compiled-release-gate-and-rig-evidence-traps]]). The release-reviewer rejected proposal P20261022-c75127 (verify of D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C-NO-PACKAGE-CAN-BE-BUILT, batch b20261022-1666e5, 4 of 4 exposed PASS laps). The batch was declared with `plan-verify --build <srcversion>` and no `--candidate`, and its laps carried no `MXFS_CANDIDATE`. Review: `data/reviews/P20261022-c75127.md`.
+Source: [[trap-verification-batches-count-only-on-a-frozen-candidate-controls-may-run-before]] (via `compiled-release-gate-and-rig-evidence-traps`). The release-reviewer rejected proposal P20261022-c75127 (verify of D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C-NO-PACKAGE-CAN-BE-BUILT, batch b20261022-1666e5, 4 of 4 exposed PASS laps). The batch was declared with `plan-verify --build <srcversion>` and no `--candidate`, and its laps carried no `MXFS_CANDIDATE`. Review: `data/reviews/P20261022-c75127.md`.
 
 Why it is wrong:
 - A verification batch stops a record blocking a configuration *on a candidate* (`docs/release-process.md`, "What a verification clears"). With no candidate it counts for none, and in the development view it would count on any tree with that module, including one with the fix reverted.

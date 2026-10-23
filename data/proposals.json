@@ -3221,8 +3221,14 @@
         "tools/batch_lap.py",
         "data/candidates/0.90.134.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "approved",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-6dae93.md",
+        "sha256": "919ecb6bac26968a6697c493f4e01749f032a07800fb451b2340a55154b62597",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-d6265d",
@@ -3242,14 +3248,15 @@
         "tools/batch_lap.py",
         "data/candidates/0.90.134.json"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-23",
       "review": {
         "file": "data/reviews/P20261023-d6265d.md",
         "sha256": "0a8c5efb64db8eb3327af05ef9572f70355acf3631720266bbda8db794f282fe",
         "verdict": "approved",
         "date": "2026-10-23"
-      }
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-463c4c",
