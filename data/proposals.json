@@ -1323,14 +1323,15 @@
         "tests/evidence/controls/D-CHK-FREESPACE-REBUILD-DECLARES-OWNED-BLOCKS-FREE.fix.diff",
         "tests/chk_freespace_rebuild_lap.sh"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-22",
       "review": {
         "file": "data/reviews/P20261022-1ac314.md",
         "sha256": "6eeef43718df01fc217f52ea33675196fa29a24a28d8b462937a15f1be739cf2",
         "verdict": "approved",
         "date": "2026-10-23"
-      }
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261022-5b07e9",
@@ -1954,8 +1955,14 @@
         "tests/recov_bmbt_reuse.sh",
         "tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "approved",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-aa3c94.md",
+        "sha256": "0abe2737a5f601ea0ca6f44121aafa29b59516e0ccac23ed1c18eef722ecdd44",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261022-a44f67",
