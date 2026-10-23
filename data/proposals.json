@@ -2088,8 +2088,14 @@
         "tests/evidence/batch_laps/b20261022-548ef2",
         "tests/evidence/batch_laps/b20261022-4d455b"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-128f2f.md",
+        "sha256": "59c3dde03cb826e245519b184a15190dfa68e05862b47805f8dbac690a68f9a1",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-c99297",
@@ -2108,8 +2114,14 @@
         "tests/evidence/batch_laps/b20261022-548ef2",
         "tests/evidence/batch_laps/b20261022-4d455b"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-c99297.md",
+        "sha256": "dee661a2d7bd978a9890b2d918dcbf2a1bd77c52555f1dbcf748b81061106466",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     }
   ]
 }

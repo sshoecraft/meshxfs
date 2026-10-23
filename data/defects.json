@@ -3683,7 +3683,7 @@
       "opened": "2026-10-21",
       "summary": "tests/capture_gate.manifest runs join_during_takeover with NFILES=4000; under routing hash v2 (eight inode numbers to a ledger page) that authority is about 500 pages, the takeover pass finished in 5.1 s, inside the lap's first 5 s in-flight sample, and the lap aborted before its first measurement, so the gate read it BROKEN without testing its capture handling",
       "evidence": "0.90.134 dry run attempt 20261022T031549Z capture gate (tests/evidence/20261022T031739Z_capture_gate_0.90.134_20261022T031549Z): GATE join_during_takeover fault: rc=2 wall=280s fault_line=0 -> BROKEN, ABORT: the takeover pass was not seen in flight (activations=502). test1 /tmp/jointk_dmesg.txt from the A2 marker: 502 P-TAUTH-PAGE-MINE via=takeover lines, the first at 154.792859, the last at 159.919506, the mount at 154.751369. The in-flight loop (tests/join_during_takeover.sh:224-231) samples every 5 s from the mount's return and needs two growing samples; its header puts the pass at ~10 ms a page and detection at ~11 s. include/mxfs/mxfs_tauth.h:505-507: the route hash clears an inode number's low three bits. The pair was formed before the lap (PAIR formed again before join_during_takeover fault in 42s, every node src=1 sv=tree ft=1 m=1), so this is not the inherited-state cause D-CAPTURE-GATE-ENTRIES-INHERIT-THE-CLUSTER-STATE-AN-EARLIER-FAULT-LEFT names; that cause hid this one on every earlier gate. ===== ===== 2026-10-22, fix in the tree: tests/capture_gate.manifest runs the entry with NFILES=32000, the harness's own default (~4000 ledger pages under routing v2), fault-lap bound 228 s from the measured lap; the harness also reads the cluster marker it is given (MXFS_MARKER) instead of .cluster_marker.json by name. Verified with the presteps' environment (MXFS_NODE_LIST=test1,test2 MXFS_GROUP=g2 MXFS_MARKER=.cluster_marker.g2.json): tests/capture_fault_gate.sh 0.90.134-jdt32k --only join_during_takeover -> GATE join_during_takeover fault: rc=2 wall=114s fault_line=1 abort=1 -> OK, RESULT PASS (tests/evidence/20261022T035659Z_capture_gate_0.90.134-jdt32k). In the lap: 32000 creates in 57 s, the pass seen in flight 11 s after the mount (452 then 916 activations), STAGE FAULT at the first measurement (mine_at_issue), ABORT. ===== The first control b20261022-172c3f (lane g2_gate_controls_20261022T233534Z step 4) failed 9 of 10 laps but measured 0 of 1: its probe was the gate's fault line with fault_line=1, which only a lap that reached the injection prints, so none of the nine failing laps (rc=124 at the 228 s bound, no harness line after 'A's lone remount', e.g. tests/evidence/20261023T000826Z_capture_gate_jdtctl1/join_during_takeover_fault.log) counted. A second control, b20261022-4d455b (lane g2_jdt_control2_20261023T012801Z), reads its exposure from the harness's own lone-remount line.",
-      "next": "give the gate entry an authority whose pass outlasts in-flight detection and B's mount: NFILES=32000, the harness default (~4000 pages, ~40 s), with the fault-lap bound measured from a lap at that size; rerun the entry ===== 2026-10-22: the g2c lanes (20261022T202825Z, 20261022T232233Z) measured nothing: the gate checked test29/test30 while join_during_takeover ran on its default test1; the gate now refuses any pair but test1/test2. Control queued on g2: lane tests/evidence/lanes/g2_gate_controls_20261022T233534Z step 6 (10 laps).",
+      "next": "give the gate entry an authority whose pass outlasts in-flight detection and B's mount: NFILES=32000, the harness default (~4000 pages, ~40 s), with the fault-lap bound measured from a lap at that size; rerun the entry ===== 2026-10-22: the g2c lanes (20261022T202825Z, 20261022T232233Z) measured nothing: the gate checked test29/test30 while join_during_takeover ran on its default test1; the gate now refuses any pair but test1/test2. Control queued on g2: lane tests/evidence/lanes/g2_gate_controls_20261022T233534Z step 6 (10 laps). ===== Verify P20261023-128f2f was rejected (data/reviews/P20261023-128f2f.md): every lap of b20261022-548ef2 passed the gate's own checks, but in 7 of 9 laps A's last-member umount took 30.9-32.7 s, over stall_limit_s, which the release process grades as a stability FAIL whatever the row reported; that stall is now D-LAST-MEMBER-UMOUNT-AFTER-A-15K-PAGE-HANDBACK-TAKES-31S-OVER-THE-STALL-LIMIT. This record's verification needs a batch whose laps hold no stall over 30 s: after that unmount is fixed, a new verification batch on the next candidate attempt sized from control b20261022-4d455b (or a control rerun on that attempt's tree if the gate's files differ), then remove --fixed. ===== Removal P20261023-c99297 was rejected too (data/reviews/P20261023-c99297.md): every failing lap of control b20261022-4d455b was killed by the gate's 228 s bound (rc=124) with nothing after 'INFO A's lone remount', so no lap shows the cause (a stalled takeover pass leaves the same output). Needed: a fix-out control whose failing laps each carry the cause in their own evidence (the harness's in_flight=0 line and abort printed before the gate's bound, or test1's dmesg from the lap's marker with the P-TAUTH-PAGE-MINE count), then a fix-on batch sized from it; the b20261022-172c3f failures need the same evidence before a removal retires them.",
       "cells": [
         {
           "config": "1/any",
@@ -3781,7 +3781,7 @@
           "iso": "2026-10-23T01:41:57Z"
         }
       ],
-      "updated": "2026-10-22",
+      "updated": "2026-10-23",
       "batches": [
         {
           "id": "b20261022-172c3f",
@@ -4124,11 +4124,44 @@
           "candidate": "",
           "build": "16A5F5DDDB4852C9D5DB236",
           "variant": "SR_SHARD_SELECT=0 (tests/tcp_stale_resend.sh makes its candidates as before the fix: eight files written back to back)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the fix's switch off: the harness's eight candidates are written back to back, one or two routing shards, so its search for a candidate remotely mastered from W is one or two draws"
+        },
+        {
+          "id": "b20261023-be3e39",
+          "kind": "verify",
+          "row": "lap:sr_shard",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^LAP sr_shard candidates=",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:sr_shard",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-720c28",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "SR_SHARD_SELECT=0 (tests/tcp_stale_resend.sh makes its candidates as before the fix: eight files written back to back)",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "cells": [
@@ -4181,6 +4214,73 @@
           "config": "2/net/mesh/direct",
           "row": "lap:sr_shard",
           "iso": "2026-10-23T01:00:38Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:sr_shard",
+          "iso": "2026-10-23T05:28:01Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:sr_shard",
+          "iso": "2026-10-23T05:25:53Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:sr_shard",
+          "iso": "2026-10-23T05:23:44Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:sr_shard",
+          "iso": "2026-10-23T05:21:35Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:sr_shard",
+          "iso": "2026-10-23T05:19:27Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:sr_shard",
+          "iso": "2026-10-23T05:17:18Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:sr_shard",
+          "iso": "2026-10-23T05:15:08Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:sr_shard",
+          "iso": "2026-10-23T05:13:00Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:sr_shard",
+          "iso": "2026-10-23T05:10:53Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:sr_shard",
+          "iso": "2026-10-23T05:08:40Z"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:sr_shard",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-720c28",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "SR_SHARD_SELECT=0 (tests/tcp_stale_resend.sh makes its candidates as before the fix: eight files written back to back)",
+          "builds": [
+            "16A5F5DDDB4852C9D5DB236"
+          ],
+          "date": "2026-10-23"
         }
       ]
     },
@@ -4711,9 +4811,59 @@
           "config": "8/net/mesh/mpath",
           "row": "lap:adopted_grant_handoff",
           "iso": "2026-10-23T01:01:03Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_handoff",
+          "iso": "2026-10-23T05:31:44Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_handoff",
+          "iso": "2026-10-23T05:31:32Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_handoff",
+          "iso": "2026-10-23T05:31:20Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_handoff",
+          "iso": "2026-10-23T05:31:08Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_handoff",
+          "iso": "2026-10-23T05:30:55Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_handoff",
+          "iso": "2026-10-23T05:30:43Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_handoff",
+          "iso": "2026-10-23T05:30:30Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_handoff",
+          "iso": "2026-10-23T05:30:18Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_handoff",
+          "iso": "2026-10-23T05:30:05Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_handoff",
+          "iso": "2026-10-23T05:29:52Z"
         }
       ],
-      "updated": "2026-10-22",
+      "updated": "2026-10-23",
       "reproducer": "tests/tauth/adopted_grant_handoff_test.sh (host only, an in-process four-node mesh, about 9 s): the grant adopted between two attempts, its page handed to the waiter, the already-granted shortcut answer; exposure is the line 'EXPOSURE adopted=1 handed=1 local=1'; DL_SHORTCUT_CLAIM=0 turns the fix's knob off (the same-build control)",
       "batches": [
         {
@@ -4798,6 +4948,56 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-0b21e2",
+          "kind": "control",
+          "row": "lap:adopted_grant_handoff",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSURE adopted=1 handed=1 local=1",
+          "candidate": "",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "dl_shortcut_claim=0 (DL_SHORTCUT_CLAIM=0 in the lap's environment)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix's knob off on the candidate's own frozen source (16A5F5DDDB4852C9D5DB236): the already-granted shortcut ends a wait unclaimed and the hand-back unlinks the master's own record of the waiter's EX"
+        },
+        {
+          "id": "b20261023-a62d3d",
+          "kind": "verify",
+          "row": "lap:adopted_grant_handoff",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSURE adopted=1 handed=1 local=1",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:adopted_grant_handoff",
+            "config": "8/net/mesh/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-0b21e2",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "dl_shortcut_claim=0 (DL_SHORTCUT_CLAIM=0 in the lap's environment)",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -4815,6 +5015,21 @@
             "9594B08726D6732D2ED5E87"
           ],
           "date": "2026-10-22"
+        },
+        {
+          "row": "lap:adopted_grant_handoff",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-0b21e2",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "dl_shortcut_claim=0 (DL_SHORTCUT_CLAIM=0 in the lap's environment)",
+          "builds": [
+            "16A5F5DDDB4852C9D5DB236"
+          ],
+          "date": "2026-10-23"
         }
       ]
     },
@@ -5494,6 +5709,27 @@
       "summary": "tools/harness_batch.py control stopped a control batch after its first lap, reporting 'run.sh rc=0 recorded no run of the batch' and 'the lap recorded nothing (refused?); stopping', then 'control b20261022-545d6a: 0 of 0 laps failed with the fix out', although the ledger holds that lap's run (defects.py: 'batch b20261022-545d6a planned 20 laps and has 1'); its post-lap search missed a run run.sh had recorded, so the batch's own report undercounted and the control had to be resumed by hand",
       "evidence": "tests/evidence/controls/fua_control_20261022T183902Z.log:9-19 (2026-10-22, 2/net/mesh/direct4k fourkn_cdb, control b20261022-545d6a): lap 1 'run.sh rc=0 recorded no run of the batch', :13 'harness_batch: the lap recorded nothing (refused?); stopping', :18 'defects: batch b20261022-545d6a planned 20 laps and has 1; run the rest first', :19 'control b20261022-545d6a: 0 of 0 laps failed with the fix out'; the ledger row is data/criteria.runs.jsonl:7378 (review data/reviews/P20261022-4f49ad.md, observation 3). The same lap printed clyde_preflight.sh:151 '/proc/<pid>/stat: No such file or directory' four times. The control's second call (fua_control_20261022T184149Z.log) ran the other 19 laps normally.",
       "next": "Read how tools/harness_batch.py finds a lap's run after run.sh exits (the batch field, the stamp window, the ledger read) and reproduce with a lap whose run is recorded in the same second the search starts; then fix the search so a recorded lap is never reported as recorded nothing."
+    },
+    {
+      "id": "D-LAST-MEMBER-UMOUNT-AFTER-A-15K-PAGE-HANDBACK-TAKES-31S-OVER-THE-STALL-LIMIT",
+      "severity": "high",
+      "nodes": 2,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "After join_during_takeover's peer B hands its ~15k authority-ledger pages back (NFILES=32000), the last member A's umount takes 29-33 s, timed on the node around umount alone; at NFILES=4000 the same unmount takes 4.3-7.8 s, so its wall grows with the authority A holds and crosses the 30 s stall_limit_s",
+      "evidence": "Candidate 0.90.134 (build 16A5F5DDDB4852C9D5DB236), g2 test1/test2, verification batch b20261022-548ef2 of D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE, laps run by tests/capture_fault_gate.sh jdtv<N> --only join_during_takeover; tests/join_during_takeover.sh:203 times 'umount $MNT' on node A. Each lap's row.log line 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=<N>': tests/evidence/20261023T043949Z_capture_gate_jdtv1 ms=31006, 20261023T044235Z_capture_gate_jdtv2 ms=30935, 20261023T044525Z_capture_gate_jdtv3 ms=29484, 20261023T044820Z_capture_gate_jdtv4 ms=32719, 20261023T045115Z_capture_gate_jdtv5 ms=32245, 20261023T045417Z_capture_gate_jdtv6 ms=31214, 20261023T045710Z_capture_gate_jdtv7 ms=29253, 20261023T050000Z_capture_gate_jdtv8 ms=31309, 20261023T050255Z_capture_gate_jdtv9 ms=31134 (ledger runs 2/net/mesh/direct:lap:jdt_gate_fault 2026-10-23T04:42:35Z..05:05:46Z, graded PASS). Control b20261022-4d455b at NFILES=4000 measured 4.3-7.8 s for the same step (jdtcta1 ':8 INFO A's last-member unmount: A_UMOUNT_RC=0 ms=4907'). The ledger graded these laps PASS: tools/criteria.py reads a stall only from a max_stall_ms= field, tools/batch_lap.py writes none, and the harness bounds the step at 180 s. Found by the review data/reviews/P20261023-128f2f.md, which rejected that verify for this stall.",
+      "next": "Trace where the 29-33 s goes on A's last-member unmount at NFILES=32000 (ledger page write-back, release-all, log force, inode eviction) with per-phase timestamps from the module's own lines, on the same harness, and the same at NFILES=4000; fix the phase whose cost grows with the pages held; then a control with the fix out and a verification batch on the candidate. Separately, batch laps record no stall (no max_stall_ms= from tools/batch_lap.py), so a stall inside a harness lap grades PASS.",
+      "reproducer": "tests/capture_fault_gate.sh <label> --only join_during_takeover (tests/capture_gate.manifest runs it with NFILES=32000): the row.log line 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=<N>'; over 30000 reproduces"
+    },
+    {
+      "id": "D-BATCH-LAP-RECORDS-NO-STALL-SO-A-HARNESS-LAP-OVER-THE-STALL-LIMIT-GRADES-PASS",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "A harness lap run through tools/batch_lap.py is graded only on its verdict line: batch_lap.py writes no max_stall_ms= into the run it records, and tools/criteria.py reads a stall only from that field, so a lap in which a file operation stalled past stall_limit_s (30 s) is recorded PASS and can count toward a verification batch",
+      "evidence": "Verification batch b20261022-548ef2 (lap:jdt_gate_fault at 2/net/mesh/direct, candidate 0.90.134): 7 of its 9 laps timed A's last-member umount at 30.9-32.7 s on the node (row.log 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=31006' in tests/evidence/20261023T043949Z_capture_gate_jdtv1, and the same in jdtv2, 4, 5, 6, 8, 9), and every lap was recorded PASS in data/criteria.runs.jsonl. The review data/reviews/P20261023-128f2f.md traced why: the stall check in tools/criteria.py reads only a max_stall_ms= field, which tools/batch_lap.py never writes, and the harness bounds that step at 180 s.",
+      "next": "Give batch laps a stall measurement the ledger grades: either batch_lap.py extracts each harness's timed operations (a declared pattern per lap, like the probe) and records the largest as max_stall_ms, or the harnesses print a 'max_stall_ms=' line batch_lap.py copies; make criteria.py grade a batch lap over stall_limit_s FAIL as it does a board row. Reproduce with a lap that prints an operation over 30 s and passes its verdict line; control with the change out (graded PASS), verification with it in (graded FAIL)."
     }
   ]
 }
