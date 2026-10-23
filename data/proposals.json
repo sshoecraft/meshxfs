@@ -4537,8 +4537,15 @@
         "tests/evidence/drbd_rig/criteria.runs.jsonl",
         "data/defects.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-f735a0.md",
+        "sha256": "f4bb93af77f435768bacc4f680d23b1caed2d2cdb0dcdf08181e1eb8e3fc515a",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }
