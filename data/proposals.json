@@ -184,8 +184,15 @@
         "tests/evidence/run_dirent_durability_20261019T191246Z-g8",
         "tests/evidence/incident_preassert_sweep_20261022T2355Z.txt"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "applied",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-a9b14b.md",
+        "sha256": "908db2931349fdad2e816570bda1c8a81ead0d03443a00804e6a29984ada4a09",
+        "verdict": "approved",
+        "date": "2026-10-22"
+      },
+      "applied": "2026-10-22"
     }
   ]
 }

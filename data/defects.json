@@ -4693,6 +4693,33 @@
           "iso": "2026-10-22T17:32:16Z"
         }
       ]
+    },
+    {
+      "id": "D-4NETMESH-DIRECT-FIO-VS-XFS-SEQW-42PCT-ON-0.90.134-DEV-BUILD",
+      "severity": "major",
+      "nodes": 4,
+      "config": "net/mesh/direct",
+      "opened": "2026-10-22",
+      "summary": "On 4/net/mesh/direct the fio_perf_vs_xfs row scored sequential write at 42% of the native-XFS yardstick (threshold 70%) on the 0.90.134 development build 9594B08726D6732D2ED5E87, test3-test6 on pool LUN 12 (512-byte blocks); sequential read 96%, random write 286%, random read 292%.",
+      "evidence": "Ledger data/criteria.runs.jsonl: 4/net/mesh/direct fio_perf_vs_xfs 2026-10-23T00:28:31Z FAIL, run_id 20261023T002529Z-g4, measured 'seqW=42% seqR=96% randW=286% randR=292% worst(write)=42% (threshold>=70%, wsrc=xfs-baseline, rig=scst-fio)', reason 'mxfs write worst 42% < 70% of xfs-baseline (/src/mxfs/.xfs_fio_baseline.net-mesh-direct.scst-fio.json)'. Board lane tests/evidence/lanes/g8b_g4_calibrate_then_board_20261023T001239Z/step8.log:42 'FAIL fio_perf_vs_xfs (1s/10s)'. Host at the time: the g2 lane's join-during-takeover control laps on test1/test2 were running (tests/evidence/lanes/g2_gate_controls_20261022T233534Z); g8b had been powered down at step 6. The yardstick was measured on an idle host. Not the same configuration as D-FIO-VS-XFS-SEQW-63PCT-ON-2-NET-MESH-MPATH-WHILE-HOST-NVME-SHARED (2/net/mesh/mpath, 63%).",
+      "next": "Run 4/net/mesh/direct fio_perf and fio_perf_vs_xfs again with no other rig group up and a host sampler (/proc/diskstats for nvme0n1, /proc/pressure/io, loadavg every 5 s) in the evidence directory, and compare with this row's last PASS at 4/net/mesh/direct (build and percentages): contention on the shared NVMe or a write-path regression since then.",
+      "cells": [
+        {
+          "config": "4/net/mesh/direct",
+          "row": "fio_perf_vs_xfs",
+          "iso": "2026-10-23T00:28:31Z"
+        }
+      ]
+    },
+    {
+      "id": "D-DIRENT-DURABILITY-CAPTURE-COPIES-STALE-DMESG-AT-FAIL-FROM-EARLIER-BOOTS",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-22",
+      "summary": "The dirent_durability failure capture (the *_drc_blkdump_dsc_node*/dmesg_at_fail.txt files of run_dirent_durability_<run>) copies a dmesg_at_fail.txt the node kept from an earlier boot into the new run's evidence directory, so a run's evidence carries kernel lines that are not its own: run_dirent_durability_20261019T191246Z-g8 holds copies from boots of 2026-07-26 and 2026-08-20, test11's with an old-build 'Corruption of in-memory data ... xfs_trans_cancel' shutdown.",
+      "evidence": "Found by the release-reviewer's review of proposal P20261022-a9b14b (data/reviews/P20261022-a9b14b.md): the three dmesg_at_fail.txt copies under tests/evidence/run_dirent_durability_20261019T191246Z-g8/*_drc_blkdump_dsc_node*/ date from earlier boots (2026-07-26, 2026-08-20); that run's own self-fence lines are in the kernlog_test*.gz files of the same directory. A reader of the directory (a person, a reviewer, a sweep) takes an August corruption line for an October one.",
+      "next": "Read where the dirent_durability harness writes and collects dmesg_at_fail.txt on the node (tests/ and its node-side helper): make it write the file per run (named by the run id or after removing the old one), and refuse to copy a file older than the run's start mark; then check the other captures that pull node files by fixed name."
     }
   ]
 }

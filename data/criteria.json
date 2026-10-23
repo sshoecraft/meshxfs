@@ -839,16 +839,25 @@
         },
         "2/net/mesh/direct": {
           "status": "PASS",
-          "measured": "elapsed=35s (fresh prep)",
+          "measured": "elapsed=34s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-23T00:38:21Z",
+          "iso": "2026-10-23T00:42:58Z",
           "recorded": "2026-10-22",
-          "elapsed_s": 35,
+          "elapsed_s": 34,
           "build": "9594B08726D6732D2ED5E87",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261023T003737Z-g2",
+          "run_id": "20261023T004214Z-g2",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T00:38:21Z",
+              "measured": "elapsed=35s (fresh prep)",
+              "reason": "",
+              "build": "9594B08726D6732D2ED5E87",
+              "outcome": "PASS",
+              "run_id": "20261023T003737Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T00:33:43Z",
@@ -929,15 +938,6 @@
               "build": "9594B08726D6732D2ED5E87",
               "outcome": "PASS",
               "run_id": "20261022T235806Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-22T23:56:15Z",
-              "measured": "elapsed=31s (fresh prep)",
-              "reason": "",
-              "build": "9594B08726D6732D2ED5E87",
-              "outcome": "PASS",
-              "run_id": "20261022T235535Z-g2"
             }
           ]
         },
@@ -42095,13 +42095,17 @@
           ]
         },
         "4/net/mesh/direct": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261023T002529Z-g4",
-          "iso": "2026-10-23T00:40:18Z",
+          "status": "PASS",
+          "measured": "nodes_pass=4/4 hostload=2.77 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261023T002529Z-g4 fsid=48e0499b-fcfb-49d6-b367-518e60c22925 witness=tests/evidence/alloc_witness/20261023T002529Z-g4/witness.txt",
+          "reason": "",
+          "iso": "2026-10-23T00:41:31Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 61,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 120,
           "run_id": "20261023T002529Z-g4",
+          "evidence": "tests/evidence/run_alloc_witness_20261023T002529Z-g4",
           "history": [
             {
               "status": "PASS",
@@ -43495,13 +43499,17 @@
           ]
         },
         "4/net/mesh/direct": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261023T002529Z-g4",
-          "iso": "2026-10-23T00:26:30Z",
+          "status": "PASS",
+          "measured": "nodes_pass=4/4 hostload=3.93 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=21568 ledger_holders=1247 umount_ms=2775 remount_ms=5067 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261023T004143Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261023T002529Z-g4/witness.txt",
+          "reason": "",
+          "iso": "2026-10-23T00:42:01Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 17,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 180,
           "run_id": "20261023T002529Z-g4",
+          "evidence": "tests/evidence/run_chk_clean_20261023T002529Z-g4",
           "history": [
             {
               "status": "PASS",
@@ -44852,12 +44860,15 @@
           ]
         },
         "4/net/mesh/direct": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261023T002529Z-g4",
-          "iso": "2026-10-23T00:26:30Z",
+          "status": "PASS",
+          "measured": "guards=72 new=0 grown=0",
+          "reason": "",
+          "iso": "2026-10-23T00:42:03Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 1,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 20,
           "run_id": "20261023T002529Z-g4",
           "history": [
             {
@@ -47048,13 +47059,17 @@
           ]
         },
         "4/net/mesh/direct": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261023T002529Z-g4",
-          "iso": "2026-10-23T00:26:30Z",
+          "status": "PASS",
+          "measured": "nodes_pass=4/4 hostload=3.26 checks=7 passed=7 failed=0",
+          "reason": "",
+          "iso": "2026-10-23T00:42:29Z",
           "recorded": "2026-10-22",
+          "elapsed_s": 13,
           "build": "9594B08726D6732D2ED5E87",
+          "outcome": "PASS",
+          "budget_s": 300,
           "run_id": "20261023T002529Z-g4",
+          "evidence": "tests/evidence/run_tcp_dlm_scaling_20261023T002529Z-g4",
           "history": [
             {
               "status": "PASS",
@@ -47738,8 +47753,8 @@
         "4/net/mesh/direct": {
           "status": "PENDING",
           "measured": "",
-          "reason": "running 20261023T002529Z-g4",
-          "iso": "2026-10-23T00:26:30Z",
+          "reason": "executing 20261023T002529Z-g4",
+          "iso": "2026-10-23T00:42:30Z",
           "recorded": "2026-10-22",
           "build": "9594B08726D6732D2ED5E87",
           "run_id": "20261023T002529Z-g4",
