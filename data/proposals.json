@@ -4630,8 +4630,15 @@
         "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
         "data/candidates/0.90.134.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-171b6c.md",
+        "sha256": "eb99e469cd4313ffc3022e5181f1d4eb2c701dda10df49c4887d5a0896ad4d63",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }

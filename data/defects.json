@@ -6299,7 +6299,7 @@
           "candidate": "0.90.134",
           "build": "C54C14B681D148267D084FC",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -6336,6 +6336,18 @@
           "builds": [
             "C54C14B681D148267D084FC"
           ],
+          "date": "2026-10-23"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-222cd3",
+          "approval": "P20261023-171b6c",
           "date": "2026-10-23"
         }
       ]
