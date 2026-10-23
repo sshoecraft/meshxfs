@@ -3283,8 +3283,14 @@
         "data/defects.json",
         "CHANGELOG.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-463c4c.md",
+        "sha256": "3bb2026e84b6c3e44858b19fd38b7c59f1e77c43624770a7c40c21f89ee76c9b",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-6d07f5",
@@ -3307,6 +3313,48 @@
         "tests/evidence/candidates/0.90.134_20261023T155624Z.files.json",
         "data/reviews/P20261023-ba31ad.md",
         "data/defects.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-3a597a",
+      "kind": "verify",
+      "record": "D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E-AND-NO-WWN-BYID-LINK",
+      "change": {
+        "batch": "b20261023-4b50c2"
+      },
+      "argument": "Verification batch b20261023-4b50c2 on candidate 0.90.134, attempt frozen 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), on pool pair g2c (test29/test30, EUI-64 pool LUN pool-05-lun-0, both nodes unmounted by the lane, tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step3.log), declared by tools/harness_batch.py verify before its first lap and sized from control b20261023-92db3a on the same attempt (MXFS_RIG_EUI64=0 in the lap's own environment only; 10 of 10 laps failed, each exposed, tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step6.log). The precheck laps before the control: switch on PASS, switch off FAIL (tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/summary.log). The verification's laps all PASS with exposure, none failed or dropped (tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step7.log, tests/evidence/batch_laps/b20261023-4b50c2). Each lap is a few resolver reads over ssh (1-2 s measured), inside its derived bound. The switch is in tests/lib/rig.sh, a frozen file of the attempt.",
+      "evidence": [
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/summary.log",
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step6.log",
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step7.log",
+        "tests/evidence/batch_laps/b20261023-92db3a",
+        "tests/evidence/batch_laps/b20261023-4b50c2",
+        "tests/rig_eui64_resolve_lap.sh",
+        "tests/lib/rig.sh",
+        "data/candidates/0.90.134.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-e67e71",
+      "kind": "verify",
+      "record": "D-RIG-LIB-CONFIGURATION-DEFAULT-ON-A-POOL-RIG-IS-THE-FIXED-RIG-LUN",
+      "change": {
+        "batch": "b20261023-bacf66"
+      },
+      "argument": "Verification batch b20261023-bacf66 on candidate 0.90.134, attempt frozen 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), on pool pair g2c (test29/test30, EUI-64 pool LUN pool-05-lun-0, both nodes unmounted by the lane, tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step3.log), declared by tools/harness_batch.py verify before its first lap and sized from control b20261023-31a7bd on the same attempt (MXFS_RIG_POOL_DEFAULT=0 in the lap's own environment only; 10 of 10 laps failed, each exposed, tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step10.log). The precheck laps before the control: switch on PASS, switch off FAIL (tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/summary.log). The verification's laps all PASS with exposure, none failed or dropped (tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step11.log, tests/evidence/batch_laps/b20261023-bacf66). Each lap is a few resolver reads over ssh (1-2 s measured), inside its derived bound. The switch is in tests/lib/rig.sh, a frozen file of the attempt.",
+      "evidence": [
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/summary.log",
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step10.log",
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step11.log",
+        "tests/evidence/batch_laps/b20261023-31a7bd",
+        "tests/evidence/batch_laps/b20261023-bacf66",
+        "tests/rig_pool_default_resolve_lap.sh",
+        "tests/lib/rig.sh",
+        "data/candidates/0.90.134.json"
       ],
       "state": "pending",
       "created": "2026-10-23"
