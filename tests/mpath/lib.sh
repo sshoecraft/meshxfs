@@ -230,9 +230,17 @@ kmsg_stop() { local n; for n in $NODES; do ( rs 15 "$n" "kill \$(cat $KFILE.pid 
 # path_all_lost failing on 0.90.129 (a post-seal ledger mutation and a whole-
 # filesystem quarantine) stayed in /run on nodes the VM pool then shut off.
 # A node whose copy did not arrive is named, never passed over.
+# Every exit but a pass keeps them: pf_done clears this trap before a passing
+# row's end, so the trap runs only for a row that did not pass.  An ABORT
+# (capture_require's exit 2) counts no failure, and keying the copy on $fails
+# kept nothing for a rejoin remount that hung in D state on 16/net/mesh/mpath
+# path_all_lost; the power-down that followed destroyed the only copy
+# (D-PATH-ROW-ABORT-KEEPS-NO-KERNEL-LOG-SO-A-HUNG-REJOIN-LEAVES-NO-EVIDENCE).
+# PF_KEEP_ON_ABORT=0 keeps them only for a counted failure, as before: the
+# same-build control.
 kmsg_keep() {
     local n
-    [ "${fails:-0}" != 0 ] || return 0
+    if [ "${PF_KEEP_ON_ABORT:-1}" = 0 ]; then [ "${fails:-0}" != 0 ] || return 0; fi
     [ -z "${kmsg_kept:-}" ] || return 0
     kmsg_kept=1
     for n in $NODES; do ( rs 90 "$n" "gzip -c $KFILE > /src/mxfs/$OUT/kmsg_${n}_fromnode.gz" >/dev/null 2>&1 ) & done; wait

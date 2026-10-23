@@ -54,6 +54,7 @@ import fcntl
 import glob
 import os
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -174,6 +175,61 @@ def verdict(rc: int, text: str, passed: str, failed: str, bound: int) -> tuple:
     return "INCOMPLETE", f"no verdict line (rc={rc}): {text.strip().splitlines()[-1][:300]}"
 
 
+#: Seconds a timed-out lap's process group gets after SIGTERM, and again after SIGKILL, to be gone.
+KILL_GRACE_S = 5
+
+
+def group_alive(pgid: int) -> bool:
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def run_bounded(command: list, cwd, handle, bound: int) -> int:
+    """Run the lap's command for at most `bound` seconds; 124 on an overrun, as timeout(1) returns.
+
+    subprocess.run(timeout=) ends only its direct child, so a harness's own children went on
+    running and writing into the lap's log, and into the evidence the lap is graded from, after
+    the lap had been recorded (D-BATCH-LAP-TIMEOUT-KILLS-ONLY-THE-DIRECT-CHILD-SO-THE-HARNESS-
+    WRITES-ON). The lap now runs in a session of its own, and an overrun ends the whole process
+    group, SIGTERM and then SIGKILL, and waits until none of it is left before the lap is
+    recorded. MXFS_BATCH_LAP_KILLPG=0 ends only the direct child, as before: the same-build
+    control."""
+    if os.environ.get("MXFS_BATCH_LAP_KILLPG", "1") == "0":
+        try:
+            return subprocess.run(command, cwd=cwd, stdout=handle, stderr=subprocess.STDOUT,
+                                  timeout=bound).returncode
+        except subprocess.TimeoutExpired:
+            return 124
+    proc = subprocess.Popen(command, cwd=cwd, stdout=handle, stderr=subprocess.STDOUT,
+                            start_new_session=True)
+    try:
+        return proc.wait(timeout=bound)
+    except subprocess.TimeoutExpired:
+        pass
+    pgid = proc.pid
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(pgid, sig)
+        except ProcessLookupError:
+            break
+        deadline = time.monotonic() + KILL_GRACE_S
+        while time.monotonic() < deadline and group_alive(pgid):
+            time.sleep(0.1)
+        if not group_alive(pgid):
+            break
+    proc.wait()
+    left = "gone" if not group_alive(pgid) else "STILL ALIVE after SIGKILL"
+    handle.write(f"=== the lap overran its bound of {bound}s: its process group {pgid} was "
+                 f"ended ({left}) ===\n")
+    handle.flush()
+    return 124
+
+
 #: The stall line every harness may print, read whatever `--stall` patterns a lap declares.
 STALL_LINE = r"\bmax_stall_ms=(\d+)"
 
@@ -255,11 +311,7 @@ def main() -> int:
         handle.write(f"=== {stamp()} {' '.join(command)} (bound {args.bound}s) ===\n")
         handle.write(f"=== VMs held for the lap: {' '.join(vms) or 'none'} ===\n")
         handle.flush()
-        try:
-            rc = subprocess.run(command, cwd=ROOT, stdout=handle, stderr=subprocess.STDOUT,
-                                timeout=args.bound).returncode
-        except subprocess.TimeoutExpired:
-            rc = 124
+        rc = run_bounded(command, ROOT, handle, args.bound)
         elapsed = int(time.time() - t0)
         handle.write(f"=== rc={rc} elapsed={elapsed}s ({stamp()}) ===\n")
     text = log.read_text(errors="replace")

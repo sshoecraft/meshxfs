@@ -822,6 +822,56 @@ def add_cells(entry: dict, args) -> list:
     return changed
 
 
+def drop_cells(data: dict, entry: dict, args) -> list:
+    """Stop naming runs this record's removal must not retire as its own.
+
+    A removal retires every run its record names, as fixed or disproved (retire_cells). A run a
+    record names for a failure another cause produced would be settled by a fix that did not end
+    it, and a removal was rejected for exactly that (data/reviews/P20261023-5e015a.md, Check 4: a
+    DRBD alloc_witness run that fails with or without the fix and whose failure an open major
+    record owns). The queue could add a run to a record but never take one away. A run is dropped
+    only when it stays accounted for without this record: a standing disposition already settles
+    it, or another open record names it, so the incident gate reads it as before. The run's own
+    evidence for the drop, and what still accounts for the run, go into this record's evidence."""
+    given = getattr(args, "drop_cell", None) or []
+    if not given:
+        return []
+    why = (getattr(args, "drop_why", None) or "").strip()
+    if not why:
+        sys.exit("defects: --drop-cell needs --drop-why: the run's own evidence that this "
+                 "record's cause is not what failed it")
+    criteria = board_tool()
+    dropped = []
+    for text in given:
+        cell = parse_cell(text, False)
+        key = (cell["config"], cell["row"], cell["iso"])
+        field = next((f for f in ("cells", "collateral")
+                      if any((c["config"], c["row"], c["iso"]) == key
+                             for c in entry.get(f) or [])), None)
+        if field is None:
+            sys.exit("defects: %s does not name %s" % (entry["id"], text))
+        board = criteria.SPEC if cell["row"].startswith("release:") \
+            else criteria.board_for(cell["config"])
+        others = [x["id"] for x in data["defects"] if x is not entry and any(
+            (c["config"], c["row"], c["iso"]) == key
+            for c in (x.get("cells") or []) + (x.get("collateral") or []))]
+        standing = criteria.settled(board, *key)
+        if standing:
+            still = "settled (%s)" % standing
+        elif others:
+            still = "named by " + ", ".join(others)
+        else:
+            sys.exit("defects: %s is neither settled nor named by another open record: dropping "
+                     "it would leave a failure nothing accounts for" % text)
+        entry[field] = [c for c in entry[field] if (c["config"], c["row"], c["iso"]) != key]
+        dropped.append("%s:%s:%s, %s" % (key + (still,)))
+    note = "%s: no longer names %s: %s" % (date.today().isoformat(), "; ".join(dropped), why)
+    have = entry.get("evidence") or ""
+    entry["evidence"] = have + [note] if isinstance(have, list) else \
+        ((have + " ===== " if have else "") + note)
+    return ["cells", "evidence"]
+
+
 # ---------------------------------------------------------------------------------------------
 # MEASURED RATES AND THE BATCHES THEY SIZE
 # ---------------------------------------------------------------------------------------------
@@ -1632,12 +1682,13 @@ def cmd_update(data: dict, args) -> int:
             entry["evidence"] = (have + " ===== " if have else "") + appended
         changed.append("evidence")
     changed += add_cells(entry, args)
+    changed += drop_cells(data, entry, args)
     if args.reproducer:
         entry["reproducer"] = args.reproducer
         changed.append("reproducer")
     if not changed:
         sys.exit("defects: update needs at least one of -s/-m/-n/-a/-w/-W/-N/-C/-P/-I/"
-                 "--cell/--collateral/--reproducer")
+                 "--cell/--collateral/--drop-cell/--reproducer")
     for granted in approvals:
         entry.setdefault("approvals", []).append({k: v for k, v in granted.items()
                                                   if k != "change"})
@@ -1870,6 +1921,12 @@ def main() -> int:
     update.add_argument("--collateral", action="append", metavar="CONFIG:ROW:ISO=EVIDENCE",
                         help="add a board run that failed because of this defect, with the log "
                              "evidence of the dependency (repeat for each)")
+    update.add_argument("--drop-cell", dest="drop_cell", action="append", metavar="CONFIG:ROW:ISO",
+                        help="stop naming a run that a standing disposition already settles or "
+                             "another open record names (repeat; needs --drop-why)")
+    update.add_argument("--drop-why", dest="drop_why",
+                        help="--drop-cell: the run's own evidence that this record's cause did "
+                             "not fail it")
     update.add_argument("--reproducer", help="the test that reaches the cause, and how")
     update.add_argument("--approval", help="the approved proposal a noblock impact or a narrower "
                                            "reach needs")

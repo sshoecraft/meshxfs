@@ -1,16 +1,16 @@
 ---
 name: compiled-rig-harness-traps
-description: Rig traps: pool-LUN MXFS_DEV, xfs.ko vs kretprobes, detached-process lifetime, SCST 3x abort hold, unexported modargs, MXFS_CRIT, RHEL9 folio mmap
+description: Rig traps: pool-LUN MXFS_DEV + stale mpath on adopted LUN, xfs.ko vs kretprobes, detached lifetime, SCST 3x abort, modargs, MXFS_CRIT, RHEL9 mmap
 metadata:
   type: feedback
-tags: [compiled, trap, rig, harness, device-resolution, bpftrace, kretprobe, background-jobs, lap-queue, setsid, systemd, cgroup, process-lifetime, dracut, scst, libiscsi, tas, fio, modargs, lap-chain, fenced-victim-withdraw, criteria, MXFS_CRIT, vsphere, rhel9, large-folio, mmap, iomap, kcompat, srcversion, board]
+tags: [compiled, trap, rig, harness, device-resolution, bpftrace, kretprobe, background-jobs, lap-queue, setsid, systemd, cgroup, process-lifetime, dracut, scst, libiscsi, tas, fio, modargs, lap-chain, fenced-victim-withdraw, criteria, MXFS_CRIT, vsphere, rhel9, large-folio, mmap, iomap, kcompat, srcversion, board, lun-pool, multipath, mpath-settings, iscsi, variant]
 ---
 
 # Rig and harness traps: driving the lab rig, detached-process lifetime, reading the right witness, and vSphere / RHEL 9 board bring-up
 
-Merged from four compiled articles; shared topic: traps in driving the MXFS lab rig and in reading what it reports. (1) The original article: three traps (an assorted tail) that share being traps in driving the rig, each hit on 2026-10-19 and each prevented by a cheap precondition check; organised by where the trap sits: device resolution in the harness, symbol resolution in the tracer on a guest, background-job PIDs on the host. (2) `compiled-detached-process-lifetime-and-teardown-traps`: who owns a detached process's lifetime and what a kill does or does not reach (four of five inputs), plus a neighbouring boot-time persistence trap (dracut). (3) `compiled-scst-abort-hold-3x-timeout-and-chain-reprep-drops-modargs`: two traps from the TAS line of the D-FENCED-VICTIM-WITHDRAW investigation, each a verdict read from the wrong witness. (4) `compiled-criteria-board-env-trap-and-rhel9-large-folio-mmap-livelock`: two unrelated traps hit while bringing up the vSphere / RHEL 9 platform board.
+Merged from four compiled articles; shared topic: traps in driving the MXFS lab rig and in reading what it reports. (1) The original article: three traps (an assorted tail) that share being traps in driving the rig, each hit on 2026-10-19 and each prevented by a cheap precondition check; organised by where the trap sits: device resolution in the harness, symbol resolution in the tracer on a guest, background-job PIDs on the host. A fourth trap, found 2026-10-23 and folded in later from a raw note, sits in the same section: the multipath / iSCSI settings a pool-LUN binding carries (`lun_pool.sh alloc` adopts a bound LUN without logging in again). (2) `compiled-detached-process-lifetime-and-teardown-traps`: who owns a detached process's lifetime and what a kill does or does not reach (four of five inputs), plus a neighbouring boot-time persistence trap (dracut). (3) `compiled-scst-abort-hold-3x-timeout-and-chain-reprep-drops-modargs`: two traps from the TAS line of the D-FENCED-VICTIM-WITHDRAW investigation, each a verdict read from the wrong witness. (4) `compiled-criteria-board-env-trap-and-rhel9-large-folio-mmap-livelock`: two unrelated traps hit while bringing up the vSphere / RHEL 9 platform board.
 
-## A. Driving the rig: device, symbol and PID resolution
+## A. Driving the rig: device, pool-LUN binding, symbol and PID resolution
 
 ### Pool rig: an unmounted node's LUN is not found unless the caller sets `MXFS_DEV`
 
@@ -26,6 +26,18 @@ Consequence: a harness that mounts a node the previous lap left UNMOUNTED ABORTs
 Seen 2026-10-19: queue `p6a2`'s three remount laps all ABORTed this way, and the audits behind them refused (`marker stale ... want ... MOUNTED`).
 
 A node that is still mounted resolves by its live mount and needs nothing.
+
+### Pool rig: `lun_pool.sh alloc` adopts a bound LUN without logging in again, so changed multipath / iSCSI settings never reach the nodes
+
+Source: `trap-lun-pool-adopts-a-bound-lun-so-new-mpath-settings-never-reach-the-nodes`. Found 2026-10-23 while planning the 2 s path-timescale measurement for D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S (session 02386252).
+
+`tools/lun_pool.sh` `cmd_alloc` (about :580-598) adopts a finished run's LUN when the node set, path count, block size, initiator group and wwid file match, and returns its pool line WITHOUT running `NODE_LOGIN_MP`. The multipath and iSCSI initiator settings (`tools/mpath_settings.sh multipath|iscsi`, written into `/etc/multipath/conf.d/mxfs.conf` and each node record) are applied only by that login, i.e. only when a LUN is first bound to a node set. `MXFS_FORCE_PREP=1 ./run.sh ... prep_cluster` re-forms the cluster on the adopted binding; it does not log in again.
+
+Consequences:
+- A variant of the path settings (a different timescale, a different `no_path_retry`) measured on a group whose LUN was already bound measures the OLD settings. Release the group's binding first, or make adoption compare the settings the LUN was bound with.
+- After a change to the default settings, every adopted binding keeps the old ones, and a later non-variant run on it grades the candidate on settings that do not ship.
+- Verify what a node actually runs, on the node, not the tree's file: `multipathd show config | grep -E 'polling_interval|fast_io_fail_tmo|no_path_retry'` and `iscsiadm -m node -T <tgt> -p <portal> | grep -E 'replacement_timeout|noop_out'`.
+- Same shape as section C trap 1 (a knob the chain's own prep did not carry): the setting declared in the tree is not the setting the nodes run.
 
 ### Tracing MXFS by function name while xfs.ko is also loaded
 
