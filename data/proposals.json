@@ -4349,8 +4349,15 @@
         "tests/evidence/candidates/0.90.134_20261023T183224Z.files.json",
         "data/candidates/0.90.134.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-a252b4.md",
+        "sha256": "4597595cfdfb408f1bea02f701dcb80acee4fbead4012ada958047d4e659d573",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-4036f9",

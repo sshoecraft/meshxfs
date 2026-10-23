@@ -5558,7 +5558,7 @@
           "candidate": "0.90.134",
           "build": "C54C14B681D148267D084FC",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -5610,6 +5610,18 @@
           "builds": [
             "C54C14B681D148267D084FC"
           ],
+          "date": "2026-10-23"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T18:32:24Z",
+          "build": "C54C14B681D148267D084FC",
+          "batch": "b20261023-e6a814",
+          "approval": "P20261023-a252b4",
           "date": "2026-10-23"
         }
       ]
@@ -7223,6 +7235,56 @@
           "config": "2/disk/caw/direct",
           "row": "lap:recov_iwr",
           "iso": "2026-10-23T18:38:07Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T19:21:40Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T19:20:36Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T19:19:32Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T19:18:29Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T19:17:29Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T19:16:27Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T19:15:26Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T19:14:24Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T19:13:23Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "lap:recov_iwr",
+          "iso": "2026-10-23T19:12:22Z"
         }
       ],
       "updated": "2026-10-23",
@@ -7290,11 +7352,44 @@
           "candidate": "",
           "build": "C54C14B681D148267D084FC",
           "variant": "iwr_ra_partial=0 (set on both nodes by the lap's arm 0: a recovery write of an inode cluster that still carries the readahead ops goes out whole on a 512-byte-sector volume, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the fix switched off: the rejoin's recovery writes the whole cluster of the directory it skipped, over the survivor's newer image"
+        },
+        {
+          "id": "b20261023-0e9203",
+          "kind": "verify",
+          "row": "lap:recov_iwr",
+          "config": "4/disk/caw/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "C54C14B681D148267D084FC",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:recov_iwr",
+            "config": "4/disk/caw/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-a06f82",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "iwr_ra_partial=0 (set on both nodes by the lap's arm 0: a recovery write of an inode cluster that still carries the readahead ops goes out whole on a 512-byte-sector volume, as before the fix)",
+            "builds": [
+              "C54C14B681D148267D084FC"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -7304,6 +7399,21 @@
           "platform": "any",
           "kind": "control",
           "batch": "b20261023-346edb",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "iwr_ra_partial=0 (set on both nodes by the lap's arm 0: a recovery write of an inode cluster that still carries the readahead ops goes out whole on a 512-byte-sector volume, as before the fix)",
+          "builds": [
+            "C54C14B681D148267D084FC"
+          ],
+          "date": "2026-10-23"
+        },
+        {
+          "row": "lap:recov_iwr",
+          "config": "4/disk/caw/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-a06f82",
           "k": 10,
           "n": 10,
           "candidate": "",
