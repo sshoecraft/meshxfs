@@ -2341,6 +2341,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: parse_cell splits at the first two colons and parses the configuration, and annotated_run looks the row up on the board; every exposed lap must refuse a recorded release step FAIL"
+        },
+        {
+          "id": "b20261022-332c20",
+          "kind": "verify",
+          "row": "lap:release_step_cell",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:release_step_cell",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-3f5a50",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED.fix.diff sha256=d047663cb6c5df48da3dfdf0c4ed479b9fc43e646644a4f28d920324a57cd688",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
         }
       ],
       "updated": "2026-10-22",
@@ -2600,6 +2633,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: tests/suite/fsx.sh draws its seed from four random bytes again, and a draw past INT_MAX (here 4294967295, every lap) makes the vendored fsx print its usage and exit 90 in both checks"
+        },
+        {
+          "id": "b20261022-d1f171",
+          "kind": "verify",
+          "row": "lap:fsx_seed",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^LAP fsx_seed start .* draw=4294967295 ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:fsx_seed",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-4bf99d",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-FSX-RANDOM-SEED-ABOVE-INT-MAX.fix.diff sha256=8696fceaa6c7370480148efe459b824c241407ac3fda6c037ac4e664782ea61f",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
         }
       ],
       "rates": [
@@ -2853,6 +2919,39 @@
           },
           "transfer": "",
           "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261022-7dbd0d",
+          "kind": "verify",
+          "row": "lap:vm_package_build_deb",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 4,
+          "probe": "PKG_INPUTS deb|could not pack the package inputs",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:vm_package_build_deb",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-f44545",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-PACKAGE-INPUT-LIST-NAMES-ABSENT-MXFS-C.fix.diff sha256=02753e662dadfd2818520050636347dd9c5334a555120d67149c7dfad7588393",
+            "builds": [
+              "2446C4C6401FC9D9224650F"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
         }
       ],
       "updated": "2026-10-22",
@@ -3019,6 +3118,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: the WWID normaliser keeps the e of eui. and the no-mount fallback looks only for wwn-0x<id>, which udev never makes for an EUI-64 LUN; every exposed lap must abort with no MXFS device basis"
+        },
+        {
+          "id": "b20261022-541fce",
+          "kind": "verify",
+          "row": "lap:rig_eui64_resolve",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:rig_eui64_resolve",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-bf8f03",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E.fix.diff sha256=62c688f79bff83a4525b140807cc3f5b222a0ab436a1ef2e1466dea7370332cf",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
         }
       ],
       "rates": [
@@ -3184,6 +3316,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: the dev host reads a node device path locally again; every exposed lap must tag the dev host's own disk"
+        },
+        {
+          "id": "b20261022-7742a9",
+          "kind": "verify",
+          "row": "lap:rig_tag_dev_host",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:rig_tag_dev_host",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-ba4c55",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK.fix.diff sha256=ceb7e822f9f19cdb2e879620c2cbb764a2fc6838bed120349aaabed2becacef6",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
         }
       ],
       "rates": [
@@ -3203,7 +3368,18 @@
           "date": "2026-10-22"
         }
       ],
-      "reproducer": "tests/rig_tag_dev_host_lap.sh <node> (the node up): resolves <node>:/dev/sda through tools/mxfs_rig_tag.sh from the dev host and compares the tag with the array the node itself reports; EXPOSED when the dev host's own /dev/sda is another array. With the fix taken out the tag is the dev host's disk ('ata'): RIG_TAG_LAP FAIL"
+      "reproducer": "tests/rig_tag_dev_host_lap.sh <node> (the node up): resolves <node>:/dev/sda through tools/mxfs_rig_tag.sh from the dev host and compares the tag with the array the node itself reports; EXPOSED when the dev host's own /dev/sda is another array. With the fix taken out the tag is the dev host's disk ('ata'): RIG_TAG_LAP FAIL",
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "batch": "b20261022-7742a9",
+          "approval": "P20261022-51ab60",
+          "date": "2026-10-22"
+        }
+      ]
     },
     {
       "id": "D-PRESTEPS-FORM-PAIR-UNDER-G2-MARKER-BUT-SELF-TESTS-READ-DEFAULT-MARKER",
@@ -3349,6 +3525,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: the self-tests are told only the pair's nodes, not its group or marker; every exposed lap must have them read the default marker"
+        },
+        {
+          "id": "b20261022-b46717",
+          "kind": "verify",
+          "row": "lap:presteps_env",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:presteps_env",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-12fbb7",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-PRESTEPS-FORM-PAIR-UNDER-G2-MARKER.fix.diff sha256=b6b634c61780bc4e18124e31ccf278a08d7c531865279c10593d09c0810033ab",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
         }
       ],
       "rates": [
@@ -3464,6 +3673,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: tests/recov_bmbt_reuse.sh has no EXIT trap, so a lap that aborts after destroying its victim exits with the victim powered off"
+        },
+        {
+          "id": "b20261022-80174d",
+          "kind": "verify",
+          "row": "lap:rbr_abort",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^LAP rbr_abort exposed: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:rbr_abort",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-f49ba8",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-RECOV-BMBT-REUSE-ABORT-LEAVES-VICTIM-OFF.fix.diff sha256=c5887bb0786fa3d5d44336542dc0472bc25a968d64fb80822fd0eb87b508c905",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "reproducer": "tests/recov_bmbt_reuse_abort_lap.sh <label> on g2 (the gate's fault lap of recov_bmbt_reuse alone, tests/recov_bmbt_reuse_abort.manifest; exposure: the destroy before the injection)",
@@ -3574,6 +3816,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: tests/d_intents_2tcp_open_efi.sh checks the readability of IMG, which nothing assigns, under set -u, and dies before its first measurement"
+        },
+        {
+          "id": "b20261022-4a86bc",
+          "kind": "verify",
+          "row": "lap:openefi_img_gate_fault",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^GATE d_intents_2tcp_open_efi fault: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:openefi_img_gate_fault",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-601b13",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG.fix.diff sha256=210f1d9f3ad6e32f13d8c9f1e4f8c345e868f6c8740343177b8fdb927727be67",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -3773,6 +4048,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out, lap inputs from the environment (b20261022-ec8648 passed the configuration on the probe's command line, where criteria.py sets MXFS_OWN_RIG itself, and measured nothing): every exposed lap must read the DRBD board clean"
+        },
+        {
+          "id": "b20261022-c5beda",
+          "kind": "verify",
+          "row": "lap:release_board_verdict",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:release_board_verdict",
+            "config": "2/net/mesh/drbd",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-4233e9",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW.fix.diff sha256=99a943bdc9fb20fb7eab88c1d2ff47a776a14c85233b9d5655732b8c9e16e6f7",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
         }
       ],
       "updated": "2026-10-22",
@@ -3997,6 +4305,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: join_during_takeover runs in the gate with NFILES=4000, its ~500-page takeover pass ends before the lap's first in-flight sample, and the lap never reaches the injected first measurement"
+        },
+        {
+          "id": "b20261022-2c3a0c",
+          "kind": "verify",
+          "row": "lap:jdt_gate_fault",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 9,
+          "probe": "INFO A.s lone remount: A_MOUNT_RC=0 ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:jdt_gate_fault",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-4d455b",
+            "k": 9,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE.fix.diff sha256=480d32973e93a9ecf1302cacf2f38b35adea9b4fe4b167555a3ab005582bbd6d",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.45571294310031313
         }
       ],
       "rates": [
@@ -4061,6 +4402,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the clean-release marker at the inactivation's release switched off: the survivor must refuse the replay not-held again"
+        },
+        {
+          "id": "b20261022-1c2336",
+          "kind": "verify",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "P-RELMARK-OWED site=inact-exrel",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "gate:d_intents_2tcp_open_efi",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-8375dc",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "inact_relmark=0 (sysfs on the formed pair, MXFS_EXTRA_MODARGS on every re-formed one): the same build releasing an inactivation's tenure unmarked, as before the fix",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -4246,6 +4620,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: the rebuild trusts that nothing but the AG headers is allocated, so it declares the blocks of a file whose inode is in another AG free"
+        },
+        {
+          "id": "b20261022-7be246",
+          "kind": "verify",
+          "row": "lap:chk_freespace_rebuild",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "holding [0-9]+ blocks of a file whose inode is in another AG",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:chk_freespace_rebuild",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-dcc377",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-CHK-FREESPACE-REBUILD-DECLARES-OWNED-BLOCKS-FREE.fix.diff sha256=72994279ef5e167700d5cc2676b15ecbe77f659a48d24dd860f0f8e55d9438b0",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -4345,6 +4752,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the hold that waits for the peer's swap switched off: laps with no MISCOMPARE (VACUOUS) must come back"
+        },
+        {
+          "id": "b20261022-7effb7",
+          "kind": "verify",
+          "row": "fourkn_merge",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 27,
+          "probe": "FOURKN-MERGE-[^ ]+ counted miscompares=[1-9]",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "failed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "fourkn_merge",
+            "config": "2/net/mesh/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-02b816",
+            "k": 9,
+            "n": 20,
+            "candidate": "",
+            "variant": "HOLD_PEER_MS=0 (MXFS_TEST_ENV): the row's hold back to a fixed 20 ms, dbg_iwr_merge_hold_peer_ms 0",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.18064889524117572
         }
       ],
       "updated": "2026-10-22",
@@ -4410,6 +4850,11 @@
           "config": "2/net/mesh/direct4k",
           "row": "fourkn_merge",
           "iso": "2026-10-22T18:49:56Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "fourkn_merge",
+          "iso": "2026-10-23T02:43:59Z"
         }
       ]
     },
@@ -4440,6 +4885,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: a bind logs a node that booted with no node record in by hand and leaves the iSCSI login unit inactive, so nothing logs the session out before the network goes at shutdown"
+        },
+        {
+          "id": "b20261022-8174f4",
+          "kind": "verify",
+          "row": "lap:lunpool_shutdown",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^LAP lunpool_shutdown exposed: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:lunpool_shutdown",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-3c656e",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT.fix.diff sha256=928a9b80753b79430dec41c2be23d8a9c97281f59d9debdbe8ff89fdf7994fc4",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "updated": "2026-10-22",
@@ -4659,6 +5137,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "fua_verify's pattern parsed in base 0 again (the fix reverted and the tool rebuilt from it): the row's 'ab' must write 0x00 and its three FUA checks fail; every lap reaches the trigger, the row's first command"
+        },
+        {
+          "id": "b20261022-28fcd8",
+          "kind": "verify",
+          "row": "fourkn_cdb",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 4,
+          "probe": "FOURKN-CDB-[^ ]+ fua_verify write",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "fourkn_cdb",
+            "config": "2/net/mesh/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-545d6a",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-FUA-VERIFY-PARSES-ITS-HEX-PATTERN-AS-BASE-0.fix.diff sha256=ce2f40964165f9b8c6c86439de816ad10e597195fd12f50f301ee9bb088dbe5c",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
         }
       ],
       "updated": "2026-10-22",
@@ -4770,6 +5281,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: a link in the exported tree to /mxfs/evidence, a disk only the host has, so a node cannot create its evidence directory through it"
+        },
+        {
+          "id": "b20261022-bd6f17",
+          "kind": "verify",
+          "row": "lap:evidence_link",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:evidence_link",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-86f27f",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "EVIDENCE_LINK_TARGET=/mxfs/evidence (the lap's own link gets the target tests/evidence had before the fix)",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -4893,6 +5437,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix's knob off: the already-granted shortcut ends a wait unclaimed, and the hand-back unlinks the entry its adopted grant installed, which after the page hand-off is the lock master's own record of the waiter's EX"
+        },
+        {
+          "id": "b20261022-ad2d57",
+          "kind": "verify",
+          "row": "lap:adopted_grant_handoff",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSURE adopted=1 handed=1 local=1",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:adopted_grant_handoff",
+            "config": "8/net/mesh/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-c82774",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "dl_shortcut_claim=0 (DL_SHORTCUT_CLAIM=0 in the lap's environment)",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -5046,6 +5623,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix taken out: dlm_page_ensure_mine and the FREEZE_REQ and FROZEN arms of mxfs_dlm_process_page_handoff do not ask dlm_authority_lost, so a node whose authority over the LUN closed activates, prepares and decides on the pages its peers hand it, ask it for and send it requests on, each a ledger write the target refuses"
+        },
+        {
+          "id": "b20261022-6db36b",
+          "kind": "verify",
+          "row": "lap:fenced_node_ledger",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 4,
+          "probe": "^  PASS 3 exposure: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:fenced_node_ledger",
+            "config": "8/net/mesh/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-1bb8dc",
+            "k": 20,
+            "n": 20,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff sha256=87b95c6e8dea4dcb261e667db107bd90f7023aa34b17d4518c8816f7c0a73521",
+            "builds": [
+              "9594B08726D6732D2ED5E87"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.7672704990109255
         }
       ],
       "updated": "2026-10-22",
@@ -5352,6 +5962,39 @@
           "support": [],
           "created": "2026-10-22",
           "why": "the fix's switch off: the lap runs with no VM held, so the reaper of a run.sh that exited shuts its node off once its grace ends"
+        },
+        {
+          "id": "b20261022-7e7690",
+          "kind": "verify",
+          "row": "lap:vmhold_reaper",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-22",
+          "rate": {
+            "row": "lap:vmhold_reaper",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261022-50c5dc",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_BATCH_LAP_HOLD=0 (tools/batch_lap.py holds no VM for the lap, as before the fix)",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-22"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "updated": "2026-10-22",
@@ -5403,6 +6046,118 @@
         }
       ],
       "updated": "2026-10-22"
+    },
+    {
+      "id": "D-LANES-ON-ONE-CONFIGURATION-COLLIDE-AND-BATCHES-SPEND-THEIR-LAPS-INCOMPLETE",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-22",
+      "summary": "Two rig lanes on one configuration collide on run.sh's configuration lock, and tools/harness_batch.py verify then spends a verification batch's laps INCOMPLETE: lane g2_verify_round1's prep_cluster for 2/net/mesh/direct was refused because lane g2c_verify_round1's run.sh held 2-net-mesh-direct, so test1/test2 were never formed on the candidate; harness_batch.py ran every planned lap anyway, each aborting on the unformed pair (rc=2), and three verification batches used up their laps with 0, 0 and 4 PASS.",
+      "evidence": "Candidate 0.90.134 (frozen 2026-10-23T02:25:06Z), seven round-1 lanes started 02:25:12-02:25:24Z. tests/evidence/lanes/g2_verify_round1_20261023T022512Z/step2.log: 'ERROR: configuration 2-net-mesh-direct is held by another run: 3949243 2026-10-23T02:25:17Z run.sh 2/net/mesh/direct --group g2c run_id=20261023T022517Z-g2c' (summary.log: step 2 end rc=3 0s). step3.log: batch b20261022-bd6f17 (evidence link, 6 planned) laps 1-6 INCOMPLETE rc=2 elapsed 0 s, each lap log (tests/evidence/batch_laps/b20261022-bd6f17/20261023T022542Z.log ...) 'ABORT: test1 does not see the tree at /src/mxfs (got src=0)'. step4.log: batch b20261022-4a86bc (open-EFI image gate entry, 6 planned) laps 1-6 INCOMPLETE rc=2, each 'PAIR before d_intents_2tcp_open_efi fault: not formed ... ABORT: the pair could not be formed again ...; ERROR: configuration 2-net-mesh-direct is held by another run ... --group g2c' (tests/evidence/batch_laps/b20261022-4a86bc/20261023T022549Z.log). step5.log: batch b20261022-1c2336 (open-EFI death gate entry, 6 planned) laps 1-2 INCOMPLETE rc=2, laps 3-6 PASS once g2c's run had ended. tools/defects.py check_batch_lap counts PASS, FAIL and INCOMPLETE laps against a batch's planned number, so each of the three batches has run all its laps. No MXFS module was loaded on test1/test2 before any of the 14 aborts (the pair had not been formed on this boot).",
+      "next": "Make a lap that aborts on a precondition before its trigger (pair not formed, tree not visible) stop the batch's run without spending the rest of its laps (harness_batch.py stops at the first INCOMPLETE), and keep two lanes from holding one configuration at once (the lane runner, or run.sh waiting for the configuration lock with a derived bound, instead of refusing); a reproducer: a verification lap run while another process holds the configuration's lock. Then plan the three verifications again.",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T02:25:43Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T02:25:44Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T02:25:45Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T02:25:46Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T02:25:47Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:evidence_link",
+          "iso": "2026-10-23T02:25:48Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:openefi_img_gate_fault",
+          "iso": "2026-10-23T02:25:54Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:openefi_img_gate_fault",
+          "iso": "2026-10-23T02:26:00Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:openefi_img_gate_fault",
+          "iso": "2026-10-23T02:26:05Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:openefi_img_gate_fault",
+          "iso": "2026-10-23T02:26:10Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:openefi_img_gate_fault",
+          "iso": "2026-10-23T02:26:15Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:openefi_img_gate_fault",
+          "iso": "2026-10-23T02:26:22Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-23T02:26:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "iso": "2026-10-23T02:26:36Z"
+        }
+      ]
+    },
+    {
+      "id": "D-BATCH-LAP-LOG-NAMED-BY-THE-SECOND-SO-SUB-SECOND-LAPS-OVERWRITE-EACH-OTHER",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-22",
+      "summary": "tools/batch_lap.py names each lap's log after the second the lap starts (:174) and opens it with 'w' (:182), while the lap's ledger stamp is moved to a free second (:215): two laps started in one second write one file, the second overwriting the first, so a counted lap's PASS and exposure lines survive nowhere but the ledger row.",
+      "evidence": "Review data/reviews/P20261022-0b1720.md: batch b20261022-b46717 (lap:presteps_env) laps 1 and 2 (ledger data/criteria.runs.jsonl:7970, :7972) both name tests/evidence/batch_laps/b20261022-b46717/20261023T022540Z.log, which holds lap 2's output (it closes at 02:25:41Z; lap 1's own stamp is 02:25:40Z): three logs for four rows. Control b20261022-12fbb7 rows :7617 and :7618 both name 20261022T200846Z.log: 19 logs for 20 rows.",
+      "next": "Name each lap's log so no two laps can share it (the lap's number and its own ledger stamp) and open it exclusively; a lap that runs two sub-second laps of one batch and requires two logs, each holding its own lap's verdict line."
+    },
+    {
+      "id": "D-VERIFIED-AT-MATCHED-BY-VERSION-ALONE-CARRIES-TO-A-LATER-ATTEMPT",
+      "severity": "high",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-22",
+      "summary": "A record's verified_at entry is matched to a candidate by the version string alone (tools/defects.py blocks/verified_at, :399-400), so a verification batch that passed on one attempt of a version stops the record blocking that configuration on every later attempt of the same version, though none of its laps ran on them; grading counts only runs made after the current attempt was frozen, the verification exemption does not.",
+      "evidence": "Reviews data/reviews/P20261022-981ed4.md and data/reviews/P20261022-f64a95.md: 'the verified_at mark that approval writes is matched by the name 0.90.134 alone ... It would therefore carry over to a refrozen attempt of the same version that no lap of this batch ran on.' Candidate 0.90.134's attempt frozen 2026-10-23T02:25:06Z went INVALID at 03:1xZ; verified_at for D-RIG-TAG-READS-THE-DEV-HOSTS-OWN-DISK-FOR-A-NODE-DEVICE-PATH at 2/net/mesh/direct (batch b20261022-7742a9, approval P20261022-51ab60) was applied on it and would exempt that record on the next attempt.",
+      "next": "Record the attempt (the candidate's frozen-at stamp) in each verified_at entry and match it against the current attempt only; a lap that verifies on one attempt, freezes another, and requires the record to block again."
+    },
+    {
+      "id": "D-TAUTH-LAPS-RELINK-FROZEN-TEST-BINARIES-AND-INVALIDATE-THE-CANDIDATE",
+      "severity": "high",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-22",
+      "summary": "tests/tauth/adopted_grant_handoff_test.sh:25 and tests/tauth/fenced_node_ledger_test.sh:23 compile and link their test binary in place, tests/tauth/<name>_test, which is a frozen file of the release candidate; so every lap rewrites a frozen file, and a verification batch of either lap makes the candidate it runs on INVALID.",
+      "evidence": "Candidate 0.90.134 frozen 2026-10-23T02:25:06Z (data/candidates/0.90.134.json); the host lane's tauth verification laps ran at 02:25:47-02:27:53Z. tools/release_candidate.py check 0.90.134: 'touched (content restored after a change, or rewritten): tests/tauth/adopted_grant_handoff_test', 'changed: tests/tauth/fenced_node_ledger_test', 'candidate 0.90.134 is now INVALID'. Reviews data/reviews/P20261022-981ed4.md (inode 98566229 -> 98566218, ctime 02:26:52Z; fenced_node_ledger_test 998600 -> 1008032 bytes at 02:27:41Z), data/reviews/P20261022-f64a95.md (a scan of all 2543 frozen files found only these two) and data/reviews/P20261022-7a05dc.md. Every verification batch on that attempt ran on a drifted tree and was rejected for it.",
+      "next": "Build each tauth test binary outside the frozen tree (a scratch directory, or a path the freeze lists as a build output) and run it from there; a lap that runs both tauth tests with a candidate frozen and requires release_candidate.py check to find nothing changed after them."
     }
   ]
 }

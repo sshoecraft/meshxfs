@@ -1,8 +1,8 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-22T03:15:49Z",
-  "state": "ABANDONED",
+  "created": "2026-10-23T02:25:06Z",
+  "state": "INVALID",
   "attempts": [
     {
       "created": "2026-10-21T21:26:41Z",
@@ -189,47 +189,55 @@
       "steps": {
         "seal": "FAIL"
       }
+    },
+    {
+      "created": "2026-10-22T03:15:49Z",
+      "state": "ABANDONED",
+      "dry_run": true,
+      "srcversion": "0988C50EC610F82EE08D135",
+      "files": "tests/evidence/candidates/0.90.134_20261022T031549Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-22T03:15:49Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-22T03:48:38Z",
+          "why": "scoped dry run done; not passed: presteps"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {
+        "presteps": "FAIL",
+        "batches": "PASS"
+      }
     }
   ],
-  "dry_run": true,
-  "srcversion": "0988C50EC610F82EE08D135",
-  "module_sha256": "1a971c5c5314bc4047bbb01a82a1de99b9c5a579d931857d1b5371985602bff3",
-  "files": "tests/evidence/candidates/0.90.134_20261022T031549Z.files.json",
-  "files_count": 2506,
-  "files_digest": "67e86884e8cf78c9e1d2eb94352627983a766ed6a4436a77c06a8121e0021983",
-  "spec": "4483dc7df9c2c532fe92a12691c8c8b8f6c18b018ace1a6acf9a2348546a42da",
+  "dry_run": false,
+  "srcversion": "16A5F5DDDB4852C9D5DB236",
+  "module_sha256": "845d148d491c073f27f9e20dc1eaf7bba48144efbaeb2e102f6932e10f8e517b",
+  "files": "tests/evidence/candidates/0.90.134_20261023T022506Z.files.json",
+  "files_count": 2543,
+  "files_digest": "fc568d6c60235cccdb2bd2e61308ed3cbc28b5e4d48818e99f7dc8508c79bc09",
+  "spec": "239edd020f1a096365b741c3102e0e052eec58ebe70c3d53dd631e5aa7a81ea8",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
   "packages": {},
   "dist": "",
-  "steps": {
-    "presteps": {
-      "state": "failed",
-      "outcome": "FAIL",
-      "detail": "self-tests failed: capture fault gate rc=1: RESULT: FAIL label=0.90.134_20261022T031549Z entries=60 broken=1 vacuous=0 restores=8 wall=1858s evidence=tests/evidence/20261022T031739Z_capture_gate_0.90.134_",
-      "evidence": "tests/evidence/candidates/0.90.134_20261022T031549Z.presteps.log",
-      "started": "2026-10-22T03:15:57Z",
-      "ended": "2026-10-22T03:48:37Z"
-    },
-    "batches": {
-      "state": "done",
-      "outcome": "PASS",
-      "detail": "no open verification batch for this candidate",
-      "evidence": "tests/evidence/candidates/0.90.134_20261022T031549Z.batches.log",
-      "started": "2026-10-22T03:48:38Z",
-      "ended": "2026-10-22T03:48:38Z"
-    }
-  },
+  "steps": {},
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-22T03:15:49Z",
+      "at": "2026-10-23T02:25:06Z",
       "why": "created"
     },
     {
-      "state": "ABANDONED",
-      "at": "2026-10-22T03:48:38Z",
-      "why": "scoped dry run done; not passed: presteps"
+      "state": "INVALID",
+      "at": "2026-10-23T03:14:19Z",
+      "why": "2 frozen file(s) changed: touched (content restored after a change, or rewritten): tests/tauth/adopted_grant_handoff_test; changed: tests/tauth/fenced_node_ledger_test"
     }
   ]
 }
