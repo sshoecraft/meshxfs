@@ -50,6 +50,7 @@ Exit status: 0 PASS, 1 FAIL, 2 INCOMPLETE or refused.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import fcntl
 import glob
 import os
@@ -175,18 +176,72 @@ def verdict(rc: int, text: str, passed: str, failed: str, bound: int) -> tuple:
     return "INCOMPLETE", f"no verdict line (rc={rc}): {text.strip().splitlines()[-1][:300]}"
 
 
-#: Seconds a timed-out lap's process group gets after SIGTERM, and again after SIGKILL, to be gone.
+#: Seconds a timed-out lap's processes get after SIGTERM, and again after SIGKILL, to be gone.
 KILL_GRACE_S = 5
 
+#: prctl(2): make the caller the reaper of its orphaned descendants (<linux/prctl.h>).
+PR_SET_CHILD_SUBREAPER = 36
 
-def group_alive(pgid: int) -> bool:
-    try:
-        os.killpg(pgid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
+
+def become_subreaper() -> None:
+    """Make every orphaned descendant of this process its child rather than init's, so a process
+    the lap started that outlives its parent (a self-daemonising helper, or what a killed shell
+    left behind) is still found by its parent pid."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0:
+        err = ctypes.get_errno()
+        raise OSError(err, f"prctl(PR_SET_CHILD_SUBREAPER): {os.strerror(err)}")
+
+
+def proc_table() -> dict:
+    """pid -> (ppid, session, state) of every process, from /proc/<pid>/stat. Never cmdline, which
+    takes the process's mmap_lock, so one task wedged holding its own makes the read hang for good
+    (RULE: NEVER WEDGE THE LAB HOST)."""
+    table = {}
+    for name in os.listdir("/proc"):
+        if not name.isdigit():
+            continue
+        try:
+            with open(f"/proc/{name}/stat") as stat:
+                text = stat.read()
+        except OSError:
+            continue
+        # the command name is in parentheses and may hold spaces or parentheses itself
+        fields = text[text.rfind(")") + 2:].split()
+        table[int(name)] = (int(fields[1]), int(fields[3]), fields[0])
+    return table
+
+
+def lap_processes(leader: int) -> dict:
+    """pid -> state of every process the lap started that is still in the process table: the
+    lap command's descendants by parent pid, every orphan reparented to this subreaper, and every
+    member of the session the command leads."""
+    table = proc_table()
+    me = os.getpid()
+    children = {}
+    for pid, (ppid, _, _) in table.items():
+        children.setdefault(ppid, []).append(pid)
+    found = set()
+    todo = [leader] + children.get(me, [])
+    while todo:
+        pid = todo.pop()
+        if pid in found or pid not in table or pid == me:
+            continue
+        found.add(pid)
+        todo += children.get(pid, [])
+    found |= {pid for pid, (_, sid, _) in table.items() if sid == leader and pid != me}
+    return {pid: table[pid][2] for pid in found}
+
+
+def reap(proc, lap: dict) -> None:
+    """Collect the exit of the lap's command and of every orphan reparented to this process."""
+    proc.poll()
+    for pid, state in lap.items():
+        if state == "Z" and pid != proc.pid:
+            try:
+                os.waitpid(pid, os.WNOHANG)
+            except ChildProcessError:
+                pass
 
 
 def run_bounded(command: list, cwd, handle, bound: int) -> int:
@@ -195,39 +250,49 @@ def run_bounded(command: list, cwd, handle, bound: int) -> int:
     subprocess.run(timeout=) ends only its direct child, so a harness's own children went on
     running and writing into the lap's log, and into the evidence the lap is graded from, after
     the lap had been recorded (D-BATCH-LAP-TIMEOUT-KILLS-ONLY-THE-DIRECT-CHILD-SO-THE-HARNESS-
-    WRITES-ON). The lap now runs in a session of its own, and an overrun ends the whole process
-    group, SIGTERM and then SIGKILL, and waits until none of it is left before the lap is
-    recorded. MXFS_BATCH_LAP_KILLPG=0 ends only the direct child, as before: the same-build
-    control."""
-    if os.environ.get("MXFS_BATCH_LAP_KILLPG", "1") == "0":
+    WRITES-ON). Ending the lap's process group was not enough either: GNU timeout, which the
+    capture gate runs every entry under, puts itself and its child in a group of their own, and
+    setsid or a self-daemonising helper leaves it too. This process is now a subreaper, the lap
+    runs in a session of its own, and an overrun signals every process the lap started (its
+    descendants by parent pid, the orphans reparented here, the members of its session), SIGTERM
+    and then SIGKILL, and waits until none of them is left before the lap is recorded.
+    MXFS_BATCH_LAP_KILLTREE=0 ends only the direct child, as before: the same-build control."""
+    if os.environ.get("MXFS_BATCH_LAP_KILLTREE", "1") == "0":
         try:
             return subprocess.run(command, cwd=cwd, stdout=handle, stderr=subprocess.STDOUT,
                                   timeout=bound).returncode
         except subprocess.TimeoutExpired:
             return 124
+    become_subreaper()
     proc = subprocess.Popen(command, cwd=cwd, stdout=handle, stderr=subprocess.STDOUT,
                             start_new_session=True)
     try:
         return proc.wait(timeout=bound)
     except subprocess.TimeoutExpired:
         pass
-    pgid = proc.pid
+    leader = proc.pid
+    lap = lap_processes(leader)
+    started = len(lap)
     for sig in (signal.SIGTERM, signal.SIGKILL):
-        try:
-            os.killpg(pgid, sig)
-        except ProcessLookupError:
-            break
+        for pid in lap:
+            try:
+                os.kill(pid, sig)
+            except ProcessLookupError:
+                pass
         deadline = time.monotonic() + KILL_GRACE_S
-        # the leader is this process's own child: until it is reaped it stays in the group as a
-        # zombie, and the group reads alive through both grace periods
-        while time.monotonic() < deadline and (proc.poll() is None or group_alive(pgid)):
+        while lap and time.monotonic() < deadline:
+            reap(proc, lap)
             time.sleep(0.1)
-        if not group_alive(pgid):
+            lap = lap_processes(leader)
+        if not lap:
             break
+    reap(proc, lap)
     proc.wait()
-    left = "gone" if not group_alive(pgid) else "STILL ALIVE after SIGKILL"
-    handle.write(f"=== the lap overran its bound of {bound}s: its process group {pgid} was "
-                 f"ended ({left}) ===\n")
+    lap = lap_processes(leader)
+    left = ("gone" if not lap else "STILL ALIVE after SIGKILL: " +
+            " ".join(f"{pid}({state})" for pid, state in sorted(lap.items())))
+    handle.write(f"=== the lap overran its bound of {bound}s: the {started} process(es) it had "
+                 f"started were ended ({left}) ===\n")
     handle.flush()
     return 124
 

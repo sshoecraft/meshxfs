@@ -3450,8 +3450,14 @@
         "data/reviews/P20261023-e629b4.md",
         "data/defects.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-f07942.md",
+        "sha256": "4e0572f616e7d6e3a94d53133461e38a789f20734b9f4b1a22e321458c24e534",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-66e926",
@@ -3478,8 +3484,14 @@
         "data/reviews/P20261023-3a597a.md",
         "data/defects.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-66e926.md",
+        "sha256": "f14ab2bc722639b21eb6eaac65244455e23ce0b8d403fab35f7d950d715ca217",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-10e0c9",
@@ -3568,6 +3580,62 @@
         "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step6.log",
         "data/reviews/P20261023-175966.md",
         "data/reviews/P20261023-d3a418.md",
+        "data/defects.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-36616a",
+      "kind": "remove-fixed",
+      "record": "D-RIG-LIB-EUI64-LUN-ID-NORMALISED-WITH-STRAY-E-AND-NO-WWN-BYID-LINK",
+      "change": {
+        "control": "b20261023-92db3a",
+        "fixon": "b20261023-4b50c2",
+        "cause": "tests/lib/rig.sh normalised a LUN identifier by stripping naa., 0x and mpath- but not eui., so an EUI-64 LUN's eui.<hex> became e<hex>, and its no-mount fallback looked the LUN up only as /dev/disk/by-id/wwn-0x<id>, a link udev makes for NAA identifiers only (an EUI-64 LUN is linked as scsi-2<hex>), so on a pool pair whose node had no mxfs mount the resolver aborted 'no MXFS device basis'; it now strips eui. too and looks the LUN up under wwn-0x, scsi-3 and scsi-2"
+      },
+      "argument": "FIXED AND VERIFIED, resubmitted after the rejection of P20261023-66e926 (data/reviews/P20261023-66e926.md), whose findings on the cause, the control and the fix-on batch held; it rejected only because this record still counted the contract's 13b and 13h changes in its fix and held the 13b ABORT with no batch touching it.\n\nWhat changed since: the contract's three NAA-only checks (11b, 13b, 13h) are one record now, D-RIG-LIB-CONTRACT-ACCEPTED-ONLY-NAA-SO-AN-EUI-64-LUN-FAILED-11B-AND-13B, with a switch of its own in tests/rig_lib_contract.sh (MXFS_CONTRACT_EUI64; 0 holds 11b to naa., 13b to the alias wwn-0x<id> and 13h to a wwn-0x link) and its own lap, tests/rig_contract_eui64_lap.sh, to be controlled and verified on the next attempt. That record names the 21:43:30Z presteps run for its 11b FAIL (presteps.log:139) and 13b ABORT (:145-146). This record's evidence and next step now say its fix is the two tests/lib/rig.sh hunks alone and claims none of the contract's changes (data/defects.json, this record's last two evidence notes and its next step).\n\nThis record's fix, unchanged from the earlier proposal: tests/lib/rig.sh:467-475 under MXFS_RIG_EUI64 (default on): the WWID normaliser strips eui. as it strips naa., and the no-mount fallback looks the LUN up under wwn-0x, scsi-3 and scsi-2; at 0 both are the pre-fix values (:473).\n\nCause, control and fix-on, as the earlier review found them: control b20261023-92db3a, candidate 0.90.134 attempt 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), pool pair g2c, the frozen tree with only MXFS_RIG_EUI64=0 in the lap's own environment, 10 of 10 exposed laps FAIL with 'ABORT: no MXFS device basis on test29 ... no /dev/disk/by-id/{wwn-0x,scsi-3,scsi-2}e3837303435343634' (tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step6.log:5-14, :17), inputs before and after alike (tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step6.log:16; tests/evidence/controls/b20261023-92db3a.20261023T160436Z.inputs.before.json, .after.json); fix-on batch b20261023-4b50c2, same attempt and pair, sized from it (N=6), 6 of 6 PASS with exposure, each binding scsi-23837303435343634 with source=declared-wwid (tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step7.log:1, :3-8), its verify approved and applied (data/reviews/P20261023-3a597a.md).\n\nCells: the two presteps runs whose own logs show this record's abort four times each, from the capture-gate entries that do not prep themselves: 1/any:release:presteps:2026-10-21T19:05:47Z (tests/evidence/candidates/0.90.133-2.presteps.log:185, :188, :191, :194) and 1/any:release:presteps:2026-10-21T21:43:30Z (tests/evidence/candidates/0.90.134_20261021T212712Z.presteps.log:184, :187, :190, :193); the second is also named by the contract record for its 11b and 13b failures, which this record does not claim. The 20 laps of control b20261022-bf8f03 (the fix diff reversed) and the 10 of b20261023-92db3a, each a lap of this reproducer failing on this abort. Reach: the rig library resolves every harness's device at every configuration; the fix has no configuration branch.",
+      "evidence": [
+        "tests/lib/rig.sh",
+        "tests/rig_eui64_resolve_lap.sh",
+        "tests/rig_lib_contract.sh",
+        "tests/rig_contract_eui64_lap.sh",
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step6.log",
+        "tests/evidence/lanes/g2c_a11_riglib_20261023T160319Z/step7.log",
+        "tests/evidence/controls/b20261023-92db3a.20261023T160436Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-92db3a.20261023T160436Z.inputs.after.json",
+        "tests/evidence/candidates/0.90.133-2.presteps.log",
+        "tests/evidence/candidates/0.90.134_20261021T212712Z.presteps.log",
+        "data/reviews/P20261023-66e926.md",
+        "data/reviews/P20261023-3a597a.md",
+        "data/defects.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-63aa62",
+      "kind": "remove-fixed",
+      "record": "D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD",
+      "change": {
+        "control": "b20261023-b9400f",
+        "fixon": "b20261023-45c118",
+        "cause": "tools/release_run.py board_verdict graded the own-rig 2/net/mesh/drbd board without MXFS_OWN_RIG, which that configuration needs to parse and which criteria.py sets only when its own command line names an own-rig configuration, so in the orchestrator no row of the specification applied and the verdict named none of the board's rows; board_verdict now sets the flag for an own-rig attachment for the duration of the grading and restores the caller's value after"
+      },
+      "argument": "FIXED AND VERIFIED, resubmitted after the rejection of P20261023-f07942 (data/reviews/P20261023-f07942.md), which found the flag fix, its control b20261023-b9400f and its fix-on batch b20261023-45c118 sound and said they can be cited again unchanged for the flag fix. It rejected on two points, both answered:\n\n1. The release:drbd run of 2026-10-21T22:56:58Z was still retired by this record's applied verify (data/criteria.runs.jsonl:9919). That retirement is withdrawn: tools/criteria.py unretire release:drbd --at 2/net/mesh/drbd --iso 2026-10-21T22:56:58Z, with the why that this defect did not fail it (the unretired note is the last release:drbd line for that stamp in data/criteria.runs.jsonl). tools/criteria.py incidents lists no release:drbd run after it: D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION and D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN, whose rows failed that step (tests/evidence/drbd_release_verify_0.90.134_20261021T212712Z.out:114-128), name it. The record's evidence says so (its last note).\n\n2. The refusal of a verdict that graded no row (hunk (b)) shared this record's switch and never acted in a lap. It is its own record now, D-RELEASE-RUN-BOARD-VERDICT-READ-AN-EMPTY-VERDICT-AS-CLEAN, under a switch of its own, MXFS_BOARD_VERDICT_EMPTY (tools/release_run.py:70-73 and the 'not graded' test in board_verdict), with its own lap (tests/release_board_verdict_lap.py --empty) to be controlled and verified on the next attempt. The cause above claims only the flag.\n\nThe tree changed after the batches: hunk (b) was re-keyed from MXFS_BOARD_VERDICT_OWN_RIG to MXFS_BOARD_VERDICT_EMPTY, and the comment above the switches was rewritten. The flag hunk itself (board_verdict's save, set and restore of MXFS_OWN_RIG under BOARD_VERDICT_OWN_RIG) is unchanged from the frozen attempt's tools/release_run.py. The control's failures do not depend on hunk (b): on the current tree, with the flag hunk out and hunk (b) in (MXFS_BOARD_VERDICT_OWN_RIG=0 only), tests/release_board_verdict_lap.py still fails, 'INFO as the orchestrator calls it: 1 row(s): [no row of the specification applies at 2/net/mesh/drbd: nothing was graded]' and 'BOARD_VERDICT_LAP FAIL the orchestrator's verdict names 1 row(s), the board has 35' (a refusal names none of the board's rows either), so each of the control's 10 failures is the missing flag's.\n\nControl b20261023-b9400f, candidate 0.90.134 attempt 2026-10-23T15:56:24Z (module 08D63764A9352FBDD5A76CD), the frozen tree with only MXFS_BOARD_VERDICT_OWN_RIG=0 in the lap's own environment: 10 of 10 exposed laps FAIL (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step3.log:17, :29; tests/evidence/drbd_rig/criteria.runs.jsonl:3371-3380), inputs before and after alike (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step3.log:16; tests/evidence/controls/b20261023-b9400f.20261023T160016Z.inputs.before.json and .after.json). Fix-on batch b20261023-45c118, same attempt, sized from it (N=6): 6 of 6 PASS with exposure (tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step4.log:1, :9; tests/evidence/drbd_rig/criteria.runs.jsonl:3381-3386), approved and applied (data/reviews/P20261023-e629b4.md).\n\nCells: the 30 the record names, the 20 laps of control b20261022-4233e9 (the fix diff reversed) and the 10 of b20261023-b9400f, each a lap of this reproducer failing on the missing flag. Reach: board_verdict grades every configuration's board, and only an own-rig attachment's grading depends on the flag; on every other configuration the flag is not set and the grading is as before.",
+      "evidence": [
+        "tools/release_run.py",
+        "tests/release_board_verdict_lap.py",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/summary.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step3.log",
+        "tests/evidence/lanes/local_a11_tooling_20261023T155735Z/step4.log",
+        "tests/evidence/controls/b20261023-b9400f.20261023T160016Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-b9400f.20261023T160016Z.inputs.after.json",
+        "tests/evidence/drbd_rig/criteria.runs.jsonl",
+        "tests/evidence/drbd_release_verify_0.90.134_20261021T212712Z.out",
+        "data/criteria.runs.jsonl",
+        "data/reviews/P20261023-f07942.md",
+        "data/reviews/P20261023-e629b4.md",
         "data/defects.json"
       ],
       "state": "pending",

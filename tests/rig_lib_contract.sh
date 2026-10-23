@@ -64,15 +64,29 @@ echo "--- device resolver: identity, not path"
 # an ABORT line, and that the ABORT names the reason it was supposed to find
 rej() { local name=$1 want=$2; shift 2; ( "$@" > "$OUT/$name.verdict" 2>&1 ); local rc=$?; echo "rc=$rc abort=$( [ $rc = 2 ] && grep -qa '^ABORT:' "$OUT/$name.verdict" && echo 1 || echo 0) why=$( grep -qa "$want" "$OUT/$name.verdict" && echo named || echo unnamed)"; }
 DECL=$(mxfs_dev_declared) || { echo "RESULT: INFRA label=$LABEL no declared LUN for this rig: $DECL"; exit 2; }
+# 11b, 13b and 13h take a LUN of either designator: an NAA identifier (naa.<hex>, linked by udev as
+# wwn-0x<hex> and scsi-3<hex>) or an EUI-64 one (eui.<hex>, linked as scsi-2<hex> only), which
+# every pooled SCST LUN carries.  Held to the NAA forms, 11b failed and 13b aborted on a pool pair
+# (D-RIG-LIB-CONTRACT-ACCEPTED-ONLY-NAA-SO-AN-EUI-64-LUN-FAILED-11B-AND-13B).
+# MXFS_CONTRACT_EUI64=0 holds all three to the NAA forms, as before: the control of that change.
+if [ "${MXFS_CONTRACT_EUI64:-1}" = 0 ]; then
+    C_WWID='naa\.'; C_BYID='wwn-0x'
+else
+    C_WWID='\(naa\|eui\)\.'; C_BYID='*'
+fi
 ck "11 MXFS_DEV=/dev/sda on the mounted node -> used, and it carries the declared WWID" "$( ( MXFS_DEV=/dev/sda; mxfs_dev_resolve "$N" > "$OUT/c11.verdict"; echo "$MXFS_DEV_RESOLVED wwid=$(mxfs_wwid_norm "$MXFS_DEV_WWID")" ) 2>&1 | tail -1)" "/dev/sda wwid=$DECL"
-ck "11b ... its DEVICE line names the source and a filesystem uuid" "$(grep -ac '^DEVICE node='"$N"' path=/dev/sda source=MXFS_DEV wwid=\(naa\|eui\)\.[0-9a-f]* fsid=[0-9a-f-]\{36\} ' "$OUT/c11.verdict")" 1 # capture-adjudicated: c11 above already ABORTed if the resolver produced no line; this counts the shape of the line it did produce
+ck "11b ... its DEVICE line names the source and a filesystem uuid" "$(grep -ac '^DEVICE node='"$N"' path=/dev/sda source=MXFS_DEV wwid='"$C_WWID"'[0-9a-f]* fsid=[0-9a-f-]\{36\} ' "$OUT/c11.verdict")" 1 # capture-adjudicated: c11 above already ABORTed if the resolver produced no line; this counts the shape of the line it did produce
 ck "12 MXFS_DEV set to an absent path -> ABORT naming it" "$(rej c12 'not a block device' env MXFS_DEV=/dev/mapper/mpatha bash -c '. tests/lib/rig.sh; mxfs_dev_resolve '"$N")" "rc=2 abort=1 why=named"
 ck "12b MXFS_DEV=/dev/vda (a valid block device, the root disk) on the mounted node -> ABORT: no SCSI identity" "$(rej c12b 'carries no SCSI identity' env MXFS_DEV=/dev/vda bash -c '. tests/lib/rig.sh; mxfs_dev_resolve '"$N")" "rc=2 abort=1 why=named"
 ck "12c the real LUN under a different declaration (well-formed, valid WWID and uuid, wrong instrument) -> ABORT naming the mismatch" "$(rej c12c 'is not the declared LUN' env MXFS_DEV=/dev/sda MXFS_LUN_WWID=naa.0000000000000000000000000000dead bash -c '. tests/lib/rig.sh; mxfs_dev_resolve '"$N")" "rc=2 abort=1 why=named"
 ck "12d ... and mxfs_dev_same over both nodes under that declaration ABORTs too (agreement on the wrong LUN is not identity)" "$(rej c12d 'is not the declared LUN' env MXFS_LUN_WWID=naa.0000000000000000000000000000dead bash -c '. tests/lib/rig.sh; mxfs_dev_same test1 test2')" "rc=2 abort=1 why=named"
 ck "13 no MXFS_DEV, live mxfs mount -> its device, by identity" "$( ( unset MXFS_DEV; mxfs_dev_resolve "$N" > "$OUT/c13.verdict"; echo "$MXFS_DEV_RESOLVED $MXFS_DEV_SOURCE" ) 2>&1 | tail -1)" "/dev/sda live-mount"
 # the alias as the node itself lists it: wwn-0x/scsi-3 for an NAA LUN, scsi-2 for an EUI-64 one
-BYID=$(rsx 20 "$N" "ls /dev/disk/by-id/" | grep -m1 -xE "(wwn-0x|scsi-[23])$DECL")
+if [ "$C_BYID" = '*' ]; then
+    BYID=$(rsx 20 "$N" "ls /dev/disk/by-id/" | grep -m1 -xE "(wwn-0x|scsi-[23])$DECL")
+else
+    BYID=wwn-0x$DECL
+fi
 ck "13b the by-id alias of the same LUN -> accepted, same WWID and uuid as the path" "$( ( unset MXFS_DEV; mxfs_dev_resolve "$N" > /dev/null; a="$MXFS_DEV_WWID $MXFS_DEV_FSID"; [ -n "$BYID" ] || { echo "no by-id link on $N carries $DECL"; exit 0; }; MXFS_DEV=/dev/disk/by-id/$BYID mxfs_dev_resolve "$N" > "$OUT/c13b.verdict"; [ "$MXFS_DEV_WWID $MXFS_DEV_FSID" = "$a" ] && echo same || echo "differ: $a vs $MXFS_DEV_WWID $MXFS_DEV_FSID" ) 2>&1 | tail -1)" "same"
 ck "13c mxfs_dev_same test1 test2 -> one LUN, one filesystem generation" "$( ( mxfs_dev_same test1 test2 > "$OUT/c13c.verdict" 2>&1 && echo "ok fsid=$MXFS_DEV_FSID" ) 2>&1 | tail -1 | sed 's/fsid=[0-9a-f-]\{36\}/fsid=uuid/')" "ok fsid=uuid"
 ck "13d mxfs_dev_check after a resolve -> unchanged" "$( ( unset MXFS_DEV; mxfs_dev_resolve "$N" > /dev/null; mxfs_dev_check "$N" > "$OUT/c13d.verdict" 2>&1 && echo unchanged ) 2>&1 | tail -1)" "unchanged"
@@ -86,7 +100,7 @@ ck "13g an undeclared rig -> ABORT, never a configuration default" "$(rej c13g '
 N2=$( [ "$N" = test1 ] && echo test2 || echo test1 )
 um=$(rsx 130 "$N2" "timeout 120 umount $MNT && echo UMOUNT_OK; grep -c ' $MNT mxfs ' /proc/mounts" | tr '\n' ' ')
 case $um in *'UMOUNT_OK 0'*)
-    ck "13h no MXFS_DEV, no live mount on $N2 -> the declared LUN by its own identifier" "$( ( unset MXFS_DEV; mxfs_dev_resolve "$N2" > "$OUT/c13h.verdict"; case $MXFS_DEV_RESOLVED in /dev/disk/by-id/*"$DECL") echo "$MXFS_DEV_SOURCE a-by-id-link-of-the-declared-lun" ;; *) echo "$MXFS_DEV_SOURCE $MXFS_DEV_RESOLVED" ;; esac ) 2>&1 | tail -1)" "declared-wwid a-by-id-link-of-the-declared-lun"
+    ck "13h no MXFS_DEV, no live mount on $N2 -> the declared LUN by its own identifier" "$( ( unset MXFS_DEV; mxfs_dev_resolve "$N2" > "$OUT/c13h.verdict"; case $MXFS_DEV_RESOLVED in /dev/disk/by-id/$C_BYID"$DECL") echo "$MXFS_DEV_SOURCE a-by-id-link-of-the-declared-lun" ;; *) echo "$MXFS_DEV_SOURCE $MXFS_DEV_RESOLVED" ;; esac ) 2>&1 | tail -1)" "declared-wwid a-by-id-link-of-the-declared-lun"
     ck "13i MXFS_DEV=/dev/vda on the unmounted node -> ABORT: no SCSI identity (prep would have formatted the root disk)" "$(rej c13i 'carries no SCSI identity' env MXFS_DEV=/dev/vda bash -c '. tests/lib/rig.sh; mxfs_dev_resolve '"$N2")" "rc=2 abort=1 why=named"
     ck "13j no live mount, a wrong declaration, the configuration default as the candidate -> ABORT naming the mismatch" "$(rej c13j 'is not the declared LUN' env MXFS_LUN_WWID=naa.0000000000000000000000000000dead MXFS_CONFIG=2/net/mesh/direct bash -c '. tests/lib/rig.sh; unset MXFS_DEV; mxfs_dev_resolve '"$N2")" "rc=2 abort=1 why=named"
     rm=$(rsx 100 "$N2" "timeout 90 mount -t mxfs /dev/sda $MNT && echo MOUNT_OK; grep -c ' $MNT mxfs ' /proc/mounts" | tr '\n' ' ')

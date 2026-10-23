@@ -2,7 +2,7 @@
   "candidate": "0.90.134",
   "version": "0.90.134",
   "created": "2026-10-23T15:56:24Z",
-  "state": "RUNNING",
+  "state": "ABANDONED",
   "attempts": [
     {
       "created": "2026-10-21T21:26:41Z",
@@ -299,6 +299,11 @@
       "state": "RUNNING",
       "at": "2026-10-23T15:56:25Z",
       "why": "created"
+    },
+    {
+      "state": "ABANDONED",
+      "at": "2026-10-23T16:48:49Z",
+      "why": "attempt 2026-10-23T15:56:24Z retired for changes it cannot take: tools/batch_lap.py ends every descendant of a timed-out lap (a subreaper and its process tree, writers under GNU timeout and setsid included) and its stall lap runs batch_lap.py main(); a second switch for the release-step routing hunks and check_cells; tests/suite/fsx.sh's log-keeping fix and contract check 11b each controlled on their own; a path row's rejoin loads the lane's module arguments and run.sh re-preps a node whose loaded parameters differ; each node publishes its death window and a survivor waits out the longer of its own and the peer's; the default death window and path timescale from the 2- to 16-node measurements. Every verification that passed on it is applied."
     }
   ]
 }
