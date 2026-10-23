@@ -3121,14 +3121,15 @@
         "data/reviews/P20261023-0a1c5a.md",
         "data/defects.json"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-23",
       "review": {
         "file": "data/reviews/P20261023-591bf8.md",
         "sha256": "4e1f41422b3c1d5fa2787742ef4e86f1d7c49757dd65a1a9c9d14d233b0ae3ea",
         "verdict": "approved",
         "date": "2026-10-23"
-      }
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-e3cea7",
