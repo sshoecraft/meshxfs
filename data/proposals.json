@@ -2446,8 +2446,15 @@
         "tests/evidence/batch_laps/b20261023-573c14",
         "tests/bmbt_read_skip_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-624ee6.md",
+        "sha256": "ef644b8054901e0e4fe1b678e82da5b2bda8dea05e9b2d372b64add55ca67ad1",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-8efcf4",
@@ -2466,8 +2473,15 @@
         "tests/evidence/batch_laps/b20261023-0934e6",
         "tests/fsx_log_pull_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-8efcf4.md",
+        "sha256": "0777d365c4d9c1e2b2ab5d2786cb50d799811f1e13255fc1298e57e9202ada3e",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-b23ee9",
@@ -2494,8 +2508,15 @@
         "tests/evidence/controls/b20261023-b2850e.20261023T101920Z.inputs.after.json",
         "data/reviews/P20261023-8b376d.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-b23ee9.md",
+        "sha256": "111f30bbab3c56efcb841986b9beb4bff412e0597ad1f1f014980aff3ee734b8",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-e0ffbe",
@@ -2514,6 +2535,85 @@
         "tests/evidence/batch_laps/b20261023-3f3289",
         "tests/live_holder_shard_lap.sh",
         "tests/live_holder_wait.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-0a1c5a",
+      "kind": "verify",
+      "record": "D-CAPTURE-GATE-ENTRIES-INHERIT-THE-CLUSTER-STATE-AN-EARLIER-FAULT-LEFT",
+      "change": {
+        "batch": "b20261023-621a18"
+      },
+      "argument": "Verification batch b20261023-621a18 (lap:gate_pair at 2/net/mesh/direct, candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD) was declared by tools/harness_batch.py verify before its first lap (lane tests/evidence/lanes/g2_attempt1011_20261023T101421Z step12.log, first line 'declared verification batch b20261023-621a18 ... 6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)'). Its size comes from the control batch closed just before it on the same attempt, b20261023-bff4eb (step11.log): 10 of 10 exposed laps failed with GATE_PAIR_RESTORE=0 (tests/capture_fault_gate.sh starts each entry on the pair as the last one left it, as before the fix), each 'LAP gate_pair FAIL: the entry was BROKEN on the pair an earlier lap left'; inputs before and after that control hash alike (step11.log 'inputs before -> after: content=0; touched=0; added=0; gone=0'). With k=n=10 the lower bound is L = 0.005^(1/10) = 0.5887 and N = ceil(ln 0.005 / ln(1 - 0.5887)) = ceil(5.96) = 6. All 6 laps ran on the candidate, each PASS with exposure=1 on its lap line of step12.log (the lap's probe: test1 held no mxfs mount when the gate started), 'LAP gate_pair PASS: the entry's lap was OK on a pair the gate formed again' (lap logs tests/evidence/batch_laps/b20261023-621a18/, 6 files). No lap failed, none was INCOMPLETE, none was dropped: step12.log ends 'verify b20261023-621a18: 6 PASS, 0 FAIL of 6 planned'. The lap (tests/capture_gate_pair_lap.sh) leaves test1 unmounted as the 0.90.134 gate's entries found it, then runs the gate's healthy lap of chk_mounted_node_reads_platter, an entry that does not prep itself and ABORTs at stage=precondition without both nodes mounted.",
+      "evidence": [
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step11.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step12.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-621a18",
+        "tests/evidence/batch_laps/b20261023-bff4eb",
+        "tests/evidence/controls/b20261023-bff4eb.20261023T103234Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-bff4eb.20261023T103234Z.inputs.after.json",
+        "tests/capture_gate_pair_lap.sh",
+        "tests/capture_fault_gate.sh"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-0a1c5a.md",
+        "sha256": "4bdd551bd658d009e086a022923c83adad241767dee89ba7b8c2a1c9a0e8a7ee",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-26297c",
+      "kind": "verify",
+      "record": "D-ALLOC-WITNESS-RANK-ABORT-RECORDED-AS-BUDGET-EXHAUSTED",
+      "change": {
+        "batch": "b20261023-2baa2a"
+      },
+      "argument": "Verification batch b20261023-2baa2a (lap:aw_abort at 2/disk/caw/direct, candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD, group g2b test15/test16) was declared by tools/harness_batch.py verify before its first lap (lane tests/evidence/lanes/g2b_attempt1011_20261023T101423Z step9.log, first line 'declared verification batch b20261023-2baa2a ... 6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)'). Its size comes from the control batch closed just before it on the same attempt, b20261023-5c1522 (step8.log): 10 of 10 exposed laps failed with AW_ABORT_BROADCAST=0 (tests/tooling/alloc_witness.sh: an aborting rank broadcasts nothing and its peers wait out their own bounds, as before the fix), each 'LAP aw_abort FAIL: budget_exhausted=1 abort_named=0 elapsed=120s of 120s', and its inputs before and after hash alike (step8.log 'inputs before -> after: content=0; touched=0; added=0; gone=0'). With k=n=10, L = 0.005^(1/10) = 0.5887 and N = ceil(ln 0.005 / ln(1 - 0.5887)) = 6. All 6 laps ran on the candidate, each PASS with exposure=1 on its lap line (probe '^EXPOSED: rank2 aborted after its fill': rank 2's witness record holds the injected ABORT), 'LAP aw_abort PASS: the row ended in 1s of 120s and named the abort' (2s in lap 2); lap logs tests/evidence/batch_laps/b20261023-2baa2a/ (6 files). No lap failed, none was INCOMPLETE, none was dropped: step9.log ends 'verify b20261023-2baa2a: 6 PASS, 0 FAIL of 6 planned'. Each lap took 25-26 s, inside its 160 s bound; no operation in the lap is a file operation of the filesystem under test beyond the row's own, which ended in 1-2 s.",
+      "evidence": [
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step8.log",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step9.log",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-2baa2a",
+        "tests/evidence/batch_laps/b20261023-5c1522",
+        "tests/alloc_witness_abort_lap.sh",
+        "tests/tooling/alloc_witness.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-fbab9c",
+      "kind": "remove-fixed",
+      "record": "D-SURVIVOR-CACHE-SERVES-A-DELETED-FILES-BMBT-BLOCK-FOR-A-PEERS-NEW-FILE",
+      "change": {
+        "control": "b20261023-573c14",
+        "fixon": "b20261023-8b466e",
+        "cause": "the bmbt write chokepoint at bio submit (pal/linux/xfs_buf.c, the mxfs_buf_xfsaild_skip_bmbt_write test in the submit path) judged read bios as well as writes, reading the owner from the buffer's in-memory image; for a buffer an eviction had cleared of XBF_DONE, whose memory still held a deleted file's extent-tree leaf whose owner number had become a directory this node holds NL, it skipped the READ of the reused block: mxfs_bmbt_skip_preserve_truth staled the buffer and xfs_buf_ioend verified the old image and set XBF_DONE, so the reader was handed the other tree's leaf; the chokepoint now judges writes only (mxfs_bmbt_chokepoint_covers) and every read is issued"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: on 2/net/mesh/direct test1 read 2 of 8 files its peer had just written and fsynced and got no data. Its buffer cache served extent-tree (bmbt) leaves still carrying the owner of a file from the previous lap, deleted and its blocks reused for the new files' trees; the btree owner check refused them (P975-BMBT-LOOKUP-BAD same_image=0 flags=0x60) and the reads failed.\n\nThe cause, proven: the bmbt write chokepoint in the bio submit path had no direction test. For a read of a block whose buffer had been evicted (XBF_DONE cleared) but still held the old leaf in memory, the owner it read from that memory had become a directory test1 holds NL, so the predicate said skip: mxfs_bmbt_skip_preserve_truth read the LUN, found it different (P77-SKIP-DIFFERS same=0) and staled the buffer, the chokepoint printed P61-CHOKEPOINT-SKIP-BMBT and completed the bio with xfs_buf_ioend and no I/O, which for an XBF_READ buffer verifies the old image and sets XBF_DONE. The lookup then got the old leaf with XBF_DONE|XBF_STALE (0x60), exactly as P975 printed. Instrumented before the fix: lane tests/evidence/lanes/g2_bmbt_openefi_diag_20261023T072311Z (MXFS_EXTRA_MODARGS=bmbt_skip_reads=1, the old behaviour, which printed the direction): every P975 followed a P61-CHOKEPOINT-READ of the same daddr ('skipped, the old image is served with no read'), and 3 of 12 open-EFI laps failed.\n\nThe fix (one site): mxfs_bmbt_chokepoint_covers (pal/linux/xfs_buf.c:8840-8874), called at the chokepoint (:9692-9693), returns true for a write and, for a read, the knob bmbt_skip_reads (default 0): a read is always issued. bmbt_skip_reads=1 makes the chokepoint skip a matched read exactly as before the fix, since covers() is the chokepoint's only added condition; the function also counts each matched read (bmbt_chokepoint_reads), the lap's exposure. The readahead hold dbg_bmbt_ra_hold_ms (default 0) is test instrumentation, set to 300 ms in both arms so the synchronous read meets the readahead's buffer every time.\n\nControl b20261023-573c14 (candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD, the candidate's own build with bmbt_skip_reads=1 on W and BMBT_RA_HOLD_MS=300; tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step7.log): 10 of 10 exposed laps of tests/bmbt_read_skip_lap.sh FAIL, each with P61-CHOKEPOINT-READ ... skipped then P975 on the same block (data/reviews/P20261023-624ee6.md); inputs before and after hash alike ('inputs before -> after: content=0; touched=0; added=0; gone=0').\n\nFix-on verification b20261023-8b466e sized from it (k=n=10, L=0.5887, N=6), applied by verify proposal P20261023-624ee6: 6 of 6 laps PASS on the candidate with bmbt_skip_reads=0 and the same hold, exposure from the counter (38-414 matched reads a lap, every freed inode number reused as a directory, the condition the control failed on), every head whole, no P975 (tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step8.log).\n\nCells: the ten control laps (2/net/mesh/direct:lap:bmbt_read_skip 2026-10-23T10:21:24Z .. 10:27:13Z) each show the skipped read then P975 on that block in their own logs (tests/evidence/batch_laps/b20261023-573c14/). The gate lap 2/net/mesh/direct:gate:d_intents_2tcp_open_efi:2026-10-23T06:20:27Z (lap 7 of b20261023-b40448, build 16A5F5DDDB4852C9D5DB236, whose chokepoint printed every skip as a write) shows the same sequence in tests/evidence/20261023T061841Z_intents2tcp_openefivc7-d_intents_2tcp_open_efi-ok/dmesg_test1.txt: :248 and :250 'P61-CHOKEPOINT-SKIP-BMBT owner=2097287 daddr=2106984', then :251 'P975-BMBT-LOOKUP-BAD daddr=2106984 want_ino=2097296 ... cached_owner=2097287 ... flags=0x60 ... same_image=0'; :294 and :296 the skips of daddr=2164704 (owner 2097290), then :297 its P975 (want_ino=2097298) and the corruption report :298; no node wrote either block on test1 (they are the peer's new trees' leaves, owner directory NL here), so each skipped bio was the lookup's read. Both cells were already retired at this configuration by the applied verification.\n\nScope of the claim: a read through this chokepoint is never skipped. The directory-block skip later in the same function (mxfs_buf_xfsaild_skip_dir_write, :9750, :9971) has no direction test either, but every switch that lets it complete a bio without I/O is off by default (mxfs_dirskip_enabled, xfs/xfs_mxfs_debug.c:916; mxfs_dir_reflush_skip, xfs/xfs_mxfs_buf.c:118; mxfs_dir_tenure_reflush_skip, :139; mxfs_dir_relepoch_skip, xfs/xfs_mxfs_debug.c:991) and neither the rig nor the packages set one, so as shipped it never serves a read; it is not this record's cause or fix.",
+      "evidence": [
+        "pal/linux/xfs_buf.c",
+        "tests/bmbt_read_skip_lap.sh",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step7.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/step8.log",
+        "tests/evidence/lanes/g2_attempt1011_20261023T101421Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-573c14",
+        "tests/evidence/batch_laps/b20261023-8b466e",
+        "tests/evidence/controls/b20261023-573c14.20261023T102043Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-573c14.20261023T102043Z.inputs.after.json",
+        "tests/evidence/20261023T061841Z_intents2tcp_openefivc7-d_intents_2tcp_open_efi-ok/dmesg_test1.txt",
+        "tests/evidence/20261023T061838Z_capture_gate_openefivc7/d_intents_2tcp_open_efi_ok.log",
+        "tests/evidence/lanes/g2_bmbt_openefi_diag_20261023T072311Z",
+        "data/reviews/P20261023-624ee6.md",
+        "xfs/xfs_mxfs_buf.c",
+        "xfs/xfs_mxfs_debug.c"
       ],
       "state": "pending",
       "created": "2026-10-23"

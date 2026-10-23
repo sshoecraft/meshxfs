@@ -2186,7 +2186,7 @@
       "config": "*/*/*",
       "opened": "2026-10-21",
       "summary": "On 2/net/mesh/direct (candidate 0.90.133-2, module 71AC6107043DD5BE3D9181A, the 0.90.132 release build) alloc_witness rank 2 (test16) made 26944 creates in 60 s in its AG partition and the witness saw no inode chunk carved there, so it aborted its fill; the filesystem's inode count grew by about that much (chk_clean icount=35584), so chunks were allocated somewhere the witness did not see or count.",
-      "evidence": "BOARD CELL 2/net/mesh/direct alloc_witness FAIL 2026-10-21T19:27:26Z (run 20261021T190943Z-g2b, board tests/evidence/board_2-net-mesh-direct_g2b_0.90.133-2_w1.log:96, both ranks rc=124 at 120 s). tests/evidence/alloc_witness/20261021T190943Z-g2b/rank2.txt:1 'ABORT 26944 creates in 60 s in the node's AG partition never carved a chunk; the free reserve outlasted the time the row's budget leaves the fill' (19:26:15Z); rank1.txt (test15) FILL affine_ag=0 stride=4 files=1322 carved=1 topup=42 wall_ms=2326, SNAP S0 with carves=0 in every AG, NODE ... multi=1, no PHASE1 line. Kernel logs tests/evidence/run_alloc_witness_20261021T190943Z-g2b/kernlog_test1{5,6}.gz, 19:24-19:28Z: no hung_task, 'blocked for more than', BUG, WARNING, Oops, shutdown or fence on either node; test16 wrote steadily until 19:26:26 (buf_io W), then only scsipr read_keys; five P-CAP-RECLAIM 'a grant refused for a full ledger page' lines on test16 19:25:54-19:26:09 (pages 1982, 3054 x2, 5706; ag=0) and one on test15 19:26:08 (page 8959, ag=0). chk_clean afterwards: audit CLEAN, icount=35584. test16's kernel log is missing 19:24:00-19:25:22 (capture starts 19:25:22). The open D-4CAW-DIRECT-ALLOC-WITNESS-... record is a different shape (ranks reached PHASE1-3 slowly). ===== SECOND SIGHTING 2026-10-21, 2/net/mesh/drbd (DRBD rig test1/test2, same build 71AC6107043DD5BE3D9181A, dry-run candidate 0.90.133-2): alloc_witness FAIL 19:50:44Z (run 20261021T193546Z-g2), both ranks rc=124; tests/evidence/alloc_witness/20261021T193546Z-g2/rank2.txt: 'ABORT 13440 creates in 60 s in the node's AG partition never carved a chunk; the free reserve outlasted the time the row's budget leaves the fill'; rank1.txt FILL carved=1 files=998 then SNAP S0, no PHASE1. chk_clean 19:51:20Z CLEAN, release=INDETERMINATE for want of the witness. ===== Also on 2/net/mesh/drbd, candidate 0.90.134 (module 0988C50EC610F82EE08D135), run 20261021T221943Z-g2: tests/evidence/alloc_witness/20261021T221943Z-g2/rank2.txt:1 ABORT 14336 creates in 60 s in the node AG partition never carved a chunk; rank1 FILL carved=1. Board 2/net/mesh/drbd alloc_witness FAIL 2026-10-21T22:35:00Z. ===== RELEASE STEPS OF THE 0.90.133-2 DRY RUN this record accounts for (2026-10-23): release:boards FAIL 2026-10-21T19:29:49Z (data/criteria.runs.jsonl:6909, reason '2/net/mesh/direct: alloc_witness=FAIL, chk_clean=FAIL'; tests/evidence/candidates/0.90.133-2.boards.log:66 '2/net/mesh/direct: Total: 35 - 2 FAIL, 33 PASS') is this record's 2/net/mesh/direct alloc_witness FAIL 19:27:26Z and the chk_clean INDETERMINATE behind it; release:repeats FAIL 2026-10-21T20:21:15Z (:6926, same reason; its own rows soak and sustained_load passed, 0.90.133-2.repeats.log:154-155) graded the same board; release:drbd FAIL 2026-10-21T20:12:33Z (:6910, failed=[suite-board]) graded the DRBD board whose alloc_witness FAIL 19:50:44Z and chk_clean FAIL 19:51:20Z are this record's (tests/evidence/drbd_release_verify_0.90.133-2.out:116, :118, :129-130); that board's other two non-passing rows were fsx FAIL 19:36:37Z (:77, :127, D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED) and fio_perf_vs_xfs SKIP rig-unknown (:83, :128, D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN). Collected in tests/evidence/incident_remaining_evidence_20261023.txt:2662-2860.",
+      "evidence": "BOARD CELL 2/net/mesh/direct alloc_witness FAIL 2026-10-21T19:27:26Z (run 20261021T190943Z-g2b, board tests/evidence/board_2-net-mesh-direct_g2b_0.90.133-2_w1.log:96, both ranks rc=124 at 120 s). tests/evidence/alloc_witness/20261021T190943Z-g2b/rank2.txt:1 'ABORT 26944 creates in 60 s in the node's AG partition never carved a chunk; the free reserve outlasted the time the row's budget leaves the fill' (19:26:15Z); rank1.txt (test15) FILL affine_ag=0 stride=4 files=1322 carved=1 topup=42 wall_ms=2326, SNAP S0 with carves=0 in every AG, NODE ... multi=1, no PHASE1 line. Kernel logs tests/evidence/run_alloc_witness_20261021T190943Z-g2b/kernlog_test1{5,6}.gz, 19:24-19:28Z: no hung_task, 'blocked for more than', BUG, WARNING, Oops, shutdown or fence on either node; test16 wrote steadily until 19:26:26 (buf_io W), then only scsipr read_keys; five P-CAP-RECLAIM 'a grant refused for a full ledger page' lines on test16 19:25:54-19:26:09 (pages 1982, 3054 x2, 5706; ag=0) and one on test15 19:26:08 (page 8959, ag=0). chk_clean afterwards: audit CLEAN, icount=35584. test16's kernel log is missing 19:24:00-19:25:22 (capture starts 19:25:22). The open D-4CAW-DIRECT-ALLOC-WITNESS-... record is a different shape (ranks reached PHASE1-3 slowly). ===== SECOND SIGHTING 2026-10-21, 2/net/mesh/drbd (DRBD rig test1/test2, same build 71AC6107043DD5BE3D9181A, dry-run candidate 0.90.133-2): alloc_witness FAIL 19:50:44Z (run 20261021T193546Z-g2), both ranks rc=124; tests/evidence/alloc_witness/20261021T193546Z-g2/rank2.txt: 'ABORT 13440 creates in 60 s in the node's AG partition never carved a chunk; the free reserve outlasted the time the row's budget leaves the fill'; rank1.txt FILL carved=1 files=998 then SNAP S0, no PHASE1. chk_clean 19:51:20Z CLEAN, release=INDETERMINATE for want of the witness. ===== Also on 2/net/mesh/drbd, candidate 0.90.134 (module 0988C50EC610F82EE08D135), run 20261021T221943Z-g2: tests/evidence/alloc_witness/20261021T221943Z-g2/rank2.txt:1 ABORT 14336 creates in 60 s in the node AG partition never carved a chunk; rank1 FILL carved=1. Board 2/net/mesh/drbd alloc_witness FAIL 2026-10-21T22:35:00Z. ===== RELEASE STEPS OF THE 0.90.133-2 DRY RUN this record accounts for (2026-10-23): release:boards FAIL 2026-10-21T19:29:49Z (data/criteria.runs.jsonl:6909, reason '2/net/mesh/direct: alloc_witness=FAIL, chk_clean=FAIL'; tests/evidence/candidates/0.90.133-2.boards.log:66 '2/net/mesh/direct: Total: 35 - 2 FAIL, 33 PASS') is this record's 2/net/mesh/direct alloc_witness FAIL 19:27:26Z and the chk_clean INDETERMINATE behind it; release:repeats FAIL 2026-10-21T20:21:15Z (:6926, same reason; its own rows soak and sustained_load passed, 0.90.133-2.repeats.log:154-155) graded the same board; release:drbd FAIL 2026-10-21T20:12:33Z (:6910, failed=[suite-board]) graded the DRBD board whose alloc_witness FAIL 19:50:44Z and chk_clean FAIL 19:51:20Z are this record's (tests/evidence/drbd_release_verify_0.90.133-2.out:116, :118, :129-130); that board's other two non-passing rows were fsx FAIL 19:36:37Z (:77, :127, D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED) and fio_perf_vs_xfs SKIP rig-unknown (:83, :128, D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN). Collected in tests/evidence/incident_remaining_evidence_20261023.txt:2662-2860. ===== 2026-10-23: the DRBD board's alloc_witness run of 2026-10-21T22:35:00Z (tests/evidence/drbd_rig/criteria.runs.jsonl:3262, run 20261021T221943Z-g2, candidate 0.90.134, build 0988C50EC610F82EE08D135) ended on this defect: tests/evidence/alloc_witness/20261021T221943Z-g2/rank2.txt 'ABORT 14336 creates in 60 s in the node's AG partition never carved a chunk; the free reserve outlasted the time the row's budget leaves the fill'. Its recorded outcome (both ranks BUDGET_EXHAUSTED rc=124, last_phase_census[none=2]) is D-ALLOC-WITNESS-RANK-ABORT-RECORDED-AS-BUDGET-EXHAUSTED's and D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE's; the abort that ended the lap is this record's.",
       "next": "Establish where rank 2's inodes were allocated: per-AG chunk carves and inode counts during the fill (the module's carve counters the witness reads versus the AGIs on disk), and whether the allocator placed rank 2's chunks outside its affine partition while ledger grants were refused on full pages (P-CAP-RECLAIM). Re-run 2/net/mesh/direct alloc_witness on the same build with the full kernel log captured from before the fill.",
       "cells": [
         {
@@ -2240,7 +2240,7 @@
           "why": "chk_clean FAIL: no sealed witness for run 20261021T221943Z-g2 (the coverage witness alloc_witness seals was never written because its fill aborted)"
         }
       ],
-      "updated": "2026-10-22",
+      "updated": "2026-10-23",
       "batches": [
         {
           "id": "b20261021-570500",
@@ -2316,14 +2316,64 @@
       "nodes": 2,
       "config": "*/*/*",
       "opened": "2026-10-21",
-      "summary": "tests/tooling/alloc_witness.sh: when one rank aborts its own precondition (fail_out writes ABORT to its rank file), the other rank waits for it until the row's 120 s budget kills both, and the board records FAIL BUDGET_EXHAUSTED with last_phase_census none=N instead of the abort; the census greps dmesg for mxfs-CCph markers this script never emits, so it reads none on every run.",
+      "summary": "tests/tooling/alloc_witness.sh: when one rank aborts its own precondition (fail_out writes ABORT to its rank file), the other rank waits for it until the row's 120 s budget kills both, and the board records FAIL BUDGET_EXHAUSTED on both ranks instead of the abort",
       "evidence": "Run 20261021T190943Z-g2b (2/net/mesh/direct): rank2.txt ABORT at 19:26:15Z, rank1 waited without a PHASE1 line, both rc=124 at 120 s, board line 96 'FAIL alloc_witness (nodes_pass=0/2 states:BUDGET_EXHAUSTED=2)'. run.sh:2061 greps 'mxfs-CCph rank=[0-9]* PHASE=' and run.sh:2070-2071 turn an empty result into none; tests/tooling/alloc_witness.sh records its phases with rec() into rank<N>.txt (lines 143, 326-417) and contains no CCph and no PHASE= (grep -c 0 each). ===== Again on 2/net/mesh/drbd, candidate 0.90.134, run 20261021T221943Z-g2: rank2 ABORT at its fill, both ranks recorded BUDGET_EXHAUSTED rc=124 with last_phase_census[none=2] (DRBD board ledger 2026-10-21T22:35:00Z). ===== 2026-10-23, precheck on g2b (test15/test16, 2/net/mesh/mpath, build 16A5F5DDDB4852C9D5DB236; lane tests/evidence/lanes/g2b_awabort_precheck_20261023T073948Z): with the fix (AW_ABORT_BROADCAST=1) both laps ended in 1 s, states FAIL=2, rank 1 'peer_abort rank=1' with reason 'another rank aborted the lap: rank 2: AW_ABORT_RANK=2: this rank aborts after its fill' (tests/evidence/alloc_witness/20261023T074334Z-g2b/rank1.txt ABORTED_BY_PEER, rank2.txt ABORT); with the switch off (AW_ABORT_BROADCAST=0) both laps ran 120 s of 120 s, states BUDGET_EXHAUSTED=2, last_phase_census[fill=1,start=1] (the census now reads the phases). The lap graded all four FAIL because it looked for injected_abort only, which the recorded row did not carry (rank 1 recorded first); it now accepts the abort's own text AW_ABORT_RANK=2.",
-      "next": "Control batch of tests/alloc_witness_abort_lap.sh with AW_ABORT_BROADCAST=0 (tools/harness_batch.py control --knob, 10 laps, bound 160 s, probe '^EXPOSED: rank2 aborted after its fill', pass '^LAP aw_abort PASS'), then the verification batch on the frozen candidate sized from it, then remove --fixed. The removal may name 2/net/mesh/drbd:alloc_witness:2026-10-21T22:35:00Z only with that run's own rank files showing the abort.",
+      "next": "Control batch of tests/alloc_witness_abort_lap.sh with AW_ABORT_BROADCAST=0 (tools/harness_batch.py control --knob, 10 laps, bound 160 s, probe '^EXPOSED: rank2 aborted after its fill', pass '^LAP aw_abort PASS'), then the verification batch on the frozen candidate sized from it, then remove --fixed. The removal may name 2/net/mesh/drbd:alloc_witness:2026-10-21T22:35:00Z only with that run's own rank files showing the abort. ===== 2026-10-23: the census half of this record (the script wrote no mxfs-CCph marker, so the timeout census read none) is now D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE: this record's control turns off only the abort broadcast, so a removal here proves only that fix.",
       "cells": [
         {
           "config": "2/net/mesh/drbd",
           "row": "alloc_witness",
           "iso": "2026-10-21T22:35:00Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:aw_abort",
+          "iso": "2026-10-23T10:50:49Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:aw_abort",
+          "iso": "2026-10-23T10:48:22Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:aw_abort",
+          "iso": "2026-10-23T10:45:54Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:aw_abort",
+          "iso": "2026-10-23T10:43:27Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:aw_abort",
+          "iso": "2026-10-23T10:41:00Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:aw_abort",
+          "iso": "2026-10-23T10:38:32Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:aw_abort",
+          "iso": "2026-10-23T10:36:05Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:aw_abort",
+          "iso": "2026-10-23T10:33:38Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:aw_abort",
+          "iso": "2026-10-23T10:31:10Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:aw_abort",
+          "iso": "2026-10-23T10:28:43Z"
         }
       ],
       "updated": "2026-10-23",
@@ -2340,11 +2390,61 @@
           "candidate": "",
           "build": "08D63764A9352FBDD5A76CD",
           "variant": "AW_ABORT_BROADCAST=0 (tests/tooling/alloc_witness.sh: an aborting rank broadcasts nothing and its peers wait out their own bounds, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: the defect must reproduce"
+        },
+        {
+          "id": "b20261023-2baa2a",
+          "kind": "verify",
+          "row": "lap:aw_abort",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: rank2 aborted after its fill",
+          "candidate": "0.90.134",
+          "build": "08D63764A9352FBDD5A76CD",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:aw_abort",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-5c1522",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "AW_ABORT_BROADCAST=0 (tests/tooling/alloc_witness.sh: an aborting rank broadcasts nothing and its peers wait out their own bounds, as before the fix)",
+            "builds": [
+              "08D63764A9352FBDD5A76CD"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:aw_abort",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-5c1522",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "AW_ABORT_BROADCAST=0 (tests/tooling/alloc_witness.sh: an aborting rank broadcasts nothing and its peers wait out their own bounds, as before the fix)",
+          "builds": [
+            "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
         }
       ]
     },
@@ -3236,7 +3336,7 @@
           "candidate": "0.90.134",
           "build": "08D63764A9352FBDD5A76CD",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -3273,6 +3373,18 @@
           "builds": [
             "08D63764A9352FBDD5A76CD"
           ],
+          "date": "2026-10-23"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T10:11:20Z",
+          "build": "08D63764A9352FBDD5A76CD",
+          "batch": "b20261023-621a18",
+          "approval": "P20261023-0a1c5a",
           "date": "2026-10-23"
         }
       ]
@@ -5542,7 +5654,7 @@
       "config": "*/*/*",
       "opened": "2026-10-22",
       "summary": "When a peer dies silently (killed, or every path lost), the survivors declare it dead only when its disklock heartbeat expires, 17 checks or ~34.8 s after its last heartbeat, and resume ~7-9 s later after the membership change; a survivor operation that needs the dead node therefore stalls 40-61 s, over the 30 s stall limit, at every node count on both lock managers",
-      "evidence": "LEDGER data/criteria.runs.jsonl:7931 4/net/mesh/mpath:path_fence_degraded:2026-10-23T01:47:19Z outcome FAIL raw_status PASS 'victim=test6 fenced_s=32 resumed_s=9 ... survivor_stall_ms=42595', reason 'operation stall 42595 ms is over the 30 s limit'; :7943 4/net/mesh/mpath:path_all_lost:2026-10-23T01:53:41Z FAIL raw PASS 'victim=test6 fenced_s=35 resumed_s=10 ... other_stall_ms=43862'. ROW EVIDENCE tests/evidence/board_20261023T011432Z-g4_path_fence_degraded: row.log:19 'test6 killed at 01:44:51 with every survivor on one path', :34 'test3 STALL max_ms=42595 ... errors_in_window=0', :38 test4 max_ms=37000, :42 test5 max_ms=42542; load_test3/ops.log:2286 '1792719891195 1792719933790 write ok' (one write spanning the stall, 01:44:51.195Z-01:45:33.790Z); kern_test3.txt:1 '[1862.876063] mxfs: node in slot 2 is no longer responding (heartbeat expired after 17 checks), initiating recovery [threshold=17 last_stamp_ms=1827701 last_seen_ms=1828009 now_ms=1862826]' (34.8 s after the last heartbeat seen), :2 '[1870.022606] MXFS-MEMBERSHIP ... active_count=3', :3 '[1894.954353] P-TCP-SUSPECT-DEPARTED peer 950565939'; kern_test4.txt:3 '[1897.688424] TCP peer 950565939 did not reconnect within 40000 ms -- declaring dead, recovering locks'. tests/evidence/board_20261023T011432Z-g4_path_all_lost: row.log:18 'both paths of test6 DOWN at 01:51:07', :23 'test3 STALL max_ms=43862 ... errors_in_window=0', :27 test4 43200, :31 test5 43656; load_test3/ops.log:2982 '1792720266608 1792720310470 churn ok'; kern_test3.txt:1 '[2240.422618] ... heartbeat expired after 17 checks ... last_seen_ms=2205546 now_ms=2240363' (34.8 s), :2 '[2246.351860] MXFS-MEMBERSHIP ... active_count=3'; stopped_test6_lost.txt:1 '[281.723637] P290-AUTH-CLOSED ... reason=AUTHORITY_LEASE_EXPIRED deadline_ms=281880 ... last_ok_ms=251880' (the victim's own authority lease, 30 s). No survivor operation returned an error, no shutdown, BUG, oops or hung task (row.log:81-88, :70-75). The kernel extracts are filtered (tests/mpath/lib.sh:399 greps a fixed list), so no lock-wait or takeover line between detection and resumption was kept. HISTORY (measured, graded PASS under the rows' own 120 s bound before run.sh graded stalls against stall_limit_s): data/criteria.runs.jsonl path_fence_degraded / path_fenced_return / path_all_lost on 2026-10-14 to 2026-10-21, survivor stalls 39.8-61.6 s at 2/disk/caw/mpath (40345, 41817, 42096 ms on 71AC6107043DD5BE3D9181A), 2/net/mesh/mpath (39825, 41758, 41419), 4/disk/caw/mpath (41143, 41958), 4/net/mesh/mpath (44310, 43440, 43523), 8/disk/caw/mpath (41441, 42856), 8/net/mesh/mpath (41635, 46999, 42570), 16/disk/caw/mpath (61570, 41687, 40242). path_peer_withdrawn (a death with a withdrawal) stalls 9-12 s on 9594B08726D6732D2ED5E87 and 16A5F5DDDB4852C9D5DB236, and path_fenced_return on 16A5 measured 26529 ms with fenced_s=21. ===== ALSO 16/net/mesh/mpath:path_fence_degraded:2026-10-20T13:42:36Z (data/criteria.runs.jsonl:5123, INCOMPLETE 'run died while this test was executing', status ABORTED): the row had finished; tests/evidence/board_20261020T130158Z-g16b_path_fence_degraded/row.log:345 (mtime 2026-10-20T13:42:36Z) 'RESULT: PASS src=test | measured=victim=test32 fenced_s=35 resumed_s=13 reinstate_s=18 survivor_stall_ms=45705 acked=16236 elapsed=227s fails=0', the chain was stopped as it ended so no verdict reached the board; its survivors stalled 45.7 s on the silent death of test32 (tests/evidence/incident_remaining_evidence_20261023.txt:1353-1417). ===== 2026-10-23, heartbeat path avoid (build 33DB08D36BBA2E810760F70: every heartbeat read a passthrough on the PAL's chosen path, hb_io_bound_ms=2000, a path with no answer in that time or a transport host byte passed over for 30 s) at a 20 s window (dead_timeout_ms=20000), variants with PF_KEEP_KMSG=1, lanes tests/evidence/lanes/g8_pathfo_20261023T094644Z and g4_pathfo_20261023T094647Z. Across the survivors' single-path failover no live node suspended at 4 or 8 nodes on either lock manager (no P290-AUTH-SUSPENDED in any survivor's kmsg_*_fromnode.gz): on 8/disk/caw/mpath path_fence_degraded (tests/evidence/board_20261023T094810Z-g8_path_fence_degraded) the one beat that met the dead path landed 4096 ms after the last (test7 'P-HB-IO-ABANDON ... op=beat bound_ms=2000 path_passed_over=1', 'P-HB-SLOW ... rc=-110 age_since_last_ok_ms=4096', 'P-MPATH-SIBLING 252:1 moves from 3:0:0:0 (passed over) to 4:0:0:0'), and on test9-test11 only an identity read was abandoned (op=read_prio) before the sibling took over; the landed-beat gap was 18240-19072 ms on build CA76F. Survivor stall (max_stall_ms, ledger): 8/disk/caw/mpath path_fence_degraded 26213 (41943 on CA76F), path_all_lost 28908; 4/disk/caw/mpath path_fence_degraded 24788, path_all_lost 980; 4/net/mesh/mpath path_fence_degraded 29387, path_all_lost 27678; 8/net/mesh/mpath path_all_lost 30130 FAIL (fenced_s=21 resumed_s=10; on CA76F 30953 FAIL). Same-build control path_avoid=0 hb_io_bound_ms=8000 on 4/disk/caw/mpath path_fence_degraded: 44632 FAIL. Two stalls began before the fault, during a single-path outage, and ran on through the 20 s window: 8/disk/caw/mpath path_fenced_return 43031 FAIL (test7 and test10 last completed 17.4 s before test14 was frozen, while test14's own path a was down; the other survivors 26152-27408, tests/evidence/board_20261023T095449Z-g8_path_fenced_return/stalls.txt) and 8/net/mesh/mpath path_fence_degraded 45043 FAIL (test7, test10, test11 last completed 16.5 s before the kill, during their own path a's failover; the others 28419-29407, tests/evidence/board_20261023T095932Z-g8_path_fence_degraded/stalls.txt). On the TCP lock manager survivors resume 8-10 s after the fence (fenced_s=21), on COMPARE AND WRITE 4-6 s.",
+      "evidence": "LEDGER data/criteria.runs.jsonl:7931 4/net/mesh/mpath:path_fence_degraded:2026-10-23T01:47:19Z outcome FAIL raw_status PASS 'victim=test6 fenced_s=32 resumed_s=9 ... survivor_stall_ms=42595', reason 'operation stall 42595 ms is over the 30 s limit'; :7943 4/net/mesh/mpath:path_all_lost:2026-10-23T01:53:41Z FAIL raw PASS 'victim=test6 fenced_s=35 resumed_s=10 ... other_stall_ms=43862'. ROW EVIDENCE tests/evidence/board_20261023T011432Z-g4_path_fence_degraded: row.log:19 'test6 killed at 01:44:51 with every survivor on one path', :34 'test3 STALL max_ms=42595 ... errors_in_window=0', :38 test4 max_ms=37000, :42 test5 max_ms=42542; load_test3/ops.log:2286 '1792719891195 1792719933790 write ok' (one write spanning the stall, 01:44:51.195Z-01:45:33.790Z); kern_test3.txt:1 '[1862.876063] mxfs: node in slot 2 is no longer responding (heartbeat expired after 17 checks), initiating recovery [threshold=17 last_stamp_ms=1827701 last_seen_ms=1828009 now_ms=1862826]' (34.8 s after the last heartbeat seen), :2 '[1870.022606] MXFS-MEMBERSHIP ... active_count=3', :3 '[1894.954353] P-TCP-SUSPECT-DEPARTED peer 950565939'; kern_test4.txt:3 '[1897.688424] TCP peer 950565939 did not reconnect within 40000 ms -- declaring dead, recovering locks'. tests/evidence/board_20261023T011432Z-g4_path_all_lost: row.log:18 'both paths of test6 DOWN at 01:51:07', :23 'test3 STALL max_ms=43862 ... errors_in_window=0', :27 test4 43200, :31 test5 43656; load_test3/ops.log:2982 '1792720266608 1792720310470 churn ok'; kern_test3.txt:1 '[2240.422618] ... heartbeat expired after 17 checks ... last_seen_ms=2205546 now_ms=2240363' (34.8 s), :2 '[2246.351860] MXFS-MEMBERSHIP ... active_count=3'; stopped_test6_lost.txt:1 '[281.723637] P290-AUTH-CLOSED ... reason=AUTHORITY_LEASE_EXPIRED deadline_ms=281880 ... last_ok_ms=251880' (the victim's own authority lease, 30 s). No survivor operation returned an error, no shutdown, BUG, oops or hung task (row.log:81-88, :70-75). The kernel extracts are filtered (tests/mpath/lib.sh:399 greps a fixed list), so no lock-wait or takeover line between detection and resumption was kept. HISTORY (measured, graded PASS under the rows' own 120 s bound before run.sh graded stalls against stall_limit_s): data/criteria.runs.jsonl path_fence_degraded / path_fenced_return / path_all_lost on 2026-10-14 to 2026-10-21, survivor stalls 39.8-61.6 s at 2/disk/caw/mpath (40345, 41817, 42096 ms on 71AC6107043DD5BE3D9181A), 2/net/mesh/mpath (39825, 41758, 41419), 4/disk/caw/mpath (41143, 41958), 4/net/mesh/mpath (44310, 43440, 43523), 8/disk/caw/mpath (41441, 42856), 8/net/mesh/mpath (41635, 46999, 42570), 16/disk/caw/mpath (61570, 41687, 40242). path_peer_withdrawn (a death with a withdrawal) stalls 9-12 s on 9594B08726D6732D2ED5E87 and 16A5F5DDDB4852C9D5DB236, and path_fenced_return on 16A5 measured 26529 ms with fenced_s=21. ===== ALSO 16/net/mesh/mpath:path_fence_degraded:2026-10-20T13:42:36Z (data/criteria.runs.jsonl:5123, INCOMPLETE 'run died while this test was executing', status ABORTED): the row had finished; tests/evidence/board_20261020T130158Z-g16b_path_fence_degraded/row.log:345 (mtime 2026-10-20T13:42:36Z) 'RESULT: PASS src=test | measured=victim=test32 fenced_s=35 resumed_s=13 reinstate_s=18 survivor_stall_ms=45705 acked=16236 elapsed=227s fails=0', the chain was stopped as it ended so no verdict reached the board; its survivors stalled 45.7 s on the silent death of test32 (tests/evidence/incident_remaining_evidence_20261023.txt:1353-1417). ===== 2026-10-23, heartbeat path avoid (build 33DB08D36BBA2E810760F70: every heartbeat read a passthrough on the PAL's chosen path, hb_io_bound_ms=2000, a path with no answer in that time or a transport host byte passed over for 30 s) at a 20 s window (dead_timeout_ms=20000), variants with PF_KEEP_KMSG=1, lanes tests/evidence/lanes/g8_pathfo_20261023T094644Z and g4_pathfo_20261023T094647Z. Across the survivors' single-path failover no live node suspended at 4 or 8 nodes on either lock manager (no P290-AUTH-SUSPENDED in any survivor's kmsg_*_fromnode.gz): on 8/disk/caw/mpath path_fence_degraded (tests/evidence/board_20261023T094810Z-g8_path_fence_degraded) the one beat that met the dead path landed 4096 ms after the last (test7 'P-HB-IO-ABANDON ... op=beat bound_ms=2000 path_passed_over=1', 'P-HB-SLOW ... rc=-110 age_since_last_ok_ms=4096', 'P-MPATH-SIBLING 252:1 moves from 3:0:0:0 (passed over) to 4:0:0:0'), and on test9-test11 only an identity read was abandoned (op=read_prio) before the sibling took over; the landed-beat gap was 18240-19072 ms on build CA76F. Survivor stall (max_stall_ms, ledger): 8/disk/caw/mpath path_fence_degraded 26213 (41943 on CA76F), path_all_lost 28908; 4/disk/caw/mpath path_fence_degraded 24788, path_all_lost 980; 4/net/mesh/mpath path_fence_degraded 29387, path_all_lost 27678; 8/net/mesh/mpath path_all_lost 30130 FAIL (fenced_s=21 resumed_s=10; on CA76F 30953 FAIL). Same-build control path_avoid=0 hb_io_bound_ms=8000 on 4/disk/caw/mpath path_fence_degraded: 44632 FAIL. Two stalls began before the fault, during a single-path outage, and ran on through the 20 s window: 8/disk/caw/mpath path_fenced_return 43031 FAIL (test7 and test10 last completed 17.4 s before test14 was frozen, while test14's own path a was down; the other survivors 26152-27408, tests/evidence/board_20261023T095449Z-g8_path_fenced_return/stalls.txt) and 8/net/mesh/mpath path_fence_degraded 45043 FAIL (test7, test10, test11 last completed 16.5 s before the kill, during their own path a's failover; the others 28419-29407, tests/evidence/board_20261023T095932Z-g8_path_fence_degraded/stalls.txt). On the TCP lock manager survivors resume 8-10 s after the fence (fenced_s=21), on COMPARE AND WRITE 4-6 s. ===== 2026-10-23, the takeover's phases from four kept whole kernel logs (survivor's kmsg_<node>_fromnode.gz; raw extracts by a log sweep of board_20261023T061326Z-g2b_path_all_lost, board_20261023T060247Z-g2b_path_all_lost, board_20261023T100249Z-g8_path_all_lost, board_20261023T094810Z-g8_path_fence_degraded): after the heartbeat declaration the PR fence and its certificate take 0.2 s and the seal 0.2-0.4 s, then the elected survivor's foreign replay spends 4.5 s proving the dead node's slice stable before replaying it: board_20261023T060247Z-g2b_path_all_lost kmsg_test15 'P-FRSTAB-STABLE slot=1 passes=2 unstable_seen=0 wall_ms=4528' (xfs/xfs_log_recover.c mxfs_slice_stabilize: a full read, then mxfs_fr_stab_passes=2 re-reads each after an msleep of mxfs_fr_stab_interval_ms=2000; DRBD skips them). The same 4.6-4.7 s gap between P-RMAN-LOADED and the replay's post barrier is in all four runs, at 2 and 8 nodes on both lock managers. The survivors' operations resumed right after it (CAW: before the membership change; TCP 2-node: at it). On TCP at 8 nodes the survivor resumed 3 s after the membership change instead, after the ledger takeover (P-TAUTH-TAKEOVER pages_prepared=69 total_ms=973) and the orphan sweep (P-TAUTH-ORPHAN-SWEEP settle_wait_ms=1300). In the 8-node TCP run a non-prover survivor's first replay attempt was refused for want of the certificate another survivor was still writing and retried 1 s later (P89-REAP-SCHED why=freplay-fence delay_ms=1000).",
       "next": "The design is ruled (docs/rulings/silent-peer-death-under-the-stall-limit.md, gpt-6-astra 2026-10-23): suspicion decoupled from the lease; conflicting recovery mutations and grants wait for the fence certificate AND the victim's read authority provably stopped (acknowledged read-stop, proven lease expiry, or host stop); lease closure suspends instead of shutting the filesystem down. The 17-check window, the 30 s lease and the 40 s TCP grace are derived at dlm/disklock.h:191-225 (MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD), dlm/disklock.c:5056-5071 and the TCP layer. Work in this order, each measured before the next: (1) an unfiltered phase trace of one path_all_lost and one path_fence_degraded run at 2/net/mesh/mpath and 2/disk/caw/mpath (declaration, PR commands, certificate, seal, replay size, recovery-complete, membership, first unblocked survivor operation), plus each live node's landed-beat gap distribution under a single-path failover and path restore; (2) take the TCP lock manager's disconnect-driven 20 s non-NL freeze and 40 s reconnect grace off the takeover's critical path; (3) replace the fixed 3 s seal settle with an acknowledged epoch barrier and make the certificate publication one bounded write in the normal case; (4) the ACTIVE->SUSPENDED->REVALIDATED/EVICTED mount state with a read and write admission gate, replacing the forced shutdown on lease closure; (5) only then a shorter lease (about 12 s from beat issue) and window (K from the measured gaps), with the read-expiry proof, and the 2-16 node path rows measured on it. ===== 2026-10-23: step (1) runs without a code change: the rig loads mxfs with dyndbg=+p and MXFS_TEST_ENV=PF_KEEP_KMSG=1 keeps each path row's whole followed kernel log (kmsg_<node>_fromnode.gz) on a PASS. Lane tests/evidence/lanes/g2b_spd_phase_trace_20261023T055842Z (queue tests/evidence/lanes/queue_g2b_spd_phase_trace.txt) runs path_fence_degraded, path_all_lost and path_fenced_return at 2/disk/caw/mpath and path_fence_degraded and path_all_lost at 2/net/mesh/mpath on the candidate's module as variants; read from its board_*-g2b_path_* directories the declaration, PR commands, certificate, seal, replay, P163-RECOVERY-COMPLETE, membership and the first survivor operation after the death, and every P-HB-SLOW of the live node across its single-path failover, and name each failure these runs record in this record's cells. A second consult on keeping the window longer than the lease (L about 8 s, K about 7, suspend instead of shutdown, resume on a provably early beat) ruled it unsound as stated and listed the conditions under which it is sound: docs/rulings/silent-peer-death-under-the-stall-limit.md, 'Keeping the window longer than the lease'. ===== 2026-10-23: step (4) is in the tree, unmeasured (module CA76F7531879702F0F4ADF8). On a SCSI attachment the lease is the death window less MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS (4 s), and its deadline SUSPENDS the authority (MXFS_AUTH_SUSPENDED; dlm/disklock.c auth_renew_bounded, mxfs_authority_wait) instead of closing it: a beat completing before revalidate_by_ms (last landed anchor + window less 2x500 ppm) readmits, a later one or none closes; the write gate (pal/linux/xfs_super.c mxfs_mount_write_admitted), the cluster-lock admission (mxfs_dlm_ilock_begin -> mxfs_mount_auth_gate) and getattr wait while suspended; the heartbeat keeps beating while suspended; dl_auth_suspend=0 is the control. The window is still 17 checks. Next: (a) on g2 with dead_timeout_ms=20000 (K=10, lease 16 s), a suspension lap: hold one live node's beats 17-19 s (dbg_hb_completion_delay_ms or dl_inject_hb_pause_ms) while it writes and reads, expecting P290-AUTH-SUSPENDED then P290-AUTH-RESUMED, no withdraw, no peer declaration, and its blocked operations completing after the resume; with dl_auth_suspend=0 the same hold must close and withdraw; (b) path_fence_degraded, path_all_lost and path_fenced_return at 2/disk/caw/mpath and 2/net/mesh/mpath with dead_timeout_ms=20000 as variants (PF_KEEP_KMSG=1): survivor stall and every live node's P-HB-SLOW gaps; then 4, 8 and 16 nodes; (c) only then MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD from the measured gaps, the control batch at dead_timeout_ms=34000 and the verification batch on the frozen candidate. ===== 2026-10-23: step (4) measured on the rig (build CA76F7531879702F0F4ADF8, g2, 2/net/mesh/direct, dead_timeout_ms=20000: window 20 s, lease 16 s): tests/auth_suspend_lap.sh parks B's heartbeat 15 s while B writes 256 KiB with fsync and stats every 200 ms (lane tests/evidence/lanes/g2_auth_suspend_20261023T085655Z). Suspension on, twice: P290-AUTH-SUSPENDED at the deadline, P290-AUTH-RESUMED 1240 and 1244 ms later when the next beat landed (anchor 17.4 s after the last), 124 and 126 operations all succeeded, longest 1241 ms, A declared nothing, both still mounted and writing (tests/evidence/20261023T085726Z_authsusp_susp1a, tests/evidence/20261023T090000Z_authsusp_susp1b). dl_auth_suspend=0, the same-build control: P290-AUTH-CLOSED reason=AUTHORITY_LEASE_EXPIRED overdue_ms=25, P290-AUTH-HB-STOP, 46 of 132 operations failed, A declared B dead, B no longer writes (tests/evidence/20261023T085845Z_authsusp_susp0a). Next: the path rows at the 20 s window (lane tests/evidence/lanes/g2b_spd_window20_20261023T085658Z), then the window from the measured gaps. ===== 2026-10-23: the path rows at a 20 s window (dead_timeout_ms=20000: K=10, lease 16 s, suspending; build CA76F7531879702F0F4ADF8, variants with PF_KEEP_KMSG=1; lanes tests/evidence/lanes/g2b_spd_window20_20261023T085658Z, g4_spd_window20_20261023T090715Z, g8_spd_window20_20261023T090718Z). Survivor stall: 2/disk/caw/mpath path_fence_degraded 25839 ms (detection 20.48 s after the stamp was last seen: kmsg_test15 'heartbeat expired after 10 checks ... last_seen_ms=139945 now_ms=160424', fenced_s=21 resumed_s=6), path_all_lost 26931, path_fenced_return 27169; 2/net/mesh/mpath path_fence_degraded 25656; 4/net/mesh/mpath path_fence_degraded survivor 27865, max 28831; 8/disk/caw/mpath path_fence_degraded 41550-41943 (fenced_s=21 resumed_s=4): each 41.5 s operation was a 'mutex' (mkdir/rmdir in the shared directory, tests/mpath/pathload.py:170) that began 16.2 s BEFORE the kill (load_test7/ops.log '1792746619543 1792746661078 mutex ok', t0_ms=1792746635747), during the survivors' single-path failover, so the failover's lock queueing and the death stall add; test11 and test13, whose operations began after the kill, stalled 23.9 s. THE WINDOW CANNOT BE 20 s YET: across that failover every live survivor suspended once and resumed once, its landed beats 18240-18752 ms apart at 8 nodes and 18752-19072 ms at 4 (P-HB-SLOW write_ms=1024 rc=-5: the beat's COMPARE AND WRITE kept failing on the dead path), 0.9-1.7 s inside revalidate_by: a slightly slower failover would have closed a live node and had it declared dead and fenced. No survivor closed or was declared at 2, 4 or 8 nodes. The gap is the rig's multipath failover (tools/mpath_settings.sh: noop_out 5/5, replacement_timeout 5, polling_interval 5, so a dead path is failed 10-20 s after it dies). The default window stays 17 checks. Next: make a live node's beat land on a surviving path within a few seconds of a path death (re-issue a beat whose COMPARE AND WRITE failed with a path error on another path of the LU, which the PAL already enumerates for the isolation check, mxfs_pal_lu_paths_offline), measure the failover gap again at 4 and 8 nodes, then K from it; and the failover's shared-directory lock queueing at 8 nodes.",
       "impact": "stability",
       "impact_why": "On 4/net/mesh/mpath (build 16A5F5DDDB4852C9D5DB236) a file operation on each survivor stalled 37.0-43.9 s, over the 30 s stall_limit_s (data/release_policy.json), each time a peer died without a goodbye (killed, or every path lost)",
@@ -5834,166 +5946,6 @@
       ]
     },
     {
-      "id": "D-LANE-HOLD-LINGERS-AFTER-ITS-LANE-SO-THE-NEXT-LANE-IS-REFUSED",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-22",
-      "summary": "scripts/rig_lane.sh keeps each configuration a lane holds with a holder process (tail --pid=<lane> -f /dev/null) that notices the lane has exited only at its next 1 s poll, so for up to a second after a lane ends its configurations stay held, and a lane started in that second on one of them is refused (rc 3) as if the ended lane still ran.",
-      "evidence": "Verification batch b20261022-5921cd (D-LANES-ON-ONE-CONFIGURATION-COLLIDE-AND-BATCHES-SPEND-THEIR-LAPS-INCOMPLETE, lap:lane_config_lock at 2/net/mesh/direct, candidate 0.90.134 frozen 2026-10-23T03:56Z), lane tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z step 6: laps 1, 3 and 5 PASS; laps 2, 4 and 6 INCOMPLETE rc=2 in 3 s, each lap's lane A refused by the previous lap's lane C, which had ended: tests/evidence/batch_laps/b20261022-5921cd/20261023T035823Z-978640ad.log 'ABORT: lane A's step did not start (2026-10-23T03:58:23Z lane lanelockAv2 refused: configuration 64/net/mesh/direct is held by another lane (80852 2026-10-23T03:58:23Z lane lanelockCv1))', tests/evidence/batch_laps/b20261022-5921cd/20261023T035833Z-a87cda41.log (lanelockAv4 refused, held by lanelockCv3), tests/evidence/batch_laps/b20261022-5921cd/20261023T035843Z-a2533991.log (lanelockAv6 refused, held by lanelockCv5). Each lap starts its lane A within a second of the previous lap's lane C ending (lap 1 ended 03:58:23Z, lap 2 started 03:58:23Z). The fix-out control laps (b20261022-18f783) took no lock, so they never met it; the development lap ran alone. ===== 2026-10-23, fix: scripts/rig_lane.sh records each holder's pid and its EXIT trap (release_holds) kills and waits for every holder, so the configuration locks are free before the lane's exit is seen; LANE_HOLD_RELEASE=0 skips that (the old poll-only release). Precheck on the host, tree build B155E10D900872E6CE36289: fix in, 9 laps PASS, each with EXPOSED-RELEASE 1 ms; LANE_HOLD_RELEASE=0, 8 laps with EXPOSED-RELEASE 1 ms: 7 FAIL 'lane C, started after lane A ended, did not run its step' and, before the lap waited out earlier holds, 2 ABORT 'lane A's step did not start (... refused: configuration 64/net/mesh/direct is held by another lane (... lanelockAhr0x1))', the symptom batch b20261022-5921cd recorded.",
-      "next": "Control batch of tests/lane_config_lock_lap.sh with LANE_HOLD_RELEASE=0 (tools/harness_batch.py control --knob, lap:lane_config_lock at 2/net/mesh/direct, 10 laps, bound 20 s, probe '^EXPOSED-RELEASE: ', pass '^LANE_LOCK_LAP PASS'), then the verification batch on the frozen candidate sized from it, then remove --fixed naming the three cells.",
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:lane_config_lock",
-          "iso": "2026-10-23T03:58:27Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:lane_config_lock",
-          "iso": "2026-10-23T03:58:36Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:lane_config_lock",
-          "iso": "2026-10-23T03:58:46Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:lane_config_lock",
-          "iso": "2026-10-23T10:20:11Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:lane_config_lock",
-          "iso": "2026-10-23T10:20:06Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:lane_config_lock",
-          "iso": "2026-10-23T10:20:01Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:lane_config_lock",
-          "iso": "2026-10-23T10:19:56Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:lane_config_lock",
-          "iso": "2026-10-23T10:19:51Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:lane_config_lock",
-          "iso": "2026-10-23T10:19:46Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:lane_config_lock",
-          "iso": "2026-10-23T10:19:41Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:lane_config_lock",
-          "iso": "2026-10-23T10:19:36Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:lane_config_lock",
-          "iso": "2026-10-23T10:19:31Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:lane_config_lock",
-          "iso": "2026-10-23T10:19:26Z"
-        }
-      ],
-      "reproducer": "tests/lane_config_lock_lap.sh [<tag>] (host only, about 5 s): lane A holds 64/net/mesh/direct for 4 s, lane B is started while A runs (must be refused), and lane C is started the moment A's process has exited ('EXPOSED-RELEASE: lane C was started N ms after lane A exited', N < 1000, inside the old holder's 1 s poll). PASS needs C to run its step; FAIL when C is refused. Each lap first waits out (flock -w 3) any hold an earlier lap left, so a lap measures only its own lanes. Control: LANE_HOLD_RELEASE=0 (scripts/rig_lane.sh's switch back to the poll-only release).",
-      "updated": "2026-10-23",
-      "batches": [
-        {
-          "id": "b20261023-b2850e",
-          "kind": "control",
-          "row": "lap:lane_config_lock",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED-RELEASE: ",
-          "candidate": "",
-          "build": "08D63764A9352FBDD5A76CD",
-          "variant": "LANE_HOLD_RELEASE=0 (scripts/rig_lane.sh leaves its holds to the holder's poll alone, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: the defect must reproduce"
-        },
-        {
-          "id": "b20261023-7c523f",
-          "kind": "verify",
-          "row": "lap:lane_config_lock",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED-RELEASE: ",
-          "candidate": "0.90.134",
-          "build": "08D63764A9352FBDD5A76CD",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:lane_config_lock",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-b2850e",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "LANE_HOLD_RELEASE=0 (scripts/rig_lane.sh leaves its holds to the holder's poll alone, as before the fix)",
-            "builds": [
-              "08D63764A9352FBDD5A76CD"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:lane_config_lock",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-b2850e",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "LANE_HOLD_RELEASE=0 (scripts/rig_lane.sh leaves its holds to the holder's poll alone, as before the fix)",
-          "builds": [
-            "08D63764A9352FBDD5A76CD"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T10:11:20Z",
-          "build": "08D63764A9352FBDD5A76CD",
-          "batch": "b20261023-7c523f",
-          "approval": "P20261023-8b376d",
-          "date": "2026-10-23"
-        }
-      ]
-    },
-    {
       "id": "D-FSX-FAILING-CHECK-LOG-IS-DELETED-SO-NO-FAILING-RUN-KEEPS-ITS-EVIDENCE",
       "severity": "major",
       "nodes": 1,
@@ -6033,7 +5985,7 @@
           "candidate": "0.90.134",
           "build": "08D63764A9352FBDD5A76CD",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -6124,6 +6076,18 @@
           "row": "lap:fsx_pull",
           "iso": "2026-10-23T10:21:52Z"
         }
+      ],
+      "verified_at": [
+        {
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T10:11:20Z",
+          "build": "08D63764A9352FBDD5A76CD",
+          "batch": "b20261023-707d51",
+          "approval": "P20261023-8efcf4",
+          "date": "2026-10-23"
+        }
       ]
     },
     {
@@ -6175,7 +6139,7 @@
       "opened": "2026-10-23",
       "summary": "A harness lap run through tools/batch_lap.py is graded only on its verdict line: batch_lap.py writes no max_stall_ms= into the run it records, and tools/criteria.py reads a stall only from that field, so a lap in which a file operation stalled past stall_limit_s (30 s) is recorded PASS and can count toward a verification batch",
       "evidence": "Verification batch b20261022-548ef2 (lap:jdt_gate_fault at 2/net/mesh/direct, candidate 0.90.134): 7 of its 9 laps timed A's last-member umount at 30.9-32.7 s on the node (row.log 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=31006' in tests/evidence/20261023T043949Z_capture_gate_jdtv1, and the same in jdtv2, 4, 5, 6, 8, 9), and every lap was recorded PASS in data/criteria.runs.jsonl. The review data/reviews/P20261023-128f2f.md traced why: the stall check in tools/criteria.py reads only a max_stall_ms= field, which tools/batch_lap.py never writes, and the harness bounds that step at 180 s.",
-      "next": "Give batch laps a stall measurement the ledger grades: either batch_lap.py extracts each harness's timed operations (a declared pattern per lap, like the probe) and records the largest as max_stall_ms, or the harnesses print a 'max_stall_ms=' line batch_lap.py copies; make criteria.py grade a batch lap over stall_limit_s FAIL as it does a board row. Reproduce with a lap that prints an operation over 30 s and passes its verdict line; control with the change out (graded PASS), verification with it in (graded FAIL). ===== FIX in the tree (not yet controlled or verified): tools/batch_lap.py stall_graded() reads every max_stall_ms=<ms> line and every match of each --stall pattern (one capture group, milliseconds; tools/harness_batch.py passes --stall through) in the lap's output and the evidence files it wrote, appends max_stall_ms=<worst> to measured, and turns a PASS over the policy's stall_limit_s into a FAIL with criteria.stall_over_limit, the function that grades a board row's stall; MXFS_BATCH_LAP_STALL=0 measures and grades nothing, as before. verdict() is the old verdict-line code moved out of main() unchanged. First runs on the tree: fix on, 'graded FAIL: rc=0 elapsed_s=0 max_stall_ms=31500 -- operation stall 31500 ms is over the 30 s limit'; switch off, 'graded PASS: rc=0 elapsed_s=0 -- RESULT: PASS label=stall'. Next: on the next attempt, a control batch with MXFS_BATCH_LAP_STALL=0 (lap:batch_lap_stall at 1/any or the configuration the batch names), then a verification batch sized from it, then remove --fixed.",
+      "next": "Give batch laps a stall measurement the ledger grades: either batch_lap.py extracts each harness's timed operations (a declared pattern per lap, like the probe) and records the largest as max_stall_ms, or the harnesses print a 'max_stall_ms=' line batch_lap.py copies; make criteria.py grade a batch lap over stall_limit_s FAIL as it does a board row. Reproduce with a lap that prints an operation over 30 s and passes its verdict line; control with the change out (graded PASS), verification with it in (graded FAIL). ===== FIX in the tree (not yet controlled or verified): tools/batch_lap.py stall_graded() reads every max_stall_ms=<ms> line and every match of each --stall pattern (one capture group, milliseconds; tools/harness_batch.py passes --stall through) in the lap's output and the evidence files it wrote, appends max_stall_ms=<worst> to measured, and turns a PASS over the policy's stall_limit_s into a FAIL with criteria.stall_over_limit, the function that grades a board row's stall; MXFS_BATCH_LAP_STALL=0 measures and grades nothing, as before. verdict() is the old verdict-line code moved out of main() unchanged. First runs on the tree: fix on, 'graded FAIL: rc=0 elapsed_s=0 max_stall_ms=31500 -- operation stall 31500 ms is over the 30 s limit'; switch off, 'graded PASS: rc=0 elapsed_s=0 -- RESULT: PASS label=stall'. Next: on the next attempt, a control batch with MXFS_BATCH_LAP_STALL=0 (lap:batch_lap_stall at 1/any or the configuration the batch names), then a verification batch sized from it, then remove --fixed. ===== 2026-10-23, read before any batch: the lap cannot pass a verification batch as written. tests/batch_lap_stall_lap.py:58 prints 'graded {outcome}: {measured} -- {reason}', and with the fix on, measured carries 'max_stall_ms=31500' (tools/batch_lap.py:194). tools/harness_batch.py runs each lap through tools/batch_lap.py, whose stall_graded() reads every max_stall_ms= in the lap's own output (STALL_LINE, :178, :269-272), so the outer grading turns the lap's PASS into a FAIL on every verification lap; in the control (MXFS_BATCH_LAP_STALL=0 in the lap's environment, inherited by the outer batch_lap.py too) neither grading runs and the lap fails as a control should. Before the control: print the inner measured value without the max_stall_ms= token (e.g. 'worst_ms=31500'), then the control and the verification batch on the next attempt.",
       "reproducer": "tests/batch_lap_stall_lap.py (a harness that prints an operation one second over stall_limit_s as max_stall_ms= and another through a declared --stall pattern, then RESULT: PASS, graded as tools/batch_lap.py grades a lap; EXPOSED line each lap; MXFS_BATCH_LAP_STALL=0 is the fix's switch off)",
       "updated": "2026-10-23"
     },
@@ -6438,7 +6402,7 @@
           "candidate": "0.90.134",
           "build": "08D63764A9352FBDD5A76CD",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -6477,6 +6441,18 @@
           ],
           "date": "2026-10-23"
         }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T10:11:20Z",
+          "build": "08D63764A9352FBDD5A76CD",
+          "batch": "b20261023-8b466e",
+          "approval": "P20261023-624ee6",
+          "date": "2026-10-23"
+        }
       ]
     },
     {
@@ -6490,6 +6466,24 @@
       "next": "Identify the run and node: match uptime 7834 s and the boot and power-down lines around tests/evidence/netconsole.log:96140-96215 against the DRBD rig's run logs of 2026-10-08 to 2026-10-17 (tests/evidence/drbd_rig/*). Establish what failed the backing bio in its own submission (a pool LUN unbound or its iSCSI session cut while DRBD still held it, as a rig teardown might) and whether any MXFS path (pal/linux/drbd.c, tools/mxfs_drbd_*) changes DRBD's per-device state. Reproduce: an LVM scan (pvscan, vgchange --monitor) on a node whose DRBD backing LUN's session is cut. If the crash needs no MXFS code, propose remove-disproved with that evidence and fix the rig's order if the rig caused it.",
       "impact": "stability",
       "impact_why": "A test node of the DRBD rig crashed: kernel NULL pointer dereference (Oops: 0000 [#1]) and the node rebooted (tests/evidence/netconsole.log:96144-96215)."
+    },
+    {
+      "id": "D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE",
+      "severity": "minor",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "tests/tooling/alloc_witness.sh wrote no mxfs-CCph phase marker, so when the alloc_witness row ran out its budget, run.sh's timeout census (run.sh:2061-2071, each node's last 'mxfs-CCph rank=N PHASE=' kernel-log line) recorded last_phase_census[none=N] and the board kept no phase of the ranks the budget killed",
+      "evidence": "Run 20261021T190943Z-g2b (2/net/mesh/direct) and the DRBD board's alloc_witness row of 2026-10-21T22:35:00Z recorded last_phase_census[none=2] on both ranks (evidence of D-ALLOC-WITNESS-RANK-ABORT-RECORDED-AS-BUDGET-EXHAUSTED, which first described this and from which it is split, since that record's control turns off only the abort broadcast); the script then contained no CCph and no PHASE= (grep -c 0 each). FIX in the tree, not controlled or verified: ccph() (tests/tooling/alloc_witness.sh:195-197) writes 'mxfs-CCph rank=$RANK PHASE=<phase>' to /dev/kmsg at fill, start, p1-p4, written and eval (:293, :362, :390, :405, :415, :426, :511, :514). With it, the 2026-10-23 precheck (lane tests/evidence/lanes/g2b_awabort_precheck_20261023T073948Z, AW_ABORT_BROADCAST=0) and all ten laps of control b20261023-5c1522 recorded last_phase_census[fill=1,start=1] (tests/evidence/batch_laps/b20261023-5c1522/*.log).",
+      "next": "A lap that times the row out (tests/alloc_witness_abort_lap.sh with AW_ABORT_BROADCAST=0 and AW_ABORT_RANK=2) and requires last_phase_census to name a phase on every rank; the control with ccph() reverted in place just before the next freeze (tools/harness_batch.py control --revert, then proof), the verification batch on that attempt, then remove --fixed.",
+      "cells": [
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "alloc_witness",
+          "iso": "2026-10-21T22:35:00Z"
+        }
+      ],
+      "updated": "2026-10-23"
     }
   ]
 }
