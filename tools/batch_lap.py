@@ -3,7 +3,7 @@
 
     tools/batch_lap.py --batch <id> --at <configuration> --row <row> --bound <s>
                        --pass <regex> [--fail <regex>] [--evidence <dir or glob>]...
-                       [--build-from <mxfs.ko>] -- <command> [args...]
+                       [--stall <regex>]... [--build-from <mxfs.ko>] -- <command> [args...]
 
 A batch (tools/defects.py batch / plan-verify) counts laps from the run ledger: every lap is a run
 of the batch's row at its configuration, keyed (configuration, row, iso), and run.sh records one
@@ -23,6 +23,14 @@ the harness once and records the lap the way run.sh records a board row's:
   - exposure: the batch's probe counted in the lap's own output and in every file under each
     `--evidence` path the lap wrote, appended to `measured` as `exposure=<n>` (tools/defects.py
     exposed() reads it). A harness's trigger shows in its own log, not in a kernel's;
+  - the worst operation stall, read from the same texts: every `max_stall_ms=<ms>` the harness
+    prints and every match of each `--stall` pattern (one capture group, an operation's
+    milliseconds), appended to `measured` as `max_stall_ms=<ms>` and graded as a board row's is
+    (tools/criteria.py stall_over_limit): a PASS whose stall is over the policy's stall_limit_s is
+    a FAIL. A lap with no stall graded none, so an operation stalled 31 s inside a lap that then
+    printed its PASS line recorded a PASS
+    (D-BATCH-LAP-RECORDS-NO-STALL-SO-A-HARNESS-LAP-OVER-THE-STALL-LIMIT-GRADES-PASS).
+    MXFS_BATCH_LAP_STALL=0 measures and grades nothing, as before: the same-build control;
   - the run carries the build (`--build-from`, the tree's mxfs.ko by default), the candidate
     (MXFS_CANDIDATE), the batch, and the batch's variant as `batch:<variant>`, as run.sh's does;
   - it is appended, under the board's lock, to the ledger of the board that keeps the batch's
@@ -153,6 +161,46 @@ def lap_log(logdir: Path) -> tuple:
             continue
 
 
+def verdict(rc: int, text: str, passed: str, failed: str, bound: int) -> tuple:
+    """(outcome, reason) from the harness's own verdict line, or FAIL when it overran its bound."""
+    pass_line = next((l for l in text.splitlines() if re.search(passed, l)), "")
+    fail_line = next((l for l in text.splitlines() if failed and re.search(failed, l)), "")
+    if rc == 124:
+        return "FAIL", f"elapsed>{bound}s: the harness overran its bound"
+    if fail_line:
+        return "FAIL", fail_line.strip()
+    if pass_line:
+        return "PASS", pass_line.strip()
+    return "INCOMPLETE", f"no verdict line (rc={rc}): {text.strip().splitlines()[-1][:300]}"
+
+
+#: The stall line every harness may print, read whatever `--stall` patterns a lap declares.
+STALL_LINE = r"\bmax_stall_ms=(\d+)"
+
+
+def stall_graded(outcome: str, reason: str, measured: str, texts: list,
+                 patterns: list) -> tuple:
+    """(outcome, reason, measured) with the lap's worst operation stall recorded and graded the
+    way tools/criteria.py grades a board row's: over the policy's stall_limit_s, a PASS is a FAIL."""
+    if os.environ.get("MXFS_BATCH_LAP_STALL", "1") == "0":
+        return outcome, reason, measured
+    worst = -1
+    for pattern in [STALL_LINE] + list(patterns):
+        for text in texts:
+            for match in re.finditer(pattern, text):
+                worst = max(worst, int(match.group(1)))
+    if worst < 0:
+        return outcome, reason, measured
+    measured += f" max_stall_ms={worst}"
+    stall = criteria.stall_over_limit(measured)
+    if stall and outcome == "PASS":
+        limit = int(criteria.policy().get("stall_limit_s", 30))
+        outcome = "FAIL"
+        reason = (f"operation stall {stall} ms is over the {limit} s limit "
+                  f"(data/release_policy.json stall_limit_s): a stability defect; {reason}")
+    return outcome, reason, measured
+
+
 def fresh_iso(board: Path, config: str, row: str) -> str:
     """A stamp no run of this row at this configuration already carries."""
     taken = {str(r.get("iso", "")) for r in criteria.ledger_runs(board, config, row)}
@@ -174,12 +222,19 @@ def main() -> int:
     parser.add_argument("--fail", dest="failed", default="", help="regex of its FAIL line")
     parser.add_argument("--evidence", action="append", default=[],
                         help="a dir or glob the harness writes its lap into (repeat)")
+    parser.add_argument("--stall", action="append", default=[],
+                        help="a regex whose one capture group is an operation's milliseconds "
+                             "(repeat); max_stall_ms= lines are always read")
     parser.add_argument("--build-from", default=str(ROOT / "mxfs.ko"))
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
     if not command:
         sys.exit("batch_lap: name the harness command after --")
+    for pattern in args.stall:
+        if re.compile(pattern).groups != 1:
+            sys.exit(f"batch_lap: --stall {pattern!r} must have exactly one capture group, "
+                     f"an operation's milliseconds")
     config = criteria.parse_at(args.at)
     answer = batch_check(args)
     probe, variant = answer.get("PROBE", ""), answer.get("VARIANT", "")
@@ -208,21 +263,13 @@ def main() -> int:
         elapsed = int(time.time() - t0)
         handle.write(f"=== rc={rc} elapsed={elapsed}s ({stamp()}) ===\n")
     text = log.read_text(errors="replace")
-    pass_line = next((l for l in text.splitlines() if re.search(args.passed, l)), "")
-    fail_line = next((l for l in text.splitlines() if args.failed and re.search(args.failed, l)), "")
-    if rc == 124:
-        outcome, reason = "FAIL", f"elapsed>{args.bound}s: the harness overran its bound"
-    elif fail_line:
-        outcome, reason = "FAIL", fail_line.strip()
-    elif pass_line:
-        outcome, reason = "PASS", pass_line.strip()
-    else:
-        outcome, reason = "INCOMPLETE", f"no verdict line (rc={rc}): {text.strip().splitlines()[-1][:300]}"
+    outcome, reason = verdict(rc, text, args.passed, args.failed, args.bound)
     files = written_since(args.evidence, t0)
     measured = f"rc={rc} elapsed_s={elapsed}"
+    texts = [text] + [Path(p).read_text(errors="replace") for p in files]
     if probe:
-        texts = [text] + [Path(p).read_text(errors="replace") for p in files]
         measured += f" exposure={count_probe(probe, texts)}"
+    outcome, reason, measured = stall_graded(outcome, reason, measured, texts, args.stall)
     with log.open("a") as handle:
         handle.write("=== evidence files the lap wrote: " + " ".join(
             os.path.relpath(p, ROOT) for p in files) + " ===\n")

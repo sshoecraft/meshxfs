@@ -8752,6 +8752,63 @@ mxfs_bmbt_skip_preserve_truth(
 	}
 }
 
+/*
+ * The bmbt chokepoint below judges writes only.  A buffer whose XBF_DONE an
+ * eviction cleared still holds the previous image in memory, and the
+ * predicate reads the owner from that memory.  Once the block has been reused
+ * by another inode's tree and the old owner number has become a directory
+ * this node holds NL, the predicate matches the READ of the new tree's block:
+ * no bio was issued, mxfs_bmbt_skip_preserve_truth staled the buffer, and
+ * xfs_buf_ioend verified the old image and set XBF_DONE, so the reader was
+ * handed the other tree's leaf (XBF_DONE|XBF_STALE at the btree owner check,
+ * P975-BMBT-LOOKUP-BAD, on the 2-node TCP rig).  Under the arm that compares
+ * tenure stamps the image could carry the reader's own owner, which the owner
+ * check would have passed.  A read is always issued now; bmbt_skip_reads=1
+ * restores the old behaviour (control).  The line is printed in both arms, so
+ * a lap shows it reached the read the predicate matches.
+ */
+int mxfs_bmbt_skip_reads;
+module_param_named(bmbt_skip_reads, mxfs_bmbt_skip_reads, int, 0644);
+MODULE_PARM_DESC(bmbt_skip_reads,
+		 "Let the bmbt write chokepoint skip a read bio too, serving an "
+		 "evicted buffer's old image with no read (control only; "
+		 "0=off default)");
+
+static bool
+mxfs_bmbt_chokepoint_covers(
+	struct xfs_buf		*bp)
+{
+	static atomic_t		p61r_n = ATOMIC_INIT(0);
+	int			n;
+
+	if (bp->b_flags & XBF_WRITE)
+		return true;
+	n = atomic_inc_return(&p61r_n);
+	if (n <= 200)
+		pr_warn("mxfs: P61-CHOKEPOINT-READ n=%d owner=%llu daddr=%lld numrecs=%u flags=0x%x hold=%u bli=%d skip_reads=%d -- the bmbt write chokepoint matched a read whose in-memory image names an NL-released directory: %s\n",
+			n,
+			(unsigned long long)be64_to_cpu(((struct xfs_btree_block *)
+				bp->b_addr)->bb_u.l.bb_owner),
+			(long long)bp->b_maps[0].bm_bn,
+			be16_to_cpu(((struct xfs_btree_block *)
+				bp->b_addr)->bb_numrecs),
+			bp->b_flags, READ_ONCE(bp->b_hold), bp->b_log_item ? 1 : 0,
+			mxfs_bmbt_skip_reads,
+			mxfs_bmbt_skip_reads ?
+				"skipped, the old image is served with no read" :
+				"read issued");
+	/* a readahead's buffer is normally freed once its skip completes, so
+	 * the read that follows gets fresh pages; a matched read that is not a
+	 * readahead is the one that serves the old image — name its path */
+	if (!(bp->b_flags & XBF_READ_AHEAD)) {
+		static atomic_t	p61s_n = ATOMIC_INIT(0);
+
+		if (atomic_inc_return(&p61s_n) <= 8)
+			dump_stack();
+	}
+	return mxfs_bmbt_skip_reads;
+}
+
 /* node-wide count of plain (bio) buffer READ submissions, the
  * companion of the FUA-passthrough counter in pal/linux/kern.c; sampled by
  * the create-cost probe around its directory lookup. */
@@ -9565,9 +9622,11 @@ xfs_buf_submit_bio(
 	 * change durable, so this write is a superseded redundant image; emulate
 	 * a clean completion (no bio) so xfsaild advances and the peer's leaf
 	 * stands.  EX/PR-held dirs, regular files, and single-node mounts all
-	 * fall through to the normal submit (predicate false).
+	 * fall through to the normal submit (predicate false).  A read bio is
+	 * never skipped (mxfs_bmbt_chokepoint_covers).
 	 */
-	if (mxfs_buf_xfsaild_skip_bmbt_write(bp)) {
+	if (mxfs_buf_xfsaild_skip_bmbt_write(bp) &&
+	    mxfs_bmbt_chokepoint_covers(bp)) {
 		/* tripwire — see mxfs_bmbt_skip_preserve_truth. */
 		mxfs_bmbt_skip_preserve_truth(bp, "chokepoint");
 		/* this write was counted into the completion

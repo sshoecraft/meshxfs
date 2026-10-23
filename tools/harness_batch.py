@@ -110,6 +110,8 @@ def lap_args(args, bid: str) -> list:
         cmd += ["--fail", args.failed]
     for ev in args.evidence:
         cmd += ["--evidence", ev]
+    for pattern in args.stall:
+        cmd += ["--stall", pattern]
     return cmd + ["--"]
 
 
@@ -330,6 +332,9 @@ def main() -> int:
         p.add_argument("--pass", dest="passed", default="", help="regex of the PASS line")
         p.add_argument("--fail", dest="failed", default="", help="regex of the FAIL line")
         p.add_argument("--evidence", action="append", default=[])
+        p.add_argument("--stall", action="append", default=[],
+                       help="a regex whose one capture group is an operation's milliseconds, "
+                            "passed to tools/batch_lap.py (repeat)")
         p.add_argument("--board", action="store_true",
                        help="each lap is the board row: MXFS_BATCH=<batch> ./run.sh <at> <row>")
         p.add_argument("--rebuild", default="",
