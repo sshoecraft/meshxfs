@@ -2379,8 +2379,14 @@
           "config": "2/net/mesh/drbd",
           "row": "rsync_paired",
           "iso": "2026-10-13T17:13:44Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "crash_consistency",
+          "iso": "2026-10-13T17:23:57Z"
         }
-      ]
+      ],
+      "updated": "2026-10-23"
     },
     {
       "id": "D-PRESTEPS-FORM-PAIR-UNDER-G2-MARKER-BUT-SELF-TESTS-READ-DEFAULT-MARKER",
@@ -4362,6 +4368,16 @@
           "config": "8/net/mesh/mpath",
           "row": "path_fenced_return",
           "iso": "2026-10-23T14:02:05Z"
+        },
+        {
+          "config": "4/net/mesh/mpath",
+          "row": "path_all_lost",
+          "iso": "2026-10-23T19:52:06Z"
+        },
+        {
+          "config": "4/net/mesh/mpath",
+          "row": "path_all_lost",
+          "iso": "2026-10-23T19:56:17Z"
         }
       ],
       "updated": "2026-10-23"
@@ -5722,6 +5738,16 @@
           "config": "2/disk/caw/mpath",
           "row": "lap:late_fill",
           "iso": "2026-10-23T20:44:50Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "path_mount_degraded",
+          "iso": "2026-10-23T17:31:54Z"
+        },
+        {
+          "config": "4/net/mesh/mpath",
+          "row": "path_mount_degraded",
+          "iso": "2026-10-23T17:32:15Z"
         }
       ],
       "updated": "2026-10-23",
