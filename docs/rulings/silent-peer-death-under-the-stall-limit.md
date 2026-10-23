@@ -134,6 +134,44 @@ budget (12 + 4 + 5 s is over 20).
 - Detection from the moment of failure, not from the last beat seen: a pre-failure beat that lands late
   resets the stale count and extends detection.
 
+## Keeping the window longer than the lease
+
+A simpler shape was put to gpt-6-astra the same day. It keeps today's invariant (no peer can declare
+before the victim's lease ended) and shrinks both numbers, for example L = 8 s and K = 7. At the
+deadline the victim suspends instead of shutting down: mutations, reads and lock acquires block at the
+gate. It resumes the same incarnation when a beat lands early enough to prove that no peer can have
+counted K unchanged reads. It closes and shuts down on a definitive fence signal, or when that proof
+can no longer come. Survivors keep their protocol and add no read-stop wait.
+
+The verdict was **unsound as stated**. It can be made sound only on these conditions.
+
+- **The count.** The bound needs K unchanged comparisons *after* the first observation (K intervals).
+  K observations of one stamp give only K-1 intervals. The earliest staleness declaration is
+  W/(1+e) real seconds after the old beat's issue, with W = K x 2 s and e the clock rate error.
+- **Revalidation.** A beat qualifies only if its CAS succeeded and its completion t_c satisfies
+  t_c - anchor_old < W(1-e)/(1+e). That is less any further reserve d as (t_c - anchor_old)/(1-e) + d
+  < W/(1+e). Completion is a conservative bound on when the write became visible: issue time cannot
+  show that a beat queued in multipath executed in time. The check and the state change are one
+  synchronized step. Anchor_old is not advanced by the completion being tested. The new deadline must
+  still lie in the future when the node is readmitted. No other completion bypasses the check.
+  CLOSED stays irreversible for the incarnation. Grants revoked through the lock manager in between are
+  not kept. A declaration latched before the certified anchor is never erased by a beat that lands
+  later.
+- **No survivor-side read-stop wait** only if W/(1+e) > L/(1-e) + d. Here d bounds the victim's
+  *completed* quiescence, not the closing of an entry gate. It must cover operations that passed the
+  gate, in-flight I/O and asynchronous work, faults racing with unmapping, completed TLB shootdowns and
+  CPU or timer stalls. If d cannot be bounded, survivors need an explicit stop proof. A Write Exclusive
+  reservation revokes no reads.
+- **Every declaration path obeys the bound.** A longer timeout is not enough. A TCP declaration 65 s
+  after a link failure can fall inside the lease of a node whose storage beats kept landing. A peer's
+  "did you lose the LUN" answer must certify completed closure, not a flag set.
+- **What it leaves open.** A beat that executed but whose result the node never saw resets the peers'
+  counts while the node cannot revalidate. The node must still close. Delayed queued beats then
+  postpone detection further, so shrinking W alone does not bound the stall. Pass duration,
+  outstanding beats, multipath delays, fencing, replay and membership removal each need an upper bound.
+- **The reservation.** A successful CAS proves registration only under the reservation type and nexus
+  coverage actually configured. It is never by itself a membership or no-pending-fence certificate.
+
 ## Open
 
 - The read-stop acknowledgment protocol over the TCP mesh, and what CAW, which has no network between
