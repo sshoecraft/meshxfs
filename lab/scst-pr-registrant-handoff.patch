@@ -1,0 +1,48 @@
+SCST: hand a PR registrant to the new session of an I_T nexus when that session is created.
+
+A persistent-reservation registration belongs to the I_T nexus, which iSCSI names by initiator
+name and ISID; SPC keeps it across the loss of the nexus and the session's reinstatement. When an
+initiator logs in again with the same ISID after iscsi-scst has already freed the old session in
+user space, the login is a new session, and scst_pr_init_tgt_dev() left the registrant on the old
+session's per-device state (it only assigns a registrant that no tgt_dev holds). The registrant
+moved only when the old tgt_dev was freed (scst_pr_clear_tgt_dev()), asynchronously, so for the
+6-14 ms between the new session's creation and that free every command of the registered nexus
+was refused RESERVATION CONFLICT (measured on the MXFS lab target, 2026-10-23: the five refused
+writes of a 4 s path cut all fell inside that window).
+
+Two sessions with one initiator name, ISID and relative target port cannot both be current (a
+login with the same ISID reinstates the earlier session), so the new tgt_dev takes the registrant
+under the PR write lock; the old tgt_dev's later clear then finds none to hand over.
+
+Not applied. Applying it means rebuilding SCST's modules and reloading them on the lab host,
+which takes every target's LUNs away from the lab VMs while it runs: the owner's decision.
+
+--- a/scst/src/scst_pres.c
++++ b/scst/src/scst_pres.c
+@@ -1191,12 +1191,25 @@ int scst_pr_init_tgt_dev(struct scst_tgt_dev *tgt_dev)
+ 	scst_pr_write_lock(dev);
+
+ 	reg = scst_pr_find_reg(dev, transport_id, rel_tgt_id);
+-	if (reg && !reg->tgt_dev) {
++	if (reg && reg->tgt_dev && reg->tgt_dev != tgt_dev) {
++		/*
++		 * The registrant is still linked to the per-device state of an
++		 * earlier session of the same I_T nexus, which is being freed.
++		 * The new session is the nexus now: take the registrant, so its
++		 * commands are not refused until the old state is gone.
++		 */
++		TRACE_PR("Moving reg %s/%d (%p) from tgt_dev %p to new tgt_dev %p (dev %s)",
++			 debug_transport_id_to_initiator_name(transport_id),
++			 rel_tgt_id, reg, reg->tgt_dev, tgt_dev, dev->virt_name);
++		reg->tgt_dev->registrant = NULL;
++		tgt_dev->registrant = reg;
++		reg->tgt_dev = tgt_dev;
++	} else if (reg && !reg->tgt_dev) {
+ 		TRACE_PR("Assigning reg %s/%d (%p) to tgt_dev %p (dev %s)",
+ 			 debug_transport_id_to_initiator_name(transport_id),
+ 			 rel_tgt_id, reg, tgt_dev, dev->virt_name);
+ 		tgt_dev->registrant = reg;
+ 		reg->tgt_dev = tgt_dev;
+ 	}
+
+ 	scst_pr_write_unlock(dev);

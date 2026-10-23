@@ -311,6 +311,44 @@ and then released; a fence during every phase of a retry or handoff; crashes bef
 after a retried log write with volatile write caches on; every completion class; authority
 expiring inside a retry window.
 
+### Failing fast at the initiator instead (claude-fable-5, 2026-10-23)
+
+The measured order on the lab target settled where the gap is: every refused write fell between
+iscsi-scst creating the new session and the old session's per-device state being freed, 6-14 ms
+after the login, and iscsi-scst fixes DefaultTime2Wait at 0, so the target cannot make the
+initiator wait. Put to a second consult (the first's account had no credits left), whether a
+session recovery timeout of 0 under dm-multipath avoids the gap: the session then fails its queued
+commands at the connection loss, dm-multipath retries them on the other path, and the logged-in
+session carries I/O again only once multipathd's checker reinstates the path.
+
+- **It avoids the resend, not the gap.** The commands queued during the outage no longer reach the
+  new session. But the checker does not detect the condition: under Write Exclusive Registrants
+  Only, TEST UNIT READY and reads are allowed from any initiator, so a check that runs inside the
+  gap passes and reinstates the path, and the next write is refused. multipathd can check within
+  milliseconds of the login (on the session's event). Holding a recovered path out for some
+  checker intervals makes the race very unlikely, never impossible: the gap is bounded only by an
+  asynchronous free on the target, which has no upper bound under load.
+- **Pitfalls.** A recovery timeout of 0 fails a path's outstanding I/O on one missed NOP-Out, so an
+  event common to both paths (a switch or target restart) needs a bounded all-paths-down queue
+  (`no_path_retry`) inside the 30 s budget; multipathd manages the session's recovery timeout
+  itself in recent multipath-tools, so the live value must be read from
+  `/sys/class/iscsi_session/*/recovery_tmo`, not assumed from the initiator's settings.
+- **An initiator-side gate that is sound** needs the path failed before it can be reinstated, a
+  REGISTER AND IGNORE EXISTING KEY of the node's own key down that path, then reinstatement. No
+  stock hook orders that ahead of multipathd's own handling of the event, and whether this
+  target's PERSISTENT RESERVE OUT handles the stale registrant correctly inside the gap is
+  untested; and a late REGISTER is the fencing hazard named above.
+- **The deterministic fix is the target's.** SPC binds a registration to the I_T nexus by
+  TransportID (initiator name and ISID), and it must survive the session's reinstatement. The
+  target's command-time check should be answered from the device's registrants by TransportID, or
+  the new per-device state should take the registrant from the stale one under the reservation
+  lock before the new session is unblocked; and iscsi-scst should treat a login with the same ISID
+  as a reinstatement even when user space has already freed the old session, so the old state's
+  teardown and the registrant's handoff finish before the new session's first command runs.
+
+So the fast path timescale ships only on a target without the gap: the lab's SCST needs its
+handoff fixed before the silent-death compound case can be qualified with 2 s path settings.
+
 ## Open
 
 - The read-stop acknowledgment protocol over the TCP mesh, and what CAW, which has no network between
