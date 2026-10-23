@@ -944,8 +944,14 @@
         "tests/evidence/controls/D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW.fix.diff",
         "tests/release_board_verdict_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-22"
+      "state": "rejected",
+      "created": "2026-10-22",
+      "review": {
+        "file": "data/reviews/P20261022-dcd1a8.md",
+        "sha256": "093b893fcf91b0ed6151bf24f46efbfb35d8450400ac393e59306331e2964df6",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261022-d6567c",
@@ -2122,6 +2128,118 @@
         "verdict": "rejected",
         "date": "2026-10-23"
       }
+    },
+    {
+      "id": "P20261023-efb250",
+      "kind": "verify",
+      "record": "D-TCP-STALE-RESEND-CANDIDATES-SHARE-ONE-ROUTING-SHARD-SO-ONE-MASTER-DRAW",
+      "change": {
+        "batch": "b20261023-be3e39"
+      },
+      "argument": "Verification batch b20261023-be3e39 (lap:sr_shard at 2/net/mesh/direct) was declared on the current attempt of candidate 0.90.134 (frozen 2026-10-23T03:55:19Z, build 16A5F5DDDB4852C9D5DB236) after that freeze and before its first lap, sized from control b20261023-720c28 (10 of 10 failed, L=0.5887, N=6). All 6 laps passed with exposure: each found 16 candidates in 16 distinct routing shards (step28.log). The control ran the same lap on the same frozen tree with the fix's own switch off (SR_SHARD_SELECT=0: the harness writes its eight candidates back to back as before the fix) and every lap failed with the cause printed in its own verdict line: '8 candidates in 1 distinct routing shards: the search is 1 draw(s), not 8' (step27.log). tools/release_candidate.py check passes for the attempt, so no frozen file changed while either batch ran.",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step27.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step28.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log",
+        "tests/stale_resend_shard_lap.sh",
+        "tests/tcp_stale_resend.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-49a2f7",
+      "kind": "remove-fixed",
+      "record": "D-TCP-STALE-RESEND-CANDIDATES-SHARE-ONE-ROUTING-SHARD-SO-ONE-MASTER-DRAW",
+      "change": {
+        "control": "b20261023-720c28",
+        "fixon": "b20261023-be3e39",
+        "cause": "tests/tcp_stale_resend.sh wrote its 8 candidate files back to back, so their inode numbers were consecutive; under ledger routing version 2 an inode routes with the low three bits of its number cleared (include/mxfs/mxfs_tauth.h MXFS_TAUTH_INO_SHARD), so all 8 shared one master and the search for a candidate remotely mastered from W was one draw, which on a 2-node group ABORTs whenever that draw is W (the gate's only BROKEN entry, tests/evidence/presteps_harnessfix_20261022.log). The fix creates files until 16 distinct routing shards are represented and keeps the first in each as a candidate; SR_SHARD_SELECT=0 restores the old eight consecutive files."
+      },
+      "argument": "Reproducer: tests/stale_resend_shard_lap.sh (one harness setup, the verdict computed from the candidates' inode numbers and shards). Control b20261023-720c28, closed, on the candidate's own frozen tree with the fix's switch off (SR_SHARD_SELECT=0, nothing in the tree changed): 10 of 10 laps failed, each printing its candidates' single shard. Fix-on batch b20261023-be3e39 on the frozen candidate, sized from that control (N=6): 6 of 6 PASS with exposure, 16 candidates in 16 shards each. The record also names tests/pending_late_grant.sh, whose eight consecutive files share the shape; its verdict is a late-kept total over both nodes, which both append to every file, so it does not depend on the shard draw (record evidence), and only its comment's false premise was changed (comment-only).",
+      "evidence": [
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step27.log",
+        "tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/step28.log",
+        "tests/evidence/presteps_harnessfix_20261022.log",
+        "tests/tcp_stale_resend.sh",
+        "tests/stale_resend_shard_lap.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-867053",
+      "kind": "verify",
+      "record": "D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER",
+      "change": {
+        "batch": "b20261023-a62d3d"
+      },
+      "argument": "Verification batch b20261023-a62d3d (lap:adopted_grant_handoff at 8/net/mesh/mpath, host-only in-process four-node mesh) was declared on the current attempt of candidate 0.90.134 (frozen 2026-10-23T03:55:19Z, build 16A5F5DDDB4852C9D5DB236) before its first lap, sized from control b20261023-0b21e2 (10 of 10 failed, L=0.5887, N=6). All 6 laps passed with exposure ('EXPOSURE adopted=1 handed=1 local=1': the grant adopted between two attempts, its page handed to the waiter, the already-granted shortcut answer). The control ran the same lap on the same frozen tree with the fix's own knob off (DL_SHORTCUT_CLAIM=0, read by tests/tauth/adopted_grant_handoff_test.c:137-138; nothing in the tree changed) and every lap failed its four checks with exposure. tools/release_candidate.py check passed after both batches (every frozen file as frozen).",
+      "evidence": [
+        "tests/evidence/controls/K2K3_stepA_control_20261023.out",
+        "tests/evidence/controls/K2K3_stepA_verify_20261023.out",
+        "tests/evidence/adopted_grant_handoff",
+        "tests/tauth/adopted_grant_handoff_test.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-778a6d",
+      "kind": "remove-fixed",
+      "record": "D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER",
+      "change": {
+        "control": "b20261023-0b21e2",
+        "fixon": "b20261023-a62d3d",
+        "cause": "dlm_local_answered (site=shortcut, dlm/dlm.c) ended a wait the local master answered from the entry its adopted grant had installed without claiming that grant, so dlm_acq_end released the adopted grant as unclaimed and dlm_acq_release_grant unlinked the GRANTED bucket entry; after a page hand-off had made this node the master, that entry was the master's own record of this node's EX, so the master granted a conflicting EX to another node, the ledger refused it (P-TAUTH-DOUBLE-GRANT, 110 times on test21) and a later fresh CAW grant on that AG tripped P130-FALSE-FRESH and shut the filesystem down. Fix: dlm_acq_answered_by, called from the already-granted shortcut, takes the adopted grant when the wait is answered from the entry it installed (same grant generation), so ending the record hands nothing back; module option dl_shortcut_claim (1 default, 0 = the same-build control)."
+      },
+      "argument": "Reproducer: tests/tauth/adopted_grant_handoff_test.sh, host-only, four nodes in one process, reproducing the rig's sequence (record evidence: run_20261023T005430Z.log before the fix, run_20261023T005954Z.log after). Control b20261023-0b21e2, closed, on the candidate's frozen tree with the knob off: 10 of 10 laps FAIL with exposure. Fix-on batch b20261023-a62d3d on the frozen candidate sized from it: 6 of 6 PASS with exposure. The rig sighting (8/net/mesh/mpath path_peer_withdrawn 2026-10-22T19:58:42Z, build 9594B08726D6732D2ED5E87) is the record's cell; the in-process lap reaches the same three steps the kernel log showed (P958-ACQ-GRANT-ADOPTED, P-TAUTH-PAGE-MINE via=frozen-msg, P958-ACQ-GRANT-RELEASED why=unclaimed mirror_unlinked=1 then P958-ACQ-LOCAL-ANSWER-END site=shortcut).",
+      "evidence": [
+        "tests/evidence/controls/K2K3_stepA_control_20261023.out",
+        "tests/evidence/controls/K2K3_stepA_verify_20261023.out",
+        "tests/evidence/adopted_grant_handoff",
+        "tests/evidence/ag6_false_grant_logs_20261022T1956Z.txt",
+        "tests/tauth/adopted_grant_handoff_test.c"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-6664ba",
+      "kind": "verify",
+      "record": "D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES-FOREVER-ON-RESERVATION-CONFLICT",
+      "change": {
+        "batch": "b20261023-c63530"
+      },
+      "argument": "Verification batch b20261023-c63530 (lap:fenced_node_ledger at 8/net/mesh/mpath, host-only in-process four-node mesh) was declared on the current attempt of candidate 0.90.134 (frozen 2026-10-23T03:55:19Z, build 16A5F5DDDB4852C9D5DB236) before its first lap, sized from control b20261023-50e06d (10 of 10 failed, N=6). All 6 laps passed with exposure ('  PASS 3 exposure: ...', the request, FREEZE_REQ and FROZEN all reaching the node whose authority closed). The control ran the same harness built from a scratch copy of the candidate's frozen source with only the fix diff reversed: tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.scratch_copy_16A5F5.txt hashes every copied file against the frozen manifest (1683 equal; only dlm/dlm.c and dlm/dlm.h differ; the 18 files absent from the manifest are __pycache__ entries and tests/suite/tools), and the diff's sha256 87b95c6e8dea4dcb261e667db107bd90f7023aa34b17d4518c8816f7c0a73521; the tree was never modified (candidate check passed after both batches).",
+      "evidence": [
+        "tests/evidence/controls/K2K3_stepB_control_20261023.out",
+        "tests/evidence/controls/K2K3_stepB_verify_20261023.out",
+        "tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.scratch_copy_16A5F5.txt",
+        "tests/evidence/fenced_node_ledger"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-6c4c99",
+      "kind": "remove-fixed",
+      "record": "D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES-FOREVER-ON-RESERVATION-CONFLICT",
+      "change": {
+        "control": "b20261023-50e06d",
+        "fixon": "b20261023-c63530",
+        "cause": "dlm_page_ensure_mine and the FREEZE_REQ and FROZEN arms of mxfs_dlm_process_page_handoff (dlm/dlm.c) did not ask dlm_authority_lost, so a node whose authority over the LUN had closed (filesystem shut down, PR key gone) still activated, prepared and decided on the authority-ledger pages its peers handed it, asked it for and sent it requests on, each a ledger write the target refused with RESERVATION CONFLICT; on test21 that was 31,510 P-TAUTH-PUBLISH-FAIL rc=-52 in six minutes until the VM was destroyed. Fix: those paths refuse once dlm_authority_lost reports the node's authority closed."
+      },
+      "argument": "Reproducer: tests/tauth/fenced_node_ledger_test.sh, host-only, four nodes in one process: one node's authority closes while every view still names it, and the test counts that node's ledger page writes as a request it is asked to master, a FREEZE_REQ and a FROZEN reach it. Control b20261023-50e06d, closed: the harness built from a scratch copy of the candidate's frozen source with only the fix diff reversed (provenance file hashes every copied file against the frozen manifest), 10 of 10 laps FAIL with exposure. Fix-on batch b20261023-c63530 on the frozen candidate sized from it: 6 of 6 PASS with exposure. The rig sighting is the record's cell (8/net/mesh/mpath path_peer_withdrawn 2026-10-22T19:58:42Z, tests/evidence/flood_test21_20261022T200054Z).",
+      "evidence": [
+        "tests/evidence/controls/K2K3_stepB_control_20261023.out",
+        "tests/evidence/controls/K2K3_stepB_verify_20261023.out",
+        "tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.scratch_copy_16A5F5.txt",
+        "tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff",
+        "tests/evidence/fenced_node_ledger"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
     }
   ]
 }

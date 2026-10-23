@@ -4083,3 +4083,54 @@ unreachable master: attempts that do not spend the budget".
   `P-PEER-RECV-UNLOCKED`). Harness: `tests/peer_recv_orphan.sh`.
 - `mxfs_pal_log()` adds the `mxfs: ` prefix itself; a message passed to it
   carries none.
+
+## A survivor's path through a silent peer death (code map, build 16A5F5DDDB4852C9D5DB236)
+
+What a survivor runs between a peer going silent and its own blocked operation
+resuming. Design and what must change: `docs/rulings/silent-peer-death-under-the-stall-limit.md`.
+
+- **Detection.** `dlm/disklock.c` `disklock_hb_fn`: beat (CAS) then monitor pass,
+  then a full `MXFS_DISKLOCK_HB_INTERVAL_MS` (2000) sleep that never catches up.
+  `equal_samples` counts unchanged stamps (reset by any change, so a late-landing
+  pre-failure beat restarts it); `fire_dead` at `equal_samples >= dead_threshold`
+  (`MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD` 17, 31 on DRBD/shared; module option
+  `dead_timeout_ms`, not clamped against the lease) or an early arm:
+  `hb_member_gone` / `hb_peer_closed` (both need corosync, `mxfs_quorumd`),
+  P163-WITHDRAW-SEEN / FENCED-SEEN / EXCLUDED-SEEN, an epoch change. A FUA
+  re-read cancels on a moved stamp (P-HBFALSE).
+- **Own lease.** Renewed from the beat's ISSUE time `hb_t0`
+  (`mxfs_authority_renew`, deadline = anchor + `MXFS_DISKLOCK_AUTH_LEASE_MS`
+  30000, never moved back). Checked lazily on every mutating submission
+  (`mxfs_mount_write_admitted` in `pal/linux/xfs_super.c`), the beat pre-issue,
+  the PR worker tick and lock waits. Closure = P290-AUTH-CLOSED, then
+  `v5_authority_withdraw_pump` -> `mxfs_dlm_fence_notify` ->
+  `xfs_force_shutdown(SHUTDOWN_CLUSTER_FENCED)`: a shutdown, not a suspension.
+- **Fence.** `v5_disklock_expire_cb` -> `v5_handle_node_death` -> PR worker
+  (250 ms tick) -> `v5_pr_fence_prove_locked`: durable intent, READ KEYS, READ
+  RESERVATION, durable arm, PREEMPT AND ABORT (PROUT timeout 60 s), READ KEYS
+  again, certificate (`MXFS_CERT_PUBLISH_TRIES` 5, 200 ms doubling backoff,
+  3000 ms of sleeps only on failure; comments saying ~6 s are wrong), then the
+  seal (`v5_rman_snapshot`; TCP only: `mxfs_dlm_seal_owner` polls 10 ms and
+  exits at once, 3000 ms is a cap; barrier cap 4000 ms).
+- **Replay.** Elected lowest live slot (`v5_dispatch_slice_recovery`) ->
+  `foreign_replay_work_fn` (`xfs/xfs_mxfs_recovery.c`): recovery lease, barrier
+  "pre", `mxfs_slice_stabilize` = `fr_stab_passes` (2) x `fr_stab_interval_ms`
+  (2000) FIXED sleeps on SCSI (zero on DRBD) before replaying, replay, barrier
+  "post", durability flush, `mxfs_v5_dlm_recovery_complete2` ->
+  P163-RECOVERY-COMPLETE (prints its own phase ms) -> grants retired
+  (`v5_dead_grants_retire`: CAW `mxfs_dlm_caw_purge_node`; TCP ledger purge and
+  `mxfs_dlm_purge_node`) -> dead slot zeroed; other survivors purge on
+  P163-RECOVERED.
+- **TCP lock manager.** Socket user timeout 25 s (`pal/linux/kern.c`, fixed),
+  then `tcp_death_grace_ms` 40000 before "did not reconnect"; a disklock-declared
+  death does not wait for that grace and does not cancel it. The non-NL freeze
+  `memb_settle_ms` 20000 restarts at every TCP disconnect, connect, reconnect
+  and view change (recovery completion included) and ends early once every
+  member beacons the same view (`dlm_membership_settling`, `dlm.c`).
+- **Instruments.** No healthy beat is logged: no landing-gap distribution, no
+  per-sample stale count, no issue-to-observation latency. P-HB-SLOW (cycle over
+  2 s or age over 4 s) and P-HB-MONSLOW exist but are pr_debug, like
+  P309-*, P236-FENCE-INTENT/SEALED, P304-FENCE-ARM, P-TAUTH-SEAL*,
+  P-RMAN-SNAPSHOT, P-COMPLETE-TIMING and MXFS-MEMBERSHIP: all need `dyndbg=+p`
+  on the module. The warn/err milestones (P-PR-FENCE, P236-FENCE-CERTIFIED,
+  P163-RECOVERY-COMPLETE) print by default.

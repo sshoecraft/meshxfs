@@ -3372,7 +3372,7 @@
       "opened": "2026-10-21",
       "summary": "tools/release_run.py board_verdict read an own-rig board (2/net/mesh/drbd) as clean: that configuration parses only with MXFS_OWN_RIG=1, which criteria.py sets only when its own argv names one, so in the orchestrator no row applied and the verdict was an empty list; the orchestrator second check on the DRBD step graded nothing",
       "evidence": "candidate 0.90.134: board_verdict(0.90.134, 2/net/mesh/drbd, tests/evidence/drbd_rig/criteria.json) returned [] with MXFS_OWN_RIG unset and [fio_perf_vs_xfs=SKIP, alloc_witness=FAIL, chk_clean=FAIL] with it set; configuration.parse refused 2/net/mesh/drbd without it (attach drbd is verified on a rig of its own). The step still failed on the verify own verdict line, so no false PASS was recorded. Fixed in the tree: board_verdict sets the flag for an own-rig attachment and refuses a verdict that graded no row. Also found naming this run: defects.py check_cells looked for release:<step> runs in the board of the configuration they are filed under, so a release:drbd run could never be named; it now reads them from the primary ledger, where release_run.py writes them. ===== Two controls with the same fix diff: b20261022-ec8648 (0 of 20 failed) ran the lap while it still passed 2/net/mesh/drbd as an argument, and tools/criteria.py sets MXFS_OWN_RIG at import whenever a process's arguments name an own-rig configuration (criteria.py:111), so the orchestrator's verdict was graded as an own-rig run's whatever the code under test did; the lap was changed to take its inputs from the environment and to drop MXFS_OWN_RIG from the orchestrator's call (tests/release_board_verdict_lap.py:34-54), and control b20261022-4233e9 then failed 20 of 20 with the fix out. The verification is sized from b20261022-4233e9.",
-      "next": "verify on the next dry run: the drbd step detail must name the board rows that are not green",
+      "next": "verify on the next dry run: the drbd step detail must name the board rows that are not green ===== Removal P20261022-dcd1a8 was rejected (data/reviews/P20261022-dcd1a8.md): control b20261022-4233e9 ran on a development tree (build 9594B08726D6732D2ED5E87) on which tools/criteria.py, tools/release_run.py, tools/batch_lap.py and tools/defects.py were rewritten before the freeze, and it logged no hashes. Needed: (1) a new control in a scratch copy of the candidate's frozen file list with only the fix diff reversed in tools/release_run.py, every other file the lap runs through hashing to tests/evidence/candidates/0.90.134_20261023T035519Z.files.json and the hashes logged before, during and after the laps (reverting in the tree makes the attempt INVALID); (2) a verification batch sized from that control on the frozen candidate; (3) drop the cell 2/net/mesh/drbd:release:drbd:2026-10-21T22:56:58Z (that step failed on alloc_witness and chk_clean, not on this defect) or prove this defect caused it; (4) give the defects.py check_cells fix named in the evidence its own disposition (its own record, reproducer, control and verification) before this record leaves the queue.",
       "cells": [
         {
           "config": "2/net/mesh/drbd",
@@ -3582,7 +3582,7 @@
           "lower_bound": 0.7672704990109255
         }
       ],
-      "updated": "2026-10-22",
+      "updated": "2026-10-23",
       "rates": [
         {
           "row": "lap:release_board_verdict",
@@ -3928,7 +3928,7 @@
       "evidence": "2026-10-22 0.90.134 build 0988C50EC610F82EE08D135, test1 (W) / test2 (V), 2/net/mesh/direct pool LUN eui.6664363939643231, fix build (obl_complete_enable=1): tests/d_intents_2tcp_open_efi.sh healthy lap through tests/capture_fault_gate.sh 0.90.134-harnessfix --healthy-only (evidence tests/evidence/20261022T040719Z_intents2tcp_0.90.134-harnessfix-d_intents_2tcp_open_efi-ok): V built 8 files of 4096 extents, W listed and read them (published), V entered the EFD hold with a durable EFI (P-EFD-HOLD start=3416125), virsh destroy test2, W elected to replay slot 1, census P226-ICENSUS victim_slot=1 intents=217 dones=216 ambiguous_dones=215 open=194 extents=389; then P-FR-CANCEL-PASS1 txns=38 refused=37 cancel_kept=1, P227-FR-REFUSED-WHY why: not-held=2 / not-held=8 (images class=3 res=18874496/18874498 gepoch 8/9), P241-RECOV-TERMINAL slot=1 reason=1 domain=1 refused=45, P241-RECOV-TERMINAL-IMPORT, P240-QUAR-IMPORT; FAIL replay SUCCEEDED with an OPEN obligation case got=no. P-TAUTH-SEAL for the victim at 1799.94, the replay at 1804.53. Probe counts in dmesg_test1.txt: P226-ICENSUS-DONE-AMBIGUOUS 109, -INTENT 91, -OPEN 16. This harness had measured nothing since its IMG precondition broke (D-INTENTS-2TCP-OPEN-EFI-READS-UNASSIGNED-IMG-AND-DIES-BEFORE-MEASURING), so when this began is not known. ===== ===== 2026-10-22 CAUSE PROVEN (instrumented): the refused tenures are inactivation tenures released unmarked. Reproduced on the 0.90.134 tree build 2446C4C6401FC9D9224650F through tests/capture_fault_gate.sh openefi_repro_20261022T180946Z --healthy-only --only d_intents_2tcp_open_efi (g2, test1 W / test2 V): FAIL replay SUCCEEDED with an OPEN obligation case got=no. The harness now keeps the victim's whole pre-kill log (it used to keep 7 probes and no release line): tests/evidence/20261022T181031Z_intents2tcp_openefi_repro_20261022T180946Z-d_intents_2tcp_open_efi-ok/dmesg_test2_prekill.txt holds P-RELMARK-OWED site=inact-exrel for exactly ino 2097280 gepoch 7, 2097284 gepoch 8, 2097285 gepoch 9 and 2097281 gepoch 10 (freed=0), and dmesg_test1.txt refuses exactly those four tenures not-held (94/90/81/86 images) with relmarks=0 REDUNDANT_CLEAN=0 notheld=351. Sequence for 2097280: P-INACT-EX epoch 7, truncate 0.81 s, P-UNLPRE-SKIP rc=-11 (deferred free), P-IFREE-DEFER-DIRTY drain=1 drained=1, P-RELMARK-OWED, P128-INACT-EXREL freed=0. The INACT-EXREL release in xfs/xfs_inode.c (the instrument-only block before the unlock) publishes no clean-release marker, and the held EFI keeps the tenure's transactions in the replay window, so the survivor can prove neither held-at-death (the manifest no longer lists it) nor clean release. ===== ===== 2026-10-22 FIX in the tree: xfs/xfs_inode.c, at the INACT-EXREL release, a tenure that stamped a token (the P-RELMARK-OWED condition), not ICLUS-routed, with the core home (!mxfs_inact_owes_home), not shut down or unmounting, gets blkdev_issue_flush then mxfs_inode_relmark_before_unlock(who inact/inact-free) before the unlock, probe P-RELMARK-INACT; module option inact_relmark (xfs/xfs_mxfs_dlm.c, 1 default, 0 the same-build control). Build 9594B08726D6732D2ED5E87. Fix-on lap: MXFS_GROUP=g2 tests/capture_fault_gate.sh openefi_fixon_20261022T183915Z --healthy-only --only d_intents_2tcp_open_efi: GATE rc=0 fails=0 -> OK, RESULT: PASS vacuous=0 (tests/evidence/20261022T183915Z_capture_gate_openefi_fixon_20261022T183915Z); victim dmesg_test2_prekill.txt P-RELMARK-OWED 5, P-RELMARK-INACT 5 all rc=0 us=452-619; survivor dmesg_test1.txt relmarks=5 REDUNDANT_CLEAN=339 notheld=0, P-FR-CANCEL-PASS1 txns=36 refused=0.",
       "next": "control batch of the gate lap with MXFS_EXTRA_MODARGS=inact_relmark=0 (the same build, released unmarked as before): it must refuse the replay; then the verification batch on the candidate, sized from it",
       "reproducer": "tests/d_intents_2tcp_open_efi.sh <label> test1 test2 with CHURN=0 MODE=complete on a TCP pair on the fix build; reached on its first healthy lap after the IMG fix",
-      "updated": "2026-10-22",
+      "updated": "2026-10-23",
       "batches": [
         {
           "id": "b20261022-8375dc",
@@ -4012,6 +4012,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-e3ba0b",
+          "kind": "control",
+          "row": "gate:d_intents_2tcp_open_efi",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "P-RELMARK-OWED site=inact-exrel",
+          "candidate": "",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "inact_relmark=0 on the candidate's module 16A5F5DDDB4852C9D5DB236 (sysfs on the formed pair, MXFS_EXTRA_MODARGS on every re-formed one): the same build releasing an inactivation's tenure unmarked, as before the fix",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the clean-release marker at the inactivation's release switched off on the candidate's own module: the survivor must refuse the replay not-held again"
         }
       ],
       "rates": [
@@ -4725,9 +4742,10 @@
       "opened": "2026-10-22",
       "summary": "On a DRBD pair with the default fence (agent=self with the fixed tie-break: no QDevice and no node fence configured), only participant 0 (the lower DRBD address) may carry on after a lost link. When participant 0 dies, participant 1 cannot tell that from a cut link, so it freezes, restarts and stays out until participant 0 returns: the pair survives the death of participant 1 but not of participant 0. Required (owner, 2026-10-22): in a 2-node cluster either node survives the other's death.",
       "evidence": "Outside report, Proxmox forum thread 187097 post 873810 (2026-10-22), two VMs on virt-manager with vbmc as IPMI: 'If the node 02 dies, the node 01 remains, but not the other way around.' The owner's answer the same day: 'if you have a 2 node and 02 dies 01 should remain AND if 01 dies 02 should remain - if it doesn't thats a problem.' The behaviour is the documented default: docs/drbd-setup.md section 7 ('pve1 dies. pve2 cannot tell a dead pve1 from a cut cable, so it does not take over. It freezes, logs exactly this, restarts, and waits.') and docs/rulings/drbd-two-node-self-exclusion.md 'What it does not cover: Participant 0 dying'. tools/mxfs_drbd_fence_peer.sh:37-47: no config means agent=self; authority=quorum (a corosync QDevice) lets either participant win (removed D-DRBD-PAIR-NO-EXTERNAL-QUORUM-SO-P1-CANNOT-TAKE-OVER-WHEN-P0-DIES, 0.90.128, verified only with a QDevice); agent=exec/ssh needs a program that speaks the handler's fence verbs, and no IPMI adapter ships, so a site with IPMI (iLO, iDRAC, vbmc) gets the default. The release's DRBD failure tests (tests/drbd_release_verify.sh death-test) destroy only node 2, participant 1.",
-      "next": "The owner's planned work after 0.90.134: a node fence over IPMI (and Pacemaker), so a pair with a BMC fences whichever node died. On the rig, virtualbmc in front of the libvirt VMs gives each test node an IPMI BMC, so fence_ipmilan can be exercised without iLO or iDRAC hardware. Then a death test that destroys participant 0, on a pair with that fence and on one with authority=quorum, beside the existing destroy of participant 1.",
+      "next": "The owner's planned work after 0.90.134: a node fence over IPMI (and Pacemaker), so a pair with a BMC fences whichever node died. On the rig, virtualbmc in front of the libvirt VMs gives each test node an IPMI BMC, so fence_ipmilan can be exercised without iLO or iDRAC hardware. Then a death test that destroys participant 0, on a pair with that fence and on one with authority=quorum, beside the existing destroy of participant 1. ===== No exception stands (P20261022-3473e9 rejected), and tools/release_run.py step_drbd runs tests/drbd_release_verify.sh and grades the DRBD board on every release whatever the table claims, so the DRBD work cannot wait for 0.90.135. No design lets participant 1 tell participant 0's death from a cut link without a third vote or a node fence (docs/rulings/drbd-two-node-self-exclusion.md, 'What established systems do'), so the defect can only be closed by never running that configuration: the DRBD attachment refuses to mount a dual-primary pair whose /etc/mxfs/drbd-fence.conf has neither authority=quorum nor a node-fence agent (agent=exec or agent=ssh), naming both remedies, so every pair that runs survives the death of either node. Verify on the DRBD rig: control with the refusal's switch off on a default pair (destroy participant 0, participant 1 restarts and stays out), fix on (the default pair refuses to mount; a pair with authority=quorum against the corosync-qnetd on serv survives the destroy of participant 0 and of participant 1).",
       "impact": "stability",
-      "impact_why": "The survivor restarts itself and the pair serves nothing until participant 0 returns: a node shuts down because its peer died (docs/drbd-setup.md section 7)."
+      "impact_why": "The survivor restarts itself and the pair serves nothing until participant 0 returns: a node shuts down because its peer died (docs/drbd-setup.md section 7).",
+      "updated": "2026-10-23"
     },
     {
       "id": "D-2NETMESH-4K-PRE-ROW-SYNC-OVER-12S-NO-DSTATE-DIAG-SB-SUMMARY-LOCK-WAIT",
@@ -5147,6 +5165,56 @@
           "config": "8/net/mesh/mpath",
           "row": "lap:fenced_node_ledger",
           "iso": "2026-10-22T20:43:21Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-23T05:37:22Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-23T05:37:14Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-23T05:37:06Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-23T05:36:58Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-23T05:36:50Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-23T05:36:41Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-23T05:36:33Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-23T05:36:24Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-23T05:36:14Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:fenced_node_ledger",
+          "iso": "2026-10-23T05:36:05Z"
         }
       ],
       "batches": [
@@ -5232,9 +5300,59 @@
           },
           "transfer": "",
           "lower_bound": 0.7672704990109255
+        },
+        {
+          "id": "b20261023-50e06d",
+          "kind": "control",
+          "row": "lap:fenced_node_ledger",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^  PASS 3 exposure: ",
+          "candidate": "",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "fix reverted in a scratch copy of the candidate's frozen source (16A5F5DDDB4852C9D5DB236): tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff sha256=87b95c6e8dea4dcb261e667db107bd90f7023aa34b17d4518c8816f7c0a73521, provenance tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.scratch_copy_16A5F5.txt",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out of a scratch copy of the candidate's own source: a node whose authority over the LUN closed still activates, prepares and decides on the pages its peers hand it"
+        },
+        {
+          "id": "b20261023-c63530",
+          "kind": "verify",
+          "row": "lap:fenced_node_ledger",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^  PASS 3 exposure: ",
+          "candidate": "0.90.134",
+          "build": "16A5F5DDDB4852C9D5DB236",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:fenced_node_ledger",
+            "config": "8/net/mesh/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-50e06d",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted in a scratch copy of the candidate's frozen source (16A5F5DDDB4852C9D5DB236): tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff sha256=87b95c6e8dea4dcb261e667db107bd90f7023aa34b17d4518c8816f7c0a73521, provenance tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.scratch_copy_16A5F5.txt",
+            "builds": [
+              "16A5F5DDDB4852C9D5DB236"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
-      "updated": "2026-10-22",
+      "updated": "2026-10-23",
       "rates": [
         {
           "row": "lap:fenced_node_ledger",
@@ -5250,6 +5368,21 @@
             "9594B08726D6732D2ED5E87"
           ],
           "date": "2026-10-22"
+        },
+        {
+          "row": "lap:fenced_node_ledger",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-50e06d",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "fix reverted in a scratch copy of the candidate's frozen source (16A5F5DDDB4852C9D5DB236): tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff sha256=87b95c6e8dea4dcb261e667db107bd90f7023aa34b17d4518c8816f7c0a73521, provenance tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.scratch_copy_16A5F5.txt",
+          "builds": [
+            "16A5F5DDDB4852C9D5DB236"
+          ],
+          "date": "2026-10-23"
         }
       ],
       "reproducer": "tests/tauth/fenced_node_ledger_test.sh (host only, an in-process four-node mesh, about 14 s): one node's authority over the LUN closes while every view still names it; the test counts that node's ledger page writes as a request it is asked to master, a FREEZE_REQ and a FROZEN reach it ('  PASS 3 exposure: ...' when all three reached it). With the fix none; with it taken out 2, 4 and 6 more writes and the request granted: RESULT FAIL"
