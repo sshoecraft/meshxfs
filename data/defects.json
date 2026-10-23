@@ -6564,8 +6564,8 @@
       "nodes": 1,
       "config": "*/*/*",
       "opened": "2026-10-23",
-      "summary": "tools/release_run.py board_verdict returned only the rows it graded not green, so when no row of the board applied it returned an empty list, the same answer as a green board: with MXFS_BOARD_VERDICT_OWN_RIG=0 and MXFS_BOARD_VERDICT_EMPTY=0, board_verdict(0.90.134, 2/net/mesh/drbd), called as the orchestrator calls it, returned [] with no row applying (control b20261023-2bafbd, 10 of 10)",
-      "evidence": "The measurement in D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD's evidence: [] with MXFS_OWN_RIG unset, [fio_perf_vs_xfs=SKIP, alloc_witness=FAIL, chk_clean=FAIL] with it set. That record's missing flag is what left no row applying; that an ungraded board read as clean is this record. Split out of it at its reviewer's request (data/reviews/P20261023-f07942.md): the refusal of a verdict that graded no row shared that record's switch, so no control isolated it and no fix-on lap ever reached it. FIX in the tree, not yet controlled or verified: board_verdict appends 'no row of the specification applies at <config>: nothing was graded' when it graded no row (tools/release_run.py board_verdict, the 'not graded' test), under a switch of its own, MXFS_BOARD_VERDICT_EMPTY (0 reads an empty verdict as clean, as before). Precheck on the host with tests/release_board_verdict_lap.py --empty (the flag fix out, MXFS_BOARD_VERDICT_OWN_RIG=0, so no row applies): fix in 'BOARD_VERDICT_LAP PASS the verdict that graded no row is refused'; MXFS_BOARD_VERDICT_EMPTY=0 'BOARD_VERDICT_LAP FAIL the verdict that graded no row reads []: clean'.",
+      "summary": "tools/release_run.py board_verdict returned [] when it graded no row of the board: with MXFS_BOARD_VERDICT_OWN_RIG=0 (no row of the DRBD board applies) and MXFS_BOARD_VERDICT_EMPTY=0, board_verdict(0.90.134, 2/net/mesh/drbd, tests/evidence/drbd_rig/criteria.json), called in a fresh interpreter with MXFS_OWN_RIG unset and no configuration on its command line, returned [] with 0 rows applying (control b20261023-2bafbd, 10 of 10)",
+      "evidence": "The measurement in D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD's evidence: [] with MXFS_OWN_RIG unset, [fio_perf_vs_xfs=SKIP, alloc_witness=FAIL, chk_clean=FAIL] with it set. That record's missing flag is what left no row applying; that an ungraded board read as clean is this record. Split out of it at its reviewer's request (data/reviews/P20261023-f07942.md): the refusal of a verdict that graded no row shared that record's switch, so no control isolated it and no fix-on lap ever reached it. FIX in the tree, not yet controlled or verified: board_verdict appends 'no row of the specification applies at <config>: nothing was graded' when it graded no row (tools/release_run.py board_verdict, the 'not graded' test), under a switch of its own, MXFS_BOARD_VERDICT_EMPTY (0 reads an empty verdict as clean, as before). Precheck on the host with tests/release_board_verdict_lap.py --empty (the flag fix out, MXFS_BOARD_VERDICT_OWN_RIG=0, so no row applies): fix in 'BOARD_VERDICT_LAP PASS the verdict that graded no row is refused'; MXFS_BOARD_VERDICT_EMPTY=0 'BOARD_VERDICT_LAP FAIL the verdict that graded no row reads []: clean'. ===== 2026-10-23: controlled and verified on candidate 0.90.134 (attempt frozen 2026-10-23T18:32:24Z): control b20261023-2bafbd 10 of 10 with MXFS_BOARD_VERDICT_EMPTY=0, verification b20261023-3fc798 6 of 6, verify P20261023-2c9e6b applied (lane tests/evidence/lanes/local_a12_tooling_20261023T183240Z, steps 11 and 12). The first removal P20261023-c23548 was rejected for the summary alone (data/reviews/P20261023-c23548.md); the summary now states only what the control measured.",
       "next": "On the next attempt: control batch of tests/release_board_verdict_lap.py --empty with MXFS_BOARD_VERDICT_EMPTY=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 30 s, probe '^EXPOSED: ', pass '^BOARD_VERDICT_LAP PASS'), the verification batch sized from it, then remove --fixed.",
       "reproducer": "tests/release_board_verdict_lap.py --empty: board_verdict called as the orchestrator calls it, in a child process with MXFS_OWN_RIG dropped and its inputs from the environment, with MXFS_BOARD_VERDICT_OWN_RIG=0 so no row of the DRBD board applies (the state the dry run found); EXPOSED when no row applies, PASS when the verdict names that nothing was graded, FAIL when it is empty (host only, about 2 s)",
       "batches": [
@@ -6833,151 +6833,6 @@
           "config": "2/net/mesh/direct",
           "row": "lap:release_step_cell",
           "iso": "2026-10-23T18:37:13Z"
-        }
-      ]
-    },
-    {
-      "id": "D-RUN-SH-TIMEOUT-CENSUS-READS-AN-EARLIER-ROWS-PHASE-MARKER-FROM-THE-BOOTS-RING",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-23",
-      "summary": "run.sh's timeout census (the block that kills a row's script when its budget runs out) took each node's newest 'mxfs-CCph rank=N PHASE=' line from the whole kernel ring (dmesg | grep -o ... | tail -1, run.sh:2082, kept as the MXFS_CENSUS_SINCE_ROW=0 branch), not from the row that timed out, so a row whose ranks wrote no marker was credited with a marker the ring held from before the row started: alloc_witness run out to its 120 s budget with its own markers off recorded last_phase_census[earlierrow=2], the 'mxfs-CCph rank=0 PHASE=earlierrow' line tests/census_scope_lap.sh wrote into each node's kernel log before the row (control b20261023-282bfc, 10 of 10, 2/disk/caw/direct4k)",
-      "evidence": "Measured 2026-10-23 in the precheck lane tests/evidence/lanes/g2_awcensus_precheck_20261023T172736Z (g2 test1/test2 at 2/disk/caw/direct, build 08D63764A9352FBDD5A76CD): tests/alloc_witness_census_lap.sh ran the alloc_witness row out to its 120 s budget twice on one boot, first with ccph() in, then with ccph() and its calls removed by tests/evidence/controls/D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE.fix.diff. Both runs recorded last_phase_census[fill=1,start=1] (step4.log:5 run 20261023T172850Z-g2, :13 run 20261023T173118Z-g2): the second row's ranks wrote no marker, and the census read the first row's. control_precheck: 'CONTROL_PRECHECK NO the lap gave rc=0 with the fix in and rc=0 with it out' (:18). ===== 2026-10-23: fixed in the tree: mark_row_start writes 'mxfs-rowmark <run id>-<ns>' into each node's kernel log and the census reads only the CCph lines after it ('nomark' when the ring no longer holds the mark); MXFS_CENSUS_SINCE_ROW=0 reads the whole ring as before. Precheck both ways, lane tests/evidence/lanes/g2_census_scope_precheck_20261023T181453Z (g2 test1/test2, 2/disk/caw/direct, module C54C14B681D148267D084FC): step 3 with the fix 'LAP census_scope PASS ... [none=2]' (run 20261023T181605Z-g2); step 4 with MXFS_CENSUS_SINCE_ROW=0 'LAP census_scope FAIL: 2 of 2 nodes credited with the earlier row's marker ... [earlierrow=2]' (run 20261023T181832Z-g2).",
-      "next": "On the next attempt: control batch of tests/census_scope_lap.sh with MXFS_CENSUS_SINCE_ROW=0 in the lap's own environment (tools/harness_batch.py control --knob, 10 laps, bound 180 s, probe '^EXPOSED: the row ran out its budget', pass '^LAP census_scope PASS', fail '^LAP census_scope FAIL'), the verification batch sized from it, then remove --fixed.",
-      "reproducer": "tests/census_scope_lap.sh <label> <configuration> on a formed pair (about 2.5 min): writes 'mxfs-CCph rank=0 PHASE=earlierrow' into each node's kernel log, then runs the alloc_witness row through run.sh on a scratch board with its own markers off (AW_PHASE_MARKS=0), AW_ABORT_RANK=2 and AW_ABORT_BROADCAST=0, so the row runs out its 120 s budget and run.sh takes its census; PASS when every node's entry is 'none', FAIL when one is 'earlierrow'. Control: MXFS_CENSUS_SINCE_ROW=0 in the lap's environment (run.sh reads the whole ring, as before).",
-      "updated": "2026-10-23",
-      "batches": [
-        {
-          "id": "b20261023-282bfc",
-          "kind": "control",
-          "row": "lap:census_scope",
-          "config": "2/disk/caw/direct4k",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: the row ran out its budget",
-          "candidate": "",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "MXFS_CENSUS_SINCE_ROW=0 (run.sh's timeout census reads each node's newest phase marker in the whole kernel ring, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: a row whose ranks wrote no marker is credited with an earlier row's phase"
-        },
-        {
-          "id": "b20261023-701dee",
-          "kind": "verify",
-          "row": "lap:census_scope",
-          "config": "2/disk/caw/direct4k",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: the row ran out its budget",
-          "candidate": "0.90.134",
-          "build": "C54C14B681D148267D084FC",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:census_scope",
-            "config": "2/disk/caw/direct4k",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-282bfc",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_CENSUS_SINCE_ROW=0 (run.sh's timeout census reads each node's newest phase marker in the whole kernel ring, as before the fix)",
-            "builds": [
-              "C54C14B681D148267D084FC"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:census_scope",
-          "config": "2/disk/caw/direct4k",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-282bfc",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_CENSUS_SINCE_ROW=0 (run.sh's timeout census reads each node's newest phase marker in the whole kernel ring, as before the fix)",
-          "builds": [
-            "C54C14B681D148267D084FC"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:census_scope",
-          "iso": "2026-10-23T18:58:34Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:census_scope",
-          "iso": "2026-10-23T18:56:06Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:census_scope",
-          "iso": "2026-10-23T18:53:38Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:census_scope",
-          "iso": "2026-10-23T18:51:10Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:census_scope",
-          "iso": "2026-10-23T18:48:42Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:census_scope",
-          "iso": "2026-10-23T18:46:14Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:census_scope",
-          "iso": "2026-10-23T18:43:46Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:census_scope",
-          "iso": "2026-10-23T18:41:18Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:census_scope",
-          "iso": "2026-10-23T18:38:50Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:census_scope",
-          "iso": "2026-10-23T18:36:21Z"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/disk/caw/direct4k",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T18:32:24Z",
-          "build": "C54C14B681D148267D084FC",
-          "batch": "b20261023-701dee",
-          "approval": "P20261023-e4ab95",
-          "date": "2026-10-23"
         }
       ]
     },
@@ -7279,8 +7134,8 @@
       "config": "*/*/*",
       "opened": "2026-10-23",
       "summary": "On 2/net/mesh/mpath path_flap with a 12 s death window, test18's load stalled 81.7 s during the flaps and 120.3 s after them, 5.5 million of its operations returned errors, test18 could not read every file test17 had acknowledged with its checksum, both nodes logged a shutdown, withdrawal, death declaration, BUG, oops or hung task, and test17 saw the membership fall below 2, in a row that kills no node.",
-      "evidence": "Run 2/net/mesh/mpath:path_flap:2026-10-23T17:22:40Z (FAIL, 169 s), a variant run (MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, MXFS_MPATH_TMO=2, MXFS_TEST_ENV=PF_KEEP_KMSG=1: a 12 s death window and the 2 s path timescale under evaluation for D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S), build 08D63764A9352FBDD5A76CD, lane tests/evidence/lanes/g2e_mpathtmo2_k6_20261023T162033Z. Measured 'victim=test18 flaps=10 flap_s=4 stall_ms=81690 settle_s=0 acked=29984 elapsed=166s fails=12 max_stall_ms=120272'. Failed checks, from the run's reason: 'F4: test18's longest stall, ms (got 81690)'; 'F4_after: test18's longest stall, ms (got 120272)'; 'test18: no operation returned an error in the whole run (got 5503784)'; 'test17 acknowledged files (> 0) and test18 reads every one with its checksum (got no)'; 'test17 logged no shutdown, withdrawal, death declaration, BUG, oops or hung task (got 1)'; 'test17 saw no membership below 2 (got 1)'. ===== 2026-10-23 evidence read (board_20261023T171936Z-g2e_path_flap): all 29390 of test17's files read on test18 failed 'read_error=EIO' (verify_test17_on_test18.txt:1-201), read after test18's own shutdown, so they are the shut-down node's errors, not data the files lost; test18's 594 files read on test17 all matched. test18 logged P-WITHDRAW at [993.6], P290-AUTH-CLOSED reason=AUTHORITY_LEASE_EXPIRED overdue_ms=4104 at [1005.6] and P131-SELF-FENCE [PR_KEY_PREEMPTED] at [1015.8] (kmsg_test18_fromnode.gz:168770, :171886, :172946); test17 saw the withdrawal (P163-WITHDRAW-SEEN) and recovered test18's slice. The row also failed 'the target holds the same reservation keys at the end as at the start (got differ(2))'. Hit lists: /tmp/claude-1000/-home-steve-src-mxfs/b943d379-d576-4e63-a466-c398808883d0/scratchpad/hits/. ===== 2026-10-23 (session 48), test18's whole kernel log read in order (log sweep; raw lines, board_20261023T171936Z-g2e_path_flap/kmsg_test18_fromnode.gz): both paths registered at mount (':120447 P-PR-PATHS-REGISTERED dm-1 key=0x4ef62bfe92211b9e paths=2 registered=2'); the row's mark ':120861 [967.219600]' (17:20:01.5Z by the nearest realns line); path a flaps from 17:20:22.9Z (links.log). At the first flap's return the iSCSI connection of sd 4:0:0:0 was dropped and logged in again inside the 2 s session recovery timeout (no 'session recovery timed out' and no 'Failing path' before it): ':168753 [993.604095] connection2:0: detected conn error (1022)', ':168756 [993.612189] sd 4:0:0:0: Power-on or device reset occurred', ':168757 sd 4:0:0:0: reservation conflict', ':168760 reservation conflict error, dev dm-1, sector 21432631 op 0x1:(WRITE)', ':168761 P277-RESV-CONFLICT node 3636049448 count=1 -- data-path write bounced with SCSI RESERVATION CONFLICT', ':168770 P-WITHDRAW -- FS shut down', 8 ms after the re-login. Only after it ':170848 P290-AUTH-SUSPENDED' (1001.5), ':171886 P290-AUTH-CLOSED ... overdue_ms=4104' (1005.6), and test17's preempt ':172943 P-PR-OWNKEY-GONE' (1015.8). test17 declared nothing on its own window: ':160673 P163-WITHDRAW-SEEN slot=1 node=3636049448 -- peer declared voluntary death (FS shutdown)'. So the 12 s window is not what shut test18 down: a write the session re-sent on the re-logged-in nexus was refused, and one refused data write shuts the filesystem down. pal/linux/kern.c:5967-5970 already records that 'a reinstated iSCSI session can be unregistered on SCST for tens of milliseconds, and a log write refused then shuts the filesystem down'. With the 5 s path settings a 4 s flap is not detected as a connection loss at all (NOP-Out 5 s plus 5 s answer), which is why the default rows never re-logged in. ===== Code read 2026-10-23 (session 48): even where the late-path fill runs (lease >= V5_PR_FILL_MIN_LEASE_MS, dlm/v5_mount.c:10941-10949), it never re-checks a path it already counts as registered: mxfs_pal_scsi_pr_fill_paths (pal/linux/kern.c:7074-7083) marks every path in the map's known[] list 'known to hold the key' (t.r[i] = 0) and skips it (:7097), and the scsi_device of a path whose iSCSI session logged in again is the same object, so a registration the target dropped at the re-login is never restored by the fill. At a 12 s window the fill does not run at all (lease 8 s).",
-      "next": "Measure the gap: on a formed 2/net/mesh/mpath pair with MXFS_MPATH_TMO=2, drop one path's connection for ~4 s while a writer runs, with READ KEYS down that path in a loop from the node, timestamping when the re-logged-in nexus shows the key again against the first refused write (scsi logging or the P277 line). Then decide the fix at the cause: a reservation conflict on a nexus that just reported POWER ON/RESET (the re-login) is checked against READ KEYS before it counts as a fence, and the refused write is retried once the key is back, instead of shutting down on the first one. Control: the same drop with the check's switch off.",
+      "evidence": "Run 2/net/mesh/mpath:path_flap:2026-10-23T17:22:40Z (FAIL, 169 s), a variant run (MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, MXFS_MPATH_TMO=2, MXFS_TEST_ENV=PF_KEEP_KMSG=1: a 12 s death window and the 2 s path timescale under evaluation for D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S), build 08D63764A9352FBDD5A76CD, lane tests/evidence/lanes/g2e_mpathtmo2_k6_20261023T162033Z. Measured 'victim=test18 flaps=10 flap_s=4 stall_ms=81690 settle_s=0 acked=29984 elapsed=166s fails=12 max_stall_ms=120272'. Failed checks, from the run's reason: 'F4: test18's longest stall, ms (got 81690)'; 'F4_after: test18's longest stall, ms (got 120272)'; 'test18: no operation returned an error in the whole run (got 5503784)'; 'test17 acknowledged files (> 0) and test18 reads every one with its checksum (got no)'; 'test17 logged no shutdown, withdrawal, death declaration, BUG, oops or hung task (got 1)'; 'test17 saw no membership below 2 (got 1)'. ===== 2026-10-23 evidence read (board_20261023T171936Z-g2e_path_flap): all 29390 of test17's files read on test18 failed 'read_error=EIO' (verify_test17_on_test18.txt:1-201), read after test18's own shutdown, so they are the shut-down node's errors, not data the files lost; test18's 594 files read on test17 all matched. test18 logged P-WITHDRAW at [993.6], P290-AUTH-CLOSED reason=AUTHORITY_LEASE_EXPIRED overdue_ms=4104 at [1005.6] and P131-SELF-FENCE [PR_KEY_PREEMPTED] at [1015.8] (kmsg_test18_fromnode.gz:168770, :171886, :172946); test17 saw the withdrawal (P163-WITHDRAW-SEEN) and recovered test18's slice. The row also failed 'the target holds the same reservation keys at the end as at the start (got differ(2))'. Hit lists: /tmp/claude-1000/-home-steve-src-mxfs/b943d379-d576-4e63-a466-c398808883d0/scratchpad/hits/. ===== 2026-10-23 (session 48), test18's whole kernel log read in order (log sweep; raw lines, board_20261023T171936Z-g2e_path_flap/kmsg_test18_fromnode.gz): both paths registered at mount (':120447 P-PR-PATHS-REGISTERED dm-1 key=0x4ef62bfe92211b9e paths=2 registered=2'); the row's mark ':120861 [967.219600]' (17:20:01.5Z by the nearest realns line); path a flaps from 17:20:22.9Z (links.log). At the first flap's return the iSCSI connection of sd 4:0:0:0 was dropped and logged in again inside the 2 s session recovery timeout (no 'session recovery timed out' and no 'Failing path' before it): ':168753 [993.604095] connection2:0: detected conn error (1022)', ':168756 [993.612189] sd 4:0:0:0: Power-on or device reset occurred', ':168757 sd 4:0:0:0: reservation conflict', ':168760 reservation conflict error, dev dm-1, sector 21432631 op 0x1:(WRITE)', ':168761 P277-RESV-CONFLICT node 3636049448 count=1 -- data-path write bounced with SCSI RESERVATION CONFLICT', ':168770 P-WITHDRAW -- FS shut down', 8 ms after the re-login. Only after it ':170848 P290-AUTH-SUSPENDED' (1001.5), ':171886 P290-AUTH-CLOSED ... overdue_ms=4104' (1005.6), and test17's preempt ':172943 P-PR-OWNKEY-GONE' (1015.8). test17 declared nothing on its own window: ':160673 P163-WITHDRAW-SEEN slot=1 node=3636049448 -- peer declared voluntary death (FS shutdown)'. So the 12 s window is not what shut test18 down: a write the session re-sent on the re-logged-in nexus was refused, and one refused data write shuts the filesystem down. pal/linux/kern.c:5967-5970 already records that 'a reinstated iSCSI session can be unregistered on SCST for tens of milliseconds, and a log write refused then shuts the filesystem down'. With the 5 s path settings a 4 s flap is not detected as a connection loss at all (NOP-Out 5 s plus 5 s answer), which is why the default rows never re-logged in. ===== Code read 2026-10-23 (session 48): even where the late-path fill runs (lease >= V5_PR_FILL_MIN_LEASE_MS, dlm/v5_mount.c:10941-10949), it never re-checks a path it already counts as registered: mxfs_pal_scsi_pr_fill_paths (pal/linux/kern.c:7074-7083) marks every path in the map's known[] list 'known to hold the key' (t.r[i] = 0) and skips it (:7097), and the scsi_device of a path whose iSCSI session logged in again is the same object, so a registration the target dropped at the re-login is never restored by the fill. At a 12 s window the fill does not run at all (lease 8 s). ===== 2026-10-23 (session 49), the refusal's cause read from the target's source (/src/scst): a login that iscsi-scst does not process as a session reinstatement (the old session already shutting down) gets a new tgt_dev from scst_pr_init_tgt_dev, which links the existing registrant only if reg->tgt_dev is NULL (scst/src/scst_pres.c:1193-1200); the registrant is still linked to the old session's tgt_dev, so the new one has none, and scst_pr_is_cmd_allowed refuses its WRITE (scst_pres.c:2399, :2419-2422; caller scst_targ.c:2348-2355). Only the old session's final free, queued to SCST's management thread (scst_lib.c:7482-7531, :5805-5834), moves the registrant over (scst_pr_clear_tgt_dev, scst_pres.c:1225-1238, commented 'It should never happen'). A real reinstatement holds the new session's commands (iscsi-scst/kernel/iscsi.c:175-201, reinst_pending_cmd_list) until scst_reassign_retained_sess_states moves the registrant (scst_lib.c:14595-14606, called from iscsi-scst/kernel/nthread.c:175-177), so it has no gap. The node stayed registered throughout: the target refused a write from a retained registration, which SPC keeps across an I_T nexus loss. Not yet measured on the rig (the target-side order of login, refusal and handoff).",
+      "next": "Measure the gap: on a formed 2/net/mesh/mpath pair with MXFS_MPATH_TMO=2, drop one path's connection for ~4 s while a writer runs, with READ KEYS down that path in a loop from the node, timestamping when the re-logged-in nexus shows the key again against the first refused write (scsi logging or the P277 line). Then decide the fix at the cause: a reservation conflict on a nexus that just reported POWER ON/RESET (the re-login) is checked against READ KEYS before it counts as a fence, and the refused write is retried once the key is back, instead of shutting down on the first one. Control: the same drop with the check's switch off. ===== 2026-10-23 (session 49): consulted gpt-6-astra on tolerating the refusal in MXFS (docs/rulings/silent-peer-death-under-the-stall-limit.md, 'A target that refuses a retained registration after a relogin'). Ruled: READ KEYS listing the key is no authorization for a retry; a journal-write retry also needs a durability proof (a later PREFLUSH/FUA commit never covered the refused write) and a crash-recovery proof of the hole; a data retry must keep the operation pending (redirtying breaks unwritten-extent conversion); every completion class must be covered from the first conflict. Preferred: fix the target's handoff (hold the new session's commands until the registrant is moved, as reinstatement does, synchronized with PR removal and task abort), or gate a recovering path below the filesystem before it carries I/O. Next: (1) measure the gap on the rig (2/net/mesh/mpath, MXFS_MPATH_TMO=2, a 4 s cut of one path under load): the host's /sys/kernel/scst_tgt/devices/<lun>/pr_state and iscsi-scst session log against the node's first refused write; (2) the target fix is in the lab's SCST, which the owner runs, so ask the owner whether to patch iscsi-scst's non-reinstatement login (or the registrant handoff) on clyde; (3) independently, decide whether the release's path timescale stays at 5 s (where a 4 s flap does not log in again) or moves to 2 s, which the silent-death compound case asks for.",
       "reproducer": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 MXFS_MPATH_TMO=2 MXFS_TEST_ENV=PF_KEEP_KMSG=1 ./run.sh 2/net/mesh/mpath --group g2e path_flap after a forced prep (seen once)",
       "cells": [
         {

@@ -42600,15 +42600,18 @@
           ]
         },
         "8/net/mesh/mpath": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261023T193518Z-g8",
-          "iso": "2026-10-23T19:35:34Z",
+          "status": "PASS",
+          "measured": "victim=test14 recovered_two_paths_s=9 recovered_one_path_s=10 reinstate_s=18 survivor_stall_two_ms=6202 survivor_stall_one_ms=7154 acked=5729 elapsed=199s fails=0 max_stall_ms=7535",
+          "reason": " (evidence tests/evidence/board_20261023T193518Z-g8_path_peer_withdrawn)",
+          "iso": "2026-10-23T19:39:00Z",
           "recorded": "2026-10-23",
+          "elapsed_s": 205,
           "build": "C54C14B681D148267D084FC",
+          "outcome": "PASS",
+          "budget_s": 420,
+          "run_id": "20261023T193518Z-g8",
           "candidate": "0.90.134",
           "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
-          "run_id": "20261023T193518Z-g8",
           "history": [
             {
               "status": "PASS",

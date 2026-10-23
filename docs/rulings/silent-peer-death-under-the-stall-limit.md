@@ -259,6 +259,58 @@ hidden retry, beat completion jitter, the clock error, and the latency of stoppi
 claimed earliest fence, pending fences included. Measured maxima validate an enforced bound; they do
 not establish one.
 
+## A target that refuses a retained registration after a relogin
+
+With the 2 s path timescale a 4 s cut of one path makes the initiator drop the iSCSI connection and
+log in again. On the lab's SCST target, a login that iscsi-scst does not handle as a session
+reinstatement (the old session is already shutting down) gets new per-device state with no
+registrant linked, because the registrant is still linked to the old session's state until that
+session is freed on SCST's management thread; for those tens of milliseconds the target refuses
+the node's writes with RESERVATION CONFLICT although the node is still registered. A refused log
+write shuts the filesystem down. A real reinstatement holds the new session's commands until the
+registrant is moved, so it has no gap. SPC keeps a registration across an I_T nexus loss, so this
+is the target refusing a registered nexus. Put to gpt-6-astra on 2026-10-23, whether MXFS may
+tolerate it by retrying the refused writes:
+
+- **No probe authorizes a retry.** READ KEYS listing the key says some registration of it exists;
+  not that this nexus is registered, nor that it stays so. A REGISTER with reservation key and
+  service-action key both the node's own, down the same path, is a readiness check (an
+  unregistered nexus cannot create the key with it), never an ordering barrier against a fence.
+  A retry is safe only because the target refuses every write ordered after the fence's removal
+  of the key; it need not win the race.
+- **A journal retry needs more than the refused command.** A later iclog with PREFLUSH and FUA
+  may already have completed: its flush never covered the refused write, so a plain resubmission
+  followed by an acknowledged log force can lose that write to a power cut. Holding the iclog in
+  SYNCING orders callbacks in memory, not persistence. A retry must keep the iclog logically in
+  flight, re-check authority at every resubmission, make the retried write as durable as the
+  forces that depend on it require, and the hole later records may leave on disk must be shown a
+  valid recovery state. A conservative form is an ordered log-submission gate set up before any
+  conflict: no dependent write overtakes an unresolved earlier one.
+- **A data retry keeps the operation pending.** The raw conflict must be caught before it becomes
+  a mapping error or a completed ioend; redirtying after the fact lets unwritten-extent
+  conversion expose old blocks, and a waiter may never see the rewrite. Direct I/O has no page
+  cache to fall back on. Coverage has to start at the first conflict, for journal, metadata,
+  buffered and direct data writes and flushes; a three-conflict inspection threshold cannot give
+  "no operation returns an error".
+- **Preferred:** fix the target's handoff (hold the new session's commands until the retained
+  registrant is moved, synchronized with PR removal and task abort; linking the registrant to the
+  new state early instead can leave old-session writes outside PREEMPT AND ABORT's reach), or gate
+  a recovering path below the filesystem before it carries ordinary I/O. A unit attention is no
+  notice for that gate: only one command sees it, and it may be a write.
+- **The late REGISTER is a fencing problem of its own.** A registration-creating command that
+  executes after PREEMPT AND ABORT puts the fenced key back on its nexus, and no later READ KEYS
+  can tell; SCSI keeps no tombstone of a removed key. Either registrations are created only while
+  the incarnation is not yet fenceable and reconnects only verify retained ones, or an unresolved
+  REGISTER keeps the fence from certifying until it is resolved, or the fence aborts the tasks of
+  every nexus of the logical unit. Taking the path offline at the initiator keeps the node's own
+  later writes off it, but not a write already queued at the target behind the delayed REGISTER.
+
+What must be measured: the target-side order of the login, the refusal and the handoff, and how
+long the handoff waits under management-thread load; a REGISTER held until after the certificate
+and then released; a fence during every phase of a retry or handoff; crashes before, during and
+after a retried log write with volatile write caches on; every completion class; authority
+expiring inside a retry window.
+
 ## Open
 
 - The read-stop acknowledgment protocol over the TCP mesh, and what CAW, which has no network between
