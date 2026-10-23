@@ -4712,8 +4712,15 @@
         "data/reviews/P20261023-63aa62.md",
         "data/release_policy.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-dd8171.md",
+        "sha256": "518c9f58b0e7e4f9cd313b0d59e907d53d57600e2242415cf4d9f932bc58a723",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }
