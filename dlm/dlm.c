@@ -326,6 +326,27 @@ module_param_named(dl_local_acq_end_n, mxfs_dl_local_acq_end_n.counter, int, 044
 MODULE_PARM_DESC(dl_local_acq_end_n,
 		 "acquisition records retired by a locally mastered answer outside the promote path, since dl_local_acq_end was last written");
 /*
+ * The already-granted shortcut answers a wait from this node's own GRANTED
+ * entry.  When that entry is the mirror of a grant the wait adopted between two
+ * of its attempts (dlm_acq_adopt_grant), and the resource has since come to be
+ * mastered here because its ledger page was handed to this node, the entry is
+ * the lock master's only record of this node's hold: the wait has taken the
+ * adopted grant, and its acquisition record ends claimed.  Ended unclaimed, the
+ * grant was handed back (dlm_acq_release_grant), and the release unlinked that
+ * entry, leaving the master's table empty while the caller held the lock.
+ * Measured on 8/net/mesh/mpath (test21, AG 6): the master decided another
+ * node's EX 22 ms later, the ledger refused it 110 times in six seconds
+ * (P-TAUTH-DOUBLE-GRANT ... vs record ex=test21), and test21 shut down on a
+ * fresh grant over its own open lineage (P130-FALSE-FRESH).  In user mode
+ * (tests/tauth/adopted_grant_handoff_test.sh) the caller then read its hold as
+ * NL, and every later EX on the resource was refused for good.
+ * 0 = the shortcut ends the record unclaimed, as before (test control).
+ */
+int mxfs_dl_shortcut_claim = 1;
+module_param_named(dl_shortcut_claim, mxfs_dl_shortcut_claim, int, 0644);
+MODULE_PARM_DESC(dl_shortcut_claim,
+		 "a wait the already-granted shortcut answers from the entry of a grant it adopted takes that grant (default 1); 0 = the grant is handed back unclaimed, unlinking the entry (test control)");
+/*
  * D-TCP-LEDGER-SMALLFILE-WORKLOAD-PACE-RULE0-0349 (ruling step 1,
  * docs/rulings/d0349-pregrant-pool-and-chunk-delegation.md): an inode-number
  * reserve (MXFS_LKF_RESERVE) for a number whose master is a peer, made while
@@ -9271,6 +9292,45 @@ static int dlm_acq_adopt_grant(struct mxfs_dlm_ctx *ctx,
 	return adopted;
 }
 
+/*
+ * A local answer handed this wait the table entry of grant generation `gen`
+ * (the already-granted shortcut).  If that is the entry the wait's adopted grant
+ * installed, the wait has taken the grant: forget the adoption, so ending the
+ * record does not hand back the hold the caller now has.  Returns 1 when it was.
+ */
+static int dlm_acq_answered_by(struct mxfs_dlm_ctx *ctx,
+			       const struct mxfs_resource_id *resource,
+			       uint8_t mode, uint32_t gen)
+{
+	uint64_t held_ms = 0;
+	int i, taken = 0;
+
+	if (!ctx->acq_lock)
+		return 0;
+	mxfs_pal_spinlock_lock(ctx->acq_lock);
+	for (i = 0; i < MXFS_DLM_ACQ_SLOTS; i++) {
+		if (!ctx->acq[i].in_use || ctx->acq[i].mode != mode ||
+		    !resource_equal(&ctx->acq[i].resource, resource))
+			continue;
+		if (ctx->acq[i].grant.have && ctx->acq[i].grant.grant_gen == gen) {
+			held_ms = mxfs_pal_time_ms() - ctx->acq[i].grant.adopted_ms;
+			memset(&ctx->acq[i].grant, 0, sizeof(ctx->acq[i].grant));
+			ctx->acq_grant_claimed++;
+			taken = 1;
+		}
+		break;
+	}
+	mxfs_pal_spinlock_unlock(ctx->acq_lock);
+	if (taken)
+		mxfs_probe_ratelimited(
+		    "mxfs: P958-ACQ-GRANT-CLAIMED-LOCAL type=%u ino=%llu ag=%u mode=%s gen=%u held_ms=%llu total=%llu -- the entry an adopted grant installed answered its wait through the already-granted shortcut, its resource now mastered here; the wait took the grant, nothing handed back\n",
+		    resource->type, (unsigned long long)resource->ino,
+		    resource->ag_number, mode_name(mode), gen,
+		    (unsigned long long)held_ms,
+		    (unsigned long long)ctx->acq_grant_claimed);
+	return taken;
+}
+
 /* The adopted grant's mirror is gone (released or purged under the wait):
  * forget the adoption so the next attempt sends. */
 static void dlm_acq_clear_grant(struct mxfs_dlm_ctx *ctx,
@@ -10785,6 +10845,8 @@ lockreq_sent:
 							return 0;
 						}
 						if (still_safe) {
+							uint32_t answer_gen = lk->grant_gen;
+
 							/* DLM_TRACE: local "already granted" shortcut */
 							if (resource->ino == 128 &&
 							    resource->type == MXFS_LTYPE_INODE)
@@ -10794,6 +10856,11 @@ lockreq_sent:
 								    mode_name(lk->mode), lk->owner);
 							*granted_mode = lk->mode;
 							mxfs_pal_rwlock_unlock(ctx->table_rwlock);
+							/* the entry may be the one this wait's adopted
+							 * grant installed (dl_shortcut_claim) */
+							if (READ_ONCE(mxfs_dl_shortcut_claim))
+								dlm_acq_answered_by(ctx, resource, mode,
+										    answer_gen);
 							dlm_local_answered(ctx, resource, mode, "shortcut");
 							return 0;
 						}
