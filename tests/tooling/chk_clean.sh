@@ -219,6 +219,21 @@ if [ "$RANK" = 1 ]; then
     # copy came out root-only, and reading a CORRUPT verdict's errors then
     # took sudo on the host.
     [ -f "$chkout" ] && chmod 644 "$chkout" 2>/dev/null
+    # A link-count error says how many directory entries name an inode, not
+    # which.  On one, the audit walks again, still cold, printing every entry
+    # that names each inode an error names (chk_mxfs MXFS_CHK_NAMES_OF), so the
+    # evidence holds the directory and the name of the extra or missing link:
+    # the two CORRUPT verdicts of 2026-10-19 kept only the count, and their
+    # volumes were formatted again before anyone could read the names
+    # (D-CAWMPATH-NLINK1-FILE-NAMED-TWICE-AFTER-ANSWER-LOST).  Only a failing
+    # audit pays for the second walk.
+    names_of=$(grep -aoE 'ERROR: inode [0-9]+ \(mode [0-7]+\) has nlink' "$out" | awk '{print $3}' | sort -u | head -16 | paste -sd, -)
+    if [ -n "$names_of" ] && [ "$FSTYPE" != xfs ]; then
+        {
+            echo "=== every entry naming an inode a link-count error names (MXFS_CHK_NAMES_OF=$names_of) ==="
+            MXFS_CHK_NAMES_OF=$names_of "$CHK" -v "$DEV" 2>&1 | grep -a 'NAMES-OF:'
+        } >> "$chkout" 2>/dev/null
+    fi
     # THE LEDGER CENSUS.  Every node has unmounted cleanly, so nothing holds a
     # lock: a record of the TCP authority ledger that still names an exclusive
     # holder or carries a shared-holder slot bit is a release that never

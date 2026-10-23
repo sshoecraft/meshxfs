@@ -2311,151 +2311,6 @@
       ]
     },
     {
-      "id": "D-ALLOC-WITNESS-RANK-ABORT-RECORDED-AS-BUDGET-EXHAUSTED",
-      "severity": "medium",
-      "nodes": 2,
-      "config": "*/*/*",
-      "opened": "2026-10-21",
-      "summary": "tests/tooling/alloc_witness.sh: when one rank aborts its own precondition (fail_out writes ABORT to its rank file), the other rank waits for it until the row's 120 s budget kills both, and the board records FAIL BUDGET_EXHAUSTED on both ranks instead of the abort",
-      "evidence": "Run 20261021T190943Z-g2b (2/net/mesh/direct): rank2.txt ABORT at 19:26:15Z, rank1 waited without a PHASE1 line, both rc=124 at 120 s, board line 96 'FAIL alloc_witness (nodes_pass=0/2 states:BUDGET_EXHAUSTED=2)'. run.sh:2061 greps 'mxfs-CCph rank=[0-9]* PHASE=' and run.sh:2070-2071 turn an empty result into none; tests/tooling/alloc_witness.sh records its phases with rec() into rank<N>.txt (lines 143, 326-417) and contains no CCph and no PHASE= (grep -c 0 each). ===== Again on 2/net/mesh/drbd, candidate 0.90.134, run 20261021T221943Z-g2: rank2 ABORT at its fill, both ranks recorded BUDGET_EXHAUSTED rc=124 with last_phase_census[none=2] (DRBD board ledger 2026-10-21T22:35:00Z). ===== 2026-10-23, precheck on g2b (test15/test16, 2/net/mesh/mpath, build 16A5F5DDDB4852C9D5DB236; lane tests/evidence/lanes/g2b_awabort_precheck_20261023T073948Z): with the fix (AW_ABORT_BROADCAST=1) both laps ended in 1 s, states FAIL=2, rank 1 'peer_abort rank=1' with reason 'another rank aborted the lap: rank 2: AW_ABORT_RANK=2: this rank aborts after its fill' (tests/evidence/alloc_witness/20261023T074334Z-g2b/rank1.txt ABORTED_BY_PEER, rank2.txt ABORT); with the switch off (AW_ABORT_BROADCAST=0) both laps ran 120 s of 120 s, states BUDGET_EXHAUSTED=2, last_phase_census[fill=1,start=1] (the census now reads the phases). The lap graded all four FAIL because it looked for injected_abort only, which the recorded row did not carry (rank 1 recorded first); it now accepts the abort's own text AW_ABORT_RANK=2. ===== 2026-10-23: no longer names 2/net/mesh/drbd:alloc_witness:2026-10-21T22:35:00Z, named by D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION, D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE: the run fails with or without this record's fix: rank 2's fill carved nothing in its partition, which is D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION's failure and stays named there; this record's fix changes only how that FAIL is recorded (data/reviews/P20261023-5e015a.md:7, :150-156, :169-175)",
-      "next": "Control batch of tests/alloc_witness_abort_lap.sh with AW_ABORT_BROADCAST=0 (tools/harness_batch.py control --knob, 10 laps, bound 160 s, probe '^EXPOSED: rank2 aborted after its fill', pass '^LAP aw_abort PASS'), then the verification batch on the frozen candidate sized from it, then remove --fixed. The removal may name 2/net/mesh/drbd:alloc_witness:2026-10-21T22:35:00Z only with that run's own rank files showing the abort. ===== 2026-10-23: the census half of this record (the script wrote no mxfs-CCph marker, so the timeout census read none) is now D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE: this record's control turns off only the abort broadcast, so a removal here proves only that fix. ===== Removal P20261023-5e015a was rejected (data/reviews/P20261023-5e015a.md) with cause, control (10 of 10, the frozen list unchanged) and fix-on batch (6 of 6, N recomputed) all found proven: removal would retire 2/net/mesh/drbd:alloc_witness:2026-10-21T22:35:00Z, which this record names, while that run's failure belongs to D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION (open); tools/criteria.py:777-778 drops a settled FAIL before :779 looks at which records name it. Approvable once that run is not settled by this removal: either this record stops naming it (tools/defects.py update has no option to drop a cell) or the removal waits until D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION is disposed of. Review notes: control and fix-on ran only at 2/disk/caw/direct; run.sh passes its default 120 s as COORD_TIMEOUT, which equals the row's budget, not the budget itself.",
-      "cells": [
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:aw_abort",
-          "iso": "2026-10-23T10:50:49Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:aw_abort",
-          "iso": "2026-10-23T10:48:22Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:aw_abort",
-          "iso": "2026-10-23T10:45:54Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:aw_abort",
-          "iso": "2026-10-23T10:43:27Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:aw_abort",
-          "iso": "2026-10-23T10:41:00Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:aw_abort",
-          "iso": "2026-10-23T10:38:32Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:aw_abort",
-          "iso": "2026-10-23T10:36:05Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:aw_abort",
-          "iso": "2026-10-23T10:33:38Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:aw_abort",
-          "iso": "2026-10-23T10:31:10Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:aw_abort",
-          "iso": "2026-10-23T10:28:43Z"
-        }
-      ],
-      "updated": "2026-10-23",
-      "reproducer": "tests/alloc_witness_abort_lap.sh <label> <configuration> on a formed pair (about 25 s with the fix, 146 s without): runs the alloc_witness row through run.sh on a scratch copy of the board (MXFS_CRIT) with rank 2 made to abort right after its fill (MXFS_TEST_ENV AW_ABORT_RANK=2) and AW_ABORT_BROADCAST passed through (0 is the script's switch back to the old waits). Exposure: 'EXPOSED: rank2 aborted after its fill' (rank 2's witness record holds the injected ABORT). PASS: the row ended inside its budget, named the abort (AW_ABORT_RANK=2 or injected_abort in its measured or reason) and no rank was recorded BUDGET_EXHAUSTED; FAIL otherwise. Bound 160 s (the row's 120 s budget plus run.sh's preflight).",
-      "batches": [
-        {
-          "id": "b20261023-5c1522",
-          "kind": "control",
-          "row": "lap:aw_abort",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: rank2 aborted after its fill",
-          "candidate": "",
-          "build": "08D63764A9352FBDD5A76CD",
-          "variant": "AW_ABORT_BROADCAST=0 (tests/tooling/alloc_witness.sh: an aborting rank broadcasts nothing and its peers wait out their own bounds, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: the defect must reproduce"
-        },
-        {
-          "id": "b20261023-2baa2a",
-          "kind": "verify",
-          "row": "lap:aw_abort",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: rank2 aborted after its fill",
-          "candidate": "0.90.134",
-          "build": "08D63764A9352FBDD5A76CD",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:aw_abort",
-            "config": "2/disk/caw/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-5c1522",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "AW_ABORT_BROADCAST=0 (tests/tooling/alloc_witness.sh: an aborting rank broadcasts nothing and its peers wait out their own bounds, as before the fix)",
-            "builds": [
-              "08D63764A9352FBDD5A76CD"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:aw_abort",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-5c1522",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "AW_ABORT_BROADCAST=0 (tests/tooling/alloc_witness.sh: an aborting rank broadcasts nothing and its peers wait out their own bounds, as before the fix)",
-          "builds": [
-            "08D63764A9352FBDD5A76CD"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T10:11:20Z",
-          "build": "08D63764A9352FBDD5A76CD",
-          "batch": "b20261023-2baa2a",
-          "approval": "P20261023-26297c",
-          "date": "2026-10-23"
-        }
-      ]
-    },
-    {
       "id": "D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED",
       "severity": "major",
       "nodes": 1,
@@ -6088,7 +5943,7 @@
       "config": "net/mesh/direct",
       "opened": "2026-10-22",
       "summary": "On 4/net/mesh/direct the fio_perf_vs_xfs row scored sequential write at 42% of the native-XFS yardstick (threshold 70%) on the 0.90.134 development build 9594B08726D6732D2ED5E87, test3-test6 on pool LUN 12 (512-byte blocks); sequential read 96%, random write 286%, random read 292%.",
-      "evidence": "Ledger data/criteria.runs.jsonl: 4/net/mesh/direct fio_perf_vs_xfs 2026-10-23T00:28:31Z FAIL, run_id 20261023T002529Z-g4, measured 'seqW=42% seqR=96% randW=286% randR=292% worst(write)=42% (threshold>=70%, wsrc=xfs-baseline, rig=scst-fio)', reason 'mxfs write worst 42% < 70% of xfs-baseline (/src/mxfs/.xfs_fio_baseline.net-mesh-direct.scst-fio.json)'. Board lane tests/evidence/lanes/g8b_g4_calibrate_then_board_20261023T001239Z/step8.log:42 'FAIL fio_perf_vs_xfs (1s/10s)'. Host at the time: the g2 lane's join-during-takeover control laps on test1/test2 were running (tests/evidence/lanes/g2_gate_controls_20261022T233534Z); g8b had been powered down at step 6. The yardstick was measured on an idle host. Not the same configuration as D-FIO-VS-XFS-SEQW-63PCT-ON-2-NET-MESH-MPATH-WHILE-HOST-NVME-SHARED (2/net/mesh/mpath, 63%). ===== 2026-10-23, SECOND CONFIGURATION: 4/net/mesh/mpath fio_perf_vs_xfs FAIL 2026-10-23T01:17:46Z (run 20261023T011432Z-g4, build 16A5F5DDDB4852C9D5DB236, test3-test6, data/criteria.runs.jsonl:7893) 'seqW=40% seqR=89% randW=201% randR=292% worst(write)=40% (threshold>=70%, wsrc=xfs-baseline, rig=scst-fio)' against .xfs_fio_baseline.net-mesh-mpath.scst-fio.json (seq_write_1m 1404 MiB/s, seq_read_1m 1294, file dated 2026-10-04). Every earlier run of that row at 4/net/mesh/mpath passed at seqW 124-264% (data/criteria.runs.jsonl, 2026-10-15 to 2026-10-21T12:52:09Z, the last on build 71AC6107043DD5BE3D9181A). HYPOTHESIS (not yet measured): the yardsticks are stale, not the write path. The pool LUN images moved from the NVMe root to /mxfs (/dev/sda, a SATA Samsung 870, ~512 MiB/s) on 2026-10-22 (CHANGELOG.md 0.90.134 entry, 'Rig host: LUN images, test VMs and evidence live on /mxfs'); the 512-byte yardsticks .xfs_fio_baseline.{net-mesh,disk-caw}-{direct,mpath}.scst-fio.json date from 2026-10-01/04, before it (seq write 1324-1404 MiB/s), while native XFS on a pool LUN on the 870 measured 511 MiB/s seq write and 539 MiB/s seq read (.xfs_fio_baseline.net-mesh-direct4k.scst-fio.json, 2026-10-22, 5 runs). MXFS here wrote 40% x 1404 = ~562 MiB/s and at 4/net/mesh/direct 42% x 1324 = ~556 MiB/s, at or above that.",
+      "evidence": "Ledger data/criteria.runs.jsonl: 4/net/mesh/direct fio_perf_vs_xfs 2026-10-23T00:28:31Z FAIL, run_id 20261023T002529Z-g4, measured 'seqW=42% seqR=96% randW=286% randR=292% worst(write)=42% (threshold>=70%, wsrc=xfs-baseline, rig=scst-fio)', reason 'mxfs write worst 42% < 70% of xfs-baseline (/src/mxfs/.xfs_fio_baseline.net-mesh-direct.scst-fio.json)'. Board lane tests/evidence/lanes/g8b_g4_calibrate_then_board_20261023T001239Z/step8.log:42 'FAIL fio_perf_vs_xfs (1s/10s)'. Host at the time: the g2 lane's join-during-takeover control laps on test1/test2 were running (tests/evidence/lanes/g2_gate_controls_20261022T233534Z); g8b had been powered down at step 6. The yardstick was measured on an idle host. Not the same configuration as D-FIO-VS-XFS-SEQW-63PCT-ON-2-NET-MESH-MPATH-WHILE-HOST-NVME-SHARED (2/net/mesh/mpath, 63%). ===== 2026-10-23, SECOND CONFIGURATION: 4/net/mesh/mpath fio_perf_vs_xfs FAIL 2026-10-23T01:17:46Z (run 20261023T011432Z-g4, build 16A5F5DDDB4852C9D5DB236, test3-test6, data/criteria.runs.jsonl:7893) 'seqW=40% seqR=89% randW=201% randR=292% worst(write)=40% (threshold>=70%, wsrc=xfs-baseline, rig=scst-fio)' against .xfs_fio_baseline.net-mesh-mpath.scst-fio.json (seq_write_1m 1404 MiB/s, seq_read_1m 1294, file dated 2026-10-04). Every earlier run of that row at 4/net/mesh/mpath passed at seqW 124-264% (data/criteria.runs.jsonl, 2026-10-15 to 2026-10-21T12:52:09Z, the last on build 71AC6107043DD5BE3D9181A). HYPOTHESIS (not yet measured): the yardsticks are stale, not the write path. The pool LUN images moved from the NVMe root to /mxfs (/dev/sda, a SATA Samsung 870, ~512 MiB/s) on 2026-10-22 (CHANGELOG.md 0.90.134 entry, 'Rig host: LUN images, test VMs and evidence live on /mxfs'); the 512-byte yardsticks .xfs_fio_baseline.{net-mesh,disk-caw}-{direct,mpath}.scst-fio.json date from 2026-10-01/04, before it (seq write 1324-1404 MiB/s), while native XFS on a pool LUN on the 870 measured 511 MiB/s seq write and 539 MiB/s seq read (.xfs_fio_baseline.net-mesh-direct4k.scst-fio.json, 2026-10-22, 5 runs). MXFS here wrote 40% x 1404 = ~562 MiB/s and at 4/net/mesh/direct 42% x 1324 = ~556 MiB/s, at or above that. ===== 2026-10-23, the 512-byte yardsticks re-captured on the 870 (lane tests/evidence/lanes/g2_xfs_yardstick_512_20261023T141853Z: tools/xfs_baseline_refresh.sh 512_20261023 test1, 14:18:53-14:34:07Z, the only rig lane up; test1 nproc=2, pool LUN 02 of 512-byte blocks; tests/evidence/xfs_baseline_512_20261023.log, runs in tests/evidence/xfs_baseline_512_20261023_runs/). Native XFS seq write per run: net-mesh-direct 509,511,511,509,512 MiB/s (log :333, median 511), disk-caw-direct 510,511,511,512,512 (:337, median 511); seq read medians 539 and 539 (:334, :338); every fio_perf run's host sampler read sda MiBs_max=510-513, the SATA 870's ceiling. The old yardsticks were 1324 (net-mesh-direct) and 1133 (disk-caw-direct) MiB/s seq write. Against the new net-mesh-direct yardstick this record's 4/net/mesh/direct run (42% x 1324 = ~556 MiB/s) is about 109%, over the 70% floor: the hypothesis that the yardstick, not the write path, failed it holds for this cell. NOT YET MEASURED: the mpath yardsticks (.xfs_fio_baseline.{net-mesh,disk-caw}-mpath.scst-fio.json, 2026-10-04, seq write 1404 MiB/s) that graded the 4/net/mesh/mpath cell, since tools/xfs_baseline_refresh.sh captures only the direct configurations of a 512-byte LUN; and fio_perf_vs_xfs re-run at 4/net/mesh/direct and 4/net/mesh/mpath against re-captured yardsticks on a quiet host.",
       "next": "Run 4/net/mesh/direct fio_perf and fio_perf_vs_xfs again with no other rig group up and a host sampler (/proc/diskstats for nvme0n1, /proc/pressure/io, loadavg every 5 s) in the evidence directory, and compare with this row's last PASS at 4/net/mesh/direct (build and percentages): contention on the shared NVMe or a write-path regression since then. ===== Re-capture the four 512-byte scst-fio yardsticks on a pool LUN on the 870 with tools/xfs_baseline_refresh.sh on a quiet host (no board, lane or package build on the lab VMs, whose disks share /mxfs), then grade fio_perf_vs_xfs at 4/net/mesh/direct and 4/net/mesh/mpath against them. If native XFS on the 870 measures what MXFS measured within the 70% floor, this was the yardstick (remove --disproved with both captures); if not, a write-path regression since 71AC6107043DD5BE3D9181A.",
       "cells": [
         {
@@ -6102,7 +5957,7 @@
           "iso": "2026-10-23T01:17:46Z"
         }
       ],
-      "updated": "2026-10-22"
+      "updated": "2026-10-23"
     },
     {
       "id": "D-DIRENT-DURABILITY-CAPTURE-COPIES-STALE-DMESG-AT-FAIL-FROM-EARLIER-BOOTS",

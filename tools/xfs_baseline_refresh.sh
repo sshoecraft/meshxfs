@@ -13,7 +13,13 @@
 #                            direct configurations, 4096 the direct4k ones on a
 #                            4K-native LUN (docs/4kn-support.md): native XFS on
 #                            a 4096-byte device is a different yardstick
-#   ATTACH (default lun)     drbd measures 2/net/mesh/drbd's yardstick instead:
+#   ATTACH (default lun)     mpath measures the mpath configurations' yardsticks
+#                            (512-byte blocks): the pool binds the LUN to node on
+#                            two paths (tools/lun_pool.sh --paths 2, node must
+#                            have a NIC on each storage network) and native XFS
+#                            runs on the multipath map, as every MXFS board of
+#                            an mpath configuration does.
+#                            drbd measures 2/net/mesh/drbd's yardstick instead:
 #                            scripts/drbd_rig.sh up brings the pair of MXFS_GROUP
 #                            (default g2; node must be its first node) up
 #                            dual-primary on a pool LUN each, native XFS runs on
@@ -48,9 +54,12 @@ ATTACH="${ATTACH:-lun}"
 case "$ATTACH:$BLOCK_SIZE" in
     lun:512)  CONFIGS="net-mesh-direct disk-caw-direct" ;;
     lun:4096) CONFIGS="net-mesh-direct4k disk-caw-direct4k" ;;
+    mpath:512) CONFIGS="net-mesh-mpath disk-caw-mpath" ;;
     drbd:512) CONFIGS="net-mesh-drbd" ;;
-    *)    echo "ATTACH must be lun (BLOCK_SIZE 512 or 4096) or drbd (512) (got '$ATTACH', '$BLOCK_SIZE')"; exit 2 ;;
+    *)    echo "ATTACH must be lun (BLOCK_SIZE 512 or 4096), mpath (512) or drbd (512) (got '$ATTACH', '$BLOCK_SIZE')"; exit 2 ;;
 esac
+PATHS=1
+[ "$ATTACH" = mpath ] && PATHS=2
 # the pool's SCST LUNs; a DRBD pair's tag is resolved once its device is up
 RIGTAG=scst-fio
 E="tests/evidence/xfs_baseline_$TAG.log"
@@ -82,9 +91,9 @@ for s in $CONFIGS; do
         mv ".xfs_fio_baseline.$s.$RIGTAG.json" ".xfs_fio_baseline.$s.$RIGTAG.json.backup"
 done
 {
-    if [ "$ATTACH" = lun ]; then
+    if [ "$ATTACH" = lun ] || [ "$ATTACH" = mpath ]; then
         line=$(tools/lun_pool.sh alloc --owner $$ --what "yardstick capture $TAG" --size 20G \
-            --block-size "$BLOCK_SIZE" "$NODE")
+            --block-size "$BLOCK_SIZE" --paths "$PATHS" "$NODE")
         echo "$line"
         dev=$(sed -n 's/.* dev=\([^ ]*\).*/\1/p' <<<"$line")
     fi

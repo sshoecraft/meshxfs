@@ -593,10 +593,11 @@ if [ -n "$CANDIDATE" ]; then
 fi
 # A VARIANT is a run that changes what is measured: a module knob, a test
 # environment, a calibration, a rig's own budgets, an inter-test settle, an
-# strace.  Its results are recorded
+# strace, a path timescale other than the recommended one (MXFS_MPATH_TMO
+# changes what a path fault costs).  Its results are recorded
 # and its failures stay incidents, but it never grades a release candidate.
 VARIANT=""
-for vn in MXFS_EXTRA_MODARGS MXFS_RETIRE_CONTRACT MXFS_TEST_ENV MXFS_RIG_BUDGETS MXFS_STRACE_RANK; do
+for vn in MXFS_EXTRA_MODARGS MXFS_RETIRE_CONTRACT MXFS_TEST_ENV MXFS_RIG_BUDGETS MXFS_STRACE_RANK MXFS_MPATH_TMO; do
     [ -n "${!vn:-}" ] && VARIANT="$VARIANT${VARIANT:+;}$vn=${!vn}"
 done
 [ "${RULE0_CALIBRATE:-0}" = 1 ] && VARIANT="$VARIANT${VARIANT:+;}RULE0_CALIBRATE=1"

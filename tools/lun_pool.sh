@@ -114,6 +114,9 @@ img_of() { echo "$POOL/lun$1.img"; }
 owner_of() { echo "$POOL/lun$1.owner"; }
 paths_of() { cat "$POOL/lun$1.paths" 2>/dev/null || echo 1; }
 bs_of() { cat "$POOL/lun$1.bs" 2>/dev/null || echo 512; }  # the LUN's logical block size
+# the path timescale (tools/mpath_settings.sh tmo) its multipath bind applied
+# to the nodes; a binding made before it was recorded used the default, 5
+tmo_of() { cat "$POOL/lun$1.tmo" 2>/dev/null || echo 5; }
 dev_of() {  # the guest device of an allocation: the by-path node, or the multipath map
     if [ "$(paths_of "$1")" = 2 ]; then echo /dev/mapper/mpatha
     else echo "/dev/disk/by-path/ip-$PORTAL:3260-iscsi-$(tgt_of "$1")-lun-0"; fi
@@ -464,6 +467,7 @@ release() {  # <id>: log the owner's nodes out, empty the group, drop the owner 
     fi
     : > "$(owner_of "$id")"
     unlink "$POOL/lun$id.paths" 2>/dev/null
+    unlink "$POOL/lun$id.tmo" 2>/dev/null
     unlink "$POOL/lun$id.also" 2>/dev/null
     return 0
 }
@@ -556,6 +560,11 @@ cmd_alloc() {
     case "$paths" in 1) ;; 2) [ "$(echo $MPLIST | wc -w)" -ge 2 ] || die "--paths 2 needs a portal per path on its own storage network: storage mpath=<ip>,<ip> in $MXFS_LAB (scripts/san_net.sh)" ;;
         *) die "--paths is 1 or 2" ;; esac
     [ "$also" = 1 ] && [ "$paths" = 2 ] && die "--also binds a single-path LUN only: the multipath map is always mpatha"
+    # A multipath bind writes the path settings to every node it logs in, so a
+    # binding whose timescale differs from the one asked for now is never kept:
+    # adopting it would leave the nodes on the old settings.
+    local tmo=""
+    if [ "$paths" = 2 ]; then tmo=$("$HERE/tools/mpath_settings.sh" tmo) || die "no path timescale from tools/mpath_settings.sh"; fi
     local st; st=$(starttime_of "$owner")
     [ -n "$st" ] || die "owner pid $owner is not running"
     local want; want=$(IFS=,; echo "${nodes[*]}")
@@ -567,7 +576,8 @@ cmd_alloc() {
             # --also: the owner's own LUNs on these nodes stay, and another is added
             [ "$also" = 1 ] && continue
             [ "$(owner_field "$id" 3)" = "$want" ] && [ "$(paths_of "$id")" = "$paths" ] && [ "$(bs_of "$id")" = "$bs" ] \
-                || die "owner $owner already holds lun$id for [$(owner_field "$id" 3)] on $(paths_of "$id") path(s) of $(bs_of "$id")-byte blocks, not [$want] on $paths of $bs"
+                && { [ "$paths" = 1 ] || [ "$(tmo_of "$id")" = "$tmo" ]; } \
+                || die "owner $owner already holds lun$id for [$(owner_field "$id" 3)] on $(paths_of "$id") path(s) of $(bs_of "$id")-byte blocks (path timescale $(tmo_of "$id") s), not [$want] on $paths of $bs${tmo:+ (path timescale $tmo s)}"
             pool_unlock
             pool_line "$id"
             return 0
@@ -581,7 +591,8 @@ cmd_alloc() {
     # still there, and a later run on the same node set re-uses it rather than
     # rebinding (which unmounts and unloads every node).  It is adopted when
     # it is still bound — its target registered with exactly those nodes'
-    # initiators in its group — and released when the node sets only overlap.
+    # initiators in its group — with the path timescale asked for, and
+    # released when the node sets only overlap or the timescale differs.
     for id in $(ids); do
         [ -s "$(owner_of "$id")" ] && ! owner_live "$id" || continue
         # A LUN bound with --also is never adopted: a later plain bind of its
@@ -589,6 +600,7 @@ cmd_alloc() {
         # nodes that no longer see it.
         if [ "$also" = 0 ] && [ ! -e "$POOL/lun$id.also" ] && [ "$(owner_field "$id" 3)" = "$want" ] && [ "$(lun_size "$id")" -ge "$min" ] \
            && [ "$(paths_of "$id")" = "$paths" ] && [ "$(bs_of "$id")" = "$bs" ] \
+           && { [ "$paths" = 1 ] || [ "$(tmo_of "$id")" = "$tmo" ]; } \
            && [ "$(ls "$T/$(tgt_of "$id")/ini_groups/alloc/initiators" 2>/dev/null | grep -vc '^mgmt$')" = "${#nodes[@]}" ] \
            && [ -s "$POOL/lun$id.wwid" ]; then
             echo "$claim" > "$(owner_of "$id")"
@@ -631,6 +643,7 @@ cmd_alloc() {
     id=$best
     echo "$claim" > "$(owner_of "$id")"
     echo "$paths" > "$POOL/lun$id.paths"
+    if [ "$paths" = 2 ]; then echo "$tmo" > "$POOL/lun$id.tmo"; else unlink "$POOL/lun$id.tmo" 2>/dev/null; fi
     if [ "$also" = 1 ]; then : > "$POOL/lun$id.also"; else unlink "$POOL/lun$id.also" 2>/dev/null; fi
     pool_unlock
 
@@ -796,6 +809,7 @@ cmd_destroy() {
     unlink "$(owner_of "$id")" 2>/dev/null
     unlink "$POOL/lun$id.wwid" 2>/dev/null
     unlink "$POOL/lun$id.paths" 2>/dev/null
+    unlink "$POOL/lun$id.tmo" 2>/dev/null
     unlink "$POOL/lun$id.bs" 2>/dev/null
     pool_unlock
     echo "destroyed lun$id"

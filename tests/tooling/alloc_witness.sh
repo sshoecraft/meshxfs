@@ -147,10 +147,10 @@ rec(){ printf '%s\n' "$*" >> "$REC"; }
 
 # A rank that aborts tells every peer at once, and every rendezvous below
 # returns the moment one has (aw_barrier).  Before, the aborting rank waited at
-# the final rendezvous and its peer at the next one; run.sh hands a row its
-# whole budget as COORD_TIMEOUT, so both waited until the budget killed them,
-# and the board recorded BUDGET_EXHAUSTED on both ranks with the abort that
-# ended the lap nowhere in it
+# the final rendezvous and its peer at the next one, each bounded by the 120 s
+# COORD_TIMEOUT run.sh passes by default, which equals this row's budget, so
+# both waited until the budget killed them, and the board recorded
+# BUDGET_EXHAUSTED on both ranks with the abort that ended the lap nowhere in it
 # (D-ALLOC-WITNESS-RANK-ABORT-RECORDED-AS-BUDGET-EXHAUSTED).
 # AW_ABORT_BROADCAST=0 keeps the old waits, for the control that shows them;
 # AW_ABORT_RANK=<n> makes rank n abort right after its fill, the reproducer.

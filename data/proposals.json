@@ -2976,6 +2976,46 @@
         "date": "2026-10-23"
       },
       "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-7a9e4c",
+      "kind": "remove-fixed",
+      "record": "D-ALLOC-WITNESS-RANK-ABORT-RECORDED-AS-BUDGET-EXHAUSTED",
+      "change": {
+        "control": "b20261023-5c1522",
+        "fixon": "b20261023-2baa2a",
+        "cause": "tests/tooling/alloc_witness.sh: a rank that aborted its own precondition wrote ABORT to its rank file and then waited at the final rendezvous while its peer waited at the next one; both waits are bounded by COORD_TIMEOUT, which run.sh passes at its default of 120 s, equal to the row's 120 s budget, so both ran until the budget killed them (rc=124) and the board recorded BUDGET_EXHAUSTED on both ranks with the abort nowhere in it; an aborting rank now broadcasts its abort (coord_signal_abort) and every rendezvous returns the moment one has (aw_barrier), so the peer records ABORTED_BY_PEER with the reason and the row ends at once"
+      },
+      "argument": "FIXED AND VERIFIED.\n\nThe defect: when one rank of the alloc_witness row aborted its own precondition, the other rank waited for it until the row's 120 s budget killed both, and the board recorded FAIL BUDGET_EXHAUSTED on both ranks instead of the abort that ended the lap.\n\nThe fix, one file: tests/tooling/alloc_witness.sh:148-194. fail_out (:158-167) records the abort and, with AW_ABORT_BROADCAST=1 (the default, :157), broadcasts it through the row's coordination channel (coord_signal_abort, tests/suite/coord.sh:182-193, which predates the fix and dir_reuse_coherency.sh already uses); peer_out (:168-172) records ABORTED_BY_PEER with the aborting rank's reason; aw_barrier (:173-194) runs each rendezvous in the background and returns 2 the moment coord_check_abort sees a peer's abort. AW_ABORT_BROADCAST=0 restores both pre-fix paths exactly: fail_out goes to the final rendezvous (:163) and aw_barrier is the plain coord_barrier (:174-176). Both waits are bounded by COORD_TIMEOUT, which run.sh passes at its default of 120 s (run.sh:307, :1658, :1883); that equals the row's 120 s manifest budget (tests/tooling/manifest:25) but is not derived from it, so the comment at alloc_witness.sh:150-151 ('hands a row its whole budget as COORD_TIMEOUT') overstates the link; what ends both ranks is the measured rc=124 at 120 s. This record's census half (the script wrote no mxfs-CCph phase marker) was split into D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE, which stays open: this removal claims only the abort broadcast, the one fix its control turns off.\n\nControl b20261023-5c1522 (candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD; tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step8.log): the frozen tree with AW_ABORT_BROADCAST=0 in the lap's environment. 10 of 10 exposed laps of tests/alloc_witness_abort_lap.sh FAIL 'LAP aw_abort FAIL: budget_exhausted=1 abort_named=0 elapsed=120s of 120s' (:5-14), each with rank 2 made to abort after its fill (AW_ABORT_RANK=2) and its witness record holding the injected ABORT; inputs before and after hash alike, 2559 files ('content=0; touched=0; added=0; gone=0', :16; tests/evidence/controls/b20261023-5c1522.20261023T102614Z.inputs.before.json and .after.json).\n\nFix-on verification b20261023-2baa2a sized from it (k=n=10, L=0.5887, N=6), applied by verify proposal P20261023-26297c (data/reviews/P20261023-26297c.md): 6 of 6 laps PASS 'the row ended in 1s of 120s and named the abort' (2 s on lap 2) with exposure (tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step9.log:3-9); the review read rank 2's injected ABORT and rank 1's ABORTED_BY_PEER in every run.\n\nConfigurations. The defect is in the row's script and its coordination channel; the script never reads the lock manager or the attachment. Measured beyond the batches' 2/disk/caw/direct:\n- 2/net/mesh/mpath (TCP lock manager, multipath), lane tests/evidence/lanes/g2b_awabort_precheck_20261023T073948Z on test15/test16, build 16A5F5DDDB4852C9D5DB236: with the fix both laps ended in 1 s with rank 1 'peer_abort rank=1' (step3.log:4, step5.log:4; tests/evidence/alloc_witness/20261023T074334Z-g2b/rank1.txt ABORTED_BY_PEER, rank2.txt ABORT); with AW_ABORT_BROADCAST=0 both ran 120 s of 120 s, states BUDGET_EXHAUSTED=2 (step4.log:4, step6.log:4). The precheck's fix-on laps print 'LAP aw_abort FAIL ... abort_named=0' (step3.log:6, step5.log:6) because the lap then looked for the token injected_abort only, which the recorded row did not carry (rank 1 recorded first); the lap was changed to accept the abort's own text AW_ABORT_RANK=2 before the control and verification batches, and the rows themselves (elapsed=1s, states FAIL=2, first_fail peer_abort) are the measurement cited here.\n- 2/net/mesh/drbd: the DRBD board's run of 2026-10-21T22:35:00Z (tests/evidence/drbd_rig/criteria.runs.jsonl:3262, run 20261021T221943Z-g2) shows the pre-fix mechanism in its own files: tests/evidence/alloc_witness/20261021T221943Z-g2/rank2.txt:1 'ABORT 14336 creates in 60 s ...', rank1.txt ends at its NODE line (it waited at the aw_start rendezvous), and tests/evidence/run_alloc_witness_20261021T221943Z-g2/test1.rc and test2.rc are both 124.\n\nCells. The record names only the ten control laps (2/disk/caw/direct:lap:aw_abort 2026-10-23T10:28:43Z .. 10:50:49Z), each failing on this cause in its own log (step8.log:5-14; tests/evidence/batch_laps/b20261023-5c1522/), already retired at 2/disk/caw/direct by the applied verification (data/criteria.runs.jsonl retired_by notes for lap:aw_abort). The DRBD run of 2026-10-21T22:35:00Z is no longer a cell: it was dropped from this record with tools/defects.py update --drop-cell (the record's evidence ends with the drop and its reason) because it fails with or without this fix, rank 2's fill carving nothing in its partition, which is D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION's failure. That open major record still names it (its cells in data/defects.json); D-ALLOC-WITNESS-WROTE-NO-PHASE-MARKER-SO-A-TIMED-OUT-ROW-CENSUS-READS-NONE dropped it the same way, for the same reason. So this removal settles no run its fix does not end (the objection of data/reviews/P20261023-5e015a.md:7, :169-175), and the run stays out of the incident list through the record that owns its failure (tools/criteria.py:1576).",
+      "evidence": [
+        "tests/tooling/alloc_witness.sh",
+        "tests/suite/coord.sh",
+        "tests/alloc_witness_abort_lap.sh",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step8.log",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/step9.log",
+        "tests/evidence/lanes/g2b_attempt1011_20261023T101423Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-5c1522",
+        "tests/evidence/batch_laps/b20261023-2baa2a",
+        "tests/evidence/controls/b20261023-5c1522.20261023T102614Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-5c1522.20261023T102614Z.inputs.after.json",
+        "data/reviews/P20261023-26297c.md",
+        "data/reviews/P20261023-5e015a.md",
+        "tests/evidence/lanes/g2b_awabort_precheck_20261023T073948Z",
+        "tests/evidence/alloc_witness/20261023T074334Z-g2b/rank1.txt",
+        "tests/evidence/alloc_witness/20261021T221943Z-g2/rank1.txt",
+        "tests/evidence/alloc_witness/20261021T221943Z-g2/rank2.txt",
+        "data/defects.json",
+        "tools/criteria.py"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-7a9e4c.md",
+        "sha256": "25460012d12e2ef6194d65e0d2dfefe19fc4e34051c9009087712ff08ae9f6bd",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }
