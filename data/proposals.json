@@ -3045,8 +3045,15 @@
         "pal/linux/xfs_super.c",
         "tests/evidence/board_20261023T134226Z-g2d_fourkn_merge"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-a8d4c1.md",
+        "sha256": "8d795572741c00e2fa4302c3cd4ef7dbc617670506904d61ae4b9f3598c9e32a",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }

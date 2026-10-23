@@ -62,6 +62,12 @@ import release_candidate   # noqa: E402
 EVIDENCE = ROOT / "tests" / "evidence" / "candidates"
 RUN_LOCK = release_candidate.RUN_LOCK
 
+#: board_verdict grades an own-rig board with the flag that board's configuration needs, and
+#: refuses a verdict that graded no row (D-RELEASE-RUN-BOARD-VERDICT-GRADED-NO-ROW-OF-AN-OWN-RIG-BOARD).
+#: `MXFS_BOARD_VERDICT_OWN_RIG=0` grades as before that fix, the flag left as the caller has it
+#: and an empty verdict read as clean: the fix's control (tests/release_board_verdict_lap.py).
+BOARD_VERDICT_OWN_RIG = os.environ.get("MXFS_BOARD_VERDICT_OWN_RIG", "1") != "0"
+
 
 def now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -403,7 +409,7 @@ def board_verdict(cid: str, config: str, board: Path | None = None) -> list:
     here no row applied and the verdict was empty: the DRBD board was never graded (0.90.134 dry
     run). A verdict that graded no row is refused, never read as clean."""
     saved = os.environ.get("MXFS_OWN_RIG")
-    if configuration.ATTACHES.get(config.rsplit("/", 1)[-1], {}).get("own_rig"):
+    if BOARD_VERDICT_OWN_RIG and configuration.ATTACHES.get(config.rsplit("/", 1)[-1], {}).get("own_rig"):
         os.environ["MXFS_OWN_RIG"] = "1"
     try:
         data = criteria.read_board(board or criteria.SPEC)
@@ -420,7 +426,7 @@ def board_verdict(cid: str, config: str, board: Path | None = None) -> list:
             os.environ.pop("MXFS_OWN_RIG", None)
         else:
             os.environ["MXFS_OWN_RIG"] = saved
-    if not graded:
+    if BOARD_VERDICT_OWN_RIG and not graded:
         bad.append(f"no row of the specification applies at {config}: nothing was graded")
     return bad
 
