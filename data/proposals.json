@@ -2333,8 +2333,14 @@
         "tests/evidence/candidates/0.90.134_check_20261023T040532Z.txt",
         "data/candidates/0.90.134.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-e8d614.md",
+        "sha256": "55ae936dccf686b5d9942519b4c7424f230b4540235647035353d282b695a47d",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-5fbb20",
