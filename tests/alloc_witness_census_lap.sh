@@ -13,9 +13,15 @@
 # taken.  The row is recorded on a scratch copy of the board (MXFS_CRIT), never on the release
 # board: an injected abort is not a filesystem verdict.
 #
+# run.sh's census reads each node's newest CCph line in the whole kernel ring, so an earlier row's
+# marker on the same boot would stand in for this row's
+# (D-RUN-SH-TIMEOUT-CENSUS-READS-AN-EARLIER-ROWS-PHASE-MARKER-FROM-THE-BOOTS-RING).  The lap first
+# writes `mxfs-CCph rank=0 PHASE=lapmark` on each node, so a row that writes no marker of its own
+# is read as `lapmark`, whatever earlier rows left.
+#
 #   EXPOSED  the row ran out its budget and run.sh took its census (last_phase_census in the reason)
-#   PASS     the census names a phase for every node, none of them `none`
-#   FAIL     a node's entry is `none`: a rank the budget killed left no phase
+#   PASS     the census names a phase of the row for every node, none of them `none` or `lapmark`
+#   FAIL     a node's entry is `none` or `lapmark`: a rank the budget killed left no phase
 #   ABORT    the row did not run, rank 2 never reached its fill, or the row ended before its
 #            budget (no census, nothing measured)
 #
@@ -38,6 +44,10 @@ S=$(mktemp -d /tmp/mxfs_awcensus.XXXXXX) || { echo "LAP aw_census ABORT: no scra
 trap 'rm -rf -- "$S"' EXIT
 cp data/criteria.json "$S/criteria.json" || { echo "LAP aw_census ABORT: no board copy"; exit 2; }
 echo "LAP aw_census start $(date -u +%FT%TZ) label=$LABEL at=$AT nodes=$NODES"
+for n in $NODES; do
+    timeout 20 tools/mxfs_sshpass.sh "$n" "echo 'mxfs-CCph rank=0 PHASE=lapmark' > /dev/kmsg && echo MARK-OK" \
+        < /dev/null 2>/dev/null | grep -q '^MARK-OK$' || { echo "LAP aw_census ABORT: cannot mark $n's kernel log"; exit 2; }
+done
 env -u MXFS_BATCH MXFS_CRIT="$S/criteria.json" \
     MXFS_TEST_ENV="AW_ABORT_RANK=2 AW_ABORT_BROADCAST=0" \
     ./run.sh "$AT" alloc_witness < /dev/null > "$S/run.out" 2>&1
@@ -74,8 +84,9 @@ if not census:
 entries = dict(item.split("=", 1) for item in census.group(1).split(",") if "=" in item)
 counted = sum(int(n) for n in entries.values() if n.isdigit())
 print(f"EXPOSED: the row ran out its budget and run.sh took its census: last_phase_census[{census.group(1)}]")
-if "none" in entries or counted != len(nodes):
-    print(f"LAP aw_census FAIL: {entries.get('none', '0')} of {len(nodes)} nodes left no phase "
+if "none" in entries or "lapmark" in entries or counted != len(nodes):
+    unmarked = int(entries.get("none", "0")) + int(entries.get("lapmark", "0"))
+    print(f"LAP aw_census FAIL: {unmarked} of {len(nodes)} nodes left no phase of the row "
           f"(census [{census.group(1)}], {counted} entries for {len(nodes)} nodes)")
     sys.exit(1)
 print(f"LAP aw_census PASS: every node's rank left its phase: [{census.group(1)}]")
