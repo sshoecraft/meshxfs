@@ -2366,8 +2366,15 @@
         "tests/tcp_stale_resend.sh",
         "tests/stale_resend_shard_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-5fbb20.md",
+        "sha256": "807321876e1d7271bbc505156c898d786d2dcb0312afab414ef17e5c480028c8",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }

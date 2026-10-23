@@ -3972,218 +3972,6 @@
       ]
     },
     {
-      "id": "D-TCP-STALE-RESEND-CANDIDATES-SHARE-ONE-ROUTING-SHARD-SO-ONE-MASTER-DRAW",
-      "severity": "major",
-      "nodes": 2,
-      "config": "*/*/*",
-      "opened": "2026-10-22",
-      "summary": "tests/tcp_stale_resend.sh writes its 8 candidate files back to back, so their inode numbers are consecutive. Under ledger routing version 2 an inode routes with the low three bits of its number cleared (include/mxfs/mxfs_tauth.h, MXFS_TAUTH_INO_SHARD), so all 8 share one master: the search for a candidate remotely mastered from W is one draw, not eight, and on a 2-node group it ABORTs whenever that draw is W. tests/pending_late_grant.sh has the same shape: NFILES defaults to 8 consecutive creates, and its premise that about half the files are remotely mastered from each node does not hold for one or two shards. tcp_lockreq_blackhole.sh already avoids it with seven spacer files between candidates; live_holder_wait.sh selects one candidate per distinct shard.",
-      "evidence": "Gate run tests/evidence/presteps_harnessfix_20261022.log (capture_fault_gate label 0.90.134-harnessfix-full, test1/test2, 2/net/mesh/direct, srcversion A6239940FC6B66138D10442): \"GATE tcp_stale_resend fault: rc=2 wall=121s fault_line=0 abort=0 verdicts_after_fault=0 -> BROKEN\", the only broken entry of 60. Its log tests/evidence/20261022T042630Z_capture_gate_0.90.134-harnessfix-full/tcp_stale_resend_fault.log: candidates idx=1..8 are ino 8388736..8388743 (0x800080..0x800087, one shard), every one drop_hits=0, then \"ABORT: no candidate inode is remotely mastered from test2\". pending_late_grant.sh:63 NFILES=${NFILES:-8}, line 35 states the half-remote premise; its consequence for that harness verdict is not yet measured. ===== ===== 2026-10-22, fix in the tree: tests/tcp_stale_resend.sh creates files until 16 distinct routing shards (ino >> 3) are represented, keeps the first in each as a candidate, removes the spares once every candidate exists, and removes the candidates it made at the end and on the no-candidate ABORT (rm_cands). Setup bound 13 s. Verified on g2 (test1/test2, 2/net/mesh/direct, srcversion A6239940FC6B66138D10442) through tests/capture_fault_gate.sh 0.90.134-srshard --only tcp_stale_resend: fault lap 'rc=2 wall=21s fault_line=1 abort=1 -> OK' (tests/evidence/20261022T115448Z_capture_gate_0.90.134-srshard); healthy lap 'rc=0 wall=92s fails=0 -> OK' (tests/evidence/20261022T115629Z_capture_gate_0.90.134-srshard, lap dir tests/evidence/20261022T115631Z_staleresend_0.90.134-srshard-tcp_stale_resend-ok): 16 candidates in distinct shards at +2s; the first four shards (ino 8390849, 8390857, 8390865, 8390873) were local to W (drop_hits=0) and the fifth (8390881) remote (drop_hits=10), so the old 8-consecutive-file setup, one shard, would have ABORTed on this formation; all 7 verdicts PASS. Candidate idx 58 reused a freed lower number (8388737), which is why selection is by shard and not by spacing. pending_late_grant.sh: its verdict is a late-kept total over both nodes and both nodes append to every file, so the master's own appends complete by promotion and the other node's by a wire grant whatever the shard draw; only its comment's premise was false, now corrected (comment-only change, bash -n OK). ===== ===== 2026-10-22 full presteps sequence after the fix, g2 (test1/test2, 2/net/mesh/direct, srcversion A6239940FC6B66138D10442), as tools/release_run.py runs it: harness lint rc=0; tests/chk_oracle_calibration.sh PASS 5/5; prep_cluster OK (28s); tests/rig_lib_contract.sh PASS fails=0; tests/capture_fault_gate.sh 'RESULT: PASS label=0.90.134-presteps-full2 entries=60 broken=0 vacuous=0 restores=8 wall=1621s' (tests/evidence/20261022T120001Z_capture_gate_0.90.134-presteps-full2; log tests/evidence/presteps_full_20261022b.log). The earlier full run had tcp_stale_resend as its only broken entry.",
-      "next": "The fix (16 candidates in distinct shards) is in the tree and passed the gate's fault and healthy laps (evidence above). Control batch with SR_SHARD_SELECT=0 (lane tests/evidence/lanes/queue_g2_srshard_control.txt, after the gate-controls lane frees g2): both precheck laps first (fix on PASS, off FAIL), then 10 laps that must fail; then the verification batch on the candidate sized from it. ===== Verify P20261023-efb250 approved and applied (b20261023-be3e39 passed on 0.90.134 attempt 2026-10-23T03:55:19Z). Removal P20261023-49a2f7 was rejected (data/reviews/P20261023-49a2f7.md) only because the record also names tests/pending_late_grant.sh and its consequence there was argued, not run. Needed: a run of tests/pending_late_grant.sh with NFILES=8 at 2/net/mesh/direct on the candidate's module showing the eight files' inode numbers in one routing shard (ino >> 3; the files stay in $MNT/plgrant_<label>), a STAGE late-kept: count of at least 1 on both nodes, and RESULT: PASS; then resubmit the removal citing it (the control, the fix-on batch and the cause carry over). The stale comment at tests/pending_late_grant.sh:120-121 is corrected on the next attempt, not this one.",
-      "reproducer": "tests/stale_resend_shard_lap.sh <label> on the formed g2 pair: runs tests/tcp_stale_resend.sh once and grades the candidates H made (its h_setup.txt) by distinct routing shards (ino >> 3): PASS at 8 or more, FAIL below. SR_SHARD_SELECT=0 is the harness's same-build control (eight files written back to back, one or two shards every lap).",
-      "updated": "2026-10-23",
-      "batches": [
-        {
-          "id": "b20261022-e9be03",
-          "kind": "control",
-          "row": "lap:sr_shard",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^LAP sr_shard candidates=",
-          "candidate": "",
-          "build": "9594B08726D6732D2ED5E87",
-          "variant": "SR_SHARD_SELECT=0 (tests/tcp_stale_resend.sh makes its candidates as before the fix: eight files written back to back)",
-          "state": "open",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-22",
-          "why": "the fix's switch off: the harness's eight candidates are written back to back, one or two routing shards, so its search for a candidate remotely mastered from W is one or two draws"
-        },
-        {
-          "id": "b20261023-720c28",
-          "kind": "control",
-          "row": "lap:sr_shard",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^LAP sr_shard candidates=",
-          "candidate": "",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "SR_SHARD_SELECT=0 (tests/tcp_stale_resend.sh makes its candidates as before the fix: eight files written back to back)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix's switch off: the harness's eight candidates are written back to back, one or two routing shards, so its search for a candidate remotely mastered from W is one or two draws"
-        },
-        {
-          "id": "b20261023-be3e39",
-          "kind": "verify",
-          "row": "lap:sr_shard",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^LAP sr_shard candidates=",
-          "candidate": "0.90.134",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:sr_shard",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-720c28",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "SR_SHARD_SELECT=0 (tests/tcp_stale_resend.sh makes its candidates as before the fix: eight files written back to back)",
-            "builds": [
-              "16A5F5DDDB4852C9D5DB236"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:08:11Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:08:07Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:08:03Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:07:59Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:07:56Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:07:52Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:07:48Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:04:42Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:02:40Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T01:00:38Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T05:28:01Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T05:25:53Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T05:23:44Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T05:21:35Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T05:19:27Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T05:17:18Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T05:15:08Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T05:13:00Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T05:10:53Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:sr_shard",
-          "iso": "2026-10-23T05:08:40Z"
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:sr_shard",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-720c28",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "SR_SHARD_SELECT=0 (tests/tcp_stale_resend.sh makes its candidates as before the fix: eight files written back to back)",
-          "builds": [
-            "16A5F5DDDB4852C9D5DB236"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-23T03:55:19Z",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "batch": "b20261023-be3e39",
-          "approval": "P20261023-efb250",
-          "date": "2026-10-23"
-        }
-      ]
-    },
-    {
       "id": "D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS",
       "severity": "medium",
       "nodes": 1,
@@ -5807,7 +5595,7 @@
       "opened": "2026-10-23",
       "summary": "On 2/net/mesh/direct (candidate 0.90.134, build 16A5F5DDDB4852C9D5DB236) test1 read 2 of 8 files its peer had just written and fsynced and got no data: test1's buffer cache served extent-tree (bmbt) blocks still carrying the owner of a file from the previous lap, deleted and its blocks reused for the new files' trees; the btree owner check refused them (P975-BMBT-LOOKUP-BAD same_image=0) and the reads failed. Had the inode number been reused too, the owner check would have matched and a stale extent map would have been served.",
       "evidence": "Lap 7 of verification b20261023-b40448 (tests/capture_fault_gate.sh openefivc7 --only d_intents_2tcp_open_efi, W=test1 V=test2): tests/evidence/20261023T061838Z_capture_gate_openefivc7/d_intents_2tcp_open_efi_ok.log:8 'INFO published via test1: listed=8 read=6 (+7s)', :9 'FAIL W listed and read all 8 files (published before the rm) got=6 want=8'; the step is tests/d_intents_2tcp_open_efi.sh:172-190 (V writes 8 files of 4096 extents with fsync of each file and the directory; W counts the files whose 'head -c 4096' returns 4096 bytes), before any fault. W's kernel log tests/evidence/20261023T061841Z_intents2tcp_openefivc7-d_intents_2tcp_open_efi-ok/dmesg_test1.txt:251 and :258 'P975-BMBT-LOOKUP-BAD daddr=2106984 want_ino=2097296 want_level=0 cached_owner=2097287 cached_level=0 cached_nrecs=251 ... disk_rc=0 disk_owner=2097296 ... same_image=0 comm=head', :297 and :302 the same at daddr=2164704 want_ino=2097298 cached_owner=2097290 disk_owner=2097298; :17-20 ISTALE-CAW-EVICT ino=2097294 (V's directory) try=1..4; :53 'P212-RDRETRY-SKIP ino=2097294 fmt=1 ... serving consistent-stale'. The previous lap's W log (tests/evidence/20261023T061656Z_intents2tcp_openefivc6-d_intents_2tcp_open_efi-ok/dmesg_test1.txt:241-268) already shows test1 holding bmbt images of owner 2097287 at other addresses that differ from the LUN ('P77-SKIP-DIFFERS site=chokepoint owner=2097287 daddr=2115088 numrecs=251 same=0 ... skipped bmbt image differs from LUN', 'P61-CHOKEPOINT-SKIP-BMBT owner=2097287 ... NL-released dir, skipping stale leaf write at bio submit'). W stays mounted across the gate's laps; each lap V builds, removes and dies, and W replays V's slice and completes its open EFI (P226-FR-INTENTS-RECOVERABLE, P-OBL-ENGINE-EXTENT, P163-RECOVERY-COMPLETE). The 0.87.6 eviction (CHANGELOG.md 0.87.6, mxfs_bmbt_tenure_end_evict) drops an inode's cached bmbt images at the end of each tenure on that inode; the consult on that change named buffers left by log recovery of a dead peer's slice as not covered. 1 of the batch's 7 laps.",
-      "next": "Establish how test1's cache came to hold bmbt images owned by 2097287 and 2097290 at daddr 2106984 and 2164704 when lap 7 began: brought in by lap 6's replay of V's slice or by the obligation engine's completion, never read under a tenure and so never evicted; or read under a tenure whose end did not evict them. Instrument first: a probe where recovery completes listing every bmbt buffer (daddr, payload owner, XBF_DONE, dirty) it leaves in the cache, and the tenure-end eviction's decision for those daddrs; reproduce with open-EFI laps back to back on one W mount. Then fix at the proven cause with a knob for the control, the control with it off, and a verification batch on the candidate.",
+      "next": "Establish how test1's cache came to hold bmbt images owned by 2097287 and 2097290 at daddr 2106984 and 2164704 when lap 7 began: brought in by lap 6's replay of V's slice or by the obligation engine's completion, never read under a tenure and so never evicted; or read under a tenure whose end did not evict them. Instrument first: a probe where recovery completes listing every bmbt buffer (daddr, payload owner, XBF_DONE, dirty) it leaves in the cache, and the tenure-end eviction's decision for those daddrs; reproduce with open-EFI laps back to back on one W mount. Then fix at the proven cause with a knob for the control, the control with it off, and a verification batch on the candidate. ===== HYPOTHESIS (from lap 7's own log and the code; not yet instrumented): the stale image was not served from the cache, it was served by a READ that was never issued. The bmbt write chokepoint in xfs_buf_submit_bio (pal/linux/xfs_buf.c:9570, mxfs_buf_xfsaild_skip_bmbt_write, xfs/xfs_mxfs_buf.c:1032) has no direction test, so it judges read bios too, and it reads the owner from the buffer's memory, which for an evicted buffer (XBF_DONE cleared by the tenure-end evict) still holds the previous tree's image. In lap 7 that previous owner, 2097287, had been reused as a directory that is in core on test1 and NL-released, so the predicate returned skip for head's read of daddr 2106984: mxfs_bmbt_skip_preserve_truth read the LUN, found it different (P77-SKIP-DIFFERS same=0, owner=2097287), and staled the buffer (pal/linux/xfs_buf.c:8751); the chokepoint printed P61-CHOKEPOINT-SKIP-BMBT and completed the bio with xfs_buf_ioend and no I/O (:9603); for an XBF_READ buffer that runs verify_read on the old image and sets XBF_DONE, so the lookup got the old leaf with flags=0x60 = XBF_DONE|XBF_STALE, exactly what P975-BMBT-LOOKUP-BAD printed (dmesg_test1.txt:247-251, and :293-297 for daddr 2164704, owner 2097290). The cache find cannot hand out a stale buffer (xfs_buf_find_lock resets one, pal/linux/xfs_buf.c:1068-1101), and P975 prints before xfs_buf_mark_corrupt (xfs/libxfs/xfs_btree.c:1978-1982), so XBF_STALE was set inside the lookup's own read. The recovery retirement is not involved: lap 6's replay tagged one bmbt image and retired it (P-RECOV-IMAGE-EVICT ... bmbt=1 ... evicted=5 local=0 busy=0, lap 6 dmesg_test1.txt:901). The chokepoint's second arm (b_tenure_id != i_mxfs_ex_grant_seq) can suppress a read of the owner directory's own leaf under a later tenure, and that image carries the right owner, so the owner check cannot refuse it. Falsifiable: with the chokepoint's skip printing the bio direction, every P61 that precedes a P975 must be a READ; with the skip limited to write bios, no read is ever skipped and the lookup reads the LUN. The directory-block skip at :9848 (mxfs_buf_xfsaild_skip_dir_write) has no direction test either and sets XBF_DONE itself; it is a suspected sibling to instrument separately, not part of this change.",
       "reproducer": "tests/capture_fault_gate.sh <label> --only d_intents_2tcp_open_efi, laps back to back on one survivor mount (as tools/harness_batch.py runs a batch): a lap whose 'published via' read count is below 8, with P975-BMBT-LOOKUP-BAD naming an owner from an earlier lap",
       "cells": [
         {
@@ -5815,7 +5603,8 @@
           "row": "gate:d_intents_2tcp_open_efi",
           "iso": "2026-10-23T06:20:27Z"
         }
-      ]
+      ],
+      "updated": "2026-10-23"
     }
   ]
 }
