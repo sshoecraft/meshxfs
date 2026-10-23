@@ -2144,8 +2144,15 @@
         "tests/stale_resend_shard_lap.sh",
         "tests/tcp_stale_resend.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-efb250.md",
+        "sha256": "9f7baab98865b9b84a8755c4793a1ef868845c7b0ab5021dae5fab0b864d8a64",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-49a2f7",
@@ -2164,8 +2171,14 @@
         "tests/tcp_stale_resend.sh",
         "tests/stale_resend_shard_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-49a2f7.md",
+        "sha256": "148b28611f81643a872e4b575a6245a27c3f3cd618254ad439c4f1171352cf93",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-867053",
@@ -2181,8 +2194,14 @@
         "tests/evidence/adopted_grant_handoff",
         "tests/tauth/adopted_grant_handoff_test.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-867053.md",
+        "sha256": "6ef77546fcec897c6bd07ede11d7f89077e9ff60177b929d3159579d6432224d",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-778a6d",
@@ -2201,8 +2220,14 @@
         "tests/evidence/ag6_false_grant_logs_20261022T1956Z.txt",
         "tests/tauth/adopted_grant_handoff_test.c"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-778a6d.md",
+        "sha256": "aa31dc2dd38f7d8759ce169836fba8a001b13da99b9abce1017ff6d96ef027bc",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-6664ba",
@@ -2218,8 +2243,14 @@
         "tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.scratch_copy_16A5F5.txt",
         "tests/evidence/fenced_node_ledger"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-6664ba.md",
+        "sha256": "25229fc727598170ec47c395431f9c6fbf7a6d168c27ee48aeee9621e5af445f",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-6c4c99",
@@ -2238,8 +2269,14 @@
         "tests/evidence/controls/D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES.fix.diff",
         "tests/evidence/fenced_node_ledger"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-6c4c99.md",
+        "sha256": "51e04188ab3469ff85af26c0110667b510c6fee47d88a9cd9a477e2dd27ad3f2",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     }
   ]
 }
