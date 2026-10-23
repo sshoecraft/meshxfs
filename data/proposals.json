@@ -2946,6 +2946,29 @@
         "date": "2026-10-23"
       },
       "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-4ea617",
+      "kind": "verify",
+      "record": "D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS",
+      "change": {
+        "batch": "b20261023-fa1878"
+      },
+      "argument": "Verification batch b20261023-fa1878 (fourkn_merge at 2/disk/caw/direct4k on the g2d pair test31/test32, 4096-byte pool LUN, the COMPARE AND WRITE lock manager; candidate 0.90.134, attempt frozen 2026-10-23T10:11:20Z, module 08D63764A9352FBDD5A76CD: tests/evidence/lanes/g2d_fourkn_caw_control_20261023T124700Z/step3.log '--- prep OK: mxfs mounted on all 2 node(s), build 08D63764A9352FBDD5A76CD ---') was declared by tools/harness_batch.py verify before its first lap (step5.log first line: 'declared verification batch b20261023-fa1878 for D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS: fourkn_merge at 2/disk/caw/direct4k, 13 clean laps (rate 13/20, lower bound 0.3434, delta 0.005, alpha 0.005)'). It is sized from the control closed just before it on the same attempt, build and pair, b20261023-78831e (step4.log), whose own rate was measured at this configuration rather than transferred from 2/net/mesh/direct4k. That control ran the row as the fix found it, the same knob setting the approved verification of 2/net/mesh/direct4k used (P20261023-fce738, control b20261023-2cdd94): MXFS_TEST_ENV HOLD_N=8 HOLD_MS=20 HOLD_PEER_MS=1000 FORCE_MS=0, each node's first 8 merged blocks held between read and swap until the peer writes the block (at most 1000 ms) and both unmounts plain. Every one of its 20 lap lines reads 'hold=8x1000ms forced=off', as the pre-fix row on build 16A5F5DDDB4852C9D5DB236 measured 'hold=8x1000ms' (data/criteria.runs.jsonl:8051 and :8054, batch b20261022-7effb7). 13 of 20 exposed laps failed VACUOUS with miscompares=0 hold_landed=0 (laps 3-7, 9, 10, 12-15, 17, 18; e.g. lap 3 '2/disk/caw/direct4k:fourkn_merge:2026-10-23T13:11:51Z miscompares=0 hold_landed=0 merged_blocks=101 workload_ms=20438 hold=8x1000ms forced=off exposure=1 -- FAIL'); step4.log ends 'control b20261023-78831e: 13 of 20 laps failed with the fix out (20 run by this call)'. Those 13 FAILs are exactly the record's 13 cells at 2/disk/caw/direct4k (2026-10-23T13:11:51Z, 13:12:56Z, 13:14:00Z, 13:15:06Z, 13:16:12Z, 13:18:25Z, 13:19:32Z, 13:21:47Z, 13:22:53Z, 13:23:59Z, 13:25:06Z, 13:27:19Z, 13:28:27Z); the record names no other run at this configuration, so this verification retires only runs whose own lap line shows this cause (no MISCOMPARE retried in the held window). With k=13 of n=20, L = BetaQuantile(0.005; 13, 8) = 0.3434 and N = ceil(ln 0.005 / ln(1 - 0.3434)) = ceil(12.59) = 13. Each of the 13 laps, the row as it ships (FORCE_MS 5000, HOLD_N 0), is PASS with the probe 'FOURKN-MERGE-[^ ]+ counted miscompares=[1-9].*forced=landed' matched (exposure=1 and 'hold=0x1000ms forced=landed' on every lap line, miscompares 1 each). No lap failed and none was INCOMPLETE. Stalls, what is and is not measured: the row bounds its two workers at WBOUND, 16 s with no hold (tests/suite/fourkn_merge.sh:107, :155-156), so no workload operation can last 30 s. Outside the workload the row times no single step; each lap took 37-45 s in all ('(37s/60s)' to '(45s/60s)' on the lap lines), which includes run.sh's own checks before the row, the 9.7-13.4 s workload (workload_ms), the forced overlap (one hold of at most FORCE_MS 5000 ms), both unmounts, chk_mxfs and the mode reads. In the longest lap (2/disk/caw/direct4k:fourkn_merge:2026-10-23T13:43:31Z, 45 s; data/criteria.runs.jsonl:9624, evidence tests/evidence/board_20261023T134226Z-g2d_fourkn_merge) test31's kernel log runs from the row's mark (dmesg_test31.txt:1 '[ 2122.148555] FOURKN-MERGE-20261023T134226Z-g2d') to its forced unmount's report (:1513 '[ 2137.574403] mxfs: P199-UNMOUNT-RESIDUAL-TOTAL ...'), 15.4 s for the workload, the settle reads and the forced overlap together; both force_umount_test31.txt and force_umount_test32.txt read 'umount_ok', and neither node's log holds 'Busy inodes', 'VFS: ', BUG, WARNING or Oops.",
+      "evidence": [
+        "tests/evidence/lanes/g2d_fourkn_caw_control_20261023T124700Z/step3.log",
+        "tests/evidence/lanes/g2d_fourkn_caw_control_20261023T124700Z/step4.log",
+        "tests/evidence/lanes/g2d_fourkn_caw_control_20261023T124700Z/step5.log",
+        "tests/evidence/lanes/g2d_fourkn_caw_control_20261023T124700Z/step6.log",
+        "tests/evidence/lanes/g2d_fourkn_caw_control_20261023T124700Z/summary.log",
+        "tests/evidence/lanes/g2d_fourkn_caw_control_20261023T124700Z/queue",
+        "tests/suite/fourkn_merge.sh",
+        "tests/suite/manifest",
+        "data/criteria.runs.jsonl",
+        "tests/evidence/board_20261023T134226Z-g2d_fourkn_merge/dmesg_test31.txt"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
     }
   ]
 }
