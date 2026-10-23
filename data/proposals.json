@@ -2967,8 +2967,15 @@
         "data/criteria.runs.jsonl",
         "tests/evidence/board_20261023T134226Z-g2d_fourkn_merge/dmesg_test31.txt"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-4ea617.md",
+        "sha256": "d421b0bce5a8bece3afb411b975ae56c5d0dc3265dd1567f857e457e64d5e616",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }
