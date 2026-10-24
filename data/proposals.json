@@ -6623,8 +6623,15 @@
         "tests/unretire_lap_row_lap.py",
         "tools/criteria.py"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-5897f4.md",
+        "sha256": "71a118c460a9612177a426be31e694bfc1716dbbb3769a89fa4caacac10bdf28",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-8dbbc7",
@@ -6641,8 +6648,15 @@
         "tools/sole_survivor_audit.py",
         "tests/criteria/sole_survivor_sites.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-8dbbc7.md",
+        "sha256": "c2030b77685c12c3ac87b631097f9dda705818e434f321f5d90964e648e5a551",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-f8d290",
@@ -6659,8 +6673,15 @@
         "tools/harness_batch.py",
         "tools/release_candidate.py"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-f8d290.md",
+        "sha256": "fed4c0df1acbff2de35dd5ba40f9bd6bcff82eb414a38ff917d177012b5c2d8c",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-7b2508",
@@ -6676,8 +6697,15 @@
         "tests/cell_day_stamp_lap.py",
         "tools/defects.py"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-7b2508.md",
+        "sha256": "14f65dd2588981217133ba2c8f34f12dbcd4d226cbddf903b0cc6a4543488884",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-452ba2",
@@ -6692,6 +6720,100 @@
         "tests/evidence/lanes/g2_a15_20261024T041432Z/step3.log",
         "tests/drbd_nodes_count_lap.sh",
         "scripts/drbd_rig.sh"
+      ],
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-452ba2.md",
+        "sha256": "0f8a5ca47543cb8db110511b5f7298c2ba74d092d5f776783f488422abf97f1b",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
+    },
+    {
+      "id": "P20261023-6bdbe7",
+      "kind": "remove-fixed",
+      "record": "D-HARNESS-BATCH-PROOF-COMPARES-CONTENT-ONLY-SO-A-MODE-ONLY-FIX-CANNOT-BE-PROVEN",
+      "change": {
+        "control": "b20261023-e27d82",
+        "fixon": "b20261023-3c3952",
+        "cause": "tools/harness_batch.py proof compared input stamps by content hash alone, and no stamp recorded a file's mode, so a fix whose only change is a mode (an execute bit) showed no difference from the control's tree and proof printed FAILS"
+      },
+      "argument": "FIXED AND VERIFIED. Cause: proof of control b20261023-844929 printed 'during the laps the fix's files differed [tests/release_step_copy_race.py] and nothing else' and then FAILS, although that fix's diff was 'old mode 100664 / new mode 100775' with no hunk (record evidence); compare_inputs compared field 0 (the hash) only. Fix (tools/harness_batch.py:135-159): stamp_of records the permission bits as a sixth field and differs() counts a mode difference as content when both stamps carry one; MXFS_PROOF_MODE=0 (:139) compares hashes alone, as before. Control b20261023-e27d82 (candidate 0.90.134, attempt frozen 2026-10-24T04:13:43Z, module B947A20F3C2FE3A67ABF6F3, MXFS_PROOF_MODE=0 the only change): 10 of 10 exposed laps FAIL, the chmodded file listed nowhere (tests/evidence/lanes/host_a15_20261024T041350Z/step5.log). Verification b20261023-3c3952, sized from it (N=6), 6 of 6 PASS with exposure, content=1 (tests/evidence/lanes/host_a15_20261024T041350Z/step6.log), applied with approval P20261023-f8d290 (data/reviews/P20261023-f8d290.md, which found the lap's inputs identical to the frozen manifest). Same lap, same hashes; the batches differ only in the switch. REACH: the record is at its fail-closed 1/any. The defect is in a host-only tool that reads no cluster parameter, node count, lock manager or attachment; the lap runs on the lab host in a scratch copy and touches no VM, so 2/disk/caw/direct is only the ledger key the batches are filed under and no configuration runs different code. CELLS: the record's ten cells are the control's own ten laps, which the removal settles; it names no board run.",
+      "evidence": [
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step5.log",
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step6.log",
+        "data/reviews/P20261023-f8d290.md",
+        "tests/proof_mode_lap.py",
+        "tools/harness_batch.py"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-edd872",
+      "kind": "remove-fixed",
+      "record": "D-CRITERIA-UNRETIRE-REFUSES-LAP-ROWS-SO-WRONG-LAP-RETIREMENTS-STAND",
+      "change": {
+        "control": "b20261023-97db42",
+        "fixon": "b20261023-146167",
+        "cause": "tools/criteria.py annotated_run looked any row other than release:<step> up as a board criterion, so unretire of a lap row (lap:<name>) was refused 'nothing matches' and a wrong retired_by note on a lap run could not be withdrawn"
+      },
+      "argument": "FIXED AND VERIFIED. Cause: on 2026-10-24 'MXFS_OWN_RIG=1 tools/criteria.py unretire lap:drbd_rig_tag --at 2/net/mesh/drbd --iso 2026-10-24T01:02:06Z ...' printed 'criteria: nothing matches 'lap:drbd_rig_tag'' for each of the ten wrongly retired laps of control b20261023-d08fc5, while the same command for release:drbd runs worked (record evidence); annotated_run's only non-criterion branch was release:. Fix (tools/criteria.py:1479-1488, switch :122-124): a row lap:<name> is taken under its configuration as release:<step> is; MXFS_LAP_ANNOTATE=0 looks it up as a board criterion, as before. With the fix the ten d08fc5 retirements were withdrawn (tests/evidence/drbd_rig/criteria.runs.jsonl:3615-3624). Control b20261023-97db42 (candidate 0.90.134, attempt frozen 2026-10-24T04:13:43Z, module B947A20F3C2FE3A67ABF6F3, MXFS_LAP_ANNOTATE=0 the only change): 10 of 10 exposed laps FAIL 'nothing matches' (tests/evidence/lanes/host_a15_20261024T041350Z/step1.log). Verification b20261023-146167, sized from it (N=6), 6 of 6 PASS with exposure, the scratch gate listing the run again after unretire (tests/evidence/lanes/host_a15_20261024T041350Z/step2.log), applied with approval P20261023-5897f4 (data/reviews/P20261023-5897f4.md, which hashed the five files the lap runs against the frozen manifest). REACH: the record is at its fail-closed 1/any. The defect is in a host-only tool that reads no cluster parameter, node count, lock manager or attachment; the lap runs on the lab host in a scratch copy and touches no VM, so 2/disk/caw/direct is only the ledger key the batches are filed under and no configuration runs different code. CELLS: the record's ten cells are the control's own ten laps, which the removal settles; it names no board run.",
+      "evidence": [
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step1.log",
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step2.log",
+        "data/reviews/P20261023-5897f4.md",
+        "tests/unretire_lap_row_lap.py",
+        "tools/criteria.py"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-edd872.md",
+        "sha256": "4308446b5662fa15abca5fafbda9402b89486fc12f88a74a4812bd47336fea03",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-499ec5",
+      "kind": "remove-fixed",
+      "record": "D-DEFECTS-PARSE-CELL-REFUSES-A-DAY-STAMP-SO-MIGRATED-RUNS-CANNOT-BE-NAMED",
+      "change": {
+        "control": "b20261023-4674ab",
+        "fixon": "b20261023-ab31a2",
+        "cause": "tools/defects.py parse_cell's anchored form (taken while RELEASE_STEP_SETTLE is on) required a full YYYY-MM-DDTHH:MM:SSZ stamp, so a run the board migration filed with a date alone could not be named by update/add --cell"
+      },
+      "argument": "FIXED AND VERIFIED. Cause: 'tools/defects.py add ... --cell 32/disk/caw/mpath:prep_cluster:2026-09-10' exited 1 'a board run is CONFIG:ROW:ISO' on 2026-10-23; the runs it shut out are data/criteria.runs.jsonl:646 and :349 (migrated, iso a date alone), both listed by tools/criteria.py incidents (record evidence). Fix (tools/defects.py:780-785, switch :210-211): the anchored stamp group also takes a date alone, r'\\d{4}-\\d\\d-\\d\\d(?:T\\d\\d:\\d\\d:\\d\\dZ)?'; MXFS_CELL_DAY_STAMP=0 takes only a full stamp, as before. Control b20261023-4674ab (candidate 0.90.134, attempt frozen 2026-10-24T04:13:43Z, module B947A20F3C2FE3A67ABF6F3, MXFS_CELL_DAY_STAMP=0 the only change): 10 of 10 exposed laps FAIL, update --cell refused (tests/evidence/lanes/host_a15_20261024T041350Z/step7.log). Verification b20261023-ab31a2, sized from it (N=6), 6 of 6 PASS with exposure, the scratch gate no longer listing the run (tests/evidence/lanes/host_a15_20261024T041350Z/step8.log), applied with approval P20261023-7b2508 (data/reviews/P20261023-7b2508.md). That review's non-gating note (no lap re-ran a release:<step> run with the new pattern) stands as a reading: the group is still anchored at the end and a full stamp ends in Z, so it cannot end at a date. An attempt to re-measure it with tests/release_step_cell_lap.py died on that lap's own defect, now recorded as D-RELEASE-STEP-CELL-LAP-NAMES-A-REMOVED-RECORD-AND-DIES-WITHOUT-A-VERDICT (tests/evidence/day_stamp_release_step/release_step_cell_lap_20261024.out); nothing in this removal relies on it. REACH: the record is at its fail-closed 1/any. The defect is in a host-only tool that reads no cluster parameter, node count, lock manager or attachment; the lap runs on the lab host in a scratch copy and touches no VM, so 2/disk/caw/direct is only the ledger key the batches are filed under and no configuration runs different code. CELLS: the record's ten cells are the control's own ten laps, which the removal settles; it names no board run.",
+      "evidence": [
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step7.log",
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step8.log",
+        "data/reviews/P20261023-7b2508.md",
+        "tests/cell_day_stamp_lap.py",
+        "tools/defects.py",
+        "tests/evidence/day_stamp_release_step/release_step_cell_lap_20261024.out"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-e3b3c2",
+      "kind": "remove-fixed",
+      "record": "D-GUARD-AUDIT-MISSES-ONE-LINE-TYPE-NAME-DEFINITIONS",
+      "change": {
+        "control": "b20261023-375f4c",
+        "fixon": "b20261023-e00ce8",
+        "cause": "tools/sole_survivor_audit.py named a guard's enclosing function from the last column-0 'name(' line above it, so a function defined as 'type name(' on one line was never seen and its guards were keyed to a function above it"
+      },
+      "argument": "FIXED AND VERIFIED. Cause: review P20261023-77b3d4 (data/reviews/P20261023-77b3d4.md) found the guard at dlm/v5_mount.c:27348, inside mxfs_v5_dlm_is_mds, filed under v5_boot_k_lineage 737 lines up, its inventory note describing other code; FUNC matched only 'name(' lines. Fix (tools/sole_survivor_audit.py:56-83): TYPED_FUNC (:62) also takes a column-0 'type name(' line not ending in ';', NOT_FUNC macros still excluded; MXFS_GUARD_TYPED_DEF=0 (:63) takes only FUNC, as before; six guards re-keyed, the census still 72 (record evidence). Control b20261023-375f4c (candidate 0.90.134, attempt frozen 2026-10-24T04:13:43Z, module B947A20F3C2FE3A67ABF6F3, MXFS_GUARD_TYPED_DEF=0 the only change): 10 of 10 exposed laps FAIL, 6 of 6 typed-definition guards keyed to another function (tests/evidence/lanes/host_a15_20261024T041350Z/step3.log). Verification b20261023-e00ce8, sized from it (N=6), 6 of 6 PASS with exposure (tests/evidence/lanes/host_a15_20261024T041350Z/step4.log), applied with approval P20261023-8dbbc7 (data/reviews/P20261023-8dbbc7.md). That review found the lap's DEF_LINE regex identical to the fix's TYPED_FUNC and checked all 72 guards with a third method sharing no regex (walk back to the body's opening brace, take the last name before the first '('): 0 mismatches; audit --check 'OK 72 guards' on, 'FAIL 0 new site(s), 3 grown' off. REACH: the record is at its fail-closed 1/any. The defect is in a host-only tool that reads no cluster parameter, node count, lock manager or attachment; the lap runs on the lab host in a scratch copy and touches no VM, so 2/disk/caw/direct is only the ledger key the batches are filed under and no configuration runs different code. CELLS: the record's ten cells are the control's own ten laps, which the removal settles; it names no board run.",
+      "evidence": [
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step3.log",
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step4.log",
+        "data/reviews/P20261023-8dbbc7.md",
+        "tests/guard_audit_typed_def_lap.py",
+        "tools/sole_survivor_audit.py"
       ],
       "state": "pending",
       "created": "2026-10-23"
