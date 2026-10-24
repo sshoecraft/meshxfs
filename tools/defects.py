@@ -205,6 +205,11 @@ MUTATORS = ("add", "update", "remove", "verify", "rename", "migrate-config", "ba
 #: long is wedged rather than busy, and saying so beats blocking a session forever.
 LOCK_WAIT_SECONDS = 30
 
+#: A run named as CONFIG:ROW:ISO may carry a date alone, as the runs the board migration brought
+#: into the ledgers do (D-DEFECTS-PARSE-CELL-REFUSES-A-DAY-STAMP-SO-MIGRATED-RUNS-CANNOT-BE-NAMED).
+#: MXFS_CELL_DAY_STAMP=0 takes only a full stamp, as before: the control.
+CELL_DAY_STAMP = os.environ.get("MXFS_CELL_DAY_STAMP", "1") != "0"
+
 #: For `lift_config` only: what a leading bare configuration must not be mistaken for.
 SUBCOMMANDS = ("show", "add", "update", "remove", "verify", "rename", "migrate-config", "batch",
                "measure", "plan-verify", "batch-check", "propose", "review", "proposal", "except")
@@ -772,7 +777,12 @@ def parse_cell(text: str, collateral: bool) -> dict:
         #: The stamp is anchored at the end: a release step's row (`release:<step>`) has a colon
         #: of its own, and splitting at the first two colons read row `release` and stamp
         #: `<step>:...`.
-        match = re.fullmatch(r"([^:]+):(.+):(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)", text.strip())
+        #: A run the board migration brought into a ledger keeps the date its board recorded and
+        #: no time (`32/disk/caw/mpath:prep_cluster:2026-09-10`), so such a stamp is a date alone;
+        #: MXFS_CELL_DAY_STAMP=0 takes only a full stamp, as before.
+        stamp = r"\d{4}-\d\d-\d\d(?:T\d\d:\d\d:\d\dZ)?" if CELL_DAY_STAMP \
+            else r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"
+        match = re.fullmatch(r"([^:]+):(.+):(" + stamp + ")", text.strip())
         fields = match.groups() if match else None
     else:
         config, sep1, rest = text.strip().partition(":")

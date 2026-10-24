@@ -170,6 +170,7 @@ xfs_efi_init(
 	efip->efi_format.efi_id = (uintptr_t)(void *)efip;
 	atomic_set(&efip->efi_next_extent, 0);
 	atomic_set(&efip->efi_refcount, 2);
+	efip->efi_mxfs_owner_pid = current->pid;
 
 	return efip;
 }

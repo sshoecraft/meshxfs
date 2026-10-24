@@ -49,6 +49,12 @@ struct xfs_efi_log_item {
 	struct xfs_log_item	efi_item;
 	atomic_t		efi_refcount;
 	atomic_t		efi_next_extent;
+	/*
+	 * the task that logged the intent, which runs its defer chain to the
+	 * EFD; the no-inode release fence names it (and its stack) when this
+	 * EFI is the frozen AIL minimum
+	 */
+	pid_t			efi_mxfs_owner_pid;
 	struct xfs_efi_log_format efi_format;
 };
 

@@ -2402,188 +2402,6 @@
       "updated": "2026-10-23"
     },
     {
-      "id": "D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN",
-      "severity": "high",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-21",
-      "summary": "fio_perf_vs_xfs at 2/net/mesh/drbd records SKIP rig-unknown on every run since 2026-10-20 (the native-XFS yardstick is chosen by rig tag, and tools/mxfs_rig_tag.sh cannot establish one for /dev/drbd0, which has no SCSI vendor); a SKIP is not a PASS under candidate grading, so the DRBD board can never read green and the release drbd step can never pass",
-      "evidence": "tests/evidence/drbd_rig/criteria.runs.jsonl at 2/net/mesh/drbd: 11 SKIP rig-unknown (last five 2026-10-20T14:07:05Z to 2026-10-21T22:22:29Z), 2 PASS earlier. criteria.py 2/net/mesh/drbd --candidate 0.90.134: Total 35, 2 FAIL, 32 PASS, 1 SKIP; VERDICT 3 of 35 criteria are not passing. drbd_release_verify_0.90.134_20261021T212712Z.out: STEP suite-board rc=1. ===== Again in the 0.90.134 dry run attempt 20261021T230333Z: the drbd step failed with the board naming only fio_perf_vs_xfs=SKIP (every other DRBD row passed). ===== 2026-10-23: release:drbd FAIL 2026-10-21T20:12:33Z of the 0.90.133-2 dry run (data/criteria.runs.jsonl:6910, failed=[suite-board]) graded a DRBD board with fio_perf_vs_xfs SKIP rig-unknown (tests/evidence/drbd_release_verify_0.90.133-2.out:83, :128), besides alloc_witness and chk_clean (D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION) and fsx (D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED). ===== 2026-10-23: no longer names 2/net/mesh/drbd:release:drbd:2026-10-21T22:56:58Z, named by D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION; 2/net/mesh/drbd:release:drbd:2026-10-21T20:12:33Z, named by D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION; 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:06Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:07Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:08Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:09Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:10Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:11Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:12Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:13Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:14Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:15Z, settled (retired_by): Per review data/reviews/P20261023-e7a30c.md. The two release:drbd runs (2026-10-21T22:56:58Z, 20:12:33Z) also failed on alloc_witness and chk_clean, and D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION names both, so a removal of this record must not settle them. The ten b20261023-d08fc5 laps (01:02:06Z-01:02:15Z) aborted unexposed with no DRBD pair (lap log 'backing disk='''; lane g2_a16_20261024T010135Z summary.log:7 MXFS_NODES=2, :11-12 drbd_rig.sh up rc=2 in 0 s), the cause of D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP, which now names them.",
-      "next": "establish the DRBD rig yardstick (a tag for the drbd attachment, or the backing LUN under DRBD) so the row measures; it must never pass without measuring ===== 2026-10-24: the fix is in tools/mxfs_rig_tag.sh (a DRBD device resolves through its backing disk, drbdsetup show, tagged <vendor>-drbd; CHANGELOG 0.90.134), now with a switch: MXFS_RIG_TAG_DRBD=0 reads a DRBD device like any other disk, finds no vendor and resolves nothing, as before (the control). New lap tests/drbd_rig_tag_lap.sh. Precheck on g2 after scripts/drbd_rig.sh up (DRBD 8.4.11 Primary/Primary over pool LUNs 02 and 12), evidence tests/evidence/precheck_20261024T004226Z: fix in (pre_on1, 1.44 s) 'STEP prep resolution rc=0 tag=scst-fio-drbd', 'RESULT: PASS | test=fio_perf_vs_xfs | nodes=2 | measured=seqW=274% seqR=489% randW=122% randR=182% worst(write)=122% (threshold>=70%, wsrc=xfs-baseline, rig=scst-fio-drbd)', 'LAP drbd_rig_tag PASS'; MXFS_RIG_TAG_DRBD=0 (pre_off1, 1.41 s) 'STEP prep resolution rc=1 tag=', 'RESULT: SKIP | test=fio_perf_vs_xfs | nodes=2 | measured=rig-unknown', 'LAP drbd_rig_tag FAIL'. Bound for a batch lap: 2x the precheck, 3 s. Next, on the next frozen attempt (g2, with the DRBD pair up): a control batch with MXFS_RIG_TAG_DRBD=0, the verification sized from it, remove --fixed; the release drbd step's board then grades fio_perf_vs_xfs against rig=scst-fio-drbd.",
-      "cells": [
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "release:drbd",
-          "iso": "2026-10-22T00:35:43Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T02:56:18Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T02:56:16Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T02:56:14Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T02:56:13Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T02:56:11Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T02:56:09Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T02:56:07Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T02:56:05Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T02:56:03Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T02:56:01Z"
-        }
-      ],
-      "updated": "2026-10-23",
-      "reproducer": "tests/drbd_rig_tag_lap.sh <label> on the DRBD rig after scripts/drbd_rig.sh up (g2): prep's rig resolution of /dev/drbd0 as run.sh marker_write makes it, then tests/suite/fio_perf_vs_xfs.sh on test1 against a marker shaped as prep writes it; MXFS_RIG_TAG_DRBD=0 is the control",
-      "batches": [
-        {
-          "id": "b20261023-d08fc5",
-          "kind": "control",
-          "row": "lap:drbd_rig_tag",
-          "config": "2/net/mesh/drbd",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: /dev/drbd0 on test1 is DRBD minor [0-9]+ over ",
-          "candidate": "",
-          "build": "9C7B7B00C5DE523F1D378C8",
-          "variant": "MXFS_RIG_TAG_DRBD=0 (tools/mxfs_rig_tag.sh reads a DRBD device like any other disk, finds no vendor and resolves nothing, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: /dev/drbd0 resolves to no rig, so fio_perf_vs_xfs records SKIP rig-unknown against a rig-tagged yardstick"
-        },
-        {
-          "id": "b20261023-920e59",
-          "kind": "control",
-          "row": "lap:drbd_rig_tag",
-          "config": "2/net/mesh/drbd",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: /dev/drbd0 on test1 is DRBD minor [0-9]+ over ",
-          "candidate": "",
-          "build": "9C7B7B00C5DE523F1D378C8",
-          "variant": "MXFS_RIG_TAG_DRBD=0 (tools/mxfs_rig_tag.sh reads a DRBD device like any other disk, finds no vendor and resolves nothing, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: /dev/drbd0 resolves to no rig, so fio_perf_vs_xfs records SKIP rig-unknown against a rig-tagged yardstick"
-        },
-        {
-          "id": "b20261023-54d056",
-          "kind": "verify",
-          "row": "lap:drbd_rig_tag",
-          "config": "2/net/mesh/drbd",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: /dev/drbd0 on test1 is DRBD minor [0-9]+ over ",
-          "candidate": "0.90.134",
-          "build": "9C7B7B00C5DE523F1D378C8",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:drbd_rig_tag",
-            "config": "2/net/mesh/drbd",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-920e59",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_RIG_TAG_DRBD=0 (tools/mxfs_rig_tag.sh reads a DRBD device like any other disk, finds no vendor and resolves nothing, as before the fix)",
-            "builds": [
-              "9C7B7B00C5DE523F1D378C8"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:drbd_rig_tag",
-          "config": "2/net/mesh/drbd",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-d08fc5",
-          "k": 0,
-          "n": 0,
-          "candidate": "",
-          "variant": "MXFS_RIG_TAG_DRBD=0 (tools/mxfs_rig_tag.sh reads a DRBD device like any other disk, finds no vendor and resolves nothing, as before the fix)",
-          "builds": [
-            "9C7B7B00C5DE523F1D378C8"
-          ],
-          "date": "2026-10-23"
-        },
-        {
-          "row": "lap:drbd_rig_tag",
-          "config": "2/net/mesh/drbd",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-920e59",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_RIG_TAG_DRBD=0 (tools/mxfs_rig_tag.sh reads a DRBD device like any other disk, finds no vendor and resolves nothing, as before the fix)",
-          "builds": [
-            "9C7B7B00C5DE523F1D378C8"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/net/mesh/drbd",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-24T01:01:07Z",
-          "build": "9C7B7B00C5DE523F1D378C8",
-          "batch": "b20261023-54d056",
-          "approval": "P20261023-639531",
-          "date": "2026-10-23"
-        }
-      ]
-    },
-    {
       "id": "D-LIVE-HOLDER-WAIT-FINDS-NO-REMOTE-MASTERED-INODE-AND-ABORTS-BEFORE-MEASURING",
       "severity": "major",
       "nodes": 1,
@@ -3290,7 +3108,7 @@
           "candidate": "",
           "build": "9C7B7B00C5DE523F1D378C8",
           "variant": "drbd_third_vote=0 (ARM=0: the module admits a dual-primary pair with no third vote and no node fence, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -3304,6 +3122,21 @@
           "platform": "any",
           "kind": "control",
           "batch": "b20261023-8d5f78",
+          "k": 0,
+          "n": 0,
+          "candidate": "",
+          "variant": "drbd_third_vote=0 (ARM=0: the module admits a dual-primary pair with no third vote and no node fence, as before the fix)",
+          "builds": [
+            "9C7B7B00C5DE523F1D378C8"
+          ],
+          "date": "2026-10-23"
+        },
+        {
+          "row": "lap:third_vote",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-242a48",
           "k": 0,
           "n": 0,
           "candidate": "",
@@ -3364,6 +3197,56 @@
           "config": "2/net/mesh/drbd",
           "row": "lap:third_vote",
           "iso": "2026-10-24T01:02:20Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:24:18Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:21:32Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:18:47Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:16:01Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:13:15Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:10:27Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:07:38Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:04:54Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:02:08Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T02:59:22Z"
         }
       ]
     },
@@ -6768,8 +6651,10 @@
       "config": "*/*/*",
       "opened": "2026-10-23",
       "summary": "tools/sole_survivor_audit.py names a guard's enclosing function as the last column-0 'name(' line above it (FUNC, :56; enclosing_functions :67-76), so a function defined with its return type on the same line ('bool mxfs_v5_dlm_is_mds(...)') is never seen, and its guards are keyed to whatever function above it was written kernel-style. The guard in mxfs_v5_dlm_is_mds (dlm/v5_mount.c:27348) is keyed dlm/v5_mount.c::v5_boot_k_lineage (:26611, 737 lines up), and the inventory note under that key (tests/criteria/sole_survivor_sites.json:15) describes other code. The census then checks only that a key is listed, so a guard added to a misnamed function counts as growth of another function's entry, and the inventory's review notes do not describe the guards they cover.",
-      "evidence": "2026-10-24, review of P20261023-77b3d4 (data/reviews/P20261023-77b3d4.md): with the fixed tool the guard at dlm/v5_mount.c:27348 inside mxfs_v5_dlm_is_mds is filed under v5_boot_k_lineage; 'the fixed tool still can't name that guard's function, because it misses definitions written as type name( on one line'; the inventory note for dlm/v5_mount.c::v5_boot_k_lineage (sole_survivor_sites.json:15) describes the bodies of sole_survivor and never_multi, not the is_mds guard.",
-      "next": "Make enclosing_functions also recognise a column-0 'type name(' definition (and a 'static type name(' one) while still excluding the NOT_FUNC macros; list the keys that move; re-review each moved key's note against the guards it now covers; a control that runs the audit on the current tree with the new pattern off and shows the is_mds guard keyed to v5_boot_k_lineage, and the fix-on run keying it to mxfs_v5_dlm_is_mds."
+      "evidence": "2026-10-24, review of P20261023-77b3d4 (data/reviews/P20261023-77b3d4.md): with the fixed tool the guard at dlm/v5_mount.c:27348 inside mxfs_v5_dlm_is_mds is filed under v5_boot_k_lineage; 'the fixed tool still can't name that guard's function, because it misses definitions written as type name( on one line'; the inventory note for dlm/v5_mount.c::v5_boot_k_lineage (sole_survivor_sites.json:15) describes the bodies of sole_survivor and never_multi, not the is_mds guard. ===== 2026-10-24: fix in the tree (0.90.134, not yet frozen): tools/sole_survivor_audit.py TYPED_FUNC also takes a column-0 'type name(' line not ending in ';' (first word not a keyword), still excluding NOT_FUNC macros; MXFS_GUARD_TYPED_DEF=0 takes only 'name(' lines, as before. Six guards move key: dlm/v5_mount.c:27348 v5_boot_k_lineage -> mxfs_v5_dlm_is_mds; xfs/xfs_mxfs_open.c:339 mxfs_dlm_close_release -> mxfs_dlm_open_protect; xfs/xfs_mxfs_pubob.c:812/911/968/1053 '?' -> mxfs_pubob_arm/free_pending/free_commit/free_abort (each checked against the definition above it). Inventory re-keyed with --classify (tests/criteria/sole_survivor_sites.json: the old keys keep guards 0; v5_boot_k_lineage's note now says it holds no guard; mxfs_v5_dlm_is_mds unclassified with a factual note). --check: fix on 'OK 72 guards'; MXFS_GUARD_TYPED_DEF=0 against the re-keyed inventory 'FAIL 0 new site(s), 3 grown'. Precheck of the lap: fix on PASS 6 of 6 keyed to their function (0.40 s); MXFS_GUARD_TYPED_DEF=0 FAIL 6 of 6 keyed to another (0.39 s).",
+      "next": "Control batch of lap:guard_audit_typed_def with MXFS_GUARD_TYPED_DEF=0 on the next frozen attempt (bound 4 s), a verification sized from it, remove --fixed.",
+      "reproducer": "tests/guard_audit_typed_def_lap.py (host only, read only): runs tools/sole_survivor_audit.py --csv and requires every census guard inside a one-line 'type name(' definition, found by scanning back to its body's opening brace, to be keyed to that definition's name; MXFS_GUARD_TYPED_DEF=0 is the control",
+      "updated": "2026-10-23"
     },
     {
       "id": "D-16CAWMPATH-FENCED-RETURN-SURVIVORS-WEDGE-ON-CAW-INODE-GRANTS-474S",
@@ -6801,9 +6686,9 @@
       "config": "net/mesh/drbd",
       "opened": "2026-10-23",
       "summary": "tools/batch_lap.py makes the lap runner a child subreaper (run_bounded, :271) but on the normal path only waits for its direct child (:275); orphans reparented to it are reaped only on the overrun path (reap, :241-249). So when scripts/drbd_rig.sh up exits and its EXIT trap kills its LUN holder (end_holders, scripts/drbd_rig.sh:236-237), the holder becomes a zombie of the lap runner and stays one until the lap ends, and tools/lun_pool.sh owner_live (:205-210) reads a zombie's /proc/<pid>/stat start time as a live owner. The lap's next drbd_rig.sh invocation (mxfs) is refused 'test1 is held by lun06's allocation', so every lap of tests/drbd_third_vote_lap.sh run through batch_lap aborts unexposed, and any batch lap that calls drbd_rig.sh twice does the same.",
-      "evidence": "Control b20261023-242a48 (lap:third_vote at 2/net/mesh/drbd, tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step13.log): laps 1-6 all 'LAP third_vote ABORT: drbd_rig.sh mxfs rc=1: lun_pool: test1 is held by lun06's allocation: <pid> ... drbd_rig 2/net/mesh/drbd test1', each naming the holder its own 'up' allocated (lap 1 1921059, lap 2 1925445, lap 3 1931039, lap 4 1934395, lap 5 1964261, lap 6 2044720), elapsed 164-168 s, exposure=0. Lap 1's log tests/evidence/batch_laps/b20261023-242a48/20261024T025637Z-e05f17b4.log:4; its up evidence tests/evidence/drbd_rig/20261024T025638Z-up/luns 'POOL_LUN id=06 ... nodes=test1 owner=1921059', and the mxfs directory 20261024T025921Z-mxfs/ was created the second up ended (21:59:21 local) and is empty. Measured on lap 6 by sampling /proc/2044720/stat every 2 ms from the host (fields 3 and 4 only; /tmp/claude-1000/-home-steve-src-mxfs/a769a645-be24-4c22-9872-1e346ff90f61/scratchpad/holder_watch3.txt): '03:10:45.265 state=S ppid=2044541 (drbd_rig.sh)' through up; '03:13:14.117 state=Z ppid=2044057 parent0=exited ppcomm=python3' when up exited and killed it; '03:13:15.336 state= (gone)', reaped only when the lap ended (lap 6 'FAIL ... 2026-10-24T03:13:15Z ... held by lun06's allocation: 2044720'). tools/lun_pool.sh starttime_of (:193-199) reads field 22 of /proc/<pid>/stat and never field 3 (state), so a zombie with the owner's start time passes owner_live. The lap calls drbd_rig.sh down, then up, then mxfs, each a separate process (tests/drbd_third_vote_lap.sh:38-42). Same-build control already in the tree: MXFS_BATCH_LAP_KILLTREE=0 (tools/batch_lap.py:265) runs the lap without the subreaper, so an orphan goes to init and is reaped at once. Earlier third_vote batch b20261023-8d5f78 aborted for a different reason (MXFS_NODES, its own record). ===== The host-side samples cited above are kept in tests/evidence/incident_third_vote_zombie_holder_20261024.txt.",
-      "next": "Hypothesis (written): the zombie window is the whole cause. Falsify with one lap of tests/drbd_third_vote_lap.sh through tools/batch_lap.py with MXFS_BATCH_LAP_KILLTREE=0 (no subreaper): if mxfs is still refused, the hypothesis is wrong. Fix at the cause, two candidates, one at a time: (a) tools/lun_pool.sh owner_live treats state Z (or X) as not live, since a zombie owns nothing; (b) tools/batch_lap.py reaps reparented orphans while it waits (a waitpid(-1, WNOHANG) loop beside proc.wait), with a switch to restore the old wait. Then a control with the switch off, a verification sized from it, and remove --fixed. The fix needs the frozen candidate's tree to change (tools/ is frozen while 0.90.134's attempt RUNs).",
-      "reproducer": "MXFS_BATCH=<batch> ./run.sh 2/net/mesh/drbd lap:third_vote (any batch lap that runs scripts/drbd_rig.sh up then another drbd_rig.sh step)",
+      "evidence": "Control b20261023-242a48 (lap:third_vote at 2/net/mesh/drbd, tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step13.log): laps 1-6 all 'LAP third_vote ABORT: drbd_rig.sh mxfs rc=1: lun_pool: test1 is held by lun06's allocation: <pid> ... drbd_rig 2/net/mesh/drbd test1', each naming the holder its own 'up' allocated (lap 1 1921059, lap 2 1925445, lap 3 1931039, lap 4 1934395, lap 5 1964261, lap 6 2044720), elapsed 164-168 s, exposure=0. Lap 1's log tests/evidence/batch_laps/b20261023-242a48/20261024T025637Z-e05f17b4.log:4; its up evidence tests/evidence/drbd_rig/20261024T025638Z-up/luns 'POOL_LUN id=06 ... nodes=test1 owner=1921059', and the mxfs directory 20261024T025921Z-mxfs/ was created the second up ended (21:59:21 local) and is empty. Measured on lap 6 by sampling /proc/2044720/stat every 2 ms from the host (fields 3 and 4 only; /tmp/claude-1000/-home-steve-src-mxfs/a769a645-be24-4c22-9872-1e346ff90f61/scratchpad/holder_watch3.txt): '03:10:45.265 state=S ppid=2044541 (drbd_rig.sh)' through up; '03:13:14.117 state=Z ppid=2044057 parent0=exited ppcomm=python3' when up exited and killed it; '03:13:15.336 state= (gone)', reaped only when the lap ended (lap 6 'FAIL ... 2026-10-24T03:13:15Z ... held by lun06's allocation: 2044720'). tools/lun_pool.sh starttime_of (:193-199) reads field 22 of /proc/<pid>/stat and never field 3 (state), so a zombie with the owner's start time passes owner_live. The lap calls drbd_rig.sh down, then up, then mxfs, each a separate process (tests/drbd_third_vote_lap.sh:38-42). Same-build control already in the tree: MXFS_BATCH_LAP_KILLTREE=0 (tools/batch_lap.py:265) runs the lap without the subreaper, so an orphan goes to init and is reaped at once. Earlier third_vote batch b20261023-8d5f78 aborted for a different reason (MXFS_NODES, its own record). ===== The host-side samples cited above are kept in tests/evidence/incident_third_vote_zombie_holder_20261024.txt. ===== Control b20261023-242a48 closed: laps 7-10 (03:16:01Z, 03:18:47Z, 03:21:32Z, 03:24:18Z) aborted the same way, 'drbd_rig.sh mxfs rc=1: lun_pool: test1 is held by lun06's allocation: <the lap's own up holder>' (tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step13.log, lap 7/10 through 10/10), exposure=0; 10 of 10 laps of the control aborted on this cause. ===== 2026-10-24: fix (a) in the tree (0.90.134, not yet frozen): tools/lun_pool.sh owner_live reads an owner whose /proc/<pid>/stat state is Z or X as gone (state_of, field 3); LUN_POOL_ZOMBIE_DEAD=0 reads it as live, as before. Fix (b), reaping in tools/batch_lap.py, is not made.",
+      "next": "On the next frozen attempt: a precheck of tests/drbd_zombie_holder_lap.sh through batch_lap (the subreaper), then a control batch with LUN_POOL_ZOMBIE_DEAD=0 (lap:drbd_zombie_holder at 2/net/mesh/drbd), a verification sized from it, remove --fixed. The third_vote control b20261023-242a48 (10 of 10 aborted unexposed here) then needs re-running for its own record.",
+      "reproducer": "tests/drbd_zombie_holder_lap.sh <label> through tools/batch_lap.py on the DRBD rig (g2): drbd_rig.sh down, up, the state of each node's allocation owner in /proc, then drbd_rig.sh mxfs; EXPOSED when up's holder is a zombie as mxfs asks for its node; LUN_POOL_ZOMBIE_DEAD=0 is the control",
       "cells": [
         {
           "config": "2/net/mesh/drbd",
@@ -6834,6 +6719,26 @@
           "config": "2/net/mesh/drbd",
           "row": "lap:third_vote",
           "iso": "2026-10-24T03:13:15Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:16:01Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:18:47Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:21:32Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:24:18Z"
         }
       ],
       "updated": "2026-10-23"
@@ -6845,8 +6750,10 @@
       "config": "*/*/*",
       "opened": "2026-10-23",
       "summary": "tools/criteria.py unretire (withdraw, :1542) finds its run through annotated_run (:1474-1480), which accepts only a board criterion's id or a release:<step> row, so a lap row (lap:<name>) is refused 'nothing matches'. tools/defects.py verify writes retired_by notes on every cell of the record it verifies, lap rows included, so a lap retirement that turns out wrong (the run was not that defect's) cannot be taken back, and the ledger keeps a disposition no evidence supports.",
-      "evidence": "2026-10-24: applying verify P20261023-639531 of D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN retired the ten laps of control b20261023-d08fc5 (tests/evidence/drbd_rig/criteria.runs.jsonl:3588-3597), which aborted unexposed for another record's cause (review data/reviews/P20261023-e7a30c.md asks for those notes to be withdrawn). 'MXFS_OWN_RIG=1 tools/criteria.py unretire lap:drbd_rig_tag --at 2/net/mesh/drbd --iso 2026-10-24T01:02:06Z --why ...' printed 'criteria: nothing matches 'lap:drbd_rig_tag'' for each of the ten; the same command for release:drbd runs worked.",
-      "next": "Let annotated_run accept a lap:<name> row as it accepts release:<step> (the run exists only in the ledger), then withdraw the ten d08fc5 lap retirements. tools/ is frozen while 0.90.134's attempt runs."
+      "evidence": "2026-10-24: applying verify P20261023-639531 of D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN retired the ten laps of control b20261023-d08fc5 (tests/evidence/drbd_rig/criteria.runs.jsonl:3588-3597), which aborted unexposed for another record's cause (review data/reviews/P20261023-e7a30c.md asks for those notes to be withdrawn). 'MXFS_OWN_RIG=1 tools/criteria.py unretire lap:drbd_rig_tag --at 2/net/mesh/drbd --iso 2026-10-24T01:02:06Z --why ...' printed 'criteria: nothing matches 'lap:drbd_rig_tag'' for each of the ten; the same command for release:drbd runs worked. ===== 2026-10-24: fix in the tree (0.90.134, not yet frozen): tools/criteria.py annotated_run takes a row lap:<name> under its configuration as it takes release:<step> (LAP_ANNOTATE; MXFS_LAP_ANNOTATE=0 looks it up as a board criterion, as before). With it the ten d08fc5 retirements were withdrawn (tests/evidence/drbd_rig/criteria.runs.jsonl:3615-3624); the same command with MXFS_LAP_ANNOTATE=0 first printed 'criteria: nothing matches 'lap:drbd_rig_tag'' and wrote nothing. Precheck of the lap: fix on PASS (1.08 s), switch off FAIL 'nothing matches' (0.71 s).",
+      "next": "Control batch of lap:unretire_lap_row with MXFS_LAP_ANNOTATE=0 on the next frozen attempt (bound 6 s), a verification sized from it, remove --fixed.",
+      "reproducer": "tests/unretire_lap_row_lap.py (host only, scratch tree): takes a lap run settled by a retired_by note (default 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T02:56:01Z), unretires it and requires the gate to list it again; MXFS_LAP_ANNOTATE=0 is the control",
+      "updated": "2026-10-23"
     }
   ]
 }

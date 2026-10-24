@@ -93,7 +93,10 @@
 # Env:
 #   MXFS_GROUP        the rig group whose two nodes are used (default g2)
 #   MXFS_NODES        two rig nodes by name instead of a group ("test17 test18"),
-#                     so pairs beyond the two-node groups can run side by side
+#                     so pairs beyond the two-node groups can run side by side; a
+#                     bare number is run.sh's node count and selects nothing
+#   DRBD_RIG_NODES_COUNT=0   take a bare number in MXFS_NODES as a node name, as
+#                     before that rule (the control of its fix)
 #   MXFS_NODE_REPO    the tree the nodes load mxfs.ko and run the tools from, as
 #                     they see it over NFS (default /src/<this tree's directory
 #                     name>, as run.sh takes it); it must hold the same build as
@@ -150,8 +153,18 @@ NODE_REPO=${MXFS_NODE_REPO:-/src/$(basename "$REPO")}
 # the module with the refusal off: install_self_authority sets this, the node
 # fence (install_fencing) and the vote (install_quorum_authority) clear it.
 TIEBREAK_MODARGS=""
-if [ -n "${MXFS_NODES:-}" ]; then
-    read -r -a NODES <<<"$MXFS_NODES"
+# MXFS_NODES is also the node count run.sh gives every row, and a lane queue exports it for the
+# laps that read it (tests/path_abort_kmsg_lap.sh).  Taken as names, a count of 2 named a one-node
+# group nodes-2, and every DRBD lap of such a lane aborted unexposed
+# (D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP).  A bare number is a
+# count, not a pair, so the group is used.  DRBD_RIG_NODES_COUNT=0 takes it as names, as before:
+# the control.
+PAIR=${MXFS_NODES:-}
+if [ "${DRBD_RIG_NODES_COUNT:-1}" != 0 ] && [[ "$PAIR" =~ ^[0-9]+$ ]]; then
+    PAIR=""
+fi
+if [ -n "$PAIR" ]; then
+    read -r -a NODES <<<"$PAIR"
     GROUP="nodes-${NODES[0]:-none}"
     # run.sh knows nodes only by group
     case "${1:-}" in

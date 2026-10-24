@@ -632,8 +632,10 @@ mxfs_noino_dump_ail_min(
 	uint64_t		ino)
 {
 	static atomic_t		cap = ATOMIC_INIT(0);
+	static atomic_t		owner_stacks = ATOMIC_INIT(0);
 	struct xfs_ail		*ailp = mp->m_ail;
 	struct xfs_log_item	*lip;
+	pid_t			efi_owner = 0;
 
 	if (atomic_inc_return(&cap) > 24)
 		return;
@@ -700,10 +702,11 @@ mxfs_noino_dump_ail_min(
 		int wait0 = (a0 != NULLAGNUMBER) ?
 			mxfs_noino_agwait_inflight(mp, a0) : -1;
 
-		mxfs_probe("mxfs: P-AILMIN ino=%llu EFI lsn=0x%llx nextents=%u ag0=%u agwait_inflight=%d liflags=0x%lx -- extent-free intent: EFD pending on that AG's lock\n",
+		efi_owner = efip->efi_mxfs_owner_pid;
+		mxfs_probe("mxfs: P-AILMIN ino=%llu EFI lsn=0x%llx nextents=%u ag0=%u agwait_inflight=%d liflags=0x%lx owner_pid=%d -- extent-free intent: its EFD is the owner's to commit\n",
 			(unsigned long long)ino,
 			(unsigned long long)lip->li_lsn, nx, a0, wait0,
-			lip->li_flags);
+			lip->li_flags, efi_owner);
 	} else {
 		mxfs_probe("mxfs: P-AILMIN ino=%llu type=0x%x intent=%d lsn=0x%llx liflags=0x%lx\n",
 			(unsigned long long)ino, lip->li_type,
@@ -711,6 +714,17 @@ mxfs_noino_dump_ail_min(
 			(unsigned long long)lip->li_lsn, lip->li_flags);
 	}
 	spin_unlock(&ailp->ail_lock);
+	/*
+	 * D-8CAWMPATH-SURVIVOR-SHUTS-DOWN-ON-NOINO-EFI-WEDGE-DURING-PEER-FENCE:
+	 * the frozen EFI's AG was granted to its chain 7 s before the dump
+	 * (agwait_inflight=0), so the owner was blocked somewhere no probe
+	 * named.  Its stack says where; a few per boot.
+	 */
+	if (efi_owner && atomic_inc_return(&owner_stacks) <= 4) {
+		pr_warn("mxfs: P-AILMIN-EFI-OWNER ino=%llu owner_pid=%d -- stack of the task that logged the frozen EFI follows (none: it has exited)\n",
+			(unsigned long long)ino, efi_owner);
+		mxfs_pal_dump_task_stack(efi_owner);
+	}
 }
 
 /*

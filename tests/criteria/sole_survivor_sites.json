@@ -9,10 +9,15 @@
   "generated": "tools/sole_survivor_audit.py --baseline",
   "note": "Reviewed inventory of single-node fast paths that SKIP WORK. A guard here is not thereby safe; it is thereby KNOWN. Regenerate ONLY after classifying the new sites -- re-baselining to clear a red is the same act as widening a timeout to make a test pass.",
   "sites": {
+    "dlm/v5_mount.c::mxfs_v5_dlm_is_mds": {
+      "class": "unclassified",
+      "guards": 1,
+      "note": "single-node mount answers is_mds=true (v5_mount.c:27348) before the static rule MDS == disklock slot 0; until the metadata-RPC wiring lands every node runs metadata locally, so what a sole survivor's true answer gates is the wiring's to decide"
+    },
     "dlm/v5_mount.c::v5_boot_k_lineage": {
       "class": "durable",
-      "guards": 1,
-      "note": "not guards: the bodies of mxfs_v5_dlm_sole_survivor and mxfs_v5_dlm_never_multi (0.83.3), the predicate definitions every ownership guard keys on; attributed here because their return type shares the definition line"
+      "guards": 0,
+      "note": "no guard of its own. The census keyed the guard of mxfs_v5_dlm_is_mds (a single-node mount answers is_mds=true) here while it missed definitions written 'type name(' on one line (D-GUARD-AUDIT-MISSES-ONE-LINE-TYPE-NAME-DEFINITIONS); the earlier note here described the bodies of mxfs_v5_dlm_sole_survivor and mxfs_v5_dlm_never_multi, which are not guards"
     },
     "pal/linux/xfs_buf.c::mxfs_buf_is_multinode_dir_meta": {
       "class": "durable",
@@ -381,7 +386,12 @@
     },
     "xfs/xfs_mxfs_open.c::mxfs_dlm_close_release": {
       "class": "unclassified",
-      "guards": 2,
+      "guards": 1,
+      "note": ""
+    },
+    "xfs/xfs_mxfs_open.c::mxfs_dlm_open_protect": {
+      "class": "unclassified",
+      "guards": 1,
       "note": ""
     },
     "xfs/xfs_mxfs_open.c::mxfs_dlm_pr_sweep_trigger": {
@@ -396,7 +406,27 @@
     },
     "xfs/xfs_mxfs_pubob.c::?": {
       "class": "unclassified",
-      "guards": 4,
+      "guards": 0,
+      "note": ""
+    },
+    "xfs/xfs_mxfs_pubob.c::mxfs_pubob_arm": {
+      "class": "unclassified",
+      "guards": 1,
+      "note": ""
+    },
+    "xfs/xfs_mxfs_pubob.c::mxfs_pubob_free_abort": {
+      "class": "unclassified",
+      "guards": 1,
+      "note": ""
+    },
+    "xfs/xfs_mxfs_pubob.c::mxfs_pubob_free_commit": {
+      "class": "unclassified",
+      "guards": 1,
+      "note": ""
+    },
+    "xfs/xfs_mxfs_pubob.c::mxfs_pubob_free_pending": {
+      "class": "unclassified",
+      "guards": 1,
       "note": ""
     },
     "xfs/xfs_mxfs_relbar.c::mxfs_dlm_relog_authorized": {
@@ -411,5 +441,5 @@
     }
   },
   "total_guards": 72,
-  "unclassified_sites": 54
+  "unclassified_sites": 59
 }

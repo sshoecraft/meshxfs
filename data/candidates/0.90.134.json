@@ -2,7 +2,7 @@
   "candidate": "0.90.134",
   "version": "0.90.134",
   "created": "2026-10-24T01:01:07Z",
-  "state": "RUNNING",
+  "state": "ABANDONED",
   "attempts": [
     {
       "created": "2026-10-21T21:26:41Z",
@@ -365,6 +365,11 @@
       "state": "RUNNING",
       "at": "2026-10-24T01:01:07Z",
       "why": "created"
+    },
+    {
+      "state": "ABANDONED",
+      "at": "2026-10-24T03:26:32Z",
+      "why": "No release step has run on the attempt frozen 2026-10-24T01:01:07Z (release_run.py status: every step '-', runner not running), and it cannot qualify: release_status shows 34-44 open release-blocking records per configuration. The fixes the queue needs next are in frozen files: tools/lun_pool.sh owner_live reads a zombie holder as live (D-BATCH-LAP-SUBREAPER-ZOMBIE-LUN-HOLDER-READ-LIVE-ABORTS-EVERY-THIRD-VOTE-LAP, 10 of 10 third_vote laps aborted), and tools/criteria.py unretire refuses lap rows (D-CRITERIA-UNRETIRE-REFUSES-LAP-ROWS-SO-WRONG-LAP-RETIREMENTS-STAND), which the DRBD rig-tag removal's review needs. Every passed verify on this attempt is already applied."
     }
   ]
 }

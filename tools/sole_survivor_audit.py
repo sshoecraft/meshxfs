@@ -54,7 +54,14 @@ SOLE = "mxfs_v5_dlm_sole_survivor"
 # A C function definition at column 0: either "name(" on its own line (the
 # kernel's style, return type on the line above) or "type name(".
 FUNC = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*\(")
-SKIP_KEYWORDS = {"if", "for", "while", "switch", "return", "sizeof", "else"}
+# "type name(" on one line ("bool mxfs_v5_dlm_is_mds(struct ...)", "static int x(void)"): one or
+# more type words or stars, then the name.  FUNC alone missed these, and every guard in such a
+# function was keyed to the kernel-style function above it.  A line ending in ";" is a prototype
+# or a declaration, not a definition.  MXFS_GUARD_TYPED_DEF=0 takes only FUNC, as before: the
+# control.
+TYPED_FUNC = re.compile(r"^(?:[A-Za-z_][A-Za-z0-9_]*[\s*]+)+\**([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+TYPED_DEF = os.environ.get("MXFS_GUARD_TYPED_DEF", "1") != "0"
+SKIP_KEYWORDS = {"if", "for", "while", "switch", "return", "sizeof", "else", "typedef"}
 # Column-0 macro invocations that are not function definitions.  Counted as
 # names, a module parameter added between a function and a guard below it
 # re-attributed that guard to "MODULE_PARM_DESC", which the census then read
@@ -71,6 +78,9 @@ def enclosing_functions(lines):
     for i, raw in enumerate(lines):
         if raw and not raw[0].isspace() and not raw.startswith(("#", "/", "*", "}")):
             m = FUNC.match(raw)
+            if (TYPED_DEF and not m and not raw.rstrip().endswith(";")
+                    and raw.split(None, 1)[0] not in SKIP_KEYWORDS):
+                m = TYPED_FUNC.match(raw)
             if (m and m.group(1) not in SKIP_KEYWORDS
                     and not NOT_FUNC.match(m.group(1))):
                 cur = m.group(1)

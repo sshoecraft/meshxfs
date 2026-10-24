@@ -197,6 +197,13 @@ starttime_of() {  # <pid> -> field 22 of /proc/<pid>/stat, or nothing
     set -- $s
     echo "${20}"
 }
+state_of() {  # <pid> -> field 3 of /proc/<pid>/stat (R, S, D, Z, X, ...), or nothing
+    local s
+    s=$(cat "/proc/$1/stat" 2>/dev/null) || return 0
+    s=${s##*) }
+    set -- $s
+    echo "$1"
+}
 
 # An owner file is one line:  <pid> <starttime> <nodes,comma> <iso time> <what...>
 owner_field() {  # <id> <n> -> the n-th field (1-based) of the owner line
@@ -207,7 +214,16 @@ owner_live() {  # <id> -> 0 iff the LUN has an owner and that process still runs
     f=$(owner_of "$1")
     [ -s "$f" ] || return 1
     pid=$(owner_field "$1" 1); st=$(owner_field "$1" 2)
-    [ -n "$pid" ] && [ "$(starttime_of "$pid")" = "$st" ]
+    [ -n "$pid" ] && [ "$(starttime_of "$pid")" = "$st" ] || return 1
+    # A zombie (Z) or dying (X) owner has exited and owns nothing, though its
+    # /proc entry keeps its start time until its parent reaps it.  A parent that
+    # reaps late (tools/batch_lap.py's subreaper reaps orphans only when a lap
+    # ends) left drbd_rig.sh up's killed holder a zombie, and every later step
+    # of the lap was refused its own node.  LUN_POOL_ZOMBIE_DEAD=0 reads a
+    # zombie as live, as before.
+    [ "${LUN_POOL_ZOMBIE_DEAD:-1}" = 0 ] && return 0
+    case "$(state_of "$pid")" in Z|X) return 1 ;; esac
+    return 0
 }
 
 lun_size() { stat -c %s "$(img_of "$1")" 2>/dev/null; }

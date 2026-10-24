@@ -6578,6 +6578,36 @@
         "verdict": "rejected",
         "date": "2026-10-23"
       }
+    },
+    {
+      "id": "P20261023-6a2dff",
+      "kind": "remove-fixed",
+      "record": "D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN",
+      "change": {
+        "control": "b20261023-920e59",
+        "fixon": "b20261023-54d056",
+        "cause": "tools/mxfs_rig_tag.sh chose the native-XFS yardstick by the device's SCSI vendor, and /dev/drbd0 has none, so prep resolved no rig tag and fio_perf_vs_xfs at 2/net/mesh/drbd recorded SKIP rig-unknown on every run; a SKIP is not a PASS under candidate grading"
+      },
+      "argument": "FIXED AND VERIFIED; resubmission of P20261023-e7a30c with the three conditions of its review (data/reviews/P20261023-e7a30c.md:53-56) met. Checks 1-3 carried over unchanged, as that review allows: cause isolated by the MXFS_RIG_TAG_DRBD toggle; control b20261023-920e59 (fix taken out with MXFS_RIG_TAG_DRBD=0, tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step10.log) 10 of 10 exposed laps failed 'the row declined to score (rig-unknown)'; verification b20261023-54d056 sized from it (step11.log), applied under P20261023-639531, 6 of 6 exposed laps scored against rig=scst-fio-drbd. (1) release:drbd 2026-10-21T22:56:58Z and 20:12:33Z are no longer cells of this record and their retirements are withdrawn (data/criteria.runs.jsonl:12114, :12115, besides :10136); D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION names them. (2) The ten b20261023-d08fc5 laps (01:02:06Z-01:02:15Z) are no longer cells; their retired_by notes are withdrawn at tests/evidence/drbd_rig/criteria.runs.jsonl:3615-3624, with tools/criteria.py unretire, which now takes a lap row (D-CRITERIA-UNRETIRE-REFUSES-LAP-ROWS-SO-WRONG-LAP-RETIREMENTS-STAND); D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP names them. (3) The record now names exactly release:drbd 2026-10-22T00:35:43Z (FAIL failed=[suite-board], board fio_perf_vs_xfs=SKIP alone) and the ten b20261023-920e59 control laps (tests/evidence/precheck_drbd_rig_tag_removal_20261024.txt, from tools/proposal_precheck.py, which reads the DRBD rig's own run ledger). Tree: candidate 0.90.134's attempt frozen 2026-10-24T01:01:07Z was abandoned 2026-10-24 to land fixes in frozen files. The files the two batches ran are unchanged since that freeze (sha256 equal to tests/evidence/candidates/0.90.134_20261024T010107Z.files.json): tools/mxfs_rig_tag.sh, tests/drbd_rig_tag_lap.sh, tests/suite/fio_perf_vs_xfs.sh, run.sh, tools/batch_lap.py. scripts/drbd_rig.sh changed only in how it reads a bare number in MXFS_NODES (the nodes-count record's fix); the batches' lanes set no MXFS_NODES. Scope as the verify review states: the row now resolves the DRBD device and scores; DRBD throughput is graded by the release drbd step's own board run.",
+      "evidence": [
+        "data/reviews/P20261023-e7a30c.md",
+        "data/reviews/P20261023-639531.md",
+        "tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step10.log",
+        "tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step11.log",
+        "tests/evidence/precheck_drbd_rig_tag_removal_20261024.txt",
+        "tests/evidence/drbd_rig/criteria.runs.jsonl",
+        "tools/mxfs_rig_tag.sh",
+        "tests/drbd_rig_tag_lap.sh"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-6a2dff.md",
+        "sha256": "43530b756069025acba1569476d875f2eb6a10ac9a60925130f339458982bfd5",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }

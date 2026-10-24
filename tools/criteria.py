@@ -117,6 +117,11 @@ RELEASE_STEP_ROUTE = os.environ.get("MXFS_RELEASE_STEP_ROUTE", "1") != "0"
 #: runs are filed under, which parse_at refuses (it is no configuration of MXFS);
 #: `MXFS_RELEASE_STEP_LIST=0` hands it to parse_at, as before: the control.
 RELEASE_STEP_LIST = os.environ.get("MXFS_RELEASE_STEP_LIST", "1") != "0"
+#: A batch lap's run (row `lap:<name>`, tools/batch_lap.py) also exists only in a ledger, and
+#: tools/defects.py verify writes a retirement on it like any other cell, so an annotation names it
+#: by its row as it names a release step's (annotated_run). `MXFS_LAP_ANNOTATE=0` looks a lap's row
+#: up as a board criterion, as before: the control.
+LAP_ANNOTATE = os.environ.get("MXFS_LAP_ANNOTATE", "1") != "0"
 #: An attachment verified by a rig of its own (data/configurations.json attaches.<a>.board, e.g.
 #: drbd) keeps its board there; naming such a configuration reads and writes that board, as its
 #: rig does, so `criteria.py 2/net/mesh/drbd` needs no environment. A command that names a release
@@ -1474,9 +1479,12 @@ def cmd_migrate_ledger(data: dict, args) -> int:
 def annotated_run(data: dict, args) -> tuple:
     """(row, configuration) of the run an annotation is for: a board criterion's, or a release
     step's (tools/release_run.py records row `release:<step>`, which exists only in the ledger,
-    filed under the step's configuration or the placeholder `1/any`)."""
+    filed under the step's configuration or the placeholder `1/any`), or a batch lap's (row
+    `lap:<name>`, filed under its batch's configuration)."""
     if RELEASE_STEP_ANNOTATE and str(args.id).startswith("release:"):
         return args.id, (args.at if args.at == "1/any" else parse_at(args.at))
+    if LAP_ANNOTATE and re.fullmatch(r"lap:\S+", str(args.id)):
+        return args.id, parse_at(args.at)
     return find(data, args.id)["id"], parse_at(args.at)
 
 
