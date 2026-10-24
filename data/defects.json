@@ -7952,7 +7952,26 @@
       "impact": "stability",
       "impact_why": "Survivor operations stalled over the 30 s stall_limit_s (data/release_policy.json) through the fence's bounded series: test12's 'churn' operation ran 140.0 s (tests/evidence/20261024T144431Z_fledger_f8p1/test12_load.txt:1, ops 1792853199562-1792853339558 ms), test8's 62.4 s (tests/evidence/20261024T144431Z_fledger_f8p1/test8_load.txt:1)",
       "reproducer": "tests/evidence/drafts/held/tests/fenced_ledger_rig_lap.sh at 4 or 8 nodes with INJECT=preempt",
-      "updated": "2026-10-24"
+      "updated": "2026-10-24",
+      "batches": [
+        {
+          "id": "b20261024-5c0092",
+          "kind": "control",
+          "row": "lap:oob_surrender",
+          "config": "8/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "A7E90BC5313192108E35B80",
+          "variant": "SURRENDER=0 (pr_surrender=0 on V: the node never registers its key again, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: an out-of-band key removal leaves the prover at KEY_ABSENT_UNPROVEN and the fence series runs into RECOVERY_BLOCKED"
+        }
+      ]
     },
     {
       "id": "D-2NETMESH-FALSE-ENOSPC-ON-WRITE-AND-CHURN-WITH-19GB-FREE-DURING-NOINO-FENCE-LAP",
