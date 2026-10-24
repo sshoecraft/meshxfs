@@ -10157,6 +10157,25 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-9b8254",
+      "kind": "verify",
+      "record": "D-FOURKN-MERGE-SUITE-ROW-WORKER-BOUNDED-ONLY-ON-THE-SSH-CLIENT",
+      "change": {
+        "batch": "b20261024-25e23b"
+      },
+      "argument": "Verification b20261024-25e23b of lap:merge_row_overrun at 2/net/mesh/direct4k (g2d test31/test32, candidate 0.90.134 attempt frozen 2026-10-24T19:27:48Z, module FF012B4B81CDB69CAE96883, lane tests/evidence/lanes/g2d_a21_20261024T192800Z step 5): 13 of 13 planned laps PASS, each with exposure ('EXPOSED: the row's workload ran N ms against a node-side bound of 13 s and a client bound of 16 s') and 'no worker ran on either node 8 s after the row's overrun'; none failed, none dropped. Sized from control b20261024-864e45 (step 4, same attempt and module, FOURKN_MERGE_NODE_BOUND=0: tests/suite/fourkn_merge.sh bounds each worker on the ssh client alone, as before the fix): 10 of 10 laps exposed, 8 FAIL 'a worker still ran on 2 node(s) 8 s after the row's overrun' (mrc21n1-3, n6-n10), 2 PASS (mrc21n4, mrc21n5: the unbounded workers happened to finish within the 8 s), lower bound 0.3518, 13 clean laps. The lap (tests/merge_row_overrun_lap.sh) runs the row script itself with ROUNDS=200 so its workload passes the 16 s bound, then counts the row's workers on each node 8 s later. The fix is tests/suite/fourkn_merge.sh (the worker runs under timeout --foreground WBOUND-3 on its node). With b20261024-6336a2 (2/disk/caw/direct4k, applied in P20261024-4d60f6) this covers both configurations the row runs at.",
+      "evidence": [
+        "tests/evidence/lanes/g2d_a21_20261024T192800Z/step4.log",
+        "tests/evidence/lanes/g2d_a21_20261024T192800Z/step5.log",
+        "tests/evidence/batch_laps/b20261024-864e45",
+        "tests/evidence/batch_laps/b20261024-25e23b",
+        "tests/merge_row_overrun_lap.sh",
+        "tests/suite/fourkn_merge.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
