@@ -5033,7 +5033,7 @@
       "config": "*/*/*",
       "opened": "2026-10-23",
       "summary": "tests/fourkn_merge_2node.sh, the standalone two-node merged-write lap, holds each node's first 64 merged inode-block writes 20 ms between the read and the COMPARE AND WRITE (HOLD_N 64, HOLD_MS 20, HOLD_PEER_MS 0 by default) so that a peer's write of the same block lands in between, but nothing makes the peer write that block inside the hold: of 4 held laps on the 4K-native LUN, 1 saw no MISCOMPARE and exited VACUOUS, so one lap does not reliably exercise the merged write's retry",
-      "evidence": "Held laps (HOLD_N=64 HOLD_MS=20), module 2666D8544F367E3B7424B60, test31/test32: tests/evidence/20261022T135408Z_fourkn_merge_2-net-mesh-direct miscompares 1 (PASS); 20261022T135619Z_fourkn_merge_2-disk-caw-direct 1 (PASS); 20261022T145928Z_fourkn_merge_2-disk-caw-direct 0 (VACUOUS: lap.log:13-14 iwr_merge_blocks 247 and 214, iwr_merge_miscompares=0, dbg_iwr_merge_hold_left=0 on both, so every hold was spent with no peer write inside it; :36 'VACUOUS no swap miscompared'); 20261022T154721Z_fourkn_merge_2-disk-caw-direct 2 (PASS). Unheld, 0 MISCOMPAREs in ~480 merged writes a lap (20261022T133714Z, 134001Z, 134249Z). Every VACUOUS lap passed every correctness check; the lap never reads one as PASS. The board row's fix (tests/suite/fourkn_merge.sh, forced overlap at the unmount) did not change this script: data/reviews/P20261022-68ebdb.md Check 1 (tests/fourkn_merge_2node.sh:89-91 HOLD_N 64, HOLD_MS 20, HOLD_PEER_MS 0; :201 the VACUOUS exit; frozen with sha256 783e549811440c52852786b6283438bdfd542a3f87b1d03c6a5368f8266382dd, the same hash today). Split out of D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS, which now covers the board row only. ===== 2026-10-24, control b20261024-d5be0a (the old hold: FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0, module A27A67A3E501890BE9985E0): of the three laps whose workload ended inside its bound, lap 7 saw 4 MISCOMPAREs (PASS, 15:13:34Z) and laps 8 and 9 saw none and exited VACUOUS ('VACUOUS no swap miscompared', 15:15:01Z and 15:16:34Z; tests/evidence/batch_laps/b20261024-d5be0a/20261024T151334Z-b93b7fe4.log, 151502Z-22904a8e.log). The batch was stopped at lap 10 (its laps 1 and 3-6 had overrun, D-FOURKN-MERGE-WORKLOAD-OVERRAN-16S-WHEN-EVERY-CAW-TOOK-TWICE-AS-LONG, and lap 2 was refused by the host preflight), so it cannot be measured and a new control is needed.",
+      "evidence": "Held laps (HOLD_N=64 HOLD_MS=20), module 2666D8544F367E3B7424B60, test31/test32: tests/evidence/20261022T135408Z_fourkn_merge_2-net-mesh-direct miscompares 1 (PASS); 20261022T135619Z_fourkn_merge_2-disk-caw-direct 1 (PASS); 20261022T145928Z_fourkn_merge_2-disk-caw-direct 0 (VACUOUS: lap.log:13-14 iwr_merge_blocks 247 and 214, iwr_merge_miscompares=0, dbg_iwr_merge_hold_left=0 on both, so every hold was spent with no peer write inside it; :36 'VACUOUS no swap miscompared'); 20261022T154721Z_fourkn_merge_2-disk-caw-direct 2 (PASS). Unheld, 0 MISCOMPAREs in ~480 merged writes a lap (20261022T133714Z, 134001Z, 134249Z). Every VACUOUS lap passed every correctness check; the lap never reads one as PASS. The board row's fix (tests/suite/fourkn_merge.sh, forced overlap at the unmount) did not change this script: data/reviews/P20261022-68ebdb.md Check 1 (tests/fourkn_merge_2node.sh:89-91 HOLD_N 64, HOLD_MS 20, HOLD_PEER_MS 0; :201 the VACUOUS exit; frozen with sha256 783e549811440c52852786b6283438bdfd542a3f87b1d03c6a5368f8266382dd, the same hash today). Split out of D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS, which now covers the board row only. ===== 2026-10-24, control b20261024-d5be0a (the old hold: FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0, module A27A67A3E501890BE9985E0): of the three laps whose workload ended inside its bound, lap 7 saw 4 MISCOMPAREs (PASS, 15:13:34Z) and laps 8 and 9 saw none and exited VACUOUS ('VACUOUS no swap miscompared', 15:15:01Z and 15:16:34Z; tests/evidence/batch_laps/b20261024-d5be0a/20261024T151334Z-b93b7fe4.log, 151502Z-22904a8e.log). The batch was stopped at lap 10 (its laps 1 and 3-6 had overrun, D-FOURKN-MERGE-WORKLOAD-OVERRAN-16S-WHEN-EVERY-CAW-TOOK-TWICE-AS-LONG, and lap 2 was refused by the host preflight), so it cannot be measured and a new control is needed. ===== 2026-10-24: no longer names 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:17:05Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:17:14Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:17:24Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:17:33Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:17:43Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:17:52Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:18:01Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:18:10Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:18:19Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:18:28Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:18:38Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:18:47Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:18:56Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:19:05Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:19:14Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:19:24Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:21:44Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:21:53Z, settled (retired_by): each is an INCOMPLETE abort ('no verdict line (rc=2)', 8-9 s) already retired in the run ledger by the removal of D-FOURKN-MERGE-LAP-OVERRUN-LEAVES-ITS-WORKER-HOLDING-THE-MOUNT (fixed), the overrun worker left holding /mnt/fourkn; no swap ran, so none is this record's VACUOUS lap (review data/reviews/P20261024-91492a.md:122-126) ===== 2026-10-24: no longer names 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T12:57:15Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T12:57:41Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T12:57:51Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T12:58:02Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T12:58:12Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T12:58:23Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T12:58:33Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T12:58:44Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T12:58:54Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T12:59:05Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T12:59:15Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T12:59:50Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T13:00:00Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T13:00:11Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T13:00:22Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T13:00:32Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T13:00:43Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T13:00:53Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T13:01:03Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T13:01:14Z, settled (retired_by): each is an INCOMPLETE abort at the lap's own insmod ('rmmod: ERROR: Module mxfs is in use', e.g. tests/evidence/batch_laps/b20261024-4a1349/20261024T125650Z-95460fb3.log:5) already retired in the run ledger by the removal of D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE (disproved: the lane's prep mount held the module); no swap ran, so none is this record's VACUOUS lap ===== 2026-10-24: no longer names 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T13:12:16Z, settled (retired_by): INCOMPLETE rc=1 after a workload overrun (tests/evidence/batch_laps/b20261024-f31760/20261024T131045Z-2798433f.log:13 'WORKER_STOPPED', :25 'FAIL every file reads its own writer's last mode'); the open record D-FOURKN-MERGE-WORKLOAD-OVERRAN-16S-WHEN-EVERY-CAW-TOOK-TWICE-AS-LONG names this run, and it is not a VACUOUS lap ===== 2026-10-24: no longer names 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:16:56Z, settled (retired_by); 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:21:34Z, settled (retired_by): overruns of the 130 s bound (slow mounts; workers rc=1 and busy unmounts), not VACUOUS laps; the open record D-FOURKN-MERGE-CONTROL-LAPS-OVERRAN-130S-SLOW-MOUNTS-AND-BUSY-UNMOUNTS now names both (review data/reviews/P20261024-91492a.md:92-113)",
       "next": "Make the lap force the overlap once a lap as tests/suite/fourkn_merge.sh does (the workload unheld; at the unmount node 1 armed with one held merged write of up to FORCE_MS while node 2 writes its own slot of the same block), so a lap whose forced overlap does not land is VACUOUS and every other lap retries a MISCOMPARE. Then a control with the old hold (HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0, no forced overlap) on the candidate's tree, a verification batch sized from it, and remove --fixed. ===== 2026-10-24, attempt 19: verification b20261024-0fd280 (89 planned, lane tests/evidence/lanes/g2d_a19b_20261024T153135Z step 5) passed laps 1-11 (67-75 s, miscompares 1-2 each, forced=landed) and lap 12 FAILed 'elapsed>130s' (run 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T16:12:12Z): its workers were stopped at rounds 3 and 2 of 20 by the node-side bound and its remount after chk hung past the kill, while this session's recursive grep of tests/evidence saturated /dev/sda, the SSD under every pool LUN (100% util 16:11-16:14Z, tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/). Proposed infra-proven: P20261024-a96a97. The batch ended on that FAIL; attempt 20 runs a fresh verification against the same control (queue_g2d_a20.txt).",
       "reproducer": "tests/fourkn_merge_2node.sh <4096-byte pool LUN device> test31 test32 with its default hold (about 30-40 s a lap): a lap whose holds catch no peer write exits VACUOUS (exit 3, 'VACUOUS no swap miscompared')",
       "batches": [
@@ -5402,106 +5402,6 @@
         {
           "config": "2/disk/caw/direct4k",
           "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:21:53Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:21:44Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:21:34Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:19:24Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:19:14Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:19:05Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:18:56Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:18:47Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:18:38Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:18:28Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:18:19Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:18:10Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:18:01Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:17:52Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:17:43Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:17:33Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:17:24Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:17:14Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:17:05Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-23T21:16:56Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
           "iso": "2026-10-23T20:58:34Z"
         },
         {
@@ -5518,106 +5418,6 @@
           "config": "2/disk/caw/direct4k",
           "row": "lap:fourkn_merge_2node",
           "iso": "2026-10-23T20:43:32Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:01:14Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:01:03Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:00:53Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:00:43Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:00:32Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:00:22Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:00:11Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:00:00Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:59:50Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:59:15Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:59:05Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:58:54Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:58:44Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:58:33Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:58:23Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:58:12Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:58:02Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:57:51Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:57:41Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:57:15Z"
         },
         {
           "config": "2/disk/caw/direct4k",
@@ -5648,11 +5448,6 @@
           "config": "2/disk/caw/direct4k",
           "row": "lap:fourkn_merge_2node",
           "iso": "2026-10-24T13:15:30Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:12:16Z"
         },
         {
           "config": "2/disk/caw/direct4k",
@@ -8759,6 +8554,28 @@
       "impact": "integrity",
       "impact_why": "a hazard read from the code against a design ruling, not yet observed: a REGISTER that executes at the target after a peer's PREEMPT AND ABORT registers the fenced node's key again on that nexus, so a write the node still has queued there can land after the survivors replayed its log (docs/rulings/silent-peer-death-under-the-stall-limit.md:300-306)",
       "updated": "2026-10-24"
+    },
+    {
+      "id": "D-FOURKN-MERGE-CONTROL-LAPS-OVERRAN-130S-SLOW-MOUNTS-AND-BUSY-UNMOUNTS",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "Two laps of the merged-write lap's control batch b20261023-777805 at 2/disk/caw/direct4k (2026-10-23, test31 and test32) overran the lap's 130 s bound with causes nothing has explained: in one the two mounts after mkfs took about 40 s each (normally a few seconds) and the lap was killed before its workload ended; in the other both workers exited rc=1 and both unmounts were refused 'target is busy' before the lap ran out its bound",
+      "evidence": "tests/evidence/batch_laps/b20261023-777805/20261023T211445Z-0bbf2c89.log (run 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:16:56Z, ledger FAIL 'elapsed>130s'): mkfs 21:15:12Z, ':8' 'OK mount test31' 21:15:52Z, ':9' 'OK mount test32' 21:16:38Z, ':11' '64 files in 9 inode blocks', ':12' '=== the lap overran its bound of 130s: the 14 process(es) it had started were ended (gone) ===', ':13' '=== rc=124 elapsed=130s (2026-10-23T21:16:55Z) ==='. tests/evidence/batch_laps/b20261023-777805/20261023T211924Z-ef20fc21.log (run 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-23T21:21:34Z, ledger FAIL 'elapsed>130s'): ':12' 'INFO workload wall 19019 ms; test31: rc=1 ; test32: rc=1', ':17' 'FAIL umount test31: umount: /mnt/fourkn: target is busy.|umount_rc=32|', ':21' '=== rc=124 elapsed=130s (2026-10-23T21:21:34Z) ==='. Both were cells of D-FOURKN-MERGE-2NODE-LAP-HOLD-CATCHES-THE-PEER-ONLY-BY-CHANCE, whose cause (a hold that catches no peer write: VACUOUS) explains neither; review data/reviews/P20261024-91492a.md:92-113 moved them here. The second has the shape of the removed D-FOURKN-MERGE-LAP-OVERRUN-LEAVES-ITS-WORKER-HOLDING-THE-MOUNT (a worker still holding the mount), whose removal did not retire it.",
+      "next": "Read both laps' node kernel logs and journals for the window (the batch dir and each node's journal for 2026-10-23T21:14-21:22Z): what each 40 s mount waited on (the first-mount log-slice zeroing of D-FIRST-MOUNT-SLICE-ZERO-SERIAL-FUA-TAKES-16S-UNDER-TARGET-LOAD-PREP-OVERRAN, or something else), and why both workers exited rc=1 in the second (their own logs). If the second's cause is the worker left holding the mount, propose its retirement under that removal's CHANGELOG paragraph; a cause found in the first goes to the record it matches or is fixed here.",
+      "cells": [
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:16:56Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-23T21:21:34Z"
+        }
+      ]
     }
   ]
 }
