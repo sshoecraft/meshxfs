@@ -3865,7 +3865,7 @@
       "opened": "2026-10-22",
       "summary": "On the 4/ and 8/disk/caw/mpath boards of 2026-10-19 (runs 20261019T142249Z-g4b and -g8b, v0.90.131 tools), chk_clean's cold audit found the volume CORRUPT with one nlink mismatch each: a regular file with nlink 1 named by two directory entries. In both runs the row just before chk_clean was path_answer_lost, which reports COMPARE AND WRITE answers lost on purpose and has some resent swaps find a peer's write in between. The chk_clean FAIL never reached the ledger (the boards were migrated without it); the crash_audit rows after it found the audited node left unmounted and recorded PRE-ASSERT INCOMPLETE.",
       "evidence": "tests/evidence/run_chk_clean_20261019T142249Z-g4b/test17:3 'RESULT: FAIL | test=chk_clean | nodes=4 | measured=verdict=CORRUPT release=CORRUPT rc=4 errors=3 remounted=0 icount=19328 ... evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261019T151341Z.log'; chk_clean_4node_20261019T151341Z.log:821 'ERROR: inode 6872560 (mode 0100644) has nlink 1 but 2 directory entries name it', :822 nlink_mismatch=1. tests/evidence/run_chk_clean_20261019T142249Z-g8b/test21:3 'verdict=CORRUPT release=CORRUPT rc=4 errors=3 ... chk_clean_8node_20261019T152029Z.log'; chk_clean_8node_20261019T152029Z.log:1045 'ERROR: inode 13147165 (mode 0100644) has nlink 1 but 2 directory entries name it', :1046 nlink_mismatch=1. Preceding rows: board_20261019T142249Z-g4b_path_answer_lost/row.log:129 'RESULT: PASS ... victim=test20 injected=40 landed=23 unresolved=17'; board_20261019T142249Z-g8b_path_answer_lost/row.log:241 'RESULT: PASS ... victim=test28 injected=40 landed=24 unresolved=16'. Located by tests/evidence/incident_preassert_sweep_20261022T2355Z.txt (groups d, e). ===== 2026-10-23 sweep of both runs' kept files (run_chk_clean_20261019T142249Z-g4b and -g8b kernlog_test*.gz, the path_answer_lost rows' load_* files): neither chk log names the two entries or their directories (chk_clean_4node_20261019T151341Z.log:821 and chk_clean_8node_20261019T152029Z.log:1045 are each log's only ERROR line and its only mention of the inode), and no image of either volume was kept. 8 nodes, inode 13147165 (agno 3, agino 0x89c1d): test28's churn (tests/mpath/pathload.py churn: create shared/<node>.<lap>, rename to .r, unlink the previous lap's .r) was handed that number for 59 creates, shared/test28.406 to shared/test28.806, 15:17:40-15:18:28Z (board_20261019T142249Z-g8b_path_answer_lost/load_test28/inos.log:814-1614), then its private write for test28/f0000811 at 15:18:33.790Z (inos.log:1623; directory 13121792, chk log :894). At 15:18:33 test28 logged 'P26-DSCAN-MISS ino=13121792 ndb=5 scanned=813 name=\"f0000811\" (not in any data block ...)' twice (run_chk_clean_20261019T142249Z-g8b/kernlog_test28.gz:93041, :93191). At 15:19:22 test27 still held an in-core directory incarnation of the number (P-RELOAD-XINCARN-POISON ino=13147165 incore_mode=040755 disk_mode=0100644, kernlog_test27.gz:140806; INODE-REUSE-EVICT incore_ftype=2 dirent_ftype=1 name=f0000811, :140768), the mutex's lock directory being the workload's only mkdir. chk found no ftype mismatch, so the second entry names a regular file. The 40 injected lost answers were all swaps of one lock slot (P-CAW-ANSWER-LOST-* slot=27793 in answer_lost_test28.txt: 24 LANDED, 16 UNRESOLVED), the lock of ino 25704706: every node logged P-ACQ-STUCK on it at 15:17:20 and 15:18:16-18, and test28 'P-ACQ-SELF-ORPHAN ino=25704706 slot=27793 ... sole wire holder is THIS node while this waiter starves' (kernlog_test28.gz:86021-86022). 4 nodes, inode 6872560 (agno 3, agino 0x8ddf0): no file names it besides the chk log and four lock lines (kernlog_test17.gz:45478, test18 :40251 :40264, test19 :47553); the injected swaps were slot 21417, the lock of ino 2636354 (P-ACQ-STUCK and P-ACQ-SELF-ORPHAN on test20 at 15:11:36, kernlog_test20.gz:53569-53570). ===== 2026-10-23, on build 08D63764A9352FBDD5A76CD (tree of the 0.90.134 attempt frozen 10:11:20Z), one run each of path_answer_lost then chk_clean with every node's kernel log kept (PF_KEEP_KMSG=1, lanes tests/evidence/lanes/g4_nlink_repro_20261023T102759Z and g8_nlink_repro_20261023T102802Z, step4.log): 4/disk/caw/mpath 'RESULT: PASS ... victim=test6 injected=40 landed=15 unresolved=25 ... max_stall_ms=17445' (board_20261023T105528Z-g4_path_answer_lost/row.log), chk_clean CLEAN 'nlink_mismatch=0' (chk_clean_4node_20261023T105949Z.log); 8/disk/caw/mpath 'RESULT: PASS ... victim=test14 injected=40 landed=24 unresolved=16 ... max_stall_ms=18098' (board_20261023T105719Z-g8_path_answer_lost/row.log), chk_clean CLEAN 'nlink_mismatch=0' (chk_clean_8node_20261023T110155Z.log). The trigger's conditions were present: the kept kmsg dumps hold 8 (g4) and 15 (g8) P-ACQ-STUCK/P-ACQ-SELF-ORPHAN lines. 0 of 2 runs failed on this build against 2 of 2 on 2026-10-19 (v0.90.131 tools); two clean runs dispose of nothing. ===== 2026-10-24: no longer names 4/disk/caw/mpath:lap:relog_auth:2026-10-24T04:30:50Z, named by D-LANE-POWER-UP-FLOODS-THE-HOST-LOG-AND-ANOTHER-LANES-PREFLIGHT-REFUSES-ITS-PREP: this lap never reached the lap's trigger: 'LAP relog_auth ABORT: prep_cluster rc=3: === run.sh ABORTED: host-safety preflight failed' 10-11 s in, before the forced re-log arm ran (exposure=0); its cause is another lane's power-up flooding the host log, named by D-LANE-POWER-UP-FLOODS-THE-HOST-LOG-AND-ANOTHER-LANES-PREFLIGHT-REFUSES-ITS-PREP ===== 2026-10-24: no longer names 4/disk/caw/mpath:lap:relog_auth:2026-10-24T04:37:59Z, named by D-LANE-POWER-UP-FLOODS-THE-HOST-LOG-AND-ANOTHER-LANES-PREFLIGHT-REFUSES-ITS-PREP: this lap never reached the lap's trigger: 'LAP relog_auth ABORT: prep_cluster rc=3: === run.sh ABORTED: host-safety preflight failed' 10-11 s in, before the forced re-log arm ran (exposure=0); its cause is another lane's power-up flooding the host log, named by D-LANE-POWER-UP-FLOODS-THE-HOST-LOG-AND-ANOTHER-LANES-PREFLIGHT-REFUSES-ITS-PREP",
-      "next": "Read both chk_clean logs in full and each run's path_answer_lost kernel logs for the two inodes (6872560, 13147165): which directory holds the two entries, their names, which node created and linked each, and whether a resent COMPARE AND WRITE of a directory block applied an entry insert twice. Then check whether a later version changed that path (0.90.131 was withdrawn; the 0.90.132 entry of CHANGELOG.md), and reproduce on the current build: 4/disk/caw/mpath path_answer_lost followed by chk_clean. ===== 2026-10-23: the kept files cannot name the second entry, so the cause has to come from a run on the current build: 4/disk/caw/mpath and 8/disk/caw/mpath path_answer_lost followed by chk_clean, with the rows' kernel logs kept (PF_KEEP_KMSG=1) and, on a CORRUPT verdict, the volume read before anything remounts it, so the two entries, their directories and the lock ino 25704706 is (whether it is the shared directory) are known. ===== 2026-10-23: the current build did not reproduce in one run at 4 and one at 8 nodes, with the trigger's stuck acquisitions present. Next: diff the inode-reuse and directory-entry paths between the 2026-10-19 build and this one (the 0.90.132 entry of CHANGELOG.md, the P-RELOAD-XINCARN-POISON and INODE-REUSE-EVICT sites) to find a change that would explain it; if one does, a control with that change reverted at 8/disk/caw/mpath must reproduce before a verification batch can be sized; if none does, a calibration batch of path_answer_lost+chk_clean at 8/disk/caw/mpath on this build measures the rate. ===== ===== 2026-10-23 (session 55): THE CAUSE IS ALREADY TRACED, as D-CAW-MPATH-8NODE-REUSED-INODE-NAMED-BY-TWO-DIRENTS-NLINK-1-AFTER-SUITE, removed fixed and verified in 0.90.131 (CHANGELOG.md:613-651). That removal names this record's runs and inodes: 'On the 8-node multipath board of the first 0.90.131 build (8DAEC6B8298ADB049222D74), test23 held the workload's LOCK directory (13147169) shared and wrote back a copy that still named LOCK/test28 after test28 had removed it. Inode 13147165 was then freed and reused as test28/f0000811, and the cold audit found it named twice with a link count of 1. The 4-node multipath board showed the same shape on LOCK directory 6872562' (:619-624), and its cells 'chk_clean FAIL 2026-10-19T15:20:43Z (CORRUPT)' at 8/disk/caw/mpath and 'chk_clean FAIL 2026-10-19T15:13:51Z, dlm_lock_correctness FAIL 2026-10-19T15:13:56Z and crash_audit FAIL 2026-10-19T15:13:57Z' at 4/disk/caw/mpath (:645-651). The 14:22:49Z runs were that build (data/defects.json prose of three other records: 'Builds 8DAEC6B8298ADB049222D74 (14:22:49Z runs)'; board run 20261019T142249Z-g8b path_failover 'release build 8DAEC6B8298ADB049222D74'); no file kept from the runs names a srcversion (the board logs were overwritten by the 2026-10-20 runs, board_8-disk-caw-mpath_g8b_bL1_0.90.131.log:38 build 292B547486AE6E75317F308). Cause: mxfs_dlm_relog_authorized read the CAW slot through the held-or-not query, which reports a shared bit as exclusive, so a shared holder's release drain re-logged its stale directory core; fix relog_auth_granted_mode=1 (re-log only on the granted mode; 0 is the same-build control). This record was opened from the incident sweep (tests/evidence/incident_preassert_sweep_20261022T2355Z.txt) because the chk_clean FAILs reached no run ledger and so were never retired by that removal. ===== The hypothesis tested first this session (the D-CC-16NODE abort that overwrote ACQUIRING, rel_abort_keeps_acquiring) is not this record's cause: lane tests/evidence/lanes/g4_nlink_relabort_off_20261023T230646Z (4/disk/caw/mpath, candidate build 79779BEAECBEA94844FDC72, rel_abort_keeps_acquiring=0 as a variant) made the second acquires happen (board_20261023T231404Z-g4_path_answer_lost kmsg: P-REL-ABORT-UNDER-ACQ keep=0 339-364 a node, P-ACQ-CONCURRENT 6 and 2, P109-EDEADLK-NL-RELEASE 8-13 a node) and chk_clean was CLEAN in each lap read. ===== Next, on the next candidate attempt: tests/relog_auth_lap.sh (built in the sibling tree mxfs-a15: a fresh prep, then one single-arm lap of tests/relog_pr_release_auth.sh, which gains RELOG_ARM=C|F and runs from its own tree) at 4/disk/caw/mpath: control ARM=0 (relog_auth_granted_mode=0, the read before the fix), the verification sized from it, then remove --fixed with the cause above. ===== 2026-10-24: removal P20261024-9cdfae rejected (data/reviews/P20261024-9cdfae.md): lap:relog_auth forces the re-log arm on a directory whose in-core and on-disk copies are equal, so its 8 of 8 shows the switch picks its branch, not that the corruption is gone; nothing measured ties the shared holder's re-log of the stale LOCK core (board_20261019T142249Z-g8b_path_flap/kmsg_test23_fromnode.gz:171223-171287; g4b kmsg_test20_fromnode.gz:150063-150064) to inode 13147165 or 6872560 being named twice; 13147165 had been a directory (kmsg_test28_fromnode.gz:125249 P58-STALE-BASE-ADD pino=13147165) and test27 still held it as one (kernlog_test27.gz:140806), which the trace does not account for. Next: a fix-off calibration on the record's own check, path_answer_lost then chk_clean at 8/disk/caw/mpath (and 4/) with MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0 and PF_KEEP_KMSG=1, a CORRUPT volume read (chk_mxfs -v, the two entries' directories and names) before anything remounts it; if it reproduces, fix-on batches sized from that rate at both 4/ and 8/disk/caw/mpath; if it does not, the cause is not established and the record stays open on its evidence. ===== 2026-10-24 (session 84): the fix-off calibration the review asked for is queued at the head of attempt 20's solo lane (tests/evidence/lanes/queue_solo_a20.txt): a control batch of chk_clean supported by path_answer_lost, 5 laps at 8/disk/caw/mpath on g8 then 5 at 4/disk/caw/mpath on g4b, each re-formed with MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0 and run with PF_KEEP_KMSG=1; chk_clean already prints every entry naming a mismatched inode on a CORRUPT verdict (tests/tooling/chk_clean.sh:224-234, MXFS_CHK_NAMES_OF), so a reproduction names both entries and their directories before any remount. If it reproduces: fix-on verification batches sized from it at both configurations, then remove --fixed tying the entries to the shared holder's re-log; if 0 of 10: the cause is not established. ===== ===== 2026-10-24 (session 86): the 4/disk/caw/mpath calibration b20261024-b98f94 (lane tests/evidence/lanes/g4b_a20_20261024T173633Z step 2) ran no lap: run.sh refused all five, 'runs one lap of one row ... (got: path_answer_lost chk_clean)', because it admits no supporting row but alloc_witness (D-RUN-SH-BATCH-REFUSES-A-DECLARED-SUPPORTING-ROW-OTHER-THAN-ALLOC-WITNESS, fix drafted). The batch stays open at 0 of 5; on the next attempt, with that fix, declare the calibration afresh and run path_answer_lost chk_clean in one invocation. ===== 2026-10-24 (session 91): THE FIX-OFF CONTROL REPRODUCED THE CORRUPTION on candidate 0.90.134 attempt 2026-10-24T19:27:48Z (module FF012B4B81CDB69CAE96883), path_answer_lost then chk_clean with MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0 and PF_KEEP_KMSG=1 (lanes tests/evidence/lanes/g4b_a21_20261024T192800Z and g8b_a21_20261024T192800Z, step 3): 4/disk/caw/mpath 1 of 5 laps CORRUPT (control b20261024-0ebcba, run 20261024T193205Z-g4b), 8/disk/caw/mpath 2 of 4 (b20261024-2e30a0, runs 20261024T193342Z-g8b and 20261024T195534Z-g8b; its lap 4 was refused by the host preflight, another lane's power-up flooding the log). Each CORRUPT volume names the entries (MXFS_CHK_NAMES_OF): chk_clean_4node_20261024T193644Z.log 'ERROR: inode 6218 (mode 0100644) has nlink 1 but 2 directory entries name it', 'NAMES-OF: directory 131 entry f0000200' and 'directory 6217 entry test17'; chk_clean_8node_20261024T193842Z.log inode 16779386, 'directory 16777344 entry f0000123' and 'directory 16779389 entry test26'; chk_clean_8node_20261024T200038Z.log inode 12589223, 'directory 12583040 entry f0000234' and 'directory 12589222 entry test22': a node's private file and a stale entry named after that node in the workload's two-entry LOCK directory (tests/mpath/pathload.py mutex). In each run a peer re-logged the LOCK directory's core under a shared grant and committed it without EX, inside the named node's mutex operation, which failed ENOTEMPTY (the row's one error, path_answer_lost FAIL 'no operation on <node> returned an error got=1'): run A board_20261024T193205Z-g4b_path_answer_lost kmsg_test20_fromnode.gz '[228.556188] P146V-AUTH ino=6217 held_mode=5 raw_mode=5 granted_mode=3 by_granted=0 ... -- synthetic re-log authorized', P146V-UNLANDED incore size=20 disk size=6, P58-DIRPIN-NONEX ino=6217 '-- dir committed WITHOUT EX authority' at epoch ms 1792870417577, inside test17's 'mutex ERR ENOTEMPTY' 1792870416581-1792870417760 (load_test17/ops.log:605); run B test23 P146V-AUTH/P146V-UNLANDED ino=16779389, P58-DIRPIN-NONEX at 1792870557208 inside test26's ENOTEMPTY 1792870556216-1792870557255 (load_test26/ops.log:382); run C test28 P146V-AUTH/P146V-UNLANDED ino=12589222, P58-DIRPIN-NONEX at 1792871900396 inside test22's ENOTEMPTY 1792871899887-1792871900475 (load_test22/ops.log:707). The inode each stale entry names was then freed and reused for the node's file (load_test17/inos.log:392-401 shared/test17.195, .198, then test17/f0000200 = 6218; load_test26/inos.log:238-247; load_test22/inos.log:458-469). Extracts: scratch sweep of the three runs' kmsg (A_/B_/C_ files). The control's 'measured ... 0 of 0 exposed laps' is the batch's exposure probe (P-ACQ-SELF-ORPHAN|P-ACQ-STUCK) graded on the chk_clean row while the trigger runs in its supporting row (D-RUN-SH-BATCH-REFUSES-A-DECLARED-SUPPORTING-ROW-OTHER-THAN-ALLOC-WITNESS, fix drafted: exposure from the first row's start). The shared-grant re-log decision is a marker present in both arms: 'P146V-(AUTH|NOAUTH-REFUSE) .*raw_mode=5 granted_mode=3' counted per run (AUTH/REFUSE): A 1/36, B 2/43, C 19/164, and the clean lap 20261024T194425Z-g4b 5/287, so a shared-grant AUTH reaches the trigger without always corrupting; with the fix every shared-grant decision is a REFUSE (held_mode is the granted 3 < EX). Next, on the next attempt with the supporting-row exposure fix: a control (relog_auth_granted_mode=0) at 8/disk/caw/mpath of 10 laps, probe 'P146V-(AUTH|NOAUTH-REFUSE) .*raw_mode=5 granted_mode=3', graded on chk_clean (CORRUPT = FAIL); a verification sized from its rate with the fix at its default, plus 'zero P146V-AUTH with granted_mode=3' read from each fix-on lap; the same at 4/disk/caw/mpath; then remove --fixed with this chain. ===== Correction to the entry above: run.sh's supporting-row exposure (attempt 21's tree already reads it from the first row's start) is not why the controls counted exposure=0. Their probe P-ACQ-SELF-ORPHAN|P-ACQ-STUCK matched 0 lines in all four runs' followed kernel logs (kmsg_*_fromnode.gz of board_20261024T193205Z-g4b, 193342Z-g8b, 195534Z-g8b and 194425Z-g4b _path_answer_lost): the 2026-10-19 trigger shape is not this build's. The next control's probe is the shared-grant re-log decision above; whether run.sh's ring read can hold it to the count is D-BATCH-EXPOSURE-COUNT-READS-THE-RING-AFTER-A-SUPPORTING-ROW-THAT-MAY-ROTATE-IT, whose follower is drafted.",
+      "next": "Read both chk_clean logs in full and each run's path_answer_lost kernel logs for the two inodes (6872560, 13147165): which directory holds the two entries, their names, which node created and linked each, and whether a resent COMPARE AND WRITE of a directory block applied an entry insert twice. Then check whether a later version changed that path (0.90.131 was withdrawn; the 0.90.132 entry of CHANGELOG.md), and reproduce on the current build: 4/disk/caw/mpath path_answer_lost followed by chk_clean. ===== 2026-10-23: the kept files cannot name the second entry, so the cause has to come from a run on the current build: 4/disk/caw/mpath and 8/disk/caw/mpath path_answer_lost followed by chk_clean, with the rows' kernel logs kept (PF_KEEP_KMSG=1) and, on a CORRUPT verdict, the volume read before anything remounts it, so the two entries, their directories and the lock ino 25704706 is (whether it is the shared directory) are known. ===== 2026-10-23: the current build did not reproduce in one run at 4 and one at 8 nodes, with the trigger's stuck acquisitions present. Next: diff the inode-reuse and directory-entry paths between the 2026-10-19 build and this one (the 0.90.132 entry of CHANGELOG.md, the P-RELOAD-XINCARN-POISON and INODE-REUSE-EVICT sites) to find a change that would explain it; if one does, a control with that change reverted at 8/disk/caw/mpath must reproduce before a verification batch can be sized; if none does, a calibration batch of path_answer_lost+chk_clean at 8/disk/caw/mpath on this build measures the rate. ===== ===== 2026-10-23 (session 55): THE CAUSE IS ALREADY TRACED, as D-CAW-MPATH-8NODE-REUSED-INODE-NAMED-BY-TWO-DIRENTS-NLINK-1-AFTER-SUITE, removed fixed and verified in 0.90.131 (CHANGELOG.md:613-651). That removal names this record's runs and inodes: 'On the 8-node multipath board of the first 0.90.131 build (8DAEC6B8298ADB049222D74), test23 held the workload's LOCK directory (13147169) shared and wrote back a copy that still named LOCK/test28 after test28 had removed it. Inode 13147165 was then freed and reused as test28/f0000811, and the cold audit found it named twice with a link count of 1. The 4-node multipath board showed the same shape on LOCK directory 6872562' (:619-624), and its cells 'chk_clean FAIL 2026-10-19T15:20:43Z (CORRUPT)' at 8/disk/caw/mpath and 'chk_clean FAIL 2026-10-19T15:13:51Z, dlm_lock_correctness FAIL 2026-10-19T15:13:56Z and crash_audit FAIL 2026-10-19T15:13:57Z' at 4/disk/caw/mpath (:645-651). The 14:22:49Z runs were that build (data/defects.json prose of three other records: 'Builds 8DAEC6B8298ADB049222D74 (14:22:49Z runs)'; board run 20261019T142249Z-g8b path_failover 'release build 8DAEC6B8298ADB049222D74'); no file kept from the runs names a srcversion (the board logs were overwritten by the 2026-10-20 runs, board_8-disk-caw-mpath_g8b_bL1_0.90.131.log:38 build 292B547486AE6E75317F308). Cause: mxfs_dlm_relog_authorized read the CAW slot through the held-or-not query, which reports a shared bit as exclusive, so a shared holder's release drain re-logged its stale directory core; fix relog_auth_granted_mode=1 (re-log only on the granted mode; 0 is the same-build control). This record was opened from the incident sweep (tests/evidence/incident_preassert_sweep_20261022T2355Z.txt) because the chk_clean FAILs reached no run ledger and so were never retired by that removal. ===== The hypothesis tested first this session (the D-CC-16NODE abort that overwrote ACQUIRING, rel_abort_keeps_acquiring) is not this record's cause: lane tests/evidence/lanes/g4_nlink_relabort_off_20261023T230646Z (4/disk/caw/mpath, candidate build 79779BEAECBEA94844FDC72, rel_abort_keeps_acquiring=0 as a variant) made the second acquires happen (board_20261023T231404Z-g4_path_answer_lost kmsg: P-REL-ABORT-UNDER-ACQ keep=0 339-364 a node, P-ACQ-CONCURRENT 6 and 2, P109-EDEADLK-NL-RELEASE 8-13 a node) and chk_clean was CLEAN in each lap read. ===== Next, on the next candidate attempt: tests/relog_auth_lap.sh (built in the sibling tree mxfs-a15: a fresh prep, then one single-arm lap of tests/relog_pr_release_auth.sh, which gains RELOG_ARM=C|F and runs from its own tree) at 4/disk/caw/mpath: control ARM=0 (relog_auth_granted_mode=0, the read before the fix), the verification sized from it, then remove --fixed with the cause above. ===== 2026-10-24: removal P20261024-9cdfae rejected (data/reviews/P20261024-9cdfae.md): lap:relog_auth forces the re-log arm on a directory whose in-core and on-disk copies are equal, so its 8 of 8 shows the switch picks its branch, not that the corruption is gone; nothing measured ties the shared holder's re-log of the stale LOCK core (board_20261019T142249Z-g8b_path_flap/kmsg_test23_fromnode.gz:171223-171287; g4b kmsg_test20_fromnode.gz:150063-150064) to inode 13147165 or 6872560 being named twice; 13147165 had been a directory (kmsg_test28_fromnode.gz:125249 P58-STALE-BASE-ADD pino=13147165) and test27 still held it as one (kernlog_test27.gz:140806), which the trace does not account for. Next: a fix-off calibration on the record's own check, path_answer_lost then chk_clean at 8/disk/caw/mpath (and 4/) with MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0 and PF_KEEP_KMSG=1, a CORRUPT volume read (chk_mxfs -v, the two entries' directories and names) before anything remounts it; if it reproduces, fix-on batches sized from that rate at both 4/ and 8/disk/caw/mpath; if it does not, the cause is not established and the record stays open on its evidence. ===== 2026-10-24 (session 84): the fix-off calibration the review asked for is queued at the head of attempt 20's solo lane (tests/evidence/lanes/queue_solo_a20.txt): a control batch of chk_clean supported by path_answer_lost, 5 laps at 8/disk/caw/mpath on g8 then 5 at 4/disk/caw/mpath on g4b, each re-formed with MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0 and run with PF_KEEP_KMSG=1; chk_clean already prints every entry naming a mismatched inode on a CORRUPT verdict (tests/tooling/chk_clean.sh:224-234, MXFS_CHK_NAMES_OF), so a reproduction names both entries and their directories before any remount. If it reproduces: fix-on verification batches sized from it at both configurations, then remove --fixed tying the entries to the shared holder's re-log; if 0 of 10: the cause is not established. ===== ===== 2026-10-24 (session 86): the 4/disk/caw/mpath calibration b20261024-b98f94 (lane tests/evidence/lanes/g4b_a20_20261024T173633Z step 2) ran no lap: run.sh refused all five, 'runs one lap of one row ... (got: path_answer_lost chk_clean)', because it admits no supporting row but alloc_witness (D-RUN-SH-BATCH-REFUSES-A-DECLARED-SUPPORTING-ROW-OTHER-THAN-ALLOC-WITNESS, fix drafted). The batch stays open at 0 of 5; on the next attempt, with that fix, declare the calibration afresh and run path_answer_lost chk_clean in one invocation. ===== 2026-10-24 (session 91): THE FIX-OFF CONTROL REPRODUCED THE CORRUPTION on candidate 0.90.134 attempt 2026-10-24T19:27:48Z (module FF012B4B81CDB69CAE96883), path_answer_lost then chk_clean with MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0 and PF_KEEP_KMSG=1 (lanes tests/evidence/lanes/g4b_a21_20261024T192800Z and g8b_a21_20261024T192800Z, step 3): 4/disk/caw/mpath 1 of 5 laps CORRUPT (control b20261024-0ebcba, run 20261024T193205Z-g4b), 8/disk/caw/mpath 2 of 4 (b20261024-2e30a0, runs 20261024T193342Z-g8b and 20261024T195534Z-g8b; its lap 4 was refused by the host preflight, another lane's power-up flooding the log). Each CORRUPT volume names the entries (MXFS_CHK_NAMES_OF): chk_clean_4node_20261024T193644Z.log 'ERROR: inode 6218 (mode 0100644) has nlink 1 but 2 directory entries name it', 'NAMES-OF: directory 131 entry f0000200' and 'directory 6217 entry test17'; chk_clean_8node_20261024T193842Z.log inode 16779386, 'directory 16777344 entry f0000123' and 'directory 16779389 entry test26'; chk_clean_8node_20261024T200038Z.log inode 12589223, 'directory 12583040 entry f0000234' and 'directory 12589222 entry test22': a node's private file and a stale entry named after that node in the workload's two-entry LOCK directory (tests/mpath/pathload.py mutex). In each run a peer re-logged the LOCK directory's core under a shared grant and committed it without EX, inside the named node's mutex operation, which failed ENOTEMPTY (the row's one error, path_answer_lost FAIL 'no operation on <node> returned an error got=1'): run A board_20261024T193205Z-g4b_path_answer_lost kmsg_test20_fromnode.gz '[228.556188] P146V-AUTH ino=6217 held_mode=5 raw_mode=5 granted_mode=3 by_granted=0 ... -- synthetic re-log authorized', P146V-UNLANDED incore size=20 disk size=6, P58-DIRPIN-NONEX ino=6217 '-- dir committed WITHOUT EX authority' at epoch ms 1792870417577, inside test17's 'mutex ERR ENOTEMPTY' 1792870416581-1792870417760 (load_test17/ops.log:605); run B test23 P146V-AUTH/P146V-UNLANDED ino=16779389, P58-DIRPIN-NONEX at 1792870557208 inside test26's ENOTEMPTY 1792870556216-1792870557255 (load_test26/ops.log:382); run C test28 P146V-AUTH/P146V-UNLANDED ino=12589222, P58-DIRPIN-NONEX at 1792871900396 inside test22's ENOTEMPTY 1792871899887-1792871900475 (load_test22/ops.log:707). The inode each stale entry names was then freed and reused for the node's file (load_test17/inos.log:392-401 shared/test17.195, .198, then test17/f0000200 = 6218; load_test26/inos.log:238-247; load_test22/inos.log:458-469). Extracts: scratch sweep of the three runs' kmsg (A_/B_/C_ files). The control's 'measured ... 0 of 0 exposed laps' is the batch's exposure probe (P-ACQ-SELF-ORPHAN|P-ACQ-STUCK) graded on the chk_clean row while the trigger runs in its supporting row (D-RUN-SH-BATCH-REFUSES-A-DECLARED-SUPPORTING-ROW-OTHER-THAN-ALLOC-WITNESS, fix drafted: exposure from the first row's start). The shared-grant re-log decision is a marker present in both arms: 'P146V-(AUTH|NOAUTH-REFUSE) .*raw_mode=5 granted_mode=3' counted per run (AUTH/REFUSE): A 1/36, B 2/43, C 19/164, and the clean lap 20261024T194425Z-g4b 5/287, so a shared-grant AUTH reaches the trigger without always corrupting; with the fix every shared-grant decision is a REFUSE (held_mode is the granted 3 < EX). Next, on the next attempt with the supporting-row exposure fix: a control (relog_auth_granted_mode=0) at 8/disk/caw/mpath of 10 laps, probe 'P146V-(AUTH|NOAUTH-REFUSE) .*raw_mode=5 granted_mode=3', graded on chk_clean (CORRUPT = FAIL); a verification sized from its rate with the fix at its default, plus 'zero P146V-AUTH with granted_mode=3' read from each fix-on lap; the same at 4/disk/caw/mpath; then remove --fixed with this chain. ===== Correction to the entry above: run.sh's supporting-row exposure (attempt 21's tree already reads it from the first row's start) is not why the controls counted exposure=0. Their probe P-ACQ-SELF-ORPHAN|P-ACQ-STUCK matched 0 lines in all four runs' followed kernel logs (kmsg_*_fromnode.gz of board_20261024T193205Z-g4b, 193342Z-g8b, 195534Z-g8b and 194425Z-g4b _path_answer_lost): the 2026-10-19 trigger shape is not this build's. The next control's probe is the shared-grant re-log decision above; whether run.sh's ring read can hold it to the count is D-BATCH-EXPOSURE-COUNT-READS-THE-RING-AFTER-A-SUPPORTING-ROW-THAT-MAY-ROTATE-IT, whose follower is drafted. ===== 2026-10-24, attempt 22 (lane tests/evidence/lanes/g4b_a22_20261024T204638Z step4.log, module A7E90BC5313192108E35B80, relog_auth_granted_mode=0, probe 'P146V-(AUTH|NOAUTH-REFUSE) .*raw_mode=5 granted_mode=3' read by both the ring and the kmsg follower): control b20261024-4742ab at 4/disk/caw/mpath failed 1 of 10 exposed laps (chk_clean), against 1 of 5 on attempt 21; lower bound 0.0005, so a verification needs 10571 clean laps and step5 declared b20261024-c33484 and stopped ('verification of 10571 laps is longer than this lane runs'). At 4 nodes this reproducer is too weak to verify against. Next: the 8-node control (lane g8b_a22, 2 of 4 on attempt 21) for its rate, and a lap that forces the shape (a peer re-logs the LOCK directory under a shared grant while another node's remove of an entry is in flight) so the control fails most laps.",
       "impact": "integrity",
       "impact_why": "chk_mxfs found a structural violation of the directory tree: a file whose link count is 1 is named by two directory entries, so unlinking one name frees an inode the other still names",
       "collateral": [
@@ -4002,7 +4002,7 @@
           "candidate": "0.90.134",
           "build": "",
           "variant": "relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": true,
           "support": [
             "path_answer_lost"
@@ -4028,6 +4028,41 @@
           ],
           "created": "2026-10-24",
           "why": "the fix taken out, on the record's own check: does path_answer_lost then chk_clean find an nlink-1 file named twice"
+        },
+        {
+          "id": "b20261024-c33484",
+          "kind": "verify",
+          "row": "chk_clean",
+          "config": "4/disk/caw/mpath",
+          "platform": "any",
+          "planned": 10571,
+          "probe": "P146V-(AUTH|NOAUTH-REFUSE) .*raw_mode=5 granted_mode=3",
+          "candidate": "0.90.134",
+          "build": "",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": true,
+          "support": [
+            "path_answer_lost"
+          ],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "chk_clean",
+            "config": "4/disk/caw/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-4742ab",
+            "k": 1,
+            "n": 10,
+            "candidate": "0.90.134",
+            "variant": "relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)",
+            "builds": [
+              "A7E90BC5313192108E35B80"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.0005011285754646336
         }
       ],
       "rates": [
@@ -4058,6 +4093,21 @@
           "variant": "relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)",
           "builds": [
             "FF012B4B81CDB69CAE96883"
+          ],
+          "date": "2026-10-24"
+        },
+        {
+          "row": "chk_clean",
+          "config": "4/disk/caw/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-4742ab",
+          "k": 1,
+          "n": 10,
+          "candidate": "0.90.134",
+          "variant": "relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)",
+          "builds": [
+            "A7E90BC5313192108E35B80"
           ],
           "date": "2026-10-24"
         }
@@ -8105,7 +8155,7 @@
       "opened": "2026-10-24",
       "summary": "At 3 nodes or more, when a member's PR key is removed by a PREEMPT no MXFS fence intent recorded, the prover cannot prove the member's exclusion (KEY_ABSENT_UNPROVEN: the key absent, no ledger entry naming a successor, the prover not the sole live member), re-drives the fence 22 times over 126 s before declaring the recovery BLOCKED, and survivor operations needing the member's grants stall that whole time; afterwards its slice is never replayed and its grants stay frozen until the PR state changes",
       "evidence": "Lap f8p1 (8/net/mesh/direct; record D-8NETMESH-RECOVERY-BLOCKED-LEAVES-QUEUED-SURVIVOR-ACQUIRES-PARKED-FOREVER carries the full chain). Prover test10 (tests/evidence/20261024T144431Z_fledger_f8p1/i2_t10.txt, tests/evidence/20261024T144431Z_fledger_f8p1/i3.txt): death declared 662.83 s, P236-FENCE-INTENT durable 662.94, 'P-PR-FENCE-ABSENT victim key 0xf7308f91014faf78 already absent (gen=797) -- exclusion NOT proved here', 'P238-FENCE-ABSENT-NO-SUCCESSOR rc=-2', 'P238-BOOTSUCC-HOST-NOT-LIVE', 'P238-FENCE-GATE-NOTSOLE nlive=7 other_live=1', 'P236-FENCEKIND kind=KEY_ABSENT_UNPROVEN(6) proves_excl=0', attempts 1..22 with next_retry_ms 321..6936; test10_kmsg_full.gz:6486 (790.45 s) 'P238-FENCE-BLOCKED ... attempts=22 series_ms=126457'. Replayer test14: 37 rounds 'foreign replay slot=0: NOT replayed -- no proven exclusion of the dead node (-1)' to 926.67 s. V itself had logged P277-PR-FULLSTATUS own key ABSENT, P290-AUTH-CLOSED reason=PR_CONFLICT_FENCED and P131-SELF-FENCE ('this mount has been fenced by the cluster, the device is intact') at 639.60 s on its clock, and its withdraw stamp failed rc=-52 (P163-WITHDRAW-STAMP). At 2 nodes the same injection recovered (the preempter was the sole live member: tests/evidence/20261024T14{1549,1810}Z_fledger_flp*). The trigger in this lap is an out-of-band PREEMPT; other ways a key can vanish without an MXFS intent (the target losing its registrations, an operator's sg_persist) are untested.",
-      "next": "Decide with the fencing design (docs/dlm-protocol.md 'Recovery blocked', docs/rulings on fence proof) whether a key absent from the target under WRITE EXCLUSIVE ALL REGISTRANTS, together with the victim's own durable evidence of having seen its key gone (P277/P131, or a withdraw stamp it could not write), can count as proven exclusion at 3+ nodes, or what other proof the prover can obtain within the 30 s stall limit; consult another model on the proof obligation before changing it. Lap: the held fenced-ledger lap at 4 nodes, INJECT=preempt, grading the survivors' longest operation from the death to recovery. ===== 2026-10-24: the consult on the proof obligation could not be held: gpt-6-astra and gpt-5.6-sol both answered HTTP 429 'You have no credits remaining' (credit_balance_exhausted), and claude-fable-5 returned no text (stop_reason=refusal). Candidates to put to it when one answers, none decided: (a) the prover issues a LOGICAL UNIT RESET, which aborts every command outstanding on the LU from every I_T nexus, so with the victim's key absent under WRITE EXCLUSIVE ALL REGISTRANTS (persistent registrations survive the reset) no write the victim had in flight lands after it; then re-reads PR state and certifies only if the generation shows the key still absent. Its cost is every survivor's in-flight I/O aborted, its COMPARE AND WRITEs among them, which then have the answer-lost shape. (b) PREEMPT AND ABORT naming any other key does not reach the victim's no-longer-registered nexuses (believed; to confirm against SPC-4). (c) for KEY_ABSENT_UNPROVEN with the prover provably not sole, which a retry cannot change until PR state does, end the series after two attempts so the fail-fast -EIO starts inside the stall limit, keeping the durable RECOVERY_BLOCKED state, the 30 s re-drive and the operator path; whether trading the stall for errors is the honest fix is the question for the consult. ===== 2026-10-24 ~16:31Z: the consult retried: gpt-6-astra and gpt-5.6-sol still HTTP 429 credit_balance_exhausted; claude-fable-5 returned stop_reason=refusal with no text for the full question, for a reworded one without 'victim', and for a one-line control question ('In SCSI SPC-4, are persistent reservation registrations retained across a LOGICAL UNIT RESET?'), so that consult tool refuses every prompt. No model can be consulted until the OpenAI credits are topped up. Points to put to it beyond the candidates above: (a)'s cost depends on the target's TAS setting (with TAS=0 the other nexuses' tasks aborted by the reset get no status and their initiators wait out their SCSI command timeout, itself over the 30 s stall limit); and a reset must be followed by a READ KEYS whose generation and key list show the key still absent, since a victim that re-registered in the meantime voids the proof. ===== 2026-10-24 ~16:50Z: the consult was held. mcp__ask_fable__query with model=claude-opus-5-5 answers (the default claude-fable-5 refuses; the OpenAI models are still out of credits). Its answers, hypotheses to measure and not findings: (1) a plain PREEMPT leaves the preempted nexus's accepted commands running (SPC-4 Preempting; only PREEMPT AND ABORT aborts them), so the out-of-band case is a real zombie-write window, and a later PREEMPT AND ABORT cannot reach it because the key is gone; (2) LOGICAL UNIT RESET aborts every task of every I_T nexus on the LU, FUNCTION COMPLETE means none continues, and registrations and the PR generation survive it, so reset + READ KEYS (key still absent, generation unmoved) is a sound exclusion proof by the standards; (3) the bystander cost is what the sole-member guard at dlm/v5_mount.c:13454-13462 exists for, and it is real on this target: SCST vdisk defaults TAS=0 (/src/scst/scst/src/dev_handlers/scst_vdisk.c:134) and terminates another initiator's aborted command 'without delivery or notification' (/src/scst/scst/src/scst_lib.c:14417-14427), so a live member's in-flight command waits out its 30 s SCSI timeout; setting TAS=1 by MODE SELECT is rejected (not portable, shared page, reverted by the reset itself, and an aborted CAW is still ambiguous); (4) the sound general route proposed is a cluster-wide quiesce before the reset: every live member stops submitting LUN I/O (filesystem, log, disklock heartbeat, CAW and PR passthrough), drains its in-flight requests including any in SCSI error handling, and acks; the prover resets, re-reads keys, and releases the quiesce; a member that does not ack must be PREEMPTed itself before the reset is relied on. No such quiesce exists in the tree (grep -i quiesce over dlm/ and pal/ finds only the CAW teardown quiesce). Design work: a quiesce barrier on both transports (on disk/caw the request travels over the LUN being quiesced, so its ack has to land before the gate closes), bounded well inside the lease and the 30 s stall limit. ===== 2026-10-24: design written, docs/rulings/out-of-band-key-removal-surrender.md (consult claude-opus-5-5: PREEMPT AND ABORT aborts the whole task set of each I_T nexus whose registration it removes, including commands queued before an earlier plain PREEMPT, SPC-4 r37 5.12.11.5 / SAM-4 5.6; REGISTER from such a nexus cannot be refused). A departed node that is still running and has stopped every writer of its own registers its recorded key again on every path, once per incarnation, and holds it until it reads it preempted; the prover's unchanged re-drive then finds the key present and certifies with the usual PREEMPT AND ABORT, no LU reset and no cluster quiesce. Precondition: D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES-FOREVER-ON-RESERVATION-CONFLICT fixed first (its publisher bypasses the write gate and would land writes once the key is back). Next: that fix, then the re-registration behind a same-build switch, then the fenced-ledger lap INJECT=preempt at 4 and 8 nodes graded on certification and every survivor operation inside 30 s. ===== 2026-10-24 (session 87): the surrender drafted for the next attempt, behind its own switch (module parameter pr_surrender, default 1; 0 never registers again, as before: the same-build control). tests/evidence/drafts/tree/dlm/v5_mount.c v5_pr_surrender_tick, on every PR-worker tick: only with authority closed on the PR conflict (close_reason PR_CONFLICT_FENCED), the scsipr context still holding the key as its live registration, and no heartbeat beat able to land (drafts/tree/dlm/disklock.c mxfs_disklock_hb_quiet: the heartbeat thread has returned, hb_exited, and no heartbeat I/O is outstanding on a worker, abandoned ones included). The own slot's descriptor decides: one naming this incarnation that has certified or whose attempt passed its command-submission boundary (MXFS_RECOV_F_FENCE_CMD_MAY_HAVE_RUN) means a peer's PREEMPT may have removed the key, and nothing is registered (P-PR-SURRENDER-NOT-NEEDED); an attempt that met the key absent submitted nothing and leaves no such mark (the f8p1 prover wrote its intent and then found the key absent); an unreadable descriptor, 10 tries, refuses. Otherwise drafts/tree/dlm/scsipr.c mxfs_scsipr_surrender runs the mount's register (same-key probe, REGISTER on every path of a multipath map, READ KEYS verify) and keeps the key as a fence target (registered=false, never unregistered by this context), P-PR-SURRENDER. Then v5_pr_surrender_watch: once the slot shows a fence of this incarnation certified, or the slot passed to another incarnation, a key still standing is given back (mxfs_scsipr_surrender_return, P-PR-SURRENDER-RETURNED; the sole-survivor gate certifies with the key absent and could do so between the read and the REGISTER), a key gone prints P-PR-SURRENDER-PREEMPTED. All three sources pass tools/draft_syntax_check.sh (0 errors, 0 warnings). Lap: tests/evidence/drafts/tree/tests/fenced_ledger_rig_lap.sh GRADE=certify INJECT=preempt (SURRENDER=1/0 written to V at run time): EXPOSED V's P277 key gone and a survivor's P-PR-FENCE-ABSENT; PASS a survivor's P236-FENCE-CERTIFIED, no P238-FENCE-BLOCKED, every survivor operation within 30 s. Next attempt: prechecks of both arms at 4/net/mesh/direct and 8/net/mesh/direct, then a control (SURRENDER=0) and a verification sized from it. Still to read before it lands: whether D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES-FOREVER-ON-RESERVATION-CONFLICT's fix (dl_auth_closed_park, in the tree) is verified, the precondition the ruling names. ===== 2026-10-24, attempt 21 (module FF012B4B81CDB69CAE96883): the fix-on prechecks of tests/fenced_ledger_rig_lap.sh (INJECT=preempt PARK=1 GRADE=certify SURRENDER=1) at 8/net/mesh/direct (lane g8_a21 step 2, label c21e1) and 4/net/mesh/direct (g4_a21 step 3, c21q1) both ended 'RESULT: VACUOUS stage=no-absent': V's key was removed and V registered it again (key_gone=1 surrender_lines=1), and a survivor certified with PREEMPT_ABORT_PROVEN_V1 and no P238-FENCE-BLOCKED (certified=1 blocked=0), but no survivor's fence ever read the key absent (fence_absent=0), which the lap requires for exposure. The surrender closes the absent window the exposure test looks for, so the lap cannot expose the fix-on arm. Next: make the certify grade's exposure the out-of-band removal itself (V's key gone after the injected PREEMPT, read on the target) plus V's surrender line, not a survivor's absent read, then re-run both arms' prechecks; the fix-off arm (SURRENDER=0) must still block. ===== 2026-10-24, attempt 21 graded on the evidence (no re-run): the control c21q0 at 4/net/mesh/direct (tests/evidence/20261024T193350Z_fledger_c21q0) reproduced the record: test5's fence met V's key absent 24 times (P236-FENCEKIND KEY_ABSENT_UNPROVEN), two survivors imported P238-FENCE-BLOCKED, the longest survivor operation 139598 ms. The fix c21e1 (8 nodes, tests/evidence/20261024T192829Z_fledger_c21e1) and c21q1 (4 nodes, tests/evidence/20261024T192900Z_fledger_c21q1): V found its key absent (P277), surrendered (P-PR-SURRENDER rc=0), one survivor fenced it once with the key present (P236-FENCEKIND PREEMPT_ABORT_PROVEN_V1, P236-FENCE-CERTIFIED), none blocked, longest survivor operation 20480 / 20189 ms. Both were graded VACUOUS because the lap's exposure required a fence to meet the key absent, which the fix's re-registration prevents. The lap is redrafted for the next attempt in tests/evidence/drafts/tree/tests/fenced_ledger_rig_lap.sh: exposure is V's key gone (P277) and a survivor's fence of V (P236-FENCEKIND); the absent count is printed, not graded. On these three evidence directories the redraft grades c21e1 and c21q1 EXPOSED/PASS and c21q0 EXPOSED/FAIL. Next: land the redraft at the next freeze, then the control and verification batches at 4/net/mesh/direct and 8/net/mesh/direct sized from the prechecks.",
+      "next": "Decide with the fencing design (docs/dlm-protocol.md 'Recovery blocked', docs/rulings on fence proof) whether a key absent from the target under WRITE EXCLUSIVE ALL REGISTRANTS, together with the victim's own durable evidence of having seen its key gone (P277/P131, or a withdraw stamp it could not write), can count as proven exclusion at 3+ nodes, or what other proof the prover can obtain within the 30 s stall limit; consult another model on the proof obligation before changing it. Lap: the held fenced-ledger lap at 4 nodes, INJECT=preempt, grading the survivors' longest operation from the death to recovery. ===== 2026-10-24: the consult on the proof obligation could not be held: gpt-6-astra and gpt-5.6-sol both answered HTTP 429 'You have no credits remaining' (credit_balance_exhausted), and claude-fable-5 returned no text (stop_reason=refusal). Candidates to put to it when one answers, none decided: (a) the prover issues a LOGICAL UNIT RESET, which aborts every command outstanding on the LU from every I_T nexus, so with the victim's key absent under WRITE EXCLUSIVE ALL REGISTRANTS (persistent registrations survive the reset) no write the victim had in flight lands after it; then re-reads PR state and certifies only if the generation shows the key still absent. Its cost is every survivor's in-flight I/O aborted, its COMPARE AND WRITEs among them, which then have the answer-lost shape. (b) PREEMPT AND ABORT naming any other key does not reach the victim's no-longer-registered nexuses (believed; to confirm against SPC-4). (c) for KEY_ABSENT_UNPROVEN with the prover provably not sole, which a retry cannot change until PR state does, end the series after two attempts so the fail-fast -EIO starts inside the stall limit, keeping the durable RECOVERY_BLOCKED state, the 30 s re-drive and the operator path; whether trading the stall for errors is the honest fix is the question for the consult. ===== 2026-10-24 ~16:31Z: the consult retried: gpt-6-astra and gpt-5.6-sol still HTTP 429 credit_balance_exhausted; claude-fable-5 returned stop_reason=refusal with no text for the full question, for a reworded one without 'victim', and for a one-line control question ('In SCSI SPC-4, are persistent reservation registrations retained across a LOGICAL UNIT RESET?'), so that consult tool refuses every prompt. No model can be consulted until the OpenAI credits are topped up. Points to put to it beyond the candidates above: (a)'s cost depends on the target's TAS setting (with TAS=0 the other nexuses' tasks aborted by the reset get no status and their initiators wait out their SCSI command timeout, itself over the 30 s stall limit); and a reset must be followed by a READ KEYS whose generation and key list show the key still absent, since a victim that re-registered in the meantime voids the proof. ===== 2026-10-24 ~16:50Z: the consult was held. mcp__ask_fable__query with model=claude-opus-5-5 answers (the default claude-fable-5 refuses; the OpenAI models are still out of credits). Its answers, hypotheses to measure and not findings: (1) a plain PREEMPT leaves the preempted nexus's accepted commands running (SPC-4 Preempting; only PREEMPT AND ABORT aborts them), so the out-of-band case is a real zombie-write window, and a later PREEMPT AND ABORT cannot reach it because the key is gone; (2) LOGICAL UNIT RESET aborts every task of every I_T nexus on the LU, FUNCTION COMPLETE means none continues, and registrations and the PR generation survive it, so reset + READ KEYS (key still absent, generation unmoved) is a sound exclusion proof by the standards; (3) the bystander cost is what the sole-member guard at dlm/v5_mount.c:13454-13462 exists for, and it is real on this target: SCST vdisk defaults TAS=0 (/src/scst/scst/src/dev_handlers/scst_vdisk.c:134) and terminates another initiator's aborted command 'without delivery or notification' (/src/scst/scst/src/scst_lib.c:14417-14427), so a live member's in-flight command waits out its 30 s SCSI timeout; setting TAS=1 by MODE SELECT is rejected (not portable, shared page, reverted by the reset itself, and an aborted CAW is still ambiguous); (4) the sound general route proposed is a cluster-wide quiesce before the reset: every live member stops submitting LUN I/O (filesystem, log, disklock heartbeat, CAW and PR passthrough), drains its in-flight requests including any in SCSI error handling, and acks; the prover resets, re-reads keys, and releases the quiesce; a member that does not ack must be PREEMPTed itself before the reset is relied on. No such quiesce exists in the tree (grep -i quiesce over dlm/ and pal/ finds only the CAW teardown quiesce). Design work: a quiesce barrier on both transports (on disk/caw the request travels over the LUN being quiesced, so its ack has to land before the gate closes), bounded well inside the lease and the 30 s stall limit. ===== 2026-10-24: design written, docs/rulings/out-of-band-key-removal-surrender.md (consult claude-opus-5-5: PREEMPT AND ABORT aborts the whole task set of each I_T nexus whose registration it removes, including commands queued before an earlier plain PREEMPT, SPC-4 r37 5.12.11.5 / SAM-4 5.6; REGISTER from such a nexus cannot be refused). A departed node that is still running and has stopped every writer of its own registers its recorded key again on every path, once per incarnation, and holds it until it reads it preempted; the prover's unchanged re-drive then finds the key present and certifies with the usual PREEMPT AND ABORT, no LU reset and no cluster quiesce. Precondition: D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES-FOREVER-ON-RESERVATION-CONFLICT fixed first (its publisher bypasses the write gate and would land writes once the key is back). Next: that fix, then the re-registration behind a same-build switch, then the fenced-ledger lap INJECT=preempt at 4 and 8 nodes graded on certification and every survivor operation inside 30 s. ===== 2026-10-24 (session 87): the surrender drafted for the next attempt, behind its own switch (module parameter pr_surrender, default 1; 0 never registers again, as before: the same-build control). tests/evidence/drafts/tree/dlm/v5_mount.c v5_pr_surrender_tick, on every PR-worker tick: only with authority closed on the PR conflict (close_reason PR_CONFLICT_FENCED), the scsipr context still holding the key as its live registration, and no heartbeat beat able to land (drafts/tree/dlm/disklock.c mxfs_disklock_hb_quiet: the heartbeat thread has returned, hb_exited, and no heartbeat I/O is outstanding on a worker, abandoned ones included). The own slot's descriptor decides: one naming this incarnation that has certified or whose attempt passed its command-submission boundary (MXFS_RECOV_F_FENCE_CMD_MAY_HAVE_RUN) means a peer's PREEMPT may have removed the key, and nothing is registered (P-PR-SURRENDER-NOT-NEEDED); an attempt that met the key absent submitted nothing and leaves no such mark (the f8p1 prover wrote its intent and then found the key absent); an unreadable descriptor, 10 tries, refuses. Otherwise drafts/tree/dlm/scsipr.c mxfs_scsipr_surrender runs the mount's register (same-key probe, REGISTER on every path of a multipath map, READ KEYS verify) and keeps the key as a fence target (registered=false, never unregistered by this context), P-PR-SURRENDER. Then v5_pr_surrender_watch: once the slot shows a fence of this incarnation certified, or the slot passed to another incarnation, a key still standing is given back (mxfs_scsipr_surrender_return, P-PR-SURRENDER-RETURNED; the sole-survivor gate certifies with the key absent and could do so between the read and the REGISTER), a key gone prints P-PR-SURRENDER-PREEMPTED. All three sources pass tools/draft_syntax_check.sh (0 errors, 0 warnings). Lap: tests/evidence/drafts/tree/tests/fenced_ledger_rig_lap.sh GRADE=certify INJECT=preempt (SURRENDER=1/0 written to V at run time): EXPOSED V's P277 key gone and a survivor's P-PR-FENCE-ABSENT; PASS a survivor's P236-FENCE-CERTIFIED, no P238-FENCE-BLOCKED, every survivor operation within 30 s. Next attempt: prechecks of both arms at 4/net/mesh/direct and 8/net/mesh/direct, then a control (SURRENDER=0) and a verification sized from it. Still to read before it lands: whether D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES-FOREVER-ON-RESERVATION-CONFLICT's fix (dl_auth_closed_park, in the tree) is verified, the precondition the ruling names. ===== 2026-10-24, attempt 21 (module FF012B4B81CDB69CAE96883): the fix-on prechecks of tests/fenced_ledger_rig_lap.sh (INJECT=preempt PARK=1 GRADE=certify SURRENDER=1) at 8/net/mesh/direct (lane g8_a21 step 2, label c21e1) and 4/net/mesh/direct (g4_a21 step 3, c21q1) both ended 'RESULT: VACUOUS stage=no-absent': V's key was removed and V registered it again (key_gone=1 surrender_lines=1), and a survivor certified with PREEMPT_ABORT_PROVEN_V1 and no P238-FENCE-BLOCKED (certified=1 blocked=0), but no survivor's fence ever read the key absent (fence_absent=0), which the lap requires for exposure. The surrender closes the absent window the exposure test looks for, so the lap cannot expose the fix-on arm. Next: make the certify grade's exposure the out-of-band removal itself (V's key gone after the injected PREEMPT, read on the target) plus V's surrender line, not a survivor's absent read, then re-run both arms' prechecks; the fix-off arm (SURRENDER=0) must still block. ===== 2026-10-24, attempt 21 graded on the evidence (no re-run): the control c21q0 at 4/net/mesh/direct (tests/evidence/20261024T193350Z_fledger_c21q0) reproduced the record: test5's fence met V's key absent 24 times (P236-FENCEKIND KEY_ABSENT_UNPROVEN), two survivors imported P238-FENCE-BLOCKED, the longest survivor operation 139598 ms. The fix c21e1 (8 nodes, tests/evidence/20261024T192829Z_fledger_c21e1) and c21q1 (4 nodes, tests/evidence/20261024T192900Z_fledger_c21q1): V found its key absent (P277), surrendered (P-PR-SURRENDER rc=0), one survivor fenced it once with the key present (P236-FENCEKIND PREEMPT_ABORT_PROVEN_V1, P236-FENCE-CERTIFIED), none blocked, longest survivor operation 20480 / 20189 ms. Both were graded VACUOUS because the lap's exposure required a fence to meet the key absent, which the fix's re-registration prevents. The lap is redrafted for the next attempt in tests/evidence/drafts/tree/tests/fenced_ledger_rig_lap.sh: exposure is V's key gone (P277) and a survivor's fence of V (P236-FENCEKIND); the absent count is printed, not graded. On these three evidence directories the redraft grades c21e1 and c21q1 EXPOSED/PASS and c21q0 EXPOSED/FAIL. Next: land the redraft at the next freeze, then the control and verification batches at 4/net/mesh/direct and 8/net/mesh/direct sized from the prechecks. ===== 2026-10-24, attempt 22 at 4/net/mesh/direct (lane tests/evidence/lanes/g4_a22_20261024T204638Z): control b20261024-395e2b (SURRENDER=0) failed 10 of 10 exposed laps, max_stall_ms 133309-139470; verification b20261024-eed56a (6 planned) passed 5 exposed laps with max_stall_ms 19149-22098, and lap 3 (osq22v3) ended INCOMPLETE at its 120 s prep bound in the teardown of the previous lap's victim, now D-SELF-FENCED-VICTIM-HOLDS-SB-BUFFER-AND-ITS-MXFS-NEVER-RELEASES-AT-TEARDOWN's cell. That batch cannot complete; the next verification at 4 nodes needs that record's cause out of the lap's way (or the victim's teardown inside the bound) first.",
       "impact": "stability",
       "impact_why": "Survivor operations stalled over the 30 s stall_limit_s (data/release_policy.json) through the fence's bounded series: test12's 'churn' operation ran 140.0 s (tests/evidence/20261024T144431Z_fledger_f8p1/test12_load.txt:1, ops 1792853199562-1792853339558 ms), test8's 62.4 s (tests/evidence/20261024T144431Z_fledger_f8p1/test8_load.txt:1)",
       "reproducer": "tests/evidence/drafts/held/tests/fenced_ledger_rig_lap.sh at 4 or 8 nodes with INJECT=preempt",
@@ -8476,11 +8526,44 @@
           "candidate": "",
           "build": "A7E90BC5313192108E35B80",
           "variant": "LAP_LOAD_CLEAN=0 (lap_load_end removes nothing from the nodes' /run, as the fenced-ledger lap's exit did before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a fenced-ledger lap leaves its load directory and logs in each node's /run"
+        },
+        {
+          "id": "b20261024-721cc7",
+          "kind": "verify",
+          "row": "lap:lap_load_clean_fledger",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "A7E90BC5313192108E35B80",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:lap_load_clean_fledger",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-2aa7ed",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "LAP_LOAD_CLEAN=0 (lap_load_end removes nothing from the nodes' /run, as the fenced-ledger lap's exit did before the fix)",
+            "builds": [
+              "A7E90BC5313192108E35B80"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "cells": [
@@ -8583,6 +8666,73 @@
           "config": "2/disk/caw/direct",
           "row": "lap:lap_load_clean_noino",
           "iso": "2026-10-24T20:19:08Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_fledger",
+          "iso": "2026-10-24T21:45:43Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_fledger",
+          "iso": "2026-10-24T21:43:22Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_fledger",
+          "iso": "2026-10-24T21:41:01Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_fledger",
+          "iso": "2026-10-24T21:38:40Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_fledger",
+          "iso": "2026-10-24T21:36:19Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_fledger",
+          "iso": "2026-10-24T21:34:03Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_fledger",
+          "iso": "2026-10-24T21:31:45Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_fledger",
+          "iso": "2026-10-24T21:29:27Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_fledger",
+          "iso": "2026-10-24T21:26:57Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_fledger",
+          "iso": "2026-10-24T21:24:36Z"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:lap_load_clean_fledger",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-2aa7ed",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "LAP_LOAD_CLEAN=0 (lap_load_end removes nothing from the nodes' /run, as the fenced-ledger lap's exit did before the fix)",
+          "builds": [
+            "A7E90BC5313192108E35B80"
+          ],
+          "date": "2026-10-24"
         }
       ]
     },
@@ -8859,11 +9009,44 @@
           "candidate": "",
           "build": "A7E90BC5313192108E35B80",
           "variant": "pr_fill_hold=0 (LRH_ARM=0: the late-path fill sends its REGISTER down a path multipath may be writing through, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: commands of the node are dispatched down a late path while its REGISTER is unresolved"
+        },
+        {
+          "id": "b20261024-655b70",
+          "kind": "verify",
+          "row": "lap:late_register_hold",
+          "config": "2/net/mesh/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "A7E90BC5313192108E35B80",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:late_register_hold",
+            "config": "2/net/mesh/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-c518e7",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "pr_fill_hold=0 (LRH_ARM=0: the late-path fill sends its REGISTER down a path multipath may be writing through, as before the fix)",
+            "builds": [
+              "A7E90BC5313192108E35B80"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -8873,6 +9056,21 @@
           "platform": "any",
           "kind": "control",
           "batch": "b20261024-6e9fc4",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "pr_fill_hold=0 (LRH_ARM=0: the late-path fill sends its REGISTER down a path multipath may be writing through, as before the fix)",
+          "builds": [
+            "A7E90BC5313192108E35B80"
+          ],
+          "date": "2026-10-24"
+        },
+        {
+          "row": "lap:late_register_hold",
+          "config": "2/net/mesh/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-c518e7",
           "k": 10,
           "n": 10,
           "candidate": "",
@@ -8933,6 +9131,56 @@
           "config": "2/disk/caw/mpath",
           "row": "lap:late_register_hold",
           "iso": "2026-10-24T21:00:00Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:late_register_hold",
+          "iso": "2026-10-24T21:52:52Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:late_register_hold",
+          "iso": "2026-10-24T21:51:30Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:late_register_hold",
+          "iso": "2026-10-24T21:50:08Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:late_register_hold",
+          "iso": "2026-10-24T21:48:49Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:late_register_hold",
+          "iso": "2026-10-24T21:47:30Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:late_register_hold",
+          "iso": "2026-10-24T21:46:09Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:late_register_hold",
+          "iso": "2026-10-24T21:44:49Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:late_register_hold",
+          "iso": "2026-10-24T21:43:27Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:late_register_hold",
+          "iso": "2026-10-24T21:42:07Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:late_register_hold",
+          "iso": "2026-10-24T21:40:47Z"
         }
       ]
     },
@@ -8979,7 +9227,8 @@
       "opened": "2026-10-24",
       "summary": "run.sh counts a batch lap's exposure (exposure_count) from each node's dmesg ring read when the batch's own row ends, from the uptime its first row started at. When the trigger is in a supporting row before it (path_answer_lost before chk_clean), the nodes log tens of thousands of kernel lines in between, so the ring may no longer hold the trigger's lines and a lap that reached the trigger counts exposure=0",
       "evidence": "Attempt 21's NLINK1 controls (b20261024-0ebcba, b20261024-2e30a0) recorded exposure=0 on every lap, CORRUPT ones included. Their probe (P-ACQ-SELF-ORPHAN|P-ACQ-STUCK) matched 0 lines in the rows' followed kernel logs too (board_20261024T193205Z-g4b, 193342Z-g8b, 195534Z-g8b, 194425Z-g4b _path_answer_lost/kmsg_*_fromnode.gz), so those zeros are the probe's own miss, not this. What makes the ring read suspect: test20's followed log of run 20261024T193205Z-g4b numbers ~32000 lines by 228 s uptime (the trigger's P146V-AUTH ino=6217 at 228.556 s), and the chk_clean row's kept log of the same node (run_chk_clean_20261024T193205Z-g4b/kernlog_test20.gz, 123192 lines) holds 3 P146V lines and not that one. Not yet measured: the ring itself at the count.",
-      "next": "Instrument drafted for the next attempt: tests/evidence/drafts/tree/tests/lib/exposure_follow.sh (a probe-filtered /dev/kmsg follower per node from lap_mark_start, filtered on usec >= the lap's uptime as the ring read is) and tests/evidence/drafts/tree/run.sh exposure_count printing '--- exposure on <node>: ring=<n> follow=<n> ---' and grading on the follower; MXFS_EXPOSURE_FOLLOW=0 reads the ring alone, as before. The NLINK1 control on the next attempt (probe 'P146V-(AUTH|NOAUTH-REFUSE) .*raw_mode=5 granted_mode=3') prints both counts per lap: ring < follow on a lap is this record shown; ring = follow on every lap of a batch is evidence against it."
+      "next": "Instrument drafted for the next attempt: tests/evidence/drafts/tree/tests/lib/exposure_follow.sh (a probe-filtered /dev/kmsg follower per node from lap_mark_start, filtered on usec >= the lap's uptime as the ring read is) and tests/evidence/drafts/tree/run.sh exposure_count printing '--- exposure on <node>: ring=<n> follow=<n> ---' and grading on the follower; MXFS_EXPOSURE_FOLLOW=0 reads the ring alone, as before. The NLINK1 control on the next attempt (probe 'P146V-(AUTH|NOAUTH-REFUSE) .*raw_mode=5 granted_mode=3') prints both counts per lap: ring < follow on a lap is this record shown; ring = follow on every lap of a batch is evidence against it. ===== 2026-10-24, attempt 22 NLINK1 control b20261024-4742ab (4/disk/caw/mpath, tests/evidence/lanes/g4b_a22_20261024T204638Z/step4.log, 10 laps x 4 nodes): of 40 '--- exposure on <node>: ring=<n> follow=<n> ---' reads, the ring count was below the follower's in 36 (e.g. test17 ring=45 follow=49), equal in 4, above in 0, and in none was the ring 0 with the follower above 0. So the ring read loses trigger lines on almost every node of this lap shape, but in this batch it never turned an exposed lap into exposure=0. Grading on the follower is the fix's side; a control (MXFS_EXPOSURE_FOLLOW=0) needs a lap where the ring loses every line, e.g. a supporting row that logs past the ring's size between the trigger and the read.",
+      "updated": "2026-10-24"
     },
     {
       "id": "D-LH-SHARD-LAP-PREP-BOUND-OMITS-A-POWER-UP-OF-ITS-OWN-NODES",
@@ -9008,6 +9257,23 @@
       "summary": "When a suite row runs out its budget, run.sh kills its leftovers on every node with 'fuser -k -m $MNT' (run.sh:2267) whether or not $MNT is still mounted there; on a directory that is not a mount point fuser -m names every user of the root filesystem, so on a node whose volume the row already unmounted, or whose shut-down mount was torn down, the kill SIGKILLs sshd and the node's daemons",
       "evidence": "Read from the code at the review of removal P20261024-137b8d (data/reviews/P20261024-137b8d.md), which listed the tree's other 'fuser -km' sites; their surrounding code read 2026-10-24: run.sh:1056-1063 (TEARDOWN, gated on /proc/mounts), run.sh:1595, scripts/rig.sh:113-115, tests/setup/prep_node.sh:96-100, scripts/rig_recover.sh:92-94, scripts/pve_to_qnap_tcp.sh:23-24 and scripts/caw_preflight.sh:38-40 (each gated on mountpoint -q) are guarded; run.sh:2267 alone runs the kill with no mount test. The mechanism is the one measured 10 of 10 on tests/fuser_guard_lap.sh with its guard off (control b20261024-0f9ed6). No run has been seen to reach it here.",
       "next": "Fix drafted for the next attempt in tests/evidence/drafts/tree/run.sh: the kill runs only while ' $MNT ' is in /proc/mounts; MXFS_TIMEOUT_KILL_MOUNT_GUARD=0 kills unguarded, as before (the control). bash -n clean. Lap: a row whose script unmounts $MNT and then outlives its budget on one node, with the node's ssh, journald, udevd and iscsid main pids and a sentinel read before and after the kill (tests/fuser_guard_lap.sh's check); control with the switch off, then a verification sized from it."
+    },
+    {
+      "id": "D-SELF-FENCED-VICTIM-HOLDS-SB-BUFFER-AND-ITS-MXFS-NEVER-RELEASES-AT-TEARDOWN",
+      "severity": "high",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "A node whose PR key was removed out of band shut its filesystem down on a log error, self-fenced, withdrew and registered its key again (surrender); it ended the lap with its superblock buffer lock stuck (P-BUFLOCK-STUCK xfs_sb hold=4, waiter xfs_buf_item_unpin), and the next prep's teardown could not make it release mxfs: the teardown ran past the next lap's 120 s prep bound, and the lap after that found 'test3 did not release mxfs' and power-cycled it",
+      "evidence": "Verification b20261024-eed56a of lap:oob_surrender at 4/net/mesh/direct (candidate 0.90.134, module A7E90BC5313192108E35B80, lane tests/evidence/lanes/g4_a22_20261024T204638Z step5.log). Lap 2 (osq22v2, PASS), V=test3: tests/evidence/20261024T213646Z_fledger_osq22v2/test3_kmsg.txt:12667 'mxfs (sda): Filesystem has been shut down due to log error (0x2).' (usec 2856547727), :12669 P-SESSION-POISON, :12671 P-WITHDRAW, :12828 'P290-AUTH-CLOSED ... reason=PR_CONFLICT_FENCED', :12830 P131-SELF-FENCE [PR_CONFLICT_FENCED], :12860 'P-PR-SURRENDER node=3827643565 slot=0 key=0xf11c2181b182f898 rc=0', :12897 'P-PR-SURRENDER-PREEMPTED ... the fence of this node certified and the key it registered again is gone', :12901 (usec 2886753173, the last line before the lap's end mark) 'P-BUFLOCK-STUCK daddr=0 len=1 ops=xfs_sb flags=0x200020 hold=4 pin=0 err=0 lock_ip=__xfs_trans_getsb+0x23/0xf0 [mxfs] ioend_seen=1 relse_seen=0 syncw=0 ... waiter=xfs_buf_item_unpin+0x83/0x1a0 [mxfs] comm=kworker/1:1H'. Lap 3 (osq22v3): tests/evidence/20261024T213923Z_fledger_osq22v3/prep.log:60 'PREP STEP 1 start +0s: teardown on the set' (preflight passed at 21:39:35Z, :56), :61 'the lap overran its bound of 120s (and 0s it waited on other lanes): the 9 process(es) it had started were ended', recorded INCOMPLETE rc=2 with no verdict. Lap 4 (osq22v4): tests/evidence/20261024T214125Z_fledger_osq22v4/prep.log:69-71 test4-6 UNLOAD_THREADS live=0, :72 '--- prep: test3 did not release mxfs / lost /src (or unreachable) \u2014 escalating ---', :73 'power-cycling test3 (virsh destroy+start)', :74 'PREP STEP 1 end 52s'; its prep took 119 s of the lap's 120. In the 15 other laps of control b20261024-395e2b and this verification the teardown took 5-32 s with no escalation. No kernel log of test3 between 21:39Z and its power cycle at ~21:41:3xZ exists: the lap's follower ended at its end mark, the guest journal is volatile, and the host's netconsole log has not been written since 2026-10-17. The teardown's per-node output (run.sh:1290 mktemp -d) is not kept.",
+      "next": "Reproduce with the victim's whole kernel log kept past the lap's end (a follower left running to the next prep's teardown, or a sysrq-w and /proc/<pid>/stack of the umount and of every D-state task on V taken during the teardown), and keep run.sh's per-node teardown output (/<node>) in the prep's evidence. Hypothesis H-SFV1 (unproven): after the log-error shutdown the superblock buffer stays locked by a transaction whose unpin never runs (the log is shut down), so the unmount's log force or sb write waits on it forever; falsified if the stuck umount's stack is not under xfs_buf_lock of the sb buffer. Separately: the fenced-ledger lap's 120 s prep bound does not cover prep's own escalation (a power cycle, ~45 s), which a fenced victim makes likely.",
+      "cells": [
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:oob_surrender",
+          "iso": "2026-10-24T21:41:24Z"
+        }
+      ]
     }
   ]
 }
