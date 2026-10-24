@@ -6513,7 +6513,7 @@
           "candidate": "",
           "build": "468F7F30C2E190B0244AF70",
           "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -6618,6 +6618,21 @@
             "79779BEAECBEA94844FDC72"
           ],
           "date": "2026-10-23"
+        },
+        {
+          "row": "lap:peer_window",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-1d2fde",
+          "k": 9,
+          "n": 9,
+          "candidate": "",
+          "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
+          "builds": [
+            "468F7F30C2E190B0244AF70"
+          ],
+          "date": "2026-10-24"
         }
       ],
       "cells": [
@@ -7926,7 +7941,7 @@
       "opened": "2026-10-23",
       "summary": "A 32/disk/caw/mpath cluster prep failed after 177 s (ledger stamp 2026-09-10); the ledger keeps only 'prep failed', and no log, node kernel log or run id of it survives, so what failed is not known.",
       "evidence": "data/criteria.runs.jsonl:646 {\"build\": null, \"config\": \"32/disk/caw/mpath\", \"elapsed_s\": 177, \"iso\": \"2026-09-10\", \"kind\": \"run\", \"measured\": \"elapsed=177s\", \"migrated\": \"2026-10-21\", \"outcome\": \"INCOMPLETE\", \"reason\": \"prep failed\", \"row\": \"prep_cluster\", \"status\": \"FAIL\"} (the same line also sits in tests/evidence/drbd_rig/criteria.runs.jsonl:1055 and data/criteria.pvephys.runs.jsonl:535). The previous prep there passed: data/criteria.runs.jsonl:645 '2026-09-04T14:41:33Z ... elapsed=104s (fresh prep)'. Searched with no hit: CHANGELOG.md for 'prep_cluster:2026-09-10'; tests/evidence (now /src/mxfs-evidence) for board_32* and for files dated 2026-09-10; session transcripts (the oldest kept is from 2026-09-26). The run is not named as a cell: tools/defects.py refuses its day-only stamp (D-DEFECTS-PARSE-CELL-REFUSES-A-DAY-STAMP-SO-MIGRATED-RUNS-CANNOT-BE-NAMED).",
-      "next": "Once parse_cell takes a day stamp: tools/defects.py update <this id> --cell 32/disk/caw/mpath:prep_cluster:2026-09-10. A prep that fails 177 s in has passed mkfs and is in mounting or formation; run run.sh prep_cluster at 32/disk/caw/mpath (or the largest disk/caw/mpath cluster the rig forms) on the current candidate under its derived budget, keeping run.sh's prep output and every node's kernel log, until a prep fails or a measured number pass.",
+      "next": "Once parse_cell takes a day stamp: tools/defects.py update <this id> --cell 32/disk/caw/mpath:prep_cluster:2026-09-10. A prep that fails 177 s in has passed mkfs and is in mounting or formation; run run.sh prep_cluster at 32/disk/caw/mpath (or the largest disk/caw/mpath cluster the rig forms) on the current candidate under its derived budget, keeping run.sh's prep output and every node's kernel log, until a prep fails or a measured number pass. ===== ===== 2026-10-24 (session 86): narrowing to nodes 32 REJECTED (P20261024-e78725, data/reviews/P20261024-e78725.md): a reach comes from runs that show the cause's precondition absent where it is excluded, and with the cause unknown the 32-member formation is only where it was seen; the definition of nodes as the smallest cluster observed does not waive that. The review also found two 'prep failed' runs at smaller clusters in data/criteria.pvephys.runs.jsonl (:3574 4/disk/caw/direct after 7 s, :3575 16/disk/caw/direct after 6 s) that nothing ties to or separates from this record. What unblocks it: a recorded failure of this prep at 32/disk/caw/mpath with run.sh's prep output and every node's kernel log, showing the failing step and its cause, then runs showing that cause's precondition absent at the excluded node counts; or an owner ruling that one observation sets nodes without precondition evidence.",
       "cells": [
         {
           "config": "32/disk/caw/mpath",

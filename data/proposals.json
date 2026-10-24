@@ -9761,8 +9761,14 @@
         "CLAUDE.md",
         "tools/defects.py"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-e78725.md",
+        "sha256": "e2aed13a5af9a1f7cd71b4bc0be9d5c2ceaf660558101555dd0fecedbdd7ef03",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
