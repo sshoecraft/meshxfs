@@ -4262,11 +4262,44 @@
           "candidate": "",
           "build": "79779BEAECBEA94844FDC72",
           "variant": "dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the last member's release-all on one thread, as before the fix",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: the last member's release-all commits each grant's ledger page one at a time, on multipath"
+        },
+        {
+          "id": "b20261023-756620",
+          "kind": "verify",
+          "row": "lap:lmu",
+          "config": "2/net/mesh/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: A's last-member unmount released",
+          "candidate": "0.90.134",
+          "build": "79779BEAECBEA94844FDC72",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:lmu",
+            "config": "2/net/mesh/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-07077e",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the last member's release-all on one thread, as before the fix",
+            "builds": [
+              "79779BEAECBEA94844FDC72"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -4282,6 +4315,21 @@
           "variant": "dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the last member's release-all on one thread, as before the fix",
           "builds": [
             "08D63764A9352FBDD5A76CD"
+          ],
+          "date": "2026-10-23"
+        },
+        {
+          "row": "lap:lmu",
+          "config": "2/net/mesh/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-07077e",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the last member's release-all on one thread, as before the fix",
+          "builds": [
+            "79779BEAECBEA94844FDC72"
           ],
           "date": "2026-10-23"
         }
@@ -4336,6 +4384,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:lmu",
           "iso": "2026-10-23T10:42:47Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T23:57:32Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T23:53:27Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T23:49:06Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T23:45:35Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T23:42:16Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T23:37:11Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T23:33:21Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T23:29:18Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T23:24:55Z"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "row": "lap:lmu",
+          "iso": "2026-10-23T23:20:40Z"
         }
       ],
       "verified_at": [
@@ -4978,7 +5076,7 @@
           "candidate": "0.90.134",
           "build": "79779BEAECBEA94844FDC72",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -5144,6 +5242,16 @@
           "build": "79779BEAECBEA94844FDC72",
           "batch": "b20261023-3ad6d0",
           "approval": "P20261023-25f136",
+          "date": "2026-10-23"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-23T20:41:09Z",
+          "build": "79779BEAECBEA94844FDC72",
+          "batch": "b20261023-d9b09a",
+          "approval": "P20261023-849aed",
           "date": "2026-10-23"
         }
       ]
@@ -5829,6 +5937,17 @@
       "next": "Make 'all' the default goal (.DEFAULT_GOAL), add $(XBIN) to all and $(QBIN) $(XBIN) to clean, with a switch for the control; a host lap in a scratch copy: a plain 'make' (no target) must build tauth_test and every binary 'all' names, and 'make clean' must leave none of the binaries; switch off: the old goal and lists. ===== ===== 2026-10-23: fix built in the sibling tree /home/steve/src/mxfs-a15 for the next attempt: tests/tauth/Makefile sets .DEFAULT_GOAL := all, adds $(XBIN) to all, and clean removes $(CLEAN_MORE) = $(QBIN) $(XBIN); TAUTH_GOAL_ALL=0 keeps the old goal and lists (control). Lap tests/tauth_make_goal_lap.sh (host, scratch copy of dlm/ pal/ include/ tests/tauth/ sources and Makefile): a plain make, then make all, then make clean. Precheck: fix in PASS 'a plain make built all 13 binaries and make clean removed them' (18 s); TAUTH_GOAL_ALL=0 FAIL 'not built by a plain make: tauth_test ... (all 13; 1 object built); not built by make all: seal_barrier_test; left by make clean: local_page_full_test' (18 s). Bound 40 s. Next: on the next attempt, a control batch with TAUTH_GOAL_ALL=0, a verification sized from it, remove --fixed.",
       "reproducer": "tests/tauth: make -p -q | grep DEFAULT_GOAL; grep -n '^clean:' -A1 Makefile",
       "updated": "2026-10-23"
+    },
+    {
+      "id": "D-SINGLE-WRITER-CREATE-PACE-6-TO-18MS-ON-2CAW-SO-THE-LMU-LAP-OVERRAN-360S",
+      "severity": "major",
+      "nodes": 2,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "A single writer creating empty files in one fresh directory on 2/disk/caw/direct (test1, the peer test2 mounted and idle, candidate 0.90.134 build 79779BEAECBEA94844FDC72) takes 5.9 to 18 ms a create; 40000 creates take about 300 s. The same loop on test2's local ext4 root takes 0.063 ms a create (40000 in 2519 ms), so the shared-LUN create is about 100 to 290 times the local one, far over 2x native. tests/last_member_umount_lap.sh derived its 360 s bound from 2.2-2.3 ms a create measured on the TCP lock manager, so all three laps of lane g2_lmu_caw_measure overran the bound (rc=124) inside the create stage, before the unmount the lap measures.",
+      "evidence": "Lane tests/evidence/lanes/g2_lmu_caw_measure_20261023T234743Z: summary.log step 2 'end rc=124 360s: timeout -k 5 360 tests/last_member_umount_lap.sh lmucaw1 2/disk/caw/direct', step 3 (lmucaw2) 'end rc=124 360s'; each step log ends after '  KNOB test2 KNOB=8 m=1' (the trace's output is captured until it returns). Each trace dir (tests/evidence/20261023T234905Z_lmutrace_lmucaw1, 20261023T235552Z_lmutrace_lmucaw2, 20261024T000155Z_lmutrace_lmucaw3) holds an empty authority.txt: the create stage (tests/last_member_umount_trace.sh:54-55, bound NFILES/25+60 = 1660 s) never finished inside the lap's 360 s. Live counts on test1 during lmucaw2 (ls -f /mnt/shared/.lmutrace | grep -c ^f): 23:58:05Z 17833, 23:58:16Z 19694 (1861 in 11 s, 5.9 ms each; 17833 in the 133 s since the stage began at 23:55:52Z, 7.5 ms each). During lmucaw3: tests/evidence/20261024T000246Z_caw_create_pace_probe/test1_sample1.txt 'T=1792800166.479268689 N=2678', test1_sample2.txt 'T=1792800196.980479568 N=4353' (1675 creates in 30.5 s, 18.2 ms each). Local yardstick, the identical loop on test2's root filesystem: test2_native_rootfs.txt 'ROOTFS=ext2/ext3' 'NATIVE_CREATED=40000 ms=2519'. The ext4 root is not native XFS on the same LUN; the yardstick for the 2x ceiling is still to be measured.",
+      "next": "Measure native XFS on the same kind of pool LUN (tools/xfs_baseline_refresh.sh or a scratch mkfs.xfs on a pool LUN) with the same 40000-create loop, and the MXFS loop on 2/net/mesh/direct and 2/disk/caw/direct in one session, with per-1000 timestamps so the pace's dependence on directory size is visible. Then trace where a create's wall goes on disk/caw (CAW commands per create: the inode lock acquire, the AG grant, inode-chunk allocation; P-probe counts or blktrace of the CAW opcode on the LUN). Separately, the D-LAST-MEMBER-UMOUNT measurement on disk/caw that this lane was for still needs a run: NFILES small enough that the creates fit the lap's bound, reading whether P-RELALL-WALL appears at all on disk/caw (dlm_wire_release_all is the TCP lock manager's, dlm/dlm.c:13395, reached from mxfs_dlm_release_all at dlm/v5_mount.c:22480 only when ctx->dlm exists).",
+      "reproducer": "tests/last_member_umount_trace.sh <label> test1 test2 on a formed 2/disk/caw/direct pair (the create stage, :54-55), sampling the directory's entry count on A"
     }
   ]
 }

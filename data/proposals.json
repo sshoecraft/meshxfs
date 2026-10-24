@@ -5685,8 +5685,15 @@
         "tests/evidence/20261023T233333Z_peerwin_pwnv5",
         "tests/evidence/20261023T233503Z_peerwin_pwnv6"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-849aed.md",
+        "sha256": "b4c67e58560df7c2166779deef91cfecdaff3a9ddc7470b930882a978e3c763a",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }
