@@ -7712,6 +7712,45 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-52e185",
+      "kind": "verify",
+      "record": "D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS",
+      "change": {
+        "batch": "b20261024-565ac2"
+      },
+      "argument": "Verification b20261024-565ac2 of lap:rejoin_modargs_rig at 8/disk/caw/mpath on candidate 0.90.134 (attempt frozen 2026-10-24T10:25:09Z, module 468F7F30C2E190B0244AF70): 6 of 6 planned laps PASS, each exposed (probe '^EXPOSED: ', exposure=1), sized from control b20261024-e827e0 (same lap, same configuration, same build, PF_REJOIN_PREP_ARGS=0: 10 of 10 FAIL, every one 'the rejoined victim test28 loaded other arguments than the survivor test21: log_repeat_limit=1 (survivor 0), dead_timeout_ms=0 (survivor 12000)'), rate 10/10, lower bound 0.5887, 6 clean laps. This answers the rejection of P20261023-7bd24f (data/reviews/P20261023-7bd24f.md): tests/mpath/rejoin_modargs_rig_lap.sh runs on the rig (g8b, test21-test28), kills the victim test28 with virsh destroy, waits for the survivors to fence it, brings it back through tests/mpath/lib.sh pf_boot_rejoin (the CAW branch, at the configuration both observed runs had), then reads /sys/module/mxfs/parameters on the victim and on the survivor test21 after the rejoin (params_test28_after.txt, params_test21_after.txt) for every prep argument: force_transport, target_cache_protected, log_repeat_limit, target_retire_contract (the contract argument whose quoting the rejection named) and dead_timeout_ms; its rows are filed at 8/disk/caw/mpath, where it ran. Each PASS: 'the rejoined victim test28 reads every prep argument as test21 does (5: ...)'. The lap's MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 is the trigger, not a variant of the product under test: the defect is that pf_boot_rejoin dropped a lane's extra module arguments, so with none set the victim and survivors agree at the defaults whatever the rejoin loads and nothing is measured (the lap ABORTs on an empty MXFS_EXTRA_MODARGS, :60); the code verified is the candidate's frozen tests/mpath/lib.sh pf_rejoin_modargs (:512-525). Not covered and not claimed: the modprobe branch (a packaged install's rejoin), and the TCP branch on the rig (only the argv recorder lap at 2/net/mesh/direct, batch b20261023-abfebf, open).",
+      "evidence": [
+        "tests/evidence/lanes/g8b_a17_20261024T103310Z/summary.log",
+        "tests/evidence/lanes/g8b_a17_20261024T103310Z/step5.log",
+        "tests/evidence/lanes/g8b_a17_20261024T103310Z/step7.log",
+        "tests/evidence/lanes/g8b_a17_20261024T103310Z/queue",
+        "tests/mpath/rejoin_modargs_rig_lap.sh",
+        "tests/mpath/lib.sh",
+        "data/reviews/P20261023-7bd24f.md",
+        "tests/evidence/board_local100633_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local100913_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local101148_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local105815_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local105931_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110043_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110154_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110304_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110416_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110527_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110639_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110753_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110905_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local111151_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local111259_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local111410_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local111521_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local111628_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local111738_rejoin_modargs_rig/row.log"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
