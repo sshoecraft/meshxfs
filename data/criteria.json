@@ -401,17 +401,27 @@
         },
         "8/disk/caw/mpath": {
           "status": "PASS",
-          "measured": "skipped (marker matched 8/disk/caw/mpath)",
+          "measured": "elapsed=50s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-23T15:06:25Z",
+          "iso": "2026-10-24T00:52:31Z",
           "recorded": "2026-10-23",
-          "elapsed_s": 0,
-          "build": "08D63764A9352FBDD5A76CD",
+          "elapsed_s": 50,
+          "build": "9C7B7B00C5DE523F1D378C8",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261023T150612Z-g8",
-          "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
+          "run_id": "20261024T005101Z-g8",
+          "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_MPATH_TMO=2",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T15:06:25Z",
+              "measured": "skipped (marker matched 8/disk/caw/mpath)",
+              "reason": "",
+              "build": "08D63764A9352FBDD5A76CD",
+              "outcome": "PASS",
+              "run_id": "20261023T150612Z-g8",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T15:02:07Z",
@@ -501,16 +511,6 @@
               "outcome": "PASS",
               "run_id": "20261023T143524Z-g8",
               "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_MPATH_TMO=2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-23T13:47:45Z",
-              "measured": "skipped (marker matched 8/disk/caw/mpath)",
-              "reason": "",
-              "build": "08D63764A9352FBDD5A76CD",
-              "outcome": "PASS",
-              "run_id": "20261023T134733Z-g8",
-              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1"
             }
           ]
         },
@@ -1504,17 +1504,37 @@
         },
         "2/net/mesh/mpath": {
           "status": "PASS",
-          "measured": "elapsed=32s (fresh prep)",
+          "measured": "skipped (marker matched 2/net/mesh/mpath)",
           "reason": "",
-          "iso": "2026-10-24T00:17:26Z",
+          "iso": "2026-10-24T00:51:48Z",
           "recorded": "2026-10-23",
-          "elapsed_s": 32,
-          "build": "79779BEAECBEA94844FDC72",
+          "elapsed_s": 0,
+          "build": "9C7B7B00C5DE523F1D378C8",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T001645Z-g2e",
-          "candidate": "0.90.134",
+          "run_id": "20261024T005133Z-g2e",
+          "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T00:51:32Z",
+              "measured": "elapsed=32s (fresh prep)",
+              "reason": "",
+              "build": "9C7B7B00C5DE523F1D378C8",
+              "outcome": "PASS",
+              "run_id": "20261024T005038Z-g2e",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_MPATH_TMO=2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T00:17:26Z",
+              "measured": "elapsed=32s (fresh prep)",
+              "reason": "",
+              "build": "79779BEAECBEA94844FDC72",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T001645Z-g2e"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T00:14:54Z",
@@ -1597,45 +1617,33 @@
               "candidate": "0.90.134",
               "run_id": "20261023T234536Z-g2e",
               "variant": "MXFS_EXTRA_MODARGS=dl_relall_threads=1"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-23T23:43:00Z",
-              "measured": "elapsed=33s (fresh prep)",
-              "reason": "",
-              "build": "79779BEAECBEA94844FDC72",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261023T234217Z-g2e",
-              "variant": "MXFS_EXTRA_MODARGS=dl_relall_threads=1"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-23T23:37:56Z",
-              "measured": "elapsed=34s (fresh prep)",
-              "reason": "",
-              "build": "79779BEAECBEA94844FDC72",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261023T233712Z-g2e",
-              "variant": "MXFS_EXTRA_MODARGS=dl_relall_threads=1"
             }
           ]
         },
         "8/net/mesh/mpath": {
           "status": "PASS",
-          "measured": "skipped (marker matched 8/net/mesh/mpath)",
+          "measured": "elapsed=41s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-23T19:35:30Z",
+          "iso": "2026-10-24T00:55:14Z",
           "recorded": "2026-10-23",
-          "elapsed_s": 0,
-          "build": "C54C14B681D148267D084FC",
+          "elapsed_s": 41,
+          "build": "9C7B7B00C5DE523F1D378C8",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261023T193518Z-g8",
-          "candidate": "0.90.134",
-          "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
+          "run_id": "20261024T005404Z-g8",
+          "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_MPATH_TMO=2",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T19:35:30Z",
+              "measured": "skipped (marker matched 8/net/mesh/mpath)",
+              "reason": "",
+              "build": "C54C14B681D148267D084FC",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261023T193518Z-g8",
+              "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T19:35:18Z",
@@ -1725,16 +1733,6 @@
               "build": "08D63764A9352FBDD5A76CD",
               "outcome": "PASS",
               "run_id": "20261023T152026Z-g8",
-              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-23T15:17:25Z",
-              "measured": "skipped (marker matched 8/net/mesh/mpath)",
-              "reason": "",
-              "build": "08D63764A9352FBDD5A76CD",
-              "outcome": "PASS",
-              "run_id": "20261023T151713Z-g8",
               "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
             }
           ]
@@ -39061,17 +39059,27 @@
         },
         "2/net/mesh/mpath": {
           "status": "FAIL",
-          "measured": "victim=test18 flaps=10 flap_s=4 stall_ms=81690 settle_s=0 acked=29984 elapsed=166s fails=12 max_stall_ms=120272",
-          "reason": "F4: test18's longest stall, ms (got 81690); F4: test18's load kept completing operations through the window (got no); F4: no operation on test18 returned an error (got 3404245); F4_after: test18's longest stall, ms (got 120272); F4_after: test18's load kept completing operations through the window (got no); F4_after: no operation on test18 returned an error (got 1306943); test18: no operation returned an error in the whole run (got 5503784); test17 acknowledged files (> 0) and test18 reads every one with its checksum (got no); test17 logged no shutdown, withdrawal, death declaration, BUG, oops or hung task (got 1); test17 saw no membership below 2 (got 1); test18 logged no shutdown, withdrawal, death declaration, BUG, oops or hung task (got 3); the target holds the same reservation keys at the end as at the start (got differ(2)) (evidence tests/evidence/board_20261023T171936Z-g2e_path_flap)",
-          "iso": "2026-10-23T17:22:40Z",
+          "measured": "victim=test18 flaps=10 flap_s=4 stall_ms=77221 settle_s=5 acked=32617 elapsed=170s fails=11 max_stall_ms=120377",
+          "reason": "F4: test18's longest stall, ms (got 77221); F4: no operation on test18 returned an error (got 3232989); F4_after: test18's longest stall, ms (got 120377); F4_after: test18's load kept completing operations through the window (got no); F4_after: no operation on test18 returned an error (got 1255354); test18: no operation returned an error in the whole run (got 5371774); test17 acknowledged files (> 0) and test18 reads every one with its checksum (got no); test17 logged no shutdown, withdrawal, death declaration, BUG, oops or hung task (got 1); test17 saw no membership below 2 (got 1); test18 logged no shutdown, withdrawal, death declaration, BUG, oops or hung task (got 3); the target holds the same reservation keys at the end as at the start (got differ(2)) (evidence tests/evidence/board_20261024T005133Z-g2e_path_flap)",
+          "iso": "2026-10-24T00:54:46Z",
           "recorded": "2026-10-23",
-          "elapsed_s": 169,
-          "build": "08D63764A9352FBDD5A76CD",
+          "elapsed_s": 172,
+          "build": "9C7B7B00C5DE523F1D378C8",
           "outcome": "FAIL",
           "budget_s": 240,
-          "run_id": "20261023T171936Z-g2e",
+          "run_id": "20261024T005133Z-g2e",
           "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
           "history": [
+            {
+              "status": "FAIL",
+              "iso": "2026-10-23T17:22:40Z",
+              "measured": "victim=test18 flaps=10 flap_s=4 stall_ms=81690 settle_s=0 acked=29984 elapsed=166s fails=12 max_stall_ms=120272",
+              "reason": "F4: test18's longest stall, ms (got 81690); F4: test18's load kept completing operations through the window (got no); F4: no operation on test18 returned an error (got 3404245); F4_after: test18's longest stall, ms (got 120272); F4_after: test18's load kept completing operations through the window (got no); F4_after: no operation on test18 returned an error (got 1306943); test18: no operation retu",
+              "build": "08D63764A9352FBDD5A76CD",
+              "outcome": "FAIL",
+              "run_id": "20261023T171936Z-g2e",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-21T10:19:20Z",
@@ -39126,12 +39134,6 @@
               "iso": "2026-10-16T03:29:37Z",
               "measured": "victim=test16 flaps=10 flap_s=4 stall_ms=21587 settle_s=0 acked=5274 elapsed=158s fails=0",
               "reason": " (evidence tests/evidence/board_20261016T025019Z-g2b_path_flap)"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-15T02:55:45Z",
-              "measured": "victim=test16 flaps=10 flap_s=4 stall_ms=7132 settle_s=0 acked=3163 elapsed=160s fails=0",
-              "reason": " (evidence tests/evidence/board_20261015T022351Z-g2b_path_flap)"
             }
           ]
         },

@@ -283,11 +283,23 @@ marker_write() {  # nodes configuration srcver — node_list records WHICH hosts
     wwid=$(printf '%s\n' "$ident" | sed -n 's/.* wwid=\([^ ]*\).*/\1/p')
     fsid=$(printf '%s\n' "$ident" | sed -n 's/.* fsid=\([^ ]*\).*/\1/p')
     gen=$(( $(jq -r '.gen // 0' "$MARKER" 2>/dev/null || echo 0) + 1 ))
-    jq -n --argjson n "$1" --arg d "$2" --arg s "$3" --arg nl "$nl" \
-          --arg dev "${DEV:-}" --arg rig "$rig" --arg t "$(date -u +%FT%TZ)" \
-          --arg wwid "${wwid:-}" --arg fsid "${fsid:-}" --argjson gen "$gen" \
-          --arg ma "$(prep_modargs)" --argjson params "$params" \
-        '{nodes:$n, configuration:$d, srcversion:$s, node_list:$nl, dev:$dev, rig:$rig, wwid:$wwid, fsid:$fsid, gen:$gen, iso:$t, modargs:$ma, params:$params}' > "$MARKER" 2>/dev/null
+    # `params` reaches jq on stdin, not as an argument: every node's list is ~18 KB, so at 8
+    # nodes the object is ~145 KB, past the kernel's 128 KiB limit on one argument
+    # (MAX_ARG_STRLEN). exec of jq failed (E2BIG), the redirect had already emptied the marker,
+    # and every row after an 8-node prep refused 'cluster is prepped for <none>'
+    # (D-RUN-SH-MARKER-PARAMS-PASSED-AS-ONE-ARGUMENT-EMPTY-THE-MARKER-AT-8-NODES).
+    # MXFS_MARKER_STDIN=0 passes them as --argjson, as before: the control.
+    local jargs=(--argjson n "$1" --arg d "$2" --arg s "$3" --arg nl "$nl"
+                 --arg dev "${DEV:-}" --arg rig "$rig" --arg t "$(date -u +%FT%TZ)"
+                 --arg wwid "${wwid:-}" --arg fsid "${fsid:-}" --argjson gen "$gen"
+                 --arg ma "$(prep_modargs)")
+    local shape='{nodes:$n, configuration:$d, srcversion:$s, node_list:$nl, dev:$dev, rig:$rig, wwid:$wwid, fsid:$fsid, gen:$gen, iso:$t, modargs:$ma, params:$params}'
+    echo "--- marker params: ${#params} bytes for ${#NODES[@]} node(s) ---"
+    if [ "${MXFS_MARKER_STDIN:-1}" = 0 ]; then
+        jq -n "${jargs[@]}" --argjson params "$params" "$shape" > "$MARKER" 2>/dev/null
+    else
+        printf '%s' "$params" | jq "${jargs[@]}" ". as \$params | $shape" > "$MARKER" 2>/dev/null
+    fi
 }
 # The parameters a row can change on a node: every one its owner can read and
 # write, as sorted name=value lines with a value's newlines folded.  Read-only

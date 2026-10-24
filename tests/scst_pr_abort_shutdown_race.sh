@@ -44,8 +44,10 @@
 #     is reset (ss -K, as a path flap resets it) and iscsid recovers the same
 #     session: it logs in again with the same ISID, so the target sees a new
 #     session of the same I_T nexus while the old one is held in its teardown.
-#     X then writes one 4 KiB block at the LU's end through path 1; Y then
-#     issues PREEMPT AND ABORT on KX1 while the old session is still held.
+#     X then writes one 4 KiB block at the LU's end through path 1.  Once the
+#     old session's holds are over, path 1 is reset again and Y issues PREEMPT
+#     AND ABORT on KX1 at DELAY/3, while the session just left is still held in
+#     SHUTDOWN with its refcount alive.
 #     A logout and a login cannot stand in for the reset: open-iscsi builds a
 #     session's ISID from its session id, and a login after a logout is a new
 #     session with a new id, so a different I_T nexus that holds no
@@ -73,7 +75,9 @@
 # handoff arm budget: connection reset + iscsid's re-login (polled up to 20 s,
 # 0.2 s apart) + path learn + write + P&A ~5 s inside the 2 x DELAY hold
 # (DELAY=8000 for it), then the rest of the hold and cleanup: ~30 s, and at
-# most ~45 s if the re-login takes the whole poll.
+# most ~45 s if the re-login takes the whole poll; the second reset and its P&A
+# wait out the first session's holds and then hold a second session for 2 x
+# DELAY: ~20 s more, ~50 s in all at DELAY=8000 (65 s at the poll's worst).
 #
 # Usage: tests/scst_pr_abort_shutdown_race.sh <label> [window|stress|handoff] [X=test1] [Y=test2] [DELAY_MS=4000] [ITERS=20]
 # Env:   SPR_OUT (evidence dir, default tests/evidence/<label>_spr), MXFS_SCST_TGT
@@ -212,8 +216,20 @@ elif [ "$ARM" = handoff ]; then
     w1=$(xwrite "${XP1_DEV:-null}"); tw=$(( $(date +%s%3N) - ta ))
     echo "handoff: X path1 connection reset at $TA: $rc1 (+${tl} ms; 0.2 s polls) | path1 now /dev/${XP1_DEV:-none} | write at +${tw} ms: $w1"
     case "$rc1" in *back=LOGGED_IN*) ;; *) echo "FAIL: not exercised — X's path-1 session did not leave LOGGED_IN and recover after its connection reset: $rc1"; fail=1;; esac
-    paA=$(pa $KX1); tp=$(( $(date +%s%3N) - ta ))
-    echo "handoff: P&A $KX1 from Y at +${tp} ms: $paA"
+    # Second part: PREEMPT AND ABORT must also reach the nexus's earlier session while that one
+    # still holds its refcount (inside the first hold), since the registrant has moved off it and
+    # it may still carry commands it admitted. The write above cannot be that moment: iscsid's
+    # re-login completes only once the old session has left SHUTDOWN (measured +8.7 s at
+    # DELAY=8000, 2026-10-24), so a P&A after it finds the earlier session's refcount at zero,
+    # where .6 skips it by design (nothing is left to abort). So the earlier session's holds are
+    # waited out, path 1 is reset again, and the P&A goes in at DELAY/3, inside the new hold.
+    left_ms=$(( 2 * DELAY - ($(date +%s%3N) - ta) )); [ "$left_ms" -gt 0 ] || left_ms=0
+    sleep $(( left_ms / 1000 + 1 ))
+    TB=$(date -u +%FT%T.%3NZ); tb=$(date +%s%3N)
+    rc2=$(rsh $X "ss -K dst $XP1_IP dport = :3260 >/dev/null 2>&1; echo kill_rc=\$?" | tr '\n' ' ')
+    sleep $(( DELAY / 3000 ))
+    paA=$(pa $KX1); tp=$(( $(date +%s%3N) - tb ))
+    echo "handoff: X path1 connection reset again at $TB: $rc2 | P&A $KX1 from Y at +${tp} ms (first hold ${DELAY} ms): $paA"
     sleep $(( (2 * DELAY) / 1000 + 1 ))
     setknob 0
     TE=$(date -u +%FT%T.%3NZ)
@@ -237,6 +253,7 @@ elif [ "$ARM" = handoff ]; then
     [ "$conf" = 0 ] || { echo "FAIL: the target refused $conf command(s) of the registered nexus after its re-login"; fail=1; }
     [ "$mov" -ge 1 ] || { echo "FAIL: the target logged no handoff of X's registrant to the new session"; fail=1; }
     case "$paA" in *rc=0*) ;; *) echo "FAIL: the P&A did not return rc=0: $paA"; fail=1;; esac
+    [ "$held" -ge 2 ] && [ "$tp" -lt "$DELAY" ] || { echo "FAIL: not exercised — the second reset's session was not held (held=$held, want 2) or the P&A came after its first hold (+${tp} ms, hold ${DELAY} ms)"; fail=1; }
     [ "$earlier" -ge 1 ] || { echo "FAIL: the P&A did not abort the earlier session of X's nexus"; fail=1; }
     [ "$(keycount $KX1)" = 0 ] || { echo "FAIL: KX1 survived its PREEMPT AND ABORT"; fail=1; }
     [ "$bad" = 0 ] || { echo "FAIL: BUG/Oops/CRITICAL/unexpected error on the host during the window"; fail=1; }
