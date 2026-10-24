@@ -4430,7 +4430,8 @@
           "approval": "P20261024-977f69",
           "date": "2026-10-24"
         }
-      ]
+      ],
+      "reproducer": "tests/relog_auth_lap.sh <label> 4/disk/caw/mpath (lap:relog_auth, a fresh prep then one lap of tests/relog_pr_release_auth.sh on the formation's first two nodes): A holds a fresh directory shared with its next release drain forced onto the re-log arm (dbg_relog_force_ino) while B creates in it; EXPOSED when the forced arm runs under a shared grant (P146V-FORCE granted_mode=3); with ARM=0 (relog_auth_granted_mode=0, the held-or-not slot read) A re-logs its stale directory core under the shared hold, as the 2026-10-19 runs' LOCK directory was"
     },
     {
       "id": "D-2CAWMPATH-FENCED-RETURN-FENCE-NEVER-LANDED-SURVIVOR-ERRORS-236S",
@@ -7863,7 +7864,8 @@
           "approval": "P20261024-e2fcdf",
           "date": "2026-10-24"
         }
-      ]
+      ],
+      "reproducer": "tests/lockrec_slot0_lap.sh <label> 2/disk/caw/direct with LOCKREC_TARGET=root (lap:lockrec_slot0): formats with volume-id bytes found by tests/caw_slot_uuid.py so the root inode lock lands in CAW slot 0, mounts A alone (slot 0 live, gen=1: EXPOSED), then remounts B with its kernel log marked; LOCKREC_VALIDATE=1 (dl_validate_lockrec=1) validates slot 0 as a lock record and B logs 'disklock: corrupt lock record at slot 0'"
     },
     {
       "id": "D-HARNESS-LAP-TIMED-OPS-REACH-NO-STALL-GRADER-JDT-31S-UNMOUNT-GRADED-PASS",
@@ -8645,7 +8647,8 @@
           "approval": "P20261024-d8bd3f",
           "date": "2026-10-24"
         }
-      ]
+      ],
+      "reproducer": "tests/drbd_nodes_count_lap.sh <label> (host only, lap:drbd_arm_group, about 15 s): runs tests/drbd_write_bound_arm.sh's node resolution with MXFS_NODES=2 MXFS_GROUP=g2 and requires the g2 pair test1 test2 (EXPOSED names both); with DRBD_ARM_GROUP=0 the arm takes test3 test4, g4's nodes, whatever the group"
     },
     {
       "id": "D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED",
@@ -9483,14 +9486,116 @@
           "candidate": "",
           "build": "A27A67A3E501890BE9985E0",
           "variant": "probe_a_replay_apart=0 (MXFS_EXTRA_MODARGS at the lap's prep: a replay's image is reported as an unheld AG write, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: the replayer reports every replay image of an AG header as PROBE-A AG-META-WRITE-NOT-HELD"
+        },
+        {
+          "id": "b20261024-d04ebf",
+          "kind": "verify",
+          "row": "lap:probe_a_replay",
+          "config": "4/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^STAGE replayer ",
+          "candidate": "0.90.134",
+          "build": "A27A67A3E501890BE9985E0",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:probe_a_replay",
+            "config": "4/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-e216a7",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "probe_a_replay_apart=0 (MXFS_EXTRA_MODARGS at the lap's prep: a replay's image is reported as an unheld AG write, as before the fix)",
+            "builds": [
+              "A27A67A3E501890BE9985E0"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
-      "updated": "2026-10-24"
+      "updated": "2026-10-24",
+      "rates": [
+        {
+          "row": "lap:probe_a_replay",
+          "config": "4/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-e216a7",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "probe_a_replay_apart=0 (MXFS_EXTRA_MODARGS at the lap's prep: a replay's image is reported as an unheld AG write, as before the fix)",
+          "builds": [
+            "A27A67A3E501890BE9985E0"
+          ],
+          "date": "2026-10-24"
+        }
+      ],
+      "cells": [
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:probe_a_replay",
+          "iso": "2026-10-24T15:53:01Z"
+        },
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:probe_a_replay",
+          "iso": "2026-10-24T15:50:39Z"
+        },
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:probe_a_replay",
+          "iso": "2026-10-24T15:48:18Z"
+        },
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:probe_a_replay",
+          "iso": "2026-10-24T15:45:53Z"
+        },
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:probe_a_replay",
+          "iso": "2026-10-24T15:43:36Z"
+        },
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:probe_a_replay",
+          "iso": "2026-10-24T15:41:24Z"
+        },
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:probe_a_replay",
+          "iso": "2026-10-24T15:39:12Z"
+        },
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:probe_a_replay",
+          "iso": "2026-10-24T15:36:59Z"
+        },
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:probe_a_replay",
+          "iso": "2026-10-24T15:34:43Z"
+        },
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:probe_a_replay",
+          "iso": "2026-10-24T15:32:30Z"
+        }
+      ]
     },
     {
       "id": "D-FENCED-NODE-INODE-LOCK-EIO-SHUTS-DOWN-AS-IN-CORE-CORRUPTION",

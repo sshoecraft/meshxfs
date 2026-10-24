@@ -9070,6 +9070,120 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-982314",
+      "kind": "infra-proven",
+      "record": null,
+      "change": {
+        "config": "8/disk/caw/mpath",
+        "row": "lap:peer_window",
+        "iso": "2026-10-24T14:57:18Z"
+      },
+      "argument": "Lap 10 of control b20261024-05c9e3 (tests/peer_window_lap.sh pw9c10, lane g8b_a19 step 2) ended rc=2 'RESULT: ABORT stage=prep' because the lap's own prep stage was cut at its bound ('STAGE prep rc=124 wall=121s') after run.sh's prep had already succeeded ('--- prep OK: mxfs mounted on all 8 node(s), build A27A67A3E501890BE9985E0 ---', prep.log:65, then attach and convergence lines). The time went before the prep proper: run.sh's pre-prep lines show 'lun_pool: pool lock waited 18 s' and 'pool lock waited 19 s' (prep.log:4,9) and the preflight passing at +57 s (prep.log:38). The pool lock log copied into the lap's evidence names the holders: at 14:55:37Z and 14:56:07Z the lock was 'held 20 s' by 'lun_pool.sh quiet sh -c ... sleep 20' writing tests/evidence/20261024T145517Z_lapwait_lwp1b and 20261024T145547Z_lapwait_lwp0b (pool_lock_log_copy.txt:5-6): a session's host-side precheck of the batch_lap_wait lap, which holds the pool lock 20 s on purpose, run while the lanes were up. Nothing in it is MeshXFS: no MeshXFS code holds the pool lock, the module was not loaded by it, and every one of the 8 nodes mounted. The lap measured nothing about the defect (exposure 0). The other 9 laps of the batch each measured it (9 FAIL with exposure). Settling this one run as the rig's lets the control close at the rate its 9 measured laps show.",
+      "evidence": [
+        "tests/evidence/batch_laps/b20261024-05c9e3/20261024T145517Z-e9861462.log",
+        "tests/evidence/20261024T145517Z_peerwin_pw9c10/prep.log",
+        "tests/evidence/20261024T145517Z_peerwin_pw9c10/pool_lock_log_copy.txt",
+        "tests/evidence/lanes/g8b_a19_20261024T143107Z/step2.log"
+      ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-982314.md",
+        "sha256": "14f6ff0dbf71211bf99b322551ddee309df9e8edc7a520f1f87aa290d20633ee",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
+    },
+    {
+      "id": "P20261024-9cdfae",
+      "kind": "remove-fixed",
+      "record": "D-CAWMPATH-NLINK1-FILE-NAMED-TWICE-AFTER-ANSWER-LOST",
+      "change": {
+        "control": "b20261023-3629b7",
+        "fixon": "b20261023-e1a1db",
+        "cause": "mxfs_dlm_relog_authorized authorized a synthetic re-log of an inode core on the held-or-not CAW slot read (mxfs_v5_dlm_inode_held_rawmode), which reports any slot bit of this node as EX, so a node holding the workload's LOCK directory only shared re-logged its out-of-date directory core at release and wrote it over a peer's newer image: the entry the peer had removed came back and named a number later freed and reused, a file with nlink 1 named by two entries; the fix authorizes the re-log only on the mode the transport granted (relog_auth_granted_mode=1, xfs/xfs_mxfs_relbar.c:900-933)"
+      },
+      "argument": "FIXED AND VERIFIED. The record's two CORRUPT audits (4/ and 8/disk/caw/mpath chk_clean, 2026-10-19, build 8DAEC6B8298ADB049222D74) are the runs CHANGELOG.md's 0.90.131 removal of D-CAW-MPATH-8NODE-REUSED-INODE-NAMED-BY-TWO-DIRENTS-NLINK-1-AFTER-SUITE traced (its text names inode 13147165 reused as test28/f0000811 and the LOCK directory 6872562 at 4 nodes); this record was opened only because those chk_clean FAILs never reached a run ledger. The cause is instrumented in the module (xfs/xfs_mxfs_relbar.c:900-910: test23 releasing a PR hold of the LOCK directory, P-RELFLUSH-NOTENURE held_mode=3, re-logged its core, P146V-UNLANDED incore size=20 disk size=6, over test28's newer image, P56-DIRWRITE). Reproducer tests/relog_auth_lap.sh at 4/disk/caw/mpath forces the shared holder's release onto the re-log arm. Control b20261023-3629b7 (ARM=0: relog_auth_granted_mode=0, the read before the fix, same build; lane g4c_a15_relogauth_20261024T042815Z step 2): 8 of 8 measured laps failed, A re-logging under its shared grant. Verification b20261023-e1a1db with the fix (ARM=1, the default) on candidate 0.90.134 attempt 2026-10-24T04:13:43Z, sized from that control (8 laps): 8 of 8 PASS with exposure (the forced arm ran under granted_mode=3 and A refused the re-log, both nodes list b1 b2, no shutdown or corruption), applied as verify P20261024-977f69. The switch is the only difference between the batches. Two full path_answer_lost + chk_clean runs on build 08D63764A9352FBDD5A76CD (2026-10-23) at 4 and 8 nodes were CLEAN with the trigger's stuck acquisitions present; they are supporting evidence only.",
+      "evidence": [
+        "data/reviews/P20261024-977f69.md",
+        "tests/evidence/lanes/g4c_a15_relogauth_20261024T042815Z/step2.log",
+        "tests/evidence/lanes/g4c_a15_relogauth_20261024T042815Z/step3.log",
+        "tests/evidence/batch_laps/b20261023-3629b7",
+        "tests/evidence/batch_laps/b20261023-e1a1db",
+        "tests/relog_auth_lap.sh",
+        "xfs/xfs_mxfs_relbar.c"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-79d70a",
+      "kind": "remove-fixed",
+      "record": "D-DISKLOCK-VALIDATE-READS-CAW-SLOT-0-AND-LOGS-A-CORRUPT-LOCK-RECORD",
+      "change": {
+        "control": "b20261024-13351b",
+        "fixon": "b20261024-0a3f62",
+        "cause": "dlm/disklock.c validate_lockstate read the first lock record at base + MXFS_DISKLOCK_HB_SIZE, which on a COMPARE AND WRITE volume is CAW slot 0, and when that slot was live with generation 1 (at the record's flags offset, where ACTIVE is 1) it logged 'disklock: corrupt lock record at slot 0' at every such mount, a corruption message for a healthy slot; nothing writes legacy lock records on such a volume, and the fix checks the heartbeat half only, the lock-record half under dl_validate_lockrec=1 (default 0; dlm/disklock.c:215-223, :2700-2727)"
+      },
+      "argument": "FIXED AND VERIFIED. Reproducer tests/lockrec_slot0_lap.sh LOCKREC_TARGET=root at 2/disk/caw/direct, which puts the root inode lock in CAW slot 0 on every lap (precheck on attempt 17: EXPOSED on all four laps). Control b20261024-13351b (LOCKREC_VALIDATE=1: dl_validate_lockrec=1, the validation as before the fix, same build 8DBA16AEB7FDD3066C9C1BC, attempt 2026-10-24T12:49:30Z, lane g2b_a18_20261024T125718Z step 2): 10 of 10 failed with B's mount logging 'mxfs: disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)'. Verification b20261024-0a3f62 with the default (dl_validate_lockrec=0) on the same attempt (step 3), sized from it: 6 of 6 PASS with exposure, applied as verify P20261024-e2fcdf. The knob is the only difference. The record names no failure beyond the false message: its one caller only logs the -EIO and the mount goes on (dlm/disklock.c disklock init), and the code read in the record shows nothing else reads or writes legacy lock records on a COMPARE AND WRITE volume.",
+      "evidence": [
+        "data/reviews/P20261024-e2fcdf.md",
+        "tests/evidence/lanes/g2b_a18_20261024T125718Z/step2.log",
+        "tests/evidence/lanes/g2b_a18_20261024T125718Z/step3.log",
+        "tests/evidence/batch_laps/b20261024-13351b",
+        "tests/evidence/batch_laps/b20261024-0a3f62",
+        "tests/lockrec_slot0_lap.sh",
+        "dlm/disklock.c"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-87729d",
+      "kind": "remove-fixed",
+      "record": "D-DRBD-WRITE-BOUND-ARM-IGNORES-MXFS-GROUP-AND-ADDRESSES-TEST3-TEST4",
+      "change": {
+        "control": "b20261024-1194fc",
+        "fixon": "b20261024-efeeb2",
+        "cause": "tests/drbd_write_bound_arm.sh, given a bare node count in MXFS_NODES or none, used its built-in default pair test3 test4 and ignored MXFS_GROUP, so a lane of another group addressed g4's nodes; the fix takes MXFS_GROUP's two nodes from tools/mxfs_lab.sh group (g2 when unset) when no pair is named, and DRBD_ARM_GROUP=0 takes test3 test4 as before (tests/drbd_write_bound_arm.sh:40-52)"
+      },
+      "argument": "FIXED AND VERIFIED. Reproducer tests/drbd_nodes_count_lap.sh (host only), whose arm part runs the arm's own node resolution with MXFS_NODES=2 MXFS_GROUP=g2 and requires test1 test2. Control b20261024-1194fc (DRBD_ARM_GROUP=0, the resolution before the fix, same build A27A67A3E501890BE9985E0, candidate 0.90.134 attempt 2026-10-24T14:29:24Z, lane host_a19_20261024T142947Z step 3): 10 of 10 failed, the arm selecting test3 test4 from a g2 environment. Verification b20261024-efeeb2 with the fix on the same attempt (step 4), sized from it: 6 of 6 PASS with exposure (DRBD_ARM_NODES test1 test2), applied as verify P20261024-d8bd3f. The switch is the only difference. The record is a hazard read from the code and the laps' own selection; no run collided, so nothing else needs retiring.",
+      "evidence": [
+        "data/reviews/P20261024-d8bd3f.md",
+        "tests/evidence/lanes/host_a19_20261024T142947Z/step3.log",
+        "tests/evidence/lanes/host_a19_20261024T142947Z/step4.log",
+        "tests/evidence/batch_laps/b20261024-1194fc",
+        "tests/evidence/batch_laps/b20261024-efeeb2",
+        "tests/drbd_write_bound_arm.sh",
+        "tests/drbd_nodes_count_lap.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-ce5c62",
+      "kind": "remove-fixed",
+      "record": "D-MEASURE-REFUSES-A-BATCH-WHOSE-SETTLED-LAP-CHECK-BATCH-LAP-COUNTED-AS-RUN",
+      "change": {
+        "control": "b20261024-4a72ee",
+        "fixon": "b20261024-e3e420",
+        "cause": "tools/defects.py check_batch_lap counts PASS, FAIL and INCOMPLETE laps against a batch's plan (an INFRA lap uses up no place, so a lap is run in its stead) and refuses a lap past it, while cmd_measure required the PASS and FAIL laps alone to equal the plan, so a calibration or control batch holding a settled INCOMPLETE lap could get no more laps and measure refused it for good; the fix has measure count the plan with defects.plan_laps (PASS, FAIL, INCOMPLETE), the one function check_batch_lap and tools/harness_batch.py's resume already count with (tools/defects.py:999-1005, :1087-1100)"
+      },
+      "argument": "FIXED AND VERIFIED, with the cause and the single change the review of P20261024-7f4fc9 asked for. The cause above is what tools/defects.py:999-1005 (plan_laps) and check_batch_lap do; the fix is one change: measure counts with plan_laps, as check_batch_lap and harness_batch's resume do (harness_batch.py:303-306), so all three count the same laps; the first fix's counting of settled INFRA laps is gone. Reproducer tests/measure_settled_lap.py, redrafted per that review: in a scratch tree of its own, measure on every open live batch with a settled lap, plus three fixture cases: a settled INCOMPLETE lap at a full plan (must close at 1 of 1), a settled INFRA lap beyond a full plan of FAILs (must close at 2 of 2), and the plan count with an INFRA lap through plan_laps, batch-check and the resume (must agree, one more lap allowed). Control b20261024-4a72ee (MXFS_MEASURE_COUNT_SETTLED=0, measure counting PASS and FAIL only, as before the fix; candidate 0.90.134 attempt 2026-10-24T14:29:24Z, lane host_a19_20261024T142947Z step 1): 10 of 10 failed with exposure ('EXPOSED: scratch batch ... holds 1 FAIL and 1 settled INCOMPLETE lap of 2 planned'; measure did not close the live batches). Verification b20261024-e3e420 with the fix on the same attempt (step 2), sized from it (L=0.5887, 6 laps): 6 of 6 PASS with exposure, 'every batch with a settled lap closed with its rate, and plan_laps, batch-check and the resume agree on an INFRA lap'; applied as verify P20261024-d0ac00. The environment switch is the only difference. The earlier pair (control b20261024-7d38ae, verification b20261024-5c157a, applied as P20261024-fea8e6) measured the first fix and is not claimed.",
+      "evidence": [
+        "data/reviews/P20261024-7f4fc9.md",
+        "data/reviews/P20261024-d0ac00.md",
+        "tests/evidence/lanes/host_a19_20261024T142947Z/step1.log",
+        "tests/evidence/lanes/host_a19_20261024T142947Z/step2.log",
+        "tests/evidence/batch_laps/b20261024-4a72ee",
+        "tests/evidence/batch_laps/b20261024-e3e420",
+        "tests/measure_settled_lap.py",
+        "tools/defects.py"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
