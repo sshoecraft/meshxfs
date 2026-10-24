@@ -7797,8 +7797,14 @@
         "tests/evidence/board_local111628_rejoin_modargs_rig/row.log",
         "tests/evidence/board_local111738_rejoin_modargs_rig/row.log"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "approved",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-d7c365.md",
+        "sha256": "384768b8794cbfe005133f072fb31fc315b00a9972ea59d664eb6ce20856710e",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      }
     }
   ]
 }

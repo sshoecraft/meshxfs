@@ -2831,6 +2831,41 @@
           "config": "2/net/mesh/direct",
           "row": "lap:jdt_gate_stall",
           "iso": "2026-10-24T02:50:10Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_fault",
+          "iso": "2026-10-24T11:36:11Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_fault",
+          "iso": "2026-10-24T11:33:22Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_fault",
+          "iso": "2026-10-24T11:30:27Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_fault",
+          "iso": "2026-10-24T11:28:57Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_fault",
+          "iso": "2026-10-24T11:27:29Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_fault",
+          "iso": "2026-10-24T11:26:02Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_fault",
+          "iso": "2026-10-24T11:24:27Z"
         }
       ],
       "updated": "2026-10-24",
@@ -2946,11 +2981,44 @@
           "candidate": "",
           "build": "468F7F30C2E190B0244AF70",
           "variant": "GATE_ENTRY_ENV=NFILES=4000 (the gate's join_during_takeover entry at the 4000 files it ran with before the fix, through tests/capture_fault_gate.sh --only)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: at 4000 files the takeover pass ends inside the lap's first in-flight sample and the entry aborts"
+        },
+        {
+          "id": "b20261024-b1b608",
+          "kind": "verify",
+          "row": "lap:jdt_gate_fault",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 18,
+          "probe": "INFO A.s lone remount: A_MOUNT_RC=0 ",
+          "candidate": "0.90.134",
+          "build": "468F7F30C2E190B0244AF70",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:jdt_gate_fault",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-424818",
+            "k": 7,
+            "n": 10,
+            "candidate": "",
+            "variant": "GATE_ENTRY_ENV=NFILES=4000 (the gate's join_during_takeover entry at the 4000 files it ran with before the fix, through tests/capture_fault_gate.sh --only)",
+            "builds": [
+              "468F7F30C2E190B0244AF70"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.2648860147128692
         }
       ],
       "rates": [
@@ -2983,6 +3051,21 @@
             "16A5F5DDDB4852C9D5DB236"
           ],
           "date": "2026-10-22"
+        },
+        {
+          "row": "lap:jdt_gate_fault",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-424818",
+          "k": 7,
+          "n": 10,
+          "candidate": "",
+          "variant": "GATE_ENTRY_ENV=NFILES=4000 (the gate's join_during_takeover entry at the 4000 files it ran with before the fix, through tests/capture_fault_gate.sh --only)",
+          "builds": [
+            "468F7F30C2E190B0244AF70"
+          ],
+          "date": "2026-10-24"
         }
       ],
       "reproducer": "tests/capture_fault_gate.sh <label> --only join_during_takeover on the g2 pair (the gate's fault lap of the entry, with the manifest's NFILES): with the fix taken out (NFILES=4000) the takeover pass is over before the harness's first in-flight sample and the sampling loop runs until the gate's 228 s fault-lap bound ends it (RESULT: FAIL); with NFILES=32000 the pass is seen in flight and the injected first measurement ABORTs the lap (RESULT: PASS). Exposure: the harness's 'INFO A's lone remount: A_MOUNT_RC=0' line in the gate's evidence (join_during_takeover_fault.log), which every lap that reaches the takeover pass prints"
@@ -6562,7 +6645,7 @@
       "opened": "2026-10-23",
       "summary": "A path row that kills its victim brings it back through tests/mpath/lib.sh pf_boot_rejoin, which loaded mxfs with the configuration's module arguments only (mxfs_rig_modargs: target_cache_protected, force_transport and the rig's contract), not prep_node.sh's set (log_repeat_limit=0 and the lane's MXFS_EXTRA_MODARGS among them; tests/setup/prep_node.sh:242, :248), and sent modprobe no arguments at all, so a rejoined victim ran the default death window while every other node of the lane ran the variant's. That the mismatch then carried into the following rows, because run.sh's marker match reads no loaded parameter, is its own record, D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS.",
       "evidence": "Sweep of lanes tests/evidence/lanes/g8_mpathtmo2_20261023T143444Z and g16b_mpathtmo2_20261023T143733Z (both exporting MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, summary.log:6): board_20261023T144020Z-g8_path_fence_degraded kmsg_test14_fromnode.gz:665 'mxfs: dead_timeout_ms=0 (0 = 34 s on SCSI, 62 s on DRBD or shared)', :701 'authority lease 30000 ms, death window 34000 ms', against test7-test13 '=12000' and 'authority lease 8000 ms, death window 12000 ms'; the same for test14 in 144327Z path_all_lost, 144649Z path_peer_withdrawn, 151409Z path_fence_degraded, 151713Z path_all_lost, and for test32 in 144449Z, 144842Z, 150343Z, 150725Z and 151125Z (16 nodes). The step logs of every row after a lane's first prep print '--- cluster already prepped for <config> (srcver=08D63764A9352FBDD5A76CD) \u2014 skipping prep ---' (g8 step4-12 and step14-22, g16b step4-7 and step9-12). test14 came back on 12000 only after a forced prep (151048Z path_fenced_return kmsg_test14 :157277). Every row passed; the runs were variants and grade nothing. The survivors declared on their own 12 s window, so the stalls those rows measured are the survivors' at that window. ===== 2026-10-24 rig precheck at 8/disk/caw/mpath on attempt 2026-10-24T06:38:23Z (lane tests/evidence/lanes/g8b_w14_20261024T100411Z, g8b test21-test28, MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, a forced prep before each lap): tests/mpath/rejoin_modargs_rig_lap.sh fix on, steps 3 and 5: 'EXPOSED: test21 reads the lane's dead_timeout_ms=12000 back ...' and 'LAP rejoin_modargs_rig PASS: the rejoined victim test28 reads every prep argument as test21 does (5: force_transport target_cache_protected log_repeat_limit target_retire_contract dead_timeout_ms)'; control PF_REJOIN_PREP_ARGS=0, step 7: EXPOSED and 'LAP rejoin_modargs_rig FAIL: the rejoined victim test28 loaded other arguments than the survivor test21: log_repeat_limit=1 (survivor 0), dead_timeout_ms=0 (survivor 12000)'.",
-      "next": "Make the rejoin load the module with the lane's arguments as prep does (MXFS_EXTRA_MODARGS appended to mxfs_rig_modargs in tests/mpath/lib.sh, and wherever else a row reloads mxfs on a node it restarted), and make run.sh's marker match also compare each node's loaded parameters with the ones requested, so a mismatch re-preps instead of skipping; a lap that kills a victim in one row and reads every node's /sys/module/mxfs/parameters/dead_timeout_ms in the next; control with the fix's switch off, verification sized from it, remove --fixed. ===== ===== 2026-10-23: tests/mpath/lib.sh is sourced by every row of the running lanes g4_mpathtmo2_k6 and g2e_mpathtmo2_k6, so the edit waits until both have ended (an edit mid-lane changes what the rest of the lane measures). The two halves each cure the symptom alone (the rejoin loading the lane's arguments, or run.sh re-prepping on a mismatch), so a control with one switch off would still pass the next-row read: give each half its own switch and its own lap. The rejoin half: pf_boot_rejoin's insmod (tests/mpath/lib.sh:519) takes mxfs_rig_modargs only, while prep_node.sh loads $MODARGS ${MXFS_EXTRA_MODARGS} and the retire_contract argument (tests/setup/prep_node.sh:242, :248); its lap reads the victim's /sys/module/mxfs/parameters inside the same row, right after the rejoin. The marker half: a lap that reloads mxfs on one node of a formed pair with other arguments, then runs a row and requires the row to re-prep (run.sh marker_matches compares only the arguments requested at prep, run.sh:299-302). ===== 2026-10-23: the marker half (run.sh marker_matches/marker_live_ok, run.sh:286-303, reading no node's loaded parameters) is split out as D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS, because rows other than the rejoin still leave parameters changed (path_fenced_return.sh:65-69, crash_consistency.sh:41, :58); this record is the rejoin half alone, measured by control b20261023-c6d354 and verification b20261023-abfebf. ===== ===== 2026-10-23: removal P20261023-7bd24f REJECTED (data/reviews/P20261023-7bd24f.md): besides the open fix-on batch, tests/rejoin_modargs_lap.sh only records the argv a node's shell would receive (no VM, no module load), every lap ran MXFS_CONFIG=8/net/mesh/mpath (the TCP branch, lib.sh:521 ft=1) while both observed runs were CAW (8/ and 16/disk/caw/mpath), the modprobe branch and the contract-argument quoting were not graded, and the ledger rows were filed at 2/net/mesh/direct. Next: a rig lap at 8/disk/caw/mpath that kills and rejoins the victim through pf_boot_rejoin and reads /sys/module/mxfs/parameters/dead_timeout_ms (and every prep argument) on the victim and a survivor after the rejoin, its rows at the configuration it ran; its PF_REJOIN_PREP_ARGS=0 control, a verification sized from it, then the removal, the claim narrowed to the branches run.",
+      "next": "Make the rejoin load the module with the lane's arguments as prep does (MXFS_EXTRA_MODARGS appended to mxfs_rig_modargs in tests/mpath/lib.sh, and wherever else a row reloads mxfs on a node it restarted), and make run.sh's marker match also compare each node's loaded parameters with the ones requested, so a mismatch re-preps instead of skipping; a lap that kills a victim in one row and reads every node's /sys/module/mxfs/parameters/dead_timeout_ms in the next; control with the fix's switch off, verification sized from it, remove --fixed. ===== ===== 2026-10-23: tests/mpath/lib.sh is sourced by every row of the running lanes g4_mpathtmo2_k6 and g2e_mpathtmo2_k6, so the edit waits until both have ended (an edit mid-lane changes what the rest of the lane measures). The two halves each cure the symptom alone (the rejoin loading the lane's arguments, or run.sh re-prepping on a mismatch), so a control with one switch off would still pass the next-row read: give each half its own switch and its own lap. The rejoin half: pf_boot_rejoin's insmod (tests/mpath/lib.sh:519) takes mxfs_rig_modargs only, while prep_node.sh loads $MODARGS ${MXFS_EXTRA_MODARGS} and the retire_contract argument (tests/setup/prep_node.sh:242, :248); its lap reads the victim's /sys/module/mxfs/parameters inside the same row, right after the rejoin. The marker half: a lap that reloads mxfs on one node of a formed pair with other arguments, then runs a row and requires the row to re-prep (run.sh marker_matches compares only the arguments requested at prep, run.sh:299-302). ===== 2026-10-23: the marker half (run.sh marker_matches/marker_live_ok, run.sh:286-303, reading no node's loaded parameters) is split out as D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS, because rows other than the rejoin still leave parameters changed (path_fenced_return.sh:65-69, crash_consistency.sh:41, :58); this record is the rejoin half alone, measured by control b20261023-c6d354 and verification b20261023-abfebf. ===== ===== 2026-10-23: removal P20261023-7bd24f REJECTED (data/reviews/P20261023-7bd24f.md): besides the open fix-on batch, tests/rejoin_modargs_lap.sh only records the argv a node's shell would receive (no VM, no module load), every lap ran MXFS_CONFIG=8/net/mesh/mpath (the TCP branch, lib.sh:521 ft=1) while both observed runs were CAW (8/ and 16/disk/caw/mpath), the modprobe branch and the contract-argument quoting were not graded, and the ledger rows were filed at 2/net/mesh/direct. Next: a rig lap at 8/disk/caw/mpath that kills and rejoins the victim through pf_boot_rejoin and reads /sys/module/mxfs/parameters/dead_timeout_ms (and every prep argument) on the victim and a survivor after the rejoin, its rows at the configuration it ran; its PF_REJOIN_PREP_ARGS=0 control, a verification sized from it, then the removal, the claim narrowed to the branches run. ===== 2026-10-24: verify P20261024-d7c365 (b20261024-565ac2, 6 of 6 exposed PASS) was APPROVED (data/reviews/P20261024-d7c365.md, after P20261024-52e185 was rejected for overclaiming) but cannot be applied: every lap ran on a pair prepped with MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, so each run carries variant 'marker_modargs=dead_timeout_ms=12000' and tools/defects.py unplanned_variant counts none of them toward a verification (the refusal mislabels them unexposed: D-VERIFY-REFUSAL-NAMES-VARIANT-LAPS-AS-UNEXPOSED). The control also failed on prep's own log_repeat_limit (1 against the survivors' 0), so the lap can expose without any extra argument. Draft for the next attempt: tests/evidence/drafts/tree/tests/mpath/rejoin_modargs_rig_lap.sh needs no MXFS_EXTRA_MODARGS and is EXPOSED when the survivor reads prep's log_repeat_limit=0 back (and any extra arguments the lane loads). Next attempt: control (PF_REJOIN_PREP_ARGS=0) and verification at 8/disk/caw/mpath with no MXFS_EXTRA_MODARGS, then remove --fixed claiming only what the review allows (not the contract quoting, the modprobe branch, the TCP branch on the rig, nor a lane running mixed windows); the approved variant batch stays as supporting evidence for the extra-argument half.",
       "updated": "2026-10-24",
       "batches": [
         {
@@ -8563,6 +8646,17 @@
       "evidence": "Lane tests/evidence/lanes/g8b_a17b_20261024T111854Z (attempt 2026-10-24T10:25:09Z), the follow-up of control b20261024-1d2fde (D-SURVIVOR-DECLARES-A-PEER-DEAD-ON-ITS-OWN-WINDOW-INSIDE-THE-PEERS-LONGER-LEASE, lap:peer_window at 8/disk/caw/mpath, 9 FAIL and 1 INCOMPLETE settled by the approved infra-proven proposal) step2.log: 'defects: batch b20261024-1d2fde planned 10 laps and has 9; run the rest first' and 'control b20261024-1d2fde: 9 of 10 laps failed with the fix out (0 run by this call)'; step3 plan-verify then refused 'has no measured rate'. Control b20261024-bda0e1 (D-LIVE-HOLDER-WAIT-..., lap:lh_master at 2/net/mesh/direct, 9 FAIL and 1 settled) is in the same state, and b20261024-bd6103 (no-inode control at 2/disk/caw/direct, 1 INCOMPLETE) will be once its lap is settled. Host precheck of the drafted fix with tests/evidence/drafts/tree/tests/measure_settled_lap.py (scratch copies of tools and data, nothing written live): fix in, both batches closed 'failed 9 of 9 exposed laps ... a verification batch needs 7 clean laps', LAP measure_settled PASS, 1.04 s; MXFS_MEASURE_COUNT_SETTLED=0, both refused 'planned 10 laps and has 9 (0 settled)', LAP measure_settled FAIL, 1.02 s.",
       "next": "Fix drafted for the next attempt in tests/evidence/drafts/tree/tools/defects.py: cmd_measure counts each settled INCOMPLETE or INFRA lap toward the plan (the rate stays over the PASS and FAIL laps); MXFS_MEASURE_COUNT_SETTLED=0 counts only PASS and FAIL as before (the control). Lap tests/evidence/drafts/tree/tests/measure_settled_lap.py (to tests/ with the fix). On the next attempt, before b20261024-1d2fde and b20261024-bda0e1 are measured live: a control (MXFS_MEASURE_COUNT_SETTLED=0) and a verification of lap:measure_settled through tools/harness_batch.py, then measure both controls and plan their verifications, then remove --fixed. tools/harness_batch.py's resume count (args.runs = planned - every recorded lap) agrees with check_batch_lap and needs no change.",
       "reproducer": "tests/evidence/drafts/tree/tests/measure_settled_lap.py: defects.py measure on every open calibration or control batch at its full plan with a settled lap, in a scratch tree"
+    },
+    {
+      "id": "D-VERIFY-REFUSAL-NAMES-VARIANT-LAPS-AS-UNEXPOSED",
+      "severity": "minor",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "tools/defects.py cmd_verify counts a PASS only when it is exposed and not an unplanned variant, but its refusal reports every PASS it did not count as 'PASS without exposure' (:1348-1354), so a batch whose laps were all exposed but ran as a variant reads as a probe problem",
+      "evidence": "2026-10-24: 'tools/defects.py verify D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS --batch b20261024-565ac2 --approval P20261024-d7c365' refused 'has 0 exposed PASS lap(s) of the 6 planned (6 PASS without exposure do not count)', while every ledger row of the batch reads measured 'rc=0 elapsed_s=.. exposure=1' and carries variant 'marker_modargs=dead_timeout_ms=12000' (data/criteria.runs.jsonl, the six rows of b20261024-565ac2); unplanned_variant (:979-996) was what dropped them. Draft in tests/evidence/drafts/tree/tools/defects.py names the two reasons apart; run on a scratch copy of tools and data it printed '(0 PASS without exposure and 6 run as an unplanned variant (marker_modargs=dead_timeout_ms=12000) do not count)'.",
+      "next": "Lands with the next attempt's tools/defects.py. Verify: the scratch-copy run above on the frozen candidate's tools (the refusal names the variant), a control with the message as before (the draft's diff reverted in a scratch copy: 'without exposure'), then remove --fixed.",
+      "reproducer": "tools/defects.py verify on a verification batch whose PASS laps are exposed but carry a variant (b20261024-565ac2), in a scratch copy of tools and data"
     }
   ]
 }
