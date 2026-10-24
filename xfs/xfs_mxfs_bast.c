@@ -7589,6 +7589,26 @@ incore:
 			ip->i_dlm_ex_holders, ip->i_dlm_pr_holders,
 			ip->i_dlm_pin_count,
 			(unsigned long long)ktime_get_real_ns());
+		/*
+		 * D-16CAWMPATH-FENCED-RETURN-SURVIVORS-WEDGE-ON-CAW-INODE-GRANTS-474S:
+		 * a peer's BAST deferred because this directory's grant has
+		 * been ACQUIRING for 30 s means the acquirer is parked past
+		 * the grant wait, where every wait left prints nothing.  Its
+		 * stack names the wait; a few per boot.
+		 */
+		if (ip->i_dlm_state == MXFS_DLM_ISTATE_ACQUIRING &&
+		    ip->i_dlm_acq_pid && ip->i_dlm_acq_set_ns &&
+		    ktime_get_ns() - ip->i_dlm_acq_set_ns >= 30000000000ULL) {
+			static atomic_t acq_stacks = ATOMIC_INIT(0);
+
+			if (atomic_inc_return(&acq_stacks) <= 4) {
+				pr_warn("mxfs: P-ACQ-WINDOW-STACK ino=%llu acq_pid=%d acq_comm=%s acq_age_ms=%llu site=dirbast -- stack of the task holding the grant in ACQUIRING follows (none: it has exited)\n",
+					(unsigned long long)ino,
+					ip->i_dlm_acq_pid, ip->i_dlm_acq_comm,
+					(ktime_get_ns() - ip->i_dlm_acq_set_ns) / 1000000ULL);
+				mxfs_pal_dump_task_stack(ip->i_dlm_acq_pid);
+			}
+		}
 	}
 
 	/* instrumented (run45 120s wedge): capped, unratelimited

@@ -1538,6 +1538,16 @@ module_param_named(cluster_passenger_skip, mxfs_cluster_passenger_skip, int, 064
  */
 int mxfs_recov_slots_own = 1;
 module_param_named(recov_slots_own, mxfs_recov_slots_own, int, 0644);
+/*
+ * D-F4-REGISTRY-MISSES-BMBT-FUA-WRITES-REPORTS-THEM-COMMITTED-NEVER-SUBMITTED:
+ * a bmbt buffer's FUA write snapshots the committed generation it covers, as
+ * a bio's submit does, so its successful completion retires the buffer's F4
+ * record.  0 = the behaviour before, for a same-build control: the FUA arm
+ * completes without ever reaching xfs_buf_submit_bio's snapshot, and every
+ * FUA-written bmbt buffer is counted committed-never-submitted.
+ */
+int mxfs_f4_fua_submit = 1;
+module_param_named(f4_fua_submit, mxfs_f4_fua_submit, int, 0644);
 static atomic64_t mxfs_recov_slots_written;	/* cluster writes that carried recovery-owned slots */
 static atomic64_t mxfs_recov_slot_refreshed;	/* slots given a platter baseline before their first recovery patch */
 static atomic64_t mxfs_recov_slot_incore;	/* slots left on this node's own bytes (inode in core) */
@@ -14116,6 +14126,12 @@ xfs_buf_submit_ex(
 			return;
 		}
 
+		/* F4: the write covers the committed gen, as a bio does (its
+		 * snapshot is in xfs_buf_submit_bio, which a FUA write that
+		 * succeeds never reaches).  Calling it again on the fallback
+		 * bio below takes the same snapshot. */
+		if (mxfs_f4_fua_submit)
+			mxfs_f4_submit(bp);
 		bmbt_fuawr = mxfs_buf_write_fua(bp);
 
 		{

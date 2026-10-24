@@ -2722,6 +2722,29 @@ static int mxfs_ilock_wait_for_transition(struct xfs_inode *ip, uint8_t mode,
 						(ktime_get_ns() - ip->i_dlm_acq_set_ns) / 1000000ULL : 0,
 					current->pid,
 					current->comm);
+			/*
+			 * D-16CAWMPATH-FENCED-RETURN-SURVIVORS-WEDGE-ON-CAW-INODE-GRANTS-474S:
+			 * a grant held in ACQUIRING by another task for 30 s
+			 * is parked past the grant wait, where every wait
+			 * left prints nothing.  Its stack names the wait; a
+			 * few per boot.
+			 */
+			if ((p73_waits % 10) == 0 &&
+			    ip->i_dlm_state == MXFS_DLM_ISTATE_ACQUIRING &&
+			    ip->i_dlm_acq_pid &&
+			    ip->i_dlm_acq_pid != current->pid) {
+				static atomic_t acq_stacks = ATOMIC_INIT(0);
+
+				if (atomic_inc_return(&acq_stacks) <= 4) {
+					pr_warn("mxfs: P-ACQ-WINDOW-STACK ino=%llu acq_pid=%d acq_comm=%s acq_age_ms=%llu site=waitstall -- stack of the task holding the grant in ACQUIRING follows (none: it has exited)\n",
+						(unsigned long long)ip->i_ino,
+						ip->i_dlm_acq_pid,
+						ip->i_dlm_acq_comm,
+						ip->i_dlm_acq_set_ns ?
+							(ktime_get_ns() - ip->i_dlm_acq_set_ns) / 1000000ULL : 0);
+					mxfs_pal_dump_task_stack(ip->i_dlm_acq_pid);
+				}
+			}
 			/* Replay the claim ring oldest-first.  The CLEAR
 			 * between the SET this waiter was relying on and its
 			 * own WAIT entry is the culprit, named by source
