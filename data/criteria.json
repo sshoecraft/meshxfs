@@ -722,17 +722,27 @@
         },
         "2/disk/caw/direct": {
           "status": "PASS",
-          "measured": "elapsed=45s (fresh prep)",
+          "measured": "elapsed=39s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-24T13:19:08Z",
+          "iso": "2026-10-24T16:02:16Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 45,
-          "build": "8DBA16AEB7FDD3066C9C1BC",
+          "elapsed_s": 39,
+          "build": "A27A67A3E501890BE9985E0",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T131807Z-g2b",
+          "run_id": "20261024T160116Z-g2b",
           "candidate": "0.90.134",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T13:19:08Z",
+              "measured": "elapsed=45s (fresh prep)",
+              "reason": "",
+              "build": "8DBA16AEB7FDD3066C9C1BC",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T131807Z-g2b"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T13:17:45Z",
@@ -822,16 +832,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T130603Z-g2b"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T13:05:41Z",
-              "measured": "elapsed=32s (fresh prep)",
-              "reason": "",
-              "build": "8DBA16AEB7FDD3066C9C1BC",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T130447Z-g2b"
             }
           ]
         },
@@ -1123,17 +1123,37 @@
         },
         "2/net/mesh/direct": {
           "status": "PASS",
-          "measured": "elapsed=35s (fresh prep)",
+          "measured": "elapsed=42s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-24T15:59:38Z",
+          "iso": "2026-10-24T16:03:33Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 35,
+          "elapsed_s": 42,
           "build": "A27A67A3E501890BE9985E0",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T155849Z-g2",
+          "run_id": "20261024T160222Z-g2",
           "candidate": "0.90.134",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T16:01:25Z",
+              "measured": "elapsed=35s (fresh prep)",
+              "reason": "",
+              "build": "A27A67A3E501890BE9985E0",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T160035Z-g2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T15:59:38Z",
+              "measured": "elapsed=35s (fresh prep)",
+              "reason": "",
+              "build": "A27A67A3E501890BE9985E0",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T155849Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T15:56:23Z",
@@ -1213,42 +1233,42 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T154158Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T15:38:06Z",
-              "measured": "elapsed=43s (fresh prep)",
-              "reason": "",
-              "build": "A27A67A3E501890BE9985E0",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T153708Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T15:34:06Z",
-              "measured": "elapsed=55s (fresh prep)",
-              "reason": "",
-              "build": "A27A67A3E501890BE9985E0",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T153257Z-g2"
             }
           ]
         },
         "4/net/mesh/direct": {
           "status": "PASS",
-          "measured": "elapsed=42s (fresh prep)",
+          "measured": "elapsed=41s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-24T15:59:01Z",
+          "iso": "2026-10-24T16:03:45Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 42,
+          "elapsed_s": 41,
           "build": "A27A67A3E501890BE9985E0",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T155754Z-g4",
+          "run_id": "20261024T160240Z-g4",
           "candidate": "0.90.134",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T16:01:22Z",
+              "measured": "elapsed=43s (fresh prep)",
+              "reason": "",
+              "build": "A27A67A3E501890BE9985E0",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T160019Z-g4"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T15:59:01Z",
+              "measured": "elapsed=42s (fresh prep)",
+              "reason": "",
+              "build": "A27A67A3E501890BE9985E0",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T155754Z-g4"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T15:56:34Z",
@@ -1333,28 +1353,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T153914Z-g4",
-              "variant": "MXFS_EXTRA_MODARGS=probe_a_replay_apart=0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T15:37:58Z",
-              "measured": "elapsed=39s (fresh prep)",
-              "reason": "",
-              "build": "A27A67A3E501890BE9985E0",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T153701Z-g4",
-              "variant": "MXFS_EXTRA_MODARGS=probe_a_replay_apart=0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T15:35:44Z",
-              "measured": "elapsed=40s (fresh prep)",
-              "reason": "",
-              "build": "A27A67A3E501890BE9985E0",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T153444Z-g4",
               "variant": "MXFS_EXTRA_MODARGS=probe_a_replay_apart=0"
             }
           ]
