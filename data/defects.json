@@ -2833,7 +2833,7 @@
           "iso": "2026-10-24T02:50:10Z"
         }
       ],
-      "updated": "2026-10-23",
+      "updated": "2026-10-24",
       "batches": [
         {
           "id": "b20261022-172c3f",
@@ -2934,6 +2934,23 @@
           },
           "transfer": "",
           "lower_bound": 0.45571294310031313
+        },
+        {
+          "id": "b20261024-424818",
+          "kind": "control",
+          "row": "lap:jdt_gate_fault",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "INFO A.s lone remount: A_MOUNT_RC=0 ",
+          "candidate": "",
+          "build": "468F7F30C2E190B0244AF70",
+          "variant": "GATE_ENTRY_ENV=NFILES=4000 (the gate's join_during_takeover entry at the 4000 files it ran with before the fix, through tests/capture_fault_gate.sh --only)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: at 4000 files the takeover pass ends inside the lap's first in-flight sample and the entry aborts"
         }
       ],
       "rates": [
@@ -7871,7 +7888,7 @@
       "config": "*/*/*",
       "opened": "2026-10-23",
       "summary": "On 8/disk/caw/mpath path_fenced_return (SCST .7, dead_timeout_ms=12000, MXFS_MPATH_TMO=2, build 9C7B7B00C5DE523F1D378C8), while the survivors fenced the frozen victim test14, the live survivor test7 shut its filesystem down: its no-inode lock release found the AIL minimum frozen at an extent-free intent whose EFD waited on an AG lock and shut down rather than release the lock un-durable; the peers fenced test7, refused its slice replay (INTENTS-UNDISCHARGED) and quarantined its domain, so test10's lookups in it failed EIO; test7 stalled 133.9 s with 3685732 errors, the other survivors 65-105 s",
-      "evidence": "Run 8/disk/caw/mpath:path_fenced_return:2026-10-24T02:00:35Z FAIL (variant), tests/evidence/board_20261024T015620Z-g8_path_fenced_return (lane g8_mpathtmo2_scst7_20261024T015358Z step 4). row.log:36 'test14 frozen at 01:57:55 with its path a down', :51 'fence: test7 STALL max_ms=133925 ... errors_in_window=3685732', :55-75 test8-13 STALL 65056-104532 ms, :66 test10 errors 10, :41-49 after_thaw 12 of 14 registrations (test7's 0xf5a759c4d606f904 gone). kmsg_test7_fromnode.gz: '[235.674367] P-AILMIN ino=356515841 EFI lsn=0x100000051 nextents=1 ag0=1 ... EFD pending on that AG's lock', '[235.762345] P-NOINO-DRAIN-STUCK ino=29360259 try=8 -- AIL min frozen at 0x100000051 across 8 bounded pushes', '[235.762356] P-NOINO-RELFENCE-WEDGE ino=29360259 -- shutdown (un-durable no-inode lock NOT released)', '[235.762389] Metadata I/O Error (0x1) detected at mxfs_dlm_noino_bast_work_fn+0x758/0x8a0 (xfs/xfs_mxfs_noino.c:1225). Shutting down filesystem.', earlier '[229.421756] foreign replay slot=7: NOT replayed -- no proven exclusion of the dead node (-1)', '[230.474281] P236-CLAIM-UNCERTIFIED slot=7 ... fence-time manifest is not sealed yet'. kmsg_test10: '[252.397566] P-PR-FENCE preempt-and-aborted dead node 1376322691 (key 0xf5a759c4d606f904)', '[266.695341] P241-RECOV-TERMINAL slot=0 ... slice replay REFUSED ... quarantined cluster-wide', '[293.636473] ... (INTENTS-UNDISCHARGED, rc=-117 ...)', 11x P240-QUAR-NSOP-REFUSE op=lookup rc=-5 (330-361 s). ===== 2026-10-24 (session c74395b6), the same capture, kmsg_test7_fromnode.gz read in order: the frozen EFI's AG 1 was NOT being waited on when the fence froze. At 215.576352 'P271-AGWANT want ag=1 relsafe=1 comm=python3 -- requeueing to post-roll seam', 215.576590 'P271-AGWAIT-SEAM ag=1 inodes=2 comm=python3', 215.580620 'P1-AGWAIT ag=1 comm=python3 pid=7412 trans_dirty=0', and the acquire ended 113 ms later: 215.693823 'P138-ACQ type=3 ino=0 ag=1 mode=5 elapsed_ms=68 rc=0'. During the seam pid 7412 handed dir ino 132 to slot 4 (215.616855 'P6H-HANDOFF ino=132 to_slot=4'); 215.969039 'P297-TKT ino=132 mode=5 el_ms=256 wake=1' is the last line naming ino 132's EX coming back. The no-inode BAST for ino 29360259 arrived at 215.933500 and its fence ran 215.9-235.8 s; both P-AILMIN dumps (222.545529, 235.674367) read the EFI at lsn 0x100000051 ag0=1 with agwait_inflight=0, so mxfs_noino_freeze_is_convoy (xfs/xfs_mxfs_noino.c:771, EFI branch :823-840: AG waits only) charged every try, convoy_stalls=0. No line names pid 7412 after 215.97 s, and the capture holds no stack (zcat | grep -c 'Call Trace' = 0). The EFI log item records no owner, so nothing in the module can say where the chain that must commit its EFD was blocked. ===== 2026-10-24, lane tests/evidence/lanes/g8_a15_efi_wedge_20261024T051904Z (same module B947A20F3C2FE3A67ABF6F3, same variant: dead_timeout_ms=12000, MXFS_MPATH_TMO=2, PF_KEEP_KMSG=1, SCST .7, g8 test7-test14), steps 6-15: 8/disk/caw/mpath path_fenced_return PASS 10 of 10, runs 20261024T054343Z-g8, 054724Z, 055113Z, 055506Z, 055846Z, 060228Z, 060613Z, 060957Z, 061343Z, 061729Z (other_stall_ms 17791-21536, max_stall_ms 19760-23904, survivors' errors_in_window=0). The survivors' 70 kernel logs (board_<run>_path_fenced_return/kmsg_test{7..13}_fromnode.gz) hold no P-AILMIN, P-NOINO-DRAIN-STUCK, P-NOINO-RELFENCE-WEDGE or 'Shutting down' line (zcat | grep -cE, 0 in each, re-counted by hand); the mark PF-MARK-path_fenced_return-20261024T061729Z is in test7's log, so the capture covers the row. So on this module the variant has passed 13 of 13 without reaching the trigger; with the 02:00:35Z failure on build 9C7B7B00C5DE523F1D378C8, 1 failure in 14 runs. This disposes of nothing: not reproduced is not disproved. ===== 2026-10-24, H-FENCE reproduced on the candidate's module (BE3695D2590A65F742F9816) at 2/disk/caw/direct, with no peer death: the diagnostic lap tests/evidence/drafts/noino_fence_efd_hold_lap.sh (lane tests/evidence/lanes/g2c_w12c_20261024T083433Z) runs tests/mpath/pathload.py on test29 (S) and test30 (R), and S holds one EFD transaction 30 s with dbg_efd_hold_ms while removing a 4 MiB file. Lap nfe30e (tests/evidence/20261024T083447Z_noinoefd_nfe30e/test29_kmsg.txt): 'P-EFD-HOLD start=1310729 len=1024 hold_ms=30000 comm=rm'; a peer's churn needed a no-inode release of ino 8394778 and the fence found the AIL minimum at the removed file's own inode item, whose ILOCK the held chain keeps: 'P-AILMIN ino=8394778 INODE lsn=0x1000013dc tgt_ino=8388737 ... nlink=0 mode=0100644', 'P-NOINO-DRAIN-RETRY ino=8394778 try=4 min=0x1000013dc stall=4 convoy=0', 'P-NOINO-DRAIN-STUCK ino=8394778 try=8 -- AIL min frozen at 0x1000013dc across 8 bounded pushes (post-listdrain) convoy_stalls=0', 'P-NOINO-RELFENCE-WEDGE ino=8394778 -- shutdown', '[99.265909] ... Metadata I/O Error (0x1) detected at mxfs_dlm_noino_bast_work_fn+0x758/0x8a0 (xfs/xfs_mxfs_noino.c:1239). Shutting down filesystem.', 'P-EFD-HOLD end slept_ms=22950 shutdown=1'; S's load then failed 1711050 operations and R's longest operation was 30909 ms. Laps nfe30f and nfe10c met no no-inode release inside the hold (VACUOUS); exposure is one 30 s lap in two. Earlier lanes g2c_w12 and g2c_w12b were VACUOUS 6 of 6: stats of S's evicted files on R draw PR BASTs that S serves without a no-inode fence. ===== 2026-10-24, attempt 17: control b20261024-bd6103 (2/disk/caw/direct, noino_convoy_chain=0, 16 laps, lane tests/evidence/lanes/g2c_a17_20261024T103040Z) cannot be measured as it stands. Lap 13 (11:01:28Z) reproduced the defect in full (P-NOINO-RELFENCE-WEDGE, then test29 'Shutting down filesystem'), but the lap ABORTed on an empty field after S's shutdown and was recorded INCOMPLETE. That is a defect of the lap, D-NOINO-LAP-ABORTS-ON-AN-EMPTY-FIELD-WHEN-S-SHUTS-DOWN, and it cannot be settled as the rig's or the detector's: the cluster did the wrong thing there. Through lap 15: 5 FAIL, 9 PASS (most of them VACUOUS, stage=no-fence), 1 INCOMPLETE. Next: with the lap's fix in the tree (next attempt), a fresh control at 2/disk/caw/direct, then the verification sized from it. The 2/net/mesh/direct control in lane g2b_a17 runs the same lap and can lose a lap the same way.",
+      "evidence": "Run 8/disk/caw/mpath:path_fenced_return:2026-10-24T02:00:35Z FAIL (variant), tests/evidence/board_20261024T015620Z-g8_path_fenced_return (lane g8_mpathtmo2_scst7_20261024T015358Z step 4). row.log:36 'test14 frozen at 01:57:55 with its path a down', :51 'fence: test7 STALL max_ms=133925 ... errors_in_window=3685732', :55-75 test8-13 STALL 65056-104532 ms, :66 test10 errors 10, :41-49 after_thaw 12 of 14 registrations (test7's 0xf5a759c4d606f904 gone). kmsg_test7_fromnode.gz: '[235.674367] P-AILMIN ino=356515841 EFI lsn=0x100000051 nextents=1 ag0=1 ... EFD pending on that AG's lock', '[235.762345] P-NOINO-DRAIN-STUCK ino=29360259 try=8 -- AIL min frozen at 0x100000051 across 8 bounded pushes', '[235.762356] P-NOINO-RELFENCE-WEDGE ino=29360259 -- shutdown (un-durable no-inode lock NOT released)', '[235.762389] Metadata I/O Error (0x1) detected at mxfs_dlm_noino_bast_work_fn+0x758/0x8a0 (xfs/xfs_mxfs_noino.c:1225). Shutting down filesystem.', earlier '[229.421756] foreign replay slot=7: NOT replayed -- no proven exclusion of the dead node (-1)', '[230.474281] P236-CLAIM-UNCERTIFIED slot=7 ... fence-time manifest is not sealed yet'. kmsg_test10: '[252.397566] P-PR-FENCE preempt-and-aborted dead node 1376322691 (key 0xf5a759c4d606f904)', '[266.695341] P241-RECOV-TERMINAL slot=0 ... slice replay REFUSED ... quarantined cluster-wide', '[293.636473] ... (INTENTS-UNDISCHARGED, rc=-117 ...)', 11x P240-QUAR-NSOP-REFUSE op=lookup rc=-5 (330-361 s). ===== 2026-10-24 (session c74395b6), the same capture, kmsg_test7_fromnode.gz read in order: the frozen EFI's AG 1 was NOT being waited on when the fence froze. At 215.576352 'P271-AGWANT want ag=1 relsafe=1 comm=python3 -- requeueing to post-roll seam', 215.576590 'P271-AGWAIT-SEAM ag=1 inodes=2 comm=python3', 215.580620 'P1-AGWAIT ag=1 comm=python3 pid=7412 trans_dirty=0', and the acquire ended 113 ms later: 215.693823 'P138-ACQ type=3 ino=0 ag=1 mode=5 elapsed_ms=68 rc=0'. During the seam pid 7412 handed dir ino 132 to slot 4 (215.616855 'P6H-HANDOFF ino=132 to_slot=4'); 215.969039 'P297-TKT ino=132 mode=5 el_ms=256 wake=1' is the last line naming ino 132's EX coming back. The no-inode BAST for ino 29360259 arrived at 215.933500 and its fence ran 215.9-235.8 s; both P-AILMIN dumps (222.545529, 235.674367) read the EFI at lsn 0x100000051 ag0=1 with agwait_inflight=0, so mxfs_noino_freeze_is_convoy (xfs/xfs_mxfs_noino.c:771, EFI branch :823-840: AG waits only) charged every try, convoy_stalls=0. No line names pid 7412 after 215.97 s, and the capture holds no stack (zcat | grep -c 'Call Trace' = 0). The EFI log item records no owner, so nothing in the module can say where the chain that must commit its EFD was blocked. ===== 2026-10-24, lane tests/evidence/lanes/g8_a15_efi_wedge_20261024T051904Z (same module B947A20F3C2FE3A67ABF6F3, same variant: dead_timeout_ms=12000, MXFS_MPATH_TMO=2, PF_KEEP_KMSG=1, SCST .7, g8 test7-test14), steps 6-15: 8/disk/caw/mpath path_fenced_return PASS 10 of 10, runs 20261024T054343Z-g8, 054724Z, 055113Z, 055506Z, 055846Z, 060228Z, 060613Z, 060957Z, 061343Z, 061729Z (other_stall_ms 17791-21536, max_stall_ms 19760-23904, survivors' errors_in_window=0). The survivors' 70 kernel logs (board_<run>_path_fenced_return/kmsg_test{7..13}_fromnode.gz) hold no P-AILMIN, P-NOINO-DRAIN-STUCK, P-NOINO-RELFENCE-WEDGE or 'Shutting down' line (zcat | grep -cE, 0 in each, re-counted by hand); the mark PF-MARK-path_fenced_return-20261024T061729Z is in test7's log, so the capture covers the row. So on this module the variant has passed 13 of 13 without reaching the trigger; with the 02:00:35Z failure on build 9C7B7B00C5DE523F1D378C8, 1 failure in 14 runs. This disposes of nothing: not reproduced is not disproved. ===== 2026-10-24, H-FENCE reproduced on the candidate's module (BE3695D2590A65F742F9816) at 2/disk/caw/direct, with no peer death: the diagnostic lap tests/evidence/drafts/noino_fence_efd_hold_lap.sh (lane tests/evidence/lanes/g2c_w12c_20261024T083433Z) runs tests/mpath/pathload.py on test29 (S) and test30 (R), and S holds one EFD transaction 30 s with dbg_efd_hold_ms while removing a 4 MiB file. Lap nfe30e (tests/evidence/20261024T083447Z_noinoefd_nfe30e/test29_kmsg.txt): 'P-EFD-HOLD start=1310729 len=1024 hold_ms=30000 comm=rm'; a peer's churn needed a no-inode release of ino 8394778 and the fence found the AIL minimum at the removed file's own inode item, whose ILOCK the held chain keeps: 'P-AILMIN ino=8394778 INODE lsn=0x1000013dc tgt_ino=8388737 ... nlink=0 mode=0100644', 'P-NOINO-DRAIN-RETRY ino=8394778 try=4 min=0x1000013dc stall=4 convoy=0', 'P-NOINO-DRAIN-STUCK ino=8394778 try=8 -- AIL min frozen at 0x1000013dc across 8 bounded pushes (post-listdrain) convoy_stalls=0', 'P-NOINO-RELFENCE-WEDGE ino=8394778 -- shutdown', '[99.265909] ... Metadata I/O Error (0x1) detected at mxfs_dlm_noino_bast_work_fn+0x758/0x8a0 (xfs/xfs_mxfs_noino.c:1239). Shutting down filesystem.', 'P-EFD-HOLD end slept_ms=22950 shutdown=1'; S's load then failed 1711050 operations and R's longest operation was 30909 ms. Laps nfe30f and nfe10c met no no-inode release inside the hold (VACUOUS); exposure is one 30 s lap in two. Earlier lanes g2c_w12 and g2c_w12b were VACUOUS 6 of 6: stats of S's evicted files on R draw PR BASTs that S serves without a no-inode fence. ===== 2026-10-24, attempt 17: control b20261024-bd6103 (2/disk/caw/direct, noino_convoy_chain=0, 16 laps, lane tests/evidence/lanes/g2c_a17_20261024T103040Z) cannot be measured as it stands. Lap 13 (11:01:28Z) reproduced the defect in full (P-NOINO-RELFENCE-WEDGE, then test29 'Shutting down filesystem'), but the lap ABORTed on an empty field after S's shutdown and was recorded INCOMPLETE. That is a defect of the lap, D-NOINO-LAP-ABORTS-ON-AN-EMPTY-FIELD-WHEN-S-SHUTS-DOWN, and it cannot be settled as the rig's or the detector's: the cluster did the wrong thing there. Through lap 15: 5 FAIL, 9 PASS (most of them VACUOUS, stage=no-fence), 1 INCOMPLETE. Next: with the lap's fix in the tree (next attempt), a fresh control at 2/disk/caw/direct, then the verification sized from it. The 2/net/mesh/direct control in lane g2b_a17 runs the same lap and can lose a lap the same way. ===== 2026-10-24: control b20261024-17b56e at 2/net/mesh/direct (lane tests/evidence/lanes/g2b_a17_20261024T110258Z) was stopped after 8 laps: the lap's kernel-log read was empty on both nodes in every lap (D-NOINO-LAP-READS-ITS-KERNEL-LOG-AFTER-THE-MARK-HAS-ROTATED-OUT-AND-GRADES-NOTHING), so its VACUOUS grades measured nothing. Lap 6 (run 2026-10-24T11:16:05Z, tests/evidence/20261024T111357Z_noinoefd_nic6) FAILed on R's 32378 ms operation with S's load at err=1596574, this record's S-shutdown signature in control b20261024-bd6103; its kernel log was not read, so the shutdown is inferred from the load, not seen. That control is to be re-run on the next attempt with the follow in. ===== Correction to the entry above: the kernel-log read defect is D-NOINO-LAP-READS-KERNEL-LOG-AFTER-THE-MARK-ROTATED-OUT-AND-GRADES-NOTHING (the longer id named there was refused as over 80 characters and never existed).",
       "next": "Read xfs/xfs_mxfs_noino.c near :1225 (the bounded AIL push and the wedge-to-shutdown decision) and the EFI's AG wait: which AG, held by whom, and whether it was the frozen victim test14's grant, which could not move until its fence certified and its slice replayed (refused at 229.42 s for want of a sealed fence manifest). Then why test7's replay was refused INTENTS-UNDISCHARGED. Reproduce at the default window and path settings to see whether the variant is needed. ===== Hypothesis H2 (unproven): after the P271 seam got AG 1, pid 7412 blocked re-locking its two inodes (xfs_lock_inodes / xfs_ilock in mxfs_trans_agwait_handoff, xfs/xfs_mxfs_ag_unlock.c:920-925): a cross-node inode grant queued behind the frozen victim test14, which no convoy check counts, so the fence charged 8 stalls (~20 s) inside the victim's 12 s death window plus fence and replay (dead declared 229.13 s, replay began 234.71 s) and shut the survivor down. Falsified if the chain owner's stack at the stall-2 dump is anywhere other than an inode DLM acquire. Instrument first: stamp each EFI with the pid that logged it (xfs_efi_init) and, at the stall-2 P-AILMIN dump, print that pid and its stack (mxfs_pal_dump_task_stack), capped; then reproduce 8/disk/caw/mpath path_fenced_return with MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 MXFS_MPATH_TMO=2. A patch to that effect was written this session in the sibling tree ~/src/mxfs-a17 (xfs/xfs_extfree_item.{c,h}, xfs/xfs_mxfs_noino.c) and built, never deployed; where it lands waits on the owner's decision about the sibling trees. ===== 2026-10-24: the EFI owner stamp (efi_mxfs_owner_pid set in xfs_efi_init, xfs/xfs_extfree_item.c:173; printed with a capped stack at the P-AILMIN dump, xfs/xfs_mxfs_noino.c:705-725) is in the main tree and in candidate 0.90.134's attempt frozen 2026-10-24T04:13:43Z (module B947A20F3C2FE3A67ABF6F3); the sibling-tree copy is not needed. On that module, 8/disk/caw/mpath path_fenced_return with the failing run's variant (dead_timeout_ms=12000, MXFS_MPATH_TMO=2, SCST .7, PF_KEEP_KMSG=1) on g8 (test7-test14) passed three times: runs 20261024T045437Z-g8, 20261024T045835Z-g8, 20261024T050228Z-g8 (PASS at 04:58:34Z, 05:02:27Z, 05:06:16Z; survivors' other_stall_ms 18814, 22569, 19433). In all three, no survivor's kmsg_<node>_fromnode.gz holds P-AILMIN, P-NOINO-DRAIN-STUCK, P-NOINO-RELFENCE-WEDGE or 'Shutting down' (count 0 on test7-test13); only the victim test14 shut down (1, 2, 3 lines), as the row intends. So the trigger was not reached in 3 of 3 laps, and this disposes of nothing: 1 failure in 4 runs of this variant so far. Next: more laps of the same row on the instrumented module until a survivor logs P-AILMIN with an owner pid and stack, then test H2 on that stack. ===== 2026-10-24: so the shutdown is the fence's own decision whatever holds the chain: any local transaction chain that keeps the AIL minimum (its intent, or an inode item whose ILOCK it holds) past MXFS_NOINO_STALL_TRIES (8 bounded pushes, ~20 s) shuts a live node down at the next no-inode release, and a chain waiting out a frozen peer's 12 s window plus fence and replay is such a chain. Fix (to land when this attempt ends; the tree is frozen): in mxfs_noino_freeze_is_convoy, a frozen minimum that is an intent log item still in the AIL, or an inode item whose inode's ILOCK is held (xfs_ilock_nowait fails), belongs to a local chain in flight and is a convoy, not charged; the MXFS_NOINO_MAX_TRIES (45) wall still bounds the fence; module parameter noino_convoy_chain (1; 0 = only AG waits excuse the freeze, as now) is the same-build control. Then the lap moves to tests/, a control (noino_convoy_chain=0) and verification at 2/disk/caw/direct and 2/net/mesh/direct, sized on exposed laps; the 8-node path_fenced_return the record was filed on as the field check.",
       "cells": [
         {
@@ -7908,6 +7925,11 @@
           "config": "2/disk/caw/direct",
           "row": "lap:noino_fence_efd_hold",
           "iso": "2026-10-24T10:35:46Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:noino_fence_efd_hold",
+          "iso": "2026-10-24T11:16:05Z"
         }
       ],
       "updated": "2026-10-24",
@@ -8350,11 +8372,113 @@
           "candidate": "",
           "build": "468F7F30C2E190B0244AF70",
           "variant": "CPL_KMSG_FOLLOW=0 (tests/create_pace_lap.sh reads each node's ring with dmesg | awk after the creates, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: the creates rotate the lap's mark out of the ring, and the fault check grades what is left"
+        },
+        {
+          "id": "b20261024-d8e843",
+          "kind": "verify",
+          "row": "lap:create_pace",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "468F7F30C2E190B0244AF70",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:create_pace",
+            "config": "2/disk/caw/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-5d82a5",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "CPL_KMSG_FOLLOW=0 (tests/create_pace_lap.sh reads each node's ring with dmesg | awk after the creates, as before the fix)",
+            "builds": [
+              "468F7F30C2E190B0244AF70"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:create_pace",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-5d82a5",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "CPL_KMSG_FOLLOW=0 (tests/create_pace_lap.sh reads each node's ring with dmesg | awk after the creates, as before the fix)",
+          "builds": [
+            "468F7F30C2E190B0244AF70"
+          ],
+          "date": "2026-10-24"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T11:22:02Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T11:19:50Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T11:17:24Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T11:15:01Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T11:12:41Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T11:10:20Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T11:07:51Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T11:05:17Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T11:02:07Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T10:59:40Z"
         }
       ]
     },
@@ -8416,6 +8540,17 @@
           "iso": "2026-10-24T11:01:28Z"
         }
       ]
+    },
+    {
+      "id": "D-NOINO-LAP-READS-KERNEL-LOG-AFTER-THE-MARK-ROTATED-OUT-AND-GRADES-NOTHING",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "tests/noino_fence_efd_hold_lap.sh reads each node's kernel log after the run from the ring (dmesg | sed -n '/MARK/,$p', :127-128) and decides exposure and the verdict from it; when the run's kernel lines have rotated the mark out of the ring the read is empty, and the lap grades 'stage=no-fence' VACUOUS (an unexposed PASS) on a read that held nothing, whatever S's fence did",
+      "evidence": "Control b20261024-17b56e (lap:noino_fence_efd_hold at 2/net/mesh/direct, test15/test16, noino_convoy_chain=0, candidate 0.90.134 attempt 2026-10-24T10:25:09Z, module 468F7F30C2E190B0244AF70; lane tests/evidence/lanes/g2b_a17_20261024T110258Z step2.log): in all 8 laps both nodes' <node>_kmsg.txt hold one line, 'KMSG_END' (tests/evidence/20261024T110315Z_noinoefd_nic1 .. 20261024T111810Z_noinoefd_nic8), and 7 laps ended 'RESULT: VACUOUS ... stage=no-fence'. Lap 6 (tests/evidence/20261024T111357Z_noinoefd_nic6, run 2/net/mesh/direct:lap:noino_fence_efd_hold:2026-10-24T11:16:05Z) shows S's load 'PATHLOAD node=test15 laps=517157 ok=6613 err=1596574' and R's MAXOP_MS=32378 (test16_load.txt), the shape of the laps where S shut down at 2/disk/caw/direct (control b20261024-bd6103: the five FAIL laps nic2, nic3, nic7, nic9, nic10 are exactly those with S err 1064400-1831453, every other lap err=0), yet it too was graded stage=no-fence, failing only on its stall. At 2/disk/caw/direct the same read held S's log in 13 of 15 laps (47715-96379 lines) but R's was one line in 8 (test30_kmsg.txt), so the network lock manager's heavier debug output rotates the ring within the run. The control batch was stopped after lap 8 (summary.log line 2026-10-24T11:21:05Z).",
+      "next": "Fix drafted for the next attempt in tests/evidence/drafts/tree/tests/noino_fence_efd_hold_lap.sh: each node's /dev/kmsg is followed into /root from before the marks to an end mark written after the run (stop_follow on any exit), and a read that does not hold both marks FAILs 'stage=kmsg' instead of grading the fence; NOINO_KMSG_FOLLOW=0 reads the ring afterwards as before under the same mark check (the control). Precheck in lane tests/evidence/lanes/g2e_a17nk_* at 2/net/mesh/direct4k (both arms twice). Then, on the next attempt: a control and a verification of the follow through tools/harness_batch.py at 2/net/mesh/direct, the no-inode control re-run there with the follow in, and remove --fixed.",
+      "reproducer": "tests/noino_fence_efd_hold_lap.sh at 2/net/mesh/direct (any lap: the ring read is empty on both nodes)"
     }
   ]
 }
