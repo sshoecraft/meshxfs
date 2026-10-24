@@ -9228,8 +9228,14 @@
         "tests/evidence/20261024T161001Z_fourkn_merge_2-disk-caw-direct4k/lap.log",
         "tests/fourkn_merge_2node.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-a96a97.md",
+        "sha256": "0925c06b26b4dc4096a8b1017e840971936f36b1107ffee368f87f9eae51e80c",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     },
     {
       "id": "P20261024-3650c2",
@@ -9251,8 +9257,15 @@
         "tests/evidence/20261024T161148Z_lhmaster_lhmc1910/prep_1.log",
         "tests/evidence/20261024T155719Z_lhmaster_lhmc195/prep_1.log"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-3650c2.md",
+        "sha256": "462d26c60e30eabf0916898f731dec319f2088c6279ddf66c8396707267cafff",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
