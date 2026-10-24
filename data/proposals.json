@@ -7189,6 +7189,27 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-0801cb",
+      "kind": "verify",
+      "record": "D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER",
+      "change": {
+        "batch": "b20261024-0bf8bc"
+      },
+      "argument": "Verification b20261024-0bf8bc of lap:adopted_grant_rig at 8/net/mesh/mpath (g8b, test21-test28) on candidate 0.90.134, attempt frozen 2026-10-24T06:38:23Z, module BE3695D2590A65F742F9816: the rig lap the earlier verify review (data/reviews/P20261023-867053.md) asked for, run on the candidate's module at the configuration it clears and graded from the nodes' own kernel logs, not the in-process tauth simulation. tests/adopted_grant_rig_lap.sh forces the record's sequence on one file R of a formed 8-node cluster (header :20-46): A's EX wait on R is gapped (dl_acq_gap_ino/dl_acq_gap_ms, GAP_MS=20000), the grant lands in the gap (P958-ACQ-GRANT-ADOPTED), D's clean unmount moves R's ledger page to A (P-TAUTH-PAGE-MINE via=frozen-msg), A's next attempt is answered by the already-granted shortcut (P958-ACQ-LOCAL-ANSWER-END site=shortcut); EXPOSED needs all three in A's kernel log for R and its page (:44). Control b20261024-65e307 on the same module with the fix's knob off (ARM=0: dl_shortcut_claim=0 on every node, the shortcut ends the wait unclaimed as before the fix; GAP_MS=20000 on both arms) failed 9 of 9 exposed laps, each 'LAP adopted_grant FAIL: 2 check(s) failed (double_grants=360 false_fresh=0 shutdowns=0)' (tests/evidence/lanes/g8b_w12b_20261024T081750Z/step1.log laps 2-10): A's master granted B's EX over A's while A's ledger refused it, the record's double grant. Its lap 1 (08:19:02Z, exposure 0) aborted in its own prep on 'lun_pool: pool lock not taken in 60 s' (tests/evidence/20261024T081753Z_adoptgrant_agc1/prep.log), is not in the rate, and is now named by D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT. Plan: rate 9/9, lower bound 0.5550, N = 7 at delta = alpha = 0.005 (tests/evidence/lanes/g8b_w12b_20261024T081750Z/step2.log header). The verification (ARM=1, the fix on; GAP_MS=20000; HOLD_A_MS=4000) passed 7 of 7 planned laps, each exposure=1 and 'LAP adopted_grant PASS: the shortcut took A's adopted grant of R; B's write waited for A's EX' (step2.log, 'verify b20261024-0bf8bc: 7 PASS, 0 FAIL of 7 planned'). Operation stalls: max_stall_ms 29448-29811 is A's write, which the lap holds on purpose with TEST ONLY waits on both arms: its first attempt queues 6 s (MXFS_LOCK_ACQUIRE_WAIT_MS) behind C's held EX, then the 20 s gap, then A's own 4 s hold of EX (HOLD_A_MS, lowered from 8000 for the verification because the precheck's fix-on lap measured 29807 ms with it, inside 1 s of the limit: queue file comment); B's write 5575-6979 ms; every value under stall_limit_s. The batch was declared before its first lap; no lap was dropped. The record's other cells at 8/net/mesh/mpath: the 30 in-process lap:adopted_grant_handoff control laps (ARM=0 simulation, this cause, accepted as such in data/reviews/P20261023-778a6d.md) and path_peer_withdrawn:2026-10-22T19:58:42Z, whose shutdown was this cause (test21's adoption through P-AGCACHED-PHANTOM ag=6, test21_kernlog_boot.gz:819003, per that review) and whose other failures are named by D-NETMESH-SHARED-DIR-LOCK-QUEUE-JAMS-60S-AFTER-PEER-WITHDRAWS, D-8NETMESH-REJOIN-MOUNT-AFTER-PEER-WITHDRAWN-ONE-PATH-TIMES-OUT-AT-60S and D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES-FOREVER-ON-RESERVATION-CONFLICT.",
+      "evidence": [
+        "tests/evidence/lanes/g8b_w12b_20261024T081750Z/step1.log",
+        "tests/evidence/lanes/g8b_w12b_20261024T081750Z/step2.log",
+        "tests/evidence/lanes/g8b_w12b_20261024T081750Z/queue",
+        "tests/adopted_grant_rig_lap.sh",
+        "tests/evidence/batch_laps/b20261024-0bf8bc",
+        "tests/evidence/batch_laps/b20261024-65e307",
+        "data/reviews/P20261023-778a6d.md",
+        "data/reviews/P20261023-867053.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
