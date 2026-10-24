@@ -42542,15 +42542,18 @@
           ]
         },
         "4/disk/caw/mpath": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261024T051916Z-g4",
-          "iso": "2026-10-24T05:19:42Z",
+          "status": "PASS",
+          "measured": "victim=test6 recovered_two_paths_s=10 recovered_one_path_s=7 reinstate_s=9 survivor_stall_two_ms=1745 survivor_stall_one_ms=568 acked=3209 elapsed=167s fails=0 max_stall_ms=1956",
+          "reason": " (evidence tests/evidence/board_20261024T051916Z-g4_path_peer_withdrawn)",
+          "iso": "2026-10-24T05:22:36Z",
           "recorded": "2026-10-24",
+          "elapsed_s": 172,
           "build": "B947A20F3C2FE3A67ABF6F3",
+          "outcome": "PASS",
+          "budget_s": 420,
+          "run_id": "20261024T051916Z-g4",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
-          "run_id": "20261024T051916Z-g4",
           "history": [
             {
               "status": "PASS",

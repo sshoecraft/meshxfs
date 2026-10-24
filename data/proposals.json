@@ -6951,8 +6951,15 @@
         "tools/lun_pool.sh",
         "tests/drbd_zombie_holder_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-9e6c22.md",
+        "sha256": "ff396a2232b2bde699e8f409de4510d9a59232421be87c6aaf4922fc78e626e1",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
