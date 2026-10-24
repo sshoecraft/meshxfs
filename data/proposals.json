@@ -10079,8 +10079,15 @@
         "tests/evidence/lanes/g2_a20b_20261024T181224Z/queue",
         "tests/jdt_gate_stall_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-bef1c8.md",
+        "sha256": "33e2a8b65727f6d689b8632f2020a2600ad7522a6a2b82aa27bcd0439d75d9d0",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-24107f",

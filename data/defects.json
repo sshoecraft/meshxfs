@@ -6672,7 +6672,7 @@
           "candidate": "0.90.134",
           "build": "1BC77CFB15EF4A988DD1F56",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -6957,6 +6957,18 @@
           "config": "2/net/mesh/direct",
           "row": "lap:jdt_gate_stall",
           "iso": "2026-10-24T18:58:03Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T16:34:18Z",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "batch": "b20261024-e405a1",
+          "approval": "P20261024-bef1c8",
+          "date": "2026-10-24"
         }
       ]
     },
