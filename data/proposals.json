@@ -7208,8 +7208,14 @@
         "data/reviews/P20261023-778a6d.md",
         "data/reviews/P20261023-867053.md"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-0801cb.md",
+        "sha256": "f2b74125241755e576e43e757ce72089b0ebc12341cea9995925d30e7dc447f9",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
