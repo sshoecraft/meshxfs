@@ -7539,8 +7539,14 @@
         "tests/evidence/board_20261024T082610Z-g4c_path_mount_degraded/row.log",
         "data/reviews/P20261024-3874e6.md"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-eae930.md",
+        "sha256": "0b0be6561e86ac069a67b8134902cfa76f85a39251ef55a32ef63d30a1143a46",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     },
     {
       "id": "P20261024-ae5be1",
@@ -7567,8 +7573,15 @@
         "data/reviews/P20261024-495cc8.md",
         "data/reviews/P20261023-fe0120.md"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-ae5be1.md",
+        "sha256": "fec6e8edd3c90c593536ad6863e5ac3a2425b5f49291c9053dc91e818acff2fd",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
