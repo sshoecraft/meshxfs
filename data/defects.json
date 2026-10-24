@@ -7016,6 +7016,39 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-b7bbc1",
+          "kind": "verify",
+          "row": "path_mount_degraded",
+          "config": "4/net/mesh/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "PF-LATE-B-DOWN",
+          "candidate": "0.90.134",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "path_mount_degraded",
+            "config": "4/net/mesh/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-db9c82",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "pr_fill_bounded=0 (MXFS_EXTRA_MODARGS: the late-path fill runs only with 15 s of the authority lease left, as before the fix)",
+            "builds": [
+              "BE3695D2590A65F742F9816"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -8168,7 +8201,7 @@
       "config": "*/*/*",
       "opened": "2026-10-23",
       "summary": "Verification b20261023-6ff87e of tests/fourkn_merge_2node.sh at 2/disk/caw/direct4k (test31/test32, build 79779BEAECBEA94844FDC72) failed on lap 104 of 298: test32's half of the 20-round merged-write workload did not finish inside the lap's 16 s client bound (WBOUND, tests/fourkn_merge_2node.sh:115), so its ssh was cut, its worker printed nothing (w2.txt 0 bytes, rc=1 from the output filter) and the lap failed 'test32's half ran to its end with no error got=0 want=1'. test31's worker took 15372 ms against a median of 7779 ms over 373 halves of this batch and its control (p99 11266 ms). In that lap every COMPARE AND WRITE of the inode lock took about twice as long as in a normal lap (CAW-ILOCK avg_us 2492-3711 against 1506-1835), while two other lanes drove the same SCST target. The data checks of the lap all passed (chk_mxfs clean, every file read its own writer's last mode on both nodes).",
-      "evidence": "Lap tests/evidence/20261024T000212Z_fourkn_merge_2-disk-caw-direct4k: lap.log:10 'workload wall 16018 ms; test31: rc=0 WORKER_DONE rounds=20 errors=0 wall_ms=15372 last_mode=644; test32: rc=1', :12 FAIL test32's half, :20 PASS chk_mxfs, :24-25 PASS every file reads its own writer's last mode on both nodes, :40 '=== fourkn_merge_2node: fails=1 miscompares=1 forced=landed'. Lane tests/evidence/lanes/g2d_a14_merge2node_20261023T204131Z step5.log 'lap 104/298: FAIL 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T00:03:51Z rc=1 elapsed_s=98 exposure=1', 'verify b20261023-6ff87e: 103 PASS, 1 FAIL of 298 planned'. Worker walls of every lap of the batch and its control (WORKER_DONE wall_ms in tests/evidence/2026102[34]T*_fourkn_merge_2-disk-caw-direct4k/w{1,2}.txt): n=373 min 6305 p50 7779 p90 8860 p99 11266 max 15372 (this lap); 3 halves over 12000 ms. CAW-ILOCK cumulative lines inside the workload window (kernel time anchored on each node's P-BARRIER-CLOCK admitted line and lap.log's mount times): slow lap test31 n=512/1024/1536/2048 avg_us 2492/3051/3470/3615, test32 2821/3095/3589/3711; the passing lap tests/evidence/20261023T235416Z_fourkn_merge_2-disk-caw-direct4k test31 1743/1586/1529/1506/1541, test32 1835/1595/1565/1550. In both laps' windows: 0 P-HB-SLOW, abort, timed out, RESERVATION, conflict, iscsi, connection, blk_update_request, stall, MISCOMPARE lines. The host's kernel log holds no line between 19:02:44 and 19:03:20 local (00:02:44-00:03:20Z). Concurrent on the same target: lane g2_lmu_caw_measure step 4 (00:00:17-00:06:17Z, tests/last_member_umount_lap.sh lmucaw3 at 2/disk/caw/direct, its 40000-create stage from 00:01:55Z), lane g2e_lmu_mpath step 3 (verify of D-LAST-MEMBER-UMOUNT at 2/net/mesh/mpath, from 23:57:36Z), and a 40000-create loop on test2's local root disk 00:02:46Z (tests/evidence/20261024T000246Z_caw_create_pace_probe). The lap's bound derivation (tests/fourkn_merge_2node.sh:65-73) estimates 2.6 s of workload, 2x that 6 s, plus 10 s of ssh connect, against 5.9-7.9 s measured. ===== 2026-10-24, the target's backing disk from outside MeshXFS (clyde's own sysstat, /var/log/sysstat/sa23, 1-minute samples, sadf -t local CDT): every pool LUN image (/home/steve/disks/pool -> /mxfs/disks/pool) and every guest image (/home/steve/vms/qemu -> /mxfs/vms/qemu) are on ONE device, /dev/sda, a Samsung SSD 870 SATA disk (lsblk -s; no dm/md slaves). In the slow lap's minutes (workload 00:02:55-00:03:11Z = 19:02:55-19:03:11 CDT) sda read 336-431 MB/s at 92.0/97.95/99.13% util (rows 19:02:01 rkB/s 346999 %util 92.00, 19:03:01 336009 97.95, 19:04:01 431205 99.13, 19:05:01 403216 96.78), against the passing lap tests/evidence/20261023T235416Z (18:54 CDT) 72719 rkB/s, 73.30% util, and 52-99 MB/s at 28-75% util across 18:46-19:01. Minute-average await stayed 0.50-0.64 ms in the slow minutes against 0.25-0.78 ms before, so the per-request service time a minute average shows did not double; the disk's time was full. Host CPU was idle (%idle 92.9-93.9, %iowait 1.2-1.4) in those minutes. Reading: the doubled COMPARE AND WRITE time coincides with the one SATA disk under the target being saturated by reads from other lanes' work, not with anything on the lap's nodes; a 1-minute average cannot show per-command latency inside the 16 s workload. Commands and full rows: this session's miner report (sadf -d -t -s 18:45:00 -e 19:10:00 /var/log/sysstat/sa23 -- -d -p / -u / -q).",
+      "evidence": "Lap tests/evidence/20261024T000212Z_fourkn_merge_2-disk-caw-direct4k: lap.log:10 'workload wall 16018 ms; test31: rc=0 WORKER_DONE rounds=20 errors=0 wall_ms=15372 last_mode=644; test32: rc=1', :12 FAIL test32's half, :20 PASS chk_mxfs, :24-25 PASS every file reads its own writer's last mode on both nodes, :40 '=== fourkn_merge_2node: fails=1 miscompares=1 forced=landed'. Lane tests/evidence/lanes/g2d_a14_merge2node_20261023T204131Z step5.log 'lap 104/298: FAIL 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T00:03:51Z rc=1 elapsed_s=98 exposure=1', 'verify b20261023-6ff87e: 103 PASS, 1 FAIL of 298 planned'. Worker walls of every lap of the batch and its control (WORKER_DONE wall_ms in tests/evidence/2026102[34]T*_fourkn_merge_2-disk-caw-direct4k/w{1,2}.txt): n=373 min 6305 p50 7779 p90 8860 p99 11266 max 15372 (this lap); 3 halves over 12000 ms. CAW-ILOCK cumulative lines inside the workload window (kernel time anchored on each node's P-BARRIER-CLOCK admitted line and lap.log's mount times): slow lap test31 n=512/1024/1536/2048 avg_us 2492/3051/3470/3615, test32 2821/3095/3589/3711; the passing lap tests/evidence/20261023T235416Z_fourkn_merge_2-disk-caw-direct4k test31 1743/1586/1529/1506/1541, test32 1835/1595/1565/1550. In both laps' windows: 0 P-HB-SLOW, abort, timed out, RESERVATION, conflict, iscsi, connection, blk_update_request, stall, MISCOMPARE lines. The host's kernel log holds no line between 19:02:44 and 19:03:20 local (00:02:44-00:03:20Z). Concurrent on the same target: lane g2_lmu_caw_measure step 4 (00:00:17-00:06:17Z, tests/last_member_umount_lap.sh lmucaw3 at 2/disk/caw/direct, its 40000-create stage from 00:01:55Z), lane g2e_lmu_mpath step 3 (verify of D-LAST-MEMBER-UMOUNT at 2/net/mesh/mpath, from 23:57:36Z), and a 40000-create loop on test2's local root disk 00:02:46Z (tests/evidence/20261024T000246Z_caw_create_pace_probe). The lap's bound derivation (tests/fourkn_merge_2node.sh:65-73) estimates 2.6 s of workload, 2x that 6 s, plus 10 s of ssh connect, against 5.9-7.9 s measured. ===== 2026-10-24, the target's backing disk from outside MeshXFS (clyde's own sysstat, /var/log/sysstat/sa23, 1-minute samples, sadf -t local CDT): every pool LUN image (/home/steve/disks/pool -> /mxfs/disks/pool) and every guest image (/home/steve/vms/qemu -> /mxfs/vms/qemu) are on ONE device, /dev/sda, a Samsung SSD 870 SATA disk (lsblk -s; no dm/md slaves). In the slow lap's minutes (workload 00:02:55-00:03:11Z = 19:02:55-19:03:11 CDT) sda read 336-431 MB/s at 92.0/97.95/99.13% util (rows 19:02:01 rkB/s 346999 %util 92.00, 19:03:01 336009 97.95, 19:04:01 431205 99.13, 19:05:01 403216 96.78), against the passing lap tests/evidence/20261023T235416Z (18:54 CDT) 72719 rkB/s, 73.30% util, and 52-99 MB/s at 28-75% util across 18:46-19:01. Minute-average await stayed 0.50-0.64 ms in the slow minutes against 0.25-0.78 ms before, so the per-request service time a minute average shows did not double; the disk's time was full. Host CPU was idle (%idle 92.9-93.9, %iowait 1.2-1.4) in those minutes. Reading: the doubled COMPARE AND WRITE time coincides with the one SATA disk under the target being saturated by reads from other lanes' work, not with anything on the lap's nodes; a 1-minute average cannot show per-command latency inside the 16 s workload. Commands and full rows: this session's miner report (sadf -d -t -s 18:45:00 -e 19:10:00 /var/log/sysstat/sa23 -- -d -p / -u / -q). ===== 2026-10-24, a further observation of the same shape, not a failure: lap 6 of verification b20261024-ca92a8 (lap:yield_stall_global at 2/disk/caw/direct, g2c test29/test30, candidate 0.90.134 attempt 2026-10-24T06:38:23Z), 09:10:24Z-09:12:07Z, did 577 and 595 create/unlink pairs against 2058-2674 in the batch's other five laps and its prep took 46 s against 34-37 s (review data/reviews/P20261024-5cc4d1.md); its workload ran under timeout 25 and returned 0, so no operation stalled 25 s, and the lap passed. In the same minutes two other lanes powered groups up and began prep on the same SCST target (tests/evidence/lanes/g2d_w12_20261024T091138Z/summary.log 'step 1 start: scripts/lab_power.sh up group:g2d' 09:11:38Z; tests/evidence/lanes/g2c_w12e_20261024T090026Z/summary.log 'step 2 start: scripts/lab_power.sh up group:g2c' 09:12:17Z). The lap kept no kernel log or target latency, so this shows the coincidence only, not that the target's load caused the slowdown.",
       "next": "Measure the target's per-command latency from outside MeshXFS while lanes share it (SCST's per-device latency statistics, or the host's iostat of the pool LUNs' backing files) during a fourkn_merge_2node lap alone and with a create-heavy lane on another pool LUN, to show whether the doubled COMPARE AND WRITE time is the target serving several initiators. Then either keep timing-graded laps off a target another lane is loading (the lane scheduler) or derive the lap's workload bound from the latency the target is qualified to serve, and run a fresh verification on the next attempt; the batch b20261023-6ff87e is failed and cannot be applied.",
       "reproducer": "tests/fourkn_merge_2node.sh on a 2/disk/caw/direct4k pool LUN while another lane runs tests/last_member_umount_trace.sh's create stage on a disk/caw pool LUN of the same target",
       "cells": [
@@ -8178,7 +8211,7 @@
           "iso": "2026-10-24T00:03:51Z"
         }
       ],
-      "updated": "2026-10-23"
+      "updated": "2026-10-24"
     },
     {
       "id": "D-FSX-ROW-WORK-DIRECTORY-LEFT-ON-THE-MXFS-MOUNT-AFTER-ITS-EXIT-TRAP-RAN-RM-RF",
@@ -8379,7 +8412,7 @@
           "candidate": "0.90.134",
           "build": "BE3695D2590A65F742F9816",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -8555,6 +8588,16 @@
           "build": "BE3695D2590A65F742F9816",
           "batch": "b20261024-4f770a",
           "approval": "P20261024-5bb16a",
+          "date": "2026-10-24"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T06:38:23Z",
+          "build": "BE3695D2590A65F742F9816",
+          "batch": "b20261024-ca92a8",
+          "approval": "P20261024-5cc4d1",
           "date": "2026-10-24"
         }
       ]

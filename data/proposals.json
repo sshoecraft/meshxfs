@@ -7265,6 +7265,32 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-5cc4d1",
+      "kind": "verify",
+      "record": "D-YIELD-SCAN-SAVE-RESTORE-OF-AG-BAST-STALL-ITERS-RACES-AND-STICKS-AT-200",
+      "change": {
+        "batch": "b20261024-ca92a8"
+      },
+      "argument": "Verification b20261024-ca92a8 of lap:yield_stall_global at 2/disk/caw/direct (g2c, test29/test30) on candidate 0.90.134, attempt frozen 2026-10-24T06:38:23Z, module BE3695D2590A65F742F9816. The lap (tests/yield_stall_global_lap.sh, the record's reproducer) preps the pair, writes the TEST ONLY hold dbg_yield_scan_hold_us=2000 on both nodes at runtime (both arms alike; not a prep argument), runs eight create/unlink workers per node for 20 s with worker w of both nodes in directory w, then reads each node's ag_yield_scan_overlap_n (EXPOSED when > 0) and ag_bast_stall_iters (FAIL when not what prep loaded). The lane's own queue copy (tests/evidence/lanes/g2c_w12d_20261024T084913Z/queue:13-14) ran the control with MXFS_EXTRA_MODARGS=ag_yield_stall_global=1 (the scan writes and restores the global, the code before the fix) and the verification with no extra arguments. Control b20261024-cbcaf1 failed 10 of 10 exposed laps, each 'LAP yield_stall_global FAIL ...: test29 reads ag_bast_stall_iters=200, prep loaded 600; test30 reads ag_bast_stall_iters=200' (tests/evidence/lanes/g2c_w12d_20261024T084913Z/step2.log); its ten laps are the record's ten cells at 2/disk/caw/direct, each failing on this cause. Plan: 10/10, lower bound 0.5887, N = 6 at delta = alpha = 0.005 (tests/evidence/lanes/g2c_w12d_20261024T084913Z/step2.log tail, step3.log:1). The verification was declared at 09:03:40Z after the control closed at 09:03:35Z, and passed 6 of 6 planned laps, each exposure=1 ('EXPOSED: yield scans overlapped on: test29(249 of 1335) test30(263 of 1337)' and the like, 249-308 overlaps per node) and 'LAP yield_stall_global PASS ...: every node's ag_bast_stall_iters reads what prep loaded' (tests/evidence/lanes/g2c_w12d_20261024T084913Z/step3.log, 'verify b20261024-ca92a8: 6 PASS, 0 FAIL of 6 planned'). No lap was dropped. The lap times file operations only as the workers' loop; its laps took 76-102 s of the 146 s bound.",
+      "evidence": [
+        "tests/evidence/lanes/g2c_w12d_20261024T084913Z/queue",
+        "tests/evidence/lanes/g2c_w12d_20261024T084913Z/step2.log",
+        "tests/evidence/lanes/g2c_w12d_20261024T084913Z/step3.log",
+        "tests/yield_stall_global_lap.sh",
+        "tests/evidence/batch_laps/b20261024-ca92a8",
+        "tests/evidence/batch_laps/b20261024-cbcaf1"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-5cc4d1.md",
+        "sha256": "1b7680c11ab720b6ab971ca4397a61d6a521fa156709cf4adbfb1b81981030b2",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
