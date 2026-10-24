@@ -7298,6 +7298,31 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-92dc9c",
+      "kind": "remove-fixed",
+      "record": "D-YIELD-SCAN-SAVE-RESTORE-OF-AG-BAST-STALL-ITERS-RACES-AND-STICKS-AT-200",
+      "change": {
+        "control": "b20261024-3bc635",
+        "fixon": "b20261024-4f770a",
+        "cause": "with the yield scan writing and restoring the module-global ag_bast_stall_iters (ag_yield_stall_global=1), overlapping scans on a node left it at 200; the fix sets the scan's short bound on the AG it drains, under that AG's lock, and writes nothing global, and with it every node read the value prep loaded"
+      },
+      "argument": "FIXED AND VERIFIED, on candidate 0.90.134's attempt frozen 2026-10-24T06:38:23Z (module BE3695D2590A65F742F9816), on both lock managers. The reproducer (the record's reproducer field) is tests/yield_stall_global_lap.sh: prep, the TEST ONLY hold dbg_yield_scan_hold_us=2000 written at runtime on both nodes in both arms, eight create/unlink workers a node for 20 s with worker w of both nodes in directory w, then each node's ag_yield_scan_overlap_n (EXPOSED when > 0) and ag_bast_stall_iters (FAIL when not what prep loaded). The control is a same-build module parameter, ag_yield_stall_global=1 on the lap's own prep (MXFS_EXTRA_MODARGS), which restores the global save, set and restore exactly; nothing in the tree was reverted.\\n\\nAt 2/net/mesh/direct (g2, test1/test2): control b20261024-3bc635 failed 9 of 9 exposed laps (its lap 1 was named by D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT, exposure 0, and dropped from this record), each 'reads ag_bast_stall_iters=200, prep loaded 600' on both nodes; fix-on b20261024-4f770a sized from it (lower bound 0.5550, 7 laps) passed 7 of 7 exposed; its verify was approved and applied. At 2/disk/caw/direct (g2c, test29/test30): control b20261024-cbcaf1 failed 10 of 10 exposed laps, fix-on b20261024-ca92a8 (6 laps) passed 6 of 6 exposed (lane tests/evidence/lanes/g2c_w12d_20261024T084913Z steps 2-3; verify P20261024-5cc4d1, data/reviews/P20261024-5cc4d1.md). Every cell the record names is a control lap at one of those two configurations, each failing on this cause, all retired by the two verifies.\\n\\nReach: the record is 1/any. The race is between two scans on one node, in xfs/ code above the lock managers (the scan and the global are the same on every attachment and node count); both lock managers were measured with the fix out and in. What the laps did not exercise: ag_yield_drain_n read 0 in every lap of both arms, so no scan drained an AG inline and the per-AG short bound the fix sets for that drain (and the BAST worker's prepass reading it) never ran; the removal claims only that the global is no longer left changed, which is this record's defect. The summary states only that measured claim and the lane observation that opened the record.",
+      "evidence": [
+        "tests/yield_stall_global_lap.sh",
+        "tests/evidence/lanes/g2c_w12d_20261024T084913Z/queue",
+        "tests/evidence/lanes/g2c_w12d_20261024T084913Z/step2.log",
+        "tests/evidence/lanes/g2c_w12d_20261024T084913Z/step3.log",
+        "tests/evidence/batch_laps/b20261024-3bc635",
+        "tests/evidence/batch_laps/b20261024-4f770a",
+        "tests/evidence/batch_laps/b20261024-cbcaf1",
+        "tests/evidence/batch_laps/b20261024-ca92a8",
+        "data/reviews/P20261024-5cc4d1.md",
+        "data/defects.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
