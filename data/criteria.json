@@ -286,17 +286,72 @@
         },
         "4/disk/caw/mpath": {
           "status": "PASS",
-          "measured": "elapsed=40s (fresh prep)",
+          "measured": "skipped (marker matched 4/disk/caw/mpath)",
           "reason": "",
-          "iso": "2026-10-24T04:51:27Z",
-          "recorded": "2026-10-23",
-          "elapsed_s": 40,
+          "iso": "2026-10-24T05:19:38Z",
+          "recorded": "2026-10-24",
+          "elapsed_s": 0,
           "build": "B947A20F3C2FE3A67ABF6F3",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T045026Z-g4c",
+          "run_id": "20261024T051916Z-g4",
           "candidate": "0.90.134",
+          "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T05:16:16Z",
+              "measured": "skipped (marker matched 4/disk/caw/mpath)",
+              "reason": "",
+              "build": "B947A20F3C2FE3A67ABF6F3",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T051556Z-g4",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T05:13:24Z",
+              "measured": "skipped (marker matched 4/disk/caw/mpath)",
+              "reason": "",
+              "build": "B947A20F3C2FE3A67ABF6F3",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T051303Z-g4",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T05:10:11Z",
+              "measured": "skipped (marker matched 4/disk/caw/mpath)",
+              "reason": "",
+              "build": "B947A20F3C2FE3A67ABF6F3",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T050951Z-g4",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T05:09:50Z",
+              "measured": "elapsed=51s (fresh prep)",
+              "reason": "",
+              "build": "B947A20F3C2FE3A67ABF6F3",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T050838Z-g4",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T04:51:27Z",
+              "measured": "elapsed=40s (fresh prep)",
+              "reason": "",
+              "build": "B947A20F3C2FE3A67ABF6F3",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T045026Z-g4c"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T04:50:11Z",
@@ -346,56 +401,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T044330Z-g4c"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T04:43:15Z",
-              "measured": "elapsed=48s (fresh prep)",
-              "reason": "",
-              "build": "B947A20F3C2FE3A67ABF6F3",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T044207Z-g4c"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T04:41:52Z",
-              "measured": "elapsed=40s (fresh prep)",
-              "reason": "",
-              "build": "B947A20F3C2FE3A67ABF6F3",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T044053Z-g4c"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T04:40:33Z",
-              "measured": "elapsed=52s (fresh prep)",
-              "reason": "",
-              "build": "B947A20F3C2FE3A67ABF6F3",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T043920Z-g4c"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T04:39:05Z",
-              "measured": "elapsed=39s (fresh prep)",
-              "reason": "",
-              "build": "B947A20F3C2FE3A67ABF6F3",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T043801Z-g4c"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T04:37:34Z",
-              "measured": "elapsed=51s (fresh prep)",
-              "reason": "",
-              "build": "B947A20F3C2FE3A67ABF6F3",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T043624Z-g4c"
             }
           ]
         },
@@ -40373,17 +40378,28 @@
         },
         "4/disk/caw/mpath": {
           "status": "PASS",
-          "measured": "victim=test6 fenced_s=11 resumed_s=8 reinstate_s=3 survivor_stall_ms=19054 acked=2826 elapsed=144s fails=0 max_stall_ms=19054",
-          "reason": " (evidence tests/evidence/board_20261023T162610Z-g4_path_fence_degraded)",
-          "iso": "2026-10-23T16:28:54Z",
-          "recorded": "2026-10-23",
-          "elapsed_s": 149,
-          "build": "08D63764A9352FBDD5A76CD",
+          "measured": "victim=test6 fenced_s=14 resumed_s=4 reinstate_s=21 survivor_stall_ms=18581 acked=3490 elapsed=160s fails=0 max_stall_ms=19113",
+          "reason": " (evidence tests/evidence/board_20261024T050951Z-g4_path_fence_degraded)",
+          "iso": "2026-10-24T05:13:02Z",
+          "recorded": "2026-10-24",
+          "elapsed_s": 165,
+          "build": "B947A20F3C2FE3A67ABF6F3",
           "outcome": "PASS",
           "budget_s": 420,
-          "run_id": "20261023T162610Z-g4",
+          "run_id": "20261024T050951Z-g4",
+          "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T16:28:54Z",
+              "measured": "victim=test6 fenced_s=11 resumed_s=8 reinstate_s=3 survivor_stall_ms=19054 acked=2826 elapsed=144s fails=0 max_stall_ms=19054",
+              "reason": " (evidence tests/evidence/board_20261023T162610Z-g4_path_fence_degraded)",
+              "build": "08D63764A9352FBDD5A76CD",
+              "outcome": "PASS",
+              "run_id": "20261023T162610Z-g4",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
             {
               "status": "FAIL",
               "iso": "2026-10-23T13:43:50Z",
@@ -40454,12 +40470,6 @@
               "iso": "2026-10-20T10:30:25Z",
               "measured": "victim=test20 fenced_s=39 resumed_s=4 reinstate_s=11 survivor_stall_ms=41855 acked=3996 elapsed=187s fails=0",
               "reason": " (evidence tests/evidence/board_20261020T094124Z-g4b_path_fence_degraded)"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-20T04:27:38Z",
-              "measured": "victim=test20 fenced_s=37 resumed_s=4 reinstate_s=14 survivor_stall_ms=41962 acked=4430 elapsed=186s fails=0",
-              "reason": " (evidence tests/evidence/board_20261020T034544Z-g4b_path_fence_degraded)"
             }
           ]
         },
@@ -41086,17 +41096,28 @@
         },
         "4/disk/caw/mpath": {
           "status": "PASS",
-          "measured": "victim=test6 fenced_s=14 resumed_s=4 other_stall_ms=17567 acked=3650 elapsed=159s fails=0 max_stall_ms=17813",
-          "reason": " (evidence tests/evidence/board_20261023T162217Z-g4_path_fenced_return)",
-          "iso": "2026-10-23T16:25:16Z",
-          "recorded": "2026-10-23",
-          "elapsed_s": 164,
-          "build": "08D63764A9352FBDD5A76CD",
+          "measured": "victim=test6 fenced_s=11 resumed_s=8 other_stall_ms=17167 acked=2165 elapsed=168s fails=0 max_stall_ms=17703",
+          "reason": " (evidence tests/evidence/board_20261024T051556Z-g4_path_fenced_return)",
+          "iso": "2026-10-24T05:19:14Z",
+          "recorded": "2026-10-24",
+          "elapsed_s": 173,
+          "build": "B947A20F3C2FE3A67ABF6F3",
           "outcome": "PASS",
           "budget_s": 400,
-          "run_id": "20261023T162217Z-g4",
+          "run_id": "20261024T051556Z-g4",
+          "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T16:25:16Z",
+              "measured": "victim=test6 fenced_s=14 resumed_s=4 other_stall_ms=17567 acked=3650 elapsed=159s fails=0 max_stall_ms=17813",
+              "reason": " (evidence tests/evidence/board_20261023T162217Z-g4_path_fenced_return)",
+              "build": "08D63764A9352FBDD5A76CD",
+              "outcome": "PASS",
+              "run_id": "20261023T162217Z-g4",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T13:49:59Z",
@@ -41159,12 +41180,6 @@
               "iso": "2026-10-19T15:03:12Z",
               "measured": "victim=test20 fenced_s=35 resumed_s=8 other_stall_ms=41479 acked=7113 elapsed=202s fails=0",
               "reason": " (evidence tests/evidence/board_20261019T142249Z-g4b_path_fenced_return)"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-16T02:32:26Z",
-              "measured": "victim=test20 fenced_s=36 resumed_s=6 other_stall_ms=41144 acked=4635 elapsed=198s fails=0",
-              "reason": " (evidence tests/evidence/board_20261016T013801Z-g4b_path_fenced_return)"
             }
           ]
         },
@@ -41802,18 +41817,29 @@
           ]
         },
         "4/disk/caw/mpath": {
-          "status": "FAIL",
-          "measured": "victim=test6 fenced_s=14 resumed_s=2 reinstate_s=8 other_stall_ms=16701 acked=2594 elapsed=142s fails=1 max_stall_ms=16770",
-          "reason": "test3: every churn file still named the inode its create was handed (verify_fail, tests/evidence/board_20261023T162952Z-g4_path_all_lost/load_test3/verify.log) (got 1) (evidence tests/evidence/board_20261023T162952Z-g4_path_all_lost)",
-          "iso": "2026-10-23T16:32:35Z",
-          "recorded": "2026-10-23",
-          "elapsed_s": 148,
-          "build": "08D63764A9352FBDD5A76CD",
-          "outcome": "FAIL",
+          "status": "PASS",
+          "measured": "victim=test6 fenced_s=14 resumed_s=2 reinstate_s=8 other_stall_ms=4463 acked=1333 elapsed=141s fails=0 max_stall_ms=4463",
+          "reason": " (evidence tests/evidence/board_20261024T051303Z-g4_path_all_lost)",
+          "iso": "2026-10-24T05:15:55Z",
+          "recorded": "2026-10-24",
+          "elapsed_s": 146,
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "outcome": "PASS",
           "budget_s": 380,
-          "run_id": "20261023T162952Z-g4",
+          "run_id": "20261024T051303Z-g4",
+          "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
           "history": [
+            {
+              "status": "FAIL",
+              "iso": "2026-10-23T16:32:35Z",
+              "measured": "victim=test6 fenced_s=14 resumed_s=2 reinstate_s=8 other_stall_ms=16701 acked=2594 elapsed=142s fails=1 max_stall_ms=16770",
+              "reason": "test3: every churn file still named the inode its create was handed (verify_fail, tests/evidence/board_20261023T162952Z-g4_path_all_lost/load_test3/verify.log) (got 1) (evidence tests/evidence/board_20261023T162952Z-g4_path_all_lost)",
+              "build": "08D63764A9352FBDD5A76CD",
+              "outcome": "FAIL",
+              "run_id": "20261023T162952Z-g4",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-23T13:46:45Z",
@@ -41880,12 +41906,6 @@
               "iso": "2026-10-20T04:34:09Z",
               "measured": "victim=test20 fenced_s=38 resumed_s=4 reinstate_s=18 other_stall_ms=38847 acked=5948 elapsed=185s fails=0",
               "reason": " (evidence tests/evidence/board_20261020T034544Z-g4b_path_all_lost)"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-19T15:06:32Z",
-              "measured": "victim=test20 fenced_s=35 resumed_s=7 reinstate_s=25 other_stall_ms=39892 acked=7969 elapsed=195s fails=0",
-              "reason": " (evidence tests/evidence/board_20261019T142249Z-g4b_path_all_lost)"
             }
           ]
         },
@@ -42522,18 +42542,26 @@
           ]
         },
         "4/disk/caw/mpath": {
-          "status": "PASS",
-          "measured": "victim=test6 recovered_two_paths_s=11 recovered_one_path_s=11 reinstate_s=6 survivor_stall_two_ms=493 survivor_stall_one_ms=444 acked=3212 elapsed=165s fails=0 max_stall_ms=3031",
-          "reason": " (evidence tests/evidence/board_20261023T163328Z-g4_path_peer_withdrawn)",
-          "iso": "2026-10-23T16:36:34Z",
-          "recorded": "2026-10-23",
-          "elapsed_s": 171,
-          "build": "08D63764A9352FBDD5A76CD",
-          "outcome": "PASS",
-          "budget_s": 420,
-          "run_id": "20261023T163328Z-g4",
+          "status": "PENDING",
+          "measured": "",
+          "reason": "executing 20261024T051916Z-g4",
+          "iso": "2026-10-24T05:19:42Z",
+          "recorded": "2026-10-24",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
+          "run_id": "20261024T051916Z-g4",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-23T16:36:34Z",
+              "measured": "victim=test6 recovered_two_paths_s=11 recovered_one_path_s=11 reinstate_s=6 survivor_stall_two_ms=493 survivor_stall_one_ms=444 acked=3212 elapsed=165s fails=0 max_stall_ms=3031",
+              "reason": " (evidence tests/evidence/board_20261023T163328Z-g4_path_peer_withdrawn)",
+              "build": "08D63764A9352FBDD5A76CD",
+              "outcome": "PASS",
+              "run_id": "20261023T163328Z-g4",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-21T10:33:44Z",
@@ -42588,12 +42616,6 @@
               "iso": "2026-10-14T19:17:04Z",
               "measured": "victim=test20 recovered_two_paths_s=11 recovered_one_path_s=6 reinstate_s=22 survivor_stall_two_ms=1236 survivor_stall_one_ms=1246 acked=3818 elapsed=195s fails=0",
               "reason": " (evidence tests/evidence/board_20261014T181318Z-g4b_path_peer_withdrawn)"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-12T07:44:34Z",
-              "measured": "victim=test6 recovered_two_paths_s=10 recovered_one_path_s=10 reinstate_s=22 survivor_stall_two_ms=1251 survivor_stall_one_ms=1154 acked=6177 elapsed=196s fails=0",
-              "reason": " (evidence tests/evidence/board_20261012T065755Z-g4_path_peer_withdrawn)"
             }
           ]
         },
