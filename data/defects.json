@@ -2479,6 +2479,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:lh_shard",
           "iso": "2026-10-23T10:31:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lh_master",
+          "iso": "2026-10-24T10:56:38Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lh_master",
+          "iso": "2026-10-24T10:51:52Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lh_master",
+          "iso": "2026-10-24T10:50:17Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lh_master",
+          "iso": "2026-10-24T10:48:41Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lh_master",
+          "iso": "2026-10-24T10:47:09Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lh_master",
+          "iso": "2026-10-24T10:41:54Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lh_master",
+          "iso": "2026-10-24T10:40:52Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lh_master",
+          "iso": "2026-10-24T10:39:18Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lh_master",
+          "iso": "2026-10-24T10:36:08Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lh_master",
+          "iso": "2026-10-24T10:32:54Z"
         }
       ],
       "updated": "2026-10-24",
@@ -6412,6 +6462,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:peer_window",
           "iso": "2026-10-23T23:14:40Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T10:56:35Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T10:54:25Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T10:52:14Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T10:50:00Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T10:47:43Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T10:45:04Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T10:42:46Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T10:40:44Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T10:38:14Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T10:36:05Z"
         }
       ],
       "verified_at": [
@@ -6497,6 +6597,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-e827e0",
+          "kind": "control",
+          "row": "lap:rejoin_modargs_rig",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "468F7F30C2E190B0244AF70",
+          "variant": "PF_REJOIN_PREP_ARGS=0 (tests/mpath/lib.sh pf_boot_rejoin loads mxfs with the configuration's transport arguments only, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a victim killed and rejoined by pf_boot_rejoin loads other module arguments than the prep gave every node"
         }
       ],
       "rates": [
@@ -8074,7 +8191,26 @@
       "evidence": "2026-10-24, lap cpcaw1 at 2/disk/caw/direct (lane tests/evidence/lanes/g2c_w12e_20261024T090026Z step 3, candidate 0.90.134 attempt 2026-10-24T06:38:23Z): 'LAP create_pace PASS: CREATED=10000 failed=0 ...; test30 listed all 10000'; its kernel-log files tests/evidence/20261024T091233Z_createpace_cpcaw1/test29_kmsg.txt and test30_kmsg.txt are 0 lines each (wc -l), so the fault check (tests/create_pace_lap.sh:78-88) graded two empty files. ===== 2026-10-24, attempt 17 (the fix is in its tree): precheck at 2/disk/caw/direct4k, lane tests/evidence/lanes/g2d_a17b_20261024T103826Z. Fix on, cpkf1 (step 6): 'EXPOSED: test31's kernel ring no longer holds the lap's mark', then 'LAP create_pace PASS: CREATED=10000 failed=0'. Control CPL_KMSG_FOLLOW=0, cpkc1 (step 7): the same EXPOSED line, then 'LAP create_pace FAIL: the fault check read no whole kernel log: test31's kernel log read holds 0 line(s) and not both the lap's marks'. Control batch (10 laps, the knob) and the verification sized from it are running in lane g2d_a17cp (tests/evidence/lanes/queue_g2d_a17cp.txt). Next: read its result and remove --fixed with the reviewer's approval.",
       "next": "Make the lap capture each node's kernel log across the creates (a reader of /dev/kmsg started before the loop, or the mark found in the read) and refuse a PASS when the mark is not in what it read (ABORT, naming it), with a switch for the control; then a control and verification where the creates rotate the ring (the default rig, 10000 creates on disk/caw), and remove --fixed. ===== 2026-10-24: fix drafted for the next attempt in tests/evidence/drafts/tree/tests/create_pace_lap.sh: each node's /dev/kmsg is followed into /root (cat, its pid in a pidfile) from before the lap's mark to after an end mark written at the end, and the fault check grades only a read that holds both marks, else FAIL 'the fault check read no whole kernel log'; EXPOSED is printed for a node whose ring no longer holds the mark at the end. CPL_KMSG_FOLLOW=0 reads 'dmesg | awk' afterwards as before, under the same mark check: the control, which must FAIL wherever the creates rotated the ring. Next: on the next attempt, a precheck at 2/disk/caw/direct (10000 creates rotate the ring there), the control, the verification sized from it, and remove --fixed.",
       "reproducer": "tests/create_pace_lap.sh <label> 2/disk/caw/direct on a 2-node group (NFILES=10000, the rig's debug sites on): both <node>_kmsg.txt files empty and the lap PASS",
-      "updated": "2026-10-24"
+      "updated": "2026-10-24",
+      "batches": [
+        {
+          "id": "b20261024-5d82a5",
+          "kind": "control",
+          "row": "lap:create_pace",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "468F7F30C2E190B0244AF70",
+          "variant": "CPL_KMSG_FOLLOW=0 (tests/create_pace_lap.sh reads each node's ring with dmesg | awk after the creates, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: the creates rotate the lap's mark out of the ring, and the fault check grades what is left"
+        }
+      ]
     },
     {
       "id": "D-FREEZE-HOOK-LETS-A-NEW-FILE-INTO-A-FROZEN-DIRECTORY",
@@ -8094,7 +8230,7 @@
       "config": "*/*/*",
       "opened": "2026-10-24",
       "summary": "tools/lun_pool.sh alloc waits at most 60 s for the pool lock (pool_lock, flock -w 60) and then refuses, so a prep started while another lane's allocation or bind holds the lock longer is refused 'no pool LUN of 512-byte blocks', and the run that started it ends without a verdict; nothing records which process held the lock or for how long",
-      "evidence": "2026-10-24, attempt 17 of 0.90.134 (frozen 2026-10-24T10:25:09Z): lap 5 of control b20261024-bda0e1 (tests/live_holder_shard_lap.sh lhmc5 at 2/net/mesh/direct, g2) recorded INCOMPLETE rc=2 at 2026-10-24T10:41:54Z (tests/evidence/batch_laps/b20261024-bda0e1/20261024T104052Z-68ff9925.log: 'STAGE prep rc=1 wall=62s', 'LAP lh_master ABORT: prep_cluster rc=1'); its prep log tests/evidence/20261024T104052Z_lhmaster_lhmc5/prep_1.log: '--- pre-prep: VMs up at +2 s (10:40:54) ---', 'lun_pool: pool lock not taken in 60 s: /home/steve/disks/pool/.lock', 'ERROR: no pool LUN of 512-byte blocks for [test1 test2]'. In that minute lanes g4c_a17tf (a 4-node multipath prep from 10:41:37Z), g2e_a17lp (tests/lun_pool_shutdown_lap.sh, which clears records, boots and binds two nodes with --paths 2) and g2d_a17b were allocating; other preps of the same lanes logged waits of 2-16 s ('lun_pool: pool lock waited N s'). The lock's holder is not named anywhere: <pool dir> holds only lunNN.owner/.paths/.wwid/.tmo.",
+      "evidence": "2026-10-24, attempt 17 of 0.90.134 (frozen 2026-10-24T10:25:09Z): lap 5 of control b20261024-bda0e1 (tests/live_holder_shard_lap.sh lhmc5 at 2/net/mesh/direct, g2) recorded INCOMPLETE rc=2 at 2026-10-24T10:41:54Z (tests/evidence/batch_laps/b20261024-bda0e1/20261024T104052Z-68ff9925.log: 'STAGE prep rc=1 wall=62s', 'LAP lh_master ABORT: prep_cluster rc=1'); its prep log tests/evidence/20261024T104052Z_lhmaster_lhmc5/prep_1.log: '--- pre-prep: VMs up at +2 s (10:40:54) ---', 'lun_pool: pool lock not taken in 60 s: /home/steve/disks/pool/.lock', 'ERROR: no pool LUN of 512-byte blocks for [test1 test2]'. In that minute lanes g4c_a17tf (a 4-node multipath prep from 10:41:37Z), g2e_a17lp (tests/lun_pool_shutdown_lap.sh, which clears records, boots and binds two nodes with --paths 2) and g2d_a17b were allocating; other preps of the same lanes logged waits of 2-16 s ('lun_pool: pool lock waited N s'). The lock's holder is not named anywhere: <pool dir> holds only lunNN.owner/.paths/.wwid/.tmo. ===== 2026-10-24, the holder named for the refusal of lap lhmc5 (2/net/mesh/direct, 10:40:54-10:41:54Z): run.sh runs its host preflight holding the pool lock (run.sh:2547, PREFLIGHT=(tools/lun_pool.sh quiet clyde_preflight.sh), 300 s wait, tools/lun_pool.sh:861-862), and the preflight's kernel-log-rate check waits inside it for any lane's VM power-up to finish (scripts/clyde_preflight.sh:252-260, /tmp/mxfs_host_powerup.lock, which scripts/lab_power.sh:159-162 holds for a whole 'up'). Lap pw8c4 of g8b took the pool lock at 10:40:47 (tests/evidence/20261024T104044Z_peerwin_pw8c4/prep.log:4 'pool LUN held at +1 s', :6 preflight starts 10:40:48), and its preflight waited 58 s (:51) on lane g4c's 'lab_power.sh up group:g4c' (tests/evidence/lanes/g4c_a17tf_20261024T104047Z/summary.log :8-9, 10:40:47-10:41:37), then passed at 10:41:54 (:62). Every alloc behind it waited: lhmc5 gave up at 60 s (10:41:54); tff2 and g4c got the lock at 10:41:54-55 after 16-17 s. No release ran under the lock in the window (no 'releasing' line in the 899 evidence files of 10:35-10:50Z; SCST shows only test17/test18's boot relogin and logout on pool-07 at 10:40:43-45 and test7-10's boot logins on pool-02 at 10:41:16-35). CAUSE: two locks taken in an order that makes the pool lock wait for a power-up: run.sh holds the pool lock while the preflight waits for the power-up lock. Next: draft the fix (run.sh waits for the power-up lock before it takes the pool lock for the preflight, and holds both, the preflight told not to wait again), with a switch for the control; a lap that starts a power-up and a prep beside it and times an alloc from a third caller.",
       "next": "Log the holder: pool_lock writes the holding pid, its command and the time it took the lock into <pool dir>/.lock.holder, and a waiter that gives up names it and how long it has held; pool_unlock logs a hold over 10 s. Then find which operation holds the lock past 60 s (a multipath bind of 4 nodes, the shutdown lap's boot inside the lock, or a node that does not answer) and either take that work out of the lock or bound the wait from the longest measured hold, with a lap that starts a prep while another lane binds.",
       "cells": [
         {
@@ -8102,7 +8238,8 @@
           "row": "lap:lh_master",
           "iso": "2026-10-24T10:41:54Z"
         }
-      ]
+      ],
+      "updated": "2026-10-24"
     }
   ]
 }

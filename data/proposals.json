@@ -7647,6 +7647,34 @@
         "tests/evidence/20261024T104044Z_peerwin_pw8c4/dmesg_window",
         "data/reviews/P20261024-2ab72a.md"
       ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-6ce1e5.md",
+        "sha256": "63ed0f7a3f874d36836b3e4adf5d2786cd5b5eac6c6bb892c14e1a648e5eb4e8",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-c568d7",
+      "kind": "infra-proven",
+      "record": null,
+      "change": {
+        "config": "2/net/mesh/direct",
+        "row": "lap:lh_master",
+        "iso": "2026-10-24T10:41:54Z"
+      },
+      "argument": "Resubmission of P20261024-128791, rejected because the pool lock's holder was not named and test1/test2's kernel logs were not cited (data/reviews/P20261024-128791.md). THE HOLDER, NAMED: the run.sh prep of lap pw8c4 (lane g8b, 8/disk/caw/mpath), running its host preflight under the pool lock. run.sh:2547 wraps the preflight as 'tools/lun_pool.sh quiet scripts/clyde_preflight.sh', and tools/lun_pool.sh:861-862 'quiet' takes pool_lock for the command's whole run. tests/evidence/20261024T104044Z_peerwin_pw8c4/prep.log:4 '--- pre-prep: pool LUN held at +1 s (10:40:47) ---', :6 preflight starts 10:40:48, :51 'waited 58 s for a power-up to finish', :62 'preflight passed at +68 s (10:41:54)'. The 58 s is scripts/clyde_preflight.sh:252-260 waiting on /tmp/mxfs_host_powerup.lock. scripts/lab_power.sh:159-162 holds that lock for a whole power-up, and lane g4c's 'scripts/lab_power.sh up group:g4c' ran 10:40:47-10:41:37 (tests/evidence/lanes/g4c_a17tf_20261024T104047Z/summary.log :8-9). The lock came free at exactly 10:41:54: this run asked from 10:40:54 and gave up at 10:41:54 (prep_1.log :2, :4), and the two allocs queued behind it got it at 10:41:54-55 after 16-17 s (tests/evidence/20261024T104137Z_tfshell_tff2/prep.log:4-5, tests/evidence/lanes/g4c_a17tf_20261024T104047Z/step2.log:4-5). The hold was a preflight, which reads host state and touches no node, waiting on a VM boot. No release ran under the lock: no 'releasing' or 'finished allocation' line in any evidence file of 10:35-10:50Z. In the host kernel log for 10:40:40-10:42:00Z, the only SCSI target session events are test17/test18's boot relogin and lun_pool free logout on pool-07 at 10:40:43-45, and test7-10's boot logins on pool-02 at 10:41:16-35. Neither involves an MXFS unmount. THE RUN'S OWN NODES: tests/evidence/20261024T104052Z_lhmaster_lhmc5/dmesg_window/test1.txt and test2.txt, each node's dmesg ring for 10:40:30-10:42:10Z. Both rings reach back to the nodes' boot at 10:29:46, so nothing rotated out. Lap 4's workload ends at 10:40:52 (test1's last dd/rm lines, P-INOCL-COLDREAD probes, whose 'fence=1' is a field of the probe, not a fence). From then until 10:42:06 the nodes sit mounted and idle: test1's 58 lines are reclaim (PN-TENURE-END-EVICT, PN-RECLAIM-COMMIT), periodic PR key reads (scsipr read_keys) and buffer writes; test2's 26 lines are release marks, directory evictions, key reads and one superblock write. Neither has 'Shutting down filesystem', BUG, Oops, 'WARNING: CPU', Call Trace, 'blocked for more than', I/O error, corrupt, force_shutdown, a -FAIL probe, ESTALE, DEPART-UNCLEAN, POISONED or 'reservation conflict'. No MXFS signature, and the rig's own locking named as the cause. The mechanism is recorded on the record (its 2026-10-24 update). The batch will run one more lap in place of this one.",
+      "evidence": [
+        "tests/evidence/20261024T104052Z_lhmaster_lhmc5/prep_1.log",
+        "tests/evidence/20261024T104044Z_peerwin_pw8c4/prep.log",
+        "tests/evidence/20261024T104052Z_lhmaster_lhmc5/dmesg_window",
+        "tests/evidence/lanes/g4c_a17tf_20261024T104047Z/summary.log",
+        "tests/evidence/20261024T104137Z_tfshell_tff2/prep.log",
+        "data/reviews/P20261024-128791.md"
+      ],
       "state": "pending",
       "created": "2026-10-24"
     }
