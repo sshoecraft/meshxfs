@@ -8859,6 +8859,23 @@
       "summary": "run.sh counts a batch lap's exposure (exposure_count) from each node's dmesg ring read when the batch's own row ends, from the uptime its first row started at. When the trigger is in a supporting row before it (path_answer_lost before chk_clean), the nodes log tens of thousands of kernel lines in between, so the ring may no longer hold the trigger's lines and a lap that reached the trigger counts exposure=0",
       "evidence": "Attempt 21's NLINK1 controls (b20261024-0ebcba, b20261024-2e30a0) recorded exposure=0 on every lap, CORRUPT ones included. Their probe (P-ACQ-SELF-ORPHAN|P-ACQ-STUCK) matched 0 lines in the rows' followed kernel logs too (board_20261024T193205Z-g4b, 193342Z-g8b, 195534Z-g8b, 194425Z-g4b _path_answer_lost/kmsg_*_fromnode.gz), so those zeros are the probe's own miss, not this. What makes the ring read suspect: test20's followed log of run 20261024T193205Z-g4b numbers ~32000 lines by 228 s uptime (the trigger's P146V-AUTH ino=6217 at 228.556 s), and the chk_clean row's kept log of the same node (run_chk_clean_20261024T193205Z-g4b/kernlog_test20.gz, 123192 lines) holds 3 P146V lines and not that one. Not yet measured: the ring itself at the count.",
       "next": "Instrument drafted for the next attempt: tests/evidence/drafts/tree/tests/lib/exposure_follow.sh (a probe-filtered /dev/kmsg follower per node from lap_mark_start, filtered on usec >= the lap's uptime as the ring read is) and tests/evidence/drafts/tree/run.sh exposure_count printing '--- exposure on <node>: ring=<n> follow=<n> ---' and grading on the follower; MXFS_EXPOSURE_FOLLOW=0 reads the ring alone, as before. The NLINK1 control on the next attempt (probe 'P146V-(AUTH|NOAUTH-REFUSE) .*raw_mode=5 granted_mode=3') prints both counts per lap: ring < follow on a lap is this record shown; ring = follow on every lap of a batch is evidence against it."
+    },
+    {
+      "id": "D-LH-SHARD-LAP-PREP-BOUND-OMITS-A-POWER-UP-OF-ITS-OWN-NODES",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "tests/live_holder_shard_lap.sh bounds its prep_cluster at 88 s, twice the 40-44 s measured on a group whose VMs were already up (tests/live_holder_shard_lap.sh:54-57), but run.sh powers the group's VMs up when they are off and counts that inside the same bound, so a lap whose nodes start powered off spends ~32 s of its 88 s on its own power-up and its prep is ended after it printed OK",
+      "evidence": "Lap 1 of verification b20261024-ffc93e (lhmv201, 2/net/mesh/direct, g2, attempt 20 build 1BC77CFB15EF4A988DD1F56): tests/evidence/batch_laps/b20261024-ffc93e/20261024T182036Z-3cc1300b.log 'STAGE prep rc=124 wall=88s --- prep OK: mxfs mounted on all 2 node(s) ...', 'LAP lh_master: prep_cluster overran its 88 s bound (rc 124)'; tests/evidence/20261024T182036Z_lhmaster_lhmv201/prep_1.log 'test1: up after 29 s', 'VMs up at +32 s', 'lun_pool: pool lock waited 8 s', 'pool LUN held at +40 s', preflight +42 to +50 s, prep steps 0-6 35 s, 'prep OK'. The 8 s pool-lock wait was another lane's (D-LAP-OWN-PREP-BOUND-COUNTS-OTHER-LANES-WAITS-AND-RETURNS-BEFORE-ITS-RUN-LETS-GO, which names the same cell); the 32 s power-up was the lap's own, which tools/lap_bounded.py's wait exclusion does not take out. Both nodes' kernel logs for 18:20:30-18:22:30Z (tests/evidence/20261024T182036Z_lhmaster_lhmv201/test{1,2}_kmsg_window_capture.txt): no BUG, Oops, hung task, blocked task or shutdown line.",
+      "next": "Either power the lap's group up before its bounded prep (scripts/lab_power.sh up group:<g>, bounded on its own from its measured 30-51 s) or derive the bound with a from-off power-up included; then a control (nodes powered off before the lap, the old order) and a verification sized from it. Check the other laps that bound their own prep (tests/peer_window_lap.sh, fenced_ledger_rig_lap.sh, noino_fence_efd_hold_lap.sh, marker_params_lap.sh, foreign_replay_ag_lap.sh) for the same assumption.",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lh_master",
+          "iso": "2026-10-24T18:22:04Z"
+        }
+      ]
     }
   ]
 }

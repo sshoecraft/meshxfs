@@ -10213,6 +10213,29 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-f84fc6",
+      "kind": "remove-fixed",
+      "record": "D-LAP-OWN-PREP-BOUND-COUNTS-OTHER-LANES-WAITS-AND-RETURNS-BEFORE-ITS-RUN-LETS-GO",
+      "change": {
+        "control": "b20261024-a4d6ea",
+        "fixon": "b20261024-a4bf4d",
+        "cause": "A lap that bounded its own run.sh step with timeout(1) counted every second the step waited on locks other lanes held (the pool lock, the shared power-up hold, the preflight's power-up wait), which no ledger extended, and returned when timeout signalled its direct child while the killed run's process tree still held the lap's nodes. tools/lap_bounded.py runs the step under tools/batch_lap.py run_bounded: the bound is extended by the waits in the lap's wait ledger (MXFS_BATCH_LAP_WAIT_EXCLUDE), and on an overrun every process the step started is ended before it returns (MXFS_BATCH_LAP_KILLTREE). The attempt-21 verification b20261024-22bcc8 failed because, under a batch lap, the ledger is the lap's own and waited_s counted waits from before the step began, extending the next arms' bounds; batch_lap.py's waited_s now counts only what of each wait falls after the step's own start."
+      },
+      "argument": "Host lap tests/lap_bounded_lap.sh (row lap:lap_bounded, 2/net/mesh/direct, private locks, bound 82 s) runs three arms each under the helper: a wait arm whose step starts with 19 s of another holder's lock ahead and a 10 s bound (exposure: '^EXPOSED: '), a held arm whose step's setsid child holds a lock past the step, and a work arm that overruns its bound. Control b20261024-a4d6ea on the frozen attempt-22 module A7E90BC5313192108E35B80 with MXFS_LAP_BOUNDED=0 (each arm under timeout(1), as the laps did before the fix): 10 of 10 exposed laps FAIL, each failing both the record's failures, the wait arm ended rc 124 while it waited on another holder's lock and the held arm's step returned with its child still holding the lock (e.g. tests/evidence/batch_laps/b20261024-a4d6ea/ first lap, 'LAP lap_bounded FAIL: wait arm rc=124 ... held arm lock free=no, work arm rc=124'). Verification b20261024-a4bf4d on candidate 0.90.134 (same module), sized 6 from the control's 10/10 at delta=alpha=0.005: 6 of 6 exposed PASS, each 'wait arm rc=0 with 19s of another holder's lock ahead, held arm lock free=yes, work arm rc=124' (the bound is still enforced). The verification ran as batch laps, with MXFS_LAP_WAIT_FILE the lap's shared ledger: the exact condition under which attempt 21's verification b20261024-22bcc8 failed its first lap ('FAIL the held arm's step returned (rc 0) with a process it started still holding its lock', 'FAIL the work arm was not ended at its bound (rc 0)'), so these six laps also measure batch_lap.py's since-start wait count. Field: on attempt 22, 8-node lap osq22c1 (tests/fenced_ledger_rig_lap.sh, 8/net/mesh/direct, tests/evidence/batch_laps/b20261024-395e2b/20261024T205206Z-ec8e81e2.log) waited 32 s on another lane's power-up ('power-up lock held shared at +35 s', waited_on_other_lanes=32s) and its prep ended rc=0 at 93 s under the helper. The record's cell 2/net/mesh/direct:lap:lh_master:2026-10-24T18:22:04Z had a second cause, the lap's own nodes' 32 s power-up inside its 88 s bound, which this fix does not address; that cell is now also named by D-LH-SHARD-LAP-PREP-BOUND-OMITS-A-POWER-UP-OF-ITS-OWN-NODES.",
+      "evidence": [
+        "tests/lap_bounded_lap.sh",
+        "tools/lap_bounded.py",
+        "tools/batch_lap.py",
+        "tests/evidence/batch_laps/b20261024-a4d6ea",
+        "tests/evidence/batch_laps/b20261024-a4bf4d",
+        "tests/evidence/batch_laps/b20261024-22bcc8",
+        "tests/evidence/batch_laps/b20261024-395e2b/20261024T205206Z-ec8e81e2.log",
+        "tests/evidence/lanes/host_a22_20261024T204635Z"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
