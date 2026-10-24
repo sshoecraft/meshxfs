@@ -8564,6 +8564,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-812eac",
+          "kind": "control",
+          "row": "lap:lap_load_clean_noino",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "A7E90BC5313192108E35B80",
+          "variant": "LAP_LOAD_CLEAN=0 (lap_load_end removes nothing from the nodes' /run, as the noino lap's exit did before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a noino lap leaves its load directory and logs in each node's /run"
         }
       ],
       "cells": [
@@ -9182,7 +9199,8 @@
           "row": "lap:late_register_hold",
           "iso": "2026-10-24T21:40:47Z"
         }
-      ]
+      ],
+      "reproducer": "MXFS_BATCH=<bid> ./run.sh 2/disk/caw/mpath lap:late_register_hold (or 2/net/mesh/mpath): tests/late_register_hold_lap.sh <label> <arm> runs path_mount_degraded's steps 1-3 with a load on the victim, so one path of its map returns late and the late-path fill registers the node on it; TEST ONLY dbg_pr_fill_outstanding_ms keeps the fill's REGISTER unresolved 15000 ms after it returns while the load runs through the map, and P-DBG-PR-FILL-OUTSTANDING prints requests_sent (the late path's iorequest_cnt delta) and writes_done in that window; arm 0 sets pr_fill_hold=0, as before the fix"
     },
     {
       "id": "D-FOURKN-MERGE-CONTROL-LAPS-OVERRAN-130S-SLOW-MOUNTS-AND-BUSY-UNMOUNTS",

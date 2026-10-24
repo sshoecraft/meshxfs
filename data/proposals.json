@@ -10322,6 +10322,66 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-229ee1",
+      "kind": "verify",
+      "record": "D-LATE-PATH-REGISTER-TIMED-OUT-MAY-EXECUTE-AFTER-A-FENCE-AND-RESTORE-THE-KEY",
+      "change": {
+        "batch": "b20261024-61fcda"
+      },
+      "argument": "Verification b20261024-61fcda of lap:late_register_hold at 2/disk/caw/mpath on candidate 0.90.134 (module A7E90BC5313192108E35B80, attempt-22 freeze tests/evidence/candidates/0.90.134_20261024T204620Z.files.json), declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2b_a22_20261024T204638Z/step7.log), sized 6 from control b20261024-6e9fc4's 10 of 10 exposed FAILs at the same configuration on the same module (tests/evidence/lanes/g2b_a22_20261024T204638Z/step6.log). All 6 planned laps ran, each PASS with exposure ('EXPOSED: the fill's REGISTER was held unresolved 15000 ms ... while test16's load completed <n> operations through the map'), none failed or was dropped: 'b20261024-61fcda: 6 PASS, 0 FAIL of 6 planned'.",
+      "evidence": [
+        "tests/evidence/lanes/g2b_a22_20261024T204638Z/step7.log",
+        "tests/evidence/lanes/g2b_a22_20261024T204638Z/step6.log",
+        "tests/evidence/batch_laps/b20261024-61fcda",
+        "tests/late_register_hold_lap.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-cb280d",
+      "kind": "verify",
+      "record": "D-LATE-PATH-REGISTER-TIMED-OUT-MAY-EXECUTE-AFTER-A-FENCE-AND-RESTORE-THE-KEY",
+      "change": {
+        "batch": "b20261024-655b70"
+      },
+      "argument": "Verification b20261024-655b70 of lap:late_register_hold at 2/net/mesh/mpath on candidate 0.90.134 (module A7E90BC5313192108E35B80, attempt-22 freeze tests/evidence/candidates/0.90.134_20261024T204620Z.files.json), declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2b_a22nm_20261024T213527Z/step6.log), sized 6 from control b20261024-c518e7's 10 of 10 exposed FAILs at the same configuration on the same module (tests/evidence/lanes/g2b_a22nm_20261024T213527Z/step5.log). All 6 planned laps ran, each PASS with exposure ('EXPOSED: the fill's REGISTER was held unresolved 15000 ms ... while test16's load completed <n> operations through the map'), none failed or was dropped: 'b20261024-655b70: 6 PASS, 0 FAIL of 6 planned'.",
+      "evidence": [
+        "tests/evidence/lanes/g2b_a22nm_20261024T213527Z/step6.log",
+        "tests/evidence/lanes/g2b_a22nm_20261024T213527Z/step5.log",
+        "tests/evidence/batch_laps/b20261024-655b70",
+        "tests/late_register_hold_lap.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-e7d188",
+      "kind": "remove-fixed",
+      "record": "D-LATE-PATH-REGISTER-TIMED-OUT-MAY-EXECUTE-AFTER-A-FENCE-AND-RESTORE-THE-KEY",
+      "change": {
+        "control": "b20261024-6e9fc4",
+        "fixon": "b20261024-61fcda",
+        "cause": "The late-path fill (mxfs_pal_scsi_pr_fill_paths) sent its REGISTER down a returning path while dm-multipath could already dispatch the node's own I/O through it, so a REGISTER whose outcome was unknown could sit at the target ahead of the node's writes on that nexus, and if it executed after a peer's PREEMPT AND ABORT it registered the fenced key again with those writes queued behind it. The fill now holds the late path's scsi_device quiesced (mxfs_pr_path_hold: scsi_device_quiesce, taken only when nothing is in flight on it) from before the REGISTER until its outcome is known (verified, undone, or the path quarantined offline), the fill's own PR commands carrying the PM flag; nothing else enters the device while it is held. pr_fill_hold=0 sends the REGISTER without the hold, as before."
+      },
+      "argument": "The record is a hazard read from the code against the design ruling (docs/rulings/silent-peer-death-under-the-stall-limit.md:300-306, the late REGISTER is a fencing problem of its own; its second closure: a returning path carries none of the node's I/O while its late REGISTER is unresolved, so a delayed REGISTER executed after the fence registers a nexus the fenced node sends nothing through, and no write of the node is queued behind it). It was never observed as a key restored after a fence; what the defect requires of the node, its own commands dispatched down a late path while its REGISTER is unresolved, is what the lap measures, and it is measured on both lock managers: tests/late_register_hold_lap.sh holds the fill's REGISTER unresolved 15000 ms (TEST ONLY dbg_pr_fill_outstanding_ms) while the victim's load runs through the map and counts the late path's dispatched requests (iorequest_cnt delta) in that window. Controls with the fix out (pr_fill_hold=0) on the attempt-22 module A7E90BC5313192108E35B80: b20261024-6e9fc4 at 2/disk/caw/mpath 10 of 10 exposed FAIL, each 'requests_sent=7 held=0' (tests/evidence/lanes/g2b_a22_20261024T204638Z/step6.log), and b20261024-c518e7 at 2/net/mesh/mpath 10 of 10 exposed FAIL, requests_sent=7-8 (tests/evidence/lanes/g2b_a22nm_20261024T213527Z/step5.log). Verifications sized 6 from those rates on candidate 0.90.134: b20261024-61fcda (CAW, tests/evidence/lanes/g2b_a22_20261024T204638Z/step7.log) and b20261024-655b70 (TCP, tests/evidence/lanes/g2b_a22nm_20261024T213527Z/step6.log), each 6 of 6 exposed PASS 'nothing was dispatched down the late path in the 15000 ms its REGISTER was held unresolved' (held=1 writes_done=0 requests_sent=0); verify proposals P20261024-229ee1 and P20261024-cb280d. Prechecks of both arms at both configurations agree (tests/evidence/lanes/g2b_a22_20261024T204638Z/step4.log, step5.log; tests/evidence/lanes/g2b_a22nm_20261024T213527Z/step3.log, step4.log). The fill runs only for a map registered per path, so the multipath configurations are where its precondition exists; both lock managers' multipath configurations at 2 nodes were measured.",
+      "evidence": [
+        "tests/evidence/lanes/g2b_a22_20261024T204638Z/step4.log",
+        "tests/evidence/lanes/g2b_a22_20261024T204638Z/step5.log",
+        "tests/evidence/lanes/g2b_a22_20261024T204638Z/step6.log",
+        "tests/evidence/lanes/g2b_a22_20261024T204638Z/step7.log",
+        "tests/evidence/lanes/g2b_a22nm_20261024T213527Z/step3.log",
+        "tests/evidence/lanes/g2b_a22nm_20261024T213527Z/step4.log",
+        "tests/evidence/lanes/g2b_a22nm_20261024T213527Z/step5.log",
+        "tests/evidence/lanes/g2b_a22nm_20261024T213527Z/step6.log",
+        "tests/late_register_hold_lap.sh",
+        "pal/linux/kern.c",
+        "docs/rulings/silent-peer-death-under-the-stall-limit.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
