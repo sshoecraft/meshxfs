@@ -6747,8 +6747,15 @@
         "tests/proof_mode_lap.py",
         "tools/harness_batch.py"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-6bdbe7.md",
+        "sha256": "4ea72d87799c06050a22d3b7dc85d338a4fd53e2379ebde63ca27123450c8c57",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-edd872",
@@ -6795,8 +6802,14 @@
         "tools/defects.py",
         "tests/evidence/day_stamp_release_step/release_step_cell_lap_20261024.out"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-499ec5.md",
+        "sha256": "c56a0ed44dbd9c6108837af566f81e5d3490e723f4fd299905452c9c6718e407",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-e3b3c2",
@@ -6815,8 +6828,15 @@
         "tests/guard_audit_typed_def_lap.py",
         "tools/sole_survivor_audit.py"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-e3b3c2.md",
+        "sha256": "e0f9a84e4838898b277492b88a6de295222bc0f921462e7d4380c52cf71d37f0",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }
