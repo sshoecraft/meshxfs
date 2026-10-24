@@ -6333,8 +6333,15 @@
         "/home/steve/.claude/projects/-home-steve-src-mxfs/5200f0f0-7757-454b-ae78-11688afde274.jsonl",
         "dlm/v5_mount.c"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-77b3d4.md",
+        "sha256": "0e4d6f05910c8052fcc7bd6ae1ba4259d4c258517b4156ff01a50f2f0833392f",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-8175b5",
@@ -6354,8 +6361,15 @@
         "/home/steve/.claude/projects/-home-steve-src-mxfs/5200f0f0-7757-454b-ae78-11688afde274.jsonl",
         "dlm/v5_mount.c"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-8175b5.md",
+        "sha256": "2b4537132dfef0a8083a3323ce5748b3b6fbdbc3adef09d2ba780629022dcb23",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-a0fc01",
@@ -6375,8 +6389,15 @@
         "/home/steve/.claude/projects/-home-steve-src-mxfs/5200f0f0-7757-454b-ae78-11688afde274.jsonl",
         "dlm/v5_mount.c"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-a0fc01.md",
+        "sha256": "6e1c4e4ca9ce1ff4e5a9425dba4154891c084d7b4d2cabb154746471ea93048e",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-1aeba1",
@@ -6396,8 +6417,15 @@
         "/home/steve/.claude/projects/-home-steve-src-mxfs/5200f0f0-7757-454b-ae78-11688afde274.jsonl",
         "dlm/v5_mount.c"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-1aeba1.md",
+        "sha256": "d1077aaa15e7ff006a1cb0295192c50f8df692828950d64f12b933984ead9b80",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-0a91d6",
