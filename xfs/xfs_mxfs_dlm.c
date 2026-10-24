@@ -2623,6 +2623,32 @@ module_param_cb(iwr_merge_failed, &mxfs_dbg_atomic_param_ops,
 		&mxfs_iwr_merge_failed, 0644);
 MODULE_PARM_DESC(iwr_merge_failed,
 		 "count of inode-cluster writes the merged write failed, leaving the buffer dirty (write resets)");
+/*
+ * The type-flip resolver's outcomes in xfs_lookup, which its probes cannot
+ * count: P201-RELOOKUP is ratelimited (eleven shell-dead cases in 0.6 s on one
+ * node of 4/disk/caw/mpath path_mount_degraded, 2026-10-24), and the VFS retries
+ * a lookup that failed -ESTALE once, so a give-up the workload never sees still
+ * happened (five on that node with the relookup off, every pathload operation
+ * ok).  typeflip_shell_dead_seen counts give-ups in the shell-dead shape (a live
+ * shell, a live platter image of the entry's type in another generation)
+ * whatever typeflip_relookup_shell_dead says: the exposure.  A harness writes 0
+ * and reads them at the end.
+ */
+atomic_t mxfs_typeflip_shell_dead_seen = ATOMIC_INIT(0);
+module_param_cb(typeflip_shell_dead_seen, &mxfs_dbg_atomic_param_ops,
+		&mxfs_typeflip_shell_dead_seen, 0644);
+MODULE_PARM_DESC(typeflip_shell_dead_seen,
+		 "count of unresolved type flips in the shell-dead shape, relooked or not (write resets)");
+atomic_t mxfs_typeflip_shell_dead_relookups = ATOMIC_INIT(0);
+module_param_cb(typeflip_shell_dead_relookups, &mxfs_dbg_atomic_param_ops,
+		&mxfs_typeflip_shell_dead_relookups, 0644);
+MODULE_PARM_DESC(typeflip_shell_dead_relookups,
+		 "count of unresolved type flips that read the parent again because the shell was dead (write resets)");
+atomic_t mxfs_typeflip_estale = ATOMIC_INIT(0);
+module_param_cb(typeflip_estale, &mxfs_dbg_atomic_param_ops,
+		&mxfs_typeflip_estale, 0644);
+MODULE_PARM_DESC(typeflip_estale,
+		 "count of lookups the type-flip resolver failed -ESTALE (write resets)");
 atomic_t mxfs_iwr_merge_empty = ATOMIC_INIT(0);
 module_param_cb(iwr_merge_empty, &mxfs_dbg_atomic_param_ops,
 		&mxfs_iwr_merge_empty, 0644);

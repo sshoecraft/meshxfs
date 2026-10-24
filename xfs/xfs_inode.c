@@ -2662,7 +2662,11 @@ retry_iget:
 				bool		p201_entry_behind;
 				bool		p201_platter_contra;
 				bool		p201_shell_dead;
+				bool		p201_shell_dead_shape;
 				extern int mxfs_typeflip_relookup_shell_dead;
+				extern atomic_t mxfs_typeflip_shell_dead_seen;
+				extern atomic_t mxfs_typeflip_shell_dead_relookups;
+				extern atomic_t mxfs_typeflip_estale;
 
 				if (atomic_inc_return(&p201_n) <= 2000)
 					mxfs_probe("mxfs: P207-COHERENT-TRUTH ino=%llu coh_mode=0%o coh_gen=%u incore_mode=0%o incore_gen=%u dirent_ft=%u dlm_mode=%d dlm_state=%d name=%.*s\n",
@@ -2784,12 +2788,16 @@ retry_iget:
 				 * again resolves the name from what it says now,
 				 * and a fresh get reads the incarnation it names.
 				 */
-				p201_shell_dead = mxfs_typeflip_relookup_shell_dead &&
+				p201_shell_dead_shape =
 					!p201_entry_behind && !p201_platter_contra &&
 					VFS_I(*ipp)->i_mode != 0 &&
 					coh_mode != 0 && coh_mode != 0xFFFF &&
 					xfs_mode_to_ftype(coh_mode) == dirent_ftype &&
 					coh_gen != VFS_I(*ipp)->i_generation;
+				p201_shell_dead = mxfs_typeflip_relookup_shell_dead &&
+					p201_shell_dead_shape;
+				if (p201_shell_dead_shape)
+					atomic_inc(&mxfs_typeflip_shell_dead_seen);
 
 				if ((VFS_I(*ipp)->i_mode == 0 || p201_entry_behind ||
 				     p201_platter_contra || p201_shell_dead ||
@@ -2797,6 +2805,8 @@ retry_iget:
 				      relookups == 0)) && relookups < 3 &&
 				    !xfs_is_shutdown(dp->i_mount)) {
 					relookups++;
+					if (VFS_I(*ipp)->i_mode != 0 && p201_shell_dead)
+						atomic_inc(&mxfs_typeflip_shell_dead_relookups);
 					mxfs_probe_ratelimited(
 						"mxfs: P201-RELOOKUP ino=%llu pino=%llu name=%.*s lap=%d p_stale=%d why=%s comm=%s -- the entry is behind what the number names now; reading the parent again\n",
 						(unsigned long long)(*ipp)->i_ino,
@@ -2826,6 +2836,7 @@ retry_iget:
 					dir_incarn_checked = 0;
 					goto relookup;
 				}
+				atomic_inc(&mxfs_typeflip_estale);
 				xfs_irele(*ipp);
 				*ipp = NULL;
 				return -ESTALE;

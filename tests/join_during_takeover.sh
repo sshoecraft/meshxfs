@@ -40,13 +40,21 @@
 #       that count instead of its retry budget (P960-AUTH-TRANSITION-WAIT) and
 #       the join completes when the pass reaches the page — never a shutdown.
 #   stall — additionally mxfs.dl_takeover_pause_ms=45000 on A holds the pass
-#       between pages once it is in flight, so the count B watches stops
-#       advancing; after 30 s of no progress B's root acquire fails THIS
-#       OPERATION (P960-AUTH-TRANSITION-STALLED, P960-AUTH-TRANSITION-FAIL,
-#       'Failed to lock root inode'), the mount is refused with EAGAIN and
-#       unwinds cleanly — no shutdown, no withdraw, no fence on A — and once
-#       the knobs are cleared and the pass has finished, the same mount
-#       succeeds.
+#       between pages once it is in flight, so the count a waiter watches
+#       stops advancing; after 30 s of no progress an acquire on a page the
+#       pass has not reached fails THIS OPERATION (P960-AUTH-TRANSITION-STALLED,
+#       P960-AUTH-TRANSITION-FAIL) — no shutdown, no withdraw, no fence on A —
+#       and once the knobs are cleared and the pass has finished, the same
+#       operation succeeds.  B's mount cannot be that acquire: A's own lone
+#       remount takes the root inode's page over on demand before the pass, so
+#       B's root request meets no transition and B mounts in seconds
+#       (D-JDT-STALL-ARM-GRADES-A-JOIN-THAT-MET-NO-TRANSITION-AS-A-FAILED-REFUSAL).
+#       So once B is mounted inside the held pass it stats the authority's
+#       files one by one (the probe), each a cold inode acquire on its own
+#       page, until one is refused; the refused file is stat'ed again after
+#       the pass.  A lap in which no request of B's met the transition by name
+#       (no P960-AUTH-TRANSITION-RX/-WAIT/-STALLED/-FAIL on B) measured
+#       nothing: VACUOUS, exit 3.
 #
 # THE FALSE PASSES THIS LAP GUARDS AGAINST: a join issued after the pass has
 # finished measures nothing, so the lap requires the pass to be in flight
@@ -75,6 +83,17 @@
 #        (default 6: a coin flip six times).
 #        JDT_MAX_STALL=0 prints no max_stall_ms= line (default 1; 0 is the
 #        control of the stall grading below).
+#        JDT_FORCE_OP_S (default 0, none; TEST ONLY): B's first unmount sleeps
+#        this many seconds inside its timed window, before the umount, so the
+#        lap carries one timed operation of at least that length whatever the
+#        filesystem does.  It exists for tests/jdt_gate_stall_lap.py, which
+#        grades whether such an operation reaches the stall grader: the stall
+#        arm cannot make one, because B's root request meets no transition
+#        (D-JDT-STALL-ARM-GRADES-A-JOIN-THAT-MET-NO-TRANSITION-AS-A-FAILED-REFUSAL).
+#        JDT_STALL_PROBE=0 (stall arm): no probe; B's mount is issued detached
+#        and graded as the refusal, the arm as it was (a control).
+#        JDT_STALL_VACUOUS=0 (stall arm): a lap in which B met no transition is
+#        graded by the arm's checks instead of VACUOUS, as before (a control).
 #        JDT_PASS_PACE_MS (default 0, none; clean only): A's takeover pass
 #        waits this long between pages (dl_takeover_pause_ms) from A's lone
 #        remount until the pass is seen in flight.  Under routing hash v2 a
@@ -90,7 +109,7 @@
 # early (an ABORT) still carries every operation it timed.  A 31 s last-member
 # unmount inside a gate lap was recorded PASS for want of it (batch
 # b20261022-548ef2).
-# Leaves both nodes mounted.  Exit 0 PASS, 1 FAIL, 2 INFRA/ABORT.
+# Leaves both nodes mounted.  Exit 0 PASS, 1 FAIL, 2 INFRA/ABORT, 3 VACUOUS.
 set -u
 LABEL=${1:?label}
 A=${2:-test1}; B=${3:-test2}
@@ -183,9 +202,18 @@ case "$EXPECT:$ARM" in
     # two-node view); each of the untrusted iget's 5 budgets is a 60 s gate
     # refusal of the non-blocking probe plus another of the blocking acquire
     # (derived: 5 x 120 s = 600 s), then 'Failed to read root inode'.
-    clean:stall)    MB=660 ;;
+    # with the probe, B's mount is an ordinary one (90 s): its root request
+    # met no transition in any lap measured, and one that did would be
+    # refused by the 30 s watchdog well inside it
+    clean:stall)    [ "${JDT_STALL_PROBE:-1}" = 0 ] && MB=660 || MB=90 ;;
     *)              MB=90 ;;
 esac
+STALL_PROBE=0
+[ "$EXPECT:$ARM" = clean:stall ] && [ "${JDT_STALL_PROBE:-1}" != 0 ] && STALL_PROBE=1
+# the probe: cold stats of the authority's files until one is refused; each
+# that is not on a page the held pass blocks returns in ms (bound NFILES/200
+# s), the refused one after the 30 s watchdog (bound 30 + 15 s), plus 20 s
+PROBE_BOUND=$(( NFILES / 200 + 45 + 20 ))
 
 # One iteration: B leaves, A holds the authority alone, A unmounts last and
 # remounts alone, B mounts inside the pass, evidence is captured, and the
@@ -228,7 +256,10 @@ iteration() {
     # 2. B leaves, cleanly, so A is the last member: B's pages are handed to
     #    A at the departure and what A serves stays A's when A unmounts.
     tc=$(now_ms)
-    bu=$(rs 120 "$B" "s=\$(date +%s%N); umount $MNT; rc=\$?; e=\$(date +%s%N); echo B_UMOUNT_RC=\$rc ms=\$(( (e-s)/1000000 ))")
+    fo=""
+    [ "$it" = 1 ] && [ "${JDT_FORCE_OP_S:-0}" != 0 ] && fo="sleep ${JDT_FORCE_OP_S}; " \
+        && echo "  INFO JDT_FORCE_OP_S=${JDT_FORCE_OP_S}: B's unmount sleeps that long inside its timed window (TEST ONLY)"
+    bu=$(rs $(( 120 + ${JDT_FORCE_OP_S:-0} )) "$B" "s=\$(date +%s%N); ${fo}umount $MNT; rc=\$?; e=\$(date +%s%N); echo B_UMOUNT_RC=\$rc ms=\$(( (e-s)/1000000 ))")
     echo "  INFO B unmounted first: ${bu:-no result} at +$(el)s"
     op_ms "B's unmount" "$bu" $(( $(now_ms) - tc ))
     [[ "$bu" == *"B_UMOUNT_RC=0"* ]] || { echo "ABORT: B's unmount did not return 0 ($bu)"; exit 2; }
@@ -310,7 +341,7 @@ iteration() {
     value_now_into mine_at_issue "$A" 20 "$OUT/rv_mine_at_issue_1.txt" '^[0-9]+$' "mine_at_issue on $A" "$DMA | grep -ac 'P-TAUTH-PAGE-MINE page=[0-9]* via=takeover' || [ \$? = 1 ]"
     refused_s=""; unwind_s=""
     tc=$(now_ms)
-    if [ "$ARM" = "stall" ] && [ "$EXPECT" = "clean" ]; then
+    if [ "$ARM" = "stall" ] && [ "$EXPECT" = "clean" ] && [ "$STALL_PROBE" = 0 ]; then
         local ti tr rf
         rs 20 "$B" "rm -f /tmp/jointk_mount.txt; nohup sh -c 's=\$(date +%s%N); mount -t mxfs $DEV $MNT; rc=\$?; e=\$(date +%s%N); { echo B_MOUNT_RC=\$rc ms=\$(( (e-s)/1000000 )); grep -c \" mxfs \" /proc/mounts; } > /tmp/jointk_mount.txt.tmp; mv /tmp/jointk_mount.txt.tmp /tmp/jointk_mount.txt' >/dev/null 2>&1 & echo issued" >/dev/null
         ti=$(date +%s); tr=""; bm=""
@@ -345,7 +376,25 @@ iteration() {
     bm_ms=$(echo "$bm" | grep -ao 'ms=[0-9]*' | cut -d= -f2)
     bm_mounted=$(echo "$bm" | tail -1 | grep -ao '^[0-9]*')
     [ -n "$bm" ] || echo "  INFO B's mount did not return inside ${MB}s (a timeout is a failure)"
-    # 7. stall: clear the knobs, let the pass finish, mount B for real.
+    # 6b. stall, the probe: B, mounted inside the held pass, stats the
+    #     authority's files cold, one at a time, until one is refused.
+    probe_refused=0; probe_ms=""; probe_file=""; probe_ok=""; probe_slow=0; restat_rc=""
+    if [ "$STALL_PROBE" = 1 ] && [ "${bm_rc:-1}" = 0 ]; then
+        local pr
+        pr=$(rs "$PROBE_BOUND" "$B" "n=0; i=0; while [ \$i -lt $NFILES ]; do s=\$(date +%s%3N); if ! stat -c %i $D/f\$i > /dev/null 2> /tmp/jointk_probe.err; then e=\$(date +%s%3N); echo PROBE_REFUSED file=f\$i ms=\$((e-s)) err=\$(head -c 160 /tmp/jointk_probe.err | tr '\n' ' '); break; fi; e=\$(date +%s%3N); [ \$((e-s)) -ge 5000 ] && echo PROBE_SLOW file=f\$i ms=\$((e-s)); n=\$((n+1)); i=\$((i+1)); done; echo PROBE_END stats_ok=\$n")
+        echo "$pr" > "$OUT/probe_$it.txt"
+        probe_ok=$(echo "$pr" | grep -ao 'PROBE_END stats_ok=[0-9]*' | cut -d= -f2)
+        probe_slow=$(echo "$pr" | grep -ac '^PROBE_SLOW')
+        if echo "$pr" | grep -aq '^PROBE_REFUSED'; then
+            probe_refused=1
+            probe_file=$(echo "$pr" | grep -a '^PROBE_REFUSED' | grep -ao 'file=f[0-9]*' | cut -d= -f2)
+            probe_ms=$(echo "$pr" | grep -a '^PROBE_REFUSED' | grep -ao 'ms=[0-9]*' | cut -d= -f2)
+        fi
+        echo "  INFO B's probe inside the held pass: stats_ok=${probe_ok:-none} slow=$probe_slow refused=$probe_refused ${probe_file:+file=$probe_file ms=$probe_ms} [$(echo "$pr" | grep -a '^PROBE_REFUSED' | cut -c1-200)] at +$(el)s"
+        [ -n "$probe_ok" ] || echo "  INFO B's probe did not end inside ${PROBE_BOUND}s (a timeout is a failure)"
+    fi
+    # 7. stall: clear the knobs, let the pass finish, then the refused
+    #    operation again (the probe's file, or without the probe B's mount).
     bm2_rc=""; bm2_ms=""; summ=""
     if [ "$ARM" = "stall" ] && [ "$EXPECT" = "clean" ]; then
         kn=$(knobs 0 0); echo "  INFO A knobs cleared: ${kn:-no result} at +$(el)s"
@@ -359,12 +408,21 @@ iteration() {
             sleep 5
         done
         echo "  INFO pass summary after the stall: [${summ:-not seen inside ${pb}s}] at +$(el)s"
+        if [ "$STALL_PROBE" = 1 ]; then
+            if [ -n "$probe_file" ]; then
+                restat_rc=$(rs 45 "$B" "stat -c %i $D/$probe_file > /dev/null; echo RESTAT_RC=\$?" | grep -ao 'RESTAT_RC=[0-9]*' | cut -d= -f2)
+                echo "  INFO B's stat of $probe_file after the pass: rc=${restat_rc:-none} at +$(el)s"
+            fi
+            # B stayed mounted: the loop's next iteration needs it so
+            bm2_rc=${bm_rc:-}
+        else
         tc=$(now_ms)
         bm2=$(rs 90 "$B" "grep -q ' mxfs ' /proc/mounts && echo ALREADY; s=\$(date +%s%N); mount -t mxfs $DEV $MNT; rc=\$?; e=\$(date +%s%N); echo B_MOUNT2_RC=\$rc ms=\$(( (e-s)/1000000 )); grep -c ' mxfs ' /proc/mounts")
         echo "  INFO B's mount after the pass: $(echo "$bm2" | tr '\n' ' ') at +$(el)s"
         op_ms "B's mount after the pass" "$bm2" $(( $(now_ms) - tc ))
         bm2_rc=$(echo "$bm2" | grep -ao 'B_MOUNT2_RC=[0-9]*' | cut -d= -f2)
         bm2_ms=$(echo "$bm2" | grep -ao 'ms=[0-9]*' | cut -d= -f2)
+        fi
     fi
     stall_summary=$summ
     # 8. Evidence.
@@ -537,6 +595,24 @@ clean)
         ck "no wait stalled on either node (no P960-AUTH-TRANSITION-STALLED)" "$(( trans_stalled + a_worker_stalled ))" "0"
         ;;
     stall)
+      if [ "$STALL_PROBE" = 1 ]; then
+        # B's mount, or else the probe's refused stat, is the operation the
+        # watchdog refuses; a mount that met no transition is not graded as a
+        # refusal, it is the precondition of the probe
+        if [ "${bm_rc:-1}" = 0 ]; then
+            ck "B's probe inside the held pass had one stat refused" "$probe_refused" "1"
+            ck "the refused stat returned inside 45 s (the 30 s watchdog + 15)" "$([ -n "$probe_ms" ] && [ "$probe_ms" -le 45000 ] && echo 1 || echo 0)" "1"
+            ck "the refused stat waited out the watchdog (>= 25 s, not an unrelated error)" "$([ -n "$probe_ms" ] && [ "$probe_ms" -ge 25000 ] && echo 1 || echo 0)" "1"
+            ck "the refused file's stat succeeds once the pass has finished" "${restat_rc:-none}" "0"
+        else
+            ck "B's refused mount returned inside 45 s of its issue (the 30 s watchdog + 15)" "$([ -n "$bm_ms" ] && [ "$bm_ms" -le 45000 ] && echo 1 || echo 0)" "1"
+            ck "B left the mount unmounted (nothing half-mounted)" "${bm_mounted:-none}" "0"
+        fi
+        ck "the no-progress watchdog fired on B (P960-AUTH-TRANSITION-STALLED >= 1)" "$([ "$trans_stalled" -ge 1 ] && echo 1 || echo 0)" "1"
+        ck "the pass finished once the knobs were cleared" "$([ -n "$stall_summary" ] && echo 1 || echo 0)" "1"
+        ck "A installed no view with a third member (the refused mount's departed identity, D-0961)" "$stale_view" "0"
+        echo "  INFO A: retired sightings (P961-JOIN-SIGHTING-RETIRED)=$retired"
+      else
         ck "B's mount inside the stalled pass was REFUSED (rc != 0)" "$([ "${bm_rc:-0}" != "0" ] && echo 1 || echo 0)" "1"
         ck "the refusal was logged inside ${MB} s of the mount being issued" "$([ -n "$refused_s" ] && [ "$refused_s" -le "$MB" ] && echo 1 || echo 0)" "1"
         ck "the refused mount's command returned inside 30 s of the refusal (its unwind took no cluster acquire)" "$([ -n "$unwind_s" ] && [ "$unwind_s" -le 30 ] && echo 1 || echo 0)" "1"
@@ -554,10 +630,18 @@ clean)
         ck "A installed no view with a third member (the refused mount's departed identity, D-0961)" "$stale_view" "0"
         ck "B's mount after the pass returned rc=0" "${bm2_rc:-none}" "0"
         echo "  INFO A: retired sightings (P961-JOIN-SIGHTING-RETIRED)=$retired"
+      fi
         ;;
     esac
     ;;
 esac
 echo "  INFO figures: iterations=$iters locality=$locality B mount rc=${bm_rc:-?} ms=${bm_ms:-?} refused_s=${refused_s:-n/a} unwind_s=${unwind_s:-n/a} (second: rc=${bm2_rc:-n/a} ms=${bm2_ms:-n/a}) pass activations at issue=$mine_at_issue return=$mine_at_return total=$mine_total ondemand=$ondemand served_root=$served_root transition tx=$trans_tx rx=$trans_rx wait=$trans_wait stalled=$trans_stalled fail=$trans_fail park=$trans_park remaster_rx=$remaster_rx parked=$parked"
 echo "=== join_during_takeover $LABEL: fails=$fails wall=$(el)s out=$OUT $(date -u +%FT%TZ) ==="
+# the stall arm measures the watchdog only on a request of B's that met the
+# transition by name; one that met none graded a refusal that could not happen
+if [ "$EXPECT:$ARM" = clean:stall ] && [ "${JDT_STALL_VACUOUS:-1}" != 0 ] && \
+   [ $(( trans_rx + trans_wait + trans_stalled + trans_fail )) = 0 ]; then
+    echo "RESULT: VACUOUS label=$LABEL stage=no-transition: no request of B's met the transition (B: rx=$trans_rx wait=$trans_wait stalled=$trans_stalled fail=$trans_fail; probe stats_ok=${probe_ok:-n/a})"
+    exit 3
+fi
 [ "$fails" -eq 0 ]

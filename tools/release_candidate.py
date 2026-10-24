@@ -93,6 +93,24 @@ def mutable(rel: str) -> bool:
     return False
 
 
+def would_freeze(rel: str) -> bool:
+    """Whether frozen_paths() would hold rel were it a file: what a candidate freezes includes
+    a file not there yet, since one added to a frozen directory makes the candidate INVALID
+    (drift counts added files). The edit hook let a new tests/ file through while attempt 17 was
+    RUNNING because it asked only whether rel was in the frozen list
+    (D-FREEZE-HOOK-LETS-A-NEW-FILE-INTO-A-FROZEN-DIRECTORY).
+    MXFS_FREEZE_NEW_FILES=0 answers False, as before: the control."""
+    if os.environ.get("MXFS_FREEZE_NEW_FILES", "1") == "0":
+        return False
+    if mutable(rel):
+        return False
+    if rel in FROZEN_FILES or rel.startswith("data/"):
+        return True
+    if "/" not in rel and any(fnmatch.fnmatch(rel, p) for p in FROZEN_ROOT_PATTERNS):
+        return True
+    return any(rel.startswith(top + "/") for top in FROZEN_DIRS)
+
+
 def frozen_paths() -> list:
     """Every frozen file, relative to the tree, sorted; the lab file is named by its absolute
     path (its secrets and per-platform copies are never hashed)."""
@@ -390,7 +408,7 @@ def cmd_frozen(args) -> int:
     except ValueError:
         rel = str(path)
     if rel in files or (rel.startswith("data/") and not mutable(rel)) \
-            or rel == "data/criteria.json":
+            or rel == "data/criteria.json" or would_freeze(rel):
         print(f"frozen by candidate {current['candidate']}: {rel}")
         return 0
     return 1

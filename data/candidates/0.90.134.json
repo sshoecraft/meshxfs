@@ -1,7 +1,7 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-24T10:25:09Z",
+  "created": "2026-10-24T12:49:30Z",
   "state": "RUNNING",
   "attempts": [
     {
@@ -412,14 +412,36 @@
       "dist": "",
       "packages": {},
       "steps": {}
+    },
+    {
+      "created": "2026-10-24T10:25:09Z",
+      "state": "ABANDONED",
+      "dry_run": false,
+      "srcversion": "468F7F30C2E190B0244AF70",
+      "files": "tests/evidence/candidates/0.90.134_20261024T102509Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-24T10:25:09Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-24T12:48:27Z",
+          "why": "end the attempt frozen 2026-10-24T10:25:09Z so the drafted fixes and instruments go into the next attempt: the no-inode lap's kmsg follow, empty-field verdict and own read lines; the foreign-replay lap's extent mapping; the jdt stall arm probe and forced op; the merged-write overrun lap correction; the rig rejoin lap without extra arguments; the lock-record lap's root target; the pool lock's power-up ordering and holder record; the freeze hook's new-file check; measure's settled laps; the verify refusal's variant count; the release-step lap's SETTLED line; the in-gate prep lap; the type-flip counters; P-FUA-READ-SLOW; the fsx lap writer's nocreat and the fsx row's trap log"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
-  "srcversion": "468F7F30C2E190B0244AF70",
-  "module_sha256": "31be675909391950770b40442b1bc5faa9a0508c34f5c97fed6fd539f00d62ad",
-  "files": "tests/evidence/candidates/0.90.134_20261024T102509Z.files.json",
-  "files_count": 2630,
-  "files_digest": "6c5517a3626bb7d7acd812b97bb55e69b90920efea7702a18c72166b27b4c402",
+  "srcversion": "8DBA16AEB7FDD3066C9C1BC",
+  "module_sha256": "731995125732388e45a3c7c9740b245fca0e66070a04c55e07dfd2cc584ca149",
+  "files": "tests/evidence/candidates/0.90.134_20261024T124930Z.files.json",
+  "files_count": 2638,
+  "files_digest": "a2d58b6724d4234ad16265bdc2108f1b7b42093ba6802b6ad0551083b7ecea0c",
   "spec": "ec57ce06eb09c644b368cde523dfd4fa03e87d54b80a4bee31602c59f3ec175b",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
@@ -429,7 +451,7 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-24T10:25:09Z",
+      "at": "2026-10-24T12:49:30Z",
       "why": "created"
     }
   ]

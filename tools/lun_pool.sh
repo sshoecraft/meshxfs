@@ -107,6 +107,16 @@ DEFAULT_SIZE=20G
 T=/sys/kernel/scst_tgt/targets/iscsi
 H=/sys/kernel/scst_tgt/handlers/vdisk_fileio
 LOCKFILE=$POOL/.lock
+# Who holds the pool lock, and how long each hold lasted: a prep was refused after waiting 60 s
+# for it while another lane held it, and nothing said which process that was
+# (D-LUN-POOL-LOCK-WAIT-OVER-60S-REFUSES-A-PREP-WHILE-ANOTHER-LANE-HOLDS-IT).  The holder writes
+# its pid, its command line and when it took the lock into HOLDERFILE; a hold over
+# LOCK_LOG_S seconds is appended to LOCKLOG at its release.
+HOLDERFILE=$POOL/.lock.holder
+LOCKLOG=$POOL/lock.log
+LOCK_LOG_S=10
+LP_ARGS="$*"
+LOCK_T0=""
 
 tgt_of() { echo "iqn.2026-05.local.mxfs:pool-$1"; }
 scstdev_of() { echo "mxfspool$1"; }
@@ -128,15 +138,29 @@ die() { echo "lun_pool: $*" >&2; exit 1; }
 pool_lock() {  # serialise every decision about who holds what
     mkdir -p "$POOL" || die "cannot create $POOL"
     exec {LOCKFD}>>"$LOCKFILE" || die "cannot open $LOCKFILE"
-    local t0=$SECONDS
-    flock -w "${1:-60}" "$LOCKFD" || die "pool lock not taken in ${1:-60} s: $LOCKFILE"
+    local t0=$SECONDS holder
+    if ! flock -w "${1:-60}" "$LOCKFD"; then
+        holder=$(cat "$HOLDERFILE" 2>/dev/null)
+        [ -n "$holder" ] && [ -d "/proc/${holder%% *}" ] || holder="${holder:-none recorded} (not running)"
+        die "pool lock not taken in ${1:-60} s: $LOCKFILE; held by: $holder"
+    fi
     # a run's time before its prep is counted against a batch lap's bound
     # (D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT):
     # say how long the lock took, on stderr, which no caller parses
     [ $(( SECONDS - t0 )) -gt 0 ] && echo "lun_pool: pool lock waited $(( SECONDS - t0 )) s" >&2
+    echo "$$ $(date -u +%FT%TZ) lun_pool.sh $LP_ARGS" > "$HOLDERFILE"
+    LOCK_T0=$SECONDS
     return 0
 }
-pool_unlock() { exec {LOCKFD}>&-; }
+pool_unlock() {
+    if [ -n "$LOCK_T0" ]; then
+        [ $(( SECONDS - LOCK_T0 )) -gt "$LOCK_LOG_S" ] && \
+            echo "$(date -u +%FT%TZ) held $(( SECONDS - LOCK_T0 )) s by pid $$: lun_pool.sh $LP_ARGS" >> "$LOCKLOG"
+        : > "$HOLDERFILE"
+        LOCK_T0=""
+    fi
+    exec {LOCKFD}>&-
+}
 
 # A write to an SCST management file suspends the WHOLE target: SCST stops
 # admitting commands on every LUN it exports and waits, up to 90 s

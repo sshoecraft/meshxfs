@@ -19,7 +19,16 @@ FSX="$HERE/tools/fsx"
 W="$MNT/.suite_fsx.$(hostname).$$"
 rm -rf "$W" 2>/dev/null; mkdir -p "$W" || {
     echo "RESULT: FAIL | test=$SUITE_TEST_NAME | nodes=$NODES | measured=setup | reason=cannot mkdir $W"; exit 1; }
-trap 'rm -rf "$W" 2>/dev/null' EXIT
+# FSX_TRAP_LOG=<file off the mount> keeps what the trap's removal did: every
+# name rm removed, any error, and its exit status.  A work directory left on
+# the mount after the row could not otherwise say why the removal failed
+# (D-FSX-ROW-WORK-DIRECTORY-LEFT-ON-THE-MXFS-MOUNT-AFTER-ITS-EXIT-TRAP-RAN-RM-RF).
+# Unset, the trap discards both, as the board runs it.
+if [ -n "${FSX_TRAP_LOG:-}" ]; then
+    trap 'rm -rfv "$W" > "$FSX_TRAP_LOG" 2>&1; echo "trap_rm_rc=$? at $(date +%T.%N)" >> "$FSX_TRAP_LOG"' EXIT
+else
+    trap 'rm -rf "$W" 2>/dev/null' EXIT
+fi
 
 # A random seed each run (fsx's own default is always 1, so every run replayed
 # the one same operation history), reported as seed=<n> so the board records it

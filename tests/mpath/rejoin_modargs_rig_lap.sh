@@ -19,9 +19,16 @@
 #      the prep left on it, mounts
 #   5. the same arguments read on the victim and the survivor again
 #
-#   EXPOSED  the lane loads MXFS_EXTRA_MODARGS and a survivor reads each of
-#            them back: a victim loaded without the prep's arguments would read
-#            the module's defaults instead
+#   EXPOSED  a survivor reads prep's log_repeat_limit=0 back, and each of the
+#            lane's MXFS_EXTRA_MODARGS when it loads any: a victim loaded
+#            without the prep's arguments reads the module's default instead
+#            (log_repeat_limit=1, every lap of control b20261024-e827e0)
+#
+# The lap needs no MXFS_EXTRA_MODARGS: prep's own arguments are what the rejoin
+# dropped, and a lane loading extra ones is a variant, whose laps never count
+# toward a verification batch (tools/defects.py unplanned_variant: verification
+# b20261024-565ac2's six exposed PASSes, each run carrying 'marker_modargs=
+# dead_timeout_ms=12000', counted none).
 #   PASS     the victim rejoined and reads every prep argument as the survivor
 #            does
 #   FAIL     the victim reads one of them differently (named)
@@ -40,7 +47,7 @@
 # kernel-log keep ~5 s: about 95 s, 190 s at 2x.
 #
 # Usage: MXFS_NODES=<n> MXFS_NODE_LIST=<csv> MXFS_DEV=<mpath dev> \
-#        MXFS_CONFIG=<n>/disk/caw/mpath MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 \
+#        MXFS_CONFIG=<n>/disk/caw/mpath [MXFS_EXTRA_MODARGS=...] \
 #        tests/mpath/rejoin_modargs_rig_lap.sh
 # Exit: 0 PASS, 1 FAIL, 2 ABORT.
 set -u
@@ -57,10 +64,9 @@ read_params() {
 
 main() {
 [ "$N" -ge 2 ] || { echo "LAP rejoin_modargs_rig ABORT: needs 2 nodes, got $N"; exit 2; }
-[ -n "${MXFS_EXTRA_MODARGS:-}" ] || { echo "LAP rejoin_modargs_rig ABORT: MXFS_EXTRA_MODARGS is empty: a rejoin without the prep's arguments would read like one with them"; exit 2; }
-echo "INFO PF_REJOIN_PREP_ARGS=${PF_REJOIN_PREP_ARGS:-(unset)} MXFS_CONFIG=${MXFS_CONFIG:-?} MXFS_EXTRA_MODARGS=$MXFS_EXTRA_MODARGS nodes=$NODES_CSV victim=$V survivor=$W"
+echo "INFO PF_REJOIN_PREP_ARGS=${PF_REJOIN_PREP_ARGS:-(unset)} MXFS_CONFIG=${MXFS_CONFIG:-?} MXFS_EXTRA_MODARGS=${MXFS_EXTRA_MODARGS:-(none)} nodes=$NODES_CSV victim=$V survivor=$W"
 PARAMS="force_transport target_cache_protected log_repeat_limit target_retire_contract"
-for kv in $MXFS_EXTRA_MODARGS; do PARAMS="$PARAMS ${kv%%=*}"; done
+for kv in ${MXFS_EXTRA_MODARGS:-}; do PARAMS="$PARAMS ${kv%%=*}"; done
 PF_DEATH=1
 OTHERS=$(for n in $NODES; do [ "$n" = "$V" ] || printf '%s ' "$n"; done)
 pf_start_gate
@@ -69,12 +75,14 @@ pf_start_gate
 read_params "$W" before
 echo "INFO $W before: $(tr '\n' ' ' < "$OUT/params_${W}_before.txt")"
 miss=0
-for kv in $MXFS_EXTRA_MODARGS; do
+# prep loads log_repeat_limit=0 (tests/setup/prep_node.sh MODARGS); the module's
+# default is 1, which a rejoin without prep's arguments loads
+for kv in log_repeat_limit=0 ${MXFS_EXTRA_MODARGS:-}; do
     got=$(sed -n "s/^${kv%%=*}=//p" "$OUT/params_${W}_before.txt")
     [ "$got" = "${kv#*=}" ] || { miss=1; echo "INFO $W reads ${kv%%=*}=${got:-unread}, the lane loads ${kv#*=}"; }
 done
-[ "$miss" = 0 ] || { echo "LAP rejoin_modargs_rig ABORT: the survivor does not read the lane's MXFS_EXTRA_MODARGS back; the prep did not load them"; exit 2; }
-echo "EXPOSED: $W reads the lane's $MXFS_EXTRA_MODARGS back; a victim loaded without the prep's arguments would read the module's defaults"
+[ "$miss" = 0 ] || { echo "LAP rejoin_modargs_rig ABORT: the survivor does not read prep's arguments back; the prep did not load them"; exit 2; }
+echo "EXPOSED: $W reads prep's log_repeat_limit=0${MXFS_EXTRA_MODARGS:+ and the lane extras $MXFS_EXTRA_MODARGS} back; a victim loaded without the prep's arguments would read the module's defaults"
 
 # 3. the victim dies and is fenced
 timeout 60 $VIRSH destroy "$V" >/dev/null 2>&1

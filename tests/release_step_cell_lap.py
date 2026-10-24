@@ -288,6 +288,31 @@ def dispose(tree: Path, how: str, run: str, key: tuple) -> None:
              "defects.py remove")
 
 
+def live_settled(key: tuple) -> list:
+    """The kinds of the live ledgers' annotations of the run (infra, detector-defect, retired_by,
+    withdrawn): a run the live tree has settled, which a scratch copy lists only once unsettle has
+    dropped them. Read in both arms, before the scratch gate, so a control of unsettle shows the
+    lap met the case its ABORT is about."""
+    config, row, iso = key
+    ledgers = [ROOT / "data" / "criteria.runs.jsonl"]
+    ledgers += [(ROOT / board).with_name((ROOT / board).stem + ".runs.jsonl") for board in own_boards()]
+    kinds = []
+    for ledger in ledgers:
+        if not ledger.exists():
+            continue
+        for line in ledger.read_text().splitlines():
+            if f'"{iso}"' not in line:
+                continue
+            try:
+                item = json.loads(line)
+            except ValueError:
+                continue
+            if (item.get("kind") not in (None, "run")
+                    and (item.get("config"), item.get("row"), item.get("iso")) == key):
+                kinds.append(str(item.get("kind")))
+    return kinds
+
+
 def live_run(key: tuple) -> dict | None:
     config, row, iso = key
     found = None
@@ -323,6 +348,10 @@ def main() -> int:
         for number, (run, how) in enumerate((r, h) for r in RUNS for h in DISPOSITIONS):
             if True:
                 tree = scratch_tree(base / f"{number:02d}")
+                settled = live_settled(keys[run])
+                if settled:
+                    print(f"SETTLED: the live ledger settles {run} ({', '.join(settled)}) "
+                          f"before {how}")
                 unname(tree, keys[run])
                 if UNSETTLE:
                     unsettle(tree, keys[run])

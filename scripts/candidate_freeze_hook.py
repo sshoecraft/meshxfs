@@ -52,8 +52,11 @@ def main() -> int:
         rel = str(path.relative_to(ROOT))
     except ValueError:
         rel = str(path)
+    # would_freeze: a file not there yet that a frozen directory would hold is frozen too, since
+    # adding it is drift
     if rel in files or rel == "data/criteria.json" or \
-            (rel.startswith("data/") and not release_candidate.mutable(rel)):
+            (rel.startswith("data/") and not release_candidate.mutable(rel)) or \
+            release_candidate.would_freeze(rel):
         print(f"candidate {active['candidate']} is being qualified and has frozen {rel}: an edit "
               f"now would make it INVALID. Wait for it to end, or abandon it "
               f"(tools/release_candidate.py abandon {active['candidate']} --why ...).",

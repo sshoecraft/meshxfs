@@ -66,7 +66,11 @@
 # Exit 0 PASS, 1 FAIL, 2 ABORT, 3 VACUOUS.
 set -u
 LABEL=${1:?label}
-cd "$(dirname "$0")/.." || exit 2
+# the tree root holds run.sh and tools/mxfs_lab.sh both, found from the unresolved path: a draft
+# of this lap under tests/evidence, a symbolic link out of the tree, still finds its tree
+HERE="$(cd "$(dirname "$0")" && while { [ ! -f run.sh ] || [ ! -f tools/mxfs_lab.sh ]; } && [ "$(pwd)" != / ]; do cd ..; done; pwd)"
+[ -f "$HERE/tools/mxfs_lab.sh" ] || { echo "ABORT: no tree root above $0"; exit 2; }
+cd "$HERE" || exit 2
 export MXFS_NODE_LIST=${MXFS_NODE_LIST:?MXFS_NODE_LIST (four nodes)}
 export MXFS_CONFIG=${MXFS_CONFIG:-4/disk/caw/direct}
 IFS=, read -r -a ALL <<<"$MXFS_NODE_LIST"
@@ -81,7 +85,7 @@ D=$MNT/.fragag_$LABEL
 OUT=tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_fragag_$LABEL
 mkdir -p "$OUT"
 fails=0
-. "$(dirname "$0")/lib/rig.sh"
+. "$HERE/tests/lib/rig.sh"
 MARK="FRAGAG-MARK-$LABEL-$$"
 echo "=== foreign_replay_ag_lap label=$LABEL config=$MXFS_CONFIG victim=$V survivors=${SURV[*]} nf=$NF nf_mb=$NF_MB err_ms=$ERR_MS $(date -u +%FT%TZ) ==="
 s0=$(date +%s)
@@ -121,9 +125,43 @@ echo "STAGE geometry agblklog=$AGBLKLOG inopblog=$INOPBLOG agshift=$AGSHIFT"
 measure "$V" 60 "$OUT/V_files.txt" '^FILES_END$' "V's files" \
     "mkdir -p $D/v || exit 1; i=0; while [ \$i -lt $NF ]; do f=$D/v/f\$i; fallocate -l ${NF_MB}M \$f || break; echo FILE \$i \$(stat -c %i \$f); i=\$((i+1)); done; sync -f $MNT; echo FILES_END"
 [ "$(cnt "$OUT/V_files.txt" '^FILE ')" = "$NF" ] || abort files "V made $(cnt "$OUT/V_files.txt" '^FILE ') of $NF files"
-declare -A AGOF
-while read -r _ i ino; do AGOF[$i]=$(( ino >> AGSHIFT )); done < <(grep -a '^FILE ' "$OUT/V_files.txt")
-echo "STAGE V's files: $NF in AGs $(printf '%s\n' "${AGOF[@]}" | sort -n | uniq -c | awk '{printf "%s(x%s) ", $2, $1}')"
+declare -A AGOF INOAG
+while read -r _ i ino; do INOAG[$i]=$(( ino >> AGSHIFT )); done < <(grep -a '^FILE ' "$OUT/V_files.txt")
+echo "STAGE V's files: $NF inodes in AGs $(printf '%s\n' "${INOAG[@]}" | sort -n | uniq -c | awk '{printf "%s(x%s) ", $2, $1}')"
+# A truncate frees the file's extents under the grant of the AG that holds them, and
+# writes that AG's headers (AGF, the free-space btrees); the inode's own AG gets no
+# header write from it.  The inode's AG and its data's AG are not one AG on every
+# configuration: on 4/net/mesh/direct two laps of b20261024-0f5859 had every inode in
+# AG 11 while V's load (same directory) wrote AGs 3 and 4, and graded VACUOUS by the
+# inode's AG.  So each file's extents are read and a truncate is in every AG its
+# extents are in.  xfs_io's bmap refuses the mount as a foreign filesystem, so the
+# extents come from FIEMAP (filefrag -v, in filesystem blocks); the module's iomap
+# adds the envelope ahead of the XFS region to every address
+# (pal/linux/xfs_iomap.c, bt_sector_offset), so a block's AG is (physical -
+# xfs_data_offset/blocksize) / agblocks, from the geometry read above.
+# FRA_MAP=inode maps by the inode's AG, as before: the control.
+BSIZE=$(grep -aoE 'blocksize=[0-9]+' "$OUT/geometry.txt" | head -1 | cut -d= -f2)
+AGBLOCKS=$(grep -aoE 'agblocks=[0-9]+' "$OUT/geometry.txt" | head -1 | cut -d= -f2)
+DATAOFF=$(grep -aoE 'xfs_data_offset=[0-9]+' "$OUT/geometry.txt" | head -1 | cut -d= -f2)
+[ -n "$BSIZE" ] && [ -n "$AGBLOCKS" ] && [ -n "$DATAOFF" ] || abort geometry "no blocksize/agblocks/xfs_data_offset in $OUT/geometry.txt"
+[ $(( DATAOFF % BSIZE )) = 0 ] || abort geometry "xfs_data_offset $DATAOFF is not a whole number of $BSIZE-byte blocks"
+OFFB=$(( DATAOFF / BSIZE ))
+measure "$V" 60 "$OUT/V_extents.txt" '^EXT_END$' "V's files' extents" \
+    "for i in \$(seq 0 $((NF - 1))); do filefrag -v $D/v/f\$i > /tmp/fragag_ext.txt 2>&1; echo EXTRAW \$i \$(grep -c '^ *[0-9]*:' /tmp/fragag_ext.txt) \$(grep -m1 'blocks of' /tmp/fragag_ext.txt); echo EXT \$i \$(awk -v off=$OFFB -v agb=$AGBLOCKS '\$1 ~ /^[0-9]+:\$/ {p=\$4; sub(/\\.\\.\$/, \"\", p); q=\$5; sub(/:\$/, \"\", q); print int((p - off) / agb); print int((q - off) / agb)}' /tmp/fragag_ext.txt | sort -un | tr '\n' ' '); done; echo EXT_END"
+grep -a '^EXTRAW ' "$OUT/V_extents.txt" | grep -av "blocks of $BSIZE bytes" | head -1 | grep -q . && \
+    abort extents "filefrag reported extents in other than $BSIZE-byte blocks ($OUT/V_extents.txt)"
+declare -A EXTAG
+while read -r _ i ags; do EXTAG[$i]=$ags; done < <(grep -a '^EXT ' "$OUT/V_extents.txt")
+noext=0
+for i in $(seq 0 $((NF - 1))); do
+    case "${EXTAG[$i]:-}" in ''|*[!0-9\ ]*) noext=$((noext+1)) ;; esac
+done
+echo "STAGE V's files' data extents in AGs: $(for i in $(seq 0 $((NF - 1))); do echo "${EXTAG[$i]:-none}"; done | tr ' ' '\n' | grep -v '^$' | sort -n | uniq -c | awk '{printf "%s(x%s) ", $2, $1}') (files with no AG read: $noext)"
+[ "$noext" = 0 ] || abort extents "$noext of $NF files' extents have no AG read ($OUT/V_extents.txt)"
+for i in $(seq 0 $((NF - 1))); do
+    if [ "${FRA_MAP:-extent}" = inode ]; then AGOF[$i]=${INOAG[$i]}; else AGOF[$i]=${EXTAG[$i]}; fi
+done
+echo "STAGE truncates mapped by the $( [ "${FRA_MAP:-extent}" = inode ] && echo "inode's AG (FRA_MAP=inode)" || echo "data extents' AGs" )"
 for j in 0 1 2; do
     n=${SURV[$j]}
     list=$(for i in $(seq 0 $((NF - 1))); do [ $((i % 3)) = $j ] && printf '%s ' "$i"; done)
@@ -227,12 +265,16 @@ for j in 0 1 2; do
         h0=$(( t0 - off )); h1=$(( t1 - off ))
         [ $((t1 - t0)) -gt $maxms ] && maxms=$((t1 - t0))
         [ -n "$R" ] && [ "$n" != "$R" ] || continue
-        case " $REPLAY_AGS " in *" ${AGOF[$i]} "*) ;; *) continue ;; esac
+        inrep=""
+        for a in ${AGOF[$i]}; do
+            case " $REPLAY_AGS " in *" $a "*) inrep="$inrep $a" ;; esac
+        done
+        [ -n "$inrep" ] || continue
         if [ "$h0" -lt "$T_ENTRY" ]; then
             exposed=$((exposed+1))
             if [ "$h1" -lt $(( T_ENTRY - ERR_MS )) ]; then
                 early=$((early+1))
-                echo "  EARLY $n truncated f$i (AG ${AGOF[$i]}) by host ms $h1, $(( T_ENTRY - h1 )) ms before the replay's ladder entry"
+                echo "  EARLY $n truncated f$i (AG${inrep}) by host ms $h1, $(( T_ENTRY - h1 )) ms before the replay's ladder entry"
             fi
         fi
     done < <(grep -a '^OP ' "$OUT/${n}_trunc.txt")

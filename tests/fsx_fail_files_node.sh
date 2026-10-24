@@ -25,22 +25,35 @@ HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 FSXSH="$HERE/suite/fsx.sh"
 BOUND=28
 OUT=/root/fsx_fail_files_$LABEL.row.out
+TRAPLOG=/root/fsx_fail_files_$LABEL.trap.log
 
 grep -q " $MNT mxfs " /proc/mounts || { echo "NODE fsx_fail_files ABORT: $MNT is not an mxfs mount"; exit 2; }
-echo "NODE fsx_fail_files start $(date -u +%FT%TZ) host=$(hostname) mount=$MNT FSX_KEEP_FAIL_FILES=${FSX_KEEP_FAIL_FILES:-unset}"
+echo "NODE fsx_fail_files start $(date -u +%FT%TZ) host=$(hostname) mount=$MNT FSX_KEEP_FAIL_FILES=${FSX_KEEP_FAIL_FILES:-unset} FSX_WRITER_NOCREAT=${FSX_WRITER_NOCREAT:-unset}"
+left0=$(ls -d "$MNT"/.suite_fsx.* 2>/dev/null | wc -l)
 t0=$(date +%s%3N)
-MXFS_NODES=1 timeout -k 5 "$BOUND" "$FSXSH" "$MNT" > "$OUT" 2>&1 &
+rm -f "$TRAPLOG"
+FSX_TRAP_LOG=$TRAPLOG MXFS_NODES=1 timeout -k 5 "$BOUND" "$FSXSH" "$MNT" > "$OUT" 2>&1 &
 row=$!
 
 # the second writer: the row's test files are fsxfile_<ops>; fsx's own files
-# carry a suffix and are left alone
+# carry a suffix and are left alone.  The writer runs until the row's process
+# exits, and the row's EXIT trap removes the work directory inside that
+# process, so a file the writer stat'ed before the trap's rm -rf unlinked it
+# was created again by its dd, and the trap's rmdir left the directory on the
+# mount (fxn3 at 2/net/mesh/direct: fsxfile_50000, born 4 ms after the row
+# ended,
+# D-FSX-FAIL-FILES-LAP-WRITER-RECREATES-A-TEST-FILE-AND-LEAVES-THE-WORK-DIRECTORY).
+# So it only ever overwrites a file that exists (conv=nocreat).
+# FSX_WRITER_NOCREAT=0 lets dd create the file, as before: the control.
+DDCONV=notrunc,nocreat
+[ "${FSX_WRITER_NOCREAT:-1}" = 0 ] && DDCONV=notrunc
 writes=0
 while kill -0 "$row" 2>/dev/null; do
     for f in "$MNT"/.suite_fsx."$(hostname)".*/fsxfile_*; do
         case "$f" in *'*'*|*.fsx*) continue ;; esac
         sz=$(stat -c %s "$f" 2>/dev/null) || continue
         [ "$sz" -gt 0 ] || sz=4096
-        dd if=/dev/urandom of="$f" bs="$sz" count=1 conv=notrunc status=none 2>/dev/null &&
+        dd if=/dev/urandom of="$f" bs="$sz" count=1 conv="$DDCONV" status=none 2>/dev/null &&
             writes=$((writes + 1))
     done
     sleep 0.01
@@ -63,6 +76,19 @@ if [ "${failed:-0}" -lt 2 ] || [ -z "$seed" ]; then
 fi
 left=$(ls -d "$MNT"/.suite_fsx."$(hostname)".* 2>/dev/null | wc -l)
 echo "EXPOSED: the fsx row failed both checks on the mxfs mount (failed=$failed seed=$seed), work directories left on the mount: $left"
+# what the row's EXIT trap's rm did (removed names, errors, exit status), and
+# each work directory left with every name in it and its birth, so a leftover
+# says whether a name the trap removed was created again after it
+echo "NODE fsx_fail_files trap log ($TRAPLOG): $(grep -c '^removed' "$TRAPLOG" 2>/dev/null) removed"
+grep -av '^removed' "$TRAPLOG" 2>/dev/null | sed 's/^/  TRAP /'
+grep -a '^removed .*fsxfile_[0-9]*.$' "$TRAPLOG" 2>/dev/null | sed 's/^/  TRAP /'
+for d in "$MNT"/.suite_fsx."$(hostname)".*; do
+    [ -e "$d" ] || continue
+    stat -c "  LEFT DIR %n birth=%w" "$d"
+    for f in "$d"/* "$d"/.[!.]*; do
+        [ -e "$f" ] && stat -c "  LEFT FILE %n size=%s birth=%w" "$f"
+    done
+done
 echo "NODE fsx_fail_files survived in /root:"
 ls -la /root/fsx."$seed".* /root/fsx."$seed".*.d/ 2>/dev/null | sed 's/^/  /'
 
@@ -80,6 +106,12 @@ for ops in 100000 50000; do
 done
 if [ -n "$missing" ]; then
     echo "NODE fsx_fail_files FAIL: removed with the row:$missing"; exit 1
+fi
+# a work directory the row's trap did not remove is this lap's own failure
+# (D-FSX-FAIL-FILES-LAP-WRITER-RECREATES-A-TEST-FILE-AND-LEAVES-THE-WORK-DIRECTORY);
+# directories already on the mount before the row are not this lap's
+if [ "$left" -gt "$left0" ]; then
+    echo "NODE fsx_fail_files FAIL: the row's work directory was left on the mount ($left0 before the row, $left after)"; exit 1
 fi
 echo "NODE fsx_fail_files PASS: each failed check's log and its .fsxlog, .fsxops and .fsxgood survived the row in /root"
 exit 0

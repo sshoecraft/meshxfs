@@ -12,8 +12,12 @@ gate lap was recorded PASS (batch b20261022-548ef2).
 The lap runs the gate's join_during_takeover entry as a healthy lap (`--healthy-only --only
 join_during_takeover`) through tools/batch_lap.py main() on scratch copies of the queue and the
 board (MXFS_DEFECTS, MXFS_CRIT), so nothing reaches the real ledgers, with an operation over the
-limit forced: EXPECT=clean ARM=stall holds A's takeover pass 45 s (dl_takeover_pause_ms=45000), and
-B's mount issued inside it is refused after the hold, timed by op_ms. It declares a one-lap
+limit forced: JDT_FORCE_OP_S (the policy's stall limit plus one second) makes B's first unmount
+sleep inside its timed window, so op_ms times it past the limit, on jdt's default arm (EXPECT=clean
+ARM=ondemand). The stall arm (ARM=stall) the lap used before cannot make such an operation: B's
+root request meets no transition, B mounts in seconds and nothing over the limit is timed
+(D-JDT-STALL-ARM-GRADES-A-JOIN-THAT-MET-NO-TRANSITION-AS-A-FAILED-REFUSAL; control
+b20261023-9da1ae, every lap UNMEASURED with its worst operation 7853-8196 ms). It declares a one-lap
 calibration batch of this record there (row lap:jdt_gate_stall_inner at 2/net/mesh/direct) and
 reads back the run batch_lap.py appended to the scratch ledger:
 
@@ -25,12 +29,12 @@ reads back the run batch_lap.py appended to the scratch ledger:
 Either switch off in the lap's environment is the control of its own fix site; the lap hands its
 environment to the gate and through it to jdt.
 
-Bound, derived: the gate's pair check (~1 s when formed) and jdt's clean:stall lap: B's clean
-unmount (~40 s with ~15k pages handed back at NFILES=32000; NFILES is the manifest's), A's
-last-member unmount and lone remount (~3 s), the create of NFILES entries (~NFILES/25 s = 1280 s
-at 32000, so the lap runs NFILES=4000: ~160 s), B's mount held 45 s plus the 30 s watchdog and its
-unwind (~80 s), the stall recovery (the pass remainder NFILES/50+120 s = 200 s, then a 90 s mount),
-captures ~20 s: about 600 s; 1200 s at 2x. batch_lap.py is given that bound.
+Bound, derived: the gate's pair check (~1 s when formed) and jdt's clean:ondemand lap at
+NFILES=4000: the create of the entries (~NFILES/25 s = 160 s), B's clean unmount (~40 s at most,
+measured with ~15k pages handed back at NFILES=32000) plus the forced 31 s, A's last-member unmount
+and lone remount (~3 s), the pass paced 30 ms a page until it is seen (~15 s), B's mount served on
+demand (~5 s; jdt bounds it at 90 s), captures ~20 s, the directory reads (~5 s): about 280 s;
+600 s at 2x, rounded up. batch_lap.py is given that bound.
 
 Usage: tests/jdt_gate_stall_lap.py   (on the g2 pair, formed at 2/net/mesh/direct)
 Exit: 0 PASS, 1 FAIL, 2 the lap could not measure.
@@ -51,7 +55,7 @@ import criteria  # noqa: E402
 RECORD = "D-HARNESS-LAP-TIMED-OPS-REACH-NO-STALL-GRADER-JDT-31S-UNMOUNT-GRADED-PASS"
 ROW = "lap:jdt_gate_stall_inner"
 AT = "2/net/mesh/direct"
-LAP_BOUND = 1200
+LAP_BOUND = 600
 # At NFILES=4000 the pass is ~500 pages and ended inside jdt's first in-flight sample, so every
 # lap of the first control aborted before the stall arm's hold (b20261023-9da1ae, laps 1-5:
 # 'the takeover pass was not seen in flight (activations=493 ...)'). JDT_PASS_PACE_MS=30 holds
@@ -85,7 +89,8 @@ def main() -> int:
         env = {k: v for k, v in os.environ.items()
                if k not in ("MXFS_CANDIDATE", "MXFS_BATCH", "MXFS_GROUP")}
         env.update(MXFS_DEFECTS=str(s / "defects.json"), MXFS_CRIT=str(s / "criteria.json"),
-                   EXPECT="clean", ARM="stall", WANT="any")
+                   EXPECT="clean", ARM="ondemand", WANT="any",
+                   JDT_FORCE_OP_S=str(limit_ms // 1000 + 1))
         declared = subprocess.run(
             [sys.executable, str(ROOT / "tools" / "defects.py"), "batch", RECORD, "--row", ROW,
              "--at", AT, "--kind", "calibrate", "--runs", "1", "--probe", r"^GATE join_during",

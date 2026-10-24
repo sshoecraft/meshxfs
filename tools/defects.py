@@ -1075,10 +1075,17 @@ def cmd_measure(data: dict, args) -> int:
         print("  %d FAIL lap(s) without exposure are not counted against %s (each is an incident "
               "of its own until a record names it): %s"
               % (len(unattributed), entry["id"], ", ".join(str(r.get("iso")) for r in unattributed)))
-    if len([r for r in laps if r.get("outcome") in ("PASS", "FAIL")]) != int(batch["planned"]):
-        sys.exit("defects: batch %s planned %s laps and has %d; run the rest first"
-                 % (batch["id"], batch["planned"],
-                    len([r for r in laps if r.get("outcome") in ("PASS", "FAIL")])))
+    # A lap with a reviewed disposition stands in for the lap it was, as the refusal above says:
+    # check_batch_lap counts it against the plan and refuses a lap past it, so a measure that
+    # counted only PASS and FAIL could never close a batch holding one
+    # (D-MEASURE-REFUSES-A-BATCH-WHOSE-SETTLED-LAP-CHECK-BATCH-LAP-COUNTED-AS-RUN).
+    # MXFS_MEASURE_COUNT_SETTLED=0 counts only PASS and FAIL, as before: the control.
+    settled = [] if os.environ.get("MXFS_MEASURE_COUNT_SETTLED", "1") == "0" else \
+        [r for r in laps if r.get("outcome") in ("INCOMPLETE", "INFRA") and r not in unresolved]
+    measured = len([r for r in laps if r.get("outcome") in ("PASS", "FAIL")])
+    if measured + len(settled) != int(batch["planned"]):
+        sys.exit("defects: batch %s planned %s laps and has %d (%d settled); run the rest first"
+                 % (batch["id"], batch["planned"], measured + len(settled), len(settled)))
     k = sum(1 for r in counted if r.get("outcome") == "FAIL")
     rate = {"row": batch["row"], "config": batch["config"], "platform": batch["platform"],
             "kind": batch["kind"], "batch": batch["id"], "k": k, "n": len(counted),
@@ -1346,12 +1353,23 @@ def cmd_verify(data: dict, args) -> int:
     good = [r for r in laps if r.get("outcome") == "PASS" and exposed(r, batch)
             and not unplanned_variant(r, batch)]
     if len(good) < int(batch["planned"]):
+        # Each reason a PASS does not count is named apart: a refusal that called six exposed
+        # PASSes of a variant 'without exposure' sent the reader to the probe, not the variant
+        # (D-VERIFY-REFUSAL-NAMES-VARIANT-LAPS-AS-UNEXPOSED, batch b20261024-565ac2).
+        passes = [r for r in laps if r.get("outcome") == "PASS"]
+        unexposed = [r for r in passes if not exposed(r, batch)]
+        variant = [r for r in passes if exposed(r, batch) and unplanned_variant(r, batch)]
+        # MXFS_VERIFY_NAME_VARIANT=0 counts every uncounted PASS as one without exposure, as
+        # before: the control
+        if os.environ.get("MXFS_VERIFY_NAME_VARIANT", "1") == "0":
+            sys.exit("defects: batch %s has %d exposed PASS lap(s) of the %s planned (%d PASS without "
+                     "exposure do not count); run the rest"
+                     % (batch["id"], len(good), batch["planned"], len(passes) - len(good)))
         sys.exit("defects: batch %s has %d exposed PASS lap(s) of the %s planned (%d PASS without "
-                 "exposure do not count); run the rest" % (batch["id"], len(good),
-                                                          batch["planned"],
-                                                          sum(1 for r in laps
-                                                              if r.get("outcome") == "PASS")
-                                                          - len(good)))
+                 "exposure and %d run as an unplanned variant (%s) do not count); run the rest"
+                 % (batch["id"], len(good), batch["planned"], len(unexposed), len(variant),
+                    ", ".join(sorted({str(r.get("variant") or r.get("build") or "?")
+                                      for r in variant})) or "none"))
     approval = require_approval(args.approval, "verify", entry["id"],
                                 {"batch": batch["id"]})
     batch["state"] = "passed"

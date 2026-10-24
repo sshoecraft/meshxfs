@@ -2075,9 +2075,35 @@ static int mxfs_pal_scsi_read_fua_bdev_body(struct block_device *bdev,
 				memset(&sshdr, 0, sizeof(sshdr));
 				ret = 0;		/* a short transfer: retryable */
 			} else {
+				unsigned long t0 = jiffies;
+				unsigned int took_ms;
+
 				ret = mxfs_scsi_exec_in(sdev, cdb, buf, len,
 							cmd_j, cmd_retries,
 							&sshdr, &resid);
+				/*
+				 * A read outstanding on a path that stopped
+				 * answering waits until the transport fails the
+				 * session (5.9 s on 16/disk/caw/mpath, a lock holder
+				 * whose peers waited on it all that time,
+				 * D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S);
+				 * say which path and how long, so a bound on it
+				 * can be measured against what it replaces.
+				 */
+				took_ms = jiffies_to_msecs(jiffies - t0);
+				if (took_ms >= 1000) {
+					static atomic_t p_fuaslow_n = ATOMIC_INIT(0);
+
+					if (atomic_inc_return(&p_fuaslow_n) <= 200)
+						mxfs_probe("mxfs: P-FUA-READ-SLOW lba=%llu len=%u ms=%u ret=0x%x resid=%d try=%d host=%d online=%d budget_ms=%ld comm=%s pid=%d\n",
+							(unsigned long long)lba_512,
+							len, took_ms, ret, resid,
+							fua_try + 1,
+							sdev->host->host_no,
+							scsi_device_online(sdev) ? 1 : 0,
+							budget_ms, current->comm,
+							current->pid);
+				}
 			}
 			/*
 			 * v0.3.108 (root-cause): scsi_execute_cmd can

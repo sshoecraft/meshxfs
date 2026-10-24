@@ -2542,11 +2542,35 @@ finalize_pending() {
 # gate's log-rate sample cannot tell them from a flood: measured 2026-10-04,
 # six runs started together, 58 lines/s against the 40 allowed, every line a
 # session or a LUN thread starting, and two of the six runs refused.
+#
+# The gate also waits out any lane's power-up (shared on
+# /tmp/mxfs_host_powerup.lock, which scripts/lab_power.sh holds exclusive for
+# a whole 'up').  Waited for inside the pool lock, a power-up held the pool
+# for every lane: lap pw8c4 took the pool at 10:40:47 on 2026-10-24, its gate
+# waited 58 s on lane g4c's power-up, and another lane's alloc gave up after
+# 60 s (D-LUN-POOL-LOCK-WAIT-OVER-60S-REFUSES-A-PREP-WHILE-ANOTHER-LANE-HOLDS-IT).
+# So the power-up is waited for first, and the shared hold is kept across the
+# pooled gate: the gate's own shared wait is then immediate, and no power-up
+# can start while the pool is held quiet.  Every taker orders the two locks
+# power-up first, pool second (lab_power.sh never takes the pool).
+# PREFLIGHT_POWERUP_FIRST=0 waits inside the pool lock, as before: the control.
 # ---------------------------------------------------------------------------
 PREFLIGHT=("$REPO/scripts/clyde_preflight.sh")
 [ "$USE_POOL" = 1 ] && PREFLIGHT=("$REPO/tools/lun_pool.sh" quiet "${PREFLIGHT[@]}")
 prep_wall "preflight starts"
-if ! "${PREFLIGHT[@]}"; then
+PUFD=""
+if [ "$USE_POOL" = 1 ] && [ "${PREFLIGHT_POWERUP_FIRST:-1}" != 0 ] && [ "${LAB_POWER_LOCK:-1}" != 0 ]; then
+    exec {PUFD}>>/tmp/mxfs_host_powerup.lock
+    # the gate's own bound for a power-up (scripts/clyde_preflight.sh, BOOT_S)
+    flock -s -w 240 "$PUFD" || echo "--- pre-prep: a power-up still held the host lock after 240 s ---"
+    prep_wall "power-up lock held shared"
+fi
+# The gate runs without the descriptor, so nothing it leaves running can keep
+# the hold after this shell drops it.
+if [ -n "$PUFD" ]; then "${PREFLIGHT[@]}" {PUFD}>&-; else "${PREFLIGHT[@]}"; fi
+prc=$?
+[ -n "$PUFD" ] && exec {PUFD}>&-
+if [ "$prc" != 0 ]; then
     prep_wall "preflight refused"
     echo "=== run.sh ABORTED: host-safety preflight failed at ${CONFIG} ===" >&2
     echo "    Do not widen or skip this to make a run start.  Fix the host." >&2

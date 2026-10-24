@@ -38,8 +38,20 @@
 # Usage: tests/lockrec_slot0_lap.sh <label> [config=2/disk/caw/direct] [group=g2]
 #        LOCKREC_VALIDATE=1 tests/lockrec_slot0_lap.sh <label> ...   (control)
 # Exit: 0 PASS, 1 FAIL, 2 ABORT.
+#
+# LOCKREC_TARGET=root exposes slot 0 on every lap instead of about one lap in two at 40000
+# creates (the burst arm, the default): after the prep, both nodes unmount and A formats the
+# device again as tests/setup/prep_fs.sh does, but with tests/caw_slot_uuid.py's bytes bound over
+# /dev/urandom, whose uuid puts the root directory's inode lock (type 1, ino 128) home at CAW slot
+# 0; A mounts alone, so its mount's claim of that lock is slot 0 at gen=1, and B's first mount on
+# that format is the disklock init graded.  Bound of the arm's added steps: two unmounts 2x40 s,
+# the bytes 15 s, the format 120 s (a 128 GiB pool LUN), A's mount 45 s, the slot read 10 s.
 LABEL=${1:?label}; CONFIG=${2:-2/disk/caw/direct}; GROUP=${3:-g2}
-HERE="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+# the tree root holds run.sh and tools/mxfs_lab.sh both, found from the unresolved path: a draft
+# of this lap under tests/evidence, a symbolic link out of the tree, still finds its tree
+HERE="$(cd "$(dirname "$0")" && while { [ ! -f run.sh ] || [ ! -f tools/mxfs_lab.sh ]; } && [ "$(pwd)" != / ]; do cd ..; done; pwd)"
+[ -f "$HERE/tools/mxfs_lab.sh" ] || { echo "LAP lockrec_slot0 ABORT: no tree root above $0"; exit 2; }
+SELF="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/tools/mxfs_lab.sh"
 SSH="$HERE/tools/mxfs_sshpass.sh"
 NREPO=/src/$(basename "$HERE")
@@ -67,7 +79,28 @@ DEV=$(on "$A" 10 "findmnt -no SOURCE $MNT" | tail -1)
 [ -n "$DEV" ] || abort "$A has nothing mounted at $MNT"
 
 slot0=""; n=0; t0=$(date +%s)
-while [ "$n" -lt "$MAXBURST" ]; do
+if [ "${LOCKREC_TARGET:-burst}" = root ]; then
+    python3 "$SELF/caw_slot_uuid.py" "$OUT/slot0.rand" > "$OUT/uuid.txt" || abort "no uuid bytes: $(cat "$OUT/uuid.txt")"
+    echo "STEP uuid for the root inode lock at slot 0: $(cat "$OUT/uuid.txt")"
+    on "$B" 50 "timeout 40 umount $MNT; echo UMOUNT_RC=\$?" | grep -a UMOUNT_RC
+    on "$A" 50 "timeout 40 umount $MNT; echo UMOUNT_RC=\$?" | grep -a UMOUNT_RC
+    on "$A" 15 "echo $(base64 -w0 "$OUT/slot0.rand") | base64 -d > /root/lockrec_$LABEL.rand; wc -c < /root/lockrec_$LABEL.rand" | grep -aq '^4096$' \
+        || abort "the bytes did not reach $A"
+    on "$A" 120 "sg_persist --out --register-ignore --param-sark=0x5eed $DEV >/dev/null 2>&1; sg_persist --out --clear --param-rk=0x5eed $DEV >/dev/null 2>&1; unshare -m sh -c 'mount --bind /root/lockrec_$LABEL.rand /dev/urandom && exec $NREPO/tools/mkfs_mxfs -f -n ${MXFS_LOG_SLICES:-32} ${MXFS_MKFS_OPTS:-} $DEV' > /root/lockrec_$LABEL.mkfs 2>&1; echo MKFS_RC=\$?; tail -3 /root/lockrec_$LABEL.mkfs" > "$OUT/mkfs.txt"
+    cat "$OUT/mkfs.txt"
+    grep -aq '^MKFS_RC=0$' "$OUT/mkfs.txt" || abort "A's format with the bytes failed"
+    on "$A" 60 "timeout 45 mount -t mxfs ${MXFS_MOUNT_OPTS:-} $DEV $MNT; echo MOUNT_RC=\$?" | grep -aq '^MOUNT_RC=0$' || abort "A did not mount the new format"
+    slot0=$(on "$A" 10 "$NREPO/tools/caw_slotdump $DEV --slot 0" | grep -a '^slot=0 ' | tail -1)
+    echo "STEP A mounted alone: ${slot0:-slot 0 unread}"
+    case "$slot0" in *"magic=0x4d584357 "*" gen=1") ;; *) abort "CAW slot 0 is not live with gen=1 after A's lone mount on the new format";; esac
+    echo "EXPOSED: CAW slot 0 is live with gen=1 ($slot0) before $B's first mount on the new format"
+    [ "${LOCKREC_VALIDATE:-}" = 1 ] && on "$B" 10 "echo 1 > /sys/module/mxfs/parameters/dl_validate_lockrec"
+    mark="LOCKREC-LAP $LABEL $(date +%s%N)"
+    on "$B" 60 "echo '$mark' > /dev/kmsg; timeout 45 mount -t mxfs ${MXFS_MOUNT_OPTS:-} $DEV $MNT; m=\$?; echo REMOUNT umount_rc=none mount_rc=\$m; grep -q ' $MNT mxfs ' /proc/mounts && echo MOUNTED" > "$OUT/remount.txt"
+    [ "${LOCKREC_VALIDATE:-}" = 1 ] && on "$B" 10 "echo 0 > /sys/module/mxfs/parameters/dl_validate_lockrec"
+    on "$A" 10 "rm -f /root/lockrec_$LABEL.rand" > /dev/null
+fi
+while [ -z "$slot0" ] && [ "$n" -lt "$MAXBURST" ]; do
     n=$((n + 1))
     on "$A" 60 "mkdir -p $MNT/lockrec_$LABEL && cd $MNT/lockrec_$LABEL && seq -f 'b${n}_%g' 1 $BURST | xargs touch" > /dev/null
     slot0=$(on "$A" 10 "$NREPO/tools/caw_slotdump $DEV --slot 0" | grep -a '^slot=0 ' | tail -1)
@@ -76,12 +109,13 @@ while [ "$n" -lt "$MAXBURST" ]; do
     slot0=""
 done
 [ -n "$slot0" ] || abort "CAW slot 0 never went live with gen=1 in $MAXBURST bursts of $BURST creates"
-echo "EXPOSED: CAW slot 0 is live with gen=1 ($slot0) before $B's remount"
-
-[ "${LOCKREC_VALIDATE:-}" = 1 ] && on "$B" 10 "echo 1 > /sys/module/mxfs/parameters/dl_validate_lockrec"
-mark="LOCKREC-LAP $LABEL $(date +%s%N)"
-on "$B" 100 "echo '$mark' > /dev/kmsg; timeout 40 umount $MNT; u=\$?; timeout 45 mount -t mxfs ${MXFS_MOUNT_OPTS:-} $DEV $MNT; m=\$?; echo REMOUNT umount_rc=\$u mount_rc=\$m; grep -q ' $MNT mxfs ' /proc/mounts && echo MOUNTED" > "$OUT/remount.txt"
-[ "${LOCKREC_VALIDATE:-}" = 1 ] && on "$B" 10 "echo 0 > /sys/module/mxfs/parameters/dl_validate_lockrec"
+if [ "${LOCKREC_TARGET:-burst}" != root ]; then
+    echo "EXPOSED: CAW slot 0 is live with gen=1 ($slot0) before $B's remount"
+    [ "${LOCKREC_VALIDATE:-}" = 1 ] && on "$B" 10 "echo 1 > /sys/module/mxfs/parameters/dl_validate_lockrec"
+    mark="LOCKREC-LAP $LABEL $(date +%s%N)"
+    on "$B" 100 "echo '$mark' > /dev/kmsg; timeout 40 umount $MNT; u=\$?; timeout 45 mount -t mxfs ${MXFS_MOUNT_OPTS:-} $DEV $MNT; m=\$?; echo REMOUNT umount_rc=\$u mount_rc=\$m; grep -q ' $MNT mxfs ' /proc/mounts && echo MOUNTED" > "$OUT/remount.txt"
+    [ "${LOCKREC_VALIDATE:-}" = 1 ] && on "$B" 10 "echo 0 > /sys/module/mxfs/parameters/dl_validate_lockrec"
+fi
 cat "$OUT/remount.txt"
 grep -aq '^MOUNTED' "$OUT/remount.txt" || abort "$B is not mounted after its remount: $(grep -a REMOUNT "$OUT/remount.txt")"
 on "$B" 15 "dmesg | sed -n '/$mark/,\$p'" > "$OUT/kmsg_$B.txt"

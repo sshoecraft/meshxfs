@@ -59,7 +59,9 @@
 set -u
 LABEL=${1:?label}
 cd "$(dirname "$0")" || exit 2
-while [ ! -f run.sh ] && [ "$(pwd)" != / ]; do cd ..; done
+# the tree root holds run.sh and tests/lib/rig.sh both: a draft of run.sh alone beside the lap
+# is not a root
+while { [ ! -f run.sh ] || [ ! -f tests/lib/rig.sh ]; } && [ "$(pwd)" != / ]; do cd ..; done
 [ -f run.sh ] || { echo "ABORT: no tree root above $0"; exit 2; }
 NREPO=/src/$(basename "$(pwd)")
 export MXFS_NODE_LIST=${MXFS_NODE_LIST:-test29,test30}
@@ -88,6 +90,29 @@ MXFS_FORCE_PREP=1 timeout 120 ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_clus
 prc=$?
 echo "STAGE prep rc=$prc wall=$(el)s"
 [ $prc = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=prep wall=$(el)s evidence=$OUT"; exit 2; }
+
+# ---- 0. each node's kernel log followed from before the marks
+# The verdict reads S's no-inode fence lines from the kernel log.  Read from the ring after
+# the run, it held nothing on either node in every lap at 2/net/mesh/direct: the network lock
+# manager's debug lines rotate the mark out of the ring within the run, so a lap whose S shut
+# down was graded VACUOUS on an empty read
+# (D-NOINO-LAP-READS-KERNEL-LOG-AFTER-THE-MARK-ROTATED-OUT-AND-GRADES-NOTHING).  Each
+# node's /dev/kmsg is followed into /root from before the marks to an end mark written after
+# the run, and a read that does not hold both marks grades nothing.  NOINO_KMSG_FOLLOW=0 reads
+# the ring afterwards, as before, under the same mark check: the control.
+FOLLOW=${NOINO_KMSG_FOLLOW:-1}
+KL=/root/noinoefd.$LABEL.$$.kmsg
+stop_follow() {
+    for n in "$S" "$R"; do
+        rs 15 "$n" "kill \$(cat $KL.pid 2>/dev/null) 2>/dev/null; rm -f $KL $KL.pid" > /dev/null 2>&1
+    done
+}
+if [ "$FOLLOW" = 1 ]; then
+    trap stop_follow EXIT
+    for n in "$S" "$R"; do
+        rs 20 "$n" "rm -f $KL $KL.pid; nohup setsid sh -c 'echo \$\$ > $KL.pid; exec cat /dev/kmsg > $KL' > /dev/null 2>&1 < /dev/null & echo started" > /dev/null
+    done
+fi
 
 # ---- 1. F on S, and the marks
 measure "$S" 30 "$OUT/S_setup.txt" '^SETUP_RC=[0-9]+$' "S's file F" \
@@ -123,15 +148,32 @@ done
 MAX_MS=$(for n in "$S" "$R"; do field "$OUT/${n}_load.txt" MAXOP_MS; done | sort -n | tail -1)
 echo "max_stall_ms=${MAX_MS:-0}"
 
+unread=""
 for n in "$S" "$R"; do
-    measure "$n" 30 "$OUT/${n}_kmsg.txt" '^KMSG_END$' "$n's kernel log since the mark" \
-        "dmesg | sed -n '/$MARK/,\$p' | cut -c1-700; echo KMSG_END"
+    if [ "$FOLLOW" = 1 ]; then
+        measure "$n" 30 "$OUT/${n}_kmsg.txt" '^KMSG_END$' "$n's kernel log since the mark" \
+            "echo '$MARK-END' > /dev/kmsg; sleep 1; kill \$(cat $KL.pid) 2>/dev/null; awk '/$MARK\$/{f=1} f' $KL | cut -c1-700; echo KMSG_END"
+    else
+        measure "$n" 30 "$OUT/${n}_kmsg.txt" '^KMSG_END$' "$n's kernel log since the mark" \
+            "echo '$MARK-END' > /dev/kmsg; dmesg | sed -n '/$MARK\$/,\$p' | cut -c1-700; echo KMSG_END"
+    fi
+    grep -aq "$MARK\$" "$OUT/${n}_kmsg.txt" && grep -aq "$MARK-END\$" "$OUT/${n}_kmsg.txt" \
+        || unread="$unread $n's read holds $(grep -vac '^KMSG_END$' "$OUT/${n}_kmsg.txt") line(s) and not both the lap's marks;"
+    # the read's own exposure: the ring no longer holds the lap's mark, so a read of the ring
+    # afterwards cannot hold it
+    ring=$(rs 20 "$n" "dmesg | grep -c '$MARK\$'")
+    [ "${ring:-0}" = 0 ] && echo "RING-ROTATED: $n's kernel ring no longer holds the lap's mark"
 done
+[ -z "$unread" ] && echo "KMSG-WHOLE: both nodes' kernel log reads hold both of the lap's marks"
 grep -a 'P-EFD-HOLD\|P-NOINO-DRAIN\|P-NOINO-CONVOY\|P-NOINO-RELFENCE\|P-AILMIN\|Shutting down\|no longer responding' "$OUT/${S}_kmsg.txt" "$OUT/${R}_kmsg.txt" \
     | sed 's/.*mxfs: /    /' | cut -c1-260 | head -20
 if [ "$HOLD_SEEN" != 1 ]; then
     echo "  S's EFD hold never started, so no chain was held"
     echo "RESULT: VACUOUS label=$LABEL stage=hold wall=$(el)s evidence=$OUT"; exit 3
+fi
+if [ -n "$unread" ]; then
+    echo "LAP noino_fence_efd_hold FAIL: the lap read no whole kernel log, so it cannot say whether S's fence met the held chain:$unread"
+    echo "RESULT: FAIL label=$LABEL stage=kmsg wall=$(el)s evidence=$OUT"; exit 1
 fi
 FENCE_N=$(cnt "$OUT/${S}_kmsg.txt" 'P-NOINO-DRAIN-RETRY\|P-NOINO-CONVOY\|P-NOINO-DRAIN-STUCK\|P-AILMIN')
 if [ "$FENCE_N" = 0 ]; then
@@ -146,7 +188,15 @@ ck "S shut nothing down" "$(cnt "$OUT/${S}_kmsg.txt" 'Shutting down filesystem')
 for n in "$S" "$R"; do
     ck "$n's load reported" "$(cnt "$OUT/${n}_load.txt" '^PATHLOAD ')" 1
     ck "$n's load: no operation failed" "$(field "$OUT/${n}_load.txt" ERRS)" 0
-    ck "$n's load: no double grant" "$(field "$OUT/${n}_load.txt" double_grant)" 0
+    # A load that printed no report has no double_grant field: the check above has already
+    # failed it, and judging the empty field ABORTed the lap, which lost the verdict of every
+    # lap whose S shut down (D-NOINO-LAP-ABORTS-ON-AN-EMPTY-FIELD-WHEN-S-SHUTS-DOWN).
+    # NOINO_LAP_JUDGE_MISSING=1 judges it anyway, as before: the control.
+    if [ "$(cnt "$OUT/${n}_load.txt" '^PATHLOAD ')" = 1 ] || [ "${NOINO_LAP_JUDGE_MISSING:-0}" = 1 ]; then
+        ck "$n's load: no double grant" "$(field "$OUT/${n}_load.txt" double_grant)" 0
+    else
+        echo "  INFO $n's load printed no report, so its double grants are not read (failed above)"
+    fi
     measure "$n" 30 "$OUT/${n}_after.txt" '^AFTER_END$' "$n still mounted and writable" \
         "grep -c ' $MNT ' /proc/mounts | sed 's/^/MOUNTED=/'; timeout 20 sh -c 'printf after > $D/after_$n && sync -f $MNT' && echo WROTE; echo AFTER_END"
     ck "$n is still mounted" "$(field "$OUT/${n}_after.txt" MOUNTED)" 1
