@@ -1123,17 +1123,27 @@
         },
         "2/net/mesh/direct": {
           "status": "PASS",
-          "measured": "elapsed=43s (fresh prep)",
+          "measured": "elapsed=37s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-24T15:38:06Z",
+          "iso": "2026-10-24T15:42:49Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 43,
+          "elapsed_s": 37,
           "build": "A27A67A3E501890BE9985E0",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T153708Z-g2",
+          "run_id": "20261024T154158Z-g2",
           "candidate": "0.90.134",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T15:38:06Z",
+              "measured": "elapsed=43s (fresh prep)",
+              "reason": "",
+              "build": "A27A67A3E501890BE9985E0",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T153708Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T15:34:06Z",
@@ -1223,16 +1233,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T145947Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T14:57:34Z",
-              "measured": "elapsed=45s (fresh prep)",
-              "reason": "",
-              "build": "A27A67A3E501890BE9985E0",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T145626Z-g2"
             }
           ]
         },
@@ -1240,16 +1240,38 @@
           "status": "PASS",
           "measured": "elapsed=39s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-24T15:37:58Z",
+          "iso": "2026-10-24T15:42:22Z",
           "recorded": "2026-10-24",
           "elapsed_s": 39,
           "build": "A27A67A3E501890BE9985E0",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T153701Z-g4",
+          "run_id": "20261024T154125Z-g4",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=probe_a_replay_apart=0",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T15:40:12Z",
+              "measured": "elapsed=39s (fresh prep)",
+              "reason": "",
+              "build": "A27A67A3E501890BE9985E0",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T153914Z-g4",
+              "variant": "MXFS_EXTRA_MODARGS=probe_a_replay_apart=0"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T15:37:58Z",
+              "measured": "elapsed=39s (fresh prep)",
+              "reason": "",
+              "build": "A27A67A3E501890BE9985E0",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T153701Z-g4",
+              "variant": "MXFS_EXTRA_MODARGS=probe_a_replay_apart=0"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T15:35:44Z",
@@ -1337,28 +1359,6 @@
               "candidate": "0.90.134",
               "run_id": "20261024T144813Z-g4",
               "variant": "MXFS_EXTRA_MODARGS=fr_stab_at_claim=0 rman_verify_par=16"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T14:46:39Z",
-              "measured": "elapsed=46s (fresh prep)",
-              "reason": "",
-              "build": "A27A67A3E501890BE9985E0",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T144525Z-g4",
-              "variant": "MXFS_EXTRA_MODARGS=fr_stab_at_claim=0 rman_verify_par=16"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T14:44:01Z",
-              "measured": "elapsed=41s (fresh prep)",
-              "reason": "",
-              "build": "A27A67A3E501890BE9985E0",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T144253Z-g4",
-              "variant": "MXFS_EXTRA_MODARGS=fr_stab_at_claim=1 rman_verify_par=1"
             }
           ]
         },

@@ -2600,6 +2600,23 @@
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: none of the eight candidates made back to back is remote-mastered on a formation that puts them all in one shard, and the harness aborts before measuring"
+        },
+        {
+          "id": "b20261024-aefae7",
+          "kind": "control",
+          "row": "lap:lh_master",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the pre-fix harness's 8 candidates",
+          "candidate": "",
+          "build": "A27A67A3E501890BE9985E0",
+          "variant": "LH_SHARD_SELECT=0 (tests/live_holder_wait.sh makes eight candidates back to back and keeps them all, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: none of the eight candidates made back to back is remote-mastered on a formation that puts them all in one shard, and the harness aborts before measuring"
         }
       ],
       "rates": [
@@ -8360,7 +8377,79 @@
       "opened": "2026-10-23",
       "summary": "A capture gate run by the release's presteps re-forms its pair with a bare run.sh (tests/capture_fault_gate.sh:141 './run.sh \"$PAIR_CONFIG\" prep_cluster', and gate entries' own preps such as tests/d0940_unknown_blocker_probe.sh:114), which takes the group only from MXFS_GROUP in its environment (run.sh:50, marker path run.sh:210). Where that variable does not reach the child, the prep forms the rig LUN's pair outside the group and rewrites the default .cluster_marker.json mid-gate (run.sh:48-49 names the cost). tools/release_run.py presteps_env now exports MXFS_GROUP (tools/release_run.py:192-193), but no lap has run an in-gate prep under it, so whether the in-gate preps form the pair under the group is unmeasured.",
       "evidence": "Split out of D-PRESTEPS-FORM-PAIR-UNDER-G2-MARKER-BUT-SELF-TESTS-READ-DEFAULT-MARKER, whose evidence (data/defects.json, that record) says 'The in-gate preps (d0940:114, d0944:66, fence_crash_cuts:336, ...) run run.sh without --group and rewrite the default marker mid-gate.' Review data/reviews/P20261023-6483b0.md (REJECT of that record's removal) found this mechanism measured by neither batch: tests/presteps_marker_read_lap.py gives the gate an empty mxfs.ko (:114), so the gate stops at tests/capture_fault_gate.sh:105 before its restore at :141, and no lap of control b20261023-151b0c or verification b20261023-c3e27a runs a run.sh prep. The only measurement offered (g2 marker gen 309 to 333, default marker steady at gen 1042 through a gate) is one uncontrolled run carrying three other fixes and is in no cited file (data/reviews/P20261022-a6f02f.md:120-125).",
-      "next": "A lap that runs one in-gate prep (the gate's pair_ready restore at tests/capture_fault_gate.sh:141, or tests/d0940_unknown_blocker_probe.sh:114) in the environment tools/release_run.py presteps_env('g2') gives, and records which marker run.sh writes and which group branch it takes; a control with only the MXFS_GROUP entry of presteps_env reverted, which should show the default marker rewritten or the pair formed outside the group; a verification sized from that control showing .cluster_marker.g2.json written and the default marker untouched; then the removal."
+      "next": "A lap that runs one in-gate prep (the gate's pair_ready restore at tests/capture_fault_gate.sh:141, or tests/d0940_unknown_blocker_probe.sh:114) in the environment tools/release_run.py presteps_env('g2') gives, and records which marker run.sh writes and which group branch it takes; a control with only the MXFS_GROUP entry of presteps_env reverted, which should show the default marker rewritten or the pair formed outside the group; a verification sized from that control showing .cluster_marker.g2.json written and the default marker untouched; then the removal.",
+      "batches": [
+        {
+          "id": "b20261024-aed660",
+          "kind": "control",
+          "row": "lap:in_gate_prep",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "A27A67A3E501890BE9985E0",
+          "variant": "MXFS_PRESTEPS_GROUP_MARKER=0 (tools/release_run.py presteps_env exports neither MXFS_GROUP nor MXFS_MARKER, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: the gate's bare in-gate prep forms the pair outside g2 and rewrites the default marker"
+        }
+      ],
+      "updated": "2026-10-24",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:in_gate_prep",
+          "iso": "2026-10-24T15:41:49Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:in_gate_prep",
+          "iso": "2026-10-24T15:41:47Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:in_gate_prep",
+          "iso": "2026-10-24T15:41:44Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:in_gate_prep",
+          "iso": "2026-10-24T15:41:42Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:in_gate_prep",
+          "iso": "2026-10-24T15:41:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:in_gate_prep",
+          "iso": "2026-10-24T15:41:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:in_gate_prep",
+          "iso": "2026-10-24T15:41:35Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:in_gate_prep",
+          "iso": "2026-10-24T15:41:33Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:in_gate_prep",
+          "iso": "2026-10-24T15:41:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:in_gate_prep",
+          "iso": "2026-10-24T15:41:28Z"
+        }
+      ]
     },
     {
       "id": "D-16CAWMPATH-FENCED-RETURN-SURVIVORS-WEDGE-ON-CAW-INODE-GRANTS-474S",
@@ -8850,7 +8939,7 @@
           "candidate": "",
           "build": "A27A67A3E501890BE9985E0",
           "variant": "NOINO_HOLD_FROM_FOLLOW=0 (tests/noino_fence_efd_hold_lap.sh reads whether the hold started from the ring and judges it before the whole-read check, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -8870,6 +8959,21 @@
           "variant": "NOINO_KMSG_FOLLOW=0 (tests/noino_fence_efd_hold_lap.sh reads each node's ring after the run, as before the fix)",
           "builds": [
             "8DBA16AEB7FDD3066C9C1BC"
+          ],
+          "date": "2026-10-24"
+        },
+        {
+          "row": "lap:noino_hold_read",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-2e4683",
+          "k": 0,
+          "n": 0,
+          "candidate": "",
+          "variant": "NOINO_HOLD_FROM_FOLLOW=0 (tests/noino_fence_efd_hold_lap.sh reads whether the hold started from the ring and judges it before the whole-read check, as before the fix)",
+          "builds": [
+            "A27A67A3E501890BE9985E0"
           ],
           "date": "2026-10-24"
         }
@@ -9208,7 +9312,44 @@
       "summary": "tests/fsx_fail_files_node.sh's second writer runs until the row's process exits, and the row's EXIT trap (tests/suite/fsx.sh:22, rm -rf of the work directory) runs inside that process; a test file the writer stat'ed before the trap unlinked it is created again by its 'dd conv=notrunc' (O_CREAT), so the trap's rmdir fails silently and the lap leaves a work directory holding that file on the shared mount, where every later lap's count reads it",
       "evidence": "Lane tests/evidence/lanes/g2_a17c_20261024T112110Z steps 10-11 (2/net/mesh/direct, test1, candidate 0.90.134 attempt 2026-10-24T10:25:09Z): lap fxn3 'work directories left on the mount: 1'; the listing (step11.log) shows /mnt/shared/.suite_fsx.test1.75444 holding only fsxfile_50000, size=227164, birth 12:27:03.991744736, 4 ms after the row's output was last written (12:27:03.987744616); laps fxn1 and fxn2 left 0. The writer loop is tests/fsx_fail_files_node.sh:38-47 ('while kill -0 \"$row\"', stat then dd of=\"$f\" bs=\"$sz\" count=1 conv=notrunc).",
       "next": "Fix drafted for the next attempt in tests/evidence/drafts/tree/tests/fsx_fail_files_node.sh: the writer's dd uses conv=notrunc,nocreat, so it only overwrites a file that exists; FSX_WRITER_NOCREAT=0 lets dd create it, as before: the control. Then laps at 2/net/mesh/direct (where 1 of 3 left a directory) that also list the mount after each: control (FSX_WRITER_NOCREAT=0) and a verification sized from it, the leftover count and the listing the exposure; remove --fixed.",
-      "reproducer": "tests/fsx_fail_files_lap.sh <label> <node> at 2/net/mesh/direct on a pair formed fresh, then list /mnt/shared/.suite_fsx.*: a directory holding one fsxfile_<ops> born after the row's end"
+      "reproducer": "tests/fsx_fail_files_lap.sh <label> <node> at 2/net/mesh/direct on a pair formed fresh, then list /mnt/shared/.suite_fsx.*: a directory holding one fsxfile_<ops> born after the row's end",
+      "batches": [
+        {
+          "id": "b20261024-3be786",
+          "kind": "control",
+          "row": "lap:fsx_fail_files_writer",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the fsx row failed both checks",
+          "candidate": "",
+          "build": "A27A67A3E501890BE9985E0",
+          "variant": "FSX_WRITER_NOCREAT=0 (the lap's second writer's dd may create the file, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: the writer re-creates a test file the row's trap removed and the work directory is left"
+        }
+      ],
+      "updated": "2026-10-24",
+      "rates": [
+        {
+          "row": "lap:fsx_fail_files_writer",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-3be786",
+          "k": 0,
+          "n": 10,
+          "candidate": "",
+          "variant": "FSX_WRITER_NOCREAT=0 (the lap's second writer's dd may create the file, as before the fix)",
+          "builds": [
+            "A27A67A3E501890BE9985E0"
+          ],
+          "date": "2026-10-24"
+        }
+      ]
     },
     {
       "id": "D-JDT-FAULT-LAP-KILLED-AT-228S-WITH-NO-IN-FLIGHT-SAMPLE-AFTER-A-LONE-REMOUNT",
@@ -9390,7 +9531,7 @@
           "candidate": "0.90.134",
           "build": "A27A67A3E501890BE9985E0",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -9470,6 +9611,18 @@
           "config": "2/disk/caw/mpath",
           "row": "lap:scst_flap_clock",
           "iso": "2026-10-24T14:40:20Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/disk/caw/mpath",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T14:29:24Z",
+          "build": "A27A67A3E501890BE9985E0",
+          "batch": "b20261024-b07bc3",
+          "approval": "P20261024-d662b6",
+          "date": "2026-10-24"
         }
       ]
     },
