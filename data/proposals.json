@@ -7703,14 +7703,15 @@
         "tests/evidence/20261024T1045Z_lunpool_mpath_journal",
         "data/reviews/P20261024-c568d7.md"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-24",
       "review": {
         "file": "data/reviews/P20261024-a66a0c.md",
         "sha256": "052e47e08f4bf3a03519ac0bdd38fa87bf4f5a30f085559167c554398fe1053b",
         "verdict": "approved",
         "date": "2026-10-24"
-      }
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
