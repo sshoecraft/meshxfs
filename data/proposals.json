@@ -9523,6 +9523,54 @@
         "tests/evidence/ag6_false_grant_logs_20261022T1956Z.txt",
         "dlm/dlm.c"
       ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-63d0ce.md",
+        "sha256": "c00d8d20e6d4c427c037b1f9897c39b1d42a6a49e10fcedcfc7d3dcc260c0e6d",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
+    },
+    {
+      "id": "P20261024-f8709b",
+      "kind": "remove-fixed",
+      "record": "D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS",
+      "change": {
+        "control": "b20261024-2f6ae0",
+        "fixon": "b20261024-d99c77",
+        "cause": "tests/mpath/lib.sh pf_boot_rejoin brought a killed path-row victim back by loading mxfs with the configuration's transport arguments only (mxfs_rig_modargs), not the argument set tests/setup/prep_node.sh loads on every other node (log_repeat_limit=0 and the lane's MXFS_EXTRA_MODARGS among them, prep_node.sh:242, :248), so the rejoined victim ran with module parameters that differ from its peers'. Fix: pf_boot_rejoin loads prep's set (tests/mpath/lib.sh:512-520; PF_REJOIN_PREP_ARGS=0 loads what the rejoin loaded before, the control)."
+      },
+      "argument": "Measured on the rig at the configuration the record was observed on, 8/disk/caw/mpath (the CAW branch, as the review of P20261023-7bd24f required), by tests/mpath/rejoin_modargs_rig_lap.sh, which kills and rejoins the victim through pf_boot_rejoin and reads /sys/module/mxfs/parameters on the rejoined victim and on a survivor: EXPOSED when the survivor reads prep's log_repeat_limit=0 back, FAIL when the victim's loaded parameters differ. Control b20261024-2f6ae0 (PF_REJOIN_PREP_ARGS=0): 10 of 10 FAIL with exposure. Fix-on b20261024-d99c77: 6 of 6 PASS with exposure, applied through the approved verify P20261024-3e7240 (data/reviews/P20261024-3e7240.md). Repeated on the current attempt (frozen 2026-10-24T16:34:18Z, lane tests/evidence/lanes/g8b_a20_20261024T163432Z): control b20261024-7cfa3f 10 of 10 FAIL (step6.log), verification b20261024-c553df 6 of 6 PASS ('the rejoined victim test28 reads every prep argument as test21 does', step8.log). Claim, narrowed to what the laps measured: on a CAW multipath lane with no extra arguments, a victim rejoined by pf_boot_rejoin now loads the same module parameters as its peers. Not claimed: the contract-argument quoting, the modprobe branch, the TCP branch on the rig, or that a lane can no longer run mixed windows; the marker half (rows after the rejoin reading no loaded parameter) is its own open record, D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS, and the extra-argument half is supported by the approved variant verify P20261024-d7c365.",
+      "evidence": [
+        "data/reviews/P20261023-7bd24f.md",
+        "data/reviews/P20261024-3e7240.md",
+        "data/reviews/P20261024-d7c365.md",
+        "tests/mpath/lib.sh",
+        "tests/mpath/rejoin_modargs_rig_lap.sh",
+        "tests/evidence/batch_laps/b20261024-2f6ae0",
+        "tests/evidence/batch_laps/b20261024-d99c77",
+        "tests/evidence/lanes/g8b_a20_20261024T163432Z/step6.log",
+        "tests/evidence/lanes/g8b_a20_20261024T163432Z/step8.log"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-4975c4",
+      "kind": "verify",
+      "record": "D-MERGE-OVERRUN-LAP-CLEANUP-FUSER-KILLS-ROOT-FS-USERS-WHEN-NOT-MOUNTED",
+      "change": {
+        "batch": "b20261024-8cb36c"
+      },
+      "argument": "Verification b20261024-8cb36c of lap:merge_cleanup at 2/disk/caw/direct4k (g2d test31/test32, candidate 0.90.134 attempt frozen 2026-10-24T16:34:18Z, lane tests/evidence/lanes/g2d_a20_20261024T163432Z step 8): 6 of 6 laps PASS with exposure, none failed, none dropped; sized from control b20261024-37b839 (step 7, MERGE_CLEANUP_GATE=0: fuser -k -m /mnt/fourkn run whether or not it is a mount point), 10 of 10 FAIL. The lap (tests/merge_overrun_lap.sh) reads the main pids of ssh, systemd-journald, systemd-udevd and iscsid on each node before and after its cleanup and fails when one changed; its exposure line 'CLEANUP: N node(s) had /mnt/fourkn no longer mounted when the cleanup ran' (:93) shows the cleanup met the unmounted case the record is about. Each lap's merge-overrun grade printed VACUOUS (the workload finished inside the worker's node-side bound), which is that other measurement's own verdict; the cleanup is graded on every lap, VACUOUS ones too (tests/merge_overrun_lap.sh header :33).",
+      "evidence": [
+        "tests/evidence/lanes/g2d_a20_20261024T163432Z/step7.log",
+        "tests/evidence/lanes/g2d_a20_20261024T163432Z/step8.log",
+        "tests/evidence/batch_laps/b20261024-37b839",
+        "tests/evidence/batch_laps/b20261024-8cb36c",
+        "tests/merge_overrun_lap.sh"
+      ],
       "state": "pending",
       "created": "2026-10-24"
     }
