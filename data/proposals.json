@@ -7675,8 +7675,14 @@
         "tests/evidence/20261024T104137Z_tfshell_tff2/prep.log",
         "data/reviews/P20261024-128791.md"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-c568d7.md",
+        "sha256": "6cc505340f532bd0db440eccb3aed66491430421c06fece60f609a8fd1d0be7d",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }

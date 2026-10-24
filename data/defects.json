@@ -7381,9 +7381,9 @@
       "config": "*/*/*",
       "opened": "2026-10-23",
       "summary": "A harness lap run through tools/batch_lap.py is graded against stall_limit_s only from max_stall_ms= lines and declared --stall patterns, but tests/join_during_takeover.sh (through tests/capture_fault_gate.sh) prints its timed operations in other forms (A_UMOUNT_RC=0 ms=31006) and no lane passes --stall for it, so a 31 s last-member unmount inside a jdt gate lap was recorded PASS and counted toward verification batch b20261022-548ef2",
-      "evidence": "Review of P20261023-8d639f (data/reviews/P20261023-8d639f.md): batch b20261022-548ef2 (lap:jdt_gate_fault at 2/net/mesh/direct) was launched with no --stall pattern (tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log:61); the harness wrote 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=31006' (tests/evidence/20261023T043949Z_capture_gate_jdtv1/join_during_takeover_fault.log:8); tools/batch_lap.py stall_graded reads only 'max_stall_ms=' (:301) and declared --stall patterns (:311); neither tests/capture_fault_gate.sh nor tests/join_during_takeover.sh prints max_stall_ms=, and no lane summary has passed --stall. Split out of D-BATCH-LAP-RECORDS-NO-STALL-SO-A-HARNESS-LAP-OVER-THE-STALL-LIMIT-GRADES-PASS, whose fix grades what reaches the grader.",
+      "evidence": "Review of P20261023-8d639f (data/reviews/P20261023-8d639f.md): batch b20261022-548ef2 (lap:jdt_gate_fault at 2/net/mesh/direct) was launched with no --stall pattern (tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log:61); the harness wrote 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=31006' (tests/evidence/20261023T043949Z_capture_gate_jdtv1/join_during_takeover_fault.log:8); tools/batch_lap.py stall_graded reads only 'max_stall_ms=' (:301) and declared --stall patterns (:311); neither tests/capture_fault_gate.sh nor tests/join_during_takeover.sh prints max_stall_ms=, and no lane summary has passed --stall. Split out of D-BATCH-LAP-RECORDS-NO-STALL-SO-A-HARNESS-LAP-OVER-THE-STALL-LIMIT-GRADES-PASS, whose fix grades what reaches the grader. ===== 2026-10-24, attempt 17 (lane tests/evidence/lanes/g2_a17_20261024T102925Z steps 5, 7 and 9: fix on, GATE_RELAY_STALL=0, JDT_MAX_STALL=0): all three prechecks UNMEASURED with the worst operation 12.4-12.9 s. The pass was now seen in flight (JDT_PASS_PACE_MS=30 worked), but the forced >30 s operation never happened: the stall arm's B mount met no transition (A's own lone remount had taken the root page over on demand) and mounted in 7.4-12.5 s. That is a defect of the arm itself, recorded as D-JDT-STALL-ARM-GRADES-A-JOIN-THAT-MET-NO-TRANSITION-AS-A-FAILED-REFUSAL. This lap needs that arm fixed, or a stall it forces some other way (a TEST ONLY delay on a timed operation), before its control can expose anything.",
       "next": "Make every harness lap's timed file operations reach the grader: the jdt harness (and each harness run through batch_lap.py; list them) prints max_stall_ms= over its timed operations, or its lanes declare --stall for its ms= lines; then a control (the print or declaration taken out) and a verification through a jdt gate lap with a 31 s operation forced. ===== ===== 2026-10-23: the jdt half is in the frozen tree (tests/join_during_takeover.sh:164-170 op_ms prints max_stall_ms= after every timed mount and unmount; JDT_MAX_STALL=0 its control), but on the path the defect took it does not reach the grader: tests/capture_fault_gate.sh runs each harness with its output to $OUT/<tag>_fault.log (:157) and $OUT/<tag>_ok.log (:173) and prints only its GATE summary lines (:165, :189), and tools/batch_lap.py grades the lap's own output, so a jdt max_stall_ms= line inside a gate lap is still never read. FIX in the sibling tree /home/steve/src/mxfs-a15 for the next attempt: capture_fault_gate.sh relay_stall prints 'GATE <harness> <fault|healthy> max_stall_ms=<worst>' from the harness's log after each lap; GATE_RELAY_STALL=0 relays nothing (control). Next: a lap that runs the gate's jdt entry through batch_lap.py on a scratch queue and board with an operation over the limit forced (ARM=stall EXPECT=clean: A's takeover pass held 45 s, B's mount inside it refused, timed by op_ms at :315), reading back the recorded run: FAIL carrying max_stall_ms over the limit with both parts on; PASS without it with GATE_RELAY_STALL=0 and, separately, with JDT_MAX_STALL=0 (one control per fix site). ===== 2026-10-24 (session c74395b6): control b20261023-9da1ae (GATE_RELAY_STALL=0, lap:jdt_gate_stall at 2/net/mesh/direct, lane tests/evidence/lanes/g2_a16_followup_20261024T015355Z step5) is UNEXPOSED: laps 1-5 each 'FAIL ... exposure=0 -- UNMEASURED: the gate's healthy lap did not end OK, or its jdt log ... holds no timed operation over 30000 ms (worst 7853 / 8196 / 7963 ...)'; e.g. tests/evidence/20261024T022653Z_capture_gate_jdtstall/join_during_takeover_ok.log: A's last-member unmount ms=1278, max_stall_ms=1278, then 'ABORT: the takeover pass was not seen in flight (activations=493 ...)' (D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE). The lap depends on a >30 s operation occurring by itself, which the 31 s unmount of batch b20261022-548ef2 did once and these laps do not, so a control of the relay fix cannot expose anything. Next: give the lap a stall it controls (a TEST ONLY delay knob on the last-member unmount, or a harness-side sleep inside a timed operation) so every lap has an operation over the 30 s limit, then the control with GATE_RELAY_STALL=0 must FAIL on it and the fix-on batch must report it.",
-      "updated": "2026-10-23",
+      "updated": "2026-10-24",
       "batches": [
         {
           "id": "b20261023-9da1ae",
@@ -7788,6 +7788,23 @@
           "kind": "control",
           "row": "lap:noino_fence_efd_hold",
           "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 16,
+          "probe": "^EXPOSED: S held an EFD",
+          "candidate": "",
+          "build": "468F7F30C2E190B0244AF70",
+          "variant": "noino_convoy_chain=0 (MXFS_EXTRA_MODARGS: mxfs_noino_freeze_is_convoy excuses only AG waits, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a node whose own extent-free chain holds the AIL minimum past the no-inode fence's stall budget shuts itself down"
+        },
+        {
+          "id": "b20261024-17b56e",
+          "kind": "control",
+          "row": "lap:noino_fence_efd_hold",
+          "config": "2/net/mesh/direct",
           "platform": "any",
           "planned": 16,
           "probe": "^EXPOSED: S held an EFD",
@@ -8240,6 +8257,17 @@
         }
       ],
       "updated": "2026-10-24"
+    },
+    {
+      "id": "D-JDT-STALL-ARM-GRADES-A-JOIN-THAT-MET-NO-TRANSITION-AS-A-FAILED-REFUSAL",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "tests/join_during_takeover.sh ARM=stall cannot reach the case it grades, and it grades the vacuous lap as a FAIL. The stall arm pauses A's takeover pass (dl_takeover_pause_ms=45000, dl_no_ondemand_takeover=1, set once the pass is seen in flight) and expects B's root acquire at mount to wait on the transition and be refused after 30 s. But A's own lone remount always takes the root inode's page over on demand before the pass, so B's root request meets no transition, B mounts in seconds, and the lap FAILs every refusal check instead of saying it measured nothing.",
+      "evidence": "2026-10-24, attempt 17, lane tests/evidence/lanes/g2_a17_20261024T102925Z steps 5, 7 and 9 (tests/jdt_gate_stall_lap.py, the gate's jdt entry at NFILES=4000, JDT_PASS_PACE_MS=30, ARM=stall EXPECT=clean, 2/net/mesh/direct; the inner runs went to the lap's scratch ledger, not the release board). All three: 'B's mount inside the pass: B_MOUNT_RC=0 ms=7401' (12533, 12421 for the other two), then 'FAIL B's mount inside the stalled pass was REFUSED (rc != 0) got=0 want=1' plus six more FAILs, and UNMEASURED. In tests/evidence/20261024T105759Z_jointk_jdtstall-join_during*/dmesg_A_followed_1.txt, A mounts at [1716.911692] and logs 'P960-ONDEMAND-SERVED type=1 ino=128 ag=0 page=5093' at [1717.268750], before its 'Ending clean mount' at [1717.418963]: its own root acquire. B mounts from [1736.406413] to [1738.933359] with no AUTH-TRANSITION line, and the lap's own summary reads 'B: transition rx=0 wait=0 ... stalled=0', 'A: ondemand=1 served_root=1'. The pass itself was held (activations 251 at B's issue and at its return). No recorded run has ever passed the check 'B's mount inside the stalled pass was REFUSED' (0 files under tests/evidence). Every earlier stall-arm run aborted before B's mount, the pass not seen in flight.",
+      "next": "Make the stall arm's verdict require that B's request met the transition by name (P960-AUTH-TRANSITION-* on B, or transition rx >= 1) and say VACUOUS otherwise, as the header promises for a request that met no transition. Then give it a request A has not served: B's first acquire of a page under the dead authority that A's own mount does not touch (e.g. a stat from B of an inode in the NFILES directory, after B's mount, while the pass is held), so the stall can expose the 30 s watchdog. tests/jdt_gate_stall_lap.py depends on this arm for its forced >30 s operation (D-HARNESS-LAP-TIMED-OPS-REACH-NO-STALL-GRADER-JDT-31S-UNMOUNT-GRADED-PASS).",
+      "reproducer": "tests/jdt_gate_stall_lap.py on a 2/net/mesh/direct pair (the gate's jdt entry, ARM=stall, NFILES=4000, JDT_PASS_PACE_MS=30): B mounts inside the held pass and every refusal check FAILs"
     }
   ]
 }
