@@ -225,11 +225,11 @@ static void pr_err(const char *fmt, ...)
 static const char *human_size(uint64_t bytes, char *buf, size_t buflen)
 {
     if (bytes >= (uint64_t)1024 * 1024 * 1024)
-        snprintf(buf, buflen, "%.2f GB", (double)bytes / (1024.0 * 1024 * 1024));
+        snprintf(buf, buflen, "%.2f GiB", (double)bytes / (1024.0 * 1024 * 1024));
     else if (bytes >= 1024 * 1024)
-        snprintf(buf, buflen, "%.2f MB", (double)bytes / (1024.0 * 1024));
+        snprintf(buf, buflen, "%.2f MiB", (double)bytes / (1024.0 * 1024));
     else if (bytes >= 1024)
-        snprintf(buf, buflen, "%.2f KB", (double)bytes / 1024.0);
+        snprintf(buf, buflen, "%.2f KiB", (double)bytes / 1024.0);
     else
         snprintf(buf, buflen, "%llu B", (unsigned long long)bytes);
     return buf;

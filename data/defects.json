@@ -1660,9 +1660,10 @@
       "opened": "2026-10-19",
       "summary": "mkfs.mxfs prints sizes in GiB labelled GB (human_size divides by 1024^3 and prints 'GB'), so a 100 GiB LUN reads as '99.37 GB usable' and looks 7 GB short.",
       "evidence": "tools/mkfs_mxfs.c:264 snprintf(buf, buflen, \"%.2f GB\", (double)bytes / (1024.0 * 1024 * 1024)); a tester (gyptazy.com, 0.90.130) read '99.37 GB at offset 672296960' on a 107374182400-byte LUN as about 7 GB unexplained; the true difference is the 0.63 GiB envelope.",
-      "next": "Label GiB/MiB/KiB in human_size (and the other size prints in tools/), next version: a tools source change during the 0.90.131 verification would make the packaged mkfs differ from the one verified.",
+      "next": "Label GiB/MiB/KiB in human_size (and the other size prints in tools/), next version: a tools source change during the 0.90.131 verification would make the packaged mkfs differ from the one verified. ===== 2026-10-24: fixed in the tree for the next attempt: human_size in tools/mkfs_mxfs.c and tools/resize_mxfs.c prints GiB/MiB/KiB (the only two human_size definitions in tools/*.c; nothing in tests/ or tools/ parses the label). Verify on the candidate's tools build: mkfs_mxfs on a pool LUN prints 'GiB usable', and tests/mkfs_layout_identity.py still finds a 512-byte volume identical to 0.90.132's (the label is printed, never written); then remove --fixed.",
       "impact": "noblock",
-      "impact_why": "A wrong unit label in mkfs output; nothing written or read differs."
+      "impact_why": "A wrong unit label in mkfs output; nothing written or read differs.",
+      "updated": "2026-10-24"
     },
     {
       "id": "D-F4-REGISTRY-MISSES-BMBT-FUA-WRITES-REPORTS-THEM-COMMITTED-NEVER-SUBMITTED",
@@ -2050,9 +2051,10 @@
       "opened": "2026-10-20",
       "summary": "scripts/release.sh runs the platform build checks in 'while IFS= read -r check; do ... eval \"$check\"; done <<< \"$checks\"'; the first check (scripts/vm_kbuild_check.sh, which runs ssh) reads the loop's stdin, so the here-string's remaining lines are consumed and every later platform's build check is skipped without a word.",
       "evidence": "MEASURED in the 0.90.131 release chain (tests/evidence/full_verify_0.90.131.log lines 16-59, 2026-10-20T19:52Z): one line '=== MeshXFS 0.90.131 \u2014 platform build check: scripts/vm_kbuild_check.sh pve9 6.17.2-1-pve 7.0.14-19-pve ===' and then straight to '.deb packages on the debian12 lab node'; tools/platforms.py build-checks prints seven (pve9, pve92, ubuntu2404, rhel9, ubuntu2604, debian13, debian12). Read from scripts/release.sh:102-110.",
-      "next": "Fix after the 0.90.131 publish (the tree must stay the chain's build until then): eval \"$check\" < /dev/null; then run scripts/release.sh without --publish on a scratch output dir and confirm one '=== ... platform build check' line per released platform.",
+      "next": "Fix after the 0.90.131 publish (the tree must stay the chain's build until then): eval \"$check\" < /dev/null; then run scripts/release.sh without --publish on a scratch output dir and confirm one '=== ... platform build check' line per released platform. ===== 2026-10-24: fixed in the tree for the next attempt: scripts/release.sh runs each check as eval \"$check\" < /dev/null (tools/platforms.py build-checks lists 7: pve9, pve92, ubuntu2404, rhel9, ubuntu2604, debian13, debian12). Verify on the candidate: its release:packages step's log must hold one '=== MeshXFS <version> \u2014 platform build check: ...' line for each of the 7, against the earlier releases' package logs (one line each, the defect); then remove --fixed.",
       "impact": "noblock",
-      "impact_why": "A release-tooling fault: it decides which compile checks run before the packages are built, and touches neither the module, the packages nor a node; every released platform's claimed kernels still get a DKMS compile of the built package in that platform's packaged round (tests/packaged_round.sh install step, and on pve* a DKMS build for every kernel in /lib/modules)."
+      "impact_why": "A release-tooling fault: it decides which compile checks run before the packages are built, and touches neither the module, the packages nor a node; every released platform's claimed kernels still get a DKMS compile of the built package in that platform's packaged round (tests/packaged_round.sh install step, and on pve* a DKMS build for every kernel in /lib/modules).",
+      "updated": "2026-10-24"
     },
     {
       "id": "D-FREEZE-TEST-LEAVES-VICTIM-DD-HOLDING-MOUNT-NEXT-PREP-FORMATS-UNDER-IT",

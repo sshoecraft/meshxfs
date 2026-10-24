@@ -174,11 +174,14 @@ if [ "$built" = 0 ]; then
     # Every platform a release claims (data/platforms.json, status released)
     # must compile the module before any package is built: the rig's kernel
     # is not the product's, and 0.89.77 shipped a .deb that failed on Proxmox.
+    # A check's stdin is /dev/null: the checks run ssh, which would otherwise
+    # read the rest of the list from the loop's here-string and end the loop
+    # after the first platform without a word.
     checks=$(python3 "$SRCDIR/tools/platforms.py" build-checks) || exit 1
     while IFS= read -r check; do
         [ -n "$check" ] || continue
         echo "=== MeshXFS $VERSION — platform build check: $check ==="
-        (cd "$SRCDIR" && eval "$check") || {
+        (cd "$SRCDIR" && eval "$check" < /dev/null) || {
             echo "ERROR: '$check' failed; no packages built" >&2
             exit 1
         }
