@@ -3730,6 +3730,56 @@
           "config": "8/net/mesh/mpath",
           "row": "lap:adopted_grant_rig",
           "iso": "2026-10-24T08:21:54Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T18:48:40Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T18:45:45Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T18:42:58Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T18:40:02Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T18:37:11Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T18:34:11Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T18:31:16Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T18:28:13Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T18:25:12Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T18:22:07Z"
         }
       ],
       "updated": "2026-10-24",
@@ -3979,11 +4029,44 @@
           "candidate": "",
           "build": "1BC77CFB15EF4A988DD1F56",
           "variant": "dl_shortcut_claim=0 (ARM=0 on every node: the already-granted shortcut ends the wait unclaimed, as before the fix); GAP_MS=20000 on both arms",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out on attempt 20: a grant adopted between two attempts is handed back by the shortcut's answer, so the master grants another node's EX over the waiter's"
+        },
+        {
+          "id": "b20261024-9ed034",
+          "kind": "verify",
+          "row": "lap:adopted_grant_rig",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: A adopted B.s grant of R between two attempts",
+          "candidate": "0.90.134",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:adopted_grant_rig",
+            "config": "8/net/mesh/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-9f3508",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "dl_shortcut_claim=0 (ARM=0 on every node: the already-granted shortcut ends the wait unclaimed, as before the fix); GAP_MS=20000 on both arms",
+            "builds": [
+              "1BC77CFB15EF4A988DD1F56"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -4044,6 +4127,21 @@
           "variant": "dl_shortcut_claim=0 (ARM=0 on every node: the already-granted shortcut ends the wait unclaimed, as before the fix); GAP_MS=20000 on both arms",
           "builds": [
             "BE3695D2590A65F742F9816"
+          ],
+          "date": "2026-10-24"
+        },
+        {
+          "row": "lap:adopted_grant_rig",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-9f3508",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "dl_shortcut_claim=0 (ARM=0 on every node: the already-granted shortcut ends the wait unclaimed, as before the fix); GAP_MS=20000 on both arms",
+          "builds": [
+            "1BC77CFB15EF4A988DD1F56"
           ],
           "date": "2026-10-24"
         }
@@ -7660,7 +7758,7 @@
           "candidate": "0.90.134",
           "build": "1BC77CFB15EF4A988DD1F56",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -7812,6 +7910,16 @@
           "build": "BE3695D2590A65F742F9816",
           "batch": "b20261024-b7bbc1",
           "approval": "P20261024-3874e6",
+          "date": "2026-10-24"
+        },
+        {
+          "config": "2/disk/caw/mpath",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T16:34:18Z",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "batch": "b20261024-51ea88",
+          "approval": "P20261024-8b8f14",
           "date": "2026-10-24"
         }
       ]

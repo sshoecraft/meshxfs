@@ -9820,6 +9820,52 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-8b8f14",
+      "kind": "verify",
+      "record": "D-MPATH-MOUNT-DEGRADED-12S-WINDOW-REGISTRATION-MISSING-AND-SHUTDOWNS",
+      "change": {
+        "batch": "b20261024-51ea88"
+      },
+      "argument": "Verification b20261024-51ea88 of the board row path_mount_degraded at 2/disk/caw/mpath (g2b, test15/test16) on candidate 0.90.134, attempt frozen 2026-10-24T16:34:18Z, module 1BC77CFB15EF4A988DD1F56, whose frozen default death window is the 12 s one the record's failures need, so neither arm carries a window variant. Control b20261024-cefbf5 (module BE3695D2590A65F742F9816, attempt 2026-10-24T06:38:23Z, which carries the same fix and the same 12 s default) with the fix's knob off (MXFS_EXTRA_MODARGS=pr_fill_bounded=0: the late-path fill runs only with 15 s of the authority lease left, as before the fix): 10 of 10 exposed laps failed (tests/evidence/lanes/g2b_w12b_20261024T070007Z/step3.log 'control b20261024-cefbf5: 10 of 10 laps failed with the fix out'), fails=7-8 each, late_stall_ms 25826-42032 on the victim test16. Plan: rate 10/10, lower bound 0.5887 at delta 0.005, N = 6 at alpha 0.005 (tests/evidence/lanes/g2b_a20md_20261024T180153Z/step4.log:1). The verification ran on a plain forced prep (step 3, no MXFS_EXTRA_MODARGS; queue at tests/evidence/lanes/g2b_a20md_20261024T180153Z/queue) and passed 6 of 6 planned laps, each EXPOSED on the row's PF-LATE-B-DOWN mark (exposure=1), PASS with fails=0, mount_one_path_ms 6722-11182, late_stall_ms and max_stall_ms 6120-6481, under stall_limit_s 30 (step4.log lap lines 1-6, 'verify b20261024-51ea88: 6 PASS, 0 FAIL of 6 planned'). The batch was declared before its first lap; no lap was dropped. The earlier verification at this configuration, b20261024-408f0a (attempt 2026-10-24T06:38:23Z), ended on one survivor operation's type-flip ESTALE, a cell of D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED (review data/reviews/P20261024-eae930.md); this attempt carries the shell-dead relookup for it, and is not applied.",
+      "evidence": [
+        "tests/evidence/lanes/g2b_a20md_20261024T180153Z/step4.log",
+        "tests/evidence/lanes/g2b_a20md_20261024T180153Z/summary.log",
+        "tests/evidence/lanes/g2b_a20md_20261024T180153Z/queue",
+        "tests/evidence/lanes/g2b_w12b_20261024T070007Z/step3.log",
+        "tests/mpath/path_mount_degraded.sh",
+        "data/reviews/P20261024-eae930.md"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-8b8f14.md",
+        "sha256": "a20ca7bf7c3aea42c1452b13e6efb5a22b2aae9eff87d87cef5c855b42053af6",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-b2328f",
+      "kind": "verify",
+      "record": "D-MPATH-MOUNT-DEGRADED-12S-WINDOW-REGISTRATION-MISSING-AND-SHUTDOWNS",
+      "change": {
+        "batch": "b20261024-54eb79"
+      },
+      "argument": "Verification b20261024-54eb79 of the board row path_mount_degraded at 4/disk/caw/mpath (g4b) on candidate 0.90.134, attempt frozen 2026-10-24T16:34:18Z, module 1BC77CFB15EF4A988DD1F56, whose frozen default death window is the 12 s one the record's failures need, so neither arm carries a window variant. Control b20261024-239fb6 (module BE3695D2590A65F742F9816, attempt 2026-10-24T06:38:23Z, carrying the same fix and the same 12 s default) with the fix's knob off (MXFS_EXTRA_MODARGS=pr_fill_bounded=0: the late-path fill runs only with 15 s of the authority lease left, as before the fix): 10 of 10 exposed laps failed, laps 1-3 in tests/evidence/lanes/g4c_w12_20261024T064338Z/step4.log (lap 4 there recorded no run, a preflight /proc read, and was not counted) and laps 4-10 in tests/evidence/lanes/g4c_w12b_20261024T070211Z/step4.log; the rate is the record's 'path_mount_degraded at 4/disk/caw/mpath: 10 of 10 laps failed (batch b20261024-239fb6)'. Plan: rate 10/10, lower bound 0.5887 at delta 0.005, N = 6 at alpha 0.005 (tests/evidence/lanes/g4b_a20md_20261024T180156Z/step5.log:1). The verification ran on a plain forced prep (no MXFS_EXTRA_MODARGS; queue at tests/evidence/lanes/g4b_a20md_20261024T180156Z/queue) and passed 6 of 6 planned laps, each EXPOSED on the row's PF-LATE-B-DOWN mark (exposure=1), PASS with fails=0, victim test20, mount_one_path_ms 6535-8673, max_stall_ms 6154-9614, under stall_limit_s 30 (step5.log lap lines 1-6, 'verify b20261024-54eb79: 6 PASS, 0 FAIL of 6 planned'). The batch was declared before its first lap; no lap was dropped. The earlier verification here, b20261024-fd8125 (attempt 2026-10-24T06:38:23Z), ended on one survivor operation's type-flip ESTALE, a cell of D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED (review data/reviews/P20261024-eae930.md); this attempt carries the shell-dead relookup for it, and is not applied.",
+      "evidence": [
+        "tests/evidence/lanes/g4b_a20md_20261024T180156Z/step5.log",
+        "tests/evidence/lanes/g4b_a20md_20261024T180156Z/summary.log",
+        "tests/evidence/lanes/g4b_a20md_20261024T180156Z/queue",
+        "tests/evidence/lanes/g4c_w12_20261024T064338Z/step4.log",
+        "tests/evidence/lanes/g4c_w12b_20261024T070211Z/step4.log",
+        "tests/mpath/path_mount_degraded.sh",
+        "data/reviews/P20261024-eae930.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
