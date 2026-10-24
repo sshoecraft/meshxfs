@@ -6165,14 +6165,15 @@
         "CHANGELOG.md",
         "data/reviews/P20261023-2f64df.md"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-23",
       "review": {
         "file": "data/reviews/P20261023-d6c290.md",
         "sha256": "131b27547e9538f361bf2c83712b7478ec23ecacbee72dc9729cf5a9195fa173",
         "verdict": "approved",
         "date": "2026-10-23"
-      }
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-6483b0",

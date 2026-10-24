@@ -5971,7 +5971,7 @@
       "opened": "2026-10-23",
       "summary": "tests/suite/fsx.sh ran fsx without its -P, so fsx wrote its own .fsxlog, .fsxops and .fsxgood beside its test file in the row's work directory $W on the mxfs mount, the directory the row's EXIT trap is set to remove (tests/suite/fsx.sh:19-22); after a row whose two checks both miscompared, none of those files was kept off the mount, only fsx's stdout log /root/fsx.<seed>.<ops>.log (10 of 10 laps on node test1 at 2/disk/caw/direct; also 10 of 10 on the lab host's /dev/shm). Whether the trap's rm -rf removed $W each time is not this record: see D-FSX-ROW-WORK-DIRECTORY-LEFT-ON-THE-MXFS-MOUNT-AFTER-ITS-EXIT-TRAP-RAN-RM-RF",
       "evidence": "Code, read 2026-10-23 (session 48): tests/suite/fsx.sh:19 'W=\"$MNT/.suite_fsx.$(hostname).$$\"', :22 \"trap 'rm -rf \\\"$W\\\" 2>/dev/null' EXIT\"; tests/suite/tools/fsx.c:204 'int fsxgoodfd', :239 'FILE * fsxlogf', :285-287 (prt also writes each line to fsxlogf), :635 and :662 (save_buffer writes the .fsxgood image). Found by the review of P20261023-0a53fb (data/reviews/P20261023-0a53fb.md) and noted again in data/reviews/P20261023-44869d.md: neither batch of D-FSX-SH-SENT-FSX-OUTPUT-TO-A-TMP-LOG-ITS-EXIT-TRAP-DELETED reached these files, because FSX_SEED=-1 makes fsx exit at its usage before creating them. Not yet measured: whether a miscompare's stdout already carries everything .fsxlog does, and what .fsxgood would add.",
-      "next": "Measure first: a lap that makes fsx miscompare for certain on a scratch file (a second writer changing the file under it), runs the fsx row's own code, and lists what survives the row on the node; then keep .fsxlog/.fsxgood/.fsxops of a failing check beside the kept stdout log, with a switch for the control. ===== ===== 2026-10-23: removal P20261023-b32dc8 REJECTED (data/reviews/P20261023-b32dc8.md): every lap of tests/fsx_fail_files_lap.sh ran on the lab host's /dev/shm with no VM, so each move at tests/suite/fsx.sh:52-58 was a same-filesystem rename; on a node FSX_LOG_DIR is unset, the files go to /root (fsx.sh:46), and mv copies ~256 kB across filesystems off an mxfs mount that has just miscompared, which no lap measured; and the fix-on batch b20261023-cff97e is still open. A check killed by the row's timeout still loses its files (conceded, not claimed). Next: consider fsx's own -P dirpath (tests/suite/tools/fsx.c:2735), which writes .fsxlog/.fsxops/.fsxgood outside the work directory from the start, instead of a move after the fact; then a node-side lap (work directory on the mxfs mount, logs at the default /root, a deliberate miscompare from a second writer), its switch-off control and a verification sized from it, the verify reviewed and applied, then the removal. ===== ===== 2026-10-23: rework for the next attempt, built in the sibling tree /home/steve/src/mxfs-a15. tests/suite/fsx.sh no longer moves files after the fact: it runs fsx with its own -P /root/fsx.<seed>.<ops>.d (tests/suite/tools/fsx.c:3389-3391, :3521-3525), so .fsxlog/.fsxops/.fsxgood are written off the mount from the start and survive whatever ends the row (a timeout too); the record names fsx_fail_dir=; a passing check's directory is removed with its log; FSX_KEEP_FAIL_FILES=0 runs fsx without -P, the original code, the control. run.sh's since-row pull also takes /root/fsx.*.d/ files (its by-name control branch is now the old pull exactly, ls's status ignored). The lap is node-side: tests/fsx_fail_files_lap.sh <label> <node> runs tests/fsx_fail_files_node.sh on the node over ssh (work directory on the mxfs mount, FSX_LOG_DIR unset, a second writer making both checks miscompare), bound 38 s. Precheck on g2 at 2/disk/caw/direct (build 79779BEAECBEA94844FDC72, mxfs-a15 tree): control FSX_KEEP_FAIL_FILES=0 on test1 EXPOSED and FAIL with all six fsx files gone (tests/evidence/20261023T214016Z_fsxfail_fpre0 in mxfs-a15); fix in on test2 EXPOSED and PASS, both .d directories complete (20261023T214017Z_fsxfail_fpre2); fix in on test1 EXPOSED and FAIL only on a 0-byte .fsxgood of a check that miscompared on its first operation, a lap oracle error (an empty file's image is empty), fixed: .fsxgood must exist, .fsxlog/.fsxops be non-empty (20261023T214012Z_fsxfail_fpre1). Next, on the next attempt: a precheck of the corrected oracle, then control, verification sized from it, and removal.",
+      "next": "Measure first: a lap that makes fsx miscompare for certain on a scratch file (a second writer changing the file under it), runs the fsx row's own code, and lists what survives the row on the node; then keep .fsxlog/.fsxgood/.fsxops of a failing check beside the kept stdout log, with a switch for the control. ===== ===== 2026-10-23: removal P20261023-b32dc8 REJECTED (data/reviews/P20261023-b32dc8.md): every lap of tests/fsx_fail_files_lap.sh ran on the lab host's /dev/shm with no VM, so each move at tests/suite/fsx.sh:52-58 was a same-filesystem rename; on a node FSX_LOG_DIR is unset, the files go to /root (fsx.sh:46), and mv copies ~256 kB across filesystems off an mxfs mount that has just miscompared, which no lap measured; and the fix-on batch b20261023-cff97e is still open. A check killed by the row's timeout still loses its files (conceded, not claimed). Next: consider fsx's own -P dirpath (tests/suite/tools/fsx.c:2735), which writes .fsxlog/.fsxops/.fsxgood outside the work directory from the start, instead of a move after the fact; then a node-side lap (work directory on the mxfs mount, logs at the default /root, a deliberate miscompare from a second writer), its switch-off control and a verification sized from it, the verify reviewed and applied, then the removal. ===== ===== 2026-10-23: rework for the next attempt, built in the sibling tree /home/steve/src/mxfs-a15. tests/suite/fsx.sh no longer moves files after the fact: it runs fsx with its own -P /root/fsx.<seed>.<ops>.d (tests/suite/tools/fsx.c:3389-3391, :3521-3525), so .fsxlog/.fsxops/.fsxgood are written off the mount from the start and survive whatever ends the row (a timeout too); the record names fsx_fail_dir=; a passing check's directory is removed with its log; FSX_KEEP_FAIL_FILES=0 runs fsx without -P, the original code, the control. run.sh's since-row pull also takes /root/fsx.*.d/ files (its by-name control branch is now the old pull exactly, ls's status ignored). The lap is node-side: tests/fsx_fail_files_lap.sh <label> <node> runs tests/fsx_fail_files_node.sh on the node over ssh (work directory on the mxfs mount, FSX_LOG_DIR unset, a second writer making both checks miscompare), bound 38 s. Precheck on g2 at 2/disk/caw/direct (build 79779BEAECBEA94844FDC72, mxfs-a15 tree): control FSX_KEEP_FAIL_FILES=0 on test1 EXPOSED and FAIL with all six fsx files gone (tests/evidence/20261023T214016Z_fsxfail_fpre0 in mxfs-a15); fix in on test2 EXPOSED and PASS, both .d directories complete (20261023T214017Z_fsxfail_fpre2); fix in on test1 EXPOSED and FAIL only on a 0-byte .fsxgood of a check that miscompared on its first operation, a lap oracle error (an empty file's image is empty), fixed: .fsxgood must exist, .fsxlog/.fsxops be non-empty (20261023T214012Z_fsxfail_fpre1). Next, on the next attempt: a precheck of the corrected oracle, then control, verification sized from it, and removal. ===== ===== 2026-10-24: removal P20261023-fe0120 REJECTED (data/reviews/P20261023-fe0120.md): verified only at 2/disk/caw/direct while the record reaches 1/any; the 2/net/mesh/direct control b20261023-565089 ran on the host's /dev/shm with no VM, and its verification b20261023-cff97e is open; and no lap looked where fsx put its files without the fix. Next: on a formed 2/net/mesh/direct pair, a node-side control (FSX_KEEP_FAIL_FILES=0) and a verification of tests/fsx_fail_files_lap.sh, with each lap capturing fsx's own 'Log of operations saved to' line; then propose the removal again.",
       "batches": [
         {
           "id": "b20261023-565089",
@@ -6255,283 +6255,6 @@
       "evidence": "tests/evidence/20261023T104328Z_lmutrace_lmuc2/a_kmsg.txt (lap lmuc2 of control b20261023-9a3afc of D-LAST-MEMBER-UMOUNT-AFTER-A-15K-PAGE-HANDBACK-TAKES-31S-OVER-THE-STALL-LIMIT, dl_relall_threads=1, 2/net/mesh/direct): :1784 '[ 1824.284263] mxfs: P304-RETIRE-WORKER exiting'; :1788 '[ 1824.339225] mxfs: P304-RETIRE-PENDING-SEEN slot=1 node=1412815251 inc=15509009256038431890 key=0x6ab1dba695a7a98c state=UNKNOWN via=ident immediate=0 -- clean release awaiting proof that its PR key is retired'; :1792 '[ 1824.716287] mxfs: P304-PR-WORKER exiting'; :6470 '[ 1855.115968] mxfs: P304-RETIRE-UNKNOWN-STALLED slot=1 node=1412815251 ... via=ident waited=30778 ms -- the PR key cannot be classified from this node (no PR context, READ KEYS failing, ...); the record stays RETIRE_PENDING, this slot is NOT consumable ...'; :6621-6622 the unmount's P304-RETIRE-QUIESCED and P304-RETIRE-PENDING-RELEASED at 1861.70. Named in data/reviews/P20261023-2ed8d3.md:324 as a finding no open record named. Seen in 1 of the 10 control laps (lmuc2). Whether anything waited on the slot (an admission, the unmount itself) is not established.",
       "next": "Read whether the unmount path waits on the P304 classification (the 30.8 s falls inside A's 38 s unmount, 1823.95-1861.70) and what admits the next mount onto a slot left RETIRE_PENDING with an unclassified key; then a lap: a two-node TCP pair, B leaves cleanly, A unmounts at once, and the next mount of either node, timing A's unmount and the next admission. ===== ===== 2026-10-24: read. The 38 s unmount of lap lmuc2 is that control's own release-all on one thread (control b20261023-9a3afc, dl_relall_threads=1: A's unmount 1823.95-1861.70 s), so the P304-RETIRE-UNKNOWN-STALLED at 1855.12 s (a_kmsg.txt:6470) is the heartbeat monitor's grace log (dlm/disklock.c:2013-2029, after MXFS_DISKLOCK_RETIRE_GRACE_MS from first sight), not a wait the unmount takes. What decides whether this is a defect is the next mount: before admission it settles every RETIRE_PENDING slot on its own thread (dlm/v5_mount.c:16963-16987: EMPTY when the key is proven absent, WITHDRAWN when present, otherwise the gate stays shut, P-ADMIT-RETIRE-PENDING-HELD). Lap built in the sibling tree /home/steve/src/mxfs-a17 for the next attempt: tests/retire_pending_next_mount_lap.sh <label> <configuration> forms the pair, unmounts B then A at once, mounts A then B, each timed, and reads both kernel logs after a mark; EXPOSED when A's mount saw the slot RETIRE_PENDING (P304-RETIRE-PENDING-SEEN immediate=1 or P-ADMIT-RETIRE-PENDING-HELD), PASS when both mounts return 0 under stall_limit_s with no held admission and no UNKNOWN-STALLED. Bound 160 s (2x: prep 37-58 s, two unmounts ~2 s, two mounts 3-8 s). Next: precheck it on g2 at 2/net/mesh/direct; if a mount holds admission or stalls, that is the defect and the lap its reproducer.",
       "updated": "2026-10-23"
-    },
-    {
-      "id": "D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING",
-      "severity": "minor",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-23",
-      "summary": "tests/release_step_copy_race.py lacked its execute bit (mode 0664), so tools/batch_lap.py's exec of it through env ('env MXFS_RELEASE_STEP_COPY=0 tests/release_step_copy_race.py') failed with 'env: \u2018tests/release_step_copy_race.py\u2019: Permission denied' (rc=126) before the lap ran, and all 10 laps of control b20261023-a60598 for D-RELEASE-STEP-CELL-LAP-COPIES-LIVE-DATA-DIR-AND-DIES-ON-A-VANISHED-TMP-FILE were recorded INCOMPLETE with nothing measured",
-      "evidence": "Lane tests/evidence/lanes/host_a14_controls_20261023T204131Z step3.log: ten 'lap N/10: INCOMPLETE 2/net/mesh/direct:lap:release_step_copy_race:<iso> rc=126 elapsed_s=0 exposure=0 -- no verdict line (rc=126)'; each lap log in tests/evidence/batch_laps/b20261023-a60598/ reads 'env: \u2018tests/release_step_copy_race.py\u2019: Permission denied' then '=== rc=126 elapsed=0s'. ls -l tests/release_step_copy_race.py: -rw-rw-r--, frozen so in candidate 0.90.134's attempt frozen 2026-10-23T20:40Z (copied with cp -p from the sibling tree mxfs-a14, where it was written 0664).",
-      "next": "The file is mode 0775 in the sibling tree mxfs-a15, for the next attempt; on this attempt the lap is invoked as 'python3 tests/release_step_copy_race.py' (no mode needed). Removal: a lap invoked through batch_lap.py as the queue invoked it, with the mode as frozen (rc=126, control) and as fixed (it runs), on the next attempt. ===== 2026-10-24: control with the fix reverted (tests/evidence/controls/D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT.fix.diff, a mode-only diff: 0775 back to 0664, applied by harness_batch.py --revert in place before the next freeze). Batch b20261023-d18686 declared its probe as only the fixed lap's '^EXPOSED: the writer saved the scratch queue', so its 10 FAILs (each 'env: tests/release_step_copy_race.py: Permission denied', rc=126) counted as unexposed and it measured 0 of 0; the trigger is the exec reaching the file, and env's refusal is that exec. Control b20261023-844929, probe '^env: .tests/release_step_copy_race.py.: Permission denied|^EXPOSED: the writer saved the scratch queue': 10 of 10 exposed laps failed rc=126 (lower bound 0.5887: a verification of 6 clean laps). The mode is restored to 0775 (stat after the control). Next: on the next frozen attempt, harness_batch.py verify sized from b20261023-844929 with the same command and probe, then propose remove --fixed citing harness_batch.py proof of the control against that attempt's frozen list.",
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:42:11Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:42:12Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:42:13Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:42:14Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:42:15Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:42:16Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:42:17Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:42:18Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:42:19Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race",
-          "iso": "2026-10-23T20:42:20Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:43:53Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:43:52Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:43:51Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:43:50Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:43:49Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:43:48Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:43:47Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:43:46Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:43:45Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:43:44Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:44:23Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:44:22Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:44:21Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:44:20Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:44:19Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:44:18Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:44:17Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:44:16Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:44:15Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:release_step_copy_race_mode",
-          "iso": "2026-10-24T00:44:14Z"
-        }
-      ],
-      "batches": [
-        {
-          "id": "b20261023-d18686",
-          "kind": "control",
-          "row": "lap:release_step_copy_race_mode",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: the writer saved the scratch queue",
-          "candidate": "",
-          "build": "9C7B7B00C5DE523F1D378C8",
-          "variant": "fix reverted: tests/evidence/controls/D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT.fix.diff sha256=51619a0f30363f3cd2bca0ddcdae38b79d0e9dd8e20a591405e91c6bff04881c",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: tests/release_step_copy_race.py back at mode 0664, invoked as its control queue invoked it (through env), so it cannot be executed and the lap measures nothing"
-        },
-        {
-          "id": "b20261023-844929",
-          "kind": "control",
-          "row": "lap:release_step_copy_race_mode",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^env: .tests/release_step_copy_race.py.: Permission denied|^EXPOSED: the writer saved the scratch queue",
-          "candidate": "",
-          "build": "9C7B7B00C5DE523F1D378C8",
-          "variant": "fix reverted: tests/evidence/controls/D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT.fix.diff sha256=51619a0f30363f3cd2bca0ddcdae38b79d0e9dd8e20a591405e91c6bff04881c",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: tests/release_step_copy_race.py back at mode 0664, invoked through env as its control queue invoked it; exposure is the exec reaching the file (env's refusal, or the lap's own EXPOSED line when it runs)"
-        },
-        {
-          "id": "b20261023-1ace9a",
-          "kind": "verify",
-          "row": "lap:release_step_copy_race_mode",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^env: .tests/release_step_copy_race.py.: Permission denied|^EXPOSED: the writer saved the scratch queue",
-          "candidate": "0.90.134",
-          "build": "9C7B7B00C5DE523F1D378C8",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:release_step_copy_race_mode",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-844929",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "fix reverted: tests/evidence/controls/D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT.fix.diff sha256=51619a0f30363f3cd2bca0ddcdae38b79d0e9dd8e20a591405e91c6bff04881c",
-            "builds": [
-              "9C7B7B00C5DE523F1D378C8"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "updated": "2026-10-23",
-      "rates": [
-        {
-          "row": "lap:release_step_copy_race_mode",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-d18686",
-          "k": 0,
-          "n": 0,
-          "candidate": "",
-          "variant": "fix reverted: tests/evidence/controls/D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT.fix.diff sha256=51619a0f30363f3cd2bca0ddcdae38b79d0e9dd8e20a591405e91c6bff04881c",
-          "builds": [
-            "9C7B7B00C5DE523F1D378C8"
-          ],
-          "date": "2026-10-23"
-        },
-        {
-          "row": "lap:release_step_copy_race_mode",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-844929",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "fix reverted: tests/evidence/controls/D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT.fix.diff sha256=51619a0f30363f3cd2bca0ddcdae38b79d0e9dd8e20a591405e91c6bff04881c",
-          "builds": [
-            "9C7B7B00C5DE523F1D378C8"
-          ],
-          "date": "2026-10-23"
-        }
-      ],
-      "reproducer": "env tests/release_step_copy_race.py through tools/batch_lap.py (harness_batch.py, row lap:release_step_copy_race_mode at 2/net/mesh/direct), as the control queue of the earlier record invoked it",
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-24T01:01:07Z",
-          "build": "9C7B7B00C5DE523F1D378C8",
-          "batch": "b20261023-1ace9a",
-          "approval": "P20261023-2f64df",
-          "date": "2026-10-23"
-        }
-      ]
     },
     {
       "id": "D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS",
@@ -6867,6 +6590,16 @@
       "summary": "A 32/net/mesh/direct cluster prep failed after 9 s (ledger stamp 2026-08-28); the ledger keeps only 'prep failed', and no log, node kernel log or run id of it survives, so what failed is not known.",
       "evidence": "data/criteria.runs.jsonl:349 {\"build\": null, \"config\": \"32/net/mesh/direct\", \"elapsed_s\": 9, \"iso\": \"2026-08-28\", \"kind\": \"run\", \"measured\": \"elapsed=9s\", \"migrated\": \"2026-10-21\", \"outcome\": \"INCOMPLETE\", \"reason\": \"prep failed\", \"row\": \"prep_cluster\", \"status\": \"FAIL\"} (the same line also sits in tests/evidence/drbd_rig/criteria.runs.jsonl:896 and data/criteria.pvephys.runs.jsonl:416). The previous prep there: data/criteria.runs.jsonl:304 '2026-07-28T21:51:13Z ... skipped (marker matched 32/net/mesh/direct)'. Searched with no hit: CHANGELOG.md for 'prep_cluster:2026-08-28'; tests/evidence (now /src/mxfs-evidence) for board_32* and for files dated 2026-08-28; session transcripts (the oldest kept is from 2026-09-26). The run is not named as a cell: tools/defects.py refuses its day-only stamp (D-DEFECTS-PARSE-CELL-REFUSES-A-DAY-STAMP-SO-MIGRATED-RUNS-CANNOT-BE-NAMED).",
       "next": "Once parse_cell takes a day stamp: tools/defects.py update <this id> --cell 32/net/mesh/direct:prep_cluster:2026-08-28. A prep that fails 9 s in stopped before or at mkfs (preflight, pool binding, module load, device resolution); run run.sh prep_cluster at 32/net/mesh/direct (or the largest net/mesh/direct cluster the rig forms) on the current candidate under its derived budget, keeping run.sh's prep output, until a prep fails or a measured number pass."
+    },
+    {
+      "id": "D-HARNESS-BATCH-PROOF-COMPARES-CONTENT-ONLY-SO-A-MODE-ONLY-FIX-CANNOT-BE-PROVEN",
+      "severity": "minor",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "tools/harness_batch.py proof decides whether a control's tree differed from the candidate only by the fix's files by comparing content hashes (tools/harness_batch.py:139, :436), and no input snapshot records a file's mode, so a fix that changes only a mode (an execute bit) can never be proven: proof of control b20261023-844929 printed FAILS although its only change was the mode of tests/release_step_copy_race.py",
+      "evidence": "Review data/reviews/P20261023-d6c290.md (approved that removal from the snapshots' inode/ctime and the laps' rc=126 instead). The fix diff tests/evidence/controls/ of D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING is 'old mode 100664 / new mode 100775' with no hunk; proof printed 'during the laps the fix's files differed [tests/release_step_copy_race.py] and nothing else' then FAILS on the content comparison.",
+      "next": "Record each file's mode in the control input snapshots and the frozen list (tools/release_candidate.py frozen_paths stamp) and let proof compare it; a switch restoring the content-only comparison for the control; a host lap that proves a mode-only control."
     }
   ]
 }
