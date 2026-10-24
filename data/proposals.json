@@ -7079,6 +7079,34 @@
         "tests/cell_day_stamp_lap.py",
         "data/reviews/P20261023-499ec5.md"
       ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-ea7043.md",
+        "sha256": "52ca35ff0f9cc31a93136630a97dc718bf76c9c38377df4aba715a5ffdc1f8ab",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-cc8e87",
+      "kind": "remove-fixed",
+      "record": "D-DEFECTS-PARSE-CELL-REFUSES-A-DAY-STAMP-SO-MIGRATED-RUNS-CANNOT-BE-NAMED",
+      "change": {
+        "control": "b20261024-456074",
+        "fixon": "b20261024-f44959",
+        "cause": "tools/defects.py parse_cell accepted a run key only with a full CONFIG:ROW:YYYY-MM-DDTHH:MM:SSZ stamp, so update --cell and --drop-cell refused the day-only stamps of runs migrated into the ledger on 2026-10-21. Fixed by letting the anchored pattern take a day-only YYYY-MM-DD stamp as well; MXFS_CELL_DAY_STAMP=0 restores the full-stamp pattern."
+      },
+      "argument": "Control b20261024-456074 (MXFS_CELL_DAY_STAMP=0 on the frozen candidate 0.90.134 attempt 2026-10-24T06:38:23Z) failed 10 of 10 exposed laps of tests/cell_day_stamp_lap.py: update --cell and --drop-cell of the day-stamped run 32/net/mesh/direct:prep_cluster:2026-08-28 refused rc=1 'a board run is CONFIG:ROW:ISO', the record's measured failure, while a release step's full-stamp run was named rc=0 in the same laps. Verification b20261024-f44959 sized from it passed 6 of 6 exposed laps (all three parts settled) and was approved and applied (P20261024-ea7043). The earlier removal P20261023-499ec5 was rejected for the release-step naming and the drop, which these laps now exercise with the switch on and off. One fix site (parse_cell); host-only laps, because the defect is a host tool's parser and touches no node. The record's cells are the twenty control laps of b20261023-4674ab and b20261024-456074, retired by the applied verifies. Reproducer set on the record.",
+      "evidence": [
+        "data/reviews/P20261024-ea7043.md",
+        "data/reviews/P20261023-499ec5.md",
+        "tests/evidence/lanes/host_w12_20261024T063834Z/step3.log",
+        "tests/evidence/lanes/host_w12_20261024T063834Z/step4.log",
+        "tests/cell_day_stamp_lap.py",
+        "tools/defects.py"
+      ],
       "state": "pending",
       "created": "2026-10-24"
     }

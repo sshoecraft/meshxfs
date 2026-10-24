@@ -1672,8 +1672,8 @@
       "config": "*/*/*",
       "opened": "2026-10-19",
       "summary": "The F4 committed-never-submitted registry never sees a successful FUA write of a bmbt buffer: on a multi-node mount every bmbt write takes the FUA arm of xfs_buf_submit_ex (pal/linux/xfs_buf.c:13645-13649), which on success completes through xfs_buf_ioend and returns at :13796, before xfs_buf_submit_bio (:13803) where mxfs_f4_submit stamps submit_gen (:8956). So a directory bmbt leaf written by FUA keeps submit_gen 0, its completion leaves the record open (xfs/xfs_mxfs_obligation.c:550), and the registry reports it committed-never-submitted: P285-F4-BLI-FREED-OPEN, P285-F4-REC truth=GEN-OPEN-NOT-DIRTY, P491-REL-UNDEST f4_open, P286-F4-ORPHAN and the orphan counter at unmount, all false for these buffers. With f4_gate=0 (default) the count changes nothing (relbar census-and-proceed :479-500, certificate counters :1072-1075, cause tags :706-711, P491-REL-UNDEST probe only, and the evict shutdown condition xfs_mxfs_evict.c:562-563 leaves f4_open out); it makes the telemetry unable to show a real committed-never-submitted directory buffer and would make f4_gate=1 defer every release of a btree directory after such a write.",
-      "evidence": "0.90.131 release chain window lap 7 (run 20261019T140254Z, build 8DAEC6B8298ADB049222D74), test1 kernel ring tests/evidence/w2laps_0.90.131_dmesg_test1_140918Z.gz: P285-F4-BLI-FREED-OPEN lines 2080 (daddr 25850600 committed_gen 3512), 5939 (24784056, 3807), 12099 (24784056, 4312); P491-REL-UNDEST line 15112 (ino=25165952 held_mode=5 f4_open=2 comm=kworker/u5:15); P285-F4-REC truth=GEN-OPEN-NOT-DIRTY bli=0 dirty=0 in_ail=0 delwri=0 submit_gen=0 lines 26331-26332 (3646.40); P286-F4-ORPHAN lines 73137-73138 under umount (3759.44); F4-REGISTRY-TOTAL line 73141. Against a lost commit: the last P66-LEAFWRITE of both leaves (3637.287, numrecs 170+167) equals the in-core extent count (P62-IFLUSH-FORCE if_nextents=337 leafsum=337 at 3637.309), after the newest commit (gen 4312 by 3634.5) and before the release at 3641.1. Contradiction left open: that write is xfs_bwrite of the cached leaf (xfs/xfs_mxfs_dir_bmbt.c:1116-1126), whose submit should stamp submit_gen (pal/linux/xfs_buf.c:8956, mxfs_f4_submit) and whose completion should retire the record, yet the record read submit_gen=0 nine seconds later. Not audited: window laps run no chk_clean and the next lap reformats the LUN.",
-      "next": "Stamp the F4 submit on the bmbt FUA arm (call mxfs_f4_submit(bp) before mxfs_buf_write_fua at pal/linux/xfs_buf.c ~13698, so the success completion at :13795 retires the record), then show on the rig that a FUA-written directory bmbt leaf retires its record (P286-F4-ORPHAN 0 and F4-REGISTRY-TOTAL orphans=0 at unmount on a 2/net/mesh/mpath path_fenced_return lap), and that a real committed-never-submitted buffer still opens one. Not in 0.90.131: a source change restarts its validation. ===== 2026-10-24: fix in the tree for the next attempt: pal/linux/xfs_buf.c's bmbt FUA arm calls mxfs_f4_submit(bp) before mxfs_buf_write_fua (an idempotent snapshot, b_mxfs_f4_submit_gen = b_mxfs_f4_committed_gen, xfs/xfs_mxfs_obligation.c:465-469, so the fallback bio's second call takes the same one); module parameter f4_fua_submit=0 skips it, the code before: the control. Next: on that attempt, 2/net/mesh/mpath path_fenced_return (and a 2/disk/caw/direct row with btree directories) read for P286-F4-ORPHAN and the F4-REGISTRY-TOTAL orphans= at unmount, with f4_fua_submit=0 (control: orphans > 0 on FUA-written bmbt buffers) and the default (orphans 0), each lap's kernel log kept; then show a real committed-never-submitted buffer still opens a record (a dir buffer whose write is fence-suppressed: P287), then remove --fixed.",
+      "evidence": "0.90.131 release chain window lap 7 (run 20261019T140254Z, build 8DAEC6B8298ADB049222D74), test1 kernel ring tests/evidence/w2laps_0.90.131_dmesg_test1_140918Z.gz: P285-F4-BLI-FREED-OPEN lines 2080 (daddr 25850600 committed_gen 3512), 5939 (24784056, 3807), 12099 (24784056, 4312); P491-REL-UNDEST line 15112 (ino=25165952 held_mode=5 f4_open=2 comm=kworker/u5:15); P285-F4-REC truth=GEN-OPEN-NOT-DIRTY bli=0 dirty=0 in_ail=0 delwri=0 submit_gen=0 lines 26331-26332 (3646.40); P286-F4-ORPHAN lines 73137-73138 under umount (3759.44); F4-REGISTRY-TOTAL line 73141. Against a lost commit: the last P66-LEAFWRITE of both leaves (3637.287, numrecs 170+167) equals the in-core extent count (P62-IFLUSH-FORCE if_nextents=337 leafsum=337 at 3637.309), after the newest commit (gen 4312 by 3634.5) and before the release at 3641.1. Contradiction left open: that write is xfs_bwrite of the cached leaf (xfs/xfs_mxfs_dir_bmbt.c:1116-1126), whose submit should stamp submit_gen (pal/linux/xfs_buf.c:8956, mxfs_f4_submit) and whose completion should retire the record, yet the record read submit_gen=0 nine seconds later. Not audited: window laps run no chk_clean and the next lap reformats the LUN. ===== 2026-10-24, same-build A/B on candidate 0.90.134 attempt 2026-10-24T06:38:23Z (module BE3695D2590A65F742F9816), lane tests/evidence/lanes/g2b_w12_20261024T064106Z steps 4-9, 2/net/mesh/mpath path_fenced_return on g2b (test15 survivor, test16 victim), PF_KEEP_KMSG=1, each arm on a fresh prep; every row PASS. Control f4_fua_submit=0 (runs 20261024T064255Z-g2b, 064659Z-g2b): the survivor's kmsg_test15_fromnode.gz holds 6 P285-F4 lines in each run, e.g. '[241.890703] P285-F4-BLI-FREED-OPEN daddr=24784056 len=8 committed_gen=1088 submit_gen=0 ... lseq=202 wseq=202' (written: wseq=lseq, yet submit_gen 0) and '[268.933903] P285-F4-REC ino=25165953 daddr=24784056 len=8 gen=2103 ... truth=GEN-OPEN-NOT-DIRTY ... submit_gen=0'; at the next prep's unmount of that mount '[551.504027] P286-F4-ORPHAN ino=25165953 daddr=24784056 len=8 gen=2103' (F4-REGISTRY-TOTAL ... orphans=1 open_at_destroy=1, captured in board_20261024T065104Z-g2b_path_fenced_return/kmsg_test15_fromnode.gz before that row's mark). Default (runs 065104Z-g2b, 065507Z-g2b): 0 P285-F4 and 0 submit_gen=0 lines on both nodes, F4-REGISTRY-TOTAL orphans=0 at every unmount, while the survivor logged 182 P63-LEAFWR (bmbt leaf FUA writes) in 065507Z: the FUA arm was exercised.",
+      "next": "Stamp the F4 submit on the bmbt FUA arm (call mxfs_f4_submit(bp) before mxfs_buf_write_fua at pal/linux/xfs_buf.c ~13698, so the success completion at :13795 retires the record), then show on the rig that a FUA-written directory bmbt leaf retires its record (P286-F4-ORPHAN 0 and F4-REGISTRY-TOTAL orphans=0 at unmount on a 2/net/mesh/mpath path_fenced_return lap), and that a real committed-never-submitted buffer still opens one. Not in 0.90.131: a source change restarts its validation. ===== 2026-10-24: fix in the tree for the next attempt: pal/linux/xfs_buf.c's bmbt FUA arm calls mxfs_f4_submit(bp) before mxfs_buf_write_fua (an idempotent snapshot, b_mxfs_f4_submit_gen = b_mxfs_f4_committed_gen, xfs/xfs_mxfs_obligation.c:465-469, so the fallback bio's second call takes the same one); module parameter f4_fua_submit=0 skips it, the code before: the control. Next: on that attempt, 2/net/mesh/mpath path_fenced_return (and a 2/disk/caw/direct row with btree directories) read for P286-F4-ORPHAN and the F4-REGISTRY-TOTAL orphans= at unmount, with f4_fua_submit=0 (control: orphans > 0 on FUA-written bmbt buffers) and the default (orphans 0), each lap's kernel log kept; then show a real committed-never-submitted buffer still opens a record (a dir buffer whose write is fence-suppressed: P287), then remove --fixed. ===== Next attempt: a lap (tests/f4_fua_lap.sh, a 2/net/mesh/mpath path_fenced_return on a fresh prep with PF_KEEP_KMSG=1) graded from the survivor's kernel log after the row's mark: EXPOSED on P63-LEAFWR rc=0; FAIL on any P285-F4 line with submit_gen=0 or P286-F4-ORPHAN; PASS otherwise; then a control batch with f4_fua_submit=0, a verification sized from it, and remove --fixed. A real committed-never-submitted buffer still opening a record is shown by P287 on a fence-suppressed write (the fix leaves that path alone).",
       "updated": "2026-10-24",
       "impact": "noblock",
       "impact_why": "Measured on 0.90.131 window lap 7 (tests/evidence/w2laps_0.90.131_dmesg_test1_140918Z.gz): both leaves the registry held open were written by successful FUA writes after their newest commit (P63-LEAFWR owner=25165952 daddr=24784056 numrecs=170 rc=0 and daddr=25850600 numrecs=167 rc=0 at 3637.3086, the FUA arm print; 170+167 = if_nextents 337; newest commit gen 4312 by 3634.5 and the record still at 4312 at 3646.4), with no P61-FUA-SKIP-BMBT, P63-BMBT-FUAWR-FALLBACK, P82, P77 or P81 for any bmbt write in the ring; and the peer, which can read that directory only after the EX release at 3641.1, then read every one of the 52998 files in it (VERIFY ok=52998 missing=0). Nothing was lost, and by the code read above the false count reaches no deferral, shutdown or replay decision with the default f4_gate=0."
@@ -6210,6 +6210,21 @@
           "config": "4/net/mesh/mpath",
           "row": "path_mount_degraded",
           "iso": "2026-10-23T17:32:15Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "path_mount_degraded",
+          "iso": "2026-10-24T06:56:12Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "path_mount_degraded",
+          "iso": "2026-10-24T06:52:45Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "path_mount_degraded",
+          "iso": "2026-10-24T06:49:03Z"
         }
       ],
       "updated": "2026-10-24",
@@ -7186,7 +7201,7 @@
           "candidate": "0.90.134",
           "build": "BE3695D2590A65F742F9816",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -7349,13 +7364,14 @@
           "config": "2/disk/caw/direct",
           "platform": "any",
           "candidate": "0.90.134",
-          "attempt": "2026-10-24T04:13:43Z",
-          "build": "B947A20F3C2FE3A67ABF6F3",
-          "batch": "b20261023-ab31a2",
-          "approval": "P20261023-7b2508",
-          "date": "2026-10-23"
+          "attempt": "2026-10-24T06:38:23Z",
+          "build": "BE3695D2590A65F742F9816",
+          "batch": "b20261024-f44959",
+          "approval": "P20261024-ea7043",
+          "date": "2026-10-24"
         }
-      ]
+      ],
+      "reproducer": "MXFS_CELL_DAY_STAMP=0 tests/cell_day_stamp_lap.py (on any tree: update --cell and --drop-cell of 32/net/mesh/direct:prep_cluster:2026-08-28 exit 1 'a board run is CONFIG:ROW:ISO')"
     },
     {
       "id": "D-32CAWMPATH-PREP-CLUSTER-FAILED-AFTER-177S-NO-EVIDENCE-RETAINED",
