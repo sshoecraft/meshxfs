@@ -5638,11 +5638,44 @@
           "candidate": "",
           "build": "A27A67A3E501890BE9985E0",
           "variant": "FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0 (the lap as it was before the forced overlap: its first 64 merged blocks held 20 ms on each node, no overlap forced, plain unmounts)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a lap whose holds catch no peer write retries no MISCOMPARE and ends VACUOUS"
+        },
+        {
+          "id": "b20261024-0fd280",
+          "kind": "verify",
+          "row": "lap:fourkn_merge_2node",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "planned": 89,
+          "probe": "INFO forced overlap in inode block",
+          "candidate": "0.90.134",
+          "build": "A27A67A3E501890BE9985E0",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:fourkn_merge_2node",
+            "config": "2/disk/caw/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-7f6b7e",
+            "k": 5,
+            "n": 20,
+            "candidate": "",
+            "variant": "FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0 (the lap as it was before the forced overlap: its first 64 merged blocks held 20 ms on each node, no overlap forced, plain unmounts)",
+            "builds": [
+              "A27A67A3E501890BE9985E0"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.05833393605895179
         }
       ],
       "updated": "2026-10-24",
@@ -5661,6 +5694,21 @@
             "C54C14B681D148267D084FC"
           ],
           "date": "2026-10-23"
+        },
+        {
+          "row": "lap:fourkn_merge_2node",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-7f6b7e",
+          "k": 5,
+          "n": 20,
+          "candidate": "",
+          "variant": "FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0 (the lap as it was before the forced overlap: its first 64 merged blocks held 20 ms on each node, no overlap forced, plain unmounts)",
+          "builds": [
+            "A27A67A3E501890BE9985E0"
+          ],
+          "date": "2026-10-24"
         }
       ],
       "cells": [
@@ -5988,6 +6036,31 @@
           "config": "2/disk/caw/direct4k",
           "row": "lap:fourkn_merge_2node",
           "iso": "2026-10-24T15:16:34Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-24T15:51:59Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-24T15:47:07Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-24T15:44:47Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-24T15:37:29Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:fourkn_merge_2node",
+          "iso": "2026-10-24T15:35:10Z"
         }
       ]
     },
@@ -7723,151 +7796,6 @@
       "updated": "2026-10-24"
     },
     {
-      "id": "D-DISKLOCK-VALIDATE-READS-CAW-SLOT-0-AND-LOGS-A-CORRUPT-LOCK-RECORD",
-      "severity": "minor",
-      "nodes": 1,
-      "config": "disk/caw/*",
-      "opened": "2026-10-23",
-      "summary": "dlm/disklock.c validate_lockstate reads the first lock record at base + MXFS_DISKLOCK_HB_SIZE, which on a COMPARE AND WRITE volume is CAW slot 0 (dlm/dlm_caw.c:16200 lock_region_offset = disklock_offset + MXFS_DISKLOCK_HB_SIZE), and when that slot is live (magic MXCW) and its bytes at the record's flags field read ACTIVE it logs 'disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)' at every such mount: a corruption message for a healthy slot",
-      "evidence": "Code: dlm/disklock.c:276-279 lock_slot_offset = base_offset + MXFS_DISKLOCK_HB_SIZE + slot*MXFS_DISKLOCK_RECORD_SIZE; :2644-2657 validate_lockstate's check of slot 0; dlm/dlm_caw.c:1300-1304 slot_offset = lock_region_offset + slot*MXFS_CAW_SLOT_SIZE; dlm/dlm_caw.h:33 MXFS_CAW_MAGIC 0x4D584357 'MXCW' live slot. Logs: board_20261023T165407Z-g2e_path_mount_degraded/kmsg_test18_fromnode.gz:119302 and :182393 'disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)', each followed by 'lockstate validation returned -5 (may be freshly initialized)' and the disklock's normal init (:119303-119306); 2/disk/caw/mpath, 512-byte volume. The mount went on. Its one caller, dlm/disklock.c:5235-5241 (disklock init), only logs 'lockstate validation returned %d (may be freshly initialized)' and goes on ('Not fatal'): the -EIO changes nothing but the two log lines. ===== Code read 2026-10-23 (session 48; a scout's call-chain enumeration, then the decisive lines read): of the legacy lock-record users, mxfs_disklock_write_grant (dlm/disklock.c:5688, the only writer of a lock record's MXFS_DISKLOCK_MAGIC, :5747), mxfs_disklock_clear_grant (:5778) and mxfs_disklock_read_all (:6380) have no caller in any .c or .h file, and find_lock_slot (:2577) is called only by the first two. mxfs_disklock_purge_node (:5967), reached at node death (dlm/v5_mount.c:15988) and at recovery completion (:19077) on both transports, scans the whole region (:6093-6163) but zeroes only a record that carries the disklock magic, is ACTIVE and is owned by the dead node (:6179-6181), by COMPARE AND WRITE of the exact image read (:6189, purge_cas_zero); a live CAW slot carries MXCW and never matches. So on a COMPARE AND WRITE volume nothing writes CAW slots as lock records; what remains is validate_lockstate's false corruption message.",
-      "next": "Make validate_lockstate skip the lock-record half (the region is the CAW slot table on a COMPARE AND WRITE volume, and nothing writes a lock record any more), with a switch for the control, and a lap that mounts with CAW slot 0 live and requires no 'corrupt lock record' line (switch off: the line). ===== ===== 2026-10-23: fix built in the sibling tree /home/steve/src/mxfs-a15 for the next attempt (module 8F65904041641E2C2F63966): validate_lockstate checks the heartbeat half only; the lock-record half runs under the new module parameter dl_validate_lockrec=1 (default 0), the control. The trigger is a CAW slot 0 that is live with generation 1: a CAW slot's 32-bit generation sits at the lock record's flags offset (dlm/dlm_caw.h struct mxfs_caw_lock_slot), and MXFS_DISKLOCK_FLAG_ACTIVE is 1. Lap tests/lockrec_slot0_lap.sh <label> [config=2/disk/caw/direct] [group]: prep, bursts of 2000 creates on the first node with CAW slot 0 read after each by tools/caw_slotdump --slot 0, until it is live with gen=1 (EXPOSED) or 20 bursts pass (ABORT, not exposed), then the second node remounts with its kernel log marked; LOCKREC_VALIDATE=1 sets dl_validate_lockrec=1 on that node for the remount (control). Precheck on g2 at 2/disk/caw/direct: fix in, not exposed in 40000 creates (ABORT; slot 0 never claimed, 10007 of 65536 slots nonempty afterwards); control EXPOSED at burst 5 ('slot=0 magic=0x4d584357 type=INODE ag=0 ino=8397101 gen=1') and FAIL: '[  768.149717] mxfs: disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)', '[  768.149723] mxfs: disklock: lockstate validation returned -5'. Exposure is by chance (a slot's index is an FNV-1a hash of the resource with the volume id, dlm/dlm_shared.c resource_hash_raw), about one lap in two at 40000 creates; a batch's planned laps must allow for the unexposed ones. Next, on the next attempt: a control batch with LOCKREC_VALIDATE=1, a verification sized from it, remove --fixed. ===== 2026-10-24, precheck on candidate 0.90.134 attempt 2026-10-24T04:13:43Z (g2c, test29/test30, 2/disk/caw/direct, lane tests/evidence/lanes/g2c_a15_lockrec_pre_20261024T042813Z): tests/lockrec_slot0_lap.sh never exposed. CAW slot 0 read 'slot=0 magic=0x00000000 type=? ag=0 ino=0 gen=0' after each of the first 16 bursts of 2000 creates (tests/evidence/20261024T042835Z_lockrec_lrpre1/lap.log; bursts slowed from 16 s to about 60 s each), then 'slot 0 unread' as tools/vm_pool.sh's reaper shut the nodes down 600 s after the lap's own prep (a lap run outside tools/batch_lap.py holds no VMs; /var/log/libvirt/qemu/test29.log 'shutting down, reason=shutdown' 04:40:36Z), and the lap ended ABORT 'never went live with gen=1'. So creates in one directory do not claim slot 0 on this build at 2 nodes. Next: make the lap claim slot 0 deliberately (the CAW slot hash of a resource: pick an inode or AG lock that hashes to slot 0 and take it, or a test-only knob that routes one lock to slot 0), run it under tools/batch_lap.py so its VMs are held, then precheck both arms on the next attempt. ===== 2026-10-24: a deterministic exposure to try before a batch: a CAW slot's index is resource_hash_raw (dlm/dlm_shared.c:34, FNV-1a over the raw mxfs_resource_id bytes) of a resource that carries the volume id, and mkfs_mxfs draws the volume id from /dev/urandom, which tests/mkfs_layout_identity.py already replaces with a fixed file by a bind mount in a private namespace. So a lap can search host-side for random bytes whose volume id puts a resource every mount takes (the root directory's inode lock, or AG 0's lock) in slot 0, format with them, and mount: slot 0 live at gen=1 on every lap, instead of about one in two at 40000 creates. Needs: how mkfs_mxfs derives the volume id from its random bytes, the resource_id layout of that lock, and find_slot's probe order (dlm/dlm_caw.c find_slot_skip) so the slot the resource lands in is the hash's. ===== 2026-10-24, precheck of the drafted deterministic arm (tests/evidence/drafts/tree/tests/lockrec_slot0_lap.sh LOCKREC_TARGET=root with tests/evidence/drafts/tree/tests/caw_slot_uuid.py) on attempt 17 (module 468F7F30C2E190B0244AF70) at 2/disk/caw/direct, lane tests/evidence/lanes/g2b_a17lr_20261024T114044Z: the found bytes (UUID d01a9bfc73114f7a89361de0117e0f23, 1473 tries) left CAW slot 0 live holding the root inode lock after A's lone mount on all four laps ('STEP A mounted alone: slot=0 magic=0x4d584357 type=INODE ag=0 ino=128 gen=1', EXPOSED). Fix on (dl_validate_lockrec=0, the candidate's default): lrr1 and lrr2 PASS 'disklock init logged no corrupt lock record over a live slot 0' (71 s, 69 s). LOCKREC_VALIDATE=1: lrc1 and lrc2 FAIL \"test16's mount logged 'mxfs: disklock: corrupt lock record at slot 0 (magic=4d584357, expected=4d584c4b)'\" (74 s each). The hypothesis held: every lap exposed, the fix arm passes, the control fails. Next: on the next attempt, with the draft applied, the control batch (LOCKREC_VALIDATE=1, 10 laps) and the verification sized from it.",
-      "updated": "2026-10-24",
-      "batches": [
-        {
-          "id": "b20261024-13351b",
-          "kind": "control",
-          "row": "lap:lockrec_slot0",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: CAW slot 0 is live",
-          "candidate": "",
-          "build": "8DBA16AEB7FDD3066C9C1BC",
-          "variant": "LOCKREC_VALIDATE=1 (dl_validate_lockrec=1: disklock init validates the record at CAW slot 0, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "why": "the fix taken out: B's disklock init reads slot 0 as a lock record and logs a live CAW record there as corrupt"
-        },
-        {
-          "id": "b20261024-0a3f62",
-          "kind": "verify",
-          "row": "lap:lockrec_slot0",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: CAW slot 0 is live",
-          "candidate": "0.90.134",
-          "build": "8DBA16AEB7FDD3066C9C1BC",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "rate": {
-            "row": "lap:lockrec_slot0",
-            "config": "2/disk/caw/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261024-13351b",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "LOCKREC_VALIDATE=1 (dl_validate_lockrec=1: disklock init validates the record at CAW slot 0, as before the fix)",
-            "builds": [
-              "8DBA16AEB7FDD3066C9C1BC"
-            ],
-            "date": "2026-10-24"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:lockrec_slot0",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261024-13351b",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "LOCKREC_VALIDATE=1 (dl_validate_lockrec=1: disklock init validates the record at CAW slot 0, as before the fix)",
-          "builds": [
-            "8DBA16AEB7FDD3066C9C1BC"
-          ],
-          "date": "2026-10-24"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:lockrec_slot0",
-          "iso": "2026-10-24T13:09:59Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:lockrec_slot0",
-          "iso": "2026-10-24T13:08:44Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:lockrec_slot0",
-          "iso": "2026-10-24T13:07:08Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:lockrec_slot0",
-          "iso": "2026-10-24T13:06:01Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:lockrec_slot0",
-          "iso": "2026-10-24T13:04:46Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:lockrec_slot0",
-          "iso": "2026-10-24T13:03:39Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:lockrec_slot0",
-          "iso": "2026-10-24T13:02:28Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:lockrec_slot0",
-          "iso": "2026-10-24T13:01:21Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:lockrec_slot0",
-          "iso": "2026-10-24T13:00:12Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:lockrec_slot0",
-          "iso": "2026-10-24T12:59:05Z"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-24T12:49:30Z",
-          "build": "8DBA16AEB7FDD3066C9C1BC",
-          "batch": "b20261024-0a3f62",
-          "approval": "P20261024-e2fcdf",
-          "date": "2026-10-24"
-        }
-      ],
-      "reproducer": "tests/lockrec_slot0_lap.sh <label> 2/disk/caw/direct with LOCKREC_TARGET=root (lap:lockrec_slot0): formats with volume-id bytes found by tests/caw_slot_uuid.py so the root inode lock lands in CAW slot 0, mounts A alone (slot 0 live, gen=1: EXPOSED), then remounts B with its kernel log marked; LOCKREC_VALIDATE=1 (dl_validate_lockrec=1) validates slot 0 as a lock record and B logs 'disklock: corrupt lock record at slot 0'"
-    },
-    {
       "id": "D-HARNESS-LAP-TIMED-OPS-REACH-NO-STALL-GRADER-JDT-31S-UNMOUNT-GRADED-PASS",
       "severity": "major",
       "nodes": 1,
@@ -9462,8 +9390,9 @@
       "config": "*/*/*",
       "opened": "2026-10-24",
       "summary": "tests/suite/fourkn_merge.sh (the board's merged-write row on a 4K-native volume) runs each node's tests/fourkn_merge_worker.sh bounded only on the ssh client (:155-156, rs \"$WBOUND\" through tests/lib/rig.sh rs), as tests/fourkn_merge_2node.sh did before its node-side bound: a workload that overruns WBOUND leaves the worker running on the node with the mount open after the row has ended",
-      "evidence": "Code read in review data/reviews/P20261024-bead94.md (2026-10-24): tests/suite/fourkn_merge.sh:155-156 'rs \"$WBOUND\" \"$N1\" \"/src/mxfs/tests/fourkn_merge_worker.sh $DIR 1 $ROUNDS $NF\"', with no bound on the node; scripts/drbd_rig.sh:3411 runs the same worker with a node-side bound. The same mechanism in tests/fourkn_merge_2node.sh was observed (D-FOURKN-MERGE-LAP-OVERRUN-LEAVES-ITS-WORKER-HOLDING-THE-MOUNT: after an overrun the worker held /mnt/fourkn 2.75 min and the next laps' unmounts failed 'target is busy'). No board run of this row has yet overrun: a hazard read from the code, not an observed failure.",
-      "next": "Fix drafted for the next attempt in tests/evidence/drafts/tree/tests/suite/fourkn_merge.sh: the worker runs under 'timeout --foreground $((WBOUND - 3))' on its node (as tests/fourkn_merge_2node.sh :183-189); FOURKN_MERGE_NODE_BOUND=0 bounds the client alone, as before (the control). Then a lap that runs the row with an overrun forced (ROUNDS large enough to pass WBOUND, given to the row through MXFS_TEST_ENV) on a 2/disk/caw/direct4k or 2/net/mesh/direct4k pair and requires, 8 s after the row, no worker on either node and the volume unmountable; the control (FOURKN_MERGE_NODE_BOUND=0), a verification sized from it, remove --fixed."
+      "evidence": "Code read in review data/reviews/P20261024-bead94.md (2026-10-24): tests/suite/fourkn_merge.sh:155-156 'rs \"$WBOUND\" \"$N1\" \"/src/mxfs/tests/fourkn_merge_worker.sh $DIR 1 $ROUNDS $NF\"', with no bound on the node; scripts/drbd_rig.sh:3411 runs the same worker with a node-side bound. The same mechanism in tests/fourkn_merge_2node.sh was observed (D-FOURKN-MERGE-LAP-OVERRUN-LEAVES-ITS-WORKER-HOLDING-THE-MOUNT: after an overrun the worker held /mnt/fourkn 2.75 min and the next laps' unmounts failed 'target is busy'). No board run of this row has yet overrun: a hazard read from the code, not an observed failure. ===== 2026-10-24, precheck on attempt 19 (module A27A67A3E501890BE9985E0) of the drafted lap tests/evidence/drafts/tree/tests/merge_row_overrun_lap.sh on g2b (test15/test16) at 2/net/mesh/direct4k, lane tests/evidence/lanes/g2b_mrprecheck_20261024T154932Z: the lap runs tests/suite/fourkn_merge.sh itself (no board run) with ROUNDS=200 on the formed 4K pair. Fix in: mrp1 and mrp1b 'EXPOSED: the row's workload ran 13545 ms against a node-side bound of 13 s and a client bound of 16 s', both workers 'WORKER_STOPPED ... rounds=200', 'workers=0' on both nodes 8 s after the row, PASS (46 s each). FOURKN_MERGE_NODE_BOUND=0: mrp0 'workload wall 16007 ms', 'test15: workers=1 ... /src/mxfs/tests/fourkn_merge_worker.sh /mnt/shared/fourkn_merge_mro_mrp0 1 200 64' and the same on test16, FAIL; mrp0b a worker left on test16, FAIL (42 s, 49 s). So the hazard the record read from the code is observed with the fix out.",
+      "next": "Fix drafted for the next attempt in tests/evidence/drafts/tree/tests/suite/fourkn_merge.sh: the worker runs under 'timeout --foreground $((WBOUND - 3))' on its node (as tests/fourkn_merge_2node.sh :183-189); FOURKN_MERGE_NODE_BOUND=0 bounds the client alone, as before (the control). Then a lap that runs the row with an overrun forced (ROUNDS large enough to pass WBOUND, given to the row through MXFS_TEST_ENV) on a 2/disk/caw/direct4k or 2/net/mesh/direct4k pair and requires, 8 s after the row, no worker on either node and the volume unmountable; the control (FOURKN_MERGE_NODE_BOUND=0), a verification sized from it, remove --fixed. ===== 2026-10-24: lap prechecked (both arms as expected); control (FOURKN_MERGE_NODE_BOUND=0) and verification of lap:merge_row_overrun at 2/disk/caw/direct4k in tests/evidence/lanes/queue_g2d_a20.txt, bound 278 s a lap, then remove --fixed.",
+      "updated": "2026-10-24"
     },
     {
       "id": "D-PROBE-A-REPORTS-EVERY-FOREIGN-REPLAY-WRITE-AS-AN-UNHELD-AG-WRITE",

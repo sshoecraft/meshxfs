@@ -9137,8 +9137,15 @@
         "tests/lockrec_slot0_lap.sh",
         "dlm/disklock.c"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-79d70a.md",
+        "sha256": "4db258cb7239c590dc79df5a1ce89586bece3d5a832d9cd7fb643160b3c3f4d1",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-87729d",
@@ -9159,8 +9166,14 @@
         "tests/drbd_write_bound_arm.sh",
         "tests/drbd_nodes_count_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-87729d.md",
+        "sha256": "29b75bbc25af53d08152b2836797eba09db0b8da9ab5d77339156002f739114e",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     },
     {
       "id": "P20261024-ce5c62",
