@@ -7749,6 +7749,54 @@
         "tests/evidence/board_local111628_rejoin_modargs_rig/row.log",
         "tests/evidence/board_local111738_rejoin_modargs_rig/row.log"
       ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-52e185.md",
+        "sha256": "ad9543ee3274fcddc11916a39b7d5f4514894e4e9134eeeee120c089a6f9277b",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
+    },
+    {
+      "id": "P20261024-d7c365",
+      "kind": "verify",
+      "record": "D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS",
+      "change": {
+        "batch": "b20261024-565ac2"
+      },
+      "argument": "Resubmission of P20261024-52e185 (rejected, data/reviews/P20261024-52e185.md) on the same batch, with its argument corrected. Verification b20261024-565ac2 of lap:rejoin_modargs_rig at 8/disk/caw/mpath on candidate 0.90.134 (attempt frozen 2026-10-24T10:25:09Z, module 468F7F30C2E190B0244AF70): 6 of 6 planned laps PASS, each exposed (exposure=1), sized from control b20261024-e827e0 (same lap, configuration and build, PF_REJOIN_PREP_ARGS=0: 10 of 10 FAIL, each 'the rejoined victim test28 loaded other arguments than the survivor test21: log_repeat_limit=1 (survivor 0), dead_timeout_ms=0 (survivor 12000)'), rate 10/10, lower bound 0.5887, 6 clean laps. tests/mpath/rejoin_modargs_rig_lap.sh kills the victim test28 (virsh destroy), waits for the survivors to fence it, brings it back through tests/mpath/lib.sh pf_boot_rejoin on the CAW branch at the configuration both observed runs had, and compares the victim's /sys/module/mxfs/parameters after the rejoin with the survivor test21's for force_transport, target_cache_protected, log_repeat_limit, target_retire_contract and dead_timeout_ms; its rows are filed at 8/disk/caw/mpath. What the batch shows: after the fix the rejoined victim loads the same argument values as prep gave every node, both a prep argument the rejoin used to drop that is not one of the lane's extra ones (log_repeat_limit: 1 on the control victim against the survivors' 0) and the lane's extra argument (dead_timeout_ms: 0 on the control victim against 12000). The lane's MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 is needed to observe the second (the lap ABORTs without it, :60), not the first. What it does not show: (a) mixed death windows and their cure: on this candidate the default window on a SCSI attachment is 12 s, so the control victim loaded with dead_timeout_ms=0 still ran 'death window 12000 ms' (board_local105815_rejoin_modargs_rig kmsg_test28:679), the same window as the survivors; the batch verifies the arguments loaded, not a lane running two windows; (b) the retire-contract argument's quoting: prep on this rig reports 'PREP retire-contract: NONE' (lane step6.log:62), so pf_rejoin_modargs adds no contract argument (tests/mpath/lib.sh:523) and both nodes read target_retire_contract empty in every lap, which matches however the quoting behaves; that branch is untested; (c) the modprobe branch (a packaged install's rejoin); (d) the TCP branch on the rig (only the argv recorder lap at 2/net/mesh/direct, batch b20261023-abfebf, open).",
+      "evidence": [
+        "tests/evidence/lanes/g8b_a17_20261024T103310Z/summary.log",
+        "tests/evidence/lanes/g8b_a17_20261024T103310Z/step5.log",
+        "tests/evidence/lanes/g8b_a17_20261024T103310Z/step6.log",
+        "tests/evidence/lanes/g8b_a17_20261024T103310Z/step7.log",
+        "tests/evidence/lanes/g8b_a17_20261024T103310Z/queue",
+        "tests/mpath/rejoin_modargs_rig_lap.sh",
+        "tests/mpath/lib.sh",
+        "data/reviews/P20261023-7bd24f.md",
+        "data/reviews/P20261024-52e185.md",
+        "tests/evidence/board_local105815_rejoin_modargs_rig/kmsg_test28_fromnode.gz",
+        "tests/evidence/board_local100633_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local100913_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local101148_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local105815_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local105931_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110043_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110154_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110304_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110416_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110527_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110639_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110753_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local110905_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local111151_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local111259_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local111410_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local111521_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local111628_rejoin_modargs_rig/row.log",
+        "tests/evidence/board_local111738_rejoin_modargs_rig/row.log"
+      ],
       "state": "pending",
       "created": "2026-10-24"
     }
