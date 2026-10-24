@@ -7805,6 +7805,40 @@
         "verdict": "approved",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-5ca267",
+      "kind": "verify",
+      "record": "D-CREATE-PACE-LAP-KERNEL-LOG-CHECK-READS-AN-EMPTY-LOG-AND-PASSES",
+      "change": {
+        "batch": "b20261024-d8e843"
+      },
+      "argument": "Verification b20261024-d8e843 of lap:create_pace at 2/disk/caw/direct4k on candidate 0.90.134 (attempt frozen 2026-10-24T10:25:09Z, module 468F7F30C2E190B0244AF70), on g2d (test31 A, test32 B) with no module or test-environment variant (the ledger rows' variant is empty): 6 of 6 planned laps PASS, each exposed (probe: at least one node's kernel ring no longer holds the lap's mark after the 10000 creates, 'EXPOSED: <node>'s kernel ring no longer holds the lap's mark', tests/create_pace_lap.sh:95-96), sized from control b20261024-5d82a5 (same lap, configuration and build, CPL_KMSG_FOLLOW=0: the post-run ring read, as before the fix): 10 of 10 FAIL, each 'the fault check read no whole kernel log: test31's kernel log read holds 0 line(s) and not both the lap's marks', rate 10/10, lower bound 0.5887, 6 clean laps. With the fix each node's /dev/kmsg is followed into /root from before the mark (tests/create_pace_lap.sh:56-63) and read back to the end mark (:97-99), and a PASS requires both nodes' reads to hold both marks (:103-104, :114); every PASS holds both, so the fault check (:106) graded a whole log on both nodes in each lap. What the batch does not show: the fault check catching a fault signature (no lap had one), and any configuration other than 2/disk/caw/direct4k (the follower and the mark check are the same shell on every configuration; the rotation that exposes the defect depends on the run's kernel-log volume).",
+      "evidence": [
+        "tests/evidence/lanes/g2d_a17cp_20261024T105616Z/summary.log",
+        "tests/evidence/lanes/g2d_a17cp_20261024T105616Z/step2.log",
+        "tests/evidence/lanes/g2d_a17cp_20261024T105616Z/step3.log",
+        "tests/evidence/lanes/g2d_a17cp_20261024T105616Z/queue",
+        "tests/create_pace_lap.sh",
+        "tests/evidence/batch_laps/b20261024-d8e843/20261024T112207Z-848c2498.log",
+        "tests/evidence/batch_laps/b20261024-d8e843/20261024T112430Z-9309a2e2.log",
+        "tests/evidence/batch_laps/b20261024-d8e843/20261024T112657Z-01e50bd6.log",
+        "tests/evidence/batch_laps/b20261024-d8e843/20261024T112921Z-e4b84dc7.log",
+        "tests/evidence/batch_laps/b20261024-d8e843/20261024T113148Z-f00eb995.log",
+        "tests/evidence/batch_laps/b20261024-d8e843/20261024T113410Z-ff1a361b.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T105631Z-40fcf617.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T105941Z-41744d78.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T110208Z-edb17b97.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T110517Z-7afda33d.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T110752Z-55c50dde.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T111020Z-b1ee6212.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T111242Z-83a8bee9.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T111501Z-ab1112a5.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T111724Z-f45fecfe.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T111951Z-4e39333a.log"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
