@@ -9466,6 +9466,40 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-9a0e1a",
+      "kind": "noblock",
+      "record": "D-SINGLE-WRITER-CREATE-PACE-6-TO-18MS-ON-2CAW-SO-THE-LMU-LAP-OVERRAN-360S",
+      "change": {
+        "impact": "noblock",
+        "objective": "Pace: a single writer's create in a fresh directory on a shared LUN should cost at most 2x what native XFS costs for the same loop (CLAUDE.md, RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS); on 2/disk/caw/direct it costs 6.0-6.4 ms mean, against 0.051 ms for the same shell loop's own overhead and 0.063 ms on a local root filesystem, far over 2x",
+        "assertions": "tests/create_pace_lap.sh: all 10000 creates returned success (CREATED=10000 failed=0, :71-80), the peer B listed every one of the 10000 names (:82, 'test16 lists 10000 of 10000'), and neither node's kernel log, followed from before the lap's mark (the follow fix of the removed D-CREATE-PACE-LAP-KERNEL-LOG-CHECK-READS-AN-EMPTY-LOG-AND-PASSES), holds BUG:, Oops, hung_task, 'blocked for more than', 'Shutting down filesystem' or Corruption (:106); every one of verification batch b20261024-8389c9's six laps cpdv1..cpdv6 at 2/disk/caw/direct printed LAP create_pace PASS",
+        "max_stall_s": 0.233
+      },
+      "argument": "The record is a pace defect and nothing else. Its first sightings (lane tests/evidence/lanes/g2_lmu_caw_measure_20261023T234743Z, lmucaw1..3) were tests/last_member_umount_lap.sh laps killed at their own 360 s bound inside the 40000-create stage, a bound that lap derived from the TCP lock manager's 2.2-2.3 ms a create; the live counts in the record show the creates progressing steadily the whole time (1861 in 11 s; 1675 in 30.5 s), so the kill measured that lap's bound against disk/caw's pace, not a stalled operation. The pace itself was then measured to completion with every create timed alone by tests/create_pace_lap.sh: six laps at 2/disk/caw/direct (verification batch b20261024-8389c9, lane tests/evidence/lanes/g2b_a17cpd_20261024T115152Z step 3, test15 writer, test16 lister): mean 6008-6426 us, worst single create 75.6-232.8 ms (max_stall_ms=75..232), all 10000 created, all 10000 listed by the peer, kernel logs followed from before the mark clean of every fault pattern; and at 2/net/mesh/mpath (tests/evidence/20261024T090339Z_createpace_cpnm1, candidate 0.90.134): mean 2355 us, worst 174.9 ms, all listed. The worst create anywhere is 0.233 s, two orders of magnitude under stall_limit_s=30. No data is lost or corrupted (every name exists and is visible to the peer) and no node crashed, hung or shut down. The 2x-native objective is violated (6.4 ms against a local create of 0.063 ms), which is why the record stays open: noblock disposes of nothing. Asked: impact noblock, so this pace record stops blocking releases while it stays in the queue to be fixed.",
+      "evidence": [
+        "tests/evidence/lanes/g2b_a17cpd_20261024T115152Z/summary.log",
+        "tests/evidence/batch_laps/b20261024-8389c9/20261024T121337Z-b5a71870.log",
+        "tests/evidence/batch_laps/b20261024-8389c9/20261024T121546Z-ec4d3546.log",
+        "tests/evidence/batch_laps/b20261024-8389c9/20261024T121800Z-645d447e.log",
+        "tests/evidence/batch_laps/b20261024-8389c9/20261024T122007Z-d16e3b08.log",
+        "tests/evidence/batch_laps/b20261024-8389c9/20261024T122216Z-854ab202.log",
+        "tests/evidence/batch_laps/b20261024-8389c9/20261024T122424Z-cad2fe48.log",
+        "tests/evidence/20261024T122424Z_createpace_cpdv6/test15_kmsg.txt",
+        "tests/evidence/20261024T122424Z_createpace_cpdv6/test16_kmsg.txt",
+        "tests/evidence/20261024T090339Z_createpace_cpnm1",
+        "tests/create_pace_lap.sh",
+        "tests/evidence/lanes/g2_lmu_caw_measure_20261023T234743Z/summary.log"
+      ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-9a0e1a.md",
+        "sha256": "7369c5ce2d73ae38059d78fbbafab0249d9a6f5f45b1105cbd3ac7f228b62096",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }

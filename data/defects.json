@@ -7033,11 +7033,44 @@
           "candidate": "",
           "build": "1BC77CFB15EF4A988DD1F56",
           "variant": "PF_REJOIN_PREP_ARGS=0 (tests/mpath/lib.sh pf_boot_rejoin loads mxfs with the configuration's transport arguments only, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a victim killed and rejoined by pf_boot_rejoin loads other module arguments than the prep gave every node"
+        },
+        {
+          "id": "b20261024-c553df",
+          "kind": "verify",
+          "row": "lap:rejoin_modargs_rig",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:rejoin_modargs_rig",
+            "config": "8/disk/caw/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-7cfa3f",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "PF_REJOIN_PREP_ARGS=0 (tests/mpath/lib.sh pf_boot_rejoin loads mxfs with the configuration's transport arguments only, as before the fix)",
+            "builds": [
+              "1BC77CFB15EF4A988DD1F56"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -7083,6 +7116,21 @@
           "variant": "PF_REJOIN_PREP_ARGS=0 (tests/mpath/lib.sh pf_boot_rejoin loads mxfs with the configuration's transport arguments only, as before the fix)",
           "builds": [
             "8DBA16AEB7FDD3066C9C1BC"
+          ],
+          "date": "2026-10-24"
+        },
+        {
+          "row": "lap:rejoin_modargs_rig",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-7cfa3f",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "PF_REJOIN_PREP_ARGS=0 (tests/mpath/lib.sh pf_boot_rejoin loads mxfs with the configuration's transport arguments only, as before the fix)",
+          "builds": [
+            "1BC77CFB15EF4A988DD1F56"
           ],
           "date": "2026-10-24"
         }
@@ -7237,6 +7285,56 @@
           "config": "8/disk/caw/mpath",
           "row": "lap:rejoin_modargs_rig",
           "iso": "2026-10-24T13:19:12Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T17:21:10Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T17:19:59Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T17:18:49Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T17:17:40Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T17:16:28Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T17:15:19Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T17:14:08Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T17:12:57Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T17:11:43Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T17:10:32Z"
         }
       ],
       "reproducer": "tests/rejoin_modargs_lap.sh: runs tests/mpath/lib.sh pf_boot_rejoin and pf_rejoin_modargs on the host with ssh and virsh replaced by a recorder, and compares the insmod argv the rejoin would send with prep_node.sh's for the same environment (MXFS_CONFIG=8/net/mesh/mpath MXFS_EXTRA_MODARGS=dead_timeout_ms=12000); PF_REJOIN_PREP_ARGS=0 is the control",
@@ -9533,7 +9631,7 @@
       "opened": "2026-10-24",
       "summary": "A node whose PR key was preempted while it ran a load shut its filesystem down as 'Corruption of in-memory data (0x8)' (SHUTDOWN_CORRUPT_INCORE): an inode-lock acquire returned -EIO (rc=-5) after the target refused the node's ledger writes RESERVATION CONFLICT, and mxfs_ilock_acquire_from_dlm's last-resort branch (xfs/xfs_mxfs_ilock.c:2549-2578) counts only -EBADE and -ESHUTDOWN as fenced, so a fence surfacing as EIO is reported as in-core corruption. No corruption is shown; the shutdown's reason is wrong, and an operator or a harness keyed on corruption reads a fence as one",
       "evidence": "Precheck lap flp1 of the drafted tests/evidence/drafts/tree/tests/fenced_ledger_rig_lap.sh (2/net/mesh/direct on g2e, V=test17 P=test18, attempt-18 module 8DBA16AEB7FDD3066C9C1BC, INJECT=preempt PARK=1; evidence tests/evidence/20261024T141549Z_fledger_flp1, stdout.txt): P preempted V's key at 14:17:10.115Z (plain PREEMPT, type 7). V's followed kernel log (tests/evidence/20261024T141549Z_fledger_flp1/test17_kmsg.txt): lines 25689-25767 (94.910-94.917 s) six 'tauth: P-TAUTH-PUBLISH-FAIL page=2279|8105 ... rc=-52 -- uncertain'; 25835 (95.078078 s) 'DLM inode lock unrecoverable: ino=8388738 mode=3 rc=-5 comm=python3 -- lock coordination failed, shutting down filesystem'; 25838 'mxfs (sda): Corruption of in-memory data (0x8) detected at mxfs_ilock_acquire_from_dlm+0x700/0x2470 [mxfs] (xfs/xfs_mxfs_ilock.c:2576).  Shutting down filesystem.'; then 0.71 s later 25852-25857 P305-RESV-HEALTH state=SELF_GONE, P277-PR-FULLSTATUS own key ABSENT, P290-AUTH-CLOSED reason=PR_CONFLICT_FENCED, P277-FENCED-SELF-WITHDRAW, P131-SELF-FENCE [PR_CONFLICT_FENCED] '... the device is intact'. The same injection in lap flp0 (PARK=0, tests/evidence/20261024T141810Z_fledger_flp0) shut V down as 'Fenced by the cluster (0x40) ... mxfs_dlm_fence_notify' after its withdrawal, with no corruption line: the reason depends on which path met the fence first. ===== The chain, from V's own log in that lap (tests/evidence/20261024T141549Z_fledger_flp1/test17_kmsg.txt): 25689-25706 for page 2279 three rounds of 'P-TAUTH-PUBLISH-FAIL ... rc=-52 -- uncertain', 'P-TAUTH-POISON page=2279 seq=7 write_rc=-5', 'P-TAUTH-RECONCILE ... platter_seq=6 committed=0', 'P-TAUTH-COMMIT-RETRY type=1 ino=2107440 ag=0 rc=-5 attempt=1..3'; 25707 'P-TAUTH-FAILSTOP rc=-5 -- ledger writes cannot be made durable; no further grants from this master (fail closed)'; 25753 'P-TAUTH-REFUSE type=1 ino=2107440 ag=0 ledger=1 failed=1 -- grant refused'; then page 8105 the same; 25835 the inode acquire's rc=-5 and the CORRUPT_INCORE shutdown. Code sites (read): dlm/tauth_store.c:409-416 tauth_publish_result turns every refused publish, -EBADE included (counted as target_refused), into -EIO; dlm/dlm.c:7003-7009 a commit that ends -EIO latches ledger_failed (P-TAUTH-FAILSTOP), never cleared; dlm/dlm.c:6489-6500 every later grant on this master is refused -EIO (P-TAUTH-REFUSE); that -EIO reaches mxfs_ilock_acquire_from_dlm through dlm_lock_impl unchanged, and xfs/xfs_mxfs_ilock.c:2555 counts only -EBADE and -ESHUTDOWN as fenced. So the target's RESERVATION CONFLICT is known as such at the store (target_refused++) and lost on the way up. ===== 2026-10-24 (session 80): fix drafted for the next attempt in tests/evidence/drafts/tree/dlm/dlm.c and dlm.h (user-mode -fsyntax-only clean, 0 warnings like the original). dlm_txn_commit snapshots ctx->ledger->store.target_refused before its attempts; at the fail-stop, a count that moved during the commit sets ctx->ledger_fenced (new, dlm.h) and P-TAUTH-FAILSTOP prints target_refused=/fenced=. dlm_ledger_prepare's fail-stop refusal returns -ESHUTDOWN when ledger_fenced, else -EIO as before; dlm_txn_finalize's refused grant item carries -ESHUTDOWN instead of -EIO when ledger_fenced, and the local waiter is signalled -ESHUTDOWN (remote requesters still get MXFS_ERR_LEDGER: send_grant maps every other errno to it, so a peer's view does not change). dlm_txn_commit's own return and release items are unchanged. Control switch: module parameter dl_failstop_fenced_errno (1 default; 0 = -EIO as before). Lap: tests/evidence/drafts/held/tests/fenced_ledger_rig_lap.sh GRADE=reason FENCED_ERRNO=0|1 (FAIL = a 'Corruption of in-memory data' line on V; VACUOUS = no P-TAUTH-FAILSTOP or no fenced shutdown line on V); the lap lands in tests/ at the next freeze.",
-      "next": "Carry the refusal's cause up instead of guessing at the top: a commit that failed because the target refused this node's write (target_refused, -EBADE at the store) fail-stops the ledger as fenced, and the grants it then refuses return -ESHUTDOWN (the withdrawn-authority errno the ilock layer already counts as fenced), while an I/O failure stays -EIO; with a switch restoring today's -EIO for the control. Lap: tests/evidence/drafts/held/tests/fenced_ledger_rig_lap.sh's preempt arm, counting 'Corruption of in-memory data' and 'Fenced by the cluster' on V (it reproduced on the first preempt lap with PARK=1; PARK=0 met the fence through the withdrawal instead), so first a rate for the CORRUPT_INCORE outcome over 10 preempt laps.",
+      "next": "Carry the refusal's cause up instead of guessing at the top: a commit that failed because the target refused this node's write (target_refused, -EBADE at the store) fail-stops the ledger as fenced, and the grants it then refuses return -ESHUTDOWN (the withdrawn-authority errno the ilock layer already counts as fenced), while an I/O failure stays -EIO; with a switch restoring today's -EIO for the control. Lap: tests/evidence/drafts/held/tests/fenced_ledger_rig_lap.sh's preempt arm, counting 'Corruption of in-memory data' and 'Fenced by the cluster' on V (it reproduced on the first preempt lap with PARK=1; PARK=0 met the fence through the withdrawal instead), so first a rate for the CORRUPT_INCORE outcome over 10 preempt laps. ===== 2026-10-24: verification b20261024-f88ead (lane tests/evidence/lanes/g2_a20_20261024T163432Z step 5) was sized at 281 clean laps from control b20261024-f40646's rate (2 failures, 2 of 6 exposed laps of 10 at 2/net/mesh/direct), about 12.5 h of test1/test2 at ~162 s a lap; it was stopped by hand after lap 5 (laps 1-5 PASS, lap 1 VACUOUS stage=no-failstop) so the lane's other batches could run. The batch stays open and must not be resumed as is. Next: a reproducer whose control fails most laps (the fix-off arm reached the corruption-shutdown branch in only 2 of 10; raise the exposure of the refused-grant EIO, e.g. a lap that holds the inode lock acquire until the preempt lands), then a fresh control and a verification sized from it.",
       "updated": "2026-10-24",
       "batches": [
         {
@@ -9668,11 +9766,113 @@
           "candidate": "",
           "build": "1BC77CFB15EF4A988DD1F56",
           "variant": "MERGE_CLEANUP_GATE=0 (fuser -k -m /mnt/fourkn runs whether or not it is a mount point, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: the cleanup SIGKILLs every user of each node's root filesystem, its services with them"
+        },
+        {
+          "id": "b20261024-8cb36c",
+          "kind": "verify",
+          "row": "lap:merge_cleanup",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^CLEANUP: [12] node",
+          "candidate": "0.90.134",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:merge_cleanup",
+            "config": "2/disk/caw/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-37b839",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MERGE_CLEANUP_GATE=0 (fuser -k -m /mnt/fourkn runs whether or not it is a mount point, as before the fix)",
+            "builds": [
+              "1BC77CFB15EF4A988DD1F56"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:merge_cleanup",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-37b839",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MERGE_CLEANUP_GATE=0 (fuser -k -m /mnt/fourkn runs whether or not it is a mount point, as before the fix)",
+          "builds": [
+            "1BC77CFB15EF4A988DD1F56"
+          ],
+          "date": "2026-10-24"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:merge_cleanup",
+          "iso": "2026-10-24T17:18:30Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:merge_cleanup",
+          "iso": "2026-10-24T17:17:01Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:merge_cleanup",
+          "iso": "2026-10-24T17:15:30Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:merge_cleanup",
+          "iso": "2026-10-24T17:14:02Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:merge_cleanup",
+          "iso": "2026-10-24T17:12:31Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:merge_cleanup",
+          "iso": "2026-10-24T17:10:56Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:merge_cleanup",
+          "iso": "2026-10-24T17:09:23Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:merge_cleanup",
+          "iso": "2026-10-24T17:07:45Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:merge_cleanup",
+          "iso": "2026-10-24T17:06:16Z"
+        },
+        {
+          "config": "2/disk/caw/direct4k",
+          "row": "lap:merge_cleanup",
+          "iso": "2026-10-24T17:04:42Z"
         }
       ]
     },
