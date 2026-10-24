@@ -8990,6 +8990,23 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-d662b6",
+      "kind": "verify",
+      "record": "D-SCST-FLAP-ARM-CLOCK-OFFSET-READS-SSH-SETUP",
+      "change": {
+        "batch": "b20261024-b07bc3"
+      },
+      "argument": "Verification batch b20261024-b07bc3 of lap:scst_flap_clock at 2/disk/caw/mpath (test15/test16 on a 2-path pool LUN), candidate 0.90.134 attempt 19 (module A27A67A3E501890BE9985E0), lane g2b_a19 step 5: 13 of 13 planned laps PASS, each with the exposure probe (exposure=1). It is sized from control b20261024-dad6d2 at the same configuration and attempt (lane g2b_a19 step 4, the fix taken out by its knob): 8 of 10 laps failed. The batch was declared before its first lap (line 1 of step5.log).",
+      "evidence": [
+        "tests/evidence/lanes/g2b_a19_20261024T143227Z/step4.log",
+        "tests/evidence/lanes/g2b_a19_20261024T143227Z/step5.log",
+        "tests/evidence/batch_laps/b20261024-b07bc3/20261024T152002Z-41ae6869.log",
+        "tests/evidence/batch_laps/b20261024-dad6d2/20261024T143459Z-330ac3eb.log"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
