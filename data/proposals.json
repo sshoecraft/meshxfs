@@ -9864,8 +9864,15 @@
         "tests/mpath/path_mount_degraded.sh",
         "data/reviews/P20261024-eae930.md"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-b2328f.md",
+        "sha256": "73396218fac75e9bc87fa16af20576df8d98690e07b2d13909739e1a47ede9ec",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
