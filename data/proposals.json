@@ -9990,6 +9990,34 @@
         "tests/adopted_grant_rig_lap.sh",
         "dlm/dlm.c"
       ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-65e4fc.md",
+        "sha256": "661696163cb05b11c88b5c02731c9efc63d141c5294c28081ab8ed738dc45a59",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-f1796b",
+      "kind": "remove-fixed",
+      "record": "D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER",
+      "change": {
+        "control": "b20261024-9f3508",
+        "fixon": "b20261024-9ed034",
+        "cause": "A wait answered by the local master through the already-granted shortcut (dlm/dlm.c dlm_local_answered, site=shortcut) ended its acquisition record with dlm_acq_end, which handed the record's adopted grant back as unclaimed (dlm_acq_release_grant, P958-ACQ-GRANT-RELEASED why=unclaimed mirror_unlinked=1). When the grant had been adopted between two attempts (P958-ACQ-GRANT-ADOPTED) and the resource's ledger page was then handed to the waiter (P-TAUTH-PAGE-MINE via=frozen-msg), the waiter had become the master, so the hand-back unlinked the master's own GRANTED record of the waiter's EX: the master then granted another node a conflicting EX, which the waiter's ledger refused (P-TAUTH-DOUBLE-GRANT, 110 in 6 s on test21), and the waiter later received a fresh grant with its lineage still open (P130-FALSE-FRESH) and shut its filesystem down. Fix: dlm_acq_answered_by (dlm/dlm.c:9423, called at :10983) makes a wait the shortcut answers from the entry its adopted grant installed take that grant (P958-ACQ-GRANT-CLAIMED-LOCAL), so nothing is handed back; module parameter dl_shortcut_claim (dlm/dlm.c:418-420), 0 the same-build control."
+      },
+      "argument": "Resubmission of P20261024-63d0ce, answering its review (data/reviews/P20261024-63d0ce.md), which found the three removal conditions met on build BE3695D2590A65F742F9816 but rejected because that attempt (2026-10-24T06:38:23Z) was abandoned and dlm/dlm.c changed afterwards, so no lap had run on the tree the removal would certify. Both batches cited here ran on the current tree: candidate 0.90.134, attempt frozen 2026-10-24T16:34:18Z, module 1BC77CFB15EF4A988DD1F56, which is what this tree builds (dlm/dlm.c, tests/adopted_grant_rig_lap.sh and xfs/xfs_mxfs_debug.c match the attempt's frozen list, checked by review P20261024-65e4fc). The fix's lines in that tree are dlm/dlm.c:9423 (dlm_acq_answered_by), :10983-10984 (its call, gated by mxfs_dl_shortcut_claim) and :418-420 (the module parameter dl_shortcut_claim, default 1). Control b20261024-9f3508, lap:adopted_grant_rig at 8/net/mesh/mpath on g8b (test21-test28), the fix's switch off on every node (ARM=0: dl_shortcut_claim=0), GAP_MS=20000, HOLD_A_MS at the script's default 8000: 10 of 10 exposed laps failed, each 'LAP adopted_grant FAIL: 2 check(s) failed (double_grants=360 false_fresh=0 shutdowns=0)' (tests/evidence/lanes/g8b_a20b_20261024T173545Z/step6.log). Verification b20261024-9ed034, declared before its first lap and sized from that control (10/10, lower bound 0.5887 at delta 0.005, N = 6 at alpha 0.005, tests/evidence/lanes/g8b_a20b_20261024T173545Z/step7.log:1): 6 of 6 PASS with exposure, 'the shortcut took A's adopted grant of R; B's write waited for A's EX', each lap's node A log carrying P958-ACQ-GRANT-CLAIMED-LOCAL, worst stall 25.6 s under stall_limit_s 30; verify P20261024-65e4fc approved and applied. Parameters that differ between the two batches: the fix's switch (ARM=1 vs ARM=0) and HOLD_A_MS, 4000 in the verification (tests/evidence/lanes/g8b_a20b_20261024T173545Z/queue:27) against 8000 in the control. Review P20261024-65e4fc read every control lap's kernel log and found the conflicting-grant refusals beginning 2.05-3.39 s into A's hold, inside 4 s, and in every verification lap B's conflicting request reaching A 1.07-3.28 s into the 4 s hold and queued, not granted; the hold only sets a sleep length (xfs/xfs_mxfs_debug.c:336,341), so the 10/10 rate applies to the laps verified. Earlier evidence on the same cause: control b20261024-65e307 9 of 9 and verification b20261024-0bf8bc 6 of 6 on attempt 2026-10-24T06:38:23Z (P20261024-8c611d applied); the original observation on 8/net/mesh/mpath path_peer_withdrawn (record evidence: test21_kernlog_boot.gz P958-ACQ-GRANT-ADOPTED, P-TAUTH-PAGE-MINE via=frozen-msg, P-TAUTH-DOUBLE-GRANT, P130-FALSE-FRESH, shutdown).",
+      "evidence": [
+        "tests/evidence/lanes/g8b_a20b_20261024T173545Z/step6.log",
+        "tests/evidence/lanes/g8b_a20b_20261024T173545Z/step7.log",
+        "tests/evidence/lanes/g8b_a20b_20261024T173545Z/queue",
+        "data/reviews/P20261024-65e4fc.md",
+        "data/reviews/P20261024-63d0ce.md",
+        "tests/adopted_grant_rig_lap.sh"
+      ],
       "state": "pending",
       "created": "2026-10-24"
     }
