@@ -7505,6 +7505,68 @@
         "tests/evidence/batch_laps/b20261024-4fea60",
         "data/reviews/P20261023-fe0120.md"
       ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-495cc8.md",
+        "sha256": "9647b7c1e5ebceba8ba80c021e871400030c67cadaea83cc137ce8e745a952c9",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-eae930",
+      "kind": "remove-fixed",
+      "record": "D-MPATH-MOUNT-DEGRADED-12S-WINDOW-REGISTRATION-MISSING-AND-SHUTDOWNS",
+      "change": {
+        "control": "b20261024-241ccc",
+        "fixon": "b20261024-f0aa12",
+        "cause": "the late-path fill registered a path that was down at mount only with 15 s of the authority lease left, and a 12 s death window gives an 8 s lease, so it never ran: the path came back without the node's registration, multipath sent writes down it, the target refused them, and the node stalled, errored and shut down; with the fix the fill runs whenever the authority admits writes, each REGISTER bounded to complete before the earliest time a peer may fence this node"
+      },
+      "argument": "FIXED AND VERIFIED, on candidate 0.90.134's attempt frozen 2026-10-24T06:38:23Z (module BE3695D2590A65F742F9816), whose default SCSI death window is 12 s, the window the record was found under. The control is a same-build module parameter, pr_fill_bounded=0 (MXFS_EXTRA_MODARGS on the control's own prep: the fill runs only with 15 s of lease left and hands down no bound, the code before the fix); nothing was reverted. The reproducer is the row itself, path_mount_degraded, after a forced prep (the record's reproducer field; dead_timeout_ms=12000 is now the default).\\n\\n1. 2/net/mesh/mpath (g2b, test15/test16, lane tests/evidence/lanes/g2b_w12c_20261024T075315Z): control b20261024-241ccc failed 10 of 10 exposed laps (tests/evidence/lanes/g2b_w12c_20261024T075315Z/step4.log); verification b20261024-f0aa12, sized from it, 6 of 6 PASS, late_stall_ms 6124-6297, fails=0 (tests/evidence/lanes/g2b_w12c_20261024T075315Z/step12.log), reviewed and applied (verified line on the record).\\n2. 4/net/mesh/mpath (g4c, test7-test10, lane tests/evidence/lanes/g4c_w12c_20261024T073330Z): control b20261024-db9c82 failed 10 of 10 exposed laps, late stalls 31.7-42.3 s, fails 9-10 (tests/evidence/lanes/g4c_w12c_20261024T073330Z/step4.log); verification b20261024-b7bbc1 6 of 6 PASS, late_stall_ms 6194-6917, fails=0 (tests/evidence/lanes/g4c_w12c_20261024T073330Z/step18.log), reviewed and applied (data/reviews/P20261024-3874e6.md).\\n3. The disk lock manager, where the record was found. Controls with the same switch: 2/disk/caw/mpath b20261024-cefbf5 10 of 10 (tests/evidence/lanes/g2b_w12b_20261024T070007Z/step3.log) and 4/disk/caw/mpath b20261024-239fb6 10 of 10 (tests/evidence/lanes/g4c_w12b_20261024T070211Z/step12.log, step14.log). Their verifications did not pass, and this proposal says so: b20261024-408f0a at 2/disk/caw/mpath 5 PASS, 1 FAIL of 6 (tests/evidence/lanes/g2b_w12b_20261024T070007Z/step5.log), and b20261024-fd8125 at 4/disk/caw/mpath 3 PASS, 1 FAIL, stopped at its failure (tests/evidence/lanes/g4c_w12b_20261024T070211Z/step18.log). Each failing lap failed on exactly one check, one operation error on a survivor: 2/disk/caw/mpath:path_mount_degraded:2026-10-24T07:54:43Z (test15, row.log:41 'no operation returned an error ... got=1', load_test15/ops.log:1491 'mutex ERR ESTALE') and 4/disk/caw/mpath:path_mount_degraded:2026-10-24T08:29:38Z (test9, row.log:59, load_test9/ops.log:351 'mutex ERR ESTALE'); in each the survivor's kernel log holds P95-TYPEFLIP-RELOAD ... name=LOCK, P95B-TYPEFLIP-WAIT rounds=201 and 'P201-TYPEFLIP-UNRESOLVED-FAIL ... failing the lookup with -ESTALE' on pathload's mutex directory, and both runs are cells of D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED (its evidence quotes each). Neither failing lap shows this record's failure: late_stall_ms 6192 and 7046, the victim's registrations complete after reinstatement, no shutdown, fails=1 (that ESTALE). Across all ten disk/caw fix-on laps the late stall was 6131-7046 ms with fails 0 or that one ESTALE, against the controls' 31-42 s stalls with 9-10 failures.\\n\\nSo the cause is measured on both lock managers, gone on both with the fix, and the only failures in the fix-on laps are another open record's. If the reviewer holds that a disk/caw verification must pass whole while that type-flip record stands, this proposal should be rejected on that ground alone, and the record then stays open at disk/caw until the type-flip record is fixed.",
+      "evidence": [
+        "tests/evidence/lanes/g2b_w12c_20261024T075315Z/step4.log",
+        "tests/evidence/lanes/g2b_w12c_20261024T075315Z/step12.log",
+        "tests/evidence/lanes/g4c_w12c_20261024T073330Z/step4.log",
+        "tests/evidence/lanes/g4c_w12c_20261024T073330Z/step18.log",
+        "tests/evidence/lanes/g2b_w12b_20261024T070007Z/step3.log",
+        "tests/evidence/lanes/g2b_w12b_20261024T070007Z/step5.log",
+        "tests/evidence/lanes/g4c_w12b_20261024T070211Z/step12.log",
+        "tests/evidence/lanes/g4c_w12b_20261024T070211Z/step14.log",
+        "tests/evidence/lanes/g4c_w12b_20261024T070211Z/step18.log",
+        "tests/evidence/board_20261024T075133Z-g2b_path_mount_degraded/row.log",
+        "tests/evidence/board_20261024T082610Z-g4c_path_mount_degraded/row.log",
+        "data/reviews/P20261024-3874e6.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-ae5be1",
+      "kind": "remove-fixed",
+      "record": "D-FSX-SH-EXIT-TRAP-REMOVES-FSX-OWN-FSXLOG-AND-FSXGOOD-WITH-THE-WORK-DIR",
+      "change": {
+        "control": "b20261024-4fea60",
+        "fixon": "b20261024-7a8bf4",
+        "cause": "tests/suite/fsx.sh ran fsx without -P, so fsx wrote its .fsxlog, .fsxops and .fsxgood into the row's work directory on the mxfs mount, which the row's EXIT trap removes; with the fix fsx.sh runs fsx with -P into a per-check directory under the node's log directory (/root), so a failed check's files survive the row"
+      },
+      "argument": "FIXED AND VERIFIED, a harness defect in tests/suite/fsx.sh. The reproducer is the record's (tests/fsx_fail_files_lap.sh on a formed pair: the board's fsx row on the node's mxfs mount with a second writer overwriting the test file so both checks miscompare, then what survived is listed). The control is a same-tree environment switch in the lap's own command, FSX_KEEP_FAIL_FILES=0 (fsx without -P, as before the fix); nothing was reverted.\\n\\nOn this attempt (candidate 0.90.134, frozen 2026-10-24T06:38:23Z, module BE3695D2590A65F742F9816), at 2/net/mesh/direct on test1's /mnt/shared (g2, test1/test2, lane tests/evidence/lanes/g2_w12b_20261024T081715Z): control b20261024-4fea60 failed 10 of 10 exposed laps, each 'removed with the row: fsx.<seed>.100000.d/fsxfile_100000.fsxlog ... .fsxops ... .fsxgood ...' (tests/evidence/lanes/g2_w12b_20261024T081715Z/step7.log); verification b20261024-7a8bf4, sized from it, passed 6 of 6, reviewed and applied (data/reviews/P20261024-495cc8.md). Where fsx itself put the files, from its own 'Log of operations saved to' line in each arm's surviving check log (tests/evidence/fsx_saved_to_20261024T094859Z.txt): control '/mnt/shared/.suite_fsx.test1.217967/fsxfile_100000.fsxops' (the work directory), fix '/root/fsx.15981461.100000.d/fsxfile_100000.fsxops'.\\n\\nOn the disk lock manager, on the earlier attempt frozen 2026-10-24T01:01:07Z (build 9C7B7B00C5DE523F1D378C8, lane tests/evidence/lanes/g2_a16_20261024T010135Z, steps 10-11): control b20261023-636cd6 at 2/disk/caw/direct failed 10 of 10 and verification b20261023-989617 passed 6 of 6, reviewed and applied then (the record's verified_at, approval P20261023-e9c692). tests/suite/fsx.sh, tests/fsx_fail_files_lap.sh and tests/fsx_fail_files_node.sh have not changed since commit b17a085 (2026-10-24T00:20:58Z), before that attempt was frozen, so both lock managers ran the same fix; the fix touches no module code and fsx's file placement does not depend on the lock manager.\\n\\nThe record's other open batches: b20261023-cff97e was sized from the host-tmpfs control that review P20261023-fe0120 found invalid and grades nothing here; b20261024-7c5ff0 stopped at its first lap (07:57:55Z, 'NODE fsx_fail_files ABORT: /mnt/shared is not an mxfs mount', exposure 0) because the pair could not be formed after the third-vote lap fenced and inhibited test2 (lane tests/evidence/lanes/g2_w12_20261024T063950Z step 11 rc=3 'test2: fenced and inhibited ... not starting it'), and that run is now a cell of D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED. The work directory every lap still reports left on the mount is D-FSX-ROW-WORK-DIRECTORY-LEFT-ON-THE-MXFS-MOUNT-AFTER-ITS-EXIT-TRAP-RAN-RM-RF, which stays open.",
+      "evidence": [
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/queue",
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/step7.log",
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/step8.log",
+        "tests/evidence/fsx_saved_to_20261024T094859Z.txt",
+        "tests/evidence/lanes/g2_a16_20261024T010135Z/step10.log",
+        "tests/evidence/lanes/g2_a16_20261024T010135Z/step11.log",
+        "tests/suite/fsx.sh",
+        "tests/fsx_fail_files_lap.sh",
+        "tests/fsx_fail_files_node.sh",
+        "tests/evidence/batch_laps/b20261024-7c5ff0/20261024T075754Z-494ee31c.log",
+        "tests/evidence/lanes/g2_w12_20261024T063950Z/step11.log",
+        "data/reviews/P20261024-495cc8.md",
+        "data/reviews/P20261023-fe0120.md"
+      ],
       "state": "pending",
       "created": "2026-10-24"
     }
