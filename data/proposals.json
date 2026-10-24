@@ -9739,6 +9739,23 @@
       ],
       "state": "pending",
       "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-e78725",
+      "kind": "narrow",
+      "record": "D-32CAWMPATH-PREP-CLUSTER-FAILED-AFTER-177S-NO-EVIDENCE-RETAINED",
+      "change": {
+        "nodes": 32
+      },
+      "argument": "Reach classification, not a disposition: the record stays open and keeps blocking 32-node disk/caw/mpath. The record's nodes field reads 1, the fail-closed default for an unclassified record, not a value read from its evidence. Its only evidence is one run, data/criteria.runs.jsonl:646, config 32/disk/caw/mpath, row prep_cluster, 2026-09-10, outcome INCOMPLETE 'prep failed' after 177 s, which is the record's one cell. No run at any smaller cluster is named by the record or has been attributed to it. The project defines nodes as the smallest cluster a record has been observed on (CLAUDE.md, the defect queue: 'Every record carries nodes (the smallest cluster it has been observed on)'; tools/defects.py:1632 and :1756 '-N/--nodes is the smallest cluster it was seen on'), and docs/release-process.md:383-385 records that a defect seen only at 32 nodes does not block a 2-16 node release as a known exposure the owner chose to keep. The precondition the narrowing rests on is the observation itself: the failing prep formed a 32-member cluster, the one configuration the record names, and a prep of 32 members runs work no smaller prep runs (32 nodes' module loads, mounts and log-slice zeroing, and membership convergence over 32 members; the same configuration's passing fresh preps took 96-122 s, data/criteria.runs.jsonl:625-643, so the failure was past mkfs, as the record's next step says). Not claimed: that the defect cannot occur at fewer nodes; clean preps at 2-16 nodes are not cited as evidence of absence. If a prep failure of unknown cause at a smaller cluster is ever attributed to this record, nodes moves down to it. Change: nodes 1 -> 32, config and platform unchanged (*/*/*, any).",
+      "evidence": [
+        "data/criteria.runs.jsonl",
+        "docs/release-process.md",
+        "CLAUDE.md",
+        "tools/defects.py"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
