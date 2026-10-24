@@ -2667,6 +2667,39 @@
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: none of the eight candidates made back to back is remote-mastered on a formation that puts them all in one shard, and the harness aborts before measuring"
+        },
+        {
+          "id": "b20261024-ffc93e",
+          "kind": "verify",
+          "row": "lap:lh_master",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 7,
+          "probe": "^EXPOSED: the pre-fix harness's 8 candidates",
+          "candidate": "0.90.134",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:lh_master",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-bda0e1",
+            "k": 9,
+            "n": 9,
+            "candidate": "",
+            "variant": "LH_SHARD_SELECT=0 (tests/live_holder_wait.sh makes eight candidates back to back and keeps them all, as before the fix)",
+            "builds": [
+              "468F7F30C2E190B0244AF70"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5550473077848115
         }
       ],
       "rates": [
@@ -3934,6 +3967,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5550473077848115
+        },
+        {
+          "id": "b20261024-9f3508",
+          "kind": "control",
+          "row": "lap:adopted_grant_rig",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: A adopted B.s grant of R between two attempts",
+          "candidate": "",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "variant": "dl_shortcut_claim=0 (ARM=0 on every node: the already-granted shortcut ends the wait unclaimed, as before the fix); GAP_MS=20000 on both arms",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out on attempt 20: a grant adopted between two attempts is handed back by the shortcut's answer, so the master grants another node's EX over the waiter's"
         }
       ],
       "rates": [
@@ -7608,6 +7658,72 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-51ea88",
+          "kind": "verify",
+          "row": "path_mount_degraded",
+          "config": "2/disk/caw/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "PF-LATE-B-DOWN",
+          "candidate": "0.90.134",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "path_mount_degraded",
+            "config": "2/disk/caw/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-cefbf5",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "pr_fill_bounded=0 (MXFS_EXTRA_MODARGS: the late-path fill runs only with 15 s of the authority lease left, as before the fix)",
+            "builds": [
+              "BE3695D2590A65F742F9816"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-54eb79",
+          "kind": "verify",
+          "row": "path_mount_degraded",
+          "config": "4/disk/caw/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "PF-LATE-B-DOWN",
+          "candidate": "0.90.134",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "path_mount_degraded",
+            "config": "4/disk/caw/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-239fb6",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "pr_fill_bounded=0 (MXFS_EXTRA_MODARGS: the late-path fill runs only with 15 s of the authority lease left, as before the fix)",
+            "builds": [
+              "BE3695D2590A65F742F9816"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -9070,7 +9186,7 @@
           "candidate": "0.90.134",
           "build": "1BC77CFB15EF4A988DD1F56",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -9155,6 +9271,18 @@
           "config": "2/disk/caw/direct4k",
           "row": "lap:merge_row_overrun",
           "iso": "2026-10-24T16:47:23Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T16:34:18Z",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "batch": "b20261024-6336a2",
+          "approval": "P20261024-4d60f6",
+          "date": "2026-10-24"
         }
       ]
     },

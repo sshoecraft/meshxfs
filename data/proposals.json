@@ -9769,6 +9769,32 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-4d60f6",
+      "kind": "verify",
+      "record": "D-FOURKN-MERGE-SUITE-ROW-WORKER-BOUNDED-ONLY-ON-THE-SSH-CLIENT",
+      "change": {
+        "batch": "b20261024-6336a2"
+      },
+      "argument": "Verification b20261024-6336a2 of lap:merge_row_overrun at 2/disk/caw/direct4k (g2d test31/test32, candidate 0.90.134 attempt frozen 2026-10-24T16:34:18Z, build 1BC77CFB15EF4A988DD1F56, lane tests/evidence/lanes/g2d_a20_20261024T163432Z step 5): 9 of 9 planned laps PASS, each with exposure ('EXPOSED: the row's workload ran N ms against a node-side bound of 13 s and a client bound of 16 s') and 'no worker ran on either node 8 s after the row's overrun'; none failed, none dropped. Sized from control b20261024-6b3b92 (step 4, same attempt and build, FOURKN_MERGE_NODE_BOUND=0: tests/suite/fourkn_merge.sh bounds each worker on the ssh client alone, as before the fix): 9 of 10 exposed laps FAIL 'a worker still ran on N node(s) 8 s after the row's overrun', lower bound 0.45, 9 clean laps. The lap (tests/merge_row_overrun_lap.sh) runs the row script itself with ROUNDS=200 so its workload passes the 16 s bound, then counts fourkn_merge_wo processes on each node 8 s later. The fix is tests/suite/fourkn_merge.sh:160-165 (the worker runs under timeout --foreground WBOUND-3 on its node). This batch clears 2/disk/caw/direct4k only.",
+      "evidence": [
+        "tests/evidence/lanes/g2d_a20_20261024T163432Z/step4.log",
+        "tests/evidence/lanes/g2d_a20_20261024T163432Z/step5.log",
+        "tests/evidence/batch_laps/b20261024-6b3b92",
+        "tests/evidence/batch_laps/b20261024-6336a2",
+        "tests/merge_row_overrun_lap.sh",
+        "tests/suite/fourkn_merge.sh"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-4d60f6.md",
+        "sha256": "fda717b22e5efc6536924aec2ed8e49464aa72a0d9fb8211b3ed0492fe280b45",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
