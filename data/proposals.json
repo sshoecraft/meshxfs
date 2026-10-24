@@ -6305,14 +6305,15 @@
         "data/reviews/P20261023-6483b0.md",
         "data/defects.json"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-23",
       "review": {
         "file": "data/reviews/P20261023-de49fb.md",
         "sha256": "e7eb41fa1d2b56d9ec9522369465176f6f8b013fed4c78d32b126879a73078a4",
         "verdict": "approved",
         "date": "2026-10-23"
-      }
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-77b3d4",
