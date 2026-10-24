@@ -6581,11 +6581,44 @@
           "candidate": "",
           "build": "1BC77CFB15EF4A988DD1F56",
           "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out at 8 nodes on multipath: A on a 12 s window declares B, on 34 s, dead inside B's 30 s lease"
+        },
+        {
+          "id": "b20261024-22972d",
+          "kind": "verify",
+          "row": "lap:peer_window",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:peer_window",
+            "config": "8/disk/caw/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-dfe3bd",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
+            "builds": [
+              "1BC77CFB15EF4A988DD1F56"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -6631,6 +6664,21 @@
           "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
           "builds": [
             "468F7F30C2E190B0244AF70"
+          ],
+          "date": "2026-10-24"
+        },
+        {
+          "row": "lap:peer_window",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-dfe3bd",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
+          "builds": [
+            "1BC77CFB15EF4A988DD1F56"
           ],
           "date": "2026-10-24"
         }
@@ -6935,6 +6983,56 @@
           "config": "8/disk/caw/mpath",
           "row": "lap:peer_window",
           "iso": "2026-10-24T16:46:22Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T18:02:29Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T18:00:07Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T17:57:36Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T17:55:10Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T17:52:41Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T17:50:12Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T17:47:46Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T17:45:16Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T17:42:43Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T17:40:17Z"
         }
       ],
       "verified_at": [
@@ -9375,7 +9473,7 @@
       "opened": "2026-10-24",
       "summary": "In lap 9 (niv9) of verification b20261024-bd4fa3 (tests/noino_fence_efd_hold_lap.sh at 2/net/mesh/direct, test1/test2, candidate 0.90.134 attempt 19, module A27A67A3E501890BE9985E0), test1's pathload got ENOSPC twice in a row at 14:58:35Z: its 'write' op (open O_CREAT|O_TRUNC, write, fsync of a private file) and the next 'churn' op (open O_CREAT, rename, unlink in the shared directory), while the volume had about 19 GiB free (the node's own superblock summary fdblocks=5097663 before and after). No line in test1's kernel log names ENOSPC or -28, and the create path's cancel probe never fired, so where the errno came from is not in evidence. test1's load also printed no closing PATHLOAD summary, so the lap failed 2 checks; test2's load was clean (err=0).",
       "evidence": "Lap log tests/evidence/batch_laps/b20261024-bd4fa3/20261024T145624Z-fe495d07.log: 'FAIL test1's load reported got=0 want=1', 'FAIL test1's load: no operation failed got=2 want=0', 'LAP noino_fence_efd_hold FAIL: 2 check(s) failed', 'EXPOSED: S held an EFD for 26000 ms'. test1's op log, fetched from the node after the lap (tests/evidence/20261024T145624Z_noinoefd_niv9/test1_load_postmortem.txt:12-13): '1792853915122 1792853915127 write ERR ENOSPC', '1792853915127 1792853915457 churn ERR ENOSPC' (epoch ms; the load is tests/mpath/pathload.py: write_private :108-118, churn :151-166); /run/noinoefd_niv9.out on test1 is 0 bytes. test1's kernel log (tests/evidence/20261024T145624Z_noinoefd_niv9/test1_kmsg.txt, mono_us ~= (epoch_ms - 1792846584653) x 1000, from realns on P-AGIFC-MOD lines): each failed op follows an inode allocation that completed (P150-ALLOC-FIN agno=4 startino=27072 off=16 realns 1792853915127323322, :71621; and startino=24960 off=46 realns 1792853915456378374, :71695), with no P-CR3-CANCEL, P-CREATE-ERR1, P-DIALLOC dp= or P-CR62 line anywhere in the log (xfs/xfs_inode.c:3509, :3820, :4385 probes; 0 matches), no P-FREECNT line (xfs/xfs_mxfs_sb.c:599, 0 matches), and 0 matches for ENOSPC|-28|nospc in the whole 72914-line log. Between the two failures: :71685 'DLM inode lock failed: ino=8388738 mode=5 rc=-35' (the shared directory's inode) and P146-RELDUR rerr=-11 lines. Superblock summaries: :8723 and :71871 'P-SB-WRITE-SUBMIT ... image[icount=64 ifree=61 fdblocks=5097663]'. test1 allocated almost only in agno=4 (agno histogram over the log: 1:50, 4:21307, 5:4, 6:11, 8:11). The lap's S-node held an EFD 26 s and was no-inode fenced around +87 s (14:57:51Z), about 44 s before the failures.",
-      "next": "Find the errno's source before any patch: a falsifiable hypothesis is that the ENOSPC is a block reservation or allocation refusal after the create (the write op's buffered write, which on a cluster mount allocates at write time, pal/linux/xfs_file.c:1438-1458, and the churn op's rename or unlink reservation, xfs/xfs_inode.c:9326), not the create. Instrument it: a probe on each of those returns of -ENOSPC printing the site, the in-core m_free[XC_FREE_BLOCKS] sum, m_delalloc_blks and the AG the allocator tried; rerun the lap on the candidate's module (it reproduced once in 9 laps of this batch), and read which site fired. Also why pathload printed no summary after its stop file. ===== Instrument drafted for the next attempt (tests/evidence/drafts/tree/xfs/xfs_trans.c, pal/linux/xfs_iomap.c; tools/draft_syntax_check.sh clean): P-ENOSPC-TRESV at every refused xfs_trans_reserve on a cluster mount (blocks, logres, retry, percpu fdblocks, res_avail, delalloc, single, caller %pS) and P-ENOSPC-BMAPI at a write allocation refused after its reservation (ino, off, len, dblocks, the inode's AG, wouldblock AG, fdblocks). Note from reading the code: mxfs_freecount_refresh_enospc (xfs/xfs_mxfs_sb.c:559-603) returns without its P-FREECNT-ENOSPC-SWEEP line when mxfs_freecount_cluster() is false, i.e. when the node runs as a single member (:508-512), so after its peer's fence test1 may have retried without refreshing its counters; whether that held at 14:58:35Z is what single= will show.",
+      "next": "Find the errno's source before any patch: a falsifiable hypothesis is that the ENOSPC is a block reservation or allocation refusal after the create (the write op's buffered write, which on a cluster mount allocates at write time, pal/linux/xfs_file.c:1438-1458, and the churn op's rename or unlink reservation, xfs/xfs_inode.c:9326), not the create. Instrument it: a probe on each of those returns of -ENOSPC printing the site, the in-core m_free[XC_FREE_BLOCKS] sum, m_delalloc_blks and the AG the allocator tried; rerun the lap on the candidate's module (it reproduced once in 9 laps of this batch), and read which site fired. Also why pathload printed no summary after its stop file. ===== Instrument drafted for the next attempt (tests/evidence/drafts/tree/xfs/xfs_trans.c, pal/linux/xfs_iomap.c; tools/draft_syntax_check.sh clean): P-ENOSPC-TRESV at every refused xfs_trans_reserve on a cluster mount (blocks, logres, retry, percpu fdblocks, res_avail, delalloc, single, caller %pS) and P-ENOSPC-BMAPI at a write allocation refused after its reservation (ino, off, len, dblocks, the inode's AG, wouldblock AG, fdblocks). Note from reading the code: mxfs_freecount_refresh_enospc (xfs/xfs_mxfs_sb.c:559-603) returns without its P-FREECNT-ENOSPC-SWEEP line when mxfs_freecount_cluster() is false, i.e. when the node runs as a single member (:508-512), so after its peer's fence test1 may have retried without refreshing its counters; whether that held at 14:58:35Z is what single= will show. ===== ===== 2026-10-24 (session 86), attempt 20 (module 1BC77CFB15EF4A988DD1F56, the P-ENOSPC-TRESV / P-ENOSPC-BMAPI instrument in): twelve laps of tests/noino_fence_efd_hold_lap.sh at 2/net/mesh/direct on g2 (lane tests/evidence/lanes/g2_a20_20261024T163432Z step 6, labels nie20_1..12) all ended 'RESULT: VACUOUS ... stage=no-fence' (S's no-inode fence never met the held chain), and the step's own greps found no P-ENOSPC- line in any lap's kernel-log read and no 'ERR ENOSPC' in any load post-mortem. The one ENOSPC (niv9) came about 44 s after S was no-inode fenced, so these laps never met its precondition and say nothing about the rate. Next: a lap that forces S's no-inode fence every lap (the shape niv9 met) with the instrument in, then read which site fires. ===== Correction to the entry above: the lane step's post-mortem grep (*load_postmortem*) matched no file, these laps keep test<N>_load.txt instead. Read directly, per lap (tests/evidence/<stamp>_noinoefd_nie20_<n>/): test1_kmsg.txt + test2_kmsg.txt hold 203214-216274 lines and 0 'P-ENOSPC-' lines in each of the 12 laps, and test1_load.txt/test2_load.txt print err=0 err=0 with 0 ENOSPC in each.",
       "cells": [
         {
           "config": "2/net/mesh/direct",
