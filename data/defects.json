@@ -6895,6 +6895,11 @@
           "config": "2/disk/caw/direct4k",
           "row": "lap:fourkn_merge_2node",
           "iso": "2026-10-24T15:05:08Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:powerup_flood",
+          "iso": "2026-10-24T20:09:32Z"
         }
       ],
       "updated": "2026-10-24",
@@ -6910,11 +6915,61 @@
           "candidate": "",
           "build": "FF012B4B81CDB69CAE96883",
           "variant": "LAB_POWER_LOCK=0 (scripts/lab_power.sh and the preflight take no power-up lock, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a preflight samples the host log inside a power-up and refuses the prep"
+        },
+        {
+          "id": "b20261024-6ae986",
+          "kind": "verify",
+          "row": "lap:powerup_flood",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "planned": 10571,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "FF012B4B81CDB69CAE96883",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:powerup_flood",
+            "config": "8/disk/caw/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-6fc85c",
+            "k": 1,
+            "n": 10,
+            "candidate": "",
+            "variant": "LAB_POWER_LOCK=0 (scripts/lab_power.sh and the preflight take no power-up lock, as before the fix)",
+            "builds": [
+              "FF012B4B81CDB69CAE96883"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.0005011285754646336
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:powerup_flood",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-6fc85c",
+          "k": 1,
+          "n": 10,
+          "candidate": "",
+          "variant": "LAB_POWER_LOCK=0 (scripts/lab_power.sh and the preflight take no power-up lock, as before the fix)",
+          "builds": [
+            "FF012B4B81CDB69CAE96883"
+          ],
+          "date": "2026-10-24"
         }
       ]
     },
