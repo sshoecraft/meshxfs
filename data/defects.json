@@ -2408,73 +2408,13 @@
       "config": "*/*/*",
       "opened": "2026-10-21",
       "summary": "fio_perf_vs_xfs at 2/net/mesh/drbd records SKIP rig-unknown on every run since 2026-10-20 (the native-XFS yardstick is chosen by rig tag, and tools/mxfs_rig_tag.sh cannot establish one for /dev/drbd0, which has no SCSI vendor); a SKIP is not a PASS under candidate grading, so the DRBD board can never read green and the release drbd step can never pass",
-      "evidence": "tests/evidence/drbd_rig/criteria.runs.jsonl at 2/net/mesh/drbd: 11 SKIP rig-unknown (last five 2026-10-20T14:07:05Z to 2026-10-21T22:22:29Z), 2 PASS earlier. criteria.py 2/net/mesh/drbd --candidate 0.90.134: Total 35, 2 FAIL, 32 PASS, 1 SKIP; VERDICT 3 of 35 criteria are not passing. drbd_release_verify_0.90.134_20261021T212712Z.out: STEP suite-board rc=1. ===== Again in the 0.90.134 dry run attempt 20261021T230333Z: the drbd step failed with the board naming only fio_perf_vs_xfs=SKIP (every other DRBD row passed). ===== 2026-10-23: release:drbd FAIL 2026-10-21T20:12:33Z of the 0.90.133-2 dry run (data/criteria.runs.jsonl:6910, failed=[suite-board]) graded a DRBD board with fio_perf_vs_xfs SKIP rig-unknown (tests/evidence/drbd_release_verify_0.90.133-2.out:83, :128), besides alloc_witness and chk_clean (D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION) and fsx (D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED).",
+      "evidence": "tests/evidence/drbd_rig/criteria.runs.jsonl at 2/net/mesh/drbd: 11 SKIP rig-unknown (last five 2026-10-20T14:07:05Z to 2026-10-21T22:22:29Z), 2 PASS earlier. criteria.py 2/net/mesh/drbd --candidate 0.90.134: Total 35, 2 FAIL, 32 PASS, 1 SKIP; VERDICT 3 of 35 criteria are not passing. drbd_release_verify_0.90.134_20261021T212712Z.out: STEP suite-board rc=1. ===== Again in the 0.90.134 dry run attempt 20261021T230333Z: the drbd step failed with the board naming only fio_perf_vs_xfs=SKIP (every other DRBD row passed). ===== 2026-10-23: release:drbd FAIL 2026-10-21T20:12:33Z of the 0.90.133-2 dry run (data/criteria.runs.jsonl:6910, failed=[suite-board]) graded a DRBD board with fio_perf_vs_xfs SKIP rig-unknown (tests/evidence/drbd_release_verify_0.90.133-2.out:83, :128), besides alloc_witness and chk_clean (D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION) and fsx (D-FSX-RANDOM-SEED-ABOVE-INT-MAX-MAKES-FSX-EXIT-WITH-USAGE-AND-LOGS-ARE-DELETED). ===== 2026-10-23: no longer names 2/net/mesh/drbd:release:drbd:2026-10-21T22:56:58Z, named by D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION; 2/net/mesh/drbd:release:drbd:2026-10-21T20:12:33Z, named by D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION; 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:06Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:07Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:08Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:09Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:10Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:11Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:12Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:13Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:14Z, settled (retired_by); 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T01:02:15Z, settled (retired_by): Per review data/reviews/P20261023-e7a30c.md. The two release:drbd runs (2026-10-21T22:56:58Z, 20:12:33Z) also failed on alloc_witness and chk_clean, and D-2NETMESH-ALLOC-WITNESS-RANK-FILL-CARVED-NOTHING-IN-ITS-PARTITION names both, so a removal of this record must not settle them. The ten b20261023-d08fc5 laps (01:02:06Z-01:02:15Z) aborted unexposed with no DRBD pair (lap log 'backing disk='''; lane g2_a16_20261024T010135Z summary.log:7 MXFS_NODES=2, :11-12 drbd_rig.sh up rc=2 in 0 s), the cause of D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP, which now names them.",
       "next": "establish the DRBD rig yardstick (a tag for the drbd attachment, or the backing LUN under DRBD) so the row measures; it must never pass without measuring ===== 2026-10-24: the fix is in tools/mxfs_rig_tag.sh (a DRBD device resolves through its backing disk, drbdsetup show, tagged <vendor>-drbd; CHANGELOG 0.90.134), now with a switch: MXFS_RIG_TAG_DRBD=0 reads a DRBD device like any other disk, finds no vendor and resolves nothing, as before (the control). New lap tests/drbd_rig_tag_lap.sh. Precheck on g2 after scripts/drbd_rig.sh up (DRBD 8.4.11 Primary/Primary over pool LUNs 02 and 12), evidence tests/evidence/precheck_20261024T004226Z: fix in (pre_on1, 1.44 s) 'STEP prep resolution rc=0 tag=scst-fio-drbd', 'RESULT: PASS | test=fio_perf_vs_xfs | nodes=2 | measured=seqW=274% seqR=489% randW=122% randR=182% worst(write)=122% (threshold>=70%, wsrc=xfs-baseline, rig=scst-fio-drbd)', 'LAP drbd_rig_tag PASS'; MXFS_RIG_TAG_DRBD=0 (pre_off1, 1.41 s) 'STEP prep resolution rc=1 tag=', 'RESULT: SKIP | test=fio_perf_vs_xfs | nodes=2 | measured=rig-unknown', 'LAP drbd_rig_tag FAIL'. Bound for a batch lap: 2x the precheck, 3 s. Next, on the next frozen attempt (g2, with the DRBD pair up): a control batch with MXFS_RIG_TAG_DRBD=0, the verification sized from it, remove --fixed; the release drbd step's board then grades fio_perf_vs_xfs against rig=scst-fio-drbd.",
       "cells": [
         {
           "config": "2/net/mesh/drbd",
           "row": "release:drbd",
-          "iso": "2026-10-21T22:56:58Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "release:drbd",
           "iso": "2026-10-22T00:35:43Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "release:drbd",
-          "iso": "2026-10-21T20:12:33Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:15Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:14Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:13Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:12Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:11Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:10Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:09Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:08Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:07Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:06Z"
         },
         {
           "config": "2/net/mesh/drbd",
@@ -6607,7 +6547,7 @@
       "config": "net/mesh/drbd",
       "opened": "2026-10-23",
       "summary": "MXFS_NODES carries two meanings in the tree: run.sh hands each row a node count (run.sh:1612, :1710, :1985) and laps such as tests/path_abort_kmsg_lap.sh:44,50 read it as one, while scripts/drbd_rig.sh:95,153-155 (and tests/drbd_write_bound_arm.sh:31-33) read it as the pair's node names. A lane queue that exports the count for the first kind makes drbd_rig.sh take '2' as a node name, form group nodes-2 with one node, and refuse 'DRBD dual-primary is exactly two', so every DRBD lap in that lane ABORTs with no exposure.",
-      "evidence": "Lane tests/evidence/lanes/g2_a16_20261024T010135Z (queue tests/evidence/lanes/queue_g2_next.txt, which exports MXFS_NODES=2 for the g2 pair), candidate 0.90.134 attempt frozen 2026-10-24T01:00Z, build 9C7B7B00C5DE523F1D378C8: step2 'scripts/drbd_rig.sh up' rc=2 'drbd_rig: group nodes-2 has 1 nodes; DRBD dual-primary is exactly two'. Step3 control b20261023-d08fc5 (lap:drbd_rig_tag): 10 of 10 laps FAIL rc=2 exposure=0, step3.log 'LAP drbd_rig_tag ABORT: not exposed (/dev/drbd0 on test1 is /dev/drbd0, minor=0, backing disk=)', the DRBD pair never having been brought up. Step6 control b20261023-8d5f78 (lap:third_vote): 10 of 10 FAIL rc=2 exposure=0, step6.log:5 'LAP third_vote ABORT: drbd_rig.sh up rc=2: drbd_rig: group nodes-2 has 1 nodes'. Both controls closed with 0 exposed laps and bound nothing; the step4 and step7 verifications were refused (no measured failure).",
+      "evidence": "Lane tests/evidence/lanes/g2_a16_20261024T010135Z (queue tests/evidence/lanes/queue_g2_next.txt, which exports MXFS_NODES=2 for the g2 pair), candidate 0.90.134 attempt frozen 2026-10-24T01:00Z, build 9C7B7B00C5DE523F1D378C8: step2 'scripts/drbd_rig.sh up' rc=2 'drbd_rig: group nodes-2 has 1 nodes; DRBD dual-primary is exactly two'. Step3 control b20261023-d08fc5 (lap:drbd_rig_tag): 10 of 10 laps FAIL rc=2 exposure=0, step3.log 'LAP drbd_rig_tag ABORT: not exposed (/dev/drbd0 on test1 is /dev/drbd0, minor=0, backing disk=)', the DRBD pair never having been brought up. Step6 control b20261023-8d5f78 (lap:third_vote): 10 of 10 FAIL rc=2 exposure=0, step6.log:5 'LAP third_vote ABORT: drbd_rig.sh up rc=2: drbd_rig: group nodes-2 has 1 nodes'. Both controls closed with 0 exposed laps and bound nothing; the step4 and step7 verifications were refused (no measured failure). ===== 2026-10-24: the ten laps of control b20261023-d08fc5 (lap:drbd_rig_tag at 2/net/mesh/drbd, 01:02:06Z-01:02:15Z) are this record's: lane tests/evidence/lanes/g2_a16_20261024T010135Z exported MXFS_NODES=2 (summary.log:7), its 'scripts/drbd_rig.sh up' step ended rc=2 in 0 s (:11-12), and every lap aborted 'LAP drbd_rig_tag ABORT: not exposed (/dev/drbd0 on test1 is '/dev/drbd0', minor='0', backing disk='' ...' (tests/evidence/drbd_rig/criteria.runs.jsonl, batch b20261023-d08fc5; lap logs tests/evidence/batch_laps/b20261023-d08fc5/). Moved here from D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN per review data/reviews/P20261023-e7a30c.md.",
       "next": "Next attempt: give drbd_rig.sh's pair its own variable (or refuse a value that is not two node names, naming the clash), with a switch for the control; a lap that runs drbd_rig.sh up with MXFS_NODES=2 exported must form the g2 pair. Until then a lane that runs DRBD laps must not export MXFS_NODES; rerun the two DRBD controls and verifications from a queue without it. ===== 2026-10-24: fix built in the sibling tree /home/steve/src/mxfs-a17 for the next attempt: scripts/drbd_rig.sh takes a bare number in MXFS_NODES as run.sh's node count and selects the group (MXFS_GROUP, default g2); DRBD_RIG_NODES_COUNT=0 takes it as a node name, as before: the control. New lap tests/drbd_nodes_count_lap.sh (MXFS_NODES=2 MXFS_GROUP=g2 scripts/drbd_rig.sh status; PASS when the status names test1 and test2, FAIL on the refusal; bound 25 s). Precheck from the sibling with g2 up (module 9C7B7B00C5DE523F1D378C8): fix in, tests/evidence/20261024T010753Z_drbdnodes_pre_on1 (in mxfs-a17) 'LAP drbd_nodes_count PASS label=pre_on1: the status names the g2 pair: test1 test2', 11 s; control DRBD_RIG_NODES_COUNT=0, 20261024T010804Z_drbdnodes_pre_off1 'LAP drbd_nodes_count FAIL ... drbd_rig: group nodes-2 has 1 nodes; DRBD dual-primary is exactly two', 0 s. Next: merge into the main tree before the next freeze, control batch (10 laps, knob DRBD_RIG_NODES_COUNT=0, bound 25 s, probe '^EXPOSED: MXFS_NODES=2'), verification on the frozen attempt, remove --fixed.",
       "reproducer": "MXFS_NODES=2 scripts/drbd_rig.sh up (rc=2, 'group nodes-2 has 1 nodes')",
       "cells": [
@@ -6897,6 +6837,16 @@
         }
       ],
       "updated": "2026-10-23"
+    },
+    {
+      "id": "D-CRITERIA-UNRETIRE-REFUSES-LAP-ROWS-SO-WRONG-LAP-RETIREMENTS-STAND",
+      "severity": "minor",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "tools/criteria.py unretire (withdraw, :1542) finds its run through annotated_run (:1474-1480), which accepts only a board criterion's id or a release:<step> row, so a lap row (lap:<name>) is refused 'nothing matches'. tools/defects.py verify writes retired_by notes on every cell of the record it verifies, lap rows included, so a lap retirement that turns out wrong (the run was not that defect's) cannot be taken back, and the ledger keeps a disposition no evidence supports.",
+      "evidence": "2026-10-24: applying verify P20261023-639531 of D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN retired the ten laps of control b20261023-d08fc5 (tests/evidence/drbd_rig/criteria.runs.jsonl:3588-3597), which aborted unexposed for another record's cause (review data/reviews/P20261023-e7a30c.md asks for those notes to be withdrawn). 'MXFS_OWN_RIG=1 tools/criteria.py unretire lap:drbd_rig_tag --at 2/net/mesh/drbd --iso 2026-10-24T01:02:06Z --why ...' printed 'criteria: nothing matches 'lap:drbd_rig_tag'' for each of the ten; the same command for release:drbd runs worked.",
+      "next": "Let annotated_run accept a lap:<name> row as it accepts release:<step> (the run exists only in the ledger), then withdraw the ten d08fc5 lap retirements. tools/ is frozen while 0.90.134's attempt runs."
     }
   ]
 }
