@@ -6126,8 +6126,14 @@
         "data/reviews/P20261023-c062a3.md",
         "data/reviews/P20261023-cf21fb.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-b6b6f9.md",
+        "sha256": "eb285b51170e4ef1b8d9ef75924a0509f4c0b4bfbc2c1183ac6038d5adadee12",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-d6c290",
