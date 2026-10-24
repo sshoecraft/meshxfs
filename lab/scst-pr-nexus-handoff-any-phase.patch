@@ -1,0 +1,104 @@
+SCST +caw-abort-reclaim.7: the new session of an I_T nexus takes the PR registrant from any
+earlier session of that nexus, not only from one already shutting down.
+
+.6 (lab/scst-pr-registrant-handoff.patch) moved the registrant to a new session's tgt_dev only
+when the tgt_dev holding it belonged to a session no longer SCST_SESS_SPH_READY. On a path flap
+that never held. Measured on the MXFS lab target, 2026-10-24 00:52:29Z (2/net/mesh/mpath
+path_flap, test18, pool-02): the cut path's old connection is closed only as the initiator logs
+in again ("Connection ... unexpectedly closed", NEXUS_LOSS_SESS), the new session is created at
+once with the same ISID, and iscsi-scst calls scst_unregister_session() for the old session only
+when it frees it ("Freeing session ...", 00:52:30Z). So the new tgt_dev met the registrant on a
+session still READY, left it there, and the new session's first 16 writes were refused
+RESERVATION CONFLICT ("PR: moving reg" was never logged for test18; the PREEMPT AND ABORT that
+followed reported the earlier session at shut_phase 0).
+
+A registration belongs to the I_T nexus and survives its loss; a new session of the nexus (an
+iSCSI login with an existing ISID is a reinstatement) replaces the old one. The new tgt_dev now
+takes the registrant from any other session of the nexus, whatever its shut_phase, and the log
+line names that phase. The earlier session's commands still in flight stay inside PREEMPT AND
+ABORT's reach through .6's scst_pr_abort_nexus_sessions().
+
+Applied to ~/src/scst on top of .6 and installed with scripts/scst_reload.sh (every rig VM
+powered off first). Qualification: tests/scst_pr_bounds_check.sh, and
+tests/scst_pr_abort_shutdown_race.sh's window, stress and handoff arms and its flap arm (the
+path's cable cut for 4 s with scripts/san_net.sh while a direct writer runs on it, as a path row
+cuts it), which fails on .6.
+
+--- a/scst/include/scst_const.h
++++ b/scst/include/scst_const.h
+@@ -114,8 +114,20 @@
+  *      READY, and scst_pr_abort_reg() also aborts every other live
+  *      session of the registrant's nexus on the device, so commands the
+  *      old session admitted stay inside PREEMPT AND ABORT's reach.
++ *  .7  .6's handoff never fired on a path flap (measured 2026-10-24, MXFS
++ *      lab, 2/net/mesh/mpath path_flap): the cut path's old connection is
++ *      closed only as the initiator logs in again, iscsi-scst unregisters
++ *      the old session only when it frees it, so the new tgt_dev met the
++ *      registrant on a session still SCST_SESS_SPH_READY and left it there,
++ *      and the new session's first 16 writes were refused RESERVATION
++ *      CONFLICT.  The new tgt_dev of a nexus now takes the registrant from
++ *      any earlier session of the same nexus, whatever its shut_phase: a
++ *      new session of an I_T nexus replaces the old one (an iSCSI login
++ *      with an existing ISID is a reinstatement), and the earlier
++ *      session's commands stay inside PREEMPT AND ABORT's reach through
++ *      scst_pr_abort_nexus_sessions().
+  */
+-#define SCST_VERSION_STRING_SUFFIX	"+caw-abort-reclaim.6"
++#define SCST_VERSION_STRING_SUFFIX	"+caw-abort-reclaim.7"
+ #define SCST_VERSION_STRING		SCST_VERSION_NAME SCST_VERSION_STRING_SUFFIX
+ 
+ #ifdef SCST_BUILD_DATE
+--- a/scst/src/scst_pres.c
++++ b/scst/src/scst_pres.c
+@@ -1270,26 +1270,35 @@
+ 	scst_pr_write_lock(dev);
+ 
+ 	reg = scst_pr_find_reg(dev, transport_id, rel_tgt_id);
+-	if (reg && reg->tgt_dev && reg->tgt_dev != tgt_dev &&
+-	    READ_ONCE(reg->tgt_dev->sess->shut_phase) != SCST_SESS_SPH_READY) {
++	if (reg && reg->tgt_dev && reg->tgt_dev != tgt_dev) {
+ 		/*
+-		 * +caw-abort-reclaim.6: the registrant is still linked to the
+-		 * per-device state of an earlier session of this I_T nexus, and
+-		 * that session is already shutting down: it is freed (and the
+-		 * registrant moved by scst_pr_clear_tgt_dev()) only once its
+-		 * refcount drops, on the management thread.  A registration
+-		 * belongs to the nexus and survives its loss, so the new session
+-		 * is the nexus now: take the registrant, or every command it sends
+-		 * until that free is refused RESERVATION CONFLICT although the
+-		 * nexus is registered.  The earlier session's commands still in
+-		 * flight are reached by PREEMPT AND ABORT through
+-		 * scst_pr_abort_nexus_sessions().
++		 * +caw-abort-reclaim.6/.7: the registrant is still linked to the
++		 * per-device state of an earlier session of this I_T nexus (the
++		 * same TransportID, ISID included, and relative target port).  It
++		 * would move only when that session is freed
++		 * (scst_pr_clear_tgt_dev() from scst_free_session(), on the
++		 * management thread), and until then every command of the new
++		 * session is refused RESERVATION CONFLICT although the nexus is
++		 * registered.  A registration belongs to the nexus and survives
++		 * its loss, and a new session of the nexus replaces the old one
++		 * (an iSCSI login with an existing ISID is a reinstatement), so
++		 * the new session is the nexus now: take the registrant.
++		 *
++		 * .6 took it only from a session no longer SCST_SESS_SPH_READY.
++		 * On a path flap that never held: the old connection is closed
++		 * only as the initiator logs in again, and iscsi-scst unregisters
++		 * the old session (leaving READY) only when it frees it, after
++		 * the new session's tgt_devs exist.
++		 *
++		 * The earlier session's commands still in flight are reached by
++		 * PREEMPT AND ABORT through scst_pr_abort_nexus_sessions().
+ 		 */
+-		PRINT_INFO("PR: moving reg %s/%d (%p, key 0x%016llx) from shutting-down sess %p (tgt_dev %p) to new tgt_dev %p (dev %s)",
++		PRINT_INFO("PR: moving reg %s/%d (%p, key 0x%016llx) from earlier sess %p (shut_phase %ld, tgt_dev %p) to new tgt_dev %p (dev %s)",
+ 			   debug_transport_id_to_initiator_name(transport_id),
+ 			   rel_tgt_id, reg, be64_to_cpu(reg->key),
+-			   reg->tgt_dev->sess, reg->tgt_dev, tgt_dev,
+-			   dev->virt_name);
++			   reg->tgt_dev->sess,
++			   READ_ONCE(reg->tgt_dev->sess->shut_phase),
++			   reg->tgt_dev, tgt_dev, dev->virt_name);
+ 		reg->tgt_dev->registrant = NULL;
+ 		tgt_dev->registrant = reg;
+ 		reg->tgt_dev = tgt_dev;

@@ -5694,6 +5694,163 @@
         "date": "2026-10-23"
       },
       "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-5851c2",
+      "kind": "verify",
+      "record": "D-TAUTH-TEST-OBJECTS-OMIT-INCLUDED-HEADERS-SO-A-HEADER-CHANGE-LINKS-STALE-CODE",
+      "change": {
+        "batch": "b20261023-fa4170"
+      },
+      "argument": "Verification batch b20261023-fa4170 (lap:tauth_header_dep at 2/net/mesh/direct, candidate 0.90.134, attempt frozen 2026-10-24T01:01:07Z (data/candidates/0.90.134.json, state RUNNING), module 9C7B7B00C5DE523F1D378C8) was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/host_a16_20261024T010132Z/step1.log first line: 'declared verification batch b20261023-fa4170 ... 6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)'). It is sized from control b20261023-af4605 (tests/evidence/lanes/host_prefreeze_controls_20261024T004916Z/step1.log), run with TAUTH_DEPS=0 in the lap's environment (tests/tauth/Makefile builds from the object rules' own header lists, as before the fix), closed with 10 of 10 exposed laps failing, each 'a plain make linked stale objects: obj/tauth_store.o includes pal/pal.h and lacks its mark...'. The lap runs in a scratch copy of dlm/, pal/, include/ and tests/tauth/ (tests/tauth_header_dep_lap.sh:42 mktemp), so no frozen file is written. All 6 laps PASS with exposure=1 (tests/evidence/lanes/host_a16_20261024T010132Z/step1.log 'verify b20261023-fa4170: 6 PASS, 0 FAIL of 6 planned'; per lap tests/evidence/batch_laps/b20261023-fa4170). The record's cells at 2/net/mesh/direct are the 10 laps of af4605 and the 10 laps of the earlier control b20261023-c75499 (lap:tauth_shared_objs, TAUTH_SHARED_FROM_CLEAN=0), whose failures are stale objects built from the same Makefile rules.",
+      "evidence": [
+        "tests/evidence/lanes/host_a16_20261024T010132Z/step1.log",
+        "tests/evidence/lanes/host_prefreeze_controls_20261024T004916Z/step1.log",
+        "tests/evidence/batch_laps/b20261023-fa4170",
+        "tests/evidence/batch_laps/b20261023-af4605",
+        "tests/tauth_header_dep_lap.sh",
+        "tests/tauth/Makefile"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-6da0d2",
+      "kind": "verify",
+      "record": "D-TAUTH-MAKEFILE-DEFAULT-GOAL-IS-ONE-OBJECT-AND-CLEAN-MISSES-TWO-BINARIES",
+      "change": {
+        "batch": "b20261023-0947fc"
+      },
+      "argument": "Verification batch b20261023-0947fc (lap:tauth_make_goal at 2/net/mesh/direct, candidate 0.90.134, attempt frozen 2026-10-24T01:01:07Z (data/candidates/0.90.134.json, state RUNNING), module 9C7B7B00C5DE523F1D378C8) was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/host_a16_20261024T010132Z/step2.log first line: 'declared verification batch b20261023-0947fc ... 6 clean laps (rate 10/10 ...)'). It is sized from control b20261023-a3a97f (tests/evidence/lanes/host_prefreeze_controls_20261024T004916Z/step2.log), run with TAUTH_GOAL_ALL=0 (tests/tauth/Makefile keeps its first rule's object as the goal and the old all/clean lists, as before the fix), closed with 10 of 10 exposed laps failing, each 'not built by a plain make: tauth_test ledger_test ...'. The lap works in a scratch copy (tests/tauth_make_goal_lap.sh). All 6 laps PASS with exposure=1 (tests/evidence/lanes/host_a16_20261024T010132Z/step2.log 'verify b20261023-0947fc: 6 PASS, 0 FAIL of 6 planned'; tests/evidence/batch_laps/b20261023-0947fc). The record's 10 cells are the control's laps, each failing on that cause.",
+      "evidence": [
+        "tests/evidence/lanes/host_a16_20261024T010132Z/step2.log",
+        "tests/evidence/lanes/host_prefreeze_controls_20261024T004916Z/step2.log",
+        "tests/evidence/batch_laps/b20261023-0947fc",
+        "tests/evidence/batch_laps/b20261023-a3a97f",
+        "tests/tauth_make_goal_lap.sh",
+        "tests/tauth/Makefile"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-ea2e07",
+      "kind": "verify",
+      "record": "D-CRITERIA-INCIDENTS-AT-REFUSES-A-RELEASE-STEP-CONFIGURATION-1-ANY",
+      "change": {
+        "batch": "b20261023-2f9da0"
+      },
+      "argument": "Verification batch b20261023-2f9da0 (lap:release_step_incidents_at at 2/net/mesh/direct, candidate 0.90.134, attempt frozen 2026-10-24T01:01:07Z (data/candidates/0.90.134.json, state RUNNING), module 9C7B7B00C5DE523F1D378C8) was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/host_a16_20261024T010132Z/step3.log first line). It is sized from control b20261023-3023da (tests/evidence/lanes/host_prefreeze_controls_20261024T004916Z/step3.log), run with MXFS_RELEASE_STEP_LIST=0 (tools/criteria.py cmd_incidents hands --at 1/any to parse_at, as before the fix), closed with 10 of 10 exposed laps failing, each 'FAIL: incidents --at 1/any does not list 1/any:release:boards:2026-10-21T19:29:49Z'. The lap runs on a scratch tree (tests/release_step_incidents_at_lap.py), host only, as the defect lives in a host tool. All 6 laps PASS with exposure=1 (tests/evidence/lanes/host_a16_20261024T010132Z/step3.log 'verify b20261023-2f9da0: 6 PASS, 0 FAIL of 6 planned'; tests/evidence/batch_laps/b20261023-2f9da0). The record's 10 cells are the control's laps.",
+      "evidence": [
+        "tests/evidence/lanes/host_a16_20261024T010132Z/step3.log",
+        "tests/evidence/lanes/host_prefreeze_controls_20261024T004916Z/step3.log",
+        "tests/evidence/batch_laps/b20261023-2f9da0",
+        "tests/evidence/batch_laps/b20261023-3023da",
+        "tests/release_step_incidents_at_lap.py",
+        "tools/criteria.py"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-486f3d",
+      "kind": "verify",
+      "record": "D-BATCH-LAP-RECORDS-NO-VARIANT-FOR-MODULE-ARGUMENTS-SO-A-VARIANT-LAP-CAN-COUNT",
+      "change": {
+        "batch": "b20261023-2a57cd"
+      },
+      "argument": "Verification batch b20261023-2a57cd (lap:batch_lap_variant at 2/net/mesh/direct, candidate 0.90.134, attempt frozen 2026-10-24T01:01:07Z (data/candidates/0.90.134.json, state RUNNING), module 9C7B7B00C5DE523F1D378C8) was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/host_a16_20261024T010132Z/step4.log first line). It is sized from control b20261023-62b113 (tests/evidence/lanes/host_prefreeze_controls_20261024T004916Z/step4.log), run with MXFS_BATCH_LAP_ENV_VARIANT=0 (tools/batch_lap.py records only the batch's variant, never the pair's module arguments, as before the fix), closed with 10 of 10 exposed laps failing, each 'FAIL: the environment lap's run carries no variant naming dead_timeout_ms=12000'. The lap (tests/batch_lap_variant_lap.py) runs tools/batch_lap.py on a scratch queue and board on the host, where the defect lives. All 6 laps PASS with exposure=1 (tests/evidence/lanes/host_a16_20261024T010132Z/step4.log 'verify b20261023-2a57cd: 6 PASS, 0 FAIL of 6 planned'; tests/evidence/batch_laps/b20261023-2a57cd). The record's 10 cells are the control's laps.",
+      "evidence": [
+        "tests/evidence/lanes/host_a16_20261024T010132Z/step4.log",
+        "tests/evidence/lanes/host_prefreeze_controls_20261024T004916Z/step4.log",
+        "tests/evidence/batch_laps/b20261023-2a57cd",
+        "tests/evidence/batch_laps/b20261023-62b113",
+        "tests/batch_lap_variant_lap.py",
+        "tools/batch_lap.py"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-a59d31",
+      "kind": "verify",
+      "record": "D-PRESTEPS-FORM-PAIR-UNDER-G2-MARKER-BUT-SELF-TESTS-READ-DEFAULT-MARKER",
+      "change": {
+        "batch": "b20261023-c3e27a"
+      },
+      "argument": "Verification batch b20261023-c3e27a (lap:presteps_marker_read at 2/net/mesh/direct, candidate 0.90.134, attempt frozen 2026-10-24T01:01:07Z (data/candidates/0.90.134.json, state RUNNING), module 9C7B7B00C5DE523F1D378C8) was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/host_a16_20261024T010132Z/step5.log first line: 'declared verification batch b20261023-c3e27a ... 6 clean laps (rate 10/10 ...)'). It is sized from control b20261023-151b0c, the control the rejected removal asked for (data/reviews/P20261022-a6f02f.md: 'a control on the current reproducer with only the fix reverted from the candidate's tools/release_run.py'): tests/evidence/controls/D-PRESTEPS-GROUP-MARKER-AT-ITS-SWITCH.fix.diff takes out only presteps_env's two fix lines, run in place on the development tree before this attempt's freeze with its inputs hashed before, during and after (tests/evidence/controls/b20261023-151b0c.20261024T004826Z.inputs.*.json), closed with 10 of 10 exposed laps failing, each 'PRESTEPS_MARKER_LAP FAIL tools/mxfs_rig_tag.sh opened .cluster_marker.json and holds .cluster_marker.json's pair'. The lap (tests/presteps_marker_read_lap.py) runs the presteps' own environment through the rig tag and rig library under strace on the host and reads which marker each opens, the second link the rejection said was unmeasured. All 6 laps PASS with exposure=1 (tests/evidence/lanes/host_a16_20261024T010132Z/step5.log 'verify b20261023-c3e27a: 6 PASS, 0 FAIL of 6 planned'; tests/evidence/batch_laps/b20261023-c3e27a). The record's cells at 2/net/mesh/direct are the 10 laps of 151b0c and the 20 laps of the earlier revert control b20261022-12fbb7 (lap:presteps_env, the presteps' environment carrying no group marker), each failing on that cause; its three release:presteps cells are at 1/any and are not part of this verify.",
+      "evidence": [
+        "tests/evidence/lanes/host_a16_20261024T010132Z/step5.log",
+        "tests/evidence/batch_laps/b20261023-c3e27a",
+        "tests/evidence/batch_laps/b20261023-151b0c",
+        "tests/evidence/controls/D-PRESTEPS-GROUP-MARKER-AT-ITS-SWITCH.fix.diff",
+        "tests/evidence/controls/b20261023-151b0c.20261024T004826Z.inputs.before.json",
+        "tests/evidence/controls/b20261023-151b0c.20261024T004826Z.inputs.after.json",
+        "tests/presteps_marker_read_lap.py",
+        "tools/release_run.py"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-2f64df",
+      "kind": "verify",
+      "record": "D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING",
+      "change": {
+        "batch": "b20261023-1ace9a"
+      },
+      "argument": "Verification batch b20261023-1ace9a (lap:release_step_copy_race_mode at 2/net/mesh/direct, candidate 0.90.134, attempt frozen 2026-10-24T01:01:07Z (data/candidates/0.90.134.json, state RUNNING), module 9C7B7B00C5DE523F1D378C8) was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/host_a16_20261024T010132Z/step6.log first line). It is sized from control b20261023-844929: tests/evidence/controls/D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT.fix.diff (the file's mode back to 0664, as it was frozen before) applied in place on the development tree before this attempt's freeze, inputs hashed before, during and after (tests/evidence/controls/b20261023-844929.20261024T004411Z.inputs.*.json), the lap invoked through tools/batch_lap.py as the control queue invoked it ('env tests/release_step_copy_race.py'), closed with 10 of 10 exposed laps failing 'env: tests/release_step_copy_race.py: Permission denied'. On this attempt the file is frozen 0775 (tests/evidence/candidates/0.90.134_20261024T010107Z.files.json). All 6 laps PASS with exposure=1, each 'PASS: 0 of 200 copies died and 0 are torn' (tests/evidence/lanes/host_a16_20261024T010132Z/step6.log 'verify b20261023-1ace9a: 6 PASS, 0 FAIL of 6 planned'; tests/evidence/batch_laps/b20261023-1ace9a). The record's cells at 2/net/mesh/direct: the 10 laps of 844929 and the 10 of the earlier control b20261023-d18686 (the same revert, 'Permission denied'), and the 10 INCOMPLETE laps of b20261023-a60598 that first showed it, 'no verdict line (rc=126)', the exit code of exec on a file with no execute bit.",
+      "evidence": [
+        "tests/evidence/lanes/host_a16_20261024T010132Z/step6.log",
+        "tests/evidence/batch_laps/b20261023-1ace9a",
+        "tests/evidence/batch_laps/b20261023-844929",
+        "tests/evidence/controls/D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT.fix.diff",
+        "tests/evidence/controls/b20261023-844929.20261024T004411Z.inputs.before.json",
+        "tests/evidence/candidates/0.90.134_20261024T010107Z.files.json",
+        "tests/release_step_copy_race.py"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-e9c692",
+      "kind": "verify",
+      "record": "D-FSX-SH-EXIT-TRAP-REMOVES-FSX-OWN-FSXLOG-AND-FSXGOOD-WITH-THE-WORK-DIR",
+      "change": {
+        "batch": "b20261023-989617"
+      },
+      "argument": "Verification batch b20261023-989617 (lap:fsx_fail_files at 2/disk/caw/direct, candidate 0.90.134, attempt frozen 2026-10-24T01:01:07Z (data/candidates/0.90.134.json, state RUNNING), module 9C7B7B00C5DE523F1D378C8) was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2_a16_20261024T010135Z/step11.log first line). The lap runs on the rig node, on the defect's own path: tests/fsx_fail_files_lap.sh runs tests/fsx_fail_files_node.sh on test1, which runs tests/suite/fsx.sh as the board does (MXFS_NODES=1) on the formed 2/disk/caw/direct pair's mxfs mount with a second writer overwriting the fsx file so both checks fail, then lists what survives the row in /root (the earlier /dev/shm form was rejected, data/reviews/P20261023-b32dc8.md). Its oracle was prechecked on test1 first (tests/evidence/lanes/g2_a16_20261024T010135Z/step10.log 'EXPOSED: the fsx row failed both checks on the mxfs mount', the .fsxlog, .fsxops and .fsxgood kept in /root). Sized from control b20261023-636cd6 (tests/evidence/lanes/g2_a16_20261024T010135Z/step10.log), FSX_KEEP_FAIL_FILES=0 (fsx without -P, as before the fix), closed with 10 of 10 exposed laps failing, each 'removed with the row: fsx.<seed>.100000.d/fsxfile_100000.fsxlog ...'. All 6 laps PASS with exposure=1 (tests/evidence/lanes/g2_a16_20261024T010135Z/step11.log 'verify b20261023-989617: 6 PASS, 0 FAIL of 6 planned'; tests/evidence/batch_laps/b20261023-989617). The record's cells at 2/disk/caw/direct are the 10 laps of 636cd6.",
+      "evidence": [
+        "tests/evidence/lanes/g2_a16_20261024T010135Z/step10.log",
+        "tests/evidence/lanes/g2_a16_20261024T010135Z/step11.log",
+        "tests/evidence/batch_laps/b20261023-989617",
+        "tests/evidence/batch_laps/b20261023-636cd6",
+        "tests/fsx_fail_files_lap.sh",
+        "tests/fsx_fail_files_node.sh",
+        "tests/suite/fsx.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-37e338",
+      "kind": "verify",
+      "record": "D-RUN-SH-MARKER-PARAMS-PASSED-AS-ONE-ARGUMENT-EMPTY-THE-MARKER-AT-8-NODES",
+      "change": {
+        "batch": "b20261023-f65e6e"
+      },
+      "argument": "Verification batch b20261023-f65e6e (lap:marker_size at 8/disk/caw/mpath, candidate 0.90.134, attempt frozen 2026-10-24T01:01:07Z (data/candidates/0.90.134.json, state RUNNING), module 9C7B7B00C5DE523F1D378C8) was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g8_a16_20261024T010214Z/step3.log first line). The lap runs where the defect lives, an 8-node prep: tests/marker_size_lap.sh runs MXFS_FORCE_PREP=1 ./run.sh 8/disk/caw/mpath --group g8 prep_cluster on test7-test14 and reads the marker it wrote; exposure is the prep's own printed params size over the kernel's 131072-byte single-argument limit (MAX_ARG_STRLEN, /src/linux/include/uapi/linux/binfmts.h). Sized from control b20261023-83a19a (tests/evidence/lanes/g8_a16_20261024T010214Z/step2.log), MXFS_MARKER_STDIN=0 in the lap's environment (run.sh marker_write passes params to jq as one --argjson argument, as before the fix), closed with 10 of 10 exposed laps failing, each 'the marker is 0 bytes, configuration none, params missing for [test7 ... test14]'. All 6 laps PASS with exposure=1, each 'the marker (145407 bytes) names 8/disk/caw/mpath and holds the params of all 8 nodes' (tests/evidence/lanes/g8_a16_20261024T010214Z/step3.log 'verify b20261023-f65e6e: 6 PASS, 0 FAIL of 6 planned'; tests/evidence/batch_laps/b20261023-f65e6e). The lane was stopped by the session during step 3 (its summary.log notes it), and step 3 ran on to its end. The record's 10 cells are the control's laps.",
+      "evidence": [
+        "tests/evidence/lanes/g8_a16_20261024T010214Z/step2.log",
+        "tests/evidence/lanes/g8_a16_20261024T010214Z/step3.log",
+        "tests/evidence/lanes/g8_a16_20261024T010214Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-f65e6e",
+        "tests/evidence/batch_laps/b20261023-83a19a",
+        "tests/marker_size_lap.sh",
+        "run.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
     }
   ]
 }

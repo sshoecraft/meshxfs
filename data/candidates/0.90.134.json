@@ -1,8 +1,8 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-23T20:41:09Z",
-  "state": "INVALID",
+  "created": "2026-10-24T01:01:07Z",
+  "state": "RUNNING",
   "attempts": [
     {
       "created": "2026-10-21T21:26:41Z",
@@ -324,14 +324,36 @@
       "dist": "",
       "packages": {},
       "steps": {}
+    },
+    {
+      "created": "2026-10-23T20:41:09Z",
+      "state": "INVALID",
+      "dry_run": false,
+      "srcversion": "79779BEAECBEA94844FDC72",
+      "files": "tests/evidence/candidates/0.90.134_20261023T204109Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-23T20:41:09Z",
+          "why": "created"
+        },
+        {
+          "state": "INVALID",
+          "at": "2026-10-23T23:48:05Z",
+          "why": "5 frozen file(s) changed: added: scripts/scst_reload.sh; added: tests/lanes/queue_g2_lmu_caw_measure.txt; added: tests/lanes/queue_g2_peerwin_netmesh.txt; added: tests/lanes/queue_g2e_lmu_mpath.txt; added: tests/lanes/queue_g4_nlink_relabort_off.txt"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
-  "srcversion": "79779BEAECBEA94844FDC72",
-  "module_sha256": "1109bd68a94cdce50d24dd0fa695966caa6cd86d6d10cf23ea6966bbd9995a06",
-  "files": "tests/evidence/candidates/0.90.134_20261023T204109Z.files.json",
-  "files_count": 2574,
-  "files_digest": "480bb0fc75feefc404ad1a1edcb8684aff39838196badb3d6191de8239807791",
+  "srcversion": "9C7B7B00C5DE523F1D378C8",
+  "module_sha256": "cb5ffa4b26574e42ece8a60fa15977237027253ae5423c64b1fe3c7a317908ca",
+  "files": "tests/evidence/candidates/0.90.134_20261024T010107Z.files.json",
+  "files_count": 2594,
+  "files_digest": "6b716de1b93319105be9d682b3d61f4ea8bf995db3a972d96880d09a49f0dcf0",
   "spec": "ec57ce06eb09c644b368cde523dfd4fa03e87d54b80a4bee31602c59f3ec175b",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
@@ -341,13 +363,8 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-23T20:41:09Z",
+      "at": "2026-10-24T01:01:07Z",
       "why": "created"
-    },
-    {
-      "state": "INVALID",
-      "at": "2026-10-23T23:48:05Z",
-      "why": "5 frozen file(s) changed: added: scripts/scst_reload.sh; added: tests/lanes/queue_g2_lmu_caw_measure.txt; added: tests/lanes/queue_g2_peerwin_netmesh.txt; added: tests/lanes/queue_g2e_lmu_mpath.txt; added: tests/lanes/queue_g4_nlink_relabort_off.txt"
     }
   ]
 }

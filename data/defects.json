@@ -2666,6 +2666,39 @@
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out of the candidate's tools/release_run.py (only presteps_env's group and marker lines removed, tests/evidence/controls/D-PRESTEPS-GROUP-MARKER-AT-ITS-SWITCH.fix.diff): the presteps' self-tests and their tools are told the node list alone, open the default .cluster_marker.json and hold its pair"
+        },
+        {
+          "id": "b20261023-c3e27a",
+          "kind": "verify",
+          "row": "lap:presteps_marker_read",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: the default marker describes another pair than g2.s",
+          "candidate": "0.90.134",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:presteps_marker_read",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-151b0c",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-PRESTEPS-GROUP-MARKER-AT-ITS-SWITCH.fix.diff sha256=19cc10f61c80cb1cc592e81b1df3b0545ba70270f12762fec20e591547e17417",
+            "builds": [
+              "9C7B7B00C5DE523F1D378C8"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -2738,10 +2771,96 @@
           "config": "2/net/mesh/drbd",
           "row": "release:drbd",
           "iso": "2026-10-21T20:12:33Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:15Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:14Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:13Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:12Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:11Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:10Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:09Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:08Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:07Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:06Z"
         }
       ],
       "updated": "2026-10-23",
-      "reproducer": "tests/drbd_rig_tag_lap.sh <label> on the DRBD rig after scripts/drbd_rig.sh up (g2): prep's rig resolution of /dev/drbd0 as run.sh marker_write makes it, then tests/suite/fio_perf_vs_xfs.sh on test1 against a marker shaped as prep writes it; MXFS_RIG_TAG_DRBD=0 is the control"
+      "reproducer": "tests/drbd_rig_tag_lap.sh <label> on the DRBD rig after scripts/drbd_rig.sh up (g2): prep's rig resolution of /dev/drbd0 as run.sh marker_write makes it, then tests/suite/fio_perf_vs_xfs.sh on test1 against a marker shaped as prep writes it; MXFS_RIG_TAG_DRBD=0 is the control",
+      "batches": [
+        {
+          "id": "b20261023-d08fc5",
+          "kind": "control",
+          "row": "lap:drbd_rig_tag",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: /dev/drbd0 on test1 is DRBD minor [0-9]+ over ",
+          "candidate": "",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "variant": "MXFS_RIG_TAG_DRBD=0 (tools/mxfs_rig_tag.sh reads a DRBD device like any other disk, finds no vendor and resolves nothing, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: /dev/drbd0 resolves to no rig, so fio_perf_vs_xfs records SKIP rig-unknown against a rig-tagged yardstick"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:drbd_rig_tag",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-d08fc5",
+          "k": 0,
+          "n": 0,
+          "candidate": "",
+          "variant": "MXFS_RIG_TAG_DRBD=0 (tools/mxfs_rig_tag.sh reads a DRBD device like any other disk, finds no vendor and resolves nothing, as before the fix)",
+          "builds": [
+            "9C7B7B00C5DE523F1D378C8"
+          ],
+          "date": "2026-10-23"
+        }
+      ]
     },
     {
       "id": "D-LIVE-HOLDER-WAIT-FINDS-NO-REMOTE-MASTERED-INODE-AND-ABORTS-BEFORE-MEASURING",
@@ -3325,7 +3444,95 @@
       "next": "The owner's planned work after 0.90.134: a node fence over IPMI (and Pacemaker), so a pair with a BMC fences whichever node died. On the rig, virtualbmc in front of the libvirt VMs gives each test node an IPMI BMC, so fence_ipmilan can be exercised without iLO or iDRAC hardware. Then a death test that destroys participant 0, on a pair with that fence and on one with authority=quorum, beside the existing destroy of participant 1. ===== No exception stands (P20261022-3473e9 rejected), and tools/release_run.py step_drbd runs tests/drbd_release_verify.sh and grades the DRBD board on every release whatever the table claims, so the DRBD work cannot wait for 0.90.135. No design lets participant 1 tell participant 0's death from a cut link without a third vote or a node fence (docs/rulings/drbd-two-node-self-exclusion.md, 'What established systems do'), so the defect can only be closed by never running that configuration: the DRBD attachment refuses to mount a dual-primary pair whose /etc/mxfs/drbd-fence.conf has neither authority=quorum nor a node-fence agent (agent=exec or agent=ssh), naming both remedies, so every pair that runs survives the death of either node. Verify on the DRBD rig: control with the refusal's switch off on a default pair (destroy participant 0, participant 1 restarts and stays out), fix on (the default pair refuses to mount; a pair with authority=quorum against the corosync-qnetd on serv survives the destroy of participant 0 and of participant 1). ===== ===== 2026-10-24 (session 56): fix built in the sibling tree /home/steve/src/mxfs-a15 for the next attempt (module B8EC569481B988532A1BDBF): the witness reports FENCE_AGENT and FENCE_AUTHORITY (tools/mxfs_drbd_witness.py), the report carries them (pal/pal.h fence_agent, fence_authority; pal/linux/drbd.c), and v5_drbd_arm (dlm/v5_mount.c) adds mxfs_drbd_judge_third_vote (dlm/drbdfence.c): a pair whose drbd-fence.conf is absent or agent=self without authority=quorum is refused with P-DRBD-ARM-REFUSED '... no third vote and no node fence (agent=self, authority=none): participant 1 could never outlive participant 0; set authority=quorum (a corosync QDevice) or agent=exec|ssh in /etc/mxfs/drbd-fence.conf'. drbd_third_vote=0 (dlm/v5_mount.c) admits it as before: the same-build control. scripts/drbd_rig.sh: its tie-break tests load drbd_third_vote=0 (TIEBREAK_MODARGS, set by install_self_authority, cleared by install_fencing and install_quorum_authority), NODE_REPO follows the tree's directory name as run.sh's does, and a new subcommand third-vote-test <1|0>. Docs: docs/drbd-setup.md section 7 and decision 12 of docs/rulings/drbd-two-node-self-exclusion.md (both in the sibling). Lap tests/drbd_third_vote_lap.sh <label> (g2, ARM=1|0): down, up, mxfs, third-vote-test, down; EXPOSED when the agent=self-alone pair asks to mount on both nodes; ARM=1 PASS when both mounts are refused naming the missing third vote; ARM=0 FAIL when participant 1 has not recovered participant 0's slice 74 s after participant 0 is destroyed (the defect). Next: a precheck of each arm on g2 from the sibling; on the next attempt a control batch with ARM=0, a verification sized from it, and remove --fixed; the quorum pair's survival of participant 0's death is scripts/drbd_rig.sh quorum-test death (the 0.90.128 removal of D-DRBD-PAIR-NO-EXTERNAL-QUORUM-SO-P1-CANNOT-TAKE-OVER-WHEN-P0-DIES), to run once on the candidate as support. At publish, README.md's DRBD section (now 'no third machine and no fence hardware', 'Fencing is on by default with no configuration') must say the pair needs a QDevice or a node fence.",
       "impact": "stability",
       "impact_why": "The survivor restarts itself and the pair serves nothing until participant 0 returns: a node shuts down because its peer died (docs/drbd-setup.md section 7).",
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "batches": [
+        {
+          "id": "b20261023-8d5f78",
+          "kind": "control",
+          "row": "lap:third_vote",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the pair with agent=self alone asked to mount on both nodes",
+          "candidate": "",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "variant": "drbd_third_vote=0 (ARM=0: the module admits a dual-primary pair with no third vote and no node fence, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: on a pair with agent=self alone, participant 1 does not carry on after participant 0's death"
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:third_vote",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-8d5f78",
+          "k": 0,
+          "n": 0,
+          "candidate": "",
+          "variant": "drbd_third_vote=0 (ARM=0: the module admits a dual-primary pair with no third vote and no node fence, as before the fix)",
+          "builds": [
+            "9C7B7B00C5DE523F1D378C8"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:29Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:28Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:27Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:26Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:25Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:24Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:23Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:22Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:21Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:20Z"
+        }
+      ]
     },
     {
       "id": "D-2NETMESH-4K-PRE-ROW-SYNC-OVER-12S-NO-DSTATE-DIAG-SB-SUMMARY-LOCK-WAIT",
@@ -4610,6 +4817,39 @@
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: after a change to pal/pal.h or dlm/dlm.h a plain make links tauth objects built before it"
+        },
+        {
+          "id": "b20261023-fa4170",
+          "kind": "verify",
+          "row": "lap:tauth_header_dep",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: pal/pal\\.h and dlm/dlm\\.h changed after the first build",
+          "candidate": "0.90.134",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:tauth_header_dep",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-af4605",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "TAUTH_DEPS=0 (tests/tauth/Makefile builds from the object rules' own header lists, as before the fix)",
+            "builds": [
+              "9C7B7B00C5DE523F1D378C8"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -5715,7 +5955,7 @@
       "opened": "2026-10-23",
       "summary": "On 2/net/mesh/mpath path_flap with a 12 s death window, test18's load stalled 81.7 s during the flaps and 120.3 s after them, 5.5 million of its operations returned errors, test18 could not read every file test17 had acknowledged with its checksum, both nodes logged a shutdown, withdrawal, death declaration, BUG, oops or hung task, and test17 saw the membership fall below 2, in a row that kills no node.",
       "evidence": "Run 2/net/mesh/mpath:path_flap:2026-10-23T17:22:40Z (FAIL, 169 s), a variant run (MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, MXFS_MPATH_TMO=2, MXFS_TEST_ENV=PF_KEEP_KMSG=1: a 12 s death window and the 2 s path timescale under evaluation for D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S), build 08D63764A9352FBDD5A76CD, lane tests/evidence/lanes/g2e_mpathtmo2_k6_20261023T162033Z. Measured 'victim=test18 flaps=10 flap_s=4 stall_ms=81690 settle_s=0 acked=29984 elapsed=166s fails=12 max_stall_ms=120272'. Failed checks, from the run's reason: 'F4: test18's longest stall, ms (got 81690)'; 'F4_after: test18's longest stall, ms (got 120272)'; 'test18: no operation returned an error in the whole run (got 5503784)'; 'test17 acknowledged files (> 0) and test18 reads every one with its checksum (got no)'; 'test17 logged no shutdown, withdrawal, death declaration, BUG, oops or hung task (got 1)'; 'test17 saw no membership below 2 (got 1)'. ===== 2026-10-23 evidence read (board_20261023T171936Z-g2e_path_flap): all 29390 of test17's files read on test18 failed 'read_error=EIO' (verify_test17_on_test18.txt:1-201), read after test18's own shutdown, so they are the shut-down node's errors, not data the files lost; test18's 594 files read on test17 all matched. test18 logged P-WITHDRAW at [993.6], P290-AUTH-CLOSED reason=AUTHORITY_LEASE_EXPIRED overdue_ms=4104 at [1005.6] and P131-SELF-FENCE [PR_KEY_PREEMPTED] at [1015.8] (kmsg_test18_fromnode.gz:168770, :171886, :172946); test17 saw the withdrawal (P163-WITHDRAW-SEEN) and recovered test18's slice. The row also failed 'the target holds the same reservation keys at the end as at the start (got differ(2))'. Hit lists: /tmp/claude-1000/-home-steve-src-mxfs/b943d379-d576-4e63-a466-c398808883d0/scratchpad/hits/. ===== 2026-10-23 (session 48), test18's whole kernel log read in order (log sweep; raw lines, board_20261023T171936Z-g2e_path_flap/kmsg_test18_fromnode.gz): both paths registered at mount (':120447 P-PR-PATHS-REGISTERED dm-1 key=0x4ef62bfe92211b9e paths=2 registered=2'); the row's mark ':120861 [967.219600]' (17:20:01.5Z by the nearest realns line); path a flaps from 17:20:22.9Z (links.log). At the first flap's return the iSCSI connection of sd 4:0:0:0 was dropped and logged in again inside the 2 s session recovery timeout (no 'session recovery timed out' and no 'Failing path' before it): ':168753 [993.604095] connection2:0: detected conn error (1022)', ':168756 [993.612189] sd 4:0:0:0: Power-on or device reset occurred', ':168757 sd 4:0:0:0: reservation conflict', ':168760 reservation conflict error, dev dm-1, sector 21432631 op 0x1:(WRITE)', ':168761 P277-RESV-CONFLICT node 3636049448 count=1 -- data-path write bounced with SCSI RESERVATION CONFLICT', ':168770 P-WITHDRAW -- FS shut down', 8 ms after the re-login. Only after it ':170848 P290-AUTH-SUSPENDED' (1001.5), ':171886 P290-AUTH-CLOSED ... overdue_ms=4104' (1005.6), and test17's preempt ':172943 P-PR-OWNKEY-GONE' (1015.8). test17 declared nothing on its own window: ':160673 P163-WITHDRAW-SEEN slot=1 node=3636049448 -- peer declared voluntary death (FS shutdown)'. So the 12 s window is not what shut test18 down: a write the session re-sent on the re-logged-in nexus was refused, and one refused data write shuts the filesystem down. pal/linux/kern.c:5967-5970 already records that 'a reinstated iSCSI session can be unregistered on SCST for tens of milliseconds, and a log write refused then shuts the filesystem down'. With the 5 s path settings a 4 s flap is not detected as a connection loss at all (NOP-Out 5 s plus 5 s answer), which is why the default rows never re-logged in. ===== Code read 2026-10-23 (session 48): even where the late-path fill runs (lease >= V5_PR_FILL_MIN_LEASE_MS, dlm/v5_mount.c:10941-10949), it never re-checks a path it already counts as registered: mxfs_pal_scsi_pr_fill_paths (pal/linux/kern.c:7074-7083) marks every path in the map's known[] list 'known to hold the key' (t.r[i] = 0) and skips it (:7097), and the scsi_device of a path whose iSCSI session logged in again is the same object, so a registration the target dropped at the re-login is never restored by the fill. At a 12 s window the fill does not run at all (lease 8 s). ===== 2026-10-23 (session 49), the refusal's cause read from the target's source (/src/scst): a login that iscsi-scst does not process as a session reinstatement (the old session already shutting down) gets a new tgt_dev from scst_pr_init_tgt_dev, which links the existing registrant only if reg->tgt_dev is NULL (scst/src/scst_pres.c:1193-1200); the registrant is still linked to the old session's tgt_dev, so the new one has none, and scst_pr_is_cmd_allowed refuses its WRITE (scst_pres.c:2399, :2419-2422; caller scst_targ.c:2348-2355). Only the old session's final free, queued to SCST's management thread (scst_lib.c:7482-7531, :5805-5834), moves the registrant over (scst_pr_clear_tgt_dev, scst_pres.c:1225-1238, commented 'It should never happen'). A real reinstatement holds the new session's commands (iscsi-scst/kernel/iscsi.c:175-201, reinst_pending_cmd_list) until scst_reassign_retained_sess_states moves the registrant (scst_lib.c:14595-14606, called from iscsi-scst/kernel/nthread.c:175-177), so it has no gap. The node stayed registered throughout: the target refused a write from a retained registration, which SPC keeps across an I_T nexus loss. Not yet measured on the rig (the target-side order of login, refusal and handoff).",
-      "next": "Measure the gap: on a formed 2/net/mesh/mpath pair with MXFS_MPATH_TMO=2, drop one path's connection for ~4 s while a writer runs, with READ KEYS down that path in a loop from the node, timestamping when the re-logged-in nexus shows the key again against the first refused write (scsi logging or the P277 line). Then decide the fix at the cause: a reservation conflict on a nexus that just reported POWER ON/RESET (the re-login) is checked against READ KEYS before it counts as a fence, and the refused write is retried once the key is back, instead of shutting down on the first one. Control: the same drop with the check's switch off. ===== 2026-10-23 (session 49): consulted gpt-6-astra on tolerating the refusal in MXFS (docs/rulings/silent-peer-death-under-the-stall-limit.md, 'A target that refuses a retained registration after a relogin'). Ruled: READ KEYS listing the key is no authorization for a retry; a journal-write retry also needs a durability proof (a later PREFLUSH/FUA commit never covered the refused write) and a crash-recovery proof of the hole; a data retry must keep the operation pending (redirtying breaks unwritten-extent conversion); every completion class must be covered from the first conflict. Preferred: fix the target's handoff (hold the new session's commands until the registrant is moved, as reinstatement does, synchronized with PR removal and task abort), or gate a recovering path below the filesystem before it carries I/O. Next: (1) measure the gap on the rig (2/net/mesh/mpath, MXFS_MPATH_TMO=2, a 4 s cut of one path under load): the host's /sys/kernel/scst_tgt/devices/<lun>/pr_state and iscsi-scst session log against the node's first refused write; (2) the target fix is in the lab's SCST, which the owner runs, so ask the owner whether to patch iscsi-scst's non-reinstatement login (or the registrant handoff) on clyde; (3) independently, decide whether the release's path timescale stays at 5 s (where a 4 s flap does not log in again) or moves to 2 s, which the silent-death compound case asks for. ===== 2026-10-23 (session 50), the target-side order measured from the lab host's own kernel log for the run (journalctl -k, clyde, local time CDT = UTC-5; test18's first flap return at 17:20:27Z): 12:20:27.021340 'iscsi-scst: __iscsi_state_change:436:***ERROR***: Connection 00000000438e3d53 with initiator iqn.2004-10.com.ubuntu:01:test18-mxfs-node unexpectedly closed!'; .021424 'TM fn NEXUS_LOSS_SESS/6'; .021498 'session_free:291:Freeing session 00000000e671fc13 (SID 1c1b0200003d0200)'; .023615 'iscsi_session_alloc:93:Session 00000000105ed92b created ... sid 0x1c1f0200003d0200' (a new session, not a reinstatement); .029334, .030333, .031331, .033330, .035330 five 'scst_set_cmd_error_status:1758:Reservation conflict (dev mxfspool06, initiator ...test18...)'; .042337-.042541 'Processing thread mxfspool064_0..7 finished' (the old session's per-device threads ending as its tgt_dev is freed, which is where scst_pr_clear_tgt_dev moves the registrant). The same order at the next flap: 12:20:35.149336 connection closed, .150620 new session 0000000030a396f9 created, .152330 'Reservation conflict'. So every refusal fell between the new session's creation and the old tgt_dev's release, 6-14 ms after the login, as the source read predicts. The negotiated parameters show 'DefaultTime2Wait 0'; iscsi-scst pins DefaultTime2Wait to 0 (iscsi-scst/usr/param.c:380, min 0 max 0), so the target cannot be configured to have the initiator wait before re-login: the window closes only in SCST's code (the handoff) or below the filesystem on the node. ===== 2026-10-24: SCST +caw-abort-reclaim.6 (lab/scst-pr-registrant-handoff.patch) qualified on clyde with tests/scst_pr_abort_shutdown_race.sh. The handoff arm first measured nothing of it: it re-logged in with iscsiadm -u/-l, and open-iscsi builds a session's ISID from its session id, so a login after a logout is a new session id and a new ISID, a different I_T nexus holding no registration; every write after it was refused RESERVATION CONFLICT, as SPC requires (tests/evidence/scst6_qual_20261024T003721Z, registrant ISIDs 0x100003d0200 and 0x200003d0200 for sids 1 and 2). The arm now resets path 1's TCP connection (ss -K, as a path flap does) so iscsid recovers the same session, and in a second part resets it again and issues PREEMPT AND ABORT inside the first hold. On .6 (tests/evidence/scst6_qual_20261024T005406Z, pool LUN 06, knob 8000 ms), both runs VERDICT PASS: 'handoff: X path1 connection reset ... left=FAILED@1 back=LOGGED_IN@42 (+8983 ms) ... write at +9859 ms: rc=0', host 'scst_pr_init_tgt_dev:1288:PR: moving reg iqn...test1-mxfs-node,i,0x100003d0200/2 (... key 0x0000000abcd40801) from shutting-down sess ... to new tgt_dev', 'host: handoff=2 conflicts_for_X=0 earlier_session_aborted=1 held_in_shutdown=2 bad=0', the P&A at +3.1 s of the second hold printing 'earlier session ... of the nexus (shut_phase 1): aborting its commands' and 'PR ABORT ALL admitted on session ... in shut_phase 1'; no BUG, Oops or CRITICAL in the host log. The window arm and the stress arm (20 iterations) passed on .6 (tests/evidence/scst6_qual_20261024T003330Z), and tests/scst_pr_bounds_check.sh passed. So on .6 a registered nexus that loses its connection and logs in again keeps its registration through the old session's teardown, on the target in isolation. Next: the path rows on .6 (lanes g2e_pathflap_scst6, g8_mpathtmo2_scst6 again after the 8-node marker fix, D-RUN-SH-MARKER-PARAMS-PASSED-AS-ONE-ARGUMENT-EMPTY-THE-MARKER-AT-8-NODES), reading each relogin's host lines against the node's first write after it.",
+      "next": "Measure the gap: on a formed 2/net/mesh/mpath pair with MXFS_MPATH_TMO=2, drop one path's connection for ~4 s while a writer runs, with READ KEYS down that path in a loop from the node, timestamping when the re-logged-in nexus shows the key again against the first refused write (scsi logging or the P277 line). Then decide the fix at the cause: a reservation conflict on a nexus that just reported POWER ON/RESET (the re-login) is checked against READ KEYS before it counts as a fence, and the refused write is retried once the key is back, instead of shutting down on the first one. Control: the same drop with the check's switch off. ===== 2026-10-23 (session 49): consulted gpt-6-astra on tolerating the refusal in MXFS (docs/rulings/silent-peer-death-under-the-stall-limit.md, 'A target that refuses a retained registration after a relogin'). Ruled: READ KEYS listing the key is no authorization for a retry; a journal-write retry also needs a durability proof (a later PREFLUSH/FUA commit never covered the refused write) and a crash-recovery proof of the hole; a data retry must keep the operation pending (redirtying breaks unwritten-extent conversion); every completion class must be covered from the first conflict. Preferred: fix the target's handoff (hold the new session's commands until the registrant is moved, as reinstatement does, synchronized with PR removal and task abort), or gate a recovering path below the filesystem before it carries I/O. Next: (1) measure the gap on the rig (2/net/mesh/mpath, MXFS_MPATH_TMO=2, a 4 s cut of one path under load): the host's /sys/kernel/scst_tgt/devices/<lun>/pr_state and iscsi-scst session log against the node's first refused write; (2) the target fix is in the lab's SCST, which the owner runs, so ask the owner whether to patch iscsi-scst's non-reinstatement login (or the registrant handoff) on clyde; (3) independently, decide whether the release's path timescale stays at 5 s (where a 4 s flap does not log in again) or moves to 2 s, which the silent-death compound case asks for. ===== 2026-10-23 (session 50), the target-side order measured from the lab host's own kernel log for the run (journalctl -k, clyde, local time CDT = UTC-5; test18's first flap return at 17:20:27Z): 12:20:27.021340 'iscsi-scst: __iscsi_state_change:436:***ERROR***: Connection 00000000438e3d53 with initiator iqn.2004-10.com.ubuntu:01:test18-mxfs-node unexpectedly closed!'; .021424 'TM fn NEXUS_LOSS_SESS/6'; .021498 'session_free:291:Freeing session 00000000e671fc13 (SID 1c1b0200003d0200)'; .023615 'iscsi_session_alloc:93:Session 00000000105ed92b created ... sid 0x1c1f0200003d0200' (a new session, not a reinstatement); .029334, .030333, .031331, .033330, .035330 five 'scst_set_cmd_error_status:1758:Reservation conflict (dev mxfspool06, initiator ...test18...)'; .042337-.042541 'Processing thread mxfspool064_0..7 finished' (the old session's per-device threads ending as its tgt_dev is freed, which is where scst_pr_clear_tgt_dev moves the registrant). The same order at the next flap: 12:20:35.149336 connection closed, .150620 new session 0000000030a396f9 created, .152330 'Reservation conflict'. So every refusal fell between the new session's creation and the old tgt_dev's release, 6-14 ms after the login, as the source read predicts. The negotiated parameters show 'DefaultTime2Wait 0'; iscsi-scst pins DefaultTime2Wait to 0 (iscsi-scst/usr/param.c:380, min 0 max 0), so the target cannot be configured to have the initiator wait before re-login: the window closes only in SCST's code (the handoff) or below the filesystem on the node. ===== 2026-10-24: SCST +caw-abort-reclaim.6 (lab/scst-pr-registrant-handoff.patch) qualified on clyde with tests/scst_pr_abort_shutdown_race.sh. The handoff arm first measured nothing of it: it re-logged in with iscsiadm -u/-l, and open-iscsi builds a session's ISID from its session id, so a login after a logout is a new session id and a new ISID, a different I_T nexus holding no registration; every write after it was refused RESERVATION CONFLICT, as SPC requires (tests/evidence/scst6_qual_20261024T003721Z, registrant ISIDs 0x100003d0200 and 0x200003d0200 for sids 1 and 2). The arm now resets path 1's TCP connection (ss -K, as a path flap does) so iscsid recovers the same session, and in a second part resets it again and issues PREEMPT AND ABORT inside the first hold. On .6 (tests/evidence/scst6_qual_20261024T005406Z, pool LUN 06, knob 8000 ms), both runs VERDICT PASS: 'handoff: X path1 connection reset ... left=FAILED@1 back=LOGGED_IN@42 (+8983 ms) ... write at +9859 ms: rc=0', host 'scst_pr_init_tgt_dev:1288:PR: moving reg iqn...test1-mxfs-node,i,0x100003d0200/2 (... key 0x0000000abcd40801) from shutting-down sess ... to new tgt_dev', 'host: handoff=2 conflicts_for_X=0 earlier_session_aborted=1 held_in_shutdown=2 bad=0', the P&A at +3.1 s of the second hold printing 'earlier session ... of the nexus (shut_phase 1): aborting its commands' and 'PR ABORT ALL admitted on session ... in shut_phase 1'; no BUG, Oops or CRITICAL in the host log. The window arm and the stress arm (20 iterations) passed on .6 (tests/evidence/scst6_qual_20261024T003330Z), and tests/scst_pr_bounds_check.sh passed. So on .6 a registered nexus that loses its connection and logs in again keeps its registration through the old session's teardown, on the target in isolation. Next: the path rows on .6 (lanes g2e_pathflap_scst6, g8_mpathtmo2_scst6 again after the 8-node marker fix, D-RUN-SH-MARKER-PARAMS-PASSED-AS-ONE-ARGUMENT-EMPTY-THE-MARKER-AT-8-NODES), reading each relogin's host lines against the node's first write after it. ===== 2026-10-24 (session 59): .6 does NOT close the relogin gap of a path flap. Lane tests/evidence/lanes/g2e_pathflap_scst6_20261024T005021Z step 3, 2/net/mesh/mpath path_flap (test17/test18, dead_timeout_ms=12000, MXFS_MPATH_TMO=2, build 9C7B7B00C5DE523F1D378C8, SCST 3.11.0-pre+caw-abort-reclaim.6, run 20261024T005133Z-g2e, data/criteria.runs.jsonl:11629) FAIL: test18's stalls 77221 ms and 120377 ms, 5371774 errors, test17's 31927 files EIO on test18, test18 shut down. Host kernel log 00:52:29Z (pool-02, test18, first flap's up): 'Connection 0000000049fcade2 ... unexpectedly closed', NEXUS_LOSS_SESS on the old session, then 'Session 000000004f7961b3 created' (same ISID 0x0300003d0200), then 16x 'Reservation conflict (dev mxfspool02, initiator ...test18...)', and NO 'PR: moving reg' line for test18 (the window's only four are the qualification test's, test1/pool-06); test17's PREEMPT AND ABORT then logged 'PR ABORT: registrant ...test18...,i,0x300003d0200/2 ... earlier session 000000006381753f of the nexus (shut_phase 0)'. iscsi-scst calls scst_unregister_session only at session_free (00:52:30Z, 'Freeing session 0000000048647836'), so when the new session's tgt_dev was initialised the old SCST session was still SCST_SESS_SPH_READY and .6's handoff condition (shut_phase != READY) was false. test18: '[122.805475] sd 3:0:0:0: reservation conflict', '[123.018217] P277-RESV-CONFLICT count=1', '[123.018237] P-SESSION-POISON ... (force-shutdown)'. The .6 qualification's handoff arm reset the TCP connection with ss -K, which ends the old session before the initiator logs in again; a flapped path brings the old connection's close and the new login in together. Next: .7 - the new tgt_dev of a nexus takes the registrant from any other session of the same I_T nexus (same TransportID with ISID, same relative target port): iSCSI cannot hold two sessions with one ISID, so the newer is the nexus; the earlier session's in-flight commands stay in PREEMPT AND ABORT's reach through .6's scst_pr_abort_nexus_sessions. Qualify it with a flap-shaped handoff arm (path dropped with iptables for 4 s, not ss -K).",
       "reproducer": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000 MXFS_MPATH_TMO=2 MXFS_TEST_ENV=PF_KEEP_KMSG=1 ./run.sh 2/net/mesh/mpath --group g2e path_flap after a forced prep (seen once)",
       "cells": [
         {
@@ -5785,6 +6025,56 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-636cd6",
+          "kind": "control",
+          "row": "lap:fsx_fail_files",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the fsx row failed both checks on the mxfs mount",
+          "candidate": "",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "variant": "FSX_KEEP_FAIL_FILES=0 (tests/suite/fsx.sh runs fsx without -P, so .fsxlog, .fsxops and .fsxgood go into the work directory its EXIT trap removes, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a failing fsx check's own files on a node are removed with the row's work directory"
+        },
+        {
+          "id": "b20261023-989617",
+          "kind": "verify",
+          "row": "lap:fsx_fail_files",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: the fsx row failed both checks on the mxfs mount",
+          "candidate": "0.90.134",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:fsx_fail_files",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-636cd6",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "FSX_KEEP_FAIL_FILES=0 (tests/suite/fsx.sh runs fsx without -P, so .fsxlog, .fsxops and .fsxgood go into the work directory its EXIT trap removes, as before the fix)",
+            "builds": [
+              "9C7B7B00C5DE523F1D378C8"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "updated": "2026-10-23",
@@ -5801,6 +6091,21 @@
           "variant": "FSX_KEEP_FAIL_FILES=0 (tests/suite/fsx.sh leaves a failing check's .fsxlog, .fsxops and .fsxgood in the work directory its EXIT trap removes, as before the fix)",
           "builds": [
             "79779BEAECBEA94844FDC72"
+          ],
+          "date": "2026-10-23"
+        },
+        {
+          "row": "lap:fsx_fail_files",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-636cd6",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "FSX_KEEP_FAIL_FILES=0 (tests/suite/fsx.sh runs fsx without -P, so .fsxlog, .fsxops and .fsxgood go into the work directory its EXIT trap removes, as before the fix)",
+          "builds": [
+            "9C7B7B00C5DE523F1D378C8"
           ],
           "date": "2026-10-23"
         }
@@ -5855,6 +6160,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:fsx_fail_files",
           "iso": "2026-10-23T20:47:39Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-24T01:03:42Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-24T01:03:41Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-24T01:03:40Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-24T01:03:39Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-24T01:03:38Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-24T01:03:37Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-24T01:03:36Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-24T01:03:35Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-24T01:03:34Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:fsx_fail_files",
+          "iso": "2026-10-24T01:03:33Z"
         }
       ],
       "reproducer": "tests/fsx_fail_files_lap.sh: runs tests/suite/fsx.sh (MXFS_NODES=1) on a /dev/shm scratch directory in place of the mount, with FSX_LOG_DIR in that directory, while a second writer overwrites each fsxfile_<ops> so both checks miscompare, then lists what survived the row; FSX_KEEP_FAIL_FILES=0 is the control"
@@ -6086,6 +6441,39 @@
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: tests/release_step_copy_race.py back at mode 0664, invoked through env as its control queue invoked it; exposure is the exec reaching the file (env's refusal, or the lap's own EXPOSED line when it runs)"
+        },
+        {
+          "id": "b20261023-1ace9a",
+          "kind": "verify",
+          "row": "lap:release_step_copy_race_mode",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^env: .tests/release_step_copy_race.py.: Permission denied|^EXPOSED: the writer saved the scratch queue",
+          "candidate": "0.90.134",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:release_step_copy_race_mode",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-844929",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "fix reverted: tests/evidence/controls/D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT.fix.diff sha256=51619a0f30363f3cd2bca0ddcdae38b79d0e9dd8e20a591405e91c6bff04881c",
+            "builds": [
+              "9C7B7B00C5DE523F1D378C8"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "updated": "2026-10-23",
@@ -6151,6 +6539,39 @@
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: criteria.py incidents --at 1/any is refused, so the listing cannot be narrowed to a release step's runs"
+        },
+        {
+          "id": "b20261023-2f9da0",
+          "kind": "verify",
+          "row": "lap:release_step_incidents_at",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: the unfiltered gate lists 1/any:release:boards:2026-10-21T19:29:49Z",
+          "candidate": "0.90.134",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:release_step_incidents_at",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-3023da",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_RELEASE_STEP_LIST=0 (tools/criteria.py cmd_incidents hands --at 1/any to parse_at, as before the fix)",
+            "builds": [
+              "9C7B7B00C5DE523F1D378C8"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -6262,6 +6683,39 @@
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: a lap run on a pair loaded with a non-default module argument is recorded with no variant and counted for the candidate as it ships"
+        },
+        {
+          "id": "b20261023-2a57cd",
+          "kind": "verify",
+          "row": "lap:batch_lap_variant",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: two laps of b[0-9]{8}-[0-9a-f]{6} ran through batch_lap\\.py with dead_timeout_ms=12000 on their pair",
+          "candidate": "0.90.134",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:batch_lap_variant",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-62b113",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_BATCH_LAP_ENV_VARIANT=0 (tools/batch_lap.py records only the batch's variant, never the pair's module arguments, as before the fix)",
+            "builds": [
+              "9C7B7B00C5DE523F1D378C8"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -6465,6 +6919,39 @@
           "support": [],
           "created": "2026-10-23",
           "why": "the fix taken out: a plain make builds one object, all omits seal_barrier_test and clean leaves two binaries"
+        },
+        {
+          "id": "b20261023-0947fc",
+          "kind": "verify",
+          "row": "lap:tauth_make_goal",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: a plain make in a copy of tests/tauth holding no binary",
+          "candidate": "0.90.134",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:tauth_make_goal",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-a3a97f",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "TAUTH_GOAL_ALL=0 (tests/tauth/Makefile keeps its first rule's object as the goal and the old all/clean lists, as before the fix)",
+            "builds": [
+              "9C7B7B00C5DE523F1D378C8"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -6575,7 +7062,243 @@
       "summary": "run.sh marker_write handed the marker's new params object (every node's module parameter list, ~18 KB a node) to jq as one --argjson argument; at 8 nodes it is ~145 KB, past the kernel's 128 KiB limit on a single argument (MAX_ARG_STRLEN), so exec of jq failed with E2BIG after the shell's redirect had already emptied the marker. The prep printed 'prep_cluster OK ... marker updated' and every filtered row after it refused 'cluster is prepped for <none>', so no 8- or 16-node lane or board can run a row after its prep.",
       "evidence": "Lane tests/evidence/lanes/g8_mpathtmo2_scst6_20261024T005026Z (g8, test7-test14, build 9C7B7B00C5DE523F1D378C8): step 2 'MXFS_FORCE_PREP=1 ./run.sh 8/disk/caw/mpath --group g8 prep_cluster' rc=0 91 s, step2.log '=== prep_cluster OK @ 8/disk/caw/mpath (50s) \u2014 marker updated ==='; .cluster_marker.g8.json 0 bytes, mtime 00:52:31Z (the prep's end); every row after it (steps 4-12, path_fenced_return ... path_mount_degraded) rc=1 in 10-11 s, step4.log 'ERROR: cluster is prepped for <none> (srcver=<none>), you requested 8/disk/caw/mpath (srcver=9C7B7B00C5DE523F1D378C8).' The refused rows wrote nothing to the ledger. The 2-node marker .cluster_marker.g2e.json of the same build is 36634 bytes, its params object 36253. Reproduced on the host: an 8-node-shaped params object (the g2e params four times, 145025 bytes) given to 'jq -n --argjson params' exits 126 '/usr/bin/jq: Argument list too long'; the same object on jq's stdin builds the marker (145282 bytes, 8 nodes in params). The params field came in with the fix of D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS (merged from the sibling tree mxfs-a15, whose prechecks ran on 2-node pairs only).",
       "next": "Fix (in the tree before the next freeze): marker_write pipes params to jq on stdin ('. as $params | {...}'), and prints '--- marker params: <bytes> bytes for <n> node(s) ---'; MXFS_MARKER_STDIN=0 passes it as --argjson, as before: the control. Then a lap on an 8-node group (prep, then the marker must parse with every node in params; exposure from the printed size over 131072 bytes), a control with MXFS_MARKER_STDIN=0, a verification sized from it, remove --fixed.",
-      "reproducer": "MXFS_FORCE_PREP=1 ./run.sh 8/disk/caw/mpath --group g8 prep_cluster, then the marker .cluster_marker.g8.json is 0 bytes and any filtered row refuses 'cluster is prepped for <none>'"
+      "reproducer": "MXFS_FORCE_PREP=1 ./run.sh 8/disk/caw/mpath --group g8 prep_cluster, then the marker .cluster_marker.g8.json is 0 bytes and any filtered row refuses 'cluster is prepped for <none>'",
+      "batches": [
+        {
+          "id": "b20261023-83a19a",
+          "kind": "control",
+          "row": "lap:marker_size",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the prep's marker params were [0-9]+ bytes for 8 nodes, over the 131072-byte limit",
+          "candidate": "",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "variant": "MXFS_MARKER_STDIN=0 (run.sh marker_write passes the params object to jq as one --argjson argument, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: an 8-node prep leaves the marker empty, so every filtered row after it refuses 'cluster is prepped for <none>'"
+        },
+        {
+          "id": "b20261023-f65e6e",
+          "kind": "verify",
+          "row": "lap:marker_size",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: the prep's marker params were [0-9]+ bytes for 8 nodes, over the 131072-byte limit",
+          "candidate": "0.90.134",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:marker_size",
+            "config": "8/disk/caw/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-83a19a",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_MARKER_STDIN=0 (run.sh marker_write passes the params object to jq as one --argjson argument, as before the fix)",
+            "builds": [
+              "9C7B7B00C5DE523F1D378C8"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "updated": "2026-10-23",
+      "rates": [
+        {
+          "row": "lap:marker_size",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-83a19a",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_MARKER_STDIN=0 (run.sh marker_write passes the params object to jq as one --argjson argument, as before the fix)",
+          "builds": [
+            "9C7B7B00C5DE523F1D378C8"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:marker_size",
+          "iso": "2026-10-24T01:14:49Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:marker_size",
+          "iso": "2026-10-24T01:13:34Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:marker_size",
+          "iso": "2026-10-24T01:12:19Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:marker_size",
+          "iso": "2026-10-24T01:11:03Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:marker_size",
+          "iso": "2026-10-24T01:09:45Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:marker_size",
+          "iso": "2026-10-24T01:08:31Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:marker_size",
+          "iso": "2026-10-24T01:07:16Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:marker_size",
+          "iso": "2026-10-24T01:06:03Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:marker_size",
+          "iso": "2026-10-24T01:04:46Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:marker_size",
+          "iso": "2026-10-24T01:03:28Z"
+        }
+      ]
+    },
+    {
+      "id": "D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP",
+      "severity": "minor",
+      "nodes": 2,
+      "config": "net/mesh/drbd",
+      "opened": "2026-10-23",
+      "summary": "MXFS_NODES carries two meanings in the tree: run.sh hands each row a node count (run.sh:1612, :1710, :1985) and laps such as tests/path_abort_kmsg_lap.sh:44,50 read it as one, while scripts/drbd_rig.sh:95,153-155 (and tests/drbd_write_bound_arm.sh:31-33) read it as the pair's node names. A lane queue that exports the count for the first kind makes drbd_rig.sh take '2' as a node name, form group nodes-2 with one node, and refuse 'DRBD dual-primary is exactly two', so every DRBD lap in that lane ABORTs with no exposure.",
+      "evidence": "Lane tests/evidence/lanes/g2_a16_20261024T010135Z (queue tests/evidence/lanes/queue_g2_next.txt, which exports MXFS_NODES=2 for the g2 pair), candidate 0.90.134 attempt frozen 2026-10-24T01:00Z, build 9C7B7B00C5DE523F1D378C8: step2 'scripts/drbd_rig.sh up' rc=2 'drbd_rig: group nodes-2 has 1 nodes; DRBD dual-primary is exactly two'. Step3 control b20261023-d08fc5 (lap:drbd_rig_tag): 10 of 10 laps FAIL rc=2 exposure=0, step3.log 'LAP drbd_rig_tag ABORT: not exposed (/dev/drbd0 on test1 is /dev/drbd0, minor=0, backing disk=)', the DRBD pair never having been brought up. Step6 control b20261023-8d5f78 (lap:third_vote): 10 of 10 FAIL rc=2 exposure=0, step6.log:5 'LAP third_vote ABORT: drbd_rig.sh up rc=2: drbd_rig: group nodes-2 has 1 nodes'. Both controls closed with 0 exposed laps and bound nothing; the step4 and step7 verifications were refused (no measured failure).",
+      "next": "Next attempt: give drbd_rig.sh's pair its own variable (or refuse a value that is not two node names, naming the clash), with a switch for the control; a lap that runs drbd_rig.sh up with MXFS_NODES=2 exported must form the g2 pair. Until then a lane that runs DRBD laps must not export MXFS_NODES; rerun the two DRBD controls and verifications from a queue without it. ===== 2026-10-24: fix built in the sibling tree /home/steve/src/mxfs-a17 for the next attempt: scripts/drbd_rig.sh takes a bare number in MXFS_NODES as run.sh's node count and selects the group (MXFS_GROUP, default g2); DRBD_RIG_NODES_COUNT=0 takes it as a node name, as before: the control. New lap tests/drbd_nodes_count_lap.sh (MXFS_NODES=2 MXFS_GROUP=g2 scripts/drbd_rig.sh status; PASS when the status names test1 and test2, FAIL on the refusal; bound 25 s). Precheck from the sibling with g2 up (module 9C7B7B00C5DE523F1D378C8): fix in, tests/evidence/20261024T010753Z_drbdnodes_pre_on1 (in mxfs-a17) 'LAP drbd_nodes_count PASS label=pre_on1: the status names the g2 pair: test1 test2', 11 s; control DRBD_RIG_NODES_COUNT=0, 20261024T010804Z_drbdnodes_pre_off1 'LAP drbd_nodes_count FAIL ... drbd_rig: group nodes-2 has 1 nodes; DRBD dual-primary is exactly two', 0 s. Next: merge into the main tree before the next freeze, control batch (10 laps, knob DRBD_RIG_NODES_COUNT=0, bound 25 s, probe '^EXPOSED: MXFS_NODES=2'), verification on the frozen attempt, remove --fixed.",
+      "reproducer": "MXFS_NODES=2 scripts/drbd_rig.sh up (rc=2, 'group nodes-2 has 1 nodes')",
+      "cells": [
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:20Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:21Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:22Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:23Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:24Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:25Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:26Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:27Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:28Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T01:02:29Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:06Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:07Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:08Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:09Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:10Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:11Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:12Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:13Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:14Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_rig_tag",
+          "iso": "2026-10-24T01:02:15Z"
+        }
+      ],
+      "updated": "2026-10-23"
     }
   ]
 }
