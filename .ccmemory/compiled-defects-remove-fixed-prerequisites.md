@@ -1,9 +1,12 @@
 ---
-name: remove-fixed-needs-reproducer-and-approved-verify-first
-description: defects.py remove --fixed refuses without a --reproducer on the record and a batch recorded by `verify`, which needs its OWN approved verify proposal
+name: compiled-defects-remove-fixed-prerequisites
+description: defects.py remove --fixed needs a reproducer on the record and a batch recorded by verify, which needs its own approved verify proposal
 metadata:
   type: feedback
+tags: [compiled, defects, release-gate, tools]
 ---
+
+Single-note group (assorted tail): how `tools/defects.py remove --fixed` is actually gated. Source: `remove-fixed-needs-reproducer-and-approved-verify-first`.
 
 `tools/defects.py remove <id> --fixed --control C --fixon F --approval P` refused even after the release-reviewer approved the remove-fixed proposal (P20261024-f84fc6, 2026-10-24), for two reasons:
 
