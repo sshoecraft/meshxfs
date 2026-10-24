@@ -152,8 +152,17 @@ echo "  INFO $NF files in $(awk '{print int($2 / 8)}' "$OUT/inodes.txt" | sort -
 
 # both halves at once, each with its own output and exit code
 t0=$(date +%s%N)
-rs "$WBOUND" "$N1" "/src/mxfs/tests/fourkn_merge_worker.sh $DIR 1 $ROUNDS $NF" > "$OUT/w1.txt" & p1=$!
-rs "$WBOUND" "$N2" "/src/mxfs/tests/fourkn_merge_worker.sh $DIR 0 $ROUNDS $NF" > "$OUT/w2.txt" & p2=$!
+# The worker is bounded on its node 3 s inside the ssh client's bound, so a
+# workload that overruns stops itself (WORKER_STOPPED) and lets the mount go
+# before the client gives up; bounded on the client alone it went on running
+# with $MNT open after the row had ended, and the next unmount failed 'target is
+# busy' (D-FOURKN-MERGE-SUITE-ROW-WORKER-BOUNDED-ONLY-ON-THE-SSH-CLIENT).
+# FOURKN_MERGE_NODE_BOUND=0 bounds the client alone, as before: the control.
+NODEBOUND="timeout --foreground $((WBOUND - 3)) "
+[ "${FOURKN_MERGE_NODE_BOUND:-1}" = 0 ] && NODEBOUND=""
+echo "  INFO the worker's node-side bound: ${NODEBOUND:-none (FOURKN_MERGE_NODE_BOUND=0)}"
+rs "$WBOUND" "$N1" "$NODEBOUND/src/mxfs/tests/fourkn_merge_worker.sh $DIR 1 $ROUNDS $NF" > "$OUT/w1.txt" & p1=$!
+rs "$WBOUND" "$N2" "$NODEBOUND/src/mxfs/tests/fourkn_merge_worker.sh $DIR 0 $ROUNDS $NF" > "$OUT/w2.txt" & p2=$!
 wait $p1; rc1=$?; wait $p2; rc2=$?
 wall=$(( ($(date +%s%N) - t0) / 1000000 ))
 echo "  INFO workload wall $wall ms; $N1 rc=$rc1 $(grep -a WORKER "$OUT/w1.txt" | tail -1); $N2 rc=$rc2 $(grep -a WORKER "$OUT/w2.txt" | tail -1)"

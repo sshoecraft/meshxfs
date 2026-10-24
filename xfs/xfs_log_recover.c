@@ -303,6 +303,19 @@ int mxfs_fr_stab_prefetch = 3;
  * same slot.  0 (default) starts the proof after the claim, as before.
  */
 int mxfs_fr_stab_early;
+/*
+ * fr_stab_at_claim: a replayer whose claim succeeds starts the slice's stability
+ * proof on a worker at once, tagged with the victim's incarnation, so the proof
+ * runs while the fence-time manifest is loaded and verified against the live
+ * table.  Without it a claim that succeeded outright armed nothing, and the
+ * proof ran inline only after that verify: on 4/net/mesh/direct (attempt 18,
+ * lap frx18t9) the verify took 8.1 s and the inline proof 4.75 s after it, in
+ * series, inside every survivor's wait for the dead node's replay
+ * (D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S).  The
+ * proof rests on the exclusion the claim's lease already holds, the same as the
+ * inline proof it replaces.  0 arms nothing at the claim, as before.
+ */
+int mxfs_fr_stab_at_claim = 1;
 
 /*
  * The stability proof itself, on a raw {targ, log-relative start, bytes}
@@ -4511,19 +4524,33 @@ mxfs_fr_enforce_preflight(
 	 */
 	if (!se->manifest_no_caw && se->man_n && se->man_ents) {
 		uint32_t i, checked = 0, bad = 0, unsupported = 0;
+		unsigned long t0 = jiffies;
+		struct mxfs_victim_live *live;
 		int err = 0;
 
+		/* every entry's live record read up front, on rman_verify_par
+		 * threads, then judged in order exactly as one at a time
+		 * (D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S:
+		 * 931 entries read in series took 8.1 s of the replay) */
+		live = kvcalloc(se->man_n, sizeof(*live), GFP_KERNEL);
+		if (!live) {
+			se->live_check_err++;
+			se->rman_abort = true;
+			xfs_alert(log->l_mp,
+	"MXFS foreign replay: P-RMAN-LIVECHECK-ERR victim_slot=%u site=prereplay rc=%d -- no memory for the live reads of %u manifest entries; the manifest cannot be confirmed safe and the attempt ABORTS before any record is applied (retryable)",
+				  log->l_mxfs_victim_slot, -ENOMEM, se->man_n);
+			return -EIO;
+		}
+		mxfs_v5_dlm_victim_live_read_many(log->l_mp->m_mxfs_dlm,
+						  se->man_ents, se->man_n,
+						  log->l_mxfs_victim_slot, live);
 		for (i = 0; i < se->man_n; i++) {
 			const struct mxfs_rman_entry *e = &se->man_ents[i];
-			bool lh = false;
-			uint64_t le = 0, ll = 0;
-			uint8_t lm = 0;
-			uint32_t lidx = UINT32_MAX;
-			int lrc;
-
-			lrc = mxfs_v5_dlm_victim_live_read(log->l_mp->m_mxfs_dlm,
-					e->type, e->id, log->l_mxfs_victim_slot,
-					&lh, &le, &ll, &lm, &lidx);
+			bool lh = live[i].holds;
+			uint64_t le = live[i].epoch, ll = live[i].lineage;
+			uint8_t lm = live[i].mode;
+			uint32_t lidx = live[i].slot_idx;
+			int lrc = live[i].rc;
 			if (lrc == -EOPNOTSUPP) {
 				unsupported++;
 				continue;
@@ -4551,10 +4578,12 @@ mxfs_fr_enforce_preflight(
 			err = lrc;		/* undecidable: I/O */
 			break;
 		}
+		kvfree(live);
 		mxfs_xfs_probe(log->l_mp,
-	"MXFS foreign replay: P-RMAN-PREREPLAY-VERIFY victim_slot=%u entries=%u checked=%u mutated=%u unsupported=%u err=%d",
+	"MXFS foreign replay: P-RMAN-PREREPLAY-VERIFY victim_slot=%u entries=%u checked=%u mutated=%u unsupported=%u err=%d par=%d ms=%u",
 			   log->l_mxfs_victim_slot, se->man_n, checked, bad,
-			   unsupported, err);
+			   unsupported, err, mxfs_rman_verify_par,
+			   jiffies_to_msecs(jiffies - t0));
 		if (bad) {
 			se->postseal_mutations += bad;
 			se->rman_abort = true;

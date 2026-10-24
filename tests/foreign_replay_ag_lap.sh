@@ -226,7 +226,7 @@ fi
 # ---- 5. each survivor's kernel log since the mark, on its own clock
 for n in "${SURV[@]}"; do
     measure "$n" 30 "$OUT/${n}_kmsg.txt" '^KMSG_END$' "$n's kernel log since the mark" \
-        "echo CLK \$(date +%s%3N) \$(cut -d' ' -f1 /proc/uptime); dmesg | sed -n '/$MARK/,\$p' | grep -a 'P163-RECOVERY-COMPLETE\|PROBE-A AG-META-WRITE-NOT-HELD\|no longer responding\|Filesystem has been shut down\|Corruption\|BUG:\|Oops' | cut -c1-500; echo KMSG_END"
+        "echo CLK \$(date +%s%3N) \$(cut -d' ' -f1 /proc/uptime); dmesg | sed -n '/$MARK/,\$p' | grep -a 'P163-RECOVERY-COMPLETE\|PROBE-A AG-META-WRITE-NOT-HELD\|PROBE-A-REPLAY\|no longer responding\|Filesystem has been shut down\|Corruption\|BUG:\|Oops' | cut -c1-500; echo KMSG_END"
 done
 # host ms of a kernel line of node n: its [uptime] through the node's CLK line,
 # then the node's clock offset
@@ -247,12 +247,13 @@ if [ -n "$R" ]; then
     T_RC=$(kms "$R" "$rc_k")
     T_ENTRY=$(( T_RC - total ))
     echo "STAGE replayer $R: recovery complete at host ms $T_RC (+$(( T_RC - T_KILL )) ms after the kill), ladder entry $T_ENTRY (total=$total)"
-    # the AGs the replay wrote: PROBE-A on the replayer between the kill and the ladder entry
-    REPLAY_AGS=$(grep -a 'PROBE-A AG-META-WRITE-NOT-HELD' "$OUT/${R}_kmsg.txt" | while read -r line; do
+    # the AGs the replay wrote: PROBE-A on the replayer between the kill and the ladder entry,
+    # PROBE-A-REPLAY where the module reports a replay's image apart (probe_a_replay_apart)
+    REPLAY_AGS=$(grep -a 'PROBE-A AG-META-WRITE-NOT-HELD\|PROBE-A-REPLAY' "$OUT/${R}_kmsg.txt" | while read -r line; do
         k=$(sed -n 's/^\[ *\([0-9.]*\)\].*/\1/p' <<<"$line"); t=$(kms "$R" "$k")
         [ "$t" -ge "$T_KILL" ] && [ "$t" -le "$T_ENTRY" ] && grep -aoE 'agno=[0-9]+' <<<"$line" | cut -d= -f2
     done | sort -un | tr '\n' ' ')
-    echo "STAGE AGs the replay wrote (PROBE-A on $R): [${REPLAY_AGS}]; its PROBE-A lines recov=1 $(cnt "$OUT/${R}_kmsg.txt" 'PROBE-A AG-META-WRITE-NOT-HELD.* recov=1') recov=0 $(cnt "$OUT/${R}_kmsg.txt" 'PROBE-A AG-META-WRITE-NOT-HELD.* recov=0')"
+    echo "STAGE AGs the replay wrote (PROBE-A on $R): [${REPLAY_AGS}]; its PROBE-A lines recov=1 $(cnt "$OUT/${R}_kmsg.txt" 'PROBE-A AG-META-WRITE-NOT-HELD.* recov=1') recov=0 $(cnt "$OUT/${R}_kmsg.txt" 'PROBE-A AG-META-WRITE-NOT-HELD.* recov=0') replay $(cnt "$OUT/${R}_kmsg.txt" 'PROBE-A-REPLAY')"
 fi
 
 # ---- 6. the verdict
@@ -292,6 +293,8 @@ fi
 ck "every survivor truncate was captured" "$tot" "$NF"
 ck "every truncate returned 0" "$bad" 0
 ck "no live survivor changed a replayed AG before the replay ended" "$early" 0
+[ -n "$R" ] && ck "$R reported its replay's AG header images apart (PROBE-A-REPLAY), none as an unheld write" \
+    "$(cnt "$OUT/${R}_kmsg.txt" 'PROBE-A AG-META-WRITE-NOT-HELD.* recov=1')" 0
 for n in "${SURV[@]}"; do
     # a node that is not replaying writes an AG header only under its own grant
     [ "$n" = "$R" ] || ck "$n (not the replayer) wrote no AG header without its grant" \

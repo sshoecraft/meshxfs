@@ -1,6 +1,7 @@
 #!/bin/bash
 # drbd_nodes_count_lap.sh -- one lap of
-# D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP.
+# D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP and of
+# D-DRBD-WRITE-BOUND-ARM-IGNORES-MXFS-GROUP-AND-ADDRESSES-TEST3-TEST4.
 #
 # run.sh gives every row MXFS_NODES as a node count, and a lane queue exports it
 # for the laps that read it (tests/path_abort_kmsg_lap.sh).  scripts/drbd_rig.sh
@@ -16,16 +17,21 @@
 # of the pair it selected, whether or not that node answers its ssh (step_status),
 # so the selection is read on the host where it is made; the g2 pair need not be up.
 #
-#   EXPOSED  MXFS_NODES held a bare number when drbd_rig.sh selected its pair
+#   EXPOSED  MXFS_NODES held a bare number, and MXFS_GROUP named g2, when
+#            drbd_rig.sh and the arm selected their pairs
 #   PASS     the status names both g2 nodes, test1 and test2, and nothing refused;
 #            and tests/drbd_write_bound_arm.sh's own resolution of the same
-#            MXFS_NODES selects its default pair, test3 test4
+#            environment selects the same g2 pair, test1 test2
 #   FAIL     drbd_rig.sh refused the pair ('has N nodes'), or the status names
 #            another pair than test1 and test2, or the arm selected another pair
 #   ABORT    the status overran its bound or printed no node line
 #
-# The control is DRBD_RIG_NODES_COUNT=0 in this lap's environment, which
-# drbd_rig.sh inherits: a bare number is taken as a node name, as before the fix.
+# Each fix has its own control, set in this lap's environment, which drbd_rig.sh
+# and the arm inherit:
+#   DRBD_RIG_NODES_COUNT=0  a bare number is taken as a node name, as before the
+#                           first fix (drbd_rig.sh refuses a one-node pair)
+#   DRBD_ARM_GROUP=0        the arm takes test3 test4 whatever the group, as before
+#                           the second fix (the arm selects test3 test4)
 #
 # Bound, derived: 'status' is a pool listing on the host and one ssh round to each
 # node with its own 20 s cap (step_status, 'both status ... 20'), so the status is
@@ -34,7 +40,8 @@
 # powered off (status alone), 1.4-1.9 s with both parts on 2026-10-24.
 #
 # Usage: tests/drbd_nodes_count_lap.sh <label>
-#        DRBD_RIG_NODES_COUNT=0 tests/drbd_nodes_count_lap.sh <label>   (control)
+#        DRBD_RIG_NODES_COUNT=0 tests/drbd_nodes_count_lap.sh <label>   (control, count)
+#        DRBD_ARM_GROUP=0 tests/drbd_nodes_count_lap.sh <label>         (control, arm)
 # Exit: 0 PASS, 1 FAIL, 2 ABORT.
 set -u
 LABEL=${1:?label}
@@ -42,11 +49,11 @@ REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 OUT="$REPO/tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_drbdnodes_$LABEL"
 mkdir -p "$OUT" || exit 2
 BOUND=25
-echo "LAP drbd_nodes_count start $(date -u +%FT%TZ) DRBD_RIG_NODES_COUNT=${DRBD_RIG_NODES_COUNT:-unset} out=$OUT" | tee "$OUT/lap.log"
+echo "LAP drbd_nodes_count start $(date -u +%FT%TZ) DRBD_RIG_NODES_COUNT=${DRBD_RIG_NODES_COUNT:-unset} DRBD_ARM_GROUP=${DRBD_ARM_GROUP:-unset} out=$OUT" | tee "$OUT/lap.log"
 abort() { echo "LAP drbd_nodes_count ABORT label=$LABEL: $*" | tee -a "$OUT/lap.log"; exit 2; }
 
 export MXFS_NODES=2 MXFS_GROUP=g2
-echo "EXPOSED: MXFS_NODES=$MXFS_NODES, a bare number, when drbd_rig.sh selects its pair" | tee -a "$OUT/lap.log"
+echo "EXPOSED: MXFS_NODES=$MXFS_NODES, a bare number, and MXFS_GROUP=$MXFS_GROUP when drbd_rig.sh and the arm select their pairs" | tee -a "$OUT/lap.log"
 t0=$(date +%s)
 timeout -k 5 "$BOUND" "$REPO/scripts/drbd_rig.sh" status < /dev/null > "$OUT/status.txt" 2>&1
 rc=$?
@@ -65,17 +72,18 @@ else
     wrong="the status names '$named', not test1 test2"
 fi
 # The same node resolution in tests/drbd_write_bound_arm.sh, which read MXFS_NODES
-# as names too; DRBD_ARM_PRINT_NODES=1 stops it right after the resolution, so no
-# module or node is touched.  Its default pair is test3 test4.
+# as names too and, with no pair named, took test3 test4 whatever MXFS_GROUP was;
+# DRBD_ARM_PRINT_NODES=1 stops it right after the resolution, so no module or
+# node is touched.  It must select the g2 pair, as drbd_rig.sh does.
 arm=$(DRBD_ARM_PRINT_NODES=1 timeout 5 "$REPO/tests/drbd_write_bound_arm.sh" "$LABEL" /nonexistent < /dev/null 2>&1)
 echo "STEP arm rc=$? $arm" | tee -a "$OUT/lap.log"
 case "$arm" in
-    "DRBD_ARM_NODES test3 test4") echo "INFO drbd_write_bound_arm.sh: its default pair: test3 test4" | tee -a "$OUT/lap.log" ;;
-    DRBD_ARM_NODES*) wrong="${wrong:+$wrong; }drbd_write_bound_arm.sh selected '${arm#DRBD_ARM_NODES }', not test3 test4" ;;
+    "DRBD_ARM_NODES test1 test2") echo "INFO drbd_write_bound_arm.sh: the g2 pair: test1 test2" | tee -a "$OUT/lap.log" ;;
+    DRBD_ARM_NODES*) wrong="${wrong:+$wrong; }drbd_write_bound_arm.sh selected '${arm#DRBD_ARM_NODES }', not test1 test2" ;;
     *) abort "drbd_write_bound_arm.sh printed no DRBD_ARM_NODES line: ${arm:0:200}" ;;
 esac
 if [ -z "$wrong" ]; then
-    echo "LAP drbd_nodes_count PASS label=$LABEL: a bare MXFS_NODES selected the group's pair in drbd_rig.sh and the default pair in drbd_write_bound_arm.sh" | tee -a "$OUT/lap.log"
+    echo "LAP drbd_nodes_count PASS label=$LABEL: a bare MXFS_NODES with MXFS_GROUP=g2 selected the g2 pair in drbd_rig.sh and in drbd_write_bound_arm.sh" | tee -a "$OUT/lap.log"
     exit 0
 fi
 echo "LAP drbd_nodes_count FAIL label=$LABEL: $wrong" | tee -a "$OUT/lap.log"

@@ -996,6 +996,15 @@ def unplanned_variant(run: dict, batch: dict) -> bool:
         or str(run.get("iso", "")) < board_tool().attempt_began(batch["candidate"])
 
 
+def plan_laps(batch: dict) -> list:
+    """The laps that use up a batch's plan: PASS, FAIL and INCOMPLETE. An INFRA lap does not, so
+    a lap the rig spoiled is run again. check_batch_lap, measure and tools/harness_batch.py's
+    resume all count with this; measure once counted settled INFRA laps too and the resume counted
+    every lap, so each refused a batch the others took
+    (D-MEASURE-REFUSES-A-BATCH-WHOSE-SETTLED-LAP-CHECK-BATCH-LAP-COUNTED-AS-RUN)."""
+    return [r for r in batch_runs(batch) if r.get("outcome") in ("PASS", "FAIL", "INCOMPLETE")]
+
+
 def check_batch_lap(bid: str, row: str, config: str, candidate: str) -> None:
     """Refuse a lap that is not part of an open, declared batch: wrong row, configuration or
     candidate, a batch already ended by a failure, or one that has used all its laps. Called by
@@ -1013,7 +1022,7 @@ def check_batch_lap(bid: str, row: str, config: str, candidate: str) -> None:
                  % (bid, batch["candidate"], candidate))
     if row != batch["row"]:
         return
-    laps = [r for r in batch_runs(batch) if r.get("outcome") in ("PASS", "FAIL", "INCOMPLETE")]
+    laps = plan_laps(batch)
     if any(r.get("outcome") == "FAIL" for r in laps) and batch["kind"] == "verify":
         sys.exit("defects: batch %s already failed a lap; a verification batch ends at its first "
                  "failure" % bid)
@@ -1075,17 +1084,20 @@ def cmd_measure(data: dict, args) -> int:
         print("  %d FAIL lap(s) without exposure are not counted against %s (each is an incident "
               "of its own until a record names it): %s"
               % (len(unattributed), entry["id"], ", ".join(str(r.get("iso")) for r in unattributed)))
-    # A lap with a reviewed disposition stands in for the lap it was, as the refusal above says:
-    # check_batch_lap counts it against the plan and refuses a lap past it, so a measure that
-    # counted only PASS and FAIL could never close a batch holding one
+    # The plan is counted as check_batch_lap counts it (plan_laps): a settled INCOMPLETE lap used
+    # up its place, and check_batch_lap refuses a lap past the plan, so a measure that counted only
+    # PASS and FAIL could never close a batch holding one; a settled INFRA lap used up none, and a
+    # lap was run in its place
     # (D-MEASURE-REFUSES-A-BATCH-WHOSE-SETTLED-LAP-CHECK-BATCH-LAP-COUNTED-AS-RUN).
     # MXFS_MEASURE_COUNT_SETTLED=0 counts only PASS and FAIL, as before: the control.
-    settled = [] if os.environ.get("MXFS_MEASURE_COUNT_SETTLED", "1") == "0" else \
-        [r for r in laps if r.get("outcome") in ("INCOMPLETE", "INFRA") and r not in unresolved]
-    measured = len([r for r in laps if r.get("outcome") in ("PASS", "FAIL")])
-    if measured + len(settled) != int(batch["planned"]):
-        sys.exit("defects: batch %s planned %s laps and has %d (%d settled); run the rest first"
-                 % (batch["id"], batch["planned"], measured + len(settled), len(settled)))
+    if os.environ.get("MXFS_MEASURE_COUNT_SETTLED", "1") == "0":
+        used = [r for r in laps if r.get("outcome") in ("PASS", "FAIL")]
+    else:
+        used = plan_laps(batch)
+    incomplete = len([r for r in used if r.get("outcome") == "INCOMPLETE"])
+    if len(used) != int(batch["planned"]):
+        sys.exit("defects: batch %s planned %s laps and has %d (%d settled INCOMPLETE); run the rest "
+                 "first" % (batch["id"], batch["planned"], len(used), incomplete))
     k = sum(1 for r in counted if r.get("outcome") == "FAIL")
     rate = {"row": batch["row"], "config": batch["config"], "platform": batch["platform"],
             "kind": batch["kind"], "batch": batch["id"], "k": k, "n": len(counted),

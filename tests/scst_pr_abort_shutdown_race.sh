@@ -118,7 +118,11 @@ set -u
 LABEL=${1:?label}; ARM=${2:-window}; X=${3:-test1}; Y=${4:-test2}; DELAY=${5:-4000}; ITERS=${6:-20}
 case $ARM in window|stress|handoff|flap) ;; *) echo "arm must be window, stress, handoff or flap"; exit 2;; esac
 [ "$X" = "$Y" ] && { echo "X and Y must differ"; exit 2; }
-cd "$(dirname "$0")/.." || exit 2
+cd "$(dirname "$0")" || exit 2
+# the tree root holds run.sh and tests/lib/rig.sh both, so a draft of this file run from a copy
+# of tests/ alone finds the tree's own tools
+while { [ ! -f run.sh ] || [ ! -f tests/lib/rig.sh ]; } && [ "$(pwd)" != / ]; do cd ..; done
+[ -f run.sh ] || { echo "no tree root above $0"; exit 2; }
 OUT=${SPR_OUT:-tests/evidence/${LABEL}_spr}; mkdir -p "$OUT"
 SSH=tools/mxfs_sshpass.sh
 TGT=${MXFS_SCST_TGT:-iqn.2026-05.local.mxfs:shared}
@@ -385,9 +389,35 @@ elif [ "$ARM" = flap ]; then
         done < "$OUT/held.txt"
         echo "$n"
     }
-    h0=$(date +%s%3N); n0=$(rsh $X "date +%s%3N" | tail -1 | tr -dc 0-9); h1=$(date +%s%3N)
-    off=$(( n0 - (h0 + h1) / 2 ))
-    echo "X's clock - this host's: ${off} ms (ssh round trip $(( h1 - h0 )) ms)"
+    # X's clock less this host's.  Read from one ssh call's midpoint it came out ~rtt/2 high: the
+    # call's ~400 ms round trip is mostly the connection's setup, and X runs date at the end of
+    # it (test15, 2026-10-24: midpoint -223..-236 ms, 3 ms round trips on an open session -428
+    # ms), so every login was placed ~200 ms late on X's clock and the writes the new session
+    # carried, which end 33-54 ms after it, read as ended before it: flap1 and flap2 of the .7
+    # qualification graded 6 and 7 gap logins with a blocked write each as NOT EXPOSED
+    # (D-SCST-FLAP-ARM-CLOCK-OFFSET-READS-SSH-SETUP).
+    # The offset is now the midpoint of the shortest of five round trips on one open session.
+    # SPR_OFFSET_MIDPOINT=1 takes one call's midpoint, as before: the control.
+    if [ "${SPR_OFFSET_MIDPOINT:-0}" = 1 ]; then
+        h0=$(date +%s%3N); n0=$(rsh $X "date +%s%3N" | tail -1 | tr -dc 0-9); h1=$(date +%s%3N)
+        off=$(( n0 - (h0 + h1) / 2 )); rtt=$(( h1 - h0 ))
+    else
+        coproc CLK { timeout 30 $SSH "$X" 'echo ready; while read -r l; do date +%s%3N; done' 2>/dev/null; }
+        rtt=""; off=""
+        while read -t 25 -r l <&"${CLK[0]}"; do [ "$l" = ready ] && break; done
+        if [ "$l" = ready ]; then
+            for i in 1 2 3 4 5; do
+                h0=$(date +%s%3N); echo x >&"${CLK[1]}"; read -t 5 -r n0 <&"${CLK[0]}" || break; h1=$(date +%s%3N)
+                n0=$(printf '%s' "$n0" | tr -dc 0-9)
+                if [ -n "$n0" ] && { [ -z "$rtt" ] || [ $(( h1 - h0 )) -lt "$rtt" ]; }; then
+                    rtt=$(( h1 - h0 )); off=$(( n0 - (h0 + h1) / 2 ))
+                fi
+            done
+        fi
+        exec {CLK[1]}>&-
+        [ -n "$off" ] || { echo "FAIL: could not read X's clock over an open session"; exit 3; }
+    fi
+    echo "X's clock - this host's: ${off} ms (round trip ${rtt} ms)"
     sleep 1
     TA=$(date -u +%FT%T.%3NZ); ta=$(date +%s%3N)
     # As path_flap cuts it, a cable pulled and put back, but the cut's length is varied (1.5 to

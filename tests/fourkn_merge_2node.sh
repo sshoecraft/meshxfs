@@ -192,6 +192,15 @@ step "INFO workload wall $(( ($(date +%s%N) - t0) / 1000000 )) ms; $N1: rc=$rc1 
 ck "$N1's half ran to its end with no error" "$(grep -c "^WORKER_DONE rounds=$ROUNDS errors=0 " "$OUT/w1.txt")" 1
 ck "$N2's half ran to its end with no error" "$(grep -c "^WORKER_DONE rounds=$ROUNDS errors=0 " "$OUT/w2.txt")" 1
 m1=6$((ROUNDS % 8))4; m2=6$((ROUNDS % 8))2
+# Each worker prints the mode it last set on each of its files (MODE <i> <mode>), also when its
+# bound stopped it mid-round; the mode check reads those, so a stopped workload is still checked
+# against what was written. Graded against the last round's modes alone, every file of a stopped
+# worker read wrong and the lap looked like lost setattrs
+# (D-FOURKN-MERGE-WORKLOAD-OVERRAN-16S-WHEN-EVERY-CAW-TOOK-TWICE-AS-LONG, b20261024-f31760).
+# MERGE_MODES_FROM_WORKER=0 expects the last round's modes, as before: the control.
+cat "$OUT/w1.txt" "$OUT/w2.txt" | awk '$1 == "MODE" && NF == 3 {print $2, $3}' > "$OUT/modes_written.txt"
+[ "${MERGE_MODES_FROM_WORKER:-1}" = 0 ] && : > "$OUT/modes_written.txt"
+step "INFO $(wc -l < "$OUT/modes_written.txt") file mode(s) as the workers last set them (MERGE_MODES_FROM_WORKER=${MERGE_MODES_FROM_WORKER:-1})"
 
 # the counters, before the unmount's own flushes add to them; the hold is
 # disarmed first, and what it had left says how many blocks it held
@@ -251,12 +260,17 @@ mount_both
 for n in "$N1" "$N2"; do
     on "$n" "echo 3 > /proc/sys/vm/drop_caches; for i in \$(seq 1 $NF); do echo \$i \$(stat -c %a $DIR/f\$i); done" 30 > "$OUT/modes_$n.txt"
     if [ "$FORCE_MS" -gt 0 ]; then
-        bad=$(awk -v a="$m1" -v b="$m2" -v fa="$fa" -v fb="$fb" \
-                  '{w = ($1 == fa) ? 605 : ($1 == fb) ? 606 : ($1 % 2) ? a : b; if ($2 != w) n++} END {print n + 0}' "$OUT/modes_$n.txt")
-        ck "every file reads its own writer's last mode on $n ($m1 odd, $m2 even, f$fa 605, f$fb 606)" "$(grep -cE '^[0-9]+ [0-9]+$' "$OUT/modes_$n.txt"):$bad" "$NF:0"
+        bad=$(awk -v a="$m1" -v b="$m2" -v fa="$fa" -v fb="$fb" -v sf="$OUT/modes_written.txt" \
+                  'BEGIN {while ((getline l < sf) > 0) {split(l, p, " "); set[p[1]] = p[2]}}
+                   {w = ($1 == fa) ? 605 : ($1 == fb) ? 606 : ($1 in set) ? set[$1] : ($1 % 2) ? a : b; if ($2 != w) n++} END {print n + 0}' \
+                  "$OUT/modes_$n.txt")
+        ck "every file reads its own writer's last mode on $n (as each worker last set it, else $m1 odd, $m2 even; f$fa 605, f$fb 606)" "$(grep -cE '^[0-9]+ [0-9]+$' "$OUT/modes_$n.txt"):$bad" "$NF:0"
     else
-        bad=$(awk -v a="$m1" -v b="$m2" '{w = ($1 % 2) ? a : b; if ($2 != w) n++} END {print n + 0}' "$OUT/modes_$n.txt")
-        ck "every file reads its own writer's last mode on $n ($m1 odd, $m2 even)" "$(grep -cE '^[0-9]+ [0-9]+$' "$OUT/modes_$n.txt"):$bad" "$NF:0"
+        bad=$(awk -v a="$m1" -v b="$m2" -v sf="$OUT/modes_written.txt" \
+                  'BEGIN {while ((getline l < sf) > 0) {split(l, p, " "); set[p[1]] = p[2]}}
+                   {w = ($1 in set) ? set[$1] : ($1 % 2) ? a : b; if ($2 != w) n++} END {print n + 0}' \
+                  "$OUT/modes_$n.txt")
+        ck "every file reads its own writer's last mode on $n (as each worker last set it, else $m1 odd, $m2 even)" "$(grep -cE '^[0-9]+ [0-9]+$' "$OUT/modes_$n.txt"):$bad" "$NF:0"
     fi
 done
 umount_all

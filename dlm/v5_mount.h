@@ -1045,6 +1045,24 @@ int  mxfs_v5_dlm_victim_live_read(struct mxfs_v5_dlm *ctx, uint8_t ltype,
 				  bool *out_holds, uint64_t *out_epoch,
 				  uint64_t *out_lineage, uint8_t *out_mode,
 				  uint32_t *out_slot_idx);
+/* one manifest entry's live read, as mxfs_v5_dlm_victim_live_read answers it */
+struct mxfs_victim_live {
+	int         rc;
+	bool        holds;
+	uint8_t     mode;
+	uint32_t    slot_idx;
+	uint64_t    epoch;
+	uint64_t    lineage;
+};
+/* mxfs_v5_dlm_victim_live_read for each of ents[0..n), into out[i], on up to
+ * rman_verify_par threads; every out[i].rc is that entry's own answer, the
+ * caller judges them in order.  Returns -EINVAL on bad arguments, else 0. */
+struct mxfs_rman_entry;
+extern int mxfs_rman_verify_par;
+int  mxfs_v5_dlm_victim_live_read_many(struct mxfs_v5_dlm *ctx,
+				       const struct mxfs_rman_entry *ents,
+				       uint32_t n, uint32_t victim_slot,
+				       struct mxfs_victim_live *out);
 /* (design review item 17): revalidate every sealed-manifest entry against
  * the live table right before the irreversible purge.  0 = consistent;
  * -EPROTO = a mutation was found (caller publishes AUTHORITY_MUTATED, purges

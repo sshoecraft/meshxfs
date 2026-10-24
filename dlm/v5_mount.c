@@ -52,7 +52,21 @@ static int mxfs_memb_unreached_refuse = 1;
  * same-build control, which admits such a pair as before. */
 static int mxfs_drbd_third_vote = 1;
 
+/* Threads that read a fenced victim's manifest entries against the live table
+ * (mxfs_v5_dlm_victim_live_read_many): before replay and again before the purge,
+ * every entry's lock record is read fresh from the platter, and one at a time
+ * the reads cost ~8.7 ms an entry in series, 8.1 s for 931 entries inside every
+ * survivor's wait for the replay (4/net/mesh/direct, attempt 18, lap frx18t9;
+ * D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S).  1 reads
+ * them one at a time on the caller, as before: the same-build control. */
+int mxfs_rman_verify_par = 16;
+#define MXFS_RMAN_VERIFY_PAR_MAX 32
+
 #ifdef __KERNEL__
+module_param_named(rman_verify_par, mxfs_rman_verify_par, int, 0644);
+MODULE_PARM_DESC(rman_verify_par,
+		 "threads reading a fenced victim's manifest entries against the live table before its replay and purge: default 16, max 32; 1 = one at a time on the caller, as before (control)");
+
 module_param_named(drbd_third_vote, mxfs_drbd_third_vote, int, 0644);
 MODULE_PARM_DESC(drbd_third_vote,
 		 "DRBD pair whose drbd-fence.conf has neither a node fence (agent=exec|ssh) nor authority=quorum: 1=refuse the mount naming both (default), 0=admit it (control)");
@@ -26511,13 +26525,98 @@ int mxfs_v5_dlm_victim_live_read(struct mxfs_v5_dlm *ctx, uint8_t ltype,
 	}
 }
 
+struct live_many {
+	struct mxfs_v5_dlm              *ctx;
+	const struct mxfs_rman_entry    *ents;
+	struct mxfs_victim_live         *out;
+	uint32_t                        n, slot, stride;
+};
+
+struct live_many_part {
+	struct live_many                *m;
+	uint32_t                        first;
+};
+
+static void live_many_run(struct live_many *m, uint32_t first)
+{
+	uint32_t i;
+
+	for (i = first; i < m->n; i += m->stride) {
+		struct mxfs_victim_live *o = &m->out[i];
+
+		/* as the one-at-a-time loops initialised them: a read that fails
+		 * may leave them unset, and a mutation line prints them */
+		o->holds = false;
+		o->epoch = 0;
+		o->lineage = 0;
+		o->mode = 0;
+		o->slot_idx = UINT32_MAX;
+		o->rc =mxfs_v5_dlm_victim_live_read(m->ctx, m->ents[i].type,
+						     m->ents[i].id, m->slot,
+						     &o->holds, &o->epoch,
+						     &o->lineage, &o->mode,
+						     &o->slot_idx);
+	}
+}
+
+static void live_many_fn(void *arg)
+{
+	struct live_many_part *p = arg;
+
+	live_many_run(p->m, p->first);
+}
+
+int mxfs_v5_dlm_victim_live_read_many(struct mxfs_v5_dlm *ctx,
+				      const struct mxfs_rman_entry *ents,
+				      uint32_t n, uint32_t victim_slot,
+				      struct mxfs_victim_live *out)
+{
+	struct live_many m;
+	struct live_many_part part[MXFS_RMAN_VERIFY_PAR_MAX];
+	mxfs_thread_t *thread[MXFS_RMAN_VERIFY_PAR_MAX];
+	int par = mxfs_rman_verify_par;
+	uint32_t k;
+
+	if (!ctx || (n && (!ents || !out)))
+		return -EINVAL;
+	if (par < 1)
+		par = 1;
+	if (par > MXFS_RMAN_VERIFY_PAR_MAX)
+		par = MXFS_RMAN_VERIFY_PAR_MAX;
+	if (n && (uint32_t)par > n)
+		par = (int)n;
+	m.ctx = ctx;
+	m.ents = ents;
+	m.out = out;
+	m.n = n;
+	m.slot = victim_slot;
+	m.stride = (uint32_t)par;
+	/* stride k of par runs on its own thread; stride 0, and any stride
+	 * whose thread could not be made, on the caller */
+	for (k = 1; k < (uint32_t)par; k++) {
+		part[k].m = &m;
+		part[k].first = k;
+		thread[k] = mxfs_pal_thread_create(live_many_fn, &part[k]);
+	}
+	live_many_run(&m, 0);
+	for (k = 1; k < (uint32_t)par; k++) {
+		if (thread[k])
+			mxfs_pal_thread_join(thread[k]);
+		else
+			live_many_run(&m, k);
+	}
+	return 0;
+}
+
 int mxfs_v5_dlm_rman_verify_live(struct mxfs_v5_dlm *ctx, uint32_t slot,
 				 uint32_t victim_node, uint64_t victim_epoch,
 				 uint32_t *out_checked)
 {
 	struct mxfs_rman_entry *ents = NULL;
+	struct mxfs_victim_live *live = NULL;
 	struct mxfs_recov_manifest_ptr mp;
 	uint32_t n = 0, i, checked = 0, unsupported = 0;
+	uint64_t t0 = mxfs_pal_time_ms();
 	bool no_caw = false;
 	int rc, bad = 0;
 
@@ -26534,16 +26633,22 @@ int mxfs_v5_dlm_rman_verify_live(struct mxfs_v5_dlm *ctx, uint32_t slot,
 	if (no_caw ||
 	    (!ctx->dlm_caw && !(ctx->tauth_open && ctx->dlm && ctx->dlm->ledger)))
 		goto out;
+	if (n) {
+		live = mxfs_pal_alloc((size_t)n * sizeof(*live));
+		if (!live) {
+			rc = -ENOMEM;       /* undecidable: retry later */
+			goto out;
+		}
+		mxfs_v5_dlm_victim_live_read_many(ctx, ents, n, slot, live);
+	}
 	for (i = 0; i < n; i++) {
 		const struct mxfs_rman_entry *e = &ents[i];
-		bool lh = false;
-		uint64_t le = 0, ll = 0;
-		uint8_t lm = 0;
-		uint32_t lidx = UINT32_MAX;
-		int lrc;
+		bool lh = live[i].holds;
+		uint64_t le = live[i].epoch, ll = live[i].lineage;
+		uint8_t lm = live[i].mode;
+		uint32_t lidx = live[i].slot_idx;
+		int lrc = live[i].rc;
 
-		lrc = mxfs_v5_dlm_victim_live_read(ctx, e->type, e->id, slot, &lh,
-						   &le, &ll, &lm, &lidx);
 		if (lrc == -EOPNOTSUPP) {
 			unsupported++;
 			continue;
@@ -26574,10 +26679,13 @@ int mxfs_v5_dlm_rman_verify_live(struct mxfs_v5_dlm *ctx, uint32_t slot,
 out:
 	mxfs_pal_log(bad ? MXFS_LOG_ERR : MXFS_LOG_WARN,
 	    "mxfs: P-RMAN-PREPURGE-VERIFY slot=%u victim=%u entries=%u checked=%u "
-	    "mutated=%d unsupported=%u no_caw=%d rc=%d",
-	    slot, victim_node, n, checked, bad, unsupported, no_caw ? 1 : 0, rc);
+	    "mutated=%d unsupported=%u no_caw=%d rc=%d par=%d ms=%llu",
+	    slot, victim_node, n, checked, bad, unsupported, no_caw ? 1 : 0, rc,
+	    mxfs_rman_verify_par, (unsigned long long)(mxfs_pal_time_ms() - t0));
 	if (out_checked)
 		*out_checked = checked;
+	if (live)
+		mxfs_pal_free(live);
 	mxfs_pal_free(ents);
 	return rc;
 }

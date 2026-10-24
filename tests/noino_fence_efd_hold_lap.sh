@@ -120,6 +120,15 @@ measure "$S" 30 "$OUT/S_setup.txt" '^SETUP_RC=[0-9]+$' "S's file F" \
 ck "S's file written" "$(field "$OUT/S_setup.txt" SETUP_RC)" 0
 [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=setup wall=$(el)s evidence=$OUT"; exit 2; }
 rs 15 "$R" "echo $MARK > /dev/kmsg" > /dev/null 2>&1
+# a follower that never started reads nothing: each node's file must hold the mark
+if [ "$FOLLOW" = 1 ]; then
+    for n in "$S" "$R"; do
+        measure "$n" 20 "$OUT/${n}_follow.txt" '^FOLLOW_MARK=[0-9]+$' "$n's kernel-log follower" \
+            "sleep 1; echo FOLLOW_MARK=\$(grep -ac '$MARK\$' $KL 2>/dev/null)"
+        ck "$n's follower holds the lap's mark" "$(field "$OUT/${n}_follow.txt" FOLLOW_MARK)" 1
+    done
+    [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=follow wall=$(el)s evidence=$OUT"; exit 2; }
+fi
 
 # ---- 2. the load on both nodes
 for n in "$S" "$R"; do
@@ -130,10 +139,20 @@ done
 sleep "$WARM_S"
 
 # ---- 3. the hold, and F removed
+# Whether the hold started is read from the followed log too: read from the ring after the mark
+# it is empty once the load's lines have rotated the mark out, and the lap ended VACUOUS
+# stage=hold on a read that held nothing (the review of P20261024-16a9f2), and that exit came
+# before the whole-read check. NOINO_HOLD_FROM_FOLLOW=0 reads the hold from the ring and judges it
+# before the whole-read check, as before: the control of this part (NOINO_KMSG_FOLLOW=0 implies it).
+HOLD_FOLLOW=${NOINO_HOLD_FROM_FOLLOW:-1}
+[ "$FOLLOW" = 1 ] || HOLD_FOLLOW=0
+if [ "$HOLD_FOLLOW" = 1 ]; then HOLD_READ="awk '/$MARK\$/{f=1} f' $KL"; else HOLD_READ="dmesg | sed -n '/$MARK/,\$p'"; fi
 measure "$S" 30 "$OUT/S_hold.txt" '^HOLD_SEEN=[0-9]+$' "the EFD hold on $S" \
-    "echo $HOLD_MS > $PARM/dbg_efd_hold_ms; nohup setsid rm -f $D/F > /dev/null 2>&1 < /dev/null & for t in \$(seq 1 30); do n=\$(dmesg | sed -n '/$MARK/,\$p' | grep -ac 'P-EFD-HOLD start='); [ \$n -gt 0 ] && break; sleep 0.5; done; echo HOLD_SEEN=\$n"
+    "echo $HOLD_MS > $PARM/dbg_efd_hold_ms; nohup setsid rm -f $D/F > /dev/null 2>&1 < /dev/null & for t in \$(seq 1 30); do n=\$($HOLD_READ | grep -ac 'P-EFD-HOLD start='); [ \$n -gt 0 ] && break; sleep 0.5; done; echo HOLD_SEEN=\$n; echo HOLD_RING_MARK=\$(dmesg | grep -c '$MARK\$')"
 HOLD_SEEN=$(field "$OUT/S_hold.txt" HOLD_SEEN)
 echo "STAGE hold seen=$HOLD_SEEN at +$(el)s"
+# the hold read's own exposure: the ring had lost the mark by the time the hold was looked for
+[ "$(field "$OUT/S_hold.txt" HOLD_RING_MARK)" = 0 ] && echo "HOLD-RING-ROTATED: $S's kernel ring no longer held the lap's mark when the hold was looked for"
 
 # ---- 4. the run, then both loads stopped
 sleep $(( HOLD_MS / 1000 + 30 ))
@@ -167,13 +186,18 @@ done
 [ -z "$unread" ] && echo "KMSG-WHOLE: both nodes' kernel log reads hold both of the lap's marks"
 grep -a 'P-EFD-HOLD\|P-NOINO-DRAIN\|P-NOINO-CONVOY\|P-NOINO-RELFENCE\|P-AILMIN\|Shutting down\|no longer responding' "$OUT/${S}_kmsg.txt" "$OUT/${R}_kmsg.txt" \
     | sed 's/.*mxfs: /    /' | cut -c1-260 | head -20
-if [ "$HOLD_SEEN" != 1 ]; then
+if [ "$HOLD_FOLLOW" = 0 ] && [ "$HOLD_SEEN" != 1 ]; then
     echo "  S's EFD hold never started, so no chain was held"
     echo "RESULT: VACUOUS label=$LABEL stage=hold wall=$(el)s evidence=$OUT"; exit 3
 fi
+# a read that is not whole grades nothing, so it is judged before any VACUOUS exit
 if [ -n "$unread" ]; then
     echo "LAP noino_fence_efd_hold FAIL: the lap read no whole kernel log, so it cannot say whether S's fence met the held chain:$unread"
     echo "RESULT: FAIL label=$LABEL stage=kmsg wall=$(el)s evidence=$OUT"; exit 1
+fi
+if [ "$HOLD_SEEN" != 1 ]; then
+    echo "  S's EFD hold never started, so no chain was held"
+    echo "RESULT: VACUOUS label=$LABEL stage=hold wall=$(el)s evidence=$OUT"; exit 3
 fi
 FENCE_N=$(cnt "$OUT/${S}_kmsg.txt" 'P-NOINO-DRAIN-RETRY\|P-NOINO-CONVOY\|P-NOINO-DRAIN-STUCK\|P-AILMIN')
 if [ "$FENCE_N" = 0 ]; then

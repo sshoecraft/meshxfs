@@ -15,9 +15,13 @@
 #
 # SHAPE:
 #   1. prep the pair, both nodes on the default window.
-#   2. A (first node) unmounts, takes dead_timeout_ms=SHORT_MS and
-#      dl_peer_window=ARM, and mounts again: its mount's "authority lease" line
-#      must name SHORT_MS, or the lap ABORTs.
+#   2. B (last node) unmounts, takes dead_timeout_ms=LONG_MS, and mounts again;
+#      then A (first node) unmounts, takes dead_timeout_ms=SHORT_MS and
+#      dl_peer_window=ARM, and mounts again: each mount's "authority lease" line
+#      must name its window, or the lap ABORTs.  Both windows are set here, at
+#      run time, and not by the prep: a pair prepped with extra module arguments
+#      is recorded as a variant, and a verification counts no variant lap
+#      (tools/batch_lap.py env_variant).
 #   3. B (last node) runs a writer, and its heartbeat thread is parked once for
 #      PARK_MS (dl_inject_hb_pause_ms): its next beat lands about PARK_MS + 2 s
 #      after the last, longer than A's window and inside B's own lease.
@@ -27,15 +31,16 @@
 #      B's operations succeeded; both still mounted.  ARM=0 is the same-build
 #      control: A holds B to its own window and declares it.
 #
-# the budget rule (derived): prep, measured 40-44 s on a pair, bound 120 + A's
-# unmount and mount ~6 s, bound 70 + premise reads 2 x 30 + the writer's span,
-# 3 s before the park + one interval 2 s + PARK_MS 16 s + 8 s after = 29 s,
-# bound 60 for its collection + journal reads 2 x 30 + mount checks 2 x 30 =
-# 430 s.  Caller bound 450 s.
+# the budget rule (derived): prep, measured 40-44 s on a pair, bound 120 + B's
+# and A's unmount and mount ~6 s each, bound 70 each + premise reads 2 x 30 +
+# the writer's span, 3 s before the park + one interval 2 s + PARK_MS 16 s + 8 s
+# after = 29 s, bound 60 for its collection + journal reads 2 x 30 + mount checks
+# 2 x 30 = 500 s.  Caller bound 520 s.
 #
 # Usage: tests/peer_window_lap.sh <label>
 # Env:   MXFS_NODE_LIST (test1,test2), MXFS_CONFIG (2/disk/caw/direct),
-#        SHORT_MS (12000), PARK_MS (16000), ARM (1; 0 = the control)
+#        SHORT_MS (12000), LONG_MS (34000, B's window), PARK_MS (16000),
+#        ARM (1; 0 = the control)
 # Exit 0 PASS, 1 FAIL, 2 ABORT, 3 VACUOUS.
 set -u
 LABEL=${1:?label}
@@ -47,6 +52,7 @@ B=${MXFS_NODE_LIST##*,}          # the default window, its beat parked
 MNT=/mnt/shared
 PARM=/sys/module/mxfs/parameters
 SHORT_MS=${SHORT_MS:-12000}
+LONG_MS=${LONG_MS:-34000}
 PARK_MS=${PARK_MS:-16000}
 ARM=${ARM:-1}
 OUT=tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_peerwin_$LABEL
@@ -54,7 +60,7 @@ mkdir -p "$OUT"
 fails=0
 . "$(dirname "$0")/lib/rig.sh"
 MARK="PEERWIN-MARK-$LABEL"
-echo "=== peer_window_lap label=$LABEL config=$MXFS_CONFIG A(short)=$A B(parked)=$B short_ms=$SHORT_MS park_ms=$PARK_MS arm=$ARM $(date -u +%FT%TZ) ==="
+echo "=== peer_window_lap label=$LABEL config=$MXFS_CONFIG A(short)=$A B(parked)=$B short_ms=$SHORT_MS long_ms=$LONG_MS park_ms=$PARK_MS arm=$ARM $(date -u +%FT%TZ) ==="
 s0=$(date +%s)
 el() { echo $(( $(date +%s) - s0 )); }
 field(){ grep -aoE "(^| )$2=[^ ]*" "$1" | head -1 | cut -d= -f2; }
@@ -71,9 +77,14 @@ prc=$?
 echo "STAGE prep rc=$prc wall=$(el)s  $(grep -am1 'prep OK\|FAIL' "$OUT/prep.log" | cut -c1-140)"
 [ $prc = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=prep evidence=$OUT"; exit 2; }
 
-# ---- 2. A alone on the short window
+# ---- 2. B on the long window, then A alone on the short one
 DEV=$(rs 15 "$A" "awk '\$2 == \"$MNT\" && \$3 == \"mxfs\" {print \$1}' /proc/mounts | head -1" 2>/dev/null | tr -d '\r\n')
 [ -n "$DEV" ] || { echo "RESULT: ABORT label=$LABEL stage=device evidence=$OUT"; exit 2; }
+BDEV=$(rs 15 "$B" "awk '\$2 == \"$MNT\" && \$3 == \"mxfs\" {print \$1}' /proc/mounts | head -1" 2>/dev/null | tr -d '\r\n')
+[ -n "$BDEV" ] || { echo "RESULT: ABORT label=$LABEL stage=device evidence=$OUT"; exit 2; }
+measure "$B" 70 "$OUT/B_remount.txt" '^REMOUNT_RC=[0-9]+$' "B's remount on the long window" \
+    "timeout 30 umount $MNT || { echo REMOUNT_RC=91; exit 0; }; echo $LONG_MS > $PARM/dead_timeout_ms; timeout 30 mount -t mxfs $BDEV $MNT; echo REMOUNT_RC=\$?"
+ck "B remounted" "$(field "$OUT/B_remount.txt" REMOUNT_RC)" 0
 measure "$A" 70 "$OUT/A_remount.txt" '^REMOUNT_RC=[0-9]+$' "A's remount on the short window" \
     "timeout 30 umount $MNT || { echo REMOUNT_RC=91; exit 0; }; echo $SHORT_MS > $PARM/dead_timeout_ms; echo $ARM > $PARM/dl_peer_window; echo $MARK > /dev/kmsg; timeout 30 mount -t mxfs $DEV $MNT; echo REMOUNT_RC=\$?"
 ck "A remounted" "$(field "$OUT/A_remount.txt" REMOUNT_RC)" 0
@@ -86,14 +97,12 @@ ck "A runs the short window" "$(field "$OUT/${A}_premise.txt" DEAD)" "$SHORT_MS"
 ck "A loaded dl_peer_window" "$(field "$OUT/${A}_premise.txt" PW)" "$ARM"
 ck "A's mount derived its lease from the short window" \
     "$(grep -ac "authority lease $(( SHORT_MS - 4000 )) ms, death window $SHORT_MS ms" "$OUT/${A}_premise.txt")" 1
-# B runs the window the prep loaded: the module's default (dead_timeout_ms=0), or
-# the lane's own dead_timeout_ms in MXFS_EXTRA_MODARGS.  Since the default window
-# became 12 s, a B on the default runs A's window and the lap measures nothing, so
-# a lane gives B the earlier 34 s window that way; the premise required 0 and
-# refused every such lap (pw8pc1-pw8pf2, tests/evidence/lanes/g8b_w14b_20261024T100536Z).
-# Either way B's mount must derive a window longer than A's.
-B_DEAD=$(sed -n 's/.*\bdead_timeout_ms=\([0-9]*\).*/\1/p' <<<"${MXFS_EXTRA_MODARGS:-}")
-ck "B runs the prep's window" "$(field "$OUT/${B}_premise.txt" DEAD)" "${B_DEAD:-0}"
+# B runs LONG_MS, set at its remount above.  Since the default window became
+# 12 s, a B on the default runs A's window and the lap measures nothing; a lane
+# gave B 34 s through MXFS_EXTRA_MODARGS at the prep, which made every lap a
+# variant that no verification counts.  B's mount must derive a window longer
+# than A's.
+ck "B runs the long window" "$(field "$OUT/${B}_premise.txt" DEAD)" "$LONG_MS"
 B_WIN=$(grep -aoE 'death window [0-9]+ ms' "$OUT/${B}_premise.txt" | tail -1 | grep -oE '[0-9]+')
 ck "B's mount runs a longer window than A's ($SHORT_MS ms)" "$([ "${B_WIN:-0}" -gt "$SHORT_MS" ] && echo 1 || echo 0)" 1
 [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=premise evidence=$OUT"; exit 2; }
@@ -155,8 +164,9 @@ for n in "$A" "$B"; do
     # a dynamic-debug line reads "DEBUG:", which a bare 'BUG:' also matches
     ck "$n: zero BUG / Oops" "$(cnt "$OUT/${n}_kmsg.txt" '^BUG:\|[^E]BUG:\|kernel BUG at\|Oops')" 0
 done
-# A back on the default window for whatever runs next (a later prep reloads both)
+# A and B back on the default window for whatever runs next (a later prep reloads both)
 rs 15 "$A" "echo 0 > $PARM/dead_timeout_ms; echo 1 > $PARM/dl_peer_window" > /dev/null 2>&1
+rs 15 "$B" "echo 0 > $PARM/dead_timeout_ms" > /dev/null 2>&1
 
 if [ $fails = 0 ]; then
     echo "LAP peer_window PASS: A held B to B's window ($HELD_N), declared nothing; B's longest operation ${MAX_MS} ms"

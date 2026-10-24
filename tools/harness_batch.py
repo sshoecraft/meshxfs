@@ -300,10 +300,10 @@ def cmd_control(args) -> int:
         if wrong or batch.get("config") != criteria.parse_at(args.at):
             sys.exit(f"harness_batch: {args.batch} is not this control ({', '.join(wrong) or 'config'})")
         bid = args.batch
-        ran = [r for r in criteria.ledger_runs(criteria.board_for(batch["config"]),
-                                               batch["config"], args.row)
-               if r.get("batch") == bid]
-        args.runs = max(int(batch["planned"]) - len(ran), 0)
+        # the laps left are counted as check_batch_lap counts them: an INFRA lap uses up no
+        # place in the plan (D-MEASURE-REFUSES-A-BATCH-WHOSE-SETTLED-LAP-CHECK-BATCH-LAP-COUNTED-AS-RUN)
+        import defects  # noqa: E402
+        args.runs = max(int(batch["planned"]) - len(defects.plan_laps(batch)), 0)
     else:
         declared = run(DEFECTS + ["batch", args.record, "--kind", "control", "--row", args.row,
                                   "--at", args.at, "--build", tree_build(),

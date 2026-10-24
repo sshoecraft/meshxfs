@@ -1,7 +1,7 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-24T12:49:30Z",
+  "created": "2026-10-24T14:29:24Z",
   "state": "RUNNING",
   "attempts": [
     {
@@ -434,14 +434,36 @@
       "dist": "",
       "packages": {},
       "steps": {}
+    },
+    {
+      "created": "2026-10-24T12:49:30Z",
+      "state": "ABANDONED",
+      "dry_run": false,
+      "srcversion": "8DBA16AEB7FDD3066C9C1BC",
+      "files": "tests/evidence/candidates/0.90.134_20261024T124930Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-24T12:49:30Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-24T14:26:07Z",
+          "why": "end the attempt frozen 2026-10-24T12:49:30Z so the drafted fixes and instruments go into the next attempt: the merged-write row's node-side bound, the DRBD node-count lap's group, measure's settled laps counted one way, the foreign replay's stability proof at claim and parallel lock-record reads, the merged-write lap's per-worker modes, the mkfs size-label lap, the draft syntax check, the peer-window lap's run-time windows, PROBE-A-REPLAY, the power-up flood lap, the SCST flap arm's open-session clock offset, and the no-inode lap's hold read from the followed log"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
-  "srcversion": "8DBA16AEB7FDD3066C9C1BC",
-  "module_sha256": "731995125732388e45a3c7c9740b245fca0e66070a04c55e07dfd2cc584ca149",
-  "files": "tests/evidence/candidates/0.90.134_20261024T124930Z.files.json",
-  "files_count": 2638,
-  "files_digest": "a2d58b6724d4234ad16265bdc2108f1b7b42093ba6802b6ad0551083b7ecea0c",
+  "srcversion": "A27A67A3E501890BE9985E0",
+  "module_sha256": "bd9486b6ac100f769e0cfadf0c1802df67321f85b3a6aeca532663abd881b33c",
+  "files": "tests/evidence/candidates/0.90.134_20261024T142924Z.files.json",
+  "files_count": 2641,
+  "files_digest": "8ca80fe25a0f8ba032893baca3249f9387ee022dc1cdf9f2dda599fa2536b0df",
   "spec": "ec57ce06eb09c644b368cde523dfd4fa03e87d54b80a4bee31602c59f3ec175b",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
@@ -451,7 +473,7 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-24T12:49:30Z",
+      "at": "2026-10-24T14:29:25Z",
       "why": "created"
     }
   ]

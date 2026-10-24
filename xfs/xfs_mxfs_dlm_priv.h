@@ -1309,6 +1309,7 @@ extern int mxfs_fr_stab_interval_ms;
 extern int mxfs_fr_stab_passes;
 extern int mxfs_fr_stab_prefetch;
 extern int mxfs_fr_stab_early;
+extern int mxfs_fr_stab_at_claim;
 extern int mxfs_fr_stab_deadline_ms;
 
 /* Ceiling on AG numbers the roll-migration bitmap can track.  An agno at or

@@ -182,6 +182,9 @@ MODULE_PARM_DESC(foreign_replay_token_enforce,
 module_param_named(fr_stab_early, mxfs_fr_stab_early, int, 0644);
 MODULE_PARM_DESC(fr_stab_early,
 	"1: a live recovery's replayer starts the victim slice's stability proof once the fence certificate is durable, before the prover seals the manifest; 0 (default): after the claim, as before");
+module_param_named(fr_stab_at_claim, mxfs_fr_stab_at_claim, int, 0644);
+MODULE_PARM_DESC(fr_stab_at_claim,
+	"1 (default): a replayer whose claim succeeds starts the victim slice's stability proof on a worker at once, overlapping the manifest's load and verify; 0: the proof runs inline after them, as before");
 module_param_named(fr_stab_prefetch, mxfs_fr_stab_prefetch, int, 0644);
 MODULE_PARM_DESC(fr_stab_prefetch,
 	"/445: pipeline DEPTH of victim-slice snapshot stability proofs run on workers ahead of the mount-cohort barrier's replays (each holds ~68 MiB); 0 = inline only, default 3, max 8");
@@ -1496,9 +1499,17 @@ mxfs_dlm_foreign_replay_work_fn(
 			 * was armed for */
 			mxfs_xlog_snap_prefetch_settle(mp, slot, 0);
 		} else {
-			mxfs_xlog_snap_prefetch_settle(mp, slot,
-				mxfs_v5_dlm_recovery_pending_epoch(
-					mp->m_mxfs_dlm, slot));
+			mxfs_epoch_t tag =
+				mxfs_v5_dlm_recovery_pending_epoch(mp->m_mxfs_dlm,
+								   slot);
+
+			mxfs_xlog_snap_prefetch_settle(mp, slot, tag);
+			/* the slice is ours to replay: prove its stability on a
+			 * worker now, while the manifest is loaded and verified,
+			 * not inline after them (fr_stab_at_claim); an entry
+			 * already armed for this incarnation is kept */
+			if (READ_ONCE(mxfs_fr_stab_at_claim) && tag)
+				mxfs_xlog_snap_prefetch_tagged(mp, slot, tag);
 		}
 		if (auth) {
 			xfs_alert(mp,

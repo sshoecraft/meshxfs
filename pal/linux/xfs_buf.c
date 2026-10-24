@@ -1539,6 +1539,18 @@ module_param_named(cluster_passenger_skip, mxfs_cluster_passenger_skip, int, 064
 int mxfs_recov_slots_own = 1;
 module_param_named(recov_slots_own, mxfs_recov_slots_own, int, 0644);
 /*
+ * PROBE-A reports a write of an AG header this node holds no grant for.  A
+ * foreign replay's image (b_mxfs_recov_image) is written on the replay's
+ * verdict, not this node's grant, so it is reported apart, as PROBE-A-REPLAY,
+ * with no stack: on every replay the probe read as an unauthorised write and
+ * dumped a stack once a boot
+ * (D-PROBE-A-REPORTS-EVERY-FOREIGN-REPLAY-WRITE-AS-AN-UNHELD-AG-WRITE).
+ * 0 = every such write is PROBE-A AG-META-WRITE-NOT-HELD, as before: the
+ * same-build control.
+ */
+static int mxfs_probe_a_replay_apart = 1;
+module_param_named(probe_a_replay_apart, mxfs_probe_a_replay_apart, int, 0644);
+/*
  * D-F4-REGISTRY-MISSES-BMBT-FUA-WRITES-REPORTS-THEM-COMMITTED-NEVER-SUBMITTED:
  * a bmbt buffer's FUA write snapshots the committed generation it covers, as
  * a bio's submit does, so its successful completion retires the buffer's F4
@@ -12003,7 +12015,20 @@ xfs_buf_submit_ex(
 					(long long)bp->b_maps[0].bm_bn,
 					current->comm);
 		}
-		if (!held) {
+		if (!held && bp->b_mxfs_recov_image &&
+		    READ_ONCE(mxfs_probe_a_replay_apart)) {
+			/* a replay's image, whose write the replay's verdict
+			 * authorised, not this node's grant */
+			mxfs_probe_ratelimited("mxfs: PROBE-A-REPLAY agno=%u daddr=%lld ops=%s comm=%s pid=%d -- a foreign replay's image of an AG header, written on the replay's verdict (this node holds no grant for the AG)\n",
+				pag_agno(pa), (long long)bp->b_maps[0].bm_bn,
+				(bp->b_ops == &xfs_bnobt_buf_ops ? "bno" :
+				 bp->b_ops == &xfs_cntbt_buf_ops ? "cnt" :
+				 bp->b_ops == &xfs_agf_buf_ops ? "agf" :
+				 bp->b_ops == &xfs_agi_buf_ops ? "agi" :
+				 bp->b_ops == &xfs_agfl_buf_ops ? "agfl" :
+				 bp->b_ops == &xfs_inobt_buf_ops ? "ino" : "fino"),
+				current->comm, current->pid);
+		} else if (!held) {
 			static atomic_t pa_dumped = ATOMIC_INIT(0);
 			/* recov: a replay's image (b_mxfs_recov_image), whose write a
 			 * replay verdict authorised, not this node's grant */
