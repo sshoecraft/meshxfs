@@ -1,7 +1,7 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-24T19:27:48Z",
+  "created": "2026-10-24T20:46:20Z",
   "state": "RUNNING",
   "attempts": [
     {
@@ -500,14 +500,36 @@
       "dist": "",
       "packages": {},
       "steps": {}
+    },
+    {
+      "created": "2026-10-24T19:27:48Z",
+      "state": "ABANDONED",
+      "dry_run": false,
+      "srcversion": "FF012B4B81CDB69CAE96883",
+      "files": "tests/evidence/candidates/0.90.134_20261024T192748Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-24T19:27:48Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-24T20:44:56Z",
+          "why": "end the attempt frozen 2026-10-24T19:27:48Z so the drafted fixes and instruments go into the next attempt: the late-path fill's hold of a returning path (pr_fill_hold), the fenced-ledger lap's since-mark verdict wait and verdict-source grade, the out-of-band lap's exposure, the batch exposure follower, the lap-bounded step waits, the DRBD rig's guarded mount-user kills and the lane stop helper"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
-  "srcversion": "FF012B4B81CDB69CAE96883",
-  "module_sha256": "32a7e2f10ac90b7e8d88026850e5b42427e398aabb7cd1d984bf0ea3fa0b7a86",
-  "files": "tests/evidence/candidates/0.90.134_20261024T192748Z.files.json",
-  "files_count": 2653,
-  "files_digest": "48d7d03e6d0eeac6818f56ed62ef9f4beb5be46344f060839f452c8e15eff818",
+  "srcversion": "A7E90BC5313192108E35B80",
+  "module_sha256": "a22e2a123f42b8ccd7576900aabaafb90e93525dad7d7146bee5b8909416082c",
+  "files": "tests/evidence/candidates/0.90.134_20261024T204620Z.files.json",
+  "files_count": 2656,
+  "files_digest": "e35eba54c6d2872fe89d9c8b346e4c11170bf29daadfe8564329181d64de1a36",
   "spec": "ec57ce06eb09c644b368cde523dfd4fa03e87d54b80a4bee31602c59f3ec175b",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
@@ -517,7 +539,7 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-24T19:27:48Z",
+      "at": "2026-10-24T20:46:20Z",
       "why": "created"
     }
   ]

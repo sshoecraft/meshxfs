@@ -741,17 +741,39 @@ if [ -n "$BATCH" ]; then
     echo "--- batch $BATCH: one lap of $BATCH_ROW at $CONFIG${BATCH_PROBE:+, exposure probe '$BATCH_PROBE'} ---"
 fi
 lap_mark_start() {  # every node's uptime as the batch row starts
-    local n
+    local n pb
     for n in "${NODES[@]}"; do
         LAP_UP[$n]=$(ssh_node "$n" "cut -d' ' -f1 /proc/uptime" 2>/dev/null | tr -dc '0-9.')
     done
+    # The exposure was read from each node's ring when the batch's row ended, and a supporting
+    # row before it (path_answer_lost: ~30000 kernel lines a node) can rotate the trigger's
+    # lines out of the ring first, so the count read 0 on laps that reached the trigger.  A
+    # follower of /dev/kmsg keeping only the probe's lines runs from here to the count
+    # (tests/lib/exposure_follow.sh), and the lap is graded on it.  MXFS_EXPOSURE_FOLLOW=0
+    # reads the ring alone, as before: the control.
+    if [ -n "$BATCH_PROBE" ] && [ "${MXFS_EXPOSURE_FOLLOW:-1}" != 0 ]; then
+        pb=$(printf '%s' "$BATCH_PROBE" | base64 -w0)
+        for n in "${NODES[@]}"; do
+            ssh_node "$n" "bash $NODE_REPO/tests/lib/exposure_follow.sh start $BATCH $pb" > /dev/null 2>&1
+        done
+    fi
 }
 exposure_count() {  # lines matching the batch's probe, on every node, since lap_mark_start
-    local n total=0 c pb
+    local n total=0 ring=0 c r f pb follow=1
     pb=$(printf '%s' "$BATCH_PROBE" | base64 -w0)
+    [ "${MXFS_EXPOSURE_FOLLOW:-1}" = 0 ] && follow=0
     for n in "${NODES[@]}"; do
-        c=$(ssh_node "$n" "p=\$(echo $pb | base64 -d); dmesg 2>/dev/null | awk -v t0='${LAP_UP[$n]:-0}' '{ if (match(\$0, /^\[ *[0-9]+\.[0-9]+\]/)) { ts = substr(\$0, 2, RLENGTH - 2) + 0; if (ts >= t0) print } }' | grep -cE -- \"\$p\"" 2>/dev/null | tr -dc '0-9')
-        total=$(( total + ${c:-0} ))
+        if [ "$follow" = 1 ]; then
+            c=$(ssh_node "$n" "bash $NODE_REPO/tests/lib/exposure_follow.sh count $BATCH '${LAP_UP[$n]:-0}' $pb" 2>/dev/null)
+            r=$(sed -n 's/.*RING=\([0-9]*\).*/\1/p' <<<"$c")
+            f=$(sed -n 's/.*FOLLOW=\([0-9]*\).*/\1/p' <<<"$c")
+            echo "--- exposure on $n: ring=${r:-?} follow=${f:-none} ---" >&2
+            ring=$(( ring + ${r:-0} ))
+            total=$(( total + ${f:-0} ))
+        else
+            c=$(ssh_node "$n" "p=\$(echo $pb | base64 -d); dmesg 2>/dev/null | awk -v t0='${LAP_UP[$n]:-0}' '{ if (match(\$0, /^\[ *[0-9]+\.[0-9]+\]/)) { ts = substr(\$0, 2, RLENGTH - 2) + 0; if (ts >= t0) print } }' | grep -cE -- \"\$p\"" 2>/dev/null | tr -dc '0-9')
+            total=$(( total + ${c:-0} ))
+        fi
     done
     echo "$total"
 }

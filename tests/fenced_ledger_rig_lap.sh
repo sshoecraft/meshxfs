@@ -92,12 +92,17 @@
 # PREEMPT AND ABORT.  SURRENDER, when set, is written to V's pr_surrender before
 # the injection (1, the fix; 0, as before: the control); unset, the module's
 # default.  OBS_S must cover the death window, the fence and its re-drives.
-#   EXPOSED  V found its own key gone (P277) and a survivor's fence met the key
-#            absent (P-PR-FENCE-ABSENT)
+#   EXPOSED  V found its own key gone (P277) and a survivor fenced V
+#            (P236-FENCEKIND): the out-of-band removal reached a fence.  Whether
+#            that fence met the key absent (P-PR-FENCE-ABSENT) is printed, not
+#            graded: the fix registers the key again before the fence reads it,
+#            so the fence meets it present, and an exposure that required the
+#            absent read graded every lap of the fix VACUOUS (attempt 21, c21e1
+#            and c21q1).
 #   PASS     a survivor certified V's fence (P236-FENCE-CERTIFIED), none declared
 #            the recovery blocked (P238-FENCE-BLOCKED), and no survivor
 #            operation took over the 30 s stall limit; no BUG or Oops.
-#   VACUOUS  V never found its key gone, or no fence met it absent.
+#   VACUOUS  V never found its key gone, or no survivor fenced V.
 #
 # Bounds (derived): prep on a pair measured 53-104 s, bound 120; the load start
 # 30 a node; WARM_S 10; the injection 30 (ssh) or the pause's arm 12; OBS_S 40
@@ -163,6 +168,17 @@ fails=0
 MARK="FLEDGER-MARK-$LABEL-$$"
 LD=/run/fledger_$LABEL
 KL=/root/fledger.$LABEL.$$.kmsg
+# The follower's `cat /dev/kmsg` starts at the oldest record still in the ring, so $KL begins with
+# the lines of earlier laps of the same boot; a wait that read the whole file found an earlier
+# lap's P238-FENCE-BLOCKED at once (attempt 21, f21s1: P's first match at 629.8 s, its mark at
+# 759.1 s), stamped the verdict at the injection and graded the fence series as stall after it.
+# Every wait on a line reads from this lap's mark on.  FLEDGER_KL_SINCE_MARK=0 reads the whole
+# file, as before: the control.
+if [ "${FLEDGER_KL_SINCE_MARK:-1}" = 0 ]; then
+    KS="cat $KL"
+else
+    KS="awk '/$MARK\$/{f=1} f' $KL"
+fi
 echo "=== fenced_ledger_rig_lap label=$LABEL config=$MXFS_CONFIG V=$V P=$P inject=$INJECT park=$PARK grade=$GRADE fenced_errno=${FENCED_ERRNO:-default} resend_redecide=${RESEND_REDECIDE:-default} rblk_deny_resend=${RBLK_DENY_RESEND:-default} obs_s=$OBS_S $(date -u +%FT%TZ) ==="
 s0=$(date +%s)
 el() { echo $(( $(date +%s) - s0 )); }
@@ -258,10 +274,10 @@ if [ "$INJECT" = preempt ]; then
 elif [ "$INJECT" = shutdown ]; then
     # 0x8004587d = XFS_IOC_GOINGDOWN, flag 2 = NOLOGFLUSH (tests/d379b_dirty_depart_peer_fence.sh:83)
     measure "$V" 30 "$OUT/inject.txt" '^INJECT_RC=[0-9]+$' "V's filesystem shutdown" \
-        "python3 -c \"import fcntl, os, struct; d = os.open('$MNT', os.O_RDONLY); fcntl.ioctl(d, 0x8004587d, struct.pack('I', 2)); os.close(d)\" && echo INJECT_RC=0 || echo INJECT_RC=1; sleep 2; grep -a 'P-WITHDRAW\|P163-WITHDRAW-STAMP' $KL | tail -2 | cut -c1-200"
+        "python3 -c \"import fcntl, os, struct; d = os.open('$MNT', os.O_RDONLY); fcntl.ioctl(d, 0x8004587d, struct.pack('I', 2)); os.close(d)\" && echo INJECT_RC=0 || echo INJECT_RC=1; sleep 2; $KS | grep -a 'P-WITHDRAW\|P163-WITHDRAW-STAMP' | tail -2 | cut -c1-200"
 else
     measure "$V" 30 "$OUT/inject.txt" '^INJECT_RC=[0-9]+$' "V's heartbeat pause" \
-        "echo $HB_PAUSE_MS > $PARM/dl_inject_hb_pause_ms || { echo INJECT_RC=1; exit 0; }; for i in 1 2 3 4 5 6; do sleep 2; grep -aq P-HB-INJECT-PAUSE $KL && break; done; grep -a P-HB-INJECT-PAUSE $KL | tail -1 | cut -c1-200; grep -aq P-HB-INJECT-PAUSE $KL && echo INJECT_RC=0 || echo INJECT_RC=2"
+        "echo $HB_PAUSE_MS > $PARM/dl_inject_hb_pause_ms || { echo INJECT_RC=1; exit 0; }; for i in 1 2 3 4 5 6; do sleep 2; $KS | grep -aq P-HB-INJECT-PAUSE && break; done; $KS | grep -a P-HB-INJECT-PAUSE | tail -1 | cut -c1-200; $KS | grep -aq P-HB-INJECT-PAUSE && echo INJECT_RC=0 || echo INJECT_RC=2"
 fi
 echo "STAGE inject $INJECT at $TP rc=$(field "$OUT/inject.txt" INJECT_RC)"
 ck "the injection took" "$(field "$OUT/inject.txt" INJECT_RC)" 0
@@ -272,10 +288,13 @@ ck "the injection took" "$(field "$OUT/inject.txt" INJECT_RC)" 0
 TVMS=0
 if [ "$GRADE" = survivors ]; then
     measure "$P" $(( VERDICT_S + 20 )) "$OUT/verdict.txt" '^VERDICT=' "the RECOVERY_BLOCKED verdict on P" \
-        "for i in \$(seq 1 $(( VERDICT_S / 2 ))); do grep -aq 'P238-FENCE-BLOCKED' $KL && break; sleep 2; done; grep -a 'P238-FENCE-BLOCKED' $KL | head -1 | cut -c1-220; grep -aq 'P238-FENCE-BLOCKED' $KL && echo VERDICT=\$(date +%s%3N) || echo VERDICT=none"
+        "for i in \$(seq 1 $(( VERDICT_S / 2 ))); do $KS | grep -aq 'P238-FENCE-BLOCKED' && break; sleep 2; done; $KS | grep -a 'P238-FENCE-BLOCKED' | head -1 | cut -c1-220; $KS | grep -aq 'P238-FENCE-BLOCKED' && echo VERDICT=\$(date +%s%3N) || echo VERDICT=none"
     TVMS=$(field "$OUT/verdict.txt" VERDICT)
     echo "STAGE verdict on P: ${TVMS:-none} at +$(el)s"
     case $TVMS in ''|none) TVMS=0 ;; esac
+    # what an earlier lap of this boot left in P's followed file before this lap's mark
+    measure "$P" 20 "$OUT/verdict_source.txt" '^PRE_MARK_P238=[0-9]+$' "P's verdict lines from before the mark" \
+        "awk '/$MARK\$/{exit} /P238-FENCE-BLOCKED/{n++} END{print \"PRE_MARK_P238=\" n+0}' $KL"
 fi
 
 # ---- 4. P's load runs on, then both stop
@@ -349,6 +368,22 @@ if [ "$GRADE" = survivors ]; then
         echo "  no RECOVERY_BLOCKED verdict reached $P within ${VERDICT_S}s of the injection"
         echo "RESULT: VACUOUS label=$LABEL stage=no-verdict wall=$(el)s evidence=$OUT"; exit 3
     fi
+    # The verdict's source, for D-FLEDGER-LAP-VERDICT-WAIT-READS-AN-EARLIER-LAPS-P238-FROM-BEFORE-ITS-MARK:
+    # exposed when an earlier lap's verdict precedes the mark in P's followed file; the line the
+    # wait took must then be in this lap's own log, the since-mark copy.  Graded apart from the
+    # survivors' verdict below.
+    PRE=$(field "$OUT/verdict_source.txt" PRE_MARK_P238)
+    VL=$(grep -a 'P238-FENCE-BLOCKED' "$OUT/verdict.txt" | head -1 | cut -c1-120)
+    if [ "${PRE:-0}" -gt 0 ]; then
+        echo "SINCEMARK-EXPOSED: $PRE P238-FENCE-BLOCKED line(s) of earlier laps precede this lap's mark in $P's followed log"
+        if [ -n "$VL" ] && grep -aqF -- "$VL" "$OUT/${P}_kmsg.txt"; then
+            echo "LAP verdict_source PASS: the verdict the lap waited on is in its own log"
+        else
+            echo "LAP verdict_source FAIL: the verdict the lap waited on is not in this lap's log: ${VL:-none}"
+        fi
+    else
+        echo "LAP verdict_source VACUOUS: no earlier lap's verdict precedes this lap's mark in $P's followed log"
+    fi
     echo "EXPOSED: V's recovery was declared RECOVERY_BLOCKED and the verdict reached $P"
     for n in "${SURV[@]}"; do
         ck "$n's load stopped and reported" "$(cnt "$OUT/${n}_load.txt" '^PATHLOAD ')" 1
@@ -369,13 +404,14 @@ fi
 if [ "$GRADE" = certify ]; then
     VGONE=$(cnt "$OUT/${V}_kmsg.txt" 'P277-PR-FULLSTATUS own key .* ABSENT\|P277-PR-READKEYS own key .* absent')
     SURR=$(cnt "$OUT/${V}_kmsg.txt" 'P-PR-SURRENDER ')
-    ABSENT=0; CERT=0; BLOCKED=0
+    ABSENT=0; CERT=0; BLOCKED=0; FENCED=0
     for n in "${SURV[@]}"; do
         ABSENT=$(( ABSENT + $(cnt "$OUT/${n}_kmsg.txt" 'P-PR-FENCE-ABSENT') ))
+        FENCED=$(( FENCED + $(cnt "$OUT/${n}_kmsg.txt" 'P236-FENCEKIND') ))
         CERT=$(( CERT + $(cnt "$OUT/${n}_kmsg.txt" 'P236-FENCE-CERTIFIED') ))
         BLOCKED=$(( BLOCKED + $(cnt "$OUT/${n}_kmsg.txt" 'P238-FENCE-BLOCKED') ))
     done
-    echo "STAGE certify: V key_gone=$VGONE surrender_lines=$SURR; survivors fence_absent=$ABSENT certified=$CERT blocked=$BLOCKED"
+    echo "STAGE certify: V key_gone=$VGONE surrender_lines=$SURR; survivors fenced=$FENCED fence_absent=$ABSENT certified=$CERT blocked=$BLOCKED"
     grep -a 'P-PR-SURRENDER\|P277-PR-FULLSTATUS\|P131-SELF-FENCE' "$OUT/${V}_kmsg.txt" | sed 's/.*mxfs: /    /' | cut -c1-220 | head -6
     for n in "${SURV[@]}"; do
         grep -a 'P236-FENCE-CERTIFIED\|P238-FENCE-BLOCKED\|P236-FENCEKIND' "$OUT/${n}_kmsg.txt" | sed "s/.*mxfs: /    $n: /" | cut -c1-220 | head -3
@@ -383,11 +419,11 @@ if [ "$GRADE" = certify ]; then
     for n in "${NODES[@]}"; do
         ck "$n: zero BUG / Oops" "$(cnt "$OUT/${n}_kmsg.txt" '^BUG:\|[^E]BUG:\|kernel BUG at\|Oops')" 0
     done
-    if [ "$VGONE" = 0 ] || [ "$ABSENT" = 0 ]; then
-        echo "  V found its key gone $VGONE time(s) and the survivors' fences met it absent $ABSENT time(s): the out-of-band removal never reached a fence"
-        echo "RESULT: VACUOUS label=$LABEL stage=no-absent wall=$(el)s evidence=$OUT"; exit 3
+    if [ "$VGONE" = 0 ] || [ "$FENCED" = 0 ]; then
+        echo "  V found its key gone $VGONE time(s) and the survivors fenced V $FENCED time(s): the out-of-band removal never reached a fence"
+        echo "RESULT: VACUOUS label=$LABEL stage=no-fence wall=$(el)s evidence=$OUT"; exit 3
     fi
-    echo "EXPOSED: V found its key gone and a survivor's fence met it absent ($ABSENT time(s))"
+    echo "EXPOSED: V found its key gone and the survivors fenced V ($FENCED fence line(s), $ABSENT of them met the key absent)"
     if [ "$CERT" -gt 0 ]; then echo "  PASS a survivor certified V's fence ($CERT line(s))"
     else echo "  FAIL no survivor certified V's fence within the window"; fails=$((fails+1)); fi
     if [ "$BLOCKED" = 0 ]; then echo "  PASS no survivor declared V's recovery blocked"

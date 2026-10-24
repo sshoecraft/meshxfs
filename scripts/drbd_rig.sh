@@ -283,7 +283,7 @@ NODE_UNMOUNT='
     # Every MXFS mount, not only '"$MNT"': the module does not unload under
     # any of them, and multi-death-test mounts one per resource.
     for m in $(while read -r d m t r; do [ "$t" = mxfs ] && echo "$m"; done < /proc/mounts); do
-        fuser -km "$m" 2>/dev/null; sleep 1
+        '"$(fuser_mounted_cmd '"$m"' 1)"'
         timeout 30 umount "$m" 2>/dev/null || timeout 30 umount -f "$m" 2>/dev/null
     done
     grep -q " mxfs " /proc/mounts && { echo "STOP_FAIL still mounted: $(grep " mxfs " /proc/mounts | cut -d" " -f2 | tr "\n" " ")"; exit 1; }
@@ -3327,7 +3327,7 @@ fourkn_teardown() {  # every arm's resource, loop and image, on both nodes
             [ -e /proc/\$w ] && { echo \"FKDOWN_FAIL worker \$w still running\"; exit 1; }
         fi
         rm -f /root/fourkn_worker.pid
-        for m in \$(awk '\$2 == \"$FOURKN_MNT\" {print \$2}' /proc/mounts); do fuser -km \$m 2>/dev/null; timeout 30 umount \$m; done
+        for m in \$(awk '\$2 == \"$FOURKN_MNT\" {print \$2}' /proc/mounts); do $(fuser_mounted_cmd '$m' 1) timeout 30 umount \$m; done
         for t in 1 2 3; do
             grep -q '^ *$FOURKN_MINOR: ' /proc/drbd 2>/dev/null || break  # harness-lint: ok - inside the double-quoted remote command, so the minor expands on this host before ssh
             [ -e /etc/drbd.d/$FOURKN_RES.res ] && timeout 30 drbdadm down $FOURKN_RES >/dev/null 2>&1

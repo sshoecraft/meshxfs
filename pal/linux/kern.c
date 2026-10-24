@@ -45,6 +45,9 @@
 #include <linux/vmalloc.h>
 #include <linux/bio.h>
 #include <linux/blkdev.h>
+#if MXFS_EFFECTIVE_VERSION >= KERNEL_VERSION(5, 15, 0)
+#include <linux/part_stat.h>
+#endif
 #include <linux/fs.h>
 #include <linux/kthread.h>
 #include <linux/completion.h>
@@ -5562,6 +5565,43 @@ module_param_named(dbg_pr_fill_pause_ms, mxfs_dbg_pr_fill_pause_ms, int, 0644);
 MODULE_PARM_DESC(dbg_pr_fill_pause_ms,
 	"TEST ONLY one-shot: sleep this long between finding the key still registered and registering a late path, so a test can fence the node inside that gap. Never enable in production.");
 
+/*
+ * D-LATE-PATH-REGISTER-TIMED-OUT-MAY-EXECUTE-AFTER-A-FENCE-AND-RESTORE-THE-KEY:
+ * the late path is held to its own commands while its REGISTER is out
+ * (mxfs_pr_path_hold); 0 sends the REGISTER down a path multipath may be
+ * writing through, as before: the same-build control.
+ */
+static int mxfs_pr_fill_hold = 1;
+module_param_named(pr_fill_hold, mxfs_pr_fill_hold, int, 0644);
+MODULE_PARM_DESC(pr_fill_hold,
+	"late-path registration: 1 holds the path to the fill's own commands from before its REGISTER until the outcome is known, so no request of this node is queued on that nexus behind a REGISTER that may execute after a fence (default); 0 = no hold (same-build control)");
+
+static int mxfs_dbg_pr_fill_outstanding_ms;
+module_param_named(dbg_pr_fill_outstanding_ms, mxfs_dbg_pr_fill_outstanding_ms, int, 0644);
+MODULE_PARM_DESC(dbg_pr_fill_outstanding_ms,
+	"TEST ONLY one-shot: after a late REGISTER returns, wait this long before reading its outcome, as if it were still outstanding, and print how many commands this node dispatched down that path meanwhile. Never enable in production.");
+
+/*
+ * Power-management requests are the only ones a quiesced scsi_device admits
+ * (scsi_device_quiesce: blk_set_pm_only, SDEV_QUIESCE), and BLK_MQ_REQ_PM with
+ * RQF_PM marks them from 5.11; before it the flag was RQF_PREEMPT, and the
+ * hold is not built.  A PR command sent down a path this thread holds is the
+ * fill's own and carries the flag; any other passes through as before.
+ */
+#if MXFS_EFFECTIVE_VERSION >= KERNEL_VERSION(5, 11, 0)
+#define MXFS_PR_FILL_CAN_HOLD	1
+static bool mxfs_pr_path_held_here(struct scsi_device *sdev)
+{
+	return READ_ONCE(sdev->quiesced_by) == current;
+}
+#else
+#define MXFS_PR_FILL_CAN_HOLD	0
+static bool mxfs_pr_path_held_here(struct scsi_device *sdev)
+{
+	return false;
+}
+#endif
+
 static void mxfs_pr_be64_put(u8 *b, u64 v)
 {
 	int i;
@@ -6499,7 +6539,11 @@ static int mxfs_prout_path(struct scsi_device *sdev, u8 sa, u8 type,
 			data[20] = 0x01;
 #if MXFS_EFFECTIVE_VERSION >= KERNEL_VERSION(6, 3, 0)
 		{
-			struct scsi_exec_args args = { .sshdr = &sshdr };
+			struct scsi_exec_args args = {
+				.sshdr = &sshdr,
+				.req_flags = mxfs_pr_path_held_here(sdev) ?
+					     BLK_MQ_REQ_PM : 0,
+			};
 
 			ret = scsi_execute_cmd(sdev, cdb, REQ_OP_DRV_OUT, data,
 					       sizeof(data), MXFS_PR_PATH_TIMEOUT,
@@ -6507,7 +6551,8 @@ static int mxfs_prout_path(struct scsi_device *sdev, u8 sa, u8 type,
 		}
 #else
 		ret = scsi_execute(sdev, cdb, DMA_TO_DEVICE, data, sizeof(data),
-				   NULL, &sshdr, MXFS_PR_PATH_TIMEOUT, 0, 0, 0,
+				   NULL, &sshdr, MXFS_PR_PATH_TIMEOUT, 0, 0,
+				   mxfs_pr_path_held_here(sdev) ? RQF_PM : 0,
 				   NULL);
 #endif
 		if (!(ret > 0 && scsi_sense_valid(&sshdr) &&
@@ -6541,14 +6586,20 @@ static int mxfs_prin_path(struct scsi_device *sdev, u8 sa, u8 *buf, int len)
 		cdb[8] = (u8)len;
 #if MXFS_EFFECTIVE_VERSION >= KERNEL_VERSION(6, 3, 0)
 		{
-			struct scsi_exec_args args = { .sshdr = &sshdr };
+			struct scsi_exec_args args = {
+				.sshdr = &sshdr,
+				.req_flags = mxfs_pr_path_held_here(sdev) ?
+					     BLK_MQ_REQ_PM : 0,
+			};
 
 			ret = scsi_execute_cmd(sdev, cdb, REQ_OP_DRV_IN, buf, len,
 					       MXFS_PR_PATH_TIMEOUT, 0, &args);
 		}
 #else
 		ret = scsi_execute(sdev, cdb, DMA_FROM_DEVICE, buf, len, NULL,
-				   &sshdr, MXFS_PR_PATH_TIMEOUT, 0, 0, 0, NULL);
+				   &sshdr, MXFS_PR_PATH_TIMEOUT, 0, 0,
+				   mxfs_pr_path_held_here(sdev) ? RQF_PM : 0,
+				   NULL);
 #endif
 		if (!(ret > 0 && scsi_sense_valid(&sshdr) &&
 		      sshdr.sense_key == UNIT_ATTENTION &&
@@ -7070,6 +7121,17 @@ EXPORT_SYMBOL_GPL(mxfs_pal_scsi_pr_collapse_to_one_nexus);
  * silent-peer-death-under-the-stall-limit.md, 'Registering a late path under
  * a short lease').  fence_ms 0: no bound and no quarantine, as before.
  *
+ * Taking the path offline keeps the node's later requests off it, but not
+ * one already sent down it behind the REGISTER: if the REGISTER executes
+ * after the fence, a write queued behind it on that nexus executes too, with
+ * the key registered again (D-LATE-PATH-REGISTER-TIMED-OUT-MAY-EXECUTE-AFTER-
+ * A-FENCE-AND-RESTORE-THE-KEY).  So with fence_ms the path is held to the
+ * fill's own commands (mxfs_pr_path_hold) from before the REGISTER until its
+ * outcome is known: what was in flight on it has completed before the
+ * REGISTER is sent, and nothing else is sent until the registration is
+ * verified, undone, or the path quarantined.  A REGISTER that executes late
+ * then registers a nexus the fenced node sends nothing more through.
+ *
  * Returns 0 when there was nothing to do or every late path was registered
  * and verified; -ESTALE when `key` was found registered nowhere, or was
  * found alone on the late path after registering it (the caller treats
@@ -7100,6 +7162,58 @@ static void mxfs_pr_path_quarantine(struct scsi_device *p, const char *disk,
 	       (unsigned long long)p->lun, (unsigned long long)key,
 	       register_rc, unregister_rc, rc, p->host->host_no, p->channel,
 	       p->id, (unsigned long long)p->lun);
+}
+
+/*
+ * Hold a late path to the fill's own commands: drain what this node has in
+ * flight on it and keep every other request off it until
+ * mxfs_pr_path_release.  Multipath's I/O waits in the block layer meanwhile
+ * (its clone allocation fails and dm requeues it, to this path or another),
+ * as does the path checker's TEST UNIT READY, so the path is not reinstated
+ * under a REGISTER either.
+ *
+ * Only a path with nothing in flight is held: the drain then waits on no
+ * stalled command, and the fill runs on the worker that also evaluates the
+ * lease.  0: held.  -EBUSY: not held now (requests in flight, another holder,
+ * or a state the device cannot be quiesced from); a later beat tries again.
+ * -EOPNOTSUPP: a kernel before 5.11, where the fill runs unheld, as before.
+ */
+static int mxfs_pr_path_hold(struct scsi_device *p)
+{
+#if MXFS_PR_FILL_CAN_HOLD
+	if (READ_ONCE(p->quiesced_by))
+		return -EBUSY;
+	if (blk_mq_queue_inflight(p->request_queue))
+		return -EBUSY;
+	return scsi_device_quiesce(p) ? -EBUSY : 0;
+#else
+	return -EOPNOTSUPP;
+#endif
+}
+
+/*
+ * End a hold.  A path quarantined under it is OFFLINE by now, and resuming
+ * leaves that state: the requests that waited are failed by the midlayer and
+ * multipath fails the path.
+ */
+static void mxfs_pr_path_release(struct scsi_device *p)
+{
+#if MXFS_PR_FILL_CAN_HOLD
+	scsi_device_resume(p);
+#endif
+}
+
+/* The writes completed on a path's own disk, which counts what multipath
+ * clones onto it (dbg_pr_fill_outstanding_ms); -1 where it cannot be read. */
+static long mxfs_pr_path_writes(struct scsi_device *p)
+{
+#if MXFS_EFFECTIVE_VERSION >= KERNEL_VERSION(5, 15, 0)
+	struct gendisk *disk = p->request_queue->disk;
+
+	return disk ? (long)part_stat_read(disk->part0, ios[STAT_WRITE]) : -1;
+#else
+	return -1;
+#endif
 }
 
 int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key,
@@ -7158,7 +7272,8 @@ int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key,
 	for (i = 0; i < t.n; i++) {
 		struct scsi_device *p = t.p[i];
 		uint64_t issued_ms = 0, register_ms = 0;
-		int r, c, u;
+		bool held;
+		int r, c, u, h;
 
 		if (t.r[i] == 0 || !scsi_device_online(p))
 			continue;
@@ -7206,6 +7321,25 @@ int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key,
 				(unsigned long long)key, ms);
 			msleep(ms);
 		}
+		/* nothing of this node in flight on the path, and nothing sent
+		 * down it but the fill's own commands until the REGISTER's
+		 * outcome is known; held before the admission check below, so
+		 * the drain's time counts against the bound */
+		held = false;
+		if (fence_ms && READ_ONCE(mxfs_pr_fill_hold)) {
+			h = mxfs_pr_path_hold(p);
+			if (h == -EBUSY) {
+				pr_info_ratelimited("mxfs: P-PR-PATH-FILL-BUSY %s path %d:%d:%d:%llu key=0x%llx -- requests are in flight on the late path, so it cannot be held to the REGISTER alone; it waits for a later beat\n",
+					dev->bdev->bd_disk->disk_name,
+					p->host->host_no, p->channel, p->id,
+					(unsigned long long)p->lun,
+					(unsigned long long)key);
+				if (!ret)
+					ret = -EAGAIN;
+				continue;
+			}
+			held = h == 0;
+		}
 		/* admitted only if the command's timeout ends before a peer may
 		 * fence this node; the next landed beat moves fence_ms on */
 		if (fence_ms) {
@@ -7219,6 +7353,8 @@ int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key,
 					(unsigned long long)p->lun,
 					(unsigned long long)key,
 					(long long)(fence_ms - now));
+				if (held)
+					mxfs_pr_path_release(p);
 				if (!ret)
 					ret = -EAGAIN;
 				continue;
@@ -7227,12 +7363,28 @@ int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key,
 		issued_ms = mxfs_pal_time_ms();
 		r = mxfs_prout_path(p, 0x00, 0, 0, key);
 		register_ms = mxfs_pal_time_ms() - issued_ms;
+		if (unlikely(mxfs_dbg_pr_fill_outstanding_ms > 0)) {
+			int ms = xchg(&mxfs_dbg_pr_fill_outstanding_ms, 0);
+			int sent = atomic_read(&p->iorequest_cnt);
+			long w0 = mxfs_pr_path_writes(p), w1;
+
+			msleep(ms);
+			sent = atomic_read(&p->iorequest_cnt) - sent;
+			w1 = mxfs_pr_path_writes(p);
+			pr_warn("mxfs: P-DBG-PR-FILL-OUTSTANDING %s path %d:%d:%d:%llu key=0x%llx register_rc=%d ms=%d held=%d requests_sent=%d writes_done=%ld -- TEST: the late REGISTER was treated as unresolved this long; requests_sent is every command this node dispatched down the path meanwhile, writes_done the writes completed on it (-1: not readable)\n",
+				dev->bdev->bd_disk->disk_name, p->host->host_no,
+				p->channel, p->id, (unsigned long long)p->lun,
+				(unsigned long long)key, r, ms, held ? 1 : 0,
+				sent, (w0 < 0 || w1 < 0) ? -1L : w1 - w0);
+		}
 		if (fence_ms && MXFS_PR_OUTCOME_UNKNOWN(r)) {
 			/* it may still execute at the target, after a fence:
 			 * nothing may use or count this path again */
 			u = mxfs_prout_path(p, 0x00, 0, key, 0);
 			mxfs_pr_path_quarantine(p, dev->bdev->bd_disk->disk_name,
 						key, r, u);
+			if (held)
+				mxfs_pr_path_release(p);
 			if (!ret)
 				ret = -EAGAIN;
 			continue;
@@ -7247,6 +7399,8 @@ int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key,
 				dev->bdev->bd_disk->disk_name, p->host->host_no,
 				p->channel, p->id, (unsigned long long)p->lun,
 				(unsigned long long)key);
+			if (held)
+				mxfs_pr_path_release(p);
 			if (!ret)
 				ret = -EAGAIN;
 			continue;
@@ -7258,6 +7412,8 @@ int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key,
 			if (fence_ms && MXFS_PR_OUTCOME_UNKNOWN(u))
 				mxfs_pr_path_quarantine(p,
 					dev->bdev->bd_disk->disk_name, key, r, u);
+			if (held)
+				mxfs_pr_path_release(p);
 			if (u && u != SAM_STAT_RESERVATION_CONFLICT) {
 				spin_lock(&mxfs_pr_map_lock);
 				m = mxfs_pr_map_find(devt);
@@ -7285,6 +7441,8 @@ int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key,
 			(unsigned long long)key, c,
 			(unsigned long long)register_ms,
 			fence_ms ? (long long)(fence_ms - issued_ms) : -1LL);
+		if (held)
+			mxfs_pr_path_release(p);
 		if (added)
 			(*added)++;
 known:

@@ -249,12 +249,18 @@ def reap(proc, lap: dict) -> None:
                 pass
 
 
-def waited_s(path) -> float:
+def waited_s(path, since: float = 0.0) -> float:
     """Seconds the lap spent waiting on locks other lanes held, from the wait ledger run.sh,
     tools/lun_pool.sh, scripts/clyde_preflight.sh and tests/lib/runlock.sh append to
     ('begin <pid> <epoch> <cap s> <what>', 'end <pid> <epoch>'): the union of the waits, so two
     of the lap's processes waiting at once count once, and a wait not yet ended counts until now,
-    at most its own cap."""
+    at most its own cap.
+
+    `since` (an epoch): only what of each wait falls after it. A step a lap bounds itself
+    (tools/lap_bounded.py) reads the lap's whole ledger, and counting the waits of steps before
+    it extended its own bound by them: in verification b20261024-22bcc8 the wait arm's 19 s let
+    the next two arms run their 15 s against a 10 s bound
+    (D-LAP-OWN-PREP-BOUND-COUNTS-OTHER-LANES-WAITS-AND-RETURNS-BEFORE-ITS-RUN-LETS-GO)."""
     if path is None:
         return 0.0
     try:
@@ -273,6 +279,7 @@ def waited_s(path) -> float:
         except (IndexError, ValueError):
             continue
     spans += [(begin, min(now, begin + cap)) for begin, cap in open_waits.values()]
+    spans = [(max(begin, since), end) for begin, end in spans if end > since]
     total, reach = 0.0, None
     for begin, end in sorted(spans):
         if reach is None or begin > reach:
@@ -323,11 +330,12 @@ def run_bounded(command: list, cwd, handle, bound: int, waits=None) -> int:
         except subprocess.TimeoutExpired:
             return 124
     become_subreaper()
+    since = time.time()
     proc = subprocess.Popen(command, cwd=cwd, stdout=handle, stderr=subprocess.STDOUT,
                             start_new_session=True)
     start = time.monotonic()
     while True:
-        left = start + bound + waited_s(waits) - time.monotonic()
+        left = start + bound + waited_s(waits, since) - time.monotonic()
         if left <= 0:
             break
         try:
@@ -355,7 +363,7 @@ def run_bounded(command: list, cwd, handle, bound: int, waits=None) -> int:
     lap = lap_processes(leader)
     left = ("gone" if not lap else "STILL ALIVE after SIGKILL: " +
             " ".join(f"{pid}({state})" for pid, state in sorted(lap.items())))
-    handle.write(f"=== the lap overran its bound of {bound}s (and {waited_s(waits):.0f}s it waited "
+    handle.write(f"=== the lap overran its bound of {bound}s (and {waited_s(waits, since):.0f}s it waited "
                  f"on other lanes): the {started} process(es) it had started were ended ({left}) ===\n")
     handle.flush()
     return 124
