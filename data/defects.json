@@ -6059,7 +6059,7 @@
           "candidate": "0.90.134",
           "build": "",
           "variant": "",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -6089,6 +6089,21 @@
           "kind": "calibrate",
           "batch": "b20261024-8c98b7",
           "k": 1,
+          "n": 10,
+          "candidate": "0.90.134",
+          "variant": "",
+          "builds": [
+            "8DBA16AEB7FDD3066C9C1BC"
+          ],
+          "date": "2026-10-24"
+        },
+        {
+          "row": "lap:foreign_replay_ag",
+          "config": "4/disk/caw/direct",
+          "platform": "any",
+          "kind": "calibrate",
+          "batch": "b20261024-a46ac0",
+          "k": 0,
           "n": 10,
           "candidate": "0.90.134",
           "variant": "",
@@ -7600,7 +7615,7 @@
           "candidate": "0.90.134",
           "build": "8DBA16AEB7FDD3066C9C1BC",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -7690,6 +7705,18 @@
           "config": "2/disk/caw/direct",
           "row": "lap:lockrec_slot0",
           "iso": "2026-10-24T12:59:05Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T12:49:30Z",
+          "build": "8DBA16AEB7FDD3066C9C1BC",
+          "batch": "b20261024-0a3f62",
+          "approval": "P20261024-e2fcdf",
+          "date": "2026-10-24"
         }
       ]
     },
@@ -7893,7 +7920,7 @@
       "opened": "2026-10-23",
       "summary": "tests/fourkn_merge_2node.sh bounds each node's workload only on the ssh client (on ... \"$WBOUND\", :177-178), so a workload that overruns its bound leaves tests/fourkn_merge_worker.sh running on the node with /mnt/fourkn open: the lap's unmount fails 'target is busy', and every following lap aborts at its own unmount-and-rmmod before insmod (rc=2, INCOMPLETE) until the leftover worker finishes",
       "evidence": "Control batch b20261023-777805 (lane tests/evidence/lanes/g2d_a14_merge2node_20261023T204131Z, step4.log, 2/disk/caw/direct4k, test31/test32, build 79779BEAECBEA94844FDC72): lap 29 (tests/evidence/20261023T211446Z_fourkn_merge_2-disk-caw-direct4k) overran at 130 s after its workload started 21:16:45Z; laps 30-45 then each ended in 8-9 s with lap.log 'ABORT insmod test31: [umount: /mnt/fourkn: target is busy. rmmod: ERROR: Module mxfs is in use ...' (e.g. 20261023T211656Z_..., 20261023T212144Z_...). test31's kernel log (tests/evidence/merge_stall_20261023T2114Z_g2d/test31.kmsg.txt) shows the lap-29 mount's merged-write traffic continuing at 3-6k lines per 30 s from 21:16:30 to 21:19:30Z and the unmount seal only at 21:19:32.970 (P-SB-SEAL-OK), so the worker kept the mount for 2.75 min after the client gave up. Lap 46 (20261023T211924Z_...) repeated it: 'workload wall 19019 ms; test31: rc=1 ; test32: rc=1', w1.txt/w2.txt empty, 'FAIL umount test31: umount: /mnt/fourkn: target is busy.|umount_rc=32|', then laps 47-48 aborted the same way. The overruns themselves came from host-disk saturation (sar sda 100 %util, 450-527 MB/s reads, 16:15-16:22 CDT; the lap's mean CAW service time 0.5 ms healthy, 15.0 ms in that window), recorded separately; this record is the lap leaving its worker behind. ===== 2026-10-24, attempt 17 (the node-side bound is in its tree). The lap tests/merge_overrun_lap.sh graded both of lane g2d_a17b's prechecks VACUOUS for a fault of its own: it tested 'rc=124' on fourkn_merge_2node's workload line, whose rc is the exit of the grep that filters the ssh client's output (1 for a killed client, 0 for a self-stopped worker). It also counted fuser -m on a directory that is no longer a mount point, which counts every root-filesystem user. Corrected in tests/evidence/drafts/tree/tests/merge_overrun_lap.sh: exposure is the workload wall against the node-side bound, and the hold is /proc/mounts plus the worker's comm (fourkn_merge_wo). Prechecks of the corrected lap at 2/net/mesh/direct4k on test17/test18 (lanes tests/evidence/lanes/g2e_a17mo_20261024T105659Z step 4 and g2e_a17mo2_* steps 4-6). Fix on, mop2 and mop3: workload wall 13465 and 13457 ms, both workers WORKER_STOPPED, 'mounted=0 workers=0' on both nodes, PASS. MERGE_NODE_BOUND=0, moc2 and moc3: wall 16019 and 16020 ms, the clients killed, 'mounted=1 workers=1' on both nodes 8 s later (the worker's pid and etimes listed), FAIL. The lap's cleanup ended each worker and unmounted, and the next lap started clean. Next: apply the corrected lap at the next attempt, then the control (MERGE_NODE_BOUND=0) and the verification, bound 660 s a lap. ===== 2026-10-24: no longer names 2/net/mesh/direct4k:lap:merge_overrun:2026-10-24T13:00:26Z, named by D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE; 2/net/mesh/direct4k:lap:merge_overrun:2026-10-24T13:00:03Z, named by D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE; 2/net/mesh/direct4k:lap:merge_overrun:2026-10-24T12:59:27Z, named by D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE; 2/net/mesh/direct4k:lap:merge_overrun:2026-10-24T12:59:04Z, named by D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE; 2/net/mesh/direct4k:lap:merge_overrun:2026-10-24T12:58:40Z, named by D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE; 2/net/mesh/direct4k:lap:merge_overrun:2026-10-24T12:58:17Z, named by D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE; 2/net/mesh/direct4k:lap:merge_overrun:2026-10-24T12:57:54Z, named by D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE; 2/net/mesh/direct4k:lap:merge_overrun:2026-10-24T12:57:27Z, named by D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE; 2/net/mesh/direct4k:lap:merge_overrun:2026-10-24T12:56:55Z, named by D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE; 2/net/mesh/direct4k:lap:merge_overrun:2026-10-24T12:56:08Z, named by D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE: Control b20261024-f38319 (lane tests/evidence/lanes/g2e_a18_20261024T125338Z step 3): all 10 laps INCOMPLETE rc=2, each aborting before its workload ('LAP merge_overrun ABORT: the merge lap ended before its workload: ... ABORT insmod test17: [rmmod: ERROR: Module mxfs is in use', e.g. tests/evidence/batch_laps/b20261024-f38319/20261024T130004Z-80cc1555.log) because the lane's prep mount held the module; no workload ran, so no overrun and no leftover worker. D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE names all 10.",
-      "next": "Fix built in the sibling tree /home/steve/src/mxfs-a15 for the next attempt: the worker runs on the node under 'timeout --foreground $((WBOUND - 3))', so it stops itself after the step in hand (WORKER_STOPPED, its SIGTERM trap) before the client's bound runs out. Then a precheck that forces an overrun (e.g. ROUNDS large enough to pass WBOUND) and requires the next lap to start clean, a control with the node bound off, a verification sized from it, and remove --fixed.",
+      "next": "Fix built in the sibling tree /home/steve/src/mxfs-a15 for the next attempt: the worker runs on the node under 'timeout --foreground $((WBOUND - 3))', so it stops itself after the step in hand (WORKER_STOPPED, its SIGTERM trap) before the client's bound runs out. Then a precheck that forces an overrun (e.g. ROUNDS large enough to pass WBOUND) and requires the next lap to start clean, a control with the node bound off, a verification sized from it, and remove --fixed. ===== 2026-10-24: verify P20261024-51f1e6 applied (b20261024-c6a721, 6 of 6 at 2/net/mesh/direct4k from control b20261024-5a5875 10 of 10, attempt 18); the 10 cells there are retired. Narrowing P20261024-bead94 to 2/*/*/direct4k REJECTED (data/reviews/P20261024-bead94.md): argued from code, while runs of tests/fourkn_merge_2node.sh are recorded under whatever MXFS_CONFIG says (default 2/net/mesh/direct, :108; seven laps on 2026-10-22 under 2/disk/caw/direct and 2/net/mesh/direct). The same client-only bound in the suite row is its own record, D-FOURKN-MERGE-SUITE-ROW-WORKER-BOUNDED-ONLY-ON-THE-SSH-CLIENT. Supporting, not a batch: lap 2 of control b20261024-f31760 (lap:fourkn_merge_2node at 2/disk/caw/direct4k, attempt 18, the node bound in) overran naturally ('WORKER_STOPPED at=18:19 rounds=20 ... wall_ms=16003') and then 'OK umount test31', 'OK umount test32', and the next lap started clean. Next, on the next attempt: control (MERGE_NODE_BOUND=0) and verification of lap:merge_overrun at 2/disk/caw/direct4k (g2d, test31/test32, after the unmount-and-unload step), retiring the 18 cells there; then remove --fixed, its scope argued from the runs at both 4K-native configurations.",
       "reproducer": "tests/fourkn_merge_2node.sh <4096-byte pool LUN> test31 test32 with ROUNDS raised so the workload passes its bound (WBOUND 16 s unheld): the lap FAILs its workload checks, its unmount reports 'target is busy', and an immediately following lap ABORTs at insmod",
       "cells": [
         {
@@ -8084,7 +8111,7 @@
           "candidate": "0.90.134",
           "build": "8DBA16AEB7FDD3066C9C1BC",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -8121,6 +8148,18 @@
           "builds": [
             "8DBA16AEB7FDD3066C9C1BC"
           ],
+          "date": "2026-10-24"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T12:49:30Z",
+          "build": "8DBA16AEB7FDD3066C9C1BC",
+          "batch": "b20261024-c6a721",
+          "approval": "P20261024-51f1e6",
           "date": "2026-10-24"
         }
       ]
@@ -8397,7 +8436,7 @@
       "opened": "2026-10-24",
       "summary": "tests/drbd_write_bound_arm.sh, given a bare node count in MXFS_NODES (the fix of D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP), and with MXFS_NODES unset, uses its built-in default pair test3/test4 and ignores MXFS_GROUP, so run from a lane of another group it addresses test3/test4, which belong to group g4 (test3-test6), a lane that may be running on them",
       "evidence": "Code read: tests/drbd_write_bound_arm.sh:36-41 ('MXFS_NODES=\"\"' for a bare number, then 'export MXFS_NODES=${MXFS_NODES:-test3 test4}'); found by review data/reviews/P20261024-289caf.md, whose laps (tests/evidence/batch_laps/b20261024-8ef8c9) print the arm selecting test3 test4 from a g2 lane. No run has yet collided: this is a hazard read from the code and the laps' own selection, not an observed failure.",
-      "next": "Make the arm resolve its pair as scripts/drbd_rig.sh does (MXFS_GROUP's nodes when MXFS_NODES is a count or unset), with a switch for the control; a lap that runs the arm's node resolution with MXFS_GROUP=g2 and requires test1 test2; control (switch off) prints test3 test4; verification; remove --fixed.",
+      "next": "Make the arm resolve its pair as scripts/drbd_rig.sh does (MXFS_GROUP's nodes when MXFS_NODES is a count or unset), with a switch for the control; a lap that runs the arm's node resolution with MXFS_GROUP=g2 and requires test1 test2; control (switch off) prints test3 test4; verification; remove --fixed. ===== 2026-10-24: the arm's fix is in attempt 18's frozen tree (tests/drbd_write_bound_arm.sh :40-52: with no pair named it takes MXFS_GROUP's two nodes from tools/mxfs_lab.sh group, g2 when unset; DRBD_ARM_GROUP=0 takes test3 test4, the control), and tests/drbd_nodes_count_lap.sh in that tree still expects the arm's old default pair (:72-74), so it would fail with the fix in. Lap drafted for the next attempt in tests/evidence/drafts/tree/tests/drbd_nodes_count_lap.sh: the arm part requires the g2 pair, test1 test2, from MXFS_NODES=2 MXFS_GROUP=g2 (EXPOSED names both), and DRBD_ARM_GROUP=0 in the lap's environment is this record's control (DRBD_RIG_NODES_COUNT=0 stays the earlier record's). Precheck on attempt 18's tree of the arm's own resolution (DRBD_ARM_PRINT_NODES=1 MXFS_NODES=2 MXFS_GROUP=g2): fix 'DRBD_ARM_NODES test1 test2', DRBD_ARM_GROUP=0 'DRBD_ARM_NODES test3 test4'; MXFS_NODES unset with MXFS_GROUP=g2b 'DRBD_ARM_NODES test15 test16'. Next, on the next attempt with the draft applied (host lane, bound 30 s a lap as the lap derives): control --row lap:drbd_arm_group --at 2/net/mesh/drbd --knob 'DRBD_ARM_GROUP=0' -- env DRBD_ARM_GROUP=0 tests/drbd_nodes_count_lap.sh dag{lap}, probe '^EXPOSED: ', pass '^LAP drbd_nodes_count PASS', fail '^LAP drbd_nodes_count FAIL'; the verification sized from it; remove --fixed.",
       "updated": "2026-10-24"
     },
     {
@@ -9010,248 +9049,14 @@
       ]
     },
     {
-      "id": "D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE",
+      "id": "D-FOURKN-MERGE-SUITE-ROW-WORKER-BOUNDED-ONLY-ON-THE-SSH-CLIENT",
       "severity": "minor",
       "nodes": 1,
       "config": "*/*/*",
       "opened": "2026-10-24",
-      "summary": "Every lap of lanes g2d_a18 (lap:fourkn_merge_2node at 2/disk/caw/direct4k: control b20261024-4a1349, 20 laps, and verification b20261024-c13feb, 16 laps before the step was stopped) and g2e_a18 (lap:merge_overrun at 2/net/mesh/direct4k, control b20261024-f38319, 10 laps) ended INCOMPLETE rc=2 within 9-25 s: tests/fourkn_merge_2node.sh unmounts only its own /mnt/fourkn before rmmod (:158), while each lane's step 2 (MXFS_FORCE_PREP=1 ./run.sh <config> --group <g> prep_cluster) had left the pool LUN mounted at /mnt/shared on both nodes, so rmmod failed 'Module mxfs is in use' and insmod 'File exists'. The attempt-17 queues of the same laps (tests/evidence/lanes/queue_g2d_a17b.txt, queue_g2e_a17mo2.txt) carried a step after the prep that unmounts /mnt/shared and unloads the module; the attempt-18 queues (queue_g2d_a18.txt, queue_g2e_a18.txt) omitted it.",
-      "evidence": "Lap logs: tests/evidence/batch_laps/b20261024-4a1349/20261024T125650Z-*.log ends '2026-10-24T12:57:15Z ABORT insmod test31: [rmmod: ERROR: Module mxfs is in use 343ce1754e44b0da5611a4cf4a4161aa insmod: ERROR: could not insert module /root/mxfs.ko.fourkn: File exists 8DBA16AEB7FDD3066C9C1BC 4096 0 1 0 ]'; b20261024-f38319/20261024T130004Z-80cc1555.log 'LAP merge_overrun ABORT: the merge lap ended before its workload: ... ABORT insmod test17: [rmmod: ERROR: Module mxfs is in use ...'. Measured at 13:05Z on test31 (lane g2d_a18 still up): /proc/mounts '/dev/sda /mnt/shared mxfs rw,relatime,inode64,logbufs=8,logbsize=32k,noquota 0 0', lsmod 'mxfs 12881920 1'. Lane summaries tests/evidence/lanes/g2d_a18_20261024T125453Z/summary.log (step 2 prep_cluster rc=0 at 12:56:47Z, step 3 control, step 4 verify stopped by SIGTERM rc=143 at 13:04:54Z) and g2e_a18_20261024T125338Z/summary.log (step 2 prep rc=0, step 3 control 0 of 10 failed, all INCOMPLETE; step 4 plan-verify refused, no failing rate).",
-      "next": "Re-queue both lanes with the unmount-and-unload step after the prep (as the attempt-17 queues had) and run the control and verification of each lap again on attempt 18; then propose remove --disproved: the INCOMPLETE laps were made by the lane's own prep mount, measured on test31, not by MXFS, and the re-queued laps pass the insmod step on the same pair and build.",
-      "cells": [
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:merge_overrun",
-          "iso": "2026-10-24T12:56:08Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:merge_overrun",
-          "iso": "2026-10-24T12:56:55Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:57:15Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:merge_overrun",
-          "iso": "2026-10-24T12:57:27Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:57:41Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:57:51Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:merge_overrun",
-          "iso": "2026-10-24T12:57:54Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:58:02Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:58:12Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:merge_overrun",
-          "iso": "2026-10-24T12:58:17Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:58:23Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:58:33Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:merge_overrun",
-          "iso": "2026-10-24T12:58:40Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:58:44Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:58:54Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:merge_overrun",
-          "iso": "2026-10-24T12:59:04Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:59:05Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:59:15Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:merge_overrun",
-          "iso": "2026-10-24T12:59:27Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T12:59:50Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:00:00Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:merge_overrun",
-          "iso": "2026-10-24T13:00:03Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:00:11Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:00:22Z"
-        },
-        {
-          "config": "2/net/mesh/direct4k",
-          "row": "lap:merge_overrun",
-          "iso": "2026-10-24T13:00:26Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:00:32Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:00:43Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:00:53Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:01:03Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:01:14Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:01:32Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:02:09Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:02:19Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:02:29Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:02:40Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:02:50Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:03:01Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:03:11Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:03:21Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:03:32Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:03:42Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:03:52Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:04:03Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:04:35Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:04:45Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:fourkn_merge_2node",
-          "iso": "2026-10-24T13:04:56Z"
-        }
-      ],
-      "reproducer": "a lane queue (scripts/rig_lane.sh) whose MXFS_FORCE_PREP=1 ./run.sh <config> --group <g> prep_cluster step is followed directly by a harness_batch.py batch of tests/fourkn_merge_2node.sh or tests/merge_overrun_lap.sh, with no step unmounting /mnt/shared and unloading mxfs between them (tests/evidence/lanes/queue_g2d_a18.txt, queue_g2e_a18.txt)",
-      "updated": "2026-10-24"
+      "summary": "tests/suite/fourkn_merge.sh (the board's merged-write row on a 4K-native volume) runs each node's tests/fourkn_merge_worker.sh bounded only on the ssh client (:155-156, rs \"$WBOUND\" through tests/lib/rig.sh rs), as tests/fourkn_merge_2node.sh did before its node-side bound: a workload that overruns WBOUND leaves the worker running on the node with the mount open after the row has ended",
+      "evidence": "Code read in review data/reviews/P20261024-bead94.md (2026-10-24): tests/suite/fourkn_merge.sh:155-156 'rs \"$WBOUND\" \"$N1\" \"/src/mxfs/tests/fourkn_merge_worker.sh $DIR 1 $ROUNDS $NF\"', with no bound on the node; scripts/drbd_rig.sh:3411 runs the same worker with a node-side bound. The same mechanism in tests/fourkn_merge_2node.sh was observed (D-FOURKN-MERGE-LAP-OVERRUN-LEAVES-ITS-WORKER-HOLDING-THE-MOUNT: after an overrun the worker held /mnt/fourkn 2.75 min and the next laps' unmounts failed 'target is busy'). No board run of this row has yet overrun: a hazard read from the code, not an observed failure.",
+      "next": "Fix drafted for the next attempt in tests/evidence/drafts/tree/tests/suite/fourkn_merge.sh: the worker runs under 'timeout --foreground $((WBOUND - 3))' on its node (as tests/fourkn_merge_2node.sh :183-189); FOURKN_MERGE_NODE_BOUND=0 bounds the client alone, as before (the control). Then a lap that runs the row with an overrun forced (ROUNDS large enough to pass WBOUND, given to the row through MXFS_TEST_ENV) on a 2/disk/caw/direct4k or 2/net/mesh/direct4k pair and requires, 8 s after the row, no worker on either node and the volume unmountable; the control (FOURKN_MERGE_NODE_BOUND=0), a verification sized from it, remove --fixed."
     }
   ]
 }

@@ -8583,8 +8583,15 @@
         "tests/evidence/batch_laps/b20261024-5a5875/20261024T131937Z-8971eaba.log",
         "tests/evidence/batch_laps/b20261024-5a5875/20261024T132059Z-37b15e1a.log"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-51f1e6.md",
+        "sha256": "835aa54ab4e9150ea22f0bcee03a4c76cbdd3edefcb63aee0233379b7bae4a88",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-314812",
@@ -8649,8 +8656,15 @@
         "tests/evidence/lanes/g2e_a18c_20261024T130630Z/step4.log",
         "tests/evidence/lanes/g2e_a18c_20261024T130630Z/step5.log"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-314812.md",
+        "sha256": "457b3be5f119d2426d16fd302cf4d21bc3b9b29803e2df5d99bdb5b16e123f45",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-e2fcdf",
@@ -8677,6 +8691,66 @@
         "tests/evidence/batch_laps/b20261024-13351b/20261024T130601Z-2f6eb419.log",
         "tests/evidence/batch_laps/b20261024-13351b/20261024T130708Z-32d1e18f.log",
         "tests/evidence/batch_laps/b20261024-13351b/20261024T130845Z-81d3e634.log"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-e2fcdf.md",
+        "sha256": "b48418d1bfd59eda90aebc7ddc25735ce466788110981e4b43b1243d72673db4",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-bead94",
+      "kind": "narrow",
+      "record": "D-FOURKN-MERGE-LAP-OVERRUN-LEAVES-ITS-WORKER-HOLDING-THE-MOUNT",
+      "change": {
+        "nodes": 2,
+        "config": "*/*/direct4k"
+      },
+      "argument": "The defect is in two rig laps, not in the module, and both run only on a two-node pair over a 4096-byte LUN, so no other configuration can show it. tests/fourkn_merge_2node.sh takes exactly two nodes (:107 'DEV=${1:?device}; N1=${2:?node1}; N2=${3:?node2}') and aborts unless each node's insmod reports a 4096-byte logical block (:159, the expected tuple '$KOMD5 $SV 4096 $FT 1 0'); tests/merge_overrun_lap.sh runs fourkn_merge_2node.sh on its own two nodes (its header). Every run the record names is at a 2-node 4K-native configuration: 18 cells at 2/disk/caw/direct4k (lap:fourkn_merge_2node, 2026-10-23 21:17-21:21Z, lane g2d_a14_merge2node) and 10 at 2/net/mesh/direct4k (lap:merge_overrun, control b20261024-5a5875, retired by the approved verify P20261024-51f1e6). The record's own observed field is 1/any only because nobody narrowed it. The narrowing records that it reaches 2-node pairs of both lock managers over a direct 4096-byte LUN, which are the two configurations the release table claims for 4K-native LUNs (data/release_table.json rows 2/disk/caw/direct4k and 2/net/mesh/direct4k); it disposes of nothing.",
+      "evidence": [
+        "tests/fourkn_merge_2node.sh",
+        "tests/merge_overrun_lap.sh",
+        "data/release_table.json",
+        "data/reviews/P20261024-51f1e6.md"
+      ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-bead94.md",
+        "sha256": "11dbf1fbbd4efd1f7884c012db934fbc8f6394c142ac6cf493262d3e333c64a2",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
+    },
+    {
+      "id": "P20261024-3e7240",
+      "kind": "verify",
+      "record": "D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS",
+      "change": {
+        "batch": "b20261024-d99c77"
+      },
+      "argument": "Verification b20261024-d99c77 of lap:rejoin_modargs_rig (tests/mpath/rejoin_modargs_rig_lap.sh) at 8/disk/caw/mpath on g8b (test21-test28, all eight VMs held by the batch), candidate 0.90.134 attempt 18 (2638 files frozen, RUNNING, module 8DBA16AEB7FDD3066C9C1BC), lane tests/evidence/lanes/g8b_a18_20261024T125223Z step 6, after the forced prep of step 4 with NO MXFS_EXTRA_MODARGS ('INFO PF_REJOIN_PREP_ARGS=(unset) MXFS_CONFIG=8/disk/caw/mpath MXFS_EXTRA_MODARGS=(none)'), so no lap carries a marker variant: 6 of 6 planned laps PASS, each exposed ('EXPOSED: test21 reads prep's log_repeat_limit=0 back; a victim loaded without the prep's arguments would read the module's defaults'), each 'LAP rejoin_modargs_rig PASS: the rejoined victim test28 reads every prep argument as test21 does (4: force_transport target_cache_protected log_repeat_limit target_retire_contract)'. Sized from control b20261024-2f6ae0 (same lap, group, candidate, module and prep, step 5; PF_REJOIN_PREP_ARGS=0, tests/mpath/lib.sh :512-517: pf_boot_rejoin loads mxfs with the configuration's transport arguments only, as before the fix): 10 of 10 FAIL, each exposed, each 'LAP rejoin_modargs_rig FAIL: the rejoined victim test28 loaded other arguments than the survivor test21: log_repeat_limit=1 (survivor 0)' -- the rejoin dropping prep's arguments, as recorded; rate 10/10, 6 clean laps at delta=alpha=0.005. This is the attempt-18 run the record's next step asked for: at 8/disk/caw/mpath (the CAW branch both observed runs used), a real kill and pf_boot_rejoin with a module load on the victim, each node's /sys/module/mxfs/parameters read after the rejoin, and no MXFS_EXTRA_MODARGS so the batch counts (the approved variant batch b20261024-565ac2 stays supporting evidence only). Cells this verify retires at 8/disk/caw/mpath: the 10 control laps 13:19:12Z-13:31:09Z (stamped at lap end; logs cited) and the attempt-17 control b20261024-e827e0's 10 laps 10:59:31Z-11:10:17Z, which failed the same way ('log_repeat_limit=1 (survivor 0), dead_timeout_ms=0 (survivor 12000)', per the record's evidence). What it does not show: the modprobe branch, the contract-argument quoting, the TCP branch on the rig, a lane running mixed windows (the review of P20261024-d7c365 excluded them); the record's 10 host-only cells at 2/net/mesh/direct are not at this configuration and stay named.",
+      "evidence": [
+        "tests/evidence/batch_laps/b20261024-d99c77/20261024T133115Z-8e0b46f3.log",
+        "tests/evidence/batch_laps/b20261024-d99c77/20261024T133230Z-f58bdf6d.log",
+        "tests/evidence/batch_laps/b20261024-d99c77/20261024T133342Z-2a3747bd.log",
+        "tests/evidence/batch_laps/b20261024-d99c77/20261024T133451Z-5346717c.log",
+        "tests/evidence/batch_laps/b20261024-d99c77/20261024T133600Z-ae47865e.log",
+        "tests/evidence/batch_laps/b20261024-d99c77/20261024T133709Z-40309a2a.log",
+        "tests/evidence/batch_laps/b20261024-2f6ae0/20261024T131752Z-70df2bb7.log",
+        "tests/evidence/batch_laps/b20261024-2f6ae0/20261024T131912Z-befb38e2.log",
+        "tests/evidence/batch_laps/b20261024-2f6ae0/20261024T132028Z-f68b7e9a.log",
+        "tests/evidence/batch_laps/b20261024-2f6ae0/20261024T132143Z-cc923da2.log",
+        "tests/evidence/batch_laps/b20261024-2f6ae0/20261024T132305Z-5dd03c7c.log",
+        "tests/evidence/batch_laps/b20261024-2f6ae0/20261024T132428Z-384ebdc8.log",
+        "tests/evidence/batch_laps/b20261024-2f6ae0/20261024T132551Z-a7a85683.log",
+        "tests/evidence/batch_laps/b20261024-2f6ae0/20261024T132712Z-647c1291.log",
+        "tests/evidence/batch_laps/b20261024-2f6ae0/20261024T132833Z-0c392782.log",
+        "tests/evidence/batch_laps/b20261024-2f6ae0/20261024T132954Z-95a693b4.log"
       ],
       "state": "pending",
       "created": "2026-10-24"
