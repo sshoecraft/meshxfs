@@ -8425,6 +8425,56 @@
           "config": "2/disk/caw/direct",
           "row": "lap:lap_load_clean_fledger",
           "iso": "2026-10-24T20:08:20Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T20:38:10Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T20:35:43Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T20:33:16Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T20:30:48Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T20:28:21Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T20:25:52Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T20:23:24Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T20:20:24Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T20:19:46Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T20:19:08Z"
         }
       ]
     },
@@ -8553,7 +8603,7 @@
       "opened": "2026-10-24",
       "summary": "tests/fenced_ledger_rig_lap.sh waits for the RECOVERY_BLOCKED verdict (GRADE=survivors) and for its injection's own lines by grepping the whole followed kernel-log file on the node; the follower is 'cat /dev/kmsg', which starts at the oldest record still in the ring, so the file begins with earlier laps' lines of the same boot. An earlier lap's P238-FENCE-BLOCKED satisfied the wait at once, VERDICT was stamped just after the injection, and every survivor operation of the 124 s fence series was graded as stall after the verdict",
       "evidence": "Lap f21s1 (attempt 21, 8/net/mesh/direct, test7..test14, P=test14, SURRENDER=0): tests/evidence/20261024T193859Z_fledger_f21s1/verdict.txt '3,53591,629770650,-;mxfs: P238-FENCE-BLOCKED-IMPORTED slot=0 victim=3075361954 epoch=964723982620473862' and VERDICT=1792870861909, while test14's mark is at 759.143447 s (test14_kmsg.txt:1 'FLEDGER-MARK-f21s1-1784887') and victim 3075361954 appears in no node's log of this lap; this lap's own verdict is test13_kmsg.txt:6849 P238-FENCE-BLOCKED victim=2780301294 attempts=22 series_ms=123840 at 911.200625 s, imported on test14 at :5829 (911.529357 s, epoch ~1792870997812). MAXOP_AFTER_MS from each <node>_load_end.txt with the stale verdict: 123221-136129 ms on the seven survivors; with test14's own import as the verdict: 206-1054 ms (test13 1054, test8 396), every long operation ending 0.2-0.75 s after its node's P-RBLK-DENY / P240-RBLK-EIO-ABORT. The inject arms' checks (INJECT=shutdown P-WITHDRAW, INJECT=hbpause P-HB-INJECT-PAUSE) read the same whole file.",
-      "next": "Fix drafted in tests/evidence/drafts/tree/tests/fenced_ledger_rig_lap.sh: KS reads the followed file from the lap's mark on (awk from the mark line, as the end-of-lap copy already does), used by the verdict wait and both injection checks; FLEDGER_KL_SINCE_MARK=0 reads the whole file, the control. Offline check on a fake file with a pre-mark P238 line: since-mark NONE, whole-file FOUND. Then a lap that exposes it on purpose: a second GRADE=survivors lap in the same boot as one that reached RECOVERY_BLOCKED (control: VERDICT before its own P238; fix: VERDICT at it), control and verification sized from it.",
+      "next": "Fix drafted in tests/evidence/drafts/tree/tests/fenced_ledger_rig_lap.sh: KS reads the followed file from the lap's mark on (awk from the mark line, as the end-of-lap copy already does), used by the verdict wait and both injection checks; FLEDGER_KL_SINCE_MARK=0 reads the whole file, the control. Offline check on a fake file with a pre-mark P238 line: since-mark NONE, whole-file FOUND. Then a lap that exposes it on purpose: a second GRADE=survivors lap in the same boot as one that reached RECOVERY_BLOCKED (control: VERDICT before its own P238; fix: VERDICT at it), control and verification sized from it. ===== Lap check drafted with the fix (tests/evidence/drafts/tree/tests/fenced_ledger_rig_lap.sh, GRADE=survivors): P's count of P238-FENCE-BLOCKED lines before the lap's mark (verdict_source.txt PRE_MARK_P238=); when over 0 the lap prints 'SINCEMARK-EXPOSED: ...' and grades 'LAP verdict_source PASS|FAIL' on whether the verdict line the wait took is in the lap's own since-mark copy of P's log (VACUOUS when no earlier verdict precedes the mark). Queued on attempt 22's g8 lane (queue_g8_a22.txt) after the lane's other fenced-ledger batches have left RECOVERY_BLOCKED verdicts in the rings: control (FLEDGER_KL_SINCE_MARK=0) and verification, row lap:fledger_verdict_source.",
       "reproducer": "two GRADE=survivors laps of tests/fenced_ledger_rig_lap.sh INJECT=preempt in one boot of the same nodes, the first reaching P238-FENCE-BLOCKED",
       "reach_source": "evidence",
       "updated": "2026-10-24"

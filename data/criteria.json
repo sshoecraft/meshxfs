@@ -729,15 +729,35 @@
           "status": "PASS",
           "measured": "elapsed=35s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-24T20:31:39Z",
+          "iso": "2026-10-24T20:36:34Z",
           "recorded": "2026-10-24",
           "elapsed_s": 35,
           "build": "FF012B4B81CDB69CAE96883",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T203050Z-g2c",
+          "run_id": "20261024T203545Z-g2c",
           "candidate": "0.90.134",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T20:34:06Z",
+              "measured": "elapsed=35s (fresh prep)",
+              "reason": "",
+              "build": "FF012B4B81CDB69CAE96883",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T203318Z-g2c"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T20:31:39Z",
+              "measured": "elapsed=35s (fresh prep)",
+              "reason": "",
+              "build": "FF012B4B81CDB69CAE96883",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T203050Z-g2c"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T20:29:11Z",
@@ -817,26 +837,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T200611Z-g2c"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T20:05:31Z",
-              "measured": "elapsed=34s (fresh prep)",
-              "reason": "",
-              "build": "FF012B4B81CDB69CAE96883",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T200442Z-g2c"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T20:04:09Z",
-              "measured": "elapsed=33s (fresh prep)",
-              "reason": "",
-              "build": "FF012B4B81CDB69CAE96883",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T200323Z-g2c"
             }
           ]
         },
