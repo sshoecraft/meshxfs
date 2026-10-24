@@ -7398,6 +7398,61 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-d2a027",
+      "kind": "remove-fixed",
+      "record": "D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS",
+      "change": {
+        "control": "b20261024-8c3ba5",
+        "fixon": "b20261024-f04950",
+        "cause": "run.sh's marker_live_ok checked only each node's srcversion and mount, so a filtered row reused a pair whose node ran a module parameter other than the one prepped; with the fix the marker records every owner-writable /sys/module/mxfs/parameters value after prep (counters filtered out) and marker_live_ok refuses the pair on any difference, naming the parameter"
+      },
+      "argument": "FIXED AND VERIFIED, a harness defect in run.sh, on candidate 0.90.134's attempt frozen 2026-10-24T06:38:23Z (module BE3695D2590A65F742F9816), on both lock managers and on both LUN block sizes. The reproducer is tests/marker_params_lap.sh: prep, a filtered precond_readiness that must reuse the untouched pair, watch_ino=4242 written on the second node and read back (EXPOSED), the same row again; PASS when the second row refuses the pair naming watch_ino on that node, FAIL when it reuses it ('skipping prep'). The control is a same-tree environment switch in the lap's own command, MXFS_MARKER_PARAMS=0, which makes marker_live_ok match on srcversion and mount alone, the code before the fix; nothing was reverted.\\n\\nAt 2/net/mesh/direct (g2, test1/test2, lane tests/evidence/lanes/g2_w12b_20261024T081715Z): control b20261024-32ccd5 failed 10 of 10 exposed laps, each 'the row reused the cluster with watch_ino=4242 on test2 ... skipping prep' (tests/evidence/lanes/g2_w12b_20261024T081715Z/step4.log); verification b20261024-03e428 sized from it passed 6 of 6 (tests/evidence/lanes/g2_w12b_20261024T081715Z/step5.log), and its verify was approved and applied (the record's 'verified' line).\\n\\nAt 2/disk/caw/direct4k (g2d, test31/test32, a 4096-byte pool LUN, lane tests/evidence/lanes/g2d_w12_20261024T091138Z, queue tests/evidence/lanes/g2d_w12_20261024T091138Z/queue:12-13): control b20261024-8c3ba5 ran 10 laps; 9 were exposed and all 9 failed 'the row reused the cluster with watch_ino=4242 on test32 (--- cluster already prepped for 2/disk/caw/direct4k (srcver=BE3695D2590A65F742F9816) \u2014 skipping prep ---)'; lap 5 (09:22:32Z) ABORTed with exposure 0 because its first row was killed at 44 s inside run.sh's run lock and pool allocation before any row ran, and its cell has moved to D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT (tests/evidence/lanes/g2d_w12_20261024T091138Z/step2.log, measured 9 of 9). Verification b20261024-f04950 declared after the control closed (rate 9/9, lower bound 0.5550, 7 laps at delta 0.005, alpha 0.005) passed 7 of 7, each exposure=1 and 'LAP marker_params PASS ...: the row refused the cluster: marker stale: test32 runs module parameters other than those prepped: live: watch_ino=4242' (tests/evidence/lanes/g2d_w12_20261024T091138Z/step3.log, 'verify b20261024-f04950: 7 PASS, 0 FAIL of 7 planned'); laps took 90-98 s of the 178 s bound. No lap was dropped from the verification. The record's other named sources (rows that leave knobs changed: path_fenced_return PF_FREEZE_KNOBS, dbg_admit_park_*, crash_consistency CC_SHARDED, watch_ino arming) are what this check now catches on any later row: the check compares every owner-writable parameter, not a list, so a row leaving any of them changed makes the next filtered row re-prep or refuse rather than reuse.",
+      "evidence": [
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/step4.log",
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/step5.log",
+        "tests/evidence/lanes/g2d_w12_20261024T091138Z/queue",
+        "tests/evidence/lanes/g2d_w12_20261024T091138Z/step2.log",
+        "tests/evidence/lanes/g2d_w12_20261024T091138Z/step3.log",
+        "tests/marker_params_lap.sh",
+        "run.sh",
+        "tests/evidence/batch_laps/b20261024-8c3ba5",
+        "tests/evidence/batch_laps/b20261024-f04950"
+      ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-d2a027.md",
+        "sha256": "38ab6ce186e8e83a1fa4bb41502333b04e142c5a7b5fedcfb97dacb858ba0f1d",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
+    },
+    {
+      "id": "P20261024-30a744",
+      "kind": "remove-fixed",
+      "record": "D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS",
+      "change": {
+        "control": "b20261024-32ccd5",
+        "fixon": "b20261024-03e428",
+        "cause": "run.sh's marker_live_ok checked only each node's srcversion and mount, so a filtered row reused a pair whose node ran a module parameter other than the one prepped; with the fix the marker records every owner-writable /sys/module/mxfs/parameters value after prep (counters filtered out) and marker_live_ok refuses the pair on any difference, naming the parameter"
+      },
+      "argument": "FIXED AND VERIFIED, a harness defect in run.sh, on candidate 0.90.134's attempt frozen 2026-10-24T06:38:23Z (module BE3695D2590A65F742F9816). Resubmission of P20261024-d2a027 (rejected, data/reviews/P20261024-d2a027.md: the fix-on batch b20261024-f04950 was unreviewed and the record had no reproducer). The record now carries its reproducer: tests/marker_params_lap.sh, which preps, runs a filtered precond_readiness that must reuse the untouched pair, writes watch_ino=4242 on the second node and reads it back (EXPOSED), and runs the same row again; PASS when that row refuses the pair naming watch_ino on that node, FAIL when it reuses it ('skipping prep'). The control is a same-tree environment switch in the lap's own command, MXFS_MARKER_PARAMS=0 (marker_live_ok matches on srcversion and mount alone, the code before the fix); nothing was reverted.\\n\\nThe pair this removal rests on, at 2/net/mesh/direct (g2, test1/test2, lane tests/evidence/lanes/g2_w12b_20261024T081715Z, its queue copy tests/evidence/lanes/g2_w12b_20261024T081715Z/queue): control b20261024-32ccd5 failed 10 of 10 exposed laps, each 'the row reused the cluster with watch_ino=4242 on test2 ... skipping prep' (tests/evidence/lanes/g2_w12b_20261024T081715Z/step4.log); verification b20261024-03e428 sized from it passed 6 of 6 (tests/evidence/lanes/g2_w12b_20261024T081715Z/step5.log); its verify was reviewed, approved and applied (the record's verified line, attempt 2026-10-24T06:38:23Z).\\n\\nSupporting, on the disk lock manager and a 4096-byte LUN (2/disk/caw/direct4k, g2d, test31/test32, lane tests/evidence/lanes/g2d_w12_20261024T091138Z, queue tests/evidence/lanes/g2d_w12_20261024T091138Z/queue:12-13): control b20261024-8c3ba5 failed 9 of 9 exposed laps the same way (lap 5 ABORTed with exposure 0 inside run.sh's run lock and pool allocation and is charged to D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT); b20261024-f04950 sized from it passed 7 of 7 (tests/evidence/lanes/g2d_w12_20261024T091138Z/step2.log, tests/evidence/lanes/g2d_w12_20261024T091138Z/step3.log). That batch is not reviewed and this removal does not rest on it; the earlier review recomputed and confirmed its sizing and its laps.\\n\\nThe older open verify b20261023-3ab29d (7 of 7 PASS, tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step3.log) ran at 01:53Z on 2026-10-24 on the earlier attempt frozen 2026-10-24T01:01:07Z (build 9C7B7B00C5DE523F1D378C8, control b20261023-0ff36b); that attempt ended before its verify was proposed, so it was never applied and grades nothing on this attempt. This removal does not rest on it.\\n\\nThe record's other named sources (rows that leave parameters changed: path_fenced_return PF_FREEZE_KNOBS, dbg_admit_park_*, crash_consistency CC_SHARDED, watch_ino arming) are what the fixed check now catches on the next filtered row: it compares every owner-writable parameter, not a list, so a row leaving any of them changed makes the next filtered row refuse rather than reuse.",
+      "evidence": [
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/queue",
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/step4.log",
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/step5.log",
+        "tests/evidence/lanes/g2d_w12_20261024T091138Z/queue",
+        "tests/evidence/lanes/g2d_w12_20261024T091138Z/step2.log",
+        "tests/evidence/lanes/g2d_w12_20261024T091138Z/step3.log",
+        "tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step3.log",
+        "tests/marker_params_lap.sh",
+        "run.sh",
+        "data/reviews/P20261024-d2a027.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
