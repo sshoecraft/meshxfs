@@ -14,8 +14,10 @@
 # created again.
 #
 # WHAT IT DOES, in order; any failure before the unload changes nothing:
-#   1. refuses unless the built modules carry VERSION (the suffix the patch
-#      sets), no iSCSI target has a session, mxfs-clyde-guard is active, there
+#   1. refuses unless the built core and vdisk handler carry VERSION (the
+#      suffix the patch sets; iscsi-scst.ko carries its own version, so it must
+#      instead be built for this kernel after the core), no iSCSI target has a
+#      session, mxfs-clyde-guard is active, there
 #      is no .rig_halt, and no SCST trace flag is on (a reload under a trace
 #      flag floods the host log the same way a run does);
 #   2. writes the live configuration with scstadmin (before.conf);
@@ -64,10 +66,16 @@ declare -A MAP=(
 step "=== scst_reload src=$SRC want=$WANT out=$OUT ==="
 # 1. preconditions
 for s in "${!MAP[@]}"; do [ -f "$s" ] || refuse "built file missing: $s"; done
-for k in "$SRC/scst/src/scst.ko" "$SRC/scst/src/dev_handlers/scst_vdisk.ko" "$SRC/iscsi-scst/kernel/iscsi-scst.ko"; do
+# the suffix is SCST core's version string, which scst.ko and scst_vdisk.ko report; iscsi-scst.ko
+# reports iscsi-scst's own (3.11.0-pre, loaded and built alike), so it is checked as a build
+# against this core instead: built for the running kernel, no earlier than scst.ko
+for k in "$SRC/scst/src/scst.ko" "$SRC/scst/src/dev_handlers/scst_vdisk.ko"; do
     v=$(modinfo -F version "$k" 2>/dev/null)
     case "$v" in *"$WANT") ;; *) refuse "$k is version '$v', not *$WANT" ;; esac
 done
+ik="$SRC/iscsi-scst/kernel/iscsi-scst.ko"
+case "$(modinfo -F vermagic "$ik" 2>/dev/null)" in "$(uname -r) "*) ;; *) refuse "$ik is not built for $(uname -r): $(modinfo -F vermagic "$ik" 2>&1)" ;; esac
+[ "$(stat -c %Y "$ik")" -ge "$(stat -c %Y "$SRC/scst/src/scst.ko")" ] || refuse "$ik is older than $SRC/scst/src/scst.ko: rebuild iscsi-scst against this core"
 old=$(cat /sys/module/scst/version 2>/dev/null) || refuse "scst is not loaded"
 oldsfx=${old#*+}; [ "$oldsfx" != "$old" ] || oldsfx=stock
 step "loaded: $old; installing *$WANT"
