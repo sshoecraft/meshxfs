@@ -6897,7 +6897,26 @@
           "iso": "2026-10-24T15:05:08Z"
         }
       ],
-      "updated": "2026-10-24"
+      "updated": "2026-10-24",
+      "batches": [
+        {
+          "id": "b20261024-6fc85c",
+          "kind": "control",
+          "row": "lap:powerup_flood",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "FF012B4B81CDB69CAE96883",
+          "variant": "LAB_POWER_LOCK=0 (scripts/lab_power.sh and the preflight take no power-up lock, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a preflight samples the host log inside a power-up and refuses the prep"
+        }
+      ]
     },
     {
       "id": "D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED",
@@ -8513,6 +8532,23 @@
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a noino lap that ABORTs after its warm-up leaves its loads running"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_stop",
+          "iso": "2026-10-24T20:06:02Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_stop",
+          "iso": "2026-10-24T20:04:40Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lap_load_stop",
+          "iso": "2026-10-24T20:03:21Z"
         }
       ]
     },
