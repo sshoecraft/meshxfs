@@ -5564,6 +5564,23 @@
           },
           "transfer": "",
           "lower_bound": 0.01764263795419471
+        },
+        {
+          "id": "b20261024-f31760",
+          "kind": "control",
+          "row": "lap:fourkn_merge_2node",
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "planned": 20,
+          "probe": "INFO each node holds its first 64 merged blocks",
+          "candidate": "",
+          "build": "8DBA16AEB7FDD3066C9C1BC",
+          "variant": "FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0 (the lap as it was before the forced overlap: its first 64 merged blocks held 20 ms on each node, no overlap forced, plain unmounts)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a lap whose holds catch no peer write retries no MISCOMPARE and ends VACUOUS"
         }
       ],
       "updated": "2026-10-24",
@@ -7329,11 +7346,113 @@
           "candidate": "",
           "build": "8DBA16AEB7FDD3066C9C1BC",
           "variant": "LOCKREC_VALIDATE=1 (dl_validate_lockrec=1: disklock init validates the record at CAW slot 0, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: B's disklock init reads slot 0 as a lock record and logs a live CAW record there as corrupt"
+        },
+        {
+          "id": "b20261024-0a3f62",
+          "kind": "verify",
+          "row": "lap:lockrec_slot0",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: CAW slot 0 is live",
+          "candidate": "0.90.134",
+          "build": "8DBA16AEB7FDD3066C9C1BC",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:lockrec_slot0",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-13351b",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "LOCKREC_VALIDATE=1 (dl_validate_lockrec=1: disklock init validates the record at CAW slot 0, as before the fix)",
+            "builds": [
+              "8DBA16AEB7FDD3066C9C1BC"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:lockrec_slot0",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-13351b",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "LOCKREC_VALIDATE=1 (dl_validate_lockrec=1: disklock init validates the record at CAW slot 0, as before the fix)",
+          "builds": [
+            "8DBA16AEB7FDD3066C9C1BC"
+          ],
+          "date": "2026-10-24"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lockrec_slot0",
+          "iso": "2026-10-24T13:09:59Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lockrec_slot0",
+          "iso": "2026-10-24T13:08:44Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lockrec_slot0",
+          "iso": "2026-10-24T13:07:08Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lockrec_slot0",
+          "iso": "2026-10-24T13:06:01Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lockrec_slot0",
+          "iso": "2026-10-24T13:04:46Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lockrec_slot0",
+          "iso": "2026-10-24T13:03:39Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lockrec_slot0",
+          "iso": "2026-10-24T13:02:28Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lockrec_slot0",
+          "iso": "2026-10-24T13:01:21Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lockrec_slot0",
+          "iso": "2026-10-24T13:00:12Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:lockrec_slot0",
+          "iso": "2026-10-24T12:59:05Z"
         }
       ]
     },
@@ -7699,6 +7818,23 @@
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a workload that overruns the client's bound leaves its worker holding the mount"
+        },
+        {
+          "id": "b20261024-5a5875",
+          "kind": "control",
+          "row": "lap:merge_overrun",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "8DBA16AEB7FDD3066C9C1BC",
+          "variant": "MERGE_NODE_BOUND=0 (the worker runs with no node-side bound, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a workload that overruns the client's bound leaves its worker holding the mount"
         }
       ]
     },
@@ -7921,266 +8057,6 @@
       "updated": "2026-10-24"
     },
     {
-      "id": "D-RELEASE-STEP-CELL-LAP-NAMES-A-REMOVED-RECORD-AND-DIES-WITHOUT-A-VERDICT",
-      "severity": "minor",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-23",
-      "summary": "tests/release_step_cell_lap.py drives its removal and named-removal dispositions through RECORD = D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED (:78), a record that has since been removed from the live queue, and every scratch tree is a copy of that queue (scratch_tree, :117-120); name() looks the record up with next() (:172), which raises StopIteration in the probe, and name() turns the rc=1 into a RuntimeError (:176-177) that main() does not catch, so the lap dies with a traceback before printing STEP_CELL_LAP PASS or FAIL. The lap can no longer re-measure the release-step parse it was written for.",
-      "evidence": "2026-10-24, on candidate 0.90.134 attempt frozen 2026-10-24T04:13:43Z: 'timeout 30 python3 tests/release_step_cell_lap.py' exited 1 after the infra, amend and removal dispositions of 1/any:release:boards:2026-10-21T19:29:49Z, ending 'RuntimeError: name rc=1: Traceback ... File \"<string>\", line 4, in <module> StopIteration' (tests/evidence/day_stamp_release_step/release_step_cell_lap_20261024.out). It was run to re-measure release-step stamps after the day-stamp fix in tools/defects.py parse_cell (:783-785).",
-      "next": "Give the lap a record of its own in each scratch tree (added through the scratch queue's own load and save, as unname() edits it) instead of naming a live one, behind a switch that names the live record as before (the control: it dies as above while the live queue lacks the record); then a control batch, a verification sized from it, remove --fixed. The fix changes a frozen file, so it lands on the next attempt. ===== 2026-10-24: control b20261024-b2d2ef (MXFS_STEP_LAP_OWN_RECORD=0, 10 of 10 FAIL, Traceback at name()) and verification b20261024-f5a69d (6 of 6 PASS, exposure=12 each) on attempt 2026-10-24T06:38:23Z; the verify was approved and applied (P20261024-c3f747, data/reviews/P20261024-c3f747.md). Not yet removable: the one switch takes out two parts at once (tests/release_step_cell_lap.py:323-325): own_record (the record of its own, this defect's fix) and unsettle (clearing the live ledger's annotations of the lap's runs in each scratch tree, without which the scratch gate would no longer list a run the live queue has since settled). The control crashed at the first key, so it isolates only the record lookup. Next attempt: a second switch for unsettle alone (MXFS_STEP_LAP_UNSETTLE=0), a control with own_record on and unsettle off (expected: 'ABORT: the scratch gate does not list <run> before <how>' on a run the live ledger settles), a verification sized from it, then propose remove --fixed citing both controls.",
-      "reproducer": "timeout 30 python3 tests/release_step_cell_lap.py on any tree whose queue lacks D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED",
-      "batches": [
-        {
-          "id": "b20261024-b2d2ef",
-          "kind": "control",
-          "row": "lap:release_step_cell",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: ",
-          "candidate": "",
-          "build": "BE3695D2590A65F742F9816",
-          "variant": "MXFS_STEP_LAP_OWN_RECORD=0 (tests/release_step_cell_lap.py names the live record and keeps the live annotations, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "why": "the fix taken out: the lap names a record the live queue no longer holds and dies without a verdict"
-        },
-        {
-          "id": "b20261024-f5a69d",
-          "kind": "verify",
-          "row": "lap:release_step_cell",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "BE3695D2590A65F742F9816",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "rate": {
-            "row": "lap:release_step_cell",
-            "config": "2/disk/caw/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261024-b2d2ef",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_STEP_LAP_OWN_RECORD=0 (tests/release_step_cell_lap.py names the live record and keeps the live annotations, as before the fix)",
-            "builds": [
-              "BE3695D2590A65F742F9816"
-            ],
-            "date": "2026-10-24"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        },
-        {
-          "id": "b20261024-5a8a84",
-          "kind": "control",
-          "row": "lap:release_step_cell",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^SETTLED: ",
-          "candidate": "",
-          "build": "8DBA16AEB7FDD3066C9C1BC",
-          "variant": "MXFS_STEP_LAP_UNSETTLE=0 (the scratch ledgers keep the live ledger's annotations, as before the fix; own_record on)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "why": "the unsettle part taken out: a run the live ledger has settled is not listed by the scratch gate and the lap dies without a verdict"
-        },
-        {
-          "id": "b20261024-2f6cb0",
-          "kind": "verify",
-          "row": "lap:release_step_cell",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^SETTLED: ",
-          "candidate": "0.90.134",
-          "build": "8DBA16AEB7FDD3066C9C1BC",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "rate": {
-            "row": "lap:release_step_cell",
-            "config": "2/disk/caw/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261024-5a8a84",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_STEP_LAP_UNSETTLE=0 (the scratch ledgers keep the live ledger's annotations, as before the fix; own_record on)",
-            "builds": [
-              "8DBA16AEB7FDD3066C9C1BC"
-            ],
-            "date": "2026-10-24"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "updated": "2026-10-24",
-      "rates": [
-        {
-          "row": "lap:release_step_cell",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261024-b2d2ef",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_STEP_LAP_OWN_RECORD=0 (tests/release_step_cell_lap.py names the live record and keeps the live annotations, as before the fix)",
-          "builds": [
-            "BE3695D2590A65F742F9816"
-          ],
-          "date": "2026-10-24"
-        },
-        {
-          "row": "lap:release_step_cell",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261024-5a8a84",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_STEP_LAP_UNSETTLE=0 (the scratch ledgers keep the live ledger's annotations, as before the fix; own_record on)",
-          "builds": [
-            "8DBA16AEB7FDD3066C9C1BC"
-          ],
-          "date": "2026-10-24"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T06:39:33Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T06:39:28Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T06:39:22Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T06:39:16Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T06:39:10Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T06:39:05Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T06:38:59Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T06:38:53Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T06:38:47Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T06:38:42Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T12:52:34Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T12:52:23Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T12:52:12Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T12:52:02Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T12:51:51Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T12:51:41Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T12:51:29Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T12:51:19Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T12:51:08Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:release_step_cell",
-          "iso": "2026-10-24T12:50:58Z"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-24T12:49:30Z",
-          "build": "8DBA16AEB7FDD3066C9C1BC",
-          "batch": "b20261024-2f6cb0",
-          "approval": "P20261024-145839",
-          "date": "2026-10-24"
-        }
-      ]
-    },
-    {
       "id": "D-LANE-POWER-UP-FLOODS-THE-HOST-LOG-AND-ANOTHER-LANES-PREFLIGHT-REFUSES-ITS-PREP",
       "severity": "major",
       "nodes": 1,
@@ -8380,151 +8256,6 @@
         }
       ],
       "updated": "2026-10-24"
-    },
-    {
-      "id": "D-FREEZE-HOOK-LETS-A-NEW-FILE-INTO-A-FROZEN-DIRECTORY",
-      "severity": "minor",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-24",
-      "summary": "scripts/candidate_freeze_hook.py refuses an Edit or Write only for a path already in the RUNNING candidate's frozen list (or under data/), so a Write that creates a new file in a frozen directory (tests/, tools/, scripts/, the kernel sources) goes through, while tools/release_candidate.py's drift check counts an added file as a change that makes the candidate INVALID; release_candidate.py frozen answers the same way",
-      "evidence": "2026-10-24 10:3xZ: a Write of tests/typeflip_shell_dead_lap.sh went through while candidate 0.90.134 attempt 17 (frozen 2026-10-24T10:25:09Z) was RUNNING; the file was moved to tests/evidence/drafts/ at once and 'tools/release_candidate.py check 0.90.134' then printed 'every frozen file is as it was frozen'. scripts/candidate_freeze_hook.py:55-56 tests 'rel in files or rel == data/criteria.json or (rel.startswith(data/) and not mutable(rel))'; tools/release_candidate.py cmd_frozen has the same test; frozen_paths() (:96-124) walks FROZEN_DIRS, FROZEN_FILES and FROZEN_ROOT_PATTERNS, so a new file there would be frozen at the next freeze and is an addition to this one. Fix drafted for the next attempt in tests/evidence/drafts/tree/tools/release_candidate.py (would_freeze: the same roots for a path not there yet; MXFS_FREEZE_NEW_FILES=0 the control) and tests/evidence/drafts/tree/scripts/candidate_freeze_hook.py, with tests/evidence/drafts/tree/tests/freeze_hook_new_file_lap.py.",
-      "next": "Apply the drafts at the next attempt; precheck tests/freeze_hook_new_file_lap.py both arms on a RUNNING candidate (fix: new 2, frozen 2, mutable 0; MXFS_FREEZE_NEW_FILES=0: new 0), then a control and a verification through tools/harness_batch.py, and remove --fixed.",
-      "reproducer": "a Write tool call creating tests/<new>.sh while a candidate is RUNNING (the hook exits 0)",
-      "batches": [
-        {
-          "id": "b20261024-03e367",
-          "kind": "control",
-          "row": "lap:freeze_hook_new_file",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: ",
-          "candidate": "",
-          "build": "8DBA16AEB7FDD3066C9C1BC",
-          "variant": "MXFS_FREEZE_NEW_FILES=0 (the hook asks only the candidate's frozen list, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "why": "the fix taken out: a Write creating a new file in a frozen directory goes through"
-        },
-        {
-          "id": "b20261024-4b8a7c",
-          "kind": "verify",
-          "row": "lap:freeze_hook_new_file",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "8DBA16AEB7FDD3066C9C1BC",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "rate": {
-            "row": "lap:freeze_hook_new_file",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261024-03e367",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_FREEZE_NEW_FILES=0 (the hook asks only the candidate's frozen list, as before the fix)",
-            "builds": [
-              "8DBA16AEB7FDD3066C9C1BC"
-            ],
-            "date": "2026-10-24"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "updated": "2026-10-24",
-      "rates": [
-        {
-          "row": "lap:freeze_hook_new_file",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261024-03e367",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_FREEZE_NEW_FILES=0 (the hook asks only the candidate's frozen list, as before the fix)",
-          "builds": [
-            "8DBA16AEB7FDD3066C9C1BC"
-          ],
-          "date": "2026-10-24"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:freeze_hook_new_file",
-          "iso": "2026-10-24T12:50:05Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:freeze_hook_new_file",
-          "iso": "2026-10-24T12:50:04Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:freeze_hook_new_file",
-          "iso": "2026-10-24T12:50:03Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:freeze_hook_new_file",
-          "iso": "2026-10-24T12:50:02Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:freeze_hook_new_file",
-          "iso": "2026-10-24T12:50:01Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:freeze_hook_new_file",
-          "iso": "2026-10-24T12:50:00Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:freeze_hook_new_file",
-          "iso": "2026-10-24T12:49:59Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:freeze_hook_new_file",
-          "iso": "2026-10-24T12:49:58Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:freeze_hook_new_file",
-          "iso": "2026-10-24T12:49:57Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:freeze_hook_new_file",
-          "iso": "2026-10-24T12:49:56Z"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-24T12:49:30Z",
-          "build": "8DBA16AEB7FDD3066C9C1BC",
-          "batch": "b20261024-4b8a7c",
-          "approval": "P20261024-66a095",
-          "date": "2026-10-24"
-        }
-      ]
     },
     {
       "id": "D-LUN-POOL-LOCK-WAIT-OVER-60S-REFUSES-A-PREP-WHILE-ANOTHER-LANE-HOLDS-IT",
@@ -8746,151 +8477,6 @@
           "build": "8DBA16AEB7FDD3066C9C1BC",
           "batch": "b20261024-5c157a",
           "approval": "P20261024-fea8e6",
-          "date": "2026-10-24"
-        }
-      ]
-    },
-    {
-      "id": "D-VERIFY-REFUSAL-NAMES-VARIANT-LAPS-AS-UNEXPOSED",
-      "severity": "minor",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-24",
-      "summary": "tools/defects.py cmd_verify counts a PASS only when it is exposed and not an unplanned variant, but its refusal reports every PASS it did not count as 'PASS without exposure' (:1348-1354), so a batch whose laps were all exposed but ran as a variant reads as a probe problem",
-      "evidence": "2026-10-24: 'tools/defects.py verify D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS --batch b20261024-565ac2 --approval P20261024-d7c365' refused 'has 0 exposed PASS lap(s) of the 6 planned (6 PASS without exposure do not count)', while every ledger row of the batch reads measured 'rc=0 elapsed_s=.. exposure=1' and carries variant 'marker_modargs=dead_timeout_ms=12000' (data/criteria.runs.jsonl, the six rows of b20261024-565ac2); unplanned_variant (:979-996) was what dropped them. Draft in tests/evidence/drafts/tree/tools/defects.py names the two reasons apart; run on a scratch copy of tools and data it printed '(0 PASS without exposure and 6 run as an unplanned variant (marker_modargs=dead_timeout_ms=12000) do not count)'.",
-      "next": "Lands with the next attempt's tools/defects.py. Verify: the scratch-copy run above on the frozen candidate's tools (the refusal names the variant), a control with the message as before (the draft's diff reverted in a scratch copy: 'without exposure'), then remove --fixed.",
-      "reproducer": "tools/defects.py verify on a verification batch whose PASS laps are exposed but carry a variant (b20261024-565ac2), in a scratch copy of tools and data",
-      "batches": [
-        {
-          "id": "b20261024-c11656",
-          "kind": "control",
-          "row": "lap:verify_refusal_variant",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: ",
-          "candidate": "",
-          "build": "8DBA16AEB7FDD3066C9C1BC",
-          "variant": "MXFS_VERIFY_NAME_VARIANT=0 (defects.py verify counts every uncounted PASS as one without exposure, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "why": "the fix taken out: the refusal calls exposed PASSes of an unplanned variant PASSes without exposure"
-        },
-        {
-          "id": "b20261024-17ab72",
-          "kind": "verify",
-          "row": "lap:verify_refusal_variant",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "8DBA16AEB7FDD3066C9C1BC",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "rate": {
-            "row": "lap:verify_refusal_variant",
-            "config": "2/net/mesh/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261024-c11656",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_VERIFY_NAME_VARIANT=0 (defects.py verify counts every uncounted PASS as one without exposure, as before the fix)",
-            "builds": [
-              "8DBA16AEB7FDD3066C9C1BC"
-            ],
-            "date": "2026-10-24"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "updated": "2026-10-24",
-      "rates": [
-        {
-          "row": "lap:verify_refusal_variant",
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261024-c11656",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_VERIFY_NAME_VARIANT=0 (defects.py verify counts every uncounted PASS as one without exposure, as before the fix)",
-          "builds": [
-            "8DBA16AEB7FDD3066C9C1BC"
-          ],
-          "date": "2026-10-24"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:verify_refusal_variant",
-          "iso": "2026-10-24T12:55:49Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:verify_refusal_variant",
-          "iso": "2026-10-24T12:55:48Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:verify_refusal_variant",
-          "iso": "2026-10-24T12:55:47Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:verify_refusal_variant",
-          "iso": "2026-10-24T12:55:46Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:verify_refusal_variant",
-          "iso": "2026-10-24T12:55:45Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:verify_refusal_variant",
-          "iso": "2026-10-24T12:55:43Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:verify_refusal_variant",
-          "iso": "2026-10-24T12:55:42Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:verify_refusal_variant",
-          "iso": "2026-10-24T12:55:41Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:verify_refusal_variant",
-          "iso": "2026-10-24T12:55:40Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:verify_refusal_variant",
-          "iso": "2026-10-24T12:55:39Z"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/net/mesh/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-24T12:49:30Z",
-          "build": "8DBA16AEB7FDD3066C9C1BC",
-          "batch": "b20261024-17ab72",
-          "approval": "P20261024-41c01f",
           "date": "2026-10-24"
         }
       ]

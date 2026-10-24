@@ -8404,8 +8404,15 @@
         "tests/freeze_hook_new_file_lap.py",
         "tests/evidence/lanes/host_a18_20261024T124953Z/summary.log"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-145127.md",
+        "sha256": "570ffdec64fbfdcdb5b49716443dd899fc84bf7ecc5d8c19d0d1113b0998970e",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-7f4fc9",
@@ -8440,8 +8447,14 @@
         "tests/evidence/lanes/g8b_a17b_20261024T111854Z/step2.log",
         "tests/evidence/lanes/host_a18_20261024T124953Z/summary.log"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-7f4fc9.md",
+        "sha256": "daf8991d1d28d9233c9f406c43fc07b3738b7f0fdeaed40b3babaa9631379199",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     },
     {
       "id": "P20261024-b0850e",
@@ -8475,8 +8488,15 @@
         "tests/verify_refusal_variant_lap.py",
         "tests/evidence/lanes/host_a18_20261024T124953Z/summary.log"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-b0850e.md",
+        "sha256": "d6cfa0531bb0c561185bbeb4547eb4ef32e97f6117cbe77d2680c5ad0987970e",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-7ebfce",
@@ -8527,8 +8547,15 @@
         "tests/evidence/day_stamp_release_step/release_step_cell_lap_20261024.out",
         "tests/evidence/lanes/host_a18_20261024T124953Z/summary.log"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-7ebfce.md",
+        "sha256": "ea51d3d0d340ea3c46355c05e198b5964f245992aecc780fd15133b35c5e1b49",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
