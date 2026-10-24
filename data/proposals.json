@@ -6960,6 +6960,25 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-c64f70",
+      "kind": "remove-disproved",
+      "record": "D-DRBD-RIG-NODE-OOPS-IN-DRBD-CHANGE-SYNC-ON-AN-LVM-READ-WHOSE-BACKING-BIO-FAILED",
+      "change": {},
+      "argument": "The same kernel crash happened on a node with no MeshXFS module loaded, so MeshXFS code is not needed for it: it is a fault of the kernel's DRBD 8.4 driver reached by lvm2's device scan. Instance A (the record's): tests/evidence/netconsole.log:96144 '[ 7834.836325] BUG: kernel NULL pointer dereference, address: 0000000000000010', :96149 'Comm: lvm Tainted: G OE', :96151 'RIP: 0010:__drbd_change_sync+0x56/0x440 [drbd]', module list :96208 includes mxfs(OE), no mxfs frame on the stack. Instance B: tests/evidence/reap_inactive_mount_ab/rfkb/control_console_tail.txt (test18's serial console): :497 '[53624.758130] BUG: kernel NULL pointer dereference, address: 0000000000000010', :502 'CPU: 1 PID: 3943 Comm: lvm Not tainted 6.8.0-101-generic #101-Ubuntu' (no out-of-tree module loaded at all, so no mxfs), :504 'RIP: 0010:__drbd_change_sync+0x56/0x440 [drbd]', :565 'Modules linked in:' with no mxfs among them (mxfs(OE) appears only in the later boots' lists at :823, :992, :1055, after this panic's reboot), :579 'Kernel panic - not syncing: Fatal exception'. The two are the same fault: identical Code bytes (... 41 8d 45 ff <4c> 8b 7f 10 3d ff ff ff 07 76 37 49 8b 07 45 89 f4: a load through RDI+0x10 with RDI=0), identical RAX/RBX/RCX/RDX/RSI/RDI/R8-R11/R13-R15 (only the stack addresses RSP, RBP and R12 differ), and the same call chain from an O_DIRECT aio read of the DRBD device: __drbd_change_sync <- __req_mod+0x269 <- drbd_request_endio <- bio_endio <- submit_bio_noacct (the backing bio completed inside its own submission) <- drbd_send_and_submit <- drbd_request_prepare <- drbd_submit_bio <- ... <- blkdev_read_iter <- aio_read (tests/evidence/reap_inactive_mount_ab/rfkb/control_console_tail.txt:515-537; netconsole.log:96163-96200). Every frame is DRBD, block layer or VFS; nothing on either stack is MeshXFS, and instance B ran without MeshXFS in the kernel. The rig's scripts run no LVM command against the DRBD device (the record's own search: only a comment at tools/lun_pool.sh:309), so 'lvm' is the guests' own lvm2 device scan.",
+      "evidence": [
+        "tests/evidence/netconsole.log",
+        "tests/evidence/reap_inactive_mount_ab/rfkb/control_console_tail.txt"
+      ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-c64f70.md",
+        "sha256": "bbba0c4fc6094639fc5488588b751dafed87a4b46134ff878db59c620ae28789",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
