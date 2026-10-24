@@ -7989,6 +7989,35 @@
       ],
       "state": "pending",
       "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-9170c4",
+      "kind": "remove-disproved",
+      "record": "D-FSX-ROW-WORK-DIRECTORY-LEFT-ON-THE-MXFS-MOUNT-AFTER-ITS-EXIT-TRAP-RAN-RM-RF",
+      "change": {},
+      "argument": "The work directories counted by tests/fsx_fail_files_node.sh:64 are made by that lap's own second writer, after the row's EXIT trap emptied them; nothing shows MeshXFS failing an rm -rf. Mechanism, from the code: the writer loops while the row's process is alive (tests/fsx_fail_files_node.sh:38 'while kill -0 \"$row\"'), and the row's EXIT trap ('rm -rf \"$W\" 2>/dev/null', tests/suite/fsx.sh) runs inside that process; each pass the writer globs the work directory's fsxfile_* (:39), stats a file's size (:41) and then 'dd if=/dev/urandom of=\"$f\" bs=\"$sz\" count=1 conv=notrunc' (:43), which creates the file again (O_CREAT, no O_EXCL) if rm unlinked it between the stat and the dd, so the trap's final rmdir finds the directory not empty and the error is discarded. Measured at 2/net/mesh/direct on candidate 0.90.134 attempt 2026-10-24T10:25:09Z (lane tests/evidence/lanes/g2_a17c_20261024T112110Z steps 5-11, test1, a pair formed fresh), three laps each followed by a stat listing of every .suite_fsx.* directory: fxn1 and fxn2 'work directories left on the mount: 0'; fxn3 'left on the mount: 1', and step11.log lists that directory /mnt/shared/.suite_fsx.test1.75444 holding exactly one file, fsxfile_50000, size=227164, birth=2026-10-24 12:27:03.991744736, while the row's own output /root/fsx_fail_files_fxn3.row.out was last written at 12:27:03.987744616: the file was created 4 ms after the row ended, at a size the writer's dd writes in one block (bs=$sz count=1), and none of fsx's other files (fsxfile_100000, the .fsxlog/.fsxops/.fsxgood files) remained, so the trap's rm -rf had removed everything present when it ran. At 2/disk/caw/direct the same three laps (lane g2c_w14b_20261024T101031Z) left 0, and the board's plain fsx row, which has no second writer, left no directory in two runs on a fresh pair at 2/disk/caw/direct (lane g2c_w14_20261024T100638Z: /mnt/shared listed empty on both nodes before and after each). The original sightings (control b20261023-636cd6, verification b20261023-989617) are counts from the same lap with the same writer. Disposition: DISPROVED \u2014 the behaviour is the lap's writer recreating a file after the row's trap removed it, not a MeshXFS defect.",
+      "evidence": [
+        "tests/evidence/lanes/g2_a17c_20261024T112110Z/step6.log",
+        "tests/evidence/lanes/g2_a17c_20261024T112110Z/step7.log",
+        "tests/evidence/lanes/g2_a17c_20261024T112110Z/step8.log",
+        "tests/evidence/lanes/g2_a17c_20261024T112110Z/step9.log",
+        "tests/evidence/lanes/g2_a17c_20261024T112110Z/step10.log",
+        "tests/evidence/lanes/g2_a17c_20261024T112110Z/step11.log",
+        "tests/evidence/lanes/g2_a17c_20261024T112110Z/queue",
+        "tests/fsx_fail_files_node.sh",
+        "tests/fsx_fail_files_lap.sh",
+        "tests/suite/fsx.sh",
+        "tests/evidence/lanes/g2c_w14_20261024T100638Z/summary.log",
+        "tests/evidence/lanes/g2c_w14b_20261024T101031Z/summary.log",
+        "tests/evidence/20261024T122701Z_fsxfail_fxn1/lap.log",
+        "tests/evidence/20261024T122701Z_fsxfail_fxn1/node.txt",
+        "tests/evidence/20261024T122702Z_fsxfail_fxn2/lap.log",
+        "tests/evidence/20261024T122702Z_fsxfail_fxn2/node.txt",
+        "tests/evidence/20261024T122703Z_fsxfail_fxn3/lap.log",
+        "tests/evidence/20261024T122703Z_fsxfail_fxn3/node.txt"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }

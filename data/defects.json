@@ -8784,6 +8784,17 @@
       "evidence": "2026-10-24: 'tools/defects.py verify D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS --batch b20261024-565ac2 --approval P20261024-d7c365' refused 'has 0 exposed PASS lap(s) of the 6 planned (6 PASS without exposure do not count)', while every ledger row of the batch reads measured 'rc=0 elapsed_s=.. exposure=1' and carries variant 'marker_modargs=dead_timeout_ms=12000' (data/criteria.runs.jsonl, the six rows of b20261024-565ac2); unplanned_variant (:979-996) was what dropped them. Draft in tests/evidence/drafts/tree/tools/defects.py names the two reasons apart; run on a scratch copy of tools and data it printed '(0 PASS without exposure and 6 run as an unplanned variant (marker_modargs=dead_timeout_ms=12000) do not count)'.",
       "next": "Lands with the next attempt's tools/defects.py. Verify: the scratch-copy run above on the frozen candidate's tools (the refusal names the variant), a control with the message as before (the draft's diff reverted in a scratch copy: 'without exposure'), then remove --fixed.",
       "reproducer": "tools/defects.py verify on a verification batch whose PASS laps are exposed but carry a variant (b20261024-565ac2), in a scratch copy of tools and data"
+    },
+    {
+      "id": "D-FSX-FAIL-FILES-LAP-WRITER-RECREATES-A-TEST-FILE-AND-LEAVES-THE-WORK-DIRECTORY",
+      "severity": "minor",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "tests/fsx_fail_files_node.sh's second writer runs until the row's process exits, and the row's EXIT trap (tests/suite/fsx.sh:22, rm -rf of the work directory) runs inside that process; a test file the writer stat'ed before the trap unlinked it is created again by its 'dd conv=notrunc' (O_CREAT), so the trap's rmdir fails silently and the lap leaves a work directory holding that file on the shared mount, where every later lap's count reads it",
+      "evidence": "Lane tests/evidence/lanes/g2_a17c_20261024T112110Z steps 10-11 (2/net/mesh/direct, test1, candidate 0.90.134 attempt 2026-10-24T10:25:09Z): lap fxn3 'work directories left on the mount: 1'; the listing (step11.log) shows /mnt/shared/.suite_fsx.test1.75444 holding only fsxfile_50000, size=227164, birth 12:27:03.991744736, 4 ms after the row's output was last written (12:27:03.987744616); laps fxn1 and fxn2 left 0. The writer loop is tests/fsx_fail_files_node.sh:38-47 ('while kill -0 \"$row\"', stat then dd of=\"$f\" bs=\"$sz\" count=1 conv=notrunc).",
+      "next": "Fix drafted for the next attempt in tests/evidence/drafts/tree/tests/fsx_fail_files_node.sh: the writer's dd uses conv=notrunc,nocreat, so it only overwrites a file that exists; FSX_WRITER_NOCREAT=0 lets dd create it, as before: the control. Then laps at 2/net/mesh/direct (where 1 of 3 left a directory) that also list the mount after each: control (FSX_WRITER_NOCREAT=0) and a verification sized from it, the leftover count and the listing the exposure; remove --fixed.",
+      "reproducer": "tests/fsx_fail_files_lap.sh <label> <node> at 2/net/mesh/direct on a pair formed fresh, then list /mnt/shared/.suite_fsx.*: a directory holding one fsxfile_<ops> born after the row's end"
     }
   ]
 }
