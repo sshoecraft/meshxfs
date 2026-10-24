@@ -3803,6 +3803,56 @@
           "config": "8/net/mesh/mpath",
           "row": "lap:adopted_grant_handoff",
           "iso": "2026-10-24T04:39:17Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T08:44:54Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T08:42:04Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T08:39:11Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T08:36:12Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T08:33:23Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T08:30:30Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T08:27:36Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T08:24:45Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T08:21:54Z"
+        },
+        {
+          "config": "8/net/mesh/mpath",
+          "row": "lap:adopted_grant_rig",
+          "iso": "2026-10-24T08:19:02Z"
         }
       ],
       "updated": "2026-10-24",
@@ -4002,11 +4052,44 @@
           "candidate": "",
           "build": "BE3695D2590A65F742F9816",
           "variant": "dl_shortcut_claim=0 (ARM=0 on every node: the already-granted shortcut ends the wait unclaimed, as before the fix); GAP_MS=20000 on both arms",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a grant adopted between two attempts is handed back by the shortcut's answer, so the master grants another node's EX over the waiter's"
+        },
+        {
+          "id": "b20261024-0bf8bc",
+          "kind": "verify",
+          "row": "lap:adopted_grant_rig",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 7,
+          "probe": "^EXPOSED: A adopted B.s grant of R between two attempts",
+          "candidate": "0.90.134",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:adopted_grant_rig",
+            "config": "8/net/mesh/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-65e307",
+            "k": 9,
+            "n": 9,
+            "candidate": "",
+            "variant": "dl_shortcut_claim=0 (ARM=0 on every node: the already-granted shortcut ends the wait unclaimed, as before the fix); GAP_MS=20000 on both arms",
+            "builds": [
+              "BE3695D2590A65F742F9816"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5550473077848115
         }
       ],
       "rates": [
@@ -4054,6 +4137,21 @@
             "B947A20F3C2FE3A67ABF6F3"
           ],
           "date": "2026-10-23"
+        },
+        {
+          "row": "lap:adopted_grant_rig",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-65e307",
+          "k": 9,
+          "n": 9,
+          "candidate": "",
+          "variant": "dl_shortcut_claim=0 (ARM=0 on every node: the already-granted shortcut ends the wait unclaimed, as before the fix); GAP_MS=20000 on both arms",
+          "builds": [
+            "BE3695D2590A65F742F9816"
+          ],
+          "date": "2026-10-24"
         }
       ]
     },
@@ -7829,7 +7927,7 @@
       "config": "*/*/*",
       "opened": "2026-10-23",
       "summary": "mxfs_dlm_yield_basted_cached_ags (xfs/xfs_mxfs_ilock.c:430-530), run before every slow-path inode DLM acquire, writes the module-global mxfs_ag_bast_stall_iters with no lock: it saves the value (:442), sets 200 (:444) and restores the saved value at its end (:528). Two overlapping calls on one node leave it at 200 for good (A saves 600 and sets 200, B saves 200, A restores 600, B restores 200). Its only reader is the BAST worker's prepass (xfs/xfs_mxfs_ag_unlock.c:2329-2333, stall_iters of xfs_ail_push_ag_sync_bounded), whose hard cap ag_prepass_push_iters=20 (ag_unlock.c:7) ends the push at about 200 ms, before a stall bound of either 200 or 600 iterations can, so at default settings the write changes no drain. What it does change: /sys/module/mxfs/parameters/ag_bast_stall_iters reads a value nobody set, and run.sh's live-parameter check (run.sh:366) then refuses every following row on that node as a stale prep, so a lane loses its remaining rows.",
-      "evidence": "2026-10-24 (session c74395b6): lane tests/evidence/lanes/g8_mpathtmo2_scst7_20261024T015358Z, 8/net/mesh/mpath, build 9C7B7B00C5DE523F1D378C8. After step 14 (path_fenced_return, PASS 177s/400s; its victim test14 was killed and rejoined, loading mxfs fresh) every following row, steps 15-22 from 02:07:52Z to 02:12:15Z, was refused by run.sh's live-parameter check (run.sh:366): 8 of 8 step logs print 'marker stale: test14 runs module parameters other than those prepped:' / 'prepped: ag_bast_stall_iters=600' / 'live:    ag_bast_stall_iters=200'. No rig file sets ag_bast_stall_iters (scout, grep -rIn over the tree excluding tests/evidence: 13 hits, all in xfs/ and one doc; 0 in run.sh, tests/setup, tests/lib, tests/mpath, tools, scripts, data), so 200 can come only from the module itself, and the only write of 200 is xfs/xfs_mxfs_ilock.c:444. A value held for 4 minutes is not one call's window, which lasts one AG scan; it is a restore lost to an overlapping call. ===== 2026-10-24: instrument and fix in the tree (0.90.134, not yet frozen; module B812521313FD456B147A91F). Instrument: ag_yield_scan_overlap_n (0444) counts yield scans that began while another was in its scan on the node (an in-flight atomic around the scan). Fix: the scan sets the short bound (200) on the AG whose drain it runs inline, under that AG's DLM lock with bast_scheduled (pag_dlm_yield_stall_iters, cleared after the call), and the BAST worker's prepass (xfs/xfs_mxfs_ag_unlock.c) uses it in place of ag_bast_stall_iters; nothing global is written. ag_yield_stall_global=1 (0644, default 0) writes the global as before: the control. ===== 2026-10-24, reproduced and the fix measured before the freeze (module B947A20F3C2FE3A67ABF6F3, g2 at 2/net/mesh/direct). Instruments: ag_yield_scan_n (scans), ag_yield_drain_n (inline drains), ag_yield_scan_overlap_n. Precheck 1 (one shared directory): 0 overlaps in 4280 create/unlink pairs, the parent's i_rwsem serializing each node's creates (tests/evidence/lanes/g2_pre_attempt15_20261024T034302Z steps 5-6). Precheck 2 (a directory per worker): 1 overlap per node in ~2300 scans, 0 inline drains, both arms PASS: scans last microseconds without a drain (g2_pre_attempt15b_20261024T035919Z). Precheck 3, with dbg_yield_scan_hold_us=2000 on both arms (g2_pre_attempt15c_20261024T040619Z): fix on PASS twice (test1 722 of 2156 scans overlapped, test2 790 of 2294; then 697/2087 and 789/2308), ag_bast_stall_iters 600 on both nodes, 72 s each; control (ag_yield_stall_global=1) FAIL, test1 and test2 both left at ag_bast_stall_iters=200 after 721/2126 and 720/2119 overlaps, 71 s. Hypothesis (save-restore race on overlapping scans) confirmed; the hold stands in for an inline drain's duration (0 drains on this workload). ===== 2026-10-24: no longer names 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:05Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:07Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:09Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:11Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:13Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:14Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:16Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:18Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:20Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:22Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED: the lap aborted at prep with exposure 0 because test2 was fenced and inhibited by the third-vote lap before it (vm_pool.sh: 'could not start [test1 test2]'); it measured nothing of this record, and its account moves to D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED, which names it",
+      "evidence": "2026-10-24 (session c74395b6): lane tests/evidence/lanes/g8_mpathtmo2_scst7_20261024T015358Z, 8/net/mesh/mpath, build 9C7B7B00C5DE523F1D378C8. After step 14 (path_fenced_return, PASS 177s/400s; its victim test14 was killed and rejoined, loading mxfs fresh) every following row, steps 15-22 from 02:07:52Z to 02:12:15Z, was refused by run.sh's live-parameter check (run.sh:366): 8 of 8 step logs print 'marker stale: test14 runs module parameters other than those prepped:' / 'prepped: ag_bast_stall_iters=600' / 'live:    ag_bast_stall_iters=200'. No rig file sets ag_bast_stall_iters (scout, grep -rIn over the tree excluding tests/evidence: 13 hits, all in xfs/ and one doc; 0 in run.sh, tests/setup, tests/lib, tests/mpath, tools, scripts, data), so 200 can come only from the module itself, and the only write of 200 is xfs/xfs_mxfs_ilock.c:444. A value held for 4 minutes is not one call's window, which lasts one AG scan; it is a restore lost to an overlapping call. ===== 2026-10-24: instrument and fix in the tree (0.90.134, not yet frozen; module B812521313FD456B147A91F). Instrument: ag_yield_scan_overlap_n (0444) counts yield scans that began while another was in its scan on the node (an in-flight atomic around the scan). Fix: the scan sets the short bound (200) on the AG whose drain it runs inline, under that AG's DLM lock with bast_scheduled (pag_dlm_yield_stall_iters, cleared after the call), and the BAST worker's prepass (xfs/xfs_mxfs_ag_unlock.c) uses it in place of ag_bast_stall_iters; nothing global is written. ag_yield_stall_global=1 (0644, default 0) writes the global as before: the control. ===== 2026-10-24, reproduced and the fix measured before the freeze (module B947A20F3C2FE3A67ABF6F3, g2 at 2/net/mesh/direct). Instruments: ag_yield_scan_n (scans), ag_yield_drain_n (inline drains), ag_yield_scan_overlap_n. Precheck 1 (one shared directory): 0 overlaps in 4280 create/unlink pairs, the parent's i_rwsem serializing each node's creates (tests/evidence/lanes/g2_pre_attempt15_20261024T034302Z steps 5-6). Precheck 2 (a directory per worker): 1 overlap per node in ~2300 scans, 0 inline drains, both arms PASS: scans last microseconds without a drain (g2_pre_attempt15b_20261024T035919Z). Precheck 3, with dbg_yield_scan_hold_us=2000 on both arms (g2_pre_attempt15c_20261024T040619Z): fix on PASS twice (test1 722 of 2156 scans overlapped, test2 790 of 2294; then 697/2087 and 789/2308), ag_bast_stall_iters 600 on both nodes, 72 s each; control (ag_yield_stall_global=1) FAIL, test1 and test2 both left at ag_bast_stall_iters=200 after 721/2126 and 720/2119 overlaps, 71 s. Hypothesis (save-restore race on overlapping scans) confirmed; the hold stands in for an inline drain's duration (0 drains on this workload). ===== 2026-10-24: no longer names 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:05Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:07Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:09Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:11Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:13Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:14Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:16Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:18Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:20Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED; 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T07:57:22Z, named by D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED: the lap aborted at prep with exposure 0 because test2 was fenced and inhibited by the third-vote lap before it (vm_pool.sh: 'could not start [test1 test2]'); it measured nothing of this record, and its account moves to D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED, which names it ===== 2026-10-24: no longer names 2/net/mesh/direct:lap:yield_stall_global:2026-10-24T08:20:18Z, named by D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT: the lap's own log (tests/evidence/batch_laps/b20261024-3bc635/20261024T081751Z-a5254db2.log) shows exposure=0: it never ran its workload (both work files 0 bytes) and overran its bound before reaching the yield scan read, about 95 s lost before prep's timer; D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT names it",
       "next": "On the next frozen attempt: control batch of lap:yield_stall_global at 2/net/mesh/direct with MXFS_EXTRA_MODARGS=ag_yield_stall_global=1 (bound 146 s, twice the 72 s laps), a verification sized from it, remove --fixed. The removal's reach: the scan and the write are the same on every lock manager and attachment (xfs/ code above the DLM); state that in the proposal and offer a lap at 2/disk/caw/direct too if asked.",
       "updated": "2026-10-24",
       "reproducer": "tests/yield_stall_global_lap.sh <label> <configuration> on a 2-node group (env MXFS_GROUP, MXFS_MARKER, MXFS_NODE_LIST): prep_cluster, the TEST ONLY hold dbg_yield_scan_hold_us=2000 written on both nodes, eight create/unlink workers per node for 20 s with worker w of both nodes in directory w, then each node's ag_yield_scan_overlap_n (EXPOSED when > 0) and ag_bast_stall_iters (FAIL when not what prep loaded); the control is MXFS_EXTRA_MODARGS=ag_yield_stall_global=1",
@@ -7900,6 +7998,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5550473077848115
+        },
+        {
+          "id": "b20261024-cbcaf1",
+          "kind": "control",
+          "row": "lap:yield_stall_global",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: yield scans overlapped",
+          "candidate": "",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "ag_yield_stall_global=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the yield scan writes ag_bast_stall_iters and restores it, as before the fix",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: overlapping yield scans leave ag_bast_stall_iters at 200"
         }
       ],
       "rates": [
@@ -7979,11 +8094,6 @@
           "config": "2/net/mesh/direct",
           "row": "lap:yield_stall_global",
           "iso": "2026-10-24T08:21:38Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:yield_stall_global",
-          "iso": "2026-10-24T08:20:18Z"
         }
       ]
     },
@@ -8452,6 +8562,23 @@
         }
       ],
       "updated": "2026-10-24"
+    },
+    {
+      "id": "D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "A batch lap's bound (tools/batch_lap.py) counts the time run.sh spends before its prep's own timer starts, in the runlock, tools/lun_pool.sh alloc and the preflight run under 'lun_pool.sh quiet' (pool_lock 300, tools/lun_pool.sh:855-856), and nothing logs that time: lap ysc1 of tests/yield_stall_global_lap.sh lost about 95 s there and overran its 146 s bound before its workload ran.",
+      "evidence": "2026-10-24, lane tests/evidence/lanes/g2_w12b_20261024T081715Z step 2 (control b20261024-3bc635, 2/net/mesh/direct, test1/test2, module BE3695D2590A65F742F9816): lap 1 (tests/evidence/batch_laps/b20261024-3bc635/20261024T081751Z-a5254db2.log) started 08:17:52Z, printed both nodes' after-prep lines, then 'the lap overran its bound of 146s', rc=124 at 08:20:18Z; its workload files tests/evidence/20261024T081752Z_yieldstall_ysc1/test{1,2}_work.txt are 0 bytes with mtime 08:20:09Z, so the 20 s workload started 9 s before the bound. The prep's ledger line (data/criteria.runs.jsonl:12803, run_id 20261024T081753Z-g2) says elapsed_s=39 recorded at 08:20:07Z; elapsed is measured from run.sh:2721 (t0, after preflight) to :2725, so about 95 s passed between RUN_ID (08:17:53Z, run.sh:400) and t0 with no timestamped line anywhere (run.sh writes no prep log; clyde_preflight.sh and lun_pool.sh keep none; the lap captures prep's output in a variable, tests/yield_stall_global_lap.sh:66, and prints it only on failure). In the same minute other lanes' laps allocated and prepped pool LUNs: 20261024T081753Z_adoptgrant_agc1/prep.log (8 nodes, g8b) mtime 08:18:54Z, 20261024T081747Z_fragag_fra16_caw3/prep.log (g4) 08:18:57Z, 20261024T081902Z_adoptgrant_agc2/prep.log 08:20:29Z. Laps 2-10 of the same batch spent 37-38 s in prep and ran 76-86 s. The hypothesis that the 95 s was pool_lock waits behind those allocations is unproven: no timestamp shows where the time went.",
+      "next": "Instrument first: run.sh prints a timestamped line when it takes the runlock, when lun_pool.sh alloc returns, when the preflight starts and ends (and lun_pool.sh quiet when it gets pool_lock and how long it waited), and the laps that capture prep output keep it in their evidence directory; then read a lap started while another lane allocates an 8-node LUN. If pool_lock waits are the cause, either a lap's bound covers only its own work (batch_lap.py starts the clock after prep, or prep reports its pre-t0 wait and the lap subtracts it), or lanes' allocations are serialized so a lap never waits on another's; a control with the change off.",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:yield_stall_global",
+          "iso": "2026-10-24T08:20:18Z"
+        }
+      ]
     }
   ]
 }
