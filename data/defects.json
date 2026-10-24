@@ -5490,7 +5490,7 @@
       "opened": "2026-10-23",
       "summary": "tests/fourkn_merge_2node.sh, the standalone two-node merged-write lap, holds each node's first 64 merged inode-block writes 20 ms between the read and the COMPARE AND WRITE (HOLD_N 64, HOLD_MS 20, HOLD_PEER_MS 0 by default) so that a peer's write of the same block lands in between, but nothing makes the peer write that block inside the hold: of 4 held laps on the 4K-native LUN, 1 saw no MISCOMPARE and exited VACUOUS, so one lap does not reliably exercise the merged write's retry",
       "evidence": "Held laps (HOLD_N=64 HOLD_MS=20), module 2666D8544F367E3B7424B60, test31/test32: tests/evidence/20261022T135408Z_fourkn_merge_2-net-mesh-direct miscompares 1 (PASS); 20261022T135619Z_fourkn_merge_2-disk-caw-direct 1 (PASS); 20261022T145928Z_fourkn_merge_2-disk-caw-direct 0 (VACUOUS: lap.log:13-14 iwr_merge_blocks 247 and 214, iwr_merge_miscompares=0, dbg_iwr_merge_hold_left=0 on both, so every hold was spent with no peer write inside it; :36 'VACUOUS no swap miscompared'); 20261022T154721Z_fourkn_merge_2-disk-caw-direct 2 (PASS). Unheld, 0 MISCOMPAREs in ~480 merged writes a lap (20261022T133714Z, 134001Z, 134249Z). Every VACUOUS lap passed every correctness check; the lap never reads one as PASS. The board row's fix (tests/suite/fourkn_merge.sh, forced overlap at the unmount) did not change this script: data/reviews/P20261022-68ebdb.md Check 1 (tests/fourkn_merge_2node.sh:89-91 HOLD_N 64, HOLD_MS 20, HOLD_PEER_MS 0; :201 the VACUOUS exit; frozen with sha256 783e549811440c52852786b6283438bdfd542a3f87b1d03c6a5368f8266382dd, the same hash today). Split out of D-FOURKN-MERGE-LAP-HELD-WINDOW-MISSES-THE-RETRY-IN-SOME-LAPS, which now covers the board row only. ===== 2026-10-24, control b20261024-d5be0a (the old hold: FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0, module A27A67A3E501890BE9985E0): of the three laps whose workload ended inside its bound, lap 7 saw 4 MISCOMPAREs (PASS, 15:13:34Z) and laps 8 and 9 saw none and exited VACUOUS ('VACUOUS no swap miscompared', 15:15:01Z and 15:16:34Z; tests/evidence/batch_laps/b20261024-d5be0a/20261024T151334Z-b93b7fe4.log, 151502Z-22904a8e.log). The batch was stopped at lap 10 (its laps 1 and 3-6 had overrun, D-FOURKN-MERGE-WORKLOAD-OVERRAN-16S-WHEN-EVERY-CAW-TOOK-TWICE-AS-LONG, and lap 2 was refused by the host preflight), so it cannot be measured and a new control is needed.",
-      "next": "Make the lap force the overlap once a lap as tests/suite/fourkn_merge.sh does (the workload unheld; at the unmount node 1 armed with one held merged write of up to FORCE_MS while node 2 writes its own slot of the same block), so a lap whose forced overlap does not land is VACUOUS and every other lap retries a MISCOMPARE. Then a control with the old hold (HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0, no forced overlap) on the candidate's tree, a verification batch sized from it, and remove --fixed.",
+      "next": "Make the lap force the overlap once a lap as tests/suite/fourkn_merge.sh does (the workload unheld; at the unmount node 1 armed with one held merged write of up to FORCE_MS while node 2 writes its own slot of the same block), so a lap whose forced overlap does not land is VACUOUS and every other lap retries a MISCOMPARE. Then a control with the old hold (HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0, no forced overlap) on the candidate's tree, a verification batch sized from it, and remove --fixed. ===== 2026-10-24, attempt 19: verification b20261024-0fd280 (89 planned, lane tests/evidence/lanes/g2d_a19b_20261024T153135Z step 5) passed laps 1-11 (67-75 s, miscompares 1-2 each, forced=landed) and lap 12 FAILed 'elapsed>130s' (run 2/disk/caw/direct4k:lap:fourkn_merge_2node:2026-10-24T16:12:12Z): its workers were stopped at rounds 3 and 2 of 20 by the node-side bound and its remount after chk hung past the kill, while this session's recursive grep of tests/evidence saturated /dev/sda, the SSD under every pool LUN (100% util 16:11-16:14Z, tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/). Proposed infra-proven: P20261024-a96a97. The batch ended on that FAIL; attempt 20 runs a fresh verification against the same control (queue_g2d_a20.txt).",
       "reproducer": "tests/fourkn_merge_2node.sh <4096-byte pool LUN device> test31 test32 with its default hold (about 30-40 s a lap): a lap whose holds catch no peer write exits VACUOUS (exit 3, 'VACUOUS no swap miscompared')",
       "batches": [
         {
@@ -9573,6 +9573,16 @@
           "config": "4/net/mesh/direct",
           "row": "lap:probe_a_replay",
           "iso": "2026-10-24T15:32:30Z"
+        },
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:probe_a_replay",
+          "iso": "2026-10-24T16:05:09Z"
+        },
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:probe_a_replay",
+          "iso": "2026-10-24T15:55:28Z"
         }
       ]
     },
@@ -9641,6 +9651,24 @@
           "config": "2/net/mesh/direct",
           "row": "lap:noino_fence_efd_hold",
           "iso": "2026-10-24T14:59:44Z"
+        }
+      ],
+      "updated": "2026-10-24"
+    },
+    {
+      "id": "D-FIRST-MOUNT-SLICE-ZERO-SERIAL-FUA-TAKES-16S-UNDER-TARGET-LOAD-PREP-OVERRAN",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "A node's first mount after mkfs zeroes its 64 MiB log slice (dlm/bootstrap.c:1798-1845, mxfs_slife_claim_init) with 64 serial 1 MiB FUA writes, a flush, then 64 serial 1 MiB read-backs: 128 synchronous round trips. Under load on the shared target this took 13.7 s and 16.2 s per node, against 1.0 s and 6.9 s in an earlier lap, so a 2-node prep took past its derived 88 s bound (twice its measured 40-44 s) and a batch lap ended INCOMPLETE. The flush in step 3 already makes the zeroes durable, so FUA on each write buys no durability the flush does not",
+      "evidence": "Control b20261024-aefae7 (lap:lh_master at 2/net/mesh/direct, g2 test1/test2, attempt 19, module A27A67A3E501890BE9985E0) lap 10, run 2/net/mesh/direct:lap:lh_master:2026-10-24T16:13:16Z: 'LAP lh_master: prep_cluster overran its 88 s bound (rc 124)' (tests/evidence/batch_laps/b20261024-aefae7/20261024T161148Z-a4c00aa6.log:6); its prep (tests/evidence/20261024T161148Z_lhmaster_lhmc1910/prep_1.log:41-49): mkfs 11 s, 'PREP STEP 3 ... form on test1 (module load and mount)' 27 s, join test2 started +47 s and unfinished at the kill; preflight passed at +9 s with no lock wait. test1's kernel ring: 16:12:27.912 'P-SLIFE-ZEROING slice=0 ... len=67108864', 16:12:41.605 'P-SLIFE-READY slice=0 ... zero_ms=13679', mounted 16:12:44.7; test2's journal: 16:12:56.683 P-SLIFE-ZEROING slice=1, 16:13:12.904 'P-SLIFE-READY slice=1 ... zero_ms=16208', mounted 16:13:17.6 (after the kill). The earlier lap 5 prep of the same batch (tests/evidence/20261024T155719Z_lhmaster_lhmc195/prep_1.log): zero_ms=6902 (test1) and 1030 (test2), form 12 s, join 8 s. Host kernel log in window 16:12:19-16:12:34Z: g2d's lane (test31/test32, pool-13) logging out of the same SCST target (NEXUS_LOSS_SESS, Processing thread mxfspool13*_0..7 finished) and g2d's verify laps on the target until 16:12:12Z. Read-only collection of 2026-10-24 (node dmesg, test2 journal, host journal --utc). ===== 2026-10-24, found after this record was opened: the zeroing's 13679 and 16208 ms fall inside minutes when /dev/sda, the SSD that holds every pool LUN image, ran at 100.00/99.99/92.84% util reading 474-539 MB/s (clyde sysstat, tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/sysstat_sda.txt), from this session's own 'grep -rl ... tests/evidence' (16:10:37-16:13:56Z, tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/session_grep.txt; tests/evidence is on the same disk, tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/devices.txt). Lap 5's prep of the same batch, at 29.52% util, zeroed in 6902 and 1030 ms and finished in 42 s inside its bound. Proposed infra-proven for lap 10: P20261024-3650c2.",
+      "next": "Split zero_ms into its write, flush and read-back phases (a debug line, no behaviour change) and measure them on a 2-node prep with and without another lane's load on the target, to test the hypothesis that the per-write FUA round trip on the contended target is what grows. If it is: issue the zero writes without FUA and in parallel (the step-3 flush is the durability barrier), keep the full read-back proof, with a module parameter restoring serial FUA writes for the control; lap: a forced prep's zero_ms under a concurrent target load, control vs fix. ===== If P20261024-3650c2 is approved: what remains is whether 64 serial FUA writes plus 64 serial read-backs (1.0-6.9 s per node unsaturated) is a pace defect at all with no failure attached; propose remove --disproved for the overrun on the saturation evidence, or narrow this record to the pace question with its own measurement.",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lh_master",
+          "iso": "2026-10-24T16:13:16Z"
         }
       ],
       "updated": "2026-10-24"

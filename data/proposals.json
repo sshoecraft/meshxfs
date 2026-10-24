@@ -9209,6 +9209,50 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-a96a97",
+      "kind": "infra-proven",
+      "record": null,
+      "change": {
+        "config": "2/disk/caw/direct4k",
+        "row": "lap:fourkn_merge_2node",
+        "iso": "2026-10-24T16:12:12Z"
+      },
+      "argument": "Lap 12 of verification b20261024-0fd280 (tests/fourkn_merge_2node.sh at 2/disk/caw/direct4k, g2d test31/test32) ran 16:10:01-16:12:11Z and was killed at its 130 s bound after 11 laps of 67-75 s. Its log (tests/evidence/batch_laps/b20261024-0fd280/20261024T161001Z-a9a3b885.log) shows both nodes' workers stopped by their 13 s node-side bound at round 3 and round 2 of 20 (WORKER_STOPPED at=3:27 / at=2:30, errors=0; lines :14-16), every data check passing (both wrote back, forced overlap landed, chk_mxfs clean at 16:11:03Z), then no output for 68 s: the lap's next step is mount_both (tests/fourkn_merge_2node.sh:259), whose mount on test31 had not returned when the lap was killed. The cause is outside MeshXFS: from 16:10:37Z to 16:13:56Z this Claude Code session ran 'grep -rl b20261024-d04ebf tests/evidence' (tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/session_grep.txt), and tests/evidence is /src/mxfs-evidence on /dev/sda, the same SSD that holds every SCST pool LUN image (/mxfs, /home/steve/disks/pool; tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/devices.txt). clyde's sysstat (tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/sysstat_sda.txt, CDT = UTC-5, each row the minute ending at its stamp) shows sda reading 48146 kB/s at 24.75% util for the minute ending 16:10:01Z, then 238461 kB/s at 61.09% (to 16:11:01Z), 539491 at 100.00%, 510022 at 99.99%, 473715 at 92.84% (to 16:14:01Z), and 6702 at 6.54% once the grep had ended (to 16:15:01Z): the reads start with the grep and stop with it. The lap's workload (16:10:37-16:10:51Z) and its remount (from 16:11:03Z) fall inside the saturated minutes; the 11 earlier laps of the batch ran at 22-62% util. The same saturation slowed another lane's prep in the same minutes (2/net/mesh/direct lh_master lap 10, its log-slice zeroing 13679 and 16208 ms against 1030-6902 ms, tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/window_16115_16133Z_DA.test1.txt and _A.test2.txt). No MeshXFS error, refusal or shutdown is in the lap's checks. The run is the rig's: the host disk was saturated by a session's own recursive read.",
+      "evidence": [
+        "tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/sysstat_sda.txt",
+        "tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/session_grep.txt",
+        "tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/devices.txt",
+        "tests/evidence/batch_laps/b20261024-0fd280/20261024T161001Z-a9a3b885.log",
+        "tests/evidence/20261024T161001Z_fourkn_merge_2-disk-caw-direct4k/lap.log",
+        "tests/fourkn_merge_2node.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-3650c2",
+      "kind": "infra-proven",
+      "record": null,
+      "change": {
+        "config": "2/net/mesh/direct",
+        "row": "lap:lh_master",
+        "iso": "2026-10-24T16:13:16Z"
+      },
+      "argument": "Lap 10 of control b20261024-aefae7 (tests/live_holder_shard_lap.sh at 2/net/mesh/direct, g2 test1/test2) ended rc=2 'LAP lh_master: prep_cluster overran its 88 s bound (rc 124)' (tests/evidence/batch_laps/b20261024-aefae7/20261024T161148Z-a4c00aa6.log). Its prep (tests/evidence/20261024T161148Z_lhmaster_lhmc1910/prep_1.log) waited on nothing (preflight passed at +9 s) and was slow in every step that touched the LUN: mkfs 11 s (6 s in the batch's other preps), form on test1 27 s (5-12 s), join test2 unfinished at the kill (8 s). The node logs show where: test1's log-slice zeroing 'P-SLIFE-READY slice=0 ... zero_ms=13679' (16:12:27.9-16:12:41.6Z, tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/window_16115_16133Z_DA.test1.txt) and test2's 'zero_ms=16208' (16:12:56.7-16:13:12.9Z, tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/window_16115_16133Z_A.test2.txt), against zero_ms 6902 and 1030 in lap 5's prep of the same batch (tests/evidence/20261024T155719Z_lhmaster_lhmc195/prep_1.log, when sda ran at 29.52% util). The cause is outside MeshXFS: from 16:10:37Z to 16:13:56Z this Claude Code session's 'grep -rl b20261024-d04ebf tests/evidence' read the evidence tree, which is on /dev/sda with every pool LUN image (tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/session_grep.txt, tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/devices.txt), and sda ran at 100.00%, 99.99% and 92.84% util reading 474-539 MB/s for the minutes ending 16:12, 16:13 and 16:14Z, quiet at 6.54% by 16:15Z (tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/sysstat_sda.txt). The whole prep (16:11:57-16:13:16Z) is inside the saturation. The same minutes overran another lane's lap (2/disk/caw/direct4k fourkn_merge_2node 16:12:12Z). The run is the rig's: the host disk the LUN lives on was saturated by a session's recursive read.",
+      "evidence": [
+        "tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/sysstat_sda.txt",
+        "tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/session_grep.txt",
+        "tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/devices.txt",
+        "tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/window_16115_16133Z_DA.test1.txt",
+        "tests/evidence/infra/20261024T1610Z_sda_saturation_by_session_grep/window_16115_16133Z_A.test2.txt",
+        "tests/evidence/batch_laps/b20261024-aefae7/20261024T161148Z-a4c00aa6.log",
+        "tests/evidence/20261024T161148Z_lhmaster_lhmc1910/prep_1.log",
+        "tests/evidence/20261024T155719Z_lhmaster_lhmc195/prep_1.log"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
