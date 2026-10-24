@@ -3805,7 +3805,7 @@
           "iso": "2026-10-24T04:39:17Z"
         }
       ],
-      "updated": "2026-10-23",
+      "updated": "2026-10-24",
       "reproducer": "tests/tauth/adopted_grant_handoff_test.sh (host only, an in-process four-node mesh, about 9 s): the grant adopted between two attempts, its page handed to the waiter, the already-granted shortcut answer; exposure is the line 'EXPOSURE adopted=1 handed=1 local=1'; DL_SHORTCUT_CLAIM=0 turns the fix's knob off (the same-build control)",
       "batches": [
         {
@@ -3990,6 +3990,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-65e307",
+          "kind": "control",
+          "row": "lap:adopted_grant_rig",
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: A adopted B.s grant of R between two attempts",
+          "candidate": "",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "dl_shortcut_claim=0 (ARM=0 on every node: the already-granted shortcut ends the wait unclaimed, as before the fix); GAP_MS=20000 on both arms",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a grant adopted between two attempts is handed back by the shortcut's answer, so the master grants another node's EX over the waiter's"
         }
       ],
       "rates": [
@@ -7663,6 +7680,23 @@
           "build": "BE3695D2590A65F742F9816",
           "variant": "ag_yield_stall_global=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the yield scan writes ag_bast_stall_iters and restores it, as before the fix",
           "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: overlapping yield scans leave ag_bast_stall_iters at 200"
+        },
+        {
+          "id": "b20261024-3bc635",
+          "kind": "control",
+          "row": "lap:yield_stall_global",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: yield scans overlapped",
+          "candidate": "",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "ag_yield_stall_global=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the yield scan writes ag_bast_stall_iters and restores it, as before the fix",
+          "state": "open",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
