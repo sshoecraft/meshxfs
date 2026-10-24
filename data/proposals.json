@@ -10042,14 +10042,15 @@
         "tests/evidence/lanes/g2d_a19b_20261024T153135Z/step4.log",
         "tests/fourkn_merge_2node.sh"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-24",
       "review": {
         "file": "data/reviews/P20261024-857abd.md",
         "sha256": "9399a7b124e3222d54f439b0fcfe7968a2521d60d150047bf93e5fbbe5100259",
         "verdict": "approved",
         "date": "2026-10-24"
-      }
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-91492a",

@@ -5282,7 +5282,7 @@
           "candidate": "0.90.134",
           "build": "1BC77CFB15EF4A988DD1F56",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -5688,6 +5688,18 @@
           "config": "2/disk/caw/direct4k",
           "row": "lap:fourkn_merge_2node",
           "iso": "2026-10-24T15:35:10Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T16:34:18Z",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "batch": "b20261024-160255",
+          "approval": "P20261024-857abd",
+          "date": "2026-10-24"
         }
       ]
     },
