@@ -8865,6 +8865,40 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-d0ac00",
+      "kind": "verify",
+      "record": "D-MEASURE-REFUSES-A-BATCH-WHOSE-SETTLED-LAP-CHECK-BATCH-LAP-COUNTED-AS-RUN",
+      "change": {
+        "batch": "b20261024-e3e420"
+      },
+      "argument": "Candidate 0.90.134, attempt frozen 2026-10-24 (module A27A67A3E501890BE9985E0), with the redrafted fix in the frozen tree: plan_laps(batch) (PASS, FAIL and INCOMPLETE laps use up the plan, INFRA none) is what check_batch_lap, defects.py measure and tools/harness_batch.py's resume all count; MXFS_MEASURE_COUNT_SETTLED=0 makes measure count PASS and FAIL only, as before (the control). Control b20261024-4a72ee (lane tests/evidence/lanes/host_a19_20261024T142947Z step1.log, lap tests/measure_settled_lap.py, bound 6 s): 10 of 10 laps FAIL; each lap's log (tests/evidence/batch_laps/b20261024-4a72ee/) shows measure refusing every live batch with a settled INCOMPLETE lap ('planned 10 laps and has 9 (0 settled INCOMPLETE); run the rest first' for b20261024-bda0e1 and b20261024-1d2fde, '... planned 20 laps and has 0' for b20261024-4a1349, '... 10 ... 0' for b20261024-f38319) and the scratch fixture 'EXPOSED: scratch batch ... holds 1 FAIL and 1 settled INCOMPLETE lap of 2 planned' refused the same way; the settled-INFRA fixture (2 FAIL and 1 settled INFRA lap of 2 planned) closed in the control too, as before the fix, and the INFRA plan-count fixture read 'plan_laps 1, batch-check rc=0'. Verification b20261024-e3e420, declared by harness_batch verify from that control (6 clean laps), lane tests/evidence/lanes/host_a19_20261024T142947Z step2.log: 6 of 6 PASS 'LAP measure_settled PASS: every batch with a settled lap closed with its rate, and plan_laps, batch-check and the resume agree on an INFRA lap', each with the EXPOSED settled-INCOMPLETE fixture (exposure=1) and the settled-INFRA fixture closing (2 of 2 exposed, 73 clean laps). The laps change nothing live: measure runs in a scratch copy of data/. What this does not test: an INFRA lap recorded by a real rig lap (the INFRA cases are fixtures in the scratch tree).",
+      "evidence": [
+        "tests/evidence/lanes/host_a19_20261024T142947Z/step1.log",
+        "tests/evidence/lanes/host_a19_20261024T142947Z/step2.log",
+        "tests/evidence/batch_laps/b20261024-4a72ee",
+        "tests/evidence/batch_laps/b20261024-e3e420"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-d8bd3f",
+      "kind": "verify",
+      "record": "D-DRBD-WRITE-BOUND-ARM-IGNORES-MXFS-GROUP-AND-ADDRESSES-TEST3-TEST4",
+      "change": {
+        "batch": "b20261024-efeeb2"
+      },
+      "argument": "Candidate 0.90.134, attempt frozen 2026-10-24 (module A27A67A3E501890BE9985E0). The fix (tests/drbd_write_bound_arm.sh :40-52, frozen in this attempt and in attempt 18): with no pair named the arm takes MXFS_GROUP's two nodes from the lab file (g2 when unset), as scripts/drbd_rig.sh does; DRBD_ARM_GROUP=0 takes test3 test4, as before (the control). The lap tests/drbd_nodes_count_lap.sh (redrafted for this attempt: the arm part requires the g2 pair test1 test2 from MXFS_NODES=2 MXFS_GROUP=g2; DRBD_RIG_NODES_COUNT=0 stays the earlier record's control) runs the arm's and drbd_rig.sh's node resolution on the host, no VM. Control b20261024-1194fc (lane tests/evidence/lanes/host_a19_20261024T142947Z step3.log): 10 of 10 FAIL with DRBD_ARM_GROUP=0. Verification b20261024-efeeb2 sized from it (6 clean laps), lane tests/evidence/lanes/host_a19_20261024T142947Z step4.log: 6 of 6 PASS 'LAP drbd_nodes_count PASS ... a bare MXFS_NODES with MXFS_GROUP=g2 selected the g2 pair in drbd_rig.sh and in d[rbd_write_bound_arm.sh]', exposure=1 each. Lap logs in tests/evidence/batch_laps/b20261024-1194fc and b20261024-efeeb2. What this does not test: a DRBD write-bound run on the rig; the defect is the arm's node selection alone.",
+      "evidence": [
+        "tests/evidence/lanes/host_a19_20261024T142947Z/step3.log",
+        "tests/evidence/lanes/host_a19_20261024T142947Z/step4.log",
+        "tests/evidence/batch_laps/b20261024-1194fc",
+        "tests/evidence/batch_laps/b20261024-efeeb2"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
