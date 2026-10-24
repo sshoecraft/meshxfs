@@ -6861,6 +6861,46 @@
         "date": "2026-10-23"
       },
       "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-d850ee",
+      "kind": "verify",
+      "record": "D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER",
+      "change": {
+        "batch": "b20261023-9e73d1"
+      },
+      "argument": "Verification b20261023-9e73d1 (lap:adopted_grant_handoff at 8/net/mesh/mpath, candidate 0.90.134, attempt frozen 2026-10-24T04:13:43Z, module B947A20F3C2FE3A67ABF6F3) passed 6 of 6 exposed laps (tests/evidence/lanes/host_a15b_20261024T043853Z/step2.log), sized from control b20261023-2643da on the same build (DL_SHORTCUT_CLAIM=0 in the lap's environment, the fix's switch dl_shortcut_claim=0; 10 of 10 exposed laps failed 'adopted_grant_handoff_test RESULT FAIL fails=4', tests/evidence/lanes/host_a15b_20261024T043853Z/step1.log). This repeats on this attempt the control b20261023-0b21e2 and fix-on batch b20261023-a62d3d that review P20261023-778a6d found sound on build 16A5F5DDDB4852C9D5DB236 of an earlier attempt. The lap (tests/tauth/adopted_grant_handoff_test.sh) is the in-process A/B of an AG grant adopted through a takeover and handed back; exposure is '^EXPOSURE adopted=1 handed=1 local=1'. Bound 75 s, as both earlier batches; laps took about 20 s.",
+      "evidence": [
+        "tests/evidence/lanes/host_a15b_20261024T043853Z/step1.log",
+        "tests/evidence/lanes/host_a15b_20261024T043853Z/step2.log",
+        "tests/tauth/adopted_grant_handoff_test.sh",
+        "data/reviews/P20261023-778a6d.md"
+      ],
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-d850ee.md",
+        "sha256": "0c5aa035e4606cd802e127a54ed71d82494fcdef61c7ecb5d844818efb6513cc",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
+    },
+    {
+      "id": "P20261024-977f69",
+      "kind": "verify",
+      "record": "D-CAWMPATH-NLINK1-FILE-NAMED-TWICE-AFTER-ANSWER-LOST",
+      "change": {
+        "batch": "b20261023-e1a1db"
+      },
+      "argument": "Verification b20261023-e1a1db (lap:relog_auth at 4/disk/caw/mpath on g4c test7-test10, candidate 0.90.134, attempt frozen 2026-10-24T04:13:43Z, module B947A20F3C2FE3A67ABF6F3) passed 8 of 8 exposed laps (tests/evidence/lanes/g4c_a15_relogauth_20261024T042815Z/step3.log), sized from control b20261023-3629b7 on the same build (ARM=0: relog_auth_granted_mode=0 on both nodes for the lap, the read before the fix; tests/evidence/lanes/g4c_a15_relogauth_20261024T042815Z/step2.log). Of the control's 10 laps, 8 reached the trigger and all 8 failed 'A re-logged the directory core under its shared hold'; laps 2 and 8 aborted at their prep, refused by the host-safety preflight while another lane powered up (exposure=0; they are cells of D-LANE-POWER-UP-FLOODS-THE-HOST-LOG-AND-ANOTHER-LANES-PREFLIGHT-REFUSES-ITS-PREP and were dropped from this record with that evidence), so the rate is 8 of 8 and N=8. Each lap is a fresh prep_cluster at 4/disk/caw/mpath on the candidate's module and one lap of tests/relog_pr_release_auth.sh: A holds a fresh directory shared with its next release drain forced onto the re-log arm (dbg_relog_force_ino), B creates in it. Exposure: the forced arm ran on A under a shared grant (P146V-FORCE granted_mode=3). PASS: A refused the re-log and both nodes list b1 b2, B's create rc=0, no shutdown or corruption line. Bound 224 s, twice the longest precheck lap (ARM=0 112 s).",
+      "evidence": [
+        "tests/evidence/lanes/g4c_a15_relogauth_20261024T042815Z/step2.log",
+        "tests/evidence/lanes/g4c_a15_relogauth_20261024T042815Z/step3.log",
+        "tests/relog_auth_lap.sh",
+        "tests/relog_pr_release_auth.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
