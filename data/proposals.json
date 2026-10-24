@@ -8913,6 +8913,55 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-20d40a",
+      "kind": "verify",
+      "record": "D-FOURKN-MERGE-LAP-OVERRUN-LEAVES-ITS-WORKER-HOLDING-THE-MOUNT",
+      "change": {
+        "batch": "b20261024-2daa46"
+      },
+      "argument": "Verification batch b20261024-2daa46 of lap:merge_overrun at 2/disk/caw/direct4k on candidate 0.90.134 attempt 19 (module A27A67A3E501890BE9985E0), sized from control b20261024-1213d5 (same configuration, same attempt, MERGE_NODE_BOUND=0 so the worker runs with no node-side bound as before the fix: 10 of 10 laps failed, each leaving a worker or the mount behind after a forced overrun). With the fix in (the worker runs on the node under timeout --foreground WBOUND-3), 6 of 6 planned laps PASS with exposure=1 each ('neither node had /mnt/fourkn mounted or a worker running 8 s after the overrun'). Lane tests/evidence/lanes/g2d_a19_20261024T143222Z steps 4 and 5; lap logs under tests/evidence/batch_laps/b20261024-2daa46/ and b20261024-1213d5/. The same fix was verified at 2/net/mesh/direct4k on attempt 18 (b20261024-c6a721); this batch clears the disk/caw 4K-native configuration.",
+      "evidence": [
+        "tests/evidence/lanes/g2d_a19_20261024T143222Z/step5.log",
+        "tests/evidence/lanes/g2d_a19_20261024T143222Z/step4.log",
+        "tests/evidence/batch_laps/b20261024-2daa46"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-20d40a.md",
+        "sha256": "d580282c2a847d2e74e2fb429c11f017730c51a00136e41be1fee2a55e2d9230",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-98bc9b",
+      "kind": "infra-proven",
+      "record": null,
+      "change": {
+        "config": "8/disk/caw/mpath",
+        "row": "lap:peer_window",
+        "iso": "2026-10-24T14:57:18Z"
+      },
+      "argument": "Lap 10 (pw9c10) of control batch b20261024-05c9e3 ended INCOMPLETE (rc=2, 'RESULT: ABORT ... stage=prep') because its prep overran the lap's own 120 s prep bound by 1 s ('STAGE prep rc=124 wall=121s --- prep OK: mxfs mounted on all 8 node(s)'): the prep itself completed. 37 s of that time was run.sh waiting on the LUN pool lock held by a host-only test run in this session, not by MeshXFS: tests/evidence/20261024T145517Z_peerwin_pw9c10/prep.log:4 'lun_pool: pool lock waited 18 s' (+1 s to +19 s, 14:55:19-14:55:37Z) and :9 'lun_pool: pool lock waited 19 s' inside the quiet preflight (+30 s to +57 s, ending 14:56:07Z). The pool's own hold log (copy tests/evidence/20261024T145517Z_peerwin_pw9c10/pool_lock_log_copy.txt) names the holders: '2026-10-24T14:55:37Z held 20 s by pid 4057116: lun_pool.sh quiet sh -c date ... tests/evidence/20261024T145517Z_lapwait_lwp1b/holder.start; sleep 20; ...' and '2026-10-24T14:56:07Z held 20 s by pid 4059016: lun_pool.sh quiet sh -c ... lapwait_lwp0b ...': the precheck of the draft tests/batch_lap_wait_lap.sh (tests/evidence/20261024T145517Z_lapwait_lwp1b, 20261024T145547Z_lapwait_lwp0b), which holds the pool lock 20 s on purpose with 'sleep 20'. Without those 37 s the prep took about 84 s (preflight passed at +57 s; PREP STEPs 0-4 by +21 s after it, prep.log:38-63), inside its 120 s bound. Nothing in the lap measured the defect's behaviour (exposure=0, no workload ran), so the lap is the rig's (another test's lock hold), not a MeshXFS outcome.",
+      "evidence": [
+        "tests/evidence/20261024T145517Z_peerwin_pw9c10/prep.log",
+        "tests/evidence/20261024T145517Z_peerwin_pw9c10/pool_lock_log_copy.txt",
+        "tests/evidence/20261024T145517Z_lapwait_lwp1b",
+        "tests/evidence/20261024T145547Z_lapwait_lwp0b",
+        "tests/evidence/batch_laps/b20261024-05c9e3/20261024T145517Z-e9861462.log"
+      ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-98bc9b.md",
+        "sha256": "7dab21fe822672edc6ee8475f215ccf3e829c0c8a4016e2f25ac6778637661d2",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
