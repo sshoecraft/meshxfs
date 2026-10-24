@@ -5711,8 +5711,15 @@
         "tests/tauth_header_dep_lap.sh",
         "tests/tauth/Makefile"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-5851c2.md",
+        "sha256": "209fad960b550655caec4c61dba1534eff733365efbdd1887acb2b650b090ae0",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-6da0d2",
@@ -5730,8 +5737,15 @@
         "tests/tauth_make_goal_lap.sh",
         "tests/tauth/Makefile"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-6da0d2.md",
+        "sha256": "c77946848c872ef5297dc3cbd2e6b481312088b91ff7b6d39450b3909b5a1cd9",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-ea2e07",
@@ -5749,8 +5763,15 @@
         "tests/release_step_incidents_at_lap.py",
         "tools/criteria.py"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-ea2e07.md",
+        "sha256": "0866b5fbf8f92a66bfbb6115686bd39654d4111db187683a7d566b22f2c19af4",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-486f3d",
@@ -5768,8 +5789,15 @@
         "tests/batch_lap_variant_lap.py",
         "tools/batch_lap.py"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-486f3d.md",
+        "sha256": "452b5e178539506fcf6658493135dacf950ca637f12348229a7e0e2d71a730e6",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-a59d31",
@@ -5789,8 +5817,15 @@
         "tests/presteps_marker_read_lap.py",
         "tools/release_run.py"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-a59d31.md",
+        "sha256": "344ce3eb968dd24a40ce14dae5595e425694eea58b07c9c9df044dd2c30be897",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-2f64df",
@@ -5809,8 +5844,15 @@
         "tests/evidence/candidates/0.90.134_20261024T010107Z.files.json",
         "tests/release_step_copy_race.py"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-2f64df.md",
+        "sha256": "a2bce876503a992a65f261dea5b3d9359237586c301e20d8d8c9989bc0b8c928",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-e9c692",
@@ -5829,8 +5871,15 @@
         "tests/fsx_fail_files_node.sh",
         "tests/suite/fsx.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-e9c692.md",
+        "sha256": "fd80e8bec98441a7f65c9aa537f5a115b4a806fea6ed705a69f2e58d463ca555",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-37e338",
@@ -5849,8 +5898,15 @@
         "tests/marker_size_lap.sh",
         "run.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-37e338.md",
+        "sha256": "fa3972223657ee2980402d05de5b0434487ba26cd2a2bb21e8934eef42f16bdb",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }

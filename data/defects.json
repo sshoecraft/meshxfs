@@ -2678,7 +2678,7 @@
           "candidate": "0.90.134",
           "build": "9C7B7B00C5DE523F1D378C8",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -2739,11 +2739,11 @@
           "config": "2/net/mesh/direct",
           "platform": "any",
           "candidate": "0.90.134",
-          "attempt": "2026-10-23T03:55:19Z",
-          "build": "16A5F5DDDB4852C9D5DB236",
-          "batch": "b20261022-825560",
-          "approval": "P20261022-8d103a",
-          "date": "2026-10-22"
+          "attempt": "2026-10-24T01:01:07Z",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "batch": "b20261023-c3e27a",
+          "approval": "P20261023-a59d31",
+          "date": "2026-10-23"
         }
       ]
     },
@@ -4829,7 +4829,7 @@
           "candidate": "0.90.134",
           "build": "9C7B7B00C5DE523F1D378C8",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -4991,10 +4991,10 @@
           "config": "2/net/mesh/direct",
           "platform": "any",
           "candidate": "0.90.134",
-          "attempt": "2026-10-23T10:11:20Z",
-          "build": "08D63764A9352FBDD5A76CD",
-          "batch": "b20261023-613125",
-          "approval": "P20261023-cf21fb",
+          "attempt": "2026-10-24T01:01:07Z",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "batch": "b20261023-fa4170",
+          "approval": "P20261023-5851c2",
           "date": "2026-10-23"
         }
       ]
@@ -6054,7 +6054,7 @@
           "candidate": "0.90.134",
           "build": "9C7B7B00C5DE523F1D378C8",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -6212,7 +6212,19 @@
           "iso": "2026-10-24T01:03:33Z"
         }
       ],
-      "reproducer": "tests/fsx_fail_files_lap.sh: runs tests/suite/fsx.sh (MXFS_NODES=1) on a /dev/shm scratch directory in place of the mount, with FSX_LOG_DIR in that directory, while a second writer overwrites each fsxfile_<ops> so both checks miscompare, then lists what survived the row; FSX_KEEP_FAIL_FILES=0 is the control"
+      "reproducer": "tests/fsx_fail_files_lap.sh: runs tests/suite/fsx.sh (MXFS_NODES=1) on a /dev/shm scratch directory in place of the mount, with FSX_LOG_DIR in that directory, while a second writer overwrites each fsxfile_<ops> so both checks miscompare, then lists what survived the row; FSX_KEEP_FAIL_FILES=0 is the control",
+      "verified_at": [
+        {
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T01:01:07Z",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "batch": "b20261023-989617",
+          "approval": "P20261023-e9c692",
+          "date": "2026-10-23"
+        }
+      ]
     },
     {
       "id": "D-DISKLOCK-VALIDATE-READS-CAW-SLOT-0-AND-LOGS-A-CORRUPT-LOCK-RECORD",
@@ -6453,7 +6465,7 @@
           "candidate": "0.90.134",
           "build": "9C7B7B00C5DE523F1D378C8",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -6509,7 +6521,19 @@
           "date": "2026-10-23"
         }
       ],
-      "reproducer": "env tests/release_step_copy_race.py through tools/batch_lap.py (harness_batch.py, row lap:release_step_copy_race_mode at 2/net/mesh/direct), as the control queue of the earlier record invoked it"
+      "reproducer": "env tests/release_step_copy_race.py through tools/batch_lap.py (harness_batch.py, row lap:release_step_copy_race_mode at 2/net/mesh/direct), as the control queue of the earlier record invoked it",
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T01:01:07Z",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "batch": "b20261023-1ace9a",
+          "approval": "P20261023-2f64df",
+          "date": "2026-10-23"
+        }
+      ]
     },
     {
       "id": "D-CRITERIA-INCIDENTS-AT-REFUSES-A-RELEASE-STEP-CONFIGURATION-1-ANY",
@@ -6551,7 +6575,7 @@
           "candidate": "0.90.134",
           "build": "9C7B7B00C5DE523F1D378C8",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -6642,6 +6666,18 @@
           "row": "lap:release_step_incidents_at",
           "iso": "2026-10-24T00:57:52Z"
         }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T01:01:07Z",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "batch": "b20261023-2f9da0",
+          "approval": "P20261023-ea2e07",
+          "date": "2026-10-23"
+        }
       ]
     },
     {
@@ -6695,7 +6731,7 @@
           "candidate": "0.90.134",
           "build": "9C7B7B00C5DE523F1D378C8",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -6785,6 +6821,18 @@
           "config": "2/net/mesh/direct",
           "row": "lap:batch_lap_variant",
           "iso": "2026-10-24T00:58:11Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T01:01:07Z",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "batch": "b20261023-2a57cd",
+          "approval": "P20261023-486f3d",
+          "date": "2026-10-23"
         }
       ]
     },
@@ -6931,7 +6979,7 @@
           "candidate": "0.90.134",
           "build": "9C7B7B00C5DE523F1D378C8",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -7022,6 +7070,18 @@
           "row": "lap:tauth_make_goal",
           "iso": "2026-10-24T00:55:04Z"
         }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T01:01:07Z",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "batch": "b20261023-0947fc",
+          "approval": "P20261023-6da0d2",
+          "date": "2026-10-23"
+        }
       ]
     },
     {
@@ -7092,7 +7152,7 @@
           "candidate": "0.90.134",
           "build": "9C7B7B00C5DE523F1D378C8",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -7183,6 +7243,18 @@
           "config": "8/disk/caw/mpath",
           "row": "lap:marker_size",
           "iso": "2026-10-24T01:03:28Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T01:01:07Z",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "batch": "b20261023-f65e6e",
+          "approval": "P20261023-37e338",
+          "date": "2026-10-23"
         }
       ]
     },
