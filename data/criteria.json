@@ -2315,15 +2315,25 @@
           "status": "PASS",
           "measured": "checks=9 passed=9 failed=0",
           "reason": "",
-          "iso": "2026-10-24T01:55:50Z",
+          "iso": "2026-10-24T01:57:40Z",
           "recorded": "2026-10-23",
           "elapsed_s": 2,
           "build": "9C7B7B00C5DE523F1D378C8",
           "outcome": "PASS",
           "budget_s": 10,
-          "run_id": "20261024T015528Z-g2",
+          "run_id": "20261024T015717Z-g2",
           "candidate": "0.90.134",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T01:55:50Z",
+              "measured": "checks=9 passed=9 failed=0",
+              "reason": "",
+              "build": "9C7B7B00C5DE523F1D378C8",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T015528Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T01:55:26Z",
@@ -2392,12 +2402,6 @@
             {
               "status": "PASS",
               "iso": "2026-10-20T15:32:09Z",
-              "measured": "checks=9 passed=9 failed=0",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-20T09:46:11Z",
               "measured": "checks=9 passed=9 failed=0",
               "reason": ""
             }
