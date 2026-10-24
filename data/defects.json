@@ -2813,7 +2813,7 @@
           "candidate": "0.90.134",
           "build": "468F7F30C2E190B0244AF70",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -2883,7 +2883,19 @@
           "date": "2026-10-24"
         }
       ],
-      "reproducer": "tests/capture_fault_gate.sh <label> --only join_during_takeover on the g2 pair (the gate's fault lap of the entry, with the manifest's NFILES): with the fix taken out (NFILES=4000) the takeover pass is over before the harness's first in-flight sample and the sampling loop runs until the gate's 228 s fault-lap bound ends it (RESULT: FAIL); with NFILES=32000 the pass is seen in flight and the injected first measurement ABORTs the lap (RESULT: PASS). Exposure: the harness's 'INFO A's lone remount: A_MOUNT_RC=0' line in the gate's evidence (join_during_takeover_fault.log), which every lap that reaches the takeover pass prints"
+      "reproducer": "tests/capture_fault_gate.sh <label> --only join_during_takeover on the g2 pair (the gate's fault lap of the entry, with the manifest's NFILES): with the fix taken out (NFILES=4000) the takeover pass is over before the harness's first in-flight sample and the sampling loop runs until the gate's 228 s fault-lap bound ends it (RESULT: FAIL); with NFILES=32000 the pass is seen in flight and the injected first measurement ABORTs the lap (RESULT: PASS). Exposure: the harness's 'INFO A's lone remount: A_MOUNT_RC=0' line in the gate's evidence (join_during_takeover_fault.log), which every lap that reaches the takeover pass prints",
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T10:25:09Z",
+          "build": "468F7F30C2E190B0244AF70",
+          "batch": "b20261024-b1b608",
+          "approval": "P20261024-aaff4b",
+          "date": "2026-10-24"
+        }
+      ]
     },
     {
       "id": "D-LUN-POOL-HAND-LOGIN-AFTER-A-RECORDLESS-BOOT-IS-NEVER-LOGGED-OUT-AT-SHUTDOWN",

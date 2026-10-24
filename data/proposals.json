@@ -8144,6 +8144,60 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-aaff4b",
+      "kind": "verify",
+      "record": "D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE",
+      "change": {
+        "batch": "b20261024-b1b608"
+      },
+      "argument": "Resubmission after P20261024-996263 (rejected only because applying the verify would retire 37 runs its evidence did not explain). Those runs no longer belong to this record: the 18 jdt_gate_fault laps of 2026-10-23 (killed at 228 s with no in-flight sample after A's lone remount, no kernel log) moved to D-JDT-FAULT-LAP-KILLED-AT-228S-WITH-NO-IN-FLIGHT-SAMPLE-AFTER-A-LONE-REMOUNT, which names each; the 19 jdt_gate_stall laps of 2026-10-24 02:22-02:50Z are control laps of D-HARNESS-LAP-TIMED-OPS-REACH-NO-STALL-GRADER-JDT-31S-UNMOUNT-GRADED-PASS (batches b20261023-9da1ae, b20261023-181c29), which names all 20, and this record's fix (the gate manifest's NFILES) never reaches them (tests/jdt_gate_stall_lap.py writes its own manifest). Every run this verify retires at 2/net/mesh/direct is now one of the 7 FAIL laps of control b20261024-424818 (11:24:27Z, 11:26:02Z, 11:27:29Z, 11:28:57Z, 11:30:27Z, 11:33:22Z, 11:36:11Z), each ending 'ABORT: the takeover pass was not seen in flight (activations=495-499', this record's cause at NFILES=4000 (lap logs cited); the record's other cell (1/any:release:presteps 2026-10-22T03:48:37Z) is not at this configuration. The batch: b20261024-b1b608 of lap:jdt_gate_fault at 2/net/mesh/direct on candidate 0.90.134 (attempt frozen 2026-10-24T10:25:09Z, module 468F7F30C2E190B0244AF70), the manifest's NFILES=32000 (tests/capture_gate.manifest:86), no variant, declared after the control's last lap: 18 of 18 PASS, each exposed ('INFO A's lone remount: A_MOUNT_RC=0'), each 'entries=1 broken=0 vacuous=0 restores=1', worst timed operation 7524-12804 ms (under stall_limit_s 30). Sized 18 from the control's 7 of 10 at delta=alpha=0.005 (L=0.2649).",
+      "evidence": [
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T113616Z-25e11c3b.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T113916Z-2457cd97.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T114202Z-fec55f88.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T114517Z-e059513b.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T114817Z-892f6e23.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T115057Z-8cd93cdc.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T115406Z-73603606.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T115650Z-a65d8dad.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T115928Z-5e503ddf.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T120211Z-f49a879a.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T120454Z-1211e4a0.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T120735Z-5a01a1d5.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T121019Z-ba63cc4f.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T121257Z-6e89e92a.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T121540Z-ff1a9bd6.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T121816Z-623a5284.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T122101Z-c09df3b0.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T122335Z-3beeeb93.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T112227Z-22331456.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T112300Z-282b7aab.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T112428Z-ab8c0017.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T112602Z-bfec862c.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T112730Z-6f7dd083.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T112857Z-d3a2aa6a.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T113027Z-2f0036a7.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T113150Z-399b66b5.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T113323Z-6d5ba2fc.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T113444Z-9aec3d01.log",
+        "tests/capture_gate.manifest",
+        "tests/capture_fault_gate.sh",
+        "tests/join_during_takeover.sh",
+        "data/reviews/P20261024-996263.md",
+        "tests/evidence/lanes/g2_a17c_20261024T112110Z/step3.log",
+        "tests/evidence/lanes/g2_a17c_20261024T112110Z/step4.log"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-aaff4b.md",
+        "sha256": "69120d88b4fe4d977dcd93b24ade341c1cdb5ab8902ac73a194126b896cb2dc6",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
