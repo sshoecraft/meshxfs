@@ -9925,6 +9925,64 @@
         "data/configurations.json",
         "docs/rulings/silent-peer-death-under-the-stall-limit.md"
       ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-56b663.md",
+        "sha256": "97ebf2012469c4a4a63664797f93543dbec2ea5ae5dc4cedb561cacb924ed543",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
+    },
+    {
+      "id": "P20261024-3b8625",
+      "kind": "remove-fixed",
+      "record": "D-MPATH-MOUNT-DEGRADED-12S-WINDOW-REGISTRATION-MISSING-AND-SHUTDOWNS",
+      "change": {
+        "control": "b20261024-cefbf5",
+        "fixon": "b20261024-51ea88",
+        "cause": "With a 12 s death window the authority lease is 8 s, and the only registration of a multipath path after a mount, v5_pr_fill_tick, ran only while at least V5_PR_FILL_MIN_LEASE_MS (15000 ms) of the lease remained, so a path that was down when the node mounted was never registered: the victim mounted 'P-PR-PATHS-REGISTERED ... paths=2 registered=1 unreachable=1', its path came back with no P-PR-PATH-FILLED, and when the other path failed its I/O on the unregistered path drew SCSI RESERVATION CONFLICT, which shut its filesystem down (P277-RESV-CONFLICT, P-WITHDRAW; at 4 nodes the CAW lock I/O failing -95 first, then 'DLM inode lock unrecoverable' and the in-memory-corruption shutdown), with the late stall, the errors and the death declarations the row counted. Fix (dlm/v5_mount.c:10950-11005, dlm/disklock.c:3270 mxfs_authority_fence_earliest_ms, mxfs_scsipr_fill_paths): the fill runs whenever the authority admits writes and issues each late REGISTER only if its command timeout ends before the earliest time a peer may fence this node (the last landed heartbeat plus the death window less the clock error), and takes out of service a path whose REGISTER has no known outcome; pr_fill_bounded=0 keeps the 15 s admission with no bound, the control."
+      },
+      "argument": "Resubmission of P20261024-234c4f, answering its review (data/reviews/P20261024-234c4f.md), which found the cause, the four controls and the four fix-on batches sound and rejected only because removing this record would leave untracked the residual hazard in the fix itself: a late REGISTER that executes at the target after a peer's fence and puts the fenced key back. That hazard is now its own record, D-LATE-PATH-REGISTER-TIMED-OUT-MAY-EXECUTE-AFTER-A-FENCE-AND-RESTORE-THE-KEY (critical, impact integrity, opened at the default reach, with the ruling's lines docs/rulings/silent-peer-death-under-the-stall-limit.md:237-260 and :300-306 and pal/linux/kern.c:7214, :7230-7235 as its evidence, and the measurement of the REGISTER's end at the target on a path held unanswering as its next step). It blocks every configuration until it is fixed or disproved, so the removal of this record disposes only of what this record observed: the path that was down at mount never registered under the 12 s window's 8 s lease, and the refused writes, stalls, errors and shutdowns that followed. ===== The original argument: The cause is read from instrumented runs, not inferred. The record's two first runs (board_20261023T165407Z-g2e and T165456Z-g4, each victim's whole kernel log read in order, record evidence) show the victim mounting with one path registered, the down path reinstated with no P-PR-PATH-FILLED anywhere, then the other path failing and the next I/O on the unregistered path answered 'reservation conflict', followed by the withdrawal; the code's only post-mount registration returned while remaining lease < 15000 ms, and the 12 s window's lease is 8000 ms ('authority lease 8000 ms, death window 12000 ms'). The record's measured split over every path_mount_degraded row with kept kernel logs: 12000 ms windows filled=0 and FAIL each (4 rows), 34000 ms windows filled=1 and PASS each (2 rows). Controls, the fix's knob off (pr_fill_bounded=0) on a build whose frozen default window is the 12 s one, no other variant: 2/disk/caw/mpath b20261024-cefbf5 10 of 10 failed (tests/evidence/lanes/g2b_w12b_20261024T070007Z/step3.log), 4/disk/caw/mpath b20261024-239fb6 10 of 10 (g4c_w12_20261024T064338Z/step4.log laps 1-3, g4c_w12b_20261024T070211Z/step4.log laps 4-10), 2/net/mesh/mpath b20261024-241ccc 10 of 10 (g2b_w12c_20261024T075315Z/step4.log), 4/net/mesh/mpath b20261024-db9c82 10 of 10 (g4c_w12c_20261024T073330Z/step4.log); every failing lap on this record's checks (the down path missing the victim's registration once back, the victim's late stall 25-43 s, errors and shutdowns). Fix-on verifications, each sized from its configuration's control (10/10, lower bound 0.5887, N = 6), declared before the first lap, plain prep, every lap EXPOSED on PF-LATE-B-DOWN and PASS with fails=0, registration back on the returning path, worst stall under 30 s: 2/disk/caw/mpath b20261024-51ea88 6/6 and 4/disk/caw/mpath b20261024-54eb79 6/6 on attempt 2026-10-24T16:34:18Z (module 1BC77CFB15EF4A988DD1F56; approved P20261024-8b8f14, P20261024-b2328f, applied); 2/net/mesh/mpath b20261024-f0aa12 6/6 and 4/net/mesh/mpath b20261024-b7bbc1 6/6 on attempt 2026-10-24T06:38:23Z (module BE3695D2590A65F742F9816, which carries the same fill code; approved P20261024-5b7118, P20261024-3874e6, applied). These four configurations are every configuration the record's cells name. What the removal publishes is the record's summary: the observed failure at 2 and 4 nodes, disk/caw/mpath, on the 12 s window (registration one short on the returning path, the long late stall, errors, shutdowns); the fix-on batches show none of those on either lock manager at either size. The residual hazard the second consult named (a REGISTER delayed at the target past a fence) is what the fix's admission bound and quarantine address; no lap measured a REGISTER answering after its bound (no P-PR-PATH-FILL-LATE or P-PR-PATH-QUARANTINED is claimed here). The two earlier verifications that ended on a FAIL (b20261024-408f0a, b20261024-fd8125, attempt 2026-10-24T06:38:23Z) failed only on a survivor's type-flip ESTALE, a cell of D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED (data/reviews/P20261024-eae930.md), and are not applied.",
+      "evidence": [
+        "tests/evidence/lanes/g2b_w12b_20261024T070007Z/step3.log",
+        "tests/evidence/lanes/g4c_w12_20261024T064338Z/step4.log",
+        "tests/evidence/lanes/g4c_w12b_20261024T070211Z/step4.log",
+        "tests/evidence/lanes/g2b_w12c_20261024T075315Z/step4.log",
+        "tests/evidence/lanes/g4c_w12c_20261024T073330Z/step4.log",
+        "tests/evidence/lanes/g2b_a20md_20261024T180153Z/step4.log",
+        "tests/evidence/lanes/g4b_a20md_20261024T180156Z/step5.log",
+        "tests/evidence/lanes/g2b_w12c_20261024T075315Z/step12.log",
+        "tests/evidence/lanes/g4c_w12c_20261024T073330Z/step18.log",
+        "data/reviews/P20261024-234c4f.md",
+        "data/reviews/P20261024-8b8f14.md",
+        "data/reviews/P20261024-b2328f.md",
+        "data/reviews/P20261024-5b7118.md",
+        "data/reviews/P20261024-3874e6.md",
+        "dlm/v5_mount.c",
+        "pal/linux/kern.c",
+        "docs/rulings/silent-peer-death-under-the-stall-limit.md",
+        "data/defects.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-65e4fc",
+      "kind": "verify",
+      "record": "D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER",
+      "change": {
+        "batch": "b20261024-9ed034"
+      },
+      "argument": "Verification b20261024-9ed034 of lap:adopted_grant_rig (tests/adopted_grant_rig_lap.sh, GAP_MS=20000, the rig lap the earlier verify reviews asked for: the candidate's module on the rig, the trigger forced with dl_acq_gap_ino/dl_acq_gap_ms) at 8/net/mesh/mpath on g8b (test21-test28), candidate 0.90.134 attempt frozen 2026-10-24T16:34:18Z, module 1BC77CFB15EF4A988DD1F56. Control b20261024-9f3508 on the same module and attempt, the fix's knob off on every node (ARM=0: dl_shortcut_claim=0, the already-granted shortcut ends the wait unclaimed, as before the fix), GAP_MS=20000 on both arms: 10 of 10 exposed laps failed, each 'LAP adopted_grant FAIL: 2 check(s) failed (double_grants=360 false_fresh=0 shutdowns=0)' (tests/evidence/lanes/g8b_a20b_20261024T173545Z/step6.log, 'control b20261024-9f3508: 10 of 10 laps failed with the fix out'). Plan: rate 10/10, lower bound 0.5887 at delta 0.005, N = 6 at alpha 0.005 (tests/evidence/lanes/g8b_a20b_20261024T173545Z/step7.log:1). The verification, declared before its first lap, passed 6 of 6, each exposure=1 and 'LAP adopted_grant PASS: the shortcut took A's adopted grant of R; B's write waited for A's EX', A's wait 25308-25605 ms (the forced 20 s gap plus the grant) and B's 900-3115 ms, max_stall_ms 25308-25605, under stall_limit_s 30 (tests/evidence/lanes/g8b_a20b_20261024T173545Z/step7.log lap lines 1-6, 'verify b20261024-9ed034: 6 PASS, 0 FAIL of 6 planned'). The lane's prep for this configuration was step 5 (MXFS_FORCE_PREP=1 ./run.sh 8/net/mesh/mpath --group g8b prep_cluster, rc 0, no extra module arguments); the arm's switch is set at run time by the lap (tests/evidence/lanes/g8b_a20b_20261024T173545Z/queue). An earlier verification of the same lap, b20261024-0bf8bc on attempt 2026-10-24T06:38:23Z against control b20261024-65e307 (9 of 9), was approved and applied.",
+      "evidence": [
+        "tests/evidence/lanes/g8b_a20b_20261024T173545Z/step6.log",
+        "tests/evidence/lanes/g8b_a20b_20261024T173545Z/step7.log",
+        "tests/evidence/lanes/g8b_a20b_20261024T173545Z/summary.log",
+        "tests/evidence/lanes/g8b_a20b_20261024T173545Z/queue",
+        "tests/adopted_grant_rig_lap.sh",
+        "dlm/dlm.c"
+      ],
       "state": "pending",
       "created": "2026-10-24"
     }
