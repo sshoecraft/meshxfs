@@ -132,13 +132,28 @@ def snapshot_inputs(bid: str, phase: str) -> dict:
     return stamps
 
 
+#: A stamp's permission bits (its sixth field, when both stamps have one) count as its content: a
+#: fix that changes only a mode could not be proven when proof compared content hashes alone
+#: (D-HARNESS-BATCH-PROOF-COMPARES-CONTENT-ONLY-SO-A-MODE-ONLY-FIX-CANNOT-BE-PROVEN).
+#: MXFS_PROOF_MODE=0 compares the hashes alone, as before: the control.
+PROOF_MODE = os.environ.get("MXFS_PROOF_MODE", "1") != "0"
+
+
+def differs(a: list, b: list) -> bool:
+    """Whether two stamps of one file differ in content: its hash, or its mode."""
+    if a[0] != b[0]:
+        return True
+    return PROOF_MODE and len(a) > 5 and len(b) > 5 and a[5] != b[5]
+
+
 def compare_inputs(first: dict, second: dict) -> dict:
-    """What differs between two stamp maps: content, inode change time alone, added, gone."""
+    """What differs between two stamp maps: content (with the mode), inode change time alone,
+    added, gone."""
     both = first.keys() & second.keys()
     return {
-        "content": sorted(p for p in both if first[p][0] != second[p][0]),
+        "content": sorted(p for p in both if differs(first[p], second[p])),
         "touched": sorted(p for p in both
-                          if first[p][0] == second[p][0] and first[p][4:5] != second[p][4:5]),
+                          if not differs(first[p], second[p]) and first[p][4:5] != second[p][4:5]),
         "added": sorted(second.keys() - first.keys()),
         "gone": sorted(first.keys() - second.keys()),
     }

@@ -20,9 +20,9 @@ its verify retired, stops the copy's queue naming it, and asks the copy's gate:
 MXFS_LAP_ANNOTATE=0 (tools/criteria.py) looks a lap's row up as a board criterion, as before the
 fix: the same-build control. The lap hands its environment to every command.
 
-Bound, derived: one scratch copy (0.5-1.5 s in tests/release_step_cell_lap.py's laps), two gate
-reads (0.3 s each on the tree of 2026-10-23) and one unretire (a ledger read and one appended
-line): about 3 s, so a batch lap is bounded at 2x that, 6 s; each command at 20 s.
+Bound, derived: one scratch copy, two gate reads and one unretire; the precheck on 2026-10-24 took
+1.07-1.08 s with the fix and 0.71 s without, so a batch lap is bounded at twice the longest, 3 s;
+each command at 20 s.
 
 Usage: tests/unretire_lap_row_lap.py [RUN]
        (default: 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T02:56:01Z, lap 1 of control

@@ -398,6 +398,12 @@ struct xfs_perag {
 	bool			pag_dlm_bast_pending;
 	bool			pag_dlm_bast_scheduled;
 	/*
+	 * The stall bound of the one drain the cached-AG yield scan runs inline
+	 * on this AG (mxfs_dlm_yield_basted_cached_ags): nonzero only while that
+	 * call runs, and read by its prepass in place of ag_bast_stall_iters.
+	 */
+	int			pag_dlm_yield_stall_iters;
+	/*
 	 * starvation forensics: when pag_dlm_bast_pending
 	 * went 0->1 (jiffies) and how many cached fast-path re-adoptions
 	 * happened while a peer was left waiting.  A 190s continuous AG-0 EX

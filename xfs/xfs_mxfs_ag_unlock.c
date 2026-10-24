@@ -2327,8 +2327,11 @@ mxfs_dlm_ag_bast_work_fn(
 		 * The latched entry above skips this whole prepass.
 		 */
 		extern int mxfs_ag_bast_stall_iters;
+		/* the yield scan's inline drain carries its own, shorter bound */
+		int yield_stall = READ_ONCE(pag->pag_dlm_yield_stall_iters);
 		int aerr = xfs_ail_push_ag_sync_bounded(mp->m_ail,
 				pag_agno(pag),
+				yield_stall > 0 ? yield_stall :
 				mxfs_ag_bast_stall_iters, 4,
 				mxfs_ag_prepass_push_iters);
 		if (aerr == -EAGAIN)

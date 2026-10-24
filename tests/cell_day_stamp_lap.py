@@ -17,9 +17,9 @@ the copy's gate:
 MXFS_CELL_DAY_STAMP=0 (tools/defects.py) takes only a full stamp, as before the fix: the same-build
 control. The lap hands its environment to every command.
 
-Bound, derived: one scratch copy (0.5-1.5 s in tests/release_step_cell_lap.py's laps), one update
-(a queue load and save) and two gate reads (0.3 s each on the tree of 2026-10-23): about 3 s, so a
-batch lap is bounded at 2x that, 6 s; each command at 20 s.
+Bound, derived: one scratch copy, one update (a queue load and save) and two gate reads; the
+precheck on 2026-10-24 took 1.21 s with the fix and 0.75 s without, so a batch lap is bounded at
+twice the longest, 3 s; each command at 20 s.
 
 Usage: tests/cell_day_stamp_lap.py [RECORD] [RUN]
        (defaults: D-32NETMESH-PREP-CLUSTER-FAILED-AFTER-9S-NO-EVIDENCE-RETAINED and its run)

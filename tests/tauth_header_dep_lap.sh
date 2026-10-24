@@ -29,22 +29,32 @@
 # The control is TAUTH_DEPS=0 in this lap's environment, which make reads: the
 # rules' own header lists alone, as before the fix, on the same Makefile.
 #
+# TAUTH_FIRST_NODEP=1 makes step 1 a build with TAUTH_DEPS=0, so every object
+# is one the pre-fix rules built, with no .d beside it, as the objects a tree
+# built before the fix holds.  Step 3 then runs with the lap's own TAUTH_DEPS:
+# what it measures is the fix's other branch, which rebuilds an object that
+# has no .d (tests/tauth/Makefile, the obj/%.d prerequisite with an empty
+# recipe).  EXPOSED then also needs step 1 to have left no .d file.
+#
 # Bound, derived: measured by this lap's precheck on the tree of 2026-10-23
 # (the first build compiles dlm.c and fourteen tests, 17 s; the second
-# recompiles what the marks reach, 12-17 s; 30-35 s a lap), twice that: 70 s.
+# recompiles what the marks reach, 12-17 s; 30-35 s a lap; the TAUTH_FIRST_NODEP=1
+# variant on 2026-10-24 recompiles all 19 objects, 18 s, 37 s a lap), twice the
+# longest: 74 s.
 #
 # Usage: tests/tauth_header_dep_lap.sh [label]
 # Exit: 0 PASS, 1 FAIL, 2 ABORT.
 LABEL=${1:-lap}
 HERE="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
-BOUND=${TAUTH_DEP_BOUND:-70}
+BOUND=${TAUTH_DEP_BOUND:-74}
 T0=$(date +%s)
 S=$(mktemp -d /tmp/tauth_header_dep_lap.XXXXXX) || exit 2
 trap 'rm -rf -- "$S"' EXIT
 abort() { echo "LAP tauth_header_dep ABORT label=$LABEL: $*"; exit 2; }
 left() { echo $(( BOUND - ($(date +%s) - T0) )); }
 
-echo "LAP tauth_header_dep start $(date -u +%FT%TZ) tree=$HERE TAUTH_DEPS=${TAUTH_DEPS:-unset} scratch=$S"
+FIRST_NODEP=${TAUTH_FIRST_NODEP:-0}
+echo "LAP tauth_header_dep start $(date -u +%FT%TZ) tree=$HERE TAUTH_DEPS=${TAUTH_DEPS:-unset} TAUTH_FIRST_NODEP=$FIRST_NODEP scratch=$S"
 for d in dlm pal include tests/tauth; do
     mkdir -p "$S/$d"
     rsync -a --exclude 'obj/' --include '*/' --include '*.c' --include '*.h' --include 'Makefile' --exclude '*' \
@@ -52,10 +62,16 @@ for d in dlm pal include tests/tauth; do
 done
 [ -e "$S/tests/tauth/obj" ] && abort "the scratch copy carries objects"
 
-timeout "$(left)" make -s -C "$S/tests/tauth" all > "$S/make1.log" 2>&1
+if [ "$FIRST_NODEP" = 1 ]; then
+    TAUTH_DEPS=0 timeout "$(left)" make -s -C "$S/tests/tauth" all > "$S/make1.log" 2>&1
+else
+    timeout "$(left)" make -s -C "$S/tests/tauth" all > "$S/make1.log" 2>&1
+fi
 rc=$?; [ "$rc" = 124 ] && abort "the first build overran the ${BOUND} s bound"
 [ "$rc" = 0 ] || abort "the first build failed (rc=$rc): $(tail -3 "$S/make1.log" | tr '\n' ' ')"
-echo "STEP first build: $(ls "$S/tests/tauth/obj"/*.o | wc -l) objects, $(( $(date +%s) - T0 )) s"
+ndep=$(ls "$S/tests/tauth/obj"/*.d 2>/dev/null | wc -l)
+echo "STEP first build: $(ls "$S/tests/tauth/obj"/*.o | wc -l) objects, $ndep .d file(s), $(( $(date +%s) - T0 )) s"
+[ "$FIRST_NODEP" = 1 ] && [ "$ndep" != 0 ] && abort "not exposed: the first build with TAUTH_DEPS=0 left $ndep .d file(s)"
 
 # Which of the two headers each shared object's source really includes, asked
 # of the compiler (-MM, the rules' own -I paths), not of any rule's list.
@@ -81,7 +97,7 @@ mark() {  # mark <header> <name> <string>: inside the header's include guard, be
 }
 mark "$S/pal/pal.h" tauth_dep_mark_pal "$PM"
 mark "$S/dlm/dlm.h" tauth_dep_mark_dlm "$DM"
-echo "EXPOSED: pal/pal.h and dlm/dlm.h changed after the first build ($PM, $DM)"
+echo "EXPOSED: pal/pal.h and dlm/dlm.h changed after the first build ($PM, $DM)$([ "$FIRST_NODEP" = 1 ] && echo ", which left no object a .d")"
 
 t1=$(date +%s)
 timeout "$(left)" make -C "$S/tests/tauth" all > "$S/make2.log" 2>&1

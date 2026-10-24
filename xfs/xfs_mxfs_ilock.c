@@ -426,7 +426,48 @@ int mxfs_sf_fastpath_adopt;	/* 0=in-core authoritative on fast path (fix) */
  * prescription-G drain body exactly (bounded stall, inline bast_work_fn);
  * only the call site is new.  Eligibility requires holders==0, so an AG the
  * current op is actively holding is never yielded.  Returns #AGs drained.
+ *
+ * The drain it runs inline gets a short stall bound (~2 s) so a stuck drain
+ * doesn't hold up our own acquire.  The scan used to set that bound by writing
+ * the module-wide ag_bast_stall_iters and restoring it after its AG scan, with
+ * no lock: two overlapping scans on one node left the parameter at 200 for
+ * good, and run.sh's live-parameter check then refused every later row on the
+ * node as a stale prep
+ * (D-YIELD-SCAN-SAVE-RESTORE-OF-AG-BAST-STALL-ITERS-RACES-AND-STICKS-AT-200).
+ * The bound now goes to that one drain, on its AG (pag_dlm_yield_stall_iters,
+ * set while this caller owns the drain), and nothing global is written.
+ * ag_yield_stall_global=1 writes the parameter as before: the control.
+ * ag_yield_scan_overlap_n counts the scans that began while another was in
+ * its scan on this node.
  */
+static int mxfs_ag_yield_stall_global;
+module_param_named(ag_yield_stall_global, mxfs_ag_yield_stall_global, int, 0644);
+MODULE_PARM_DESC(ag_yield_stall_global,
+		 "TEST ONLY: 1 = the cached-AG yield scan shortens the drain's stall "
+		 "bound by writing ag_bast_stall_iters and restoring it, as before its "
+		 "fix (the control); 0 (default) = the bound goes to the one inline drain");
+static atomic_t mxfs_ag_yield_scans_inflight = ATOMIC_INIT(0);
+static atomic_t mxfs_ag_yield_scan_overlap_n = ATOMIC_INIT(0);
+module_param_named(ag_yield_scan_overlap_n, mxfs_ag_yield_scan_overlap_n.counter, int, 0444);
+MODULE_PARM_DESC(ag_yield_scan_overlap_n,
+		 "cached-AG yield scans that began while another was in its scan on this node");
+static atomic_t mxfs_ag_yield_scan_n = ATOMIC_INIT(0);
+module_param_named(ag_yield_scan_n, mxfs_ag_yield_scan_n.counter, int, 0444);
+MODULE_PARM_DESC(ag_yield_scan_n, "cached-AG yield scans run on this node");
+static atomic_t mxfs_ag_yield_drain_n = ATOMIC_INIT(0);
+module_param_named(ag_yield_drain_n, mxfs_ag_yield_drain_n.counter, int, 0444);
+MODULE_PARM_DESC(ag_yield_drain_n,
+		 "cached-AG yield scans' inline drains of a BAST'd cached AG on this node");
+/*
+ * TEST ONLY: each scan sleeps this long before its AG loop, as a scan that
+ * drains an AG inline takes long, so overlapping scans are common enough to
+ * measure (tests/yield_stall_global_lap.sh); 0 (default) = no hold.
+ */
+static unsigned int mxfs_dbg_yield_scan_hold_us;
+module_param_named(dbg_yield_scan_hold_us, mxfs_dbg_yield_scan_hold_us, uint, 0644);
+MODULE_PARM_DESC(dbg_yield_scan_hold_us,
+		 "TEST ONLY: microseconds each cached-AG yield scan sleeps before its AG loop (0 = none)");
+
 static int
 mxfs_dlm_yield_basted_cached_ags(
 	struct xfs_mount	*mp)
@@ -434,14 +475,25 @@ mxfs_dlm_yield_basted_cached_ags(
 	xfs_agnumber_t		scan_agno;
 	int			drained = 0;
 	extern int		mxfs_ag_bast_stall_iters;
-	int			saved_stall;
+	int			saved_stall = 0;
+	bool			global;
 
 	if (!mp->m_mxfs_dlm)
 		return 0;
 
-	saved_stall = mxfs_ag_bast_stall_iters;
-	/* Short stall (~2s) so a stuck drain doesn't hold up our own acquire. */
-	mxfs_ag_bast_stall_iters = 200;
+	atomic_inc(&mxfs_ag_yield_scan_n);
+	if (atomic_inc_return(&mxfs_ag_yield_scans_inflight) > 1)
+		atomic_inc(&mxfs_ag_yield_scan_overlap_n);
+	global = READ_ONCE(mxfs_ag_yield_stall_global) != 0;
+	if (global) {
+		saved_stall = mxfs_ag_bast_stall_iters;
+		mxfs_ag_bast_stall_iters = 200;
+	}
+	if (unlikely(READ_ONCE(mxfs_dbg_yield_scan_hold_us))) {
+		unsigned int hold = READ_ONCE(mxfs_dbg_yield_scan_hold_us);
+
+		usleep_range(hold, hold + hold / 4 + 1);
+	}
 	for (scan_agno = 0; scan_agno < mp->m_sb.sb_agcount; scan_agno++) {
 		struct xfs_perag	*scan;
 		bool			eligible;
@@ -513,19 +565,26 @@ mxfs_dlm_yield_basted_cached_ags(
 				   scan->pag_dlm_bast_pending &&
 				   scan->pag_dlm_holders == 0 &&
 				   !scan->pag_dlm_demoting;
-			if (eligible)
+			if (eligible) {
 				scan->pag_dlm_bast_scheduled = true;
+				if (!global)
+					WRITE_ONCE(scan->pag_dlm_yield_stall_iters, 200);
+			}
 			mxfs_pag_dlm_unlock(scan, MXFS_SITE);
 		}
 		if (eligible) {
 			mxfs_idbg("mxfs: P13-INODE-YIELD-AG draining cached-basted ag=%u to break inode<->AG deadlock\n",
 				scan_agno);
 			mxfs_dlm_ag_bast_work_fn(&scan->pag_dlm_bast_work);
+			WRITE_ONCE(scan->pag_dlm_yield_stall_iters, 0);
+			atomic_inc(&mxfs_ag_yield_drain_n);
 			drained++;
 		}
 		xfs_perag_put(scan);
 	}
-	mxfs_ag_bast_stall_iters = saved_stall;
+	if (global)
+		mxfs_ag_bast_stall_iters = saved_stall;
+	atomic_dec(&mxfs_ag_yield_scans_inflight);
 	return drained;
 }
 

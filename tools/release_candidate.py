@@ -127,7 +127,11 @@ def frozen_paths() -> list:
 def stamp_of(rel: str) -> list:
     path = Path(rel) if os.path.isabs(rel) else ROOT / rel
     info = path.stat()
-    return [sha256(path), info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns]
+    # the permission bits last, so an older list's five fields keep their places: a fix that
+    # changes only a file's mode (an execute bit) has nothing else for a control's proof to
+    # compare (tools/harness_batch.py compare_inputs)
+    return [sha256(path), info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns,
+            info.st_mode & 0o7777]
 
 
 def spec_projection() -> str:

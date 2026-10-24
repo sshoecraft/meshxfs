@@ -19,8 +19,9 @@ lies inside a one-line typed definition, found from the source itself:
 MXFS_GUARD_TYPED_DEF=0 (tools/sole_survivor_audit.py) takes only 'name(' lines, as before the fix:
 the same-build control. The lap hands its environment to the audit.
 
-Bound, derived: one audit of the tree (0.5-1 s measured 2026-10-24) and reading the few source
-files it names: about 2 s, so a batch lap is bounded at 2x that, 4 s; the audit at 30 s.
+Bound, derived: one audit of the tree and reading the few source files it names; the precheck on
+2026-10-24 took 0.39-0.42 s on both arms, so a batch lap is bounded at twice the longest, rounded
+up to the next second, 1 s; the audit at 30 s.
 
 Usage: tests/guard_audit_typed_def_lap.py
 Exit: 0 PASS, 1 FAIL, 2 the lap could not measure.
