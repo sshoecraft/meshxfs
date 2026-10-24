@@ -1859,18 +1859,29 @@
         },
         "4/net/mesh/mpath": {
           "status": "PASS",
-          "measured": "elapsed=44s (fresh prep)",
+          "measured": "elapsed=41s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-24T09:09:20Z",
+          "iso": "2026-10-24T09:10:21Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 44,
+          "elapsed_s": 41,
           "build": "BE3695D2590A65F742F9816",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T090816Z-g4c",
+          "run_id": "20261024T090921Z-g4c",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=pr_fill_bounded=0",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T09:09:20Z",
+              "measured": "elapsed=44s (fresh prep)",
+              "reason": "",
+              "build": "BE3695D2590A65F742F9816",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T090816Z-g4c",
+              "variant": "MXFS_EXTRA_MODARGS=pr_fill_bounded=0"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T09:04:53Z",
@@ -1968,17 +1979,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T083459Z-g4c",
-              "variant": "MXFS_EXTRA_MODARGS=pr_fill_bounded=0;batch:pr_fill_bounded=0 (MXFS_EXTRA_MODARGS: the late-path fill runs only with 15 s of the authority lease left, as before the fix)"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T08:31:45Z",
-              "measured": "skipped (marker matched 4/net/mesh/mpath)",
-              "reason": "",
-              "build": "BE3695D2590A65F742F9816",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T083124Z-g4c",
               "variant": "MXFS_EXTRA_MODARGS=pr_fill_bounded=0;batch:pr_fill_bounded=0 (MXFS_EXTRA_MODARGS: the late-path fill runs only with 15 s of the authority lease left, as before the fix)"
             }
           ]

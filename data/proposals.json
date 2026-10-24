@@ -7216,6 +7216,48 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-8c611d",
+      "kind": "verify",
+      "record": "D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER",
+      "change": {
+        "batch": "b20261024-0bf8bc"
+      },
+      "argument": "Resubmission of the verify rejected in data/reviews/P20261024-0801cb.md, the same batch, with the parameters that actually ran. Verification b20261024-0bf8bc of lap:adopted_grant_rig at 8/net/mesh/mpath (g8b, test21-test28) on candidate 0.90.134, attempt frozen 2026-10-24T06:38:23Z, module BE3695D2590A65F742F9816. The lane ran its own copy of the queue (tests/evidence/lanes/g8b_w12b_20261024T081750Z/queue, step 2: 'env ARM=1 GAP_MS=20000 tests/adopted_grant_rig_lap.sh agv{lap} 8/net/mesh/mpath'); an edit of the queue file it was started from (tests/evidence/lanes/queue_g8b_w12b.txt, adding HOLD_A_MS=4000) never reached it, because scripts/rig_lane.sh:55 copies the queue at start and :101 reads only the copy. So every verification lap ran ARM=1 GAP_MS=20000 HOLD_C_MS=10000 HOLD_A_MS=8000 NCAND=128, as each lap log's header records ('arm=1 hold_c_ms=10000 gap_ms=20000 hold_a_ms=8000 ncand=128', tests/evidence/batch_laps/b20261024-0bf8bc/*.log line 3), the same settings as the control's laps except ARM. The lap forces the record's sequence on one file R (header :20-46): A's EX wait is gapped (dl_acq_gap_ino/dl_acq_gap_ms), the grant lands in the gap (P958-ACQ-GRANT-ADOPTED), D's clean unmount moves R's ledger page to A (P-TAUTH-PAGE-MINE via=frozen-msg), A's next attempt is answered by the already-granted shortcut (P958-ACQ-LOCAL-ANSWER-END site=shortcut); EXPOSED needs all three in A's kernel log (:44). Control b20261024-65e307 (ARM=0: dl_shortcut_claim=0 on every node, as before the fix; GAP_MS=20000) failed 9 of 9 exposed laps, each 'double_grants=360' (tests/evidence/lanes/g8b_w12b_20261024T081750Z/step1.log laps 2-10); its lap 1 (08:19:02Z, exposure 0) aborted in its prep on 'lun_pool: pool lock not taken in 60 s' and is named by D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT. Plan: 9/9, lower bound 0.5550, N = 7 at delta = alpha = 0.005. The verification passed 7 of 7 planned laps, each exposure=1 and 'LAP adopted_grant PASS: the shortcut took A's adopted grant of R; B's write waited for A's EX' (tests/evidence/lanes/g8b_w12b_20261024T081750Z/step2.log, 'verify b20261024-0bf8bc: 7 PASS, 0 FAIL of 7 planned'). Stalls, measured against stall_limit_s (30 s): A's write 29448-29811 ms, 189-552 ms under the limit, made of the lap's own TEST ONLY waits on both arms (its first attempt queued 6 s behind C's 10 s held EX, the 20 s gap, then A's own 8 s hold of EX); B's write 5575-6979 ms. The lap's own PASS gate does not test the writes against the limit; the batch grader does, from max_stall_ms (29448-29811 on the ledger rows), and none exceeded it. The record's other cells at 8/net/mesh/mpath are the 30 in-process lap:adopted_grant_handoff control laps (this cause in simulation, accepted as such in data/reviews/P20261023-778a6d.md) and path_peer_withdrawn:2026-10-22T19:58:42Z, whose shutdown was this cause (that review) and whose other failures are named by D-NETMESH-SHARED-DIR-LOCK-QUEUE-JAMS-60S-AFTER-PEER-WITHDRAWS, D-8NETMESH-REJOIN-MOUNT-AFTER-PEER-WITHDRAWN-ONE-PATH-TIMES-OUT-AT-60S and D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES-FOREVER-ON-RESERVATION-CONFLICT.",
+      "evidence": [
+        "tests/evidence/lanes/g8b_w12b_20261024T081750Z/queue",
+        "tests/evidence/lanes/g8b_w12b_20261024T081750Z/step1.log",
+        "tests/evidence/lanes/g8b_w12b_20261024T081750Z/step2.log",
+        "scripts/rig_lane.sh",
+        "tests/adopted_grant_rig_lap.sh",
+        "tests/evidence/batch_laps/b20261024-0bf8bc",
+        "tests/evidence/batch_laps/b20261024-65e307",
+        "data/reviews/P20261024-0801cb.md",
+        "data/reviews/P20261023-778a6d.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-7f824d",
+      "kind": "verify",
+      "record": "D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS",
+      "change": {
+        "batch": "b20261024-03e428"
+      },
+      "argument": "Verification b20261024-03e428 of lap:marker_params at 2/net/mesh/direct (g2, test1/test2) on candidate 0.90.134, attempt frozen 2026-10-24T06:38:23Z, module BE3695D2590A65F742F9816. The lap (tests/marker_params_lap.sh) runs this tree's run.sh on a real pair: prep, a filtered precond_readiness that must reuse the untouched pair, watch_ino written on test2 and read back (EXPOSED: 'watch_ino on test2 is 4242, prepped ...'), the same filtered row again, watch_ino restored; PASS when the second row refuses the pair naming the parameter. The lane's own queue copy (tests/evidence/lanes/g2_w12b_20261024T081715Z/queue:18-19) ran the control as 'env MXFS_MARKER_PARAMS=0 tests/marker_params_lap.sh mpc{lap} 2/net/mesh/direct g2' (marker_live_ok matches on srcversion and mount alone, the code before the fix) and the verification as 'tests/marker_params_lap.sh mpv{lap} 2/net/mesh/direct g2'. Control b20261024-32ccd5 failed 10 of 10 exposed laps, each 'LAP marker_params FAIL ...: the row reused the cluster with watch_ino=4242 on test2 (--- cluster already prepped for 2/net/mesh/direct ...' (tests/evidence/lanes/g2_w12b_20261024T081715Z/step4.log). Plan: 10/10, lower bound 0.5887, N = 6 at delta = alpha = 0.005 (step5.log header). The verification passed 6 of 6 planned laps, each exposure=1 and 'LAP marker_params PASS ...: the row refused the cluster: marker stale: test2 runs module parameters other than those prepped' (step5.log, 'verify b20261024-03e428: 6 PASS, 0 FAIL of 6 planned'). The batch was declared before its first lap; no lap was dropped. The record's other cells at 2/net/mesh/direct are laps 1-2 and 4-10 of the earlier control b20261023-0ff36b (build 9C7B7B00C5DE523F1D378C8, MXFS_MARKER_PARAMS=0), each the same 'row reused the cluster with watch_ino=4242 on test2' failure (data/criteria.runs.jsonl, lap:marker_params 2026-10-24T01:55:51Z-02:11:15Z); its lap 3 (01:59:34Z, prep overran its 88 s bound) never reached the check and is named by D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT.",
+      "evidence": [
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/queue",
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/step4.log",
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/step5.log",
+        "tests/marker_params_lap.sh",
+        "tests/evidence/batch_laps/b20261024-03e428",
+        "tests/evidence/batch_laps/b20261024-32ccd5",
+        "tests/evidence/batch_laps/b20261023-0ff36b"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
