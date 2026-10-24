@@ -7683,6 +7683,28 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-a66a0c",
+      "kind": "infra-proven",
+      "record": null,
+      "change": {
+        "config": "2/net/mesh/direct",
+        "row": "lap:lh_master",
+        "iso": "2026-10-24T10:41:54Z"
+      },
+      "argument": "Third submission. P20261024-c568d7 was rejected because a second holder of the power-up lock, after g4c's ended at 10:41:37, was not named (data/reviews/P20261024-c568d7.md). The pool-lock holder stands as approved there: lap pw8c4's host preflight under 'lun_pool.sh quiet', 10:40:48-10:41:54. THE POWER-UP LOCK, EVERY HOLDER NAMED (tests/evidence/20261024T104052Z_lhmaster_lhmc5/powerup_holder.txt, from the host journal and the lanes' logs). (1) 10:40:47-10:41:37: lane g4c's 'scripts/lab_power.sh up group:g4c', whose own log reads '[10:40:47] host power-up lock held (waited 0 s)' ... '[10:41:37] up 4 domain(s): ok' (tests/evidence/lanes/g4c_a17tf_20261024T104047Z/step1.log:1-6). The host journal shows those four domains, test7-test10, created at 05:40:47 CDT ('Domain id=27..30', 'New machine qemu-27..30'), each booting from off. (2) From 10:41:37: lane g2e_a17lp step 3, tests/lun_pool_shutdown_lap.sh test17 test18 (tests/evidence/lanes/g2e_a17lp_20261024T103926Z/summary.log :8-9, 10:40:29-10:42:12). Its ':118 timeout 250  up test17 test18' discards lab_power's output, so no lock line was written. The host journal shows test18 and test17 terminated at 05:40:51.96 and 05:40:52.30 ('Machine qemu-26-test18 terminated', 'qemu-25-test17 terminated': the lap's power-down at :117), and the next domain events are their starts at 05:41:37.21 and .22 ('Domain id=31 name=test18', 'id=32 name=test17'). Re-run in the parent: no other domain started or stopped between 05:40:52 and 05:42:10. Both guests answered ssh at 10:41:49.6 (tests/evidence/20261024T1045Z_lunpool_mpath_journal/test17.journal:228-239 and test18.journal:229-244, booting at 10:41:49-50). That ends lab_power's hold, which lasts until every guest answers ssh (scripts/lab_power.sh:159-170). The preflight's wait then ended at about 10:41:46-50 and it passed at 10:41:54. So every power-up behind the pool lock was a VM booting from off: test7-10 and test17/18. None was a running node, and none ran MXFS during the hold. The g2e lap loads no module before its bind (tests/lun_pool_shutdown_lap.sh:113-144). THE RUN'S OWN NODES are as before: tests/evidence/20261024T104052Z_lhmaster_lhmc5/dmesg_window/test1.txt and test2.txt, idle and mounted with no MXFS signature 10:40:52-10:42:06. Captured at 10:57Z by 'tools/mxfs_sshpass.sh <node> \"echo BOOT $(uptime -s); dmesg --time-format iso | head -1; dmesg --time-format iso | awk '$1 >= \"2026-10-24T10:40:30\" && $1 < \"2026-10-24T10:42:10\"'\"', each node's own ring read after the fact, unfiltered apart from the time window. Both rings reach back to boot at 10:29:46, and the six pattern hits are probe fields (fence=1 in P-INOCL-COLDREAD, poisoned=0). The run was refused by the rig's locking (the pool lock held across a preflight that waited on two VM power-ups) before anything ran on its nodes. That mechanism is D-LUN-POOL-LOCK-WAIT-OVER-60S-REFUSES-A-PREP-WHILE-ANOTHER-LANE-HOLDS-IT, with a drafted fix.",
+      "evidence": [
+        "tests/evidence/20261024T104052Z_lhmaster_lhmc5/powerup_holder.txt",
+        "tests/evidence/20261024T104052Z_lhmaster_lhmc5/prep_1.log",
+        "tests/evidence/20261024T104044Z_peerwin_pw8c4/prep.log",
+        "tests/evidence/20261024T104052Z_lhmaster_lhmc5/dmesg_window",
+        "tests/evidence/lanes/g4c_a17tf_20261024T104047Z/step1.log",
+        "tests/evidence/20261024T1045Z_lunpool_mpath_journal",
+        "data/reviews/P20261024-c568d7.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
