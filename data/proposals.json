@@ -7330,6 +7330,32 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-b33fa4",
+      "kind": "remove-fixed",
+      "record": "D-FOREIGN-REPLAY-AG-LAP-READS-SURVIVOR-LOGS-BEFORE-P163-AND-FINDS-NO-REPLAYER",
+      "change": {
+        "control": "b20261024-eade91",
+        "fixon": "b20261024-70a767",
+        "cause": "the lap read the survivors' kernel logs as soon as their truncates returned, before the replayer's P163-RECOVERY-COMPLETE could be in them, so it named no replayer; with the fix it waits (bounded at 53 s from the kill) for P163 of the victim's slot on some survivor before reading, and ABORTs when none appears"
+      },
+      "argument": "FIXED AND VERIFIED, a harness defect in tests/foreign_replay_ag_lap.sh. The fix waits for P163-RECOVERY-COMPLETE of the victim's slot on some survivor, bounded at 53 s from the kill, before reading the survivors' logs, and ABORTs (not FAILs) when none appears; LAP_WAIT_P163=0 reads at once, the lap as it was (same tree, an environment switch in the lap's own command: the control).\\n\\nControl b20261024-eade91 at 4/disk/caw/direct (g4, test3-test6), candidate 0.90.134 attempt frozen 2026-10-24T06:38:23Z, module BE3695D2590A65F742F9816, lane tests/evidence/lanes/g4_w12_20261024T064222Z step 2 (the lane's queue copy is its directory's queue file): 6 of 10 exposed laps FAIL 'LAP foreign_replay_ag FAIL: 2 check(s) failed (exposed=0 early=0 failed_ops=0 replayer=none)', the other 4 PASS. Lower bound 0.1909, N = 26. Fix-on b20261024-70a767 (step 3) passed 26 of 26 exposed laps naming the replayer; its verify P20261024-19cf74 was approved and applied.\\n\\nCells: the six failing control laps, and the three calibration laps of b20261023-2549fe at 4/disk/caw/direct on the earlier attempt (04:28:23Z, 04:31:22Z, 04:34:09Z), each the same replayer=none failure (tests/evidence/batch_laps/b20261023-2549fe); the 04:34:09Z lap's 42.5 s truncates are also a cell of D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S, which names it and stays open. The two 4/net/mesh/direct laps the 4-node control left INCOMPLETE were VACUOUS no-overlap laps that named the replayer and moved to D-FOREIGN-REPLAY-WRITES-AG-HEADERS-WITHOUT-THE-AG-LOCK.\\n\\nReach: the fix is in the lap's own read order, the same script at every configuration. At 4/net/mesh/direct the old read order passed 8 of 8 exposed laps (control b20261024-dcf30c, lane g4_w12b_20261024T090604Z step 3): the race did not occur there, so no rate was measured. The summary states only what the laps measured.",
+      "evidence": [
+        "tests/foreign_replay_ag_lap.sh",
+        "tests/evidence/lanes/g4_w12_20261024T064222Z/queue",
+        "tests/evidence/lanes/g4_w12_20261024T064222Z/step2.log",
+        "tests/evidence/lanes/g4_w12_20261024T064222Z/step3.log",
+        "tests/evidence/batch_laps/b20261024-eade91",
+        "tests/evidence/batch_laps/b20261024-70a767",
+        "tests/evidence/batch_laps/b20261023-2549fe",
+        "tests/evidence/lanes/g4_w12b_20261024T090604Z/step3.log",
+        "tests/evidence/batch_laps/b20261024-dcf30c",
+        "data/reviews/P20261024-19cf74.md",
+        "data/defects.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
