@@ -10148,8 +10148,15 @@
         "data/reviews/P20261024-91492a.md",
         "data/reviews/P20261024-857abd.md"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-345728.md",
+        "sha256": "812514d25f34a9e0f7ed7b56c446adbda052e2faac31a3a135b05353412e5fc6",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
