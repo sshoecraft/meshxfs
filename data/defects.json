@@ -9689,7 +9689,27 @@
       "opened": "2026-10-24",
       "summary": "PROBE-A (pal/linux/xfs_buf.c :11975-12024), the always-on detector of an AG header write by a node that holds no grant for the AG, fires on every AG header image a foreign replay writes (b_mxfs_recov_image, written on the replay's verdict, not a grant) and dumps a stack once a boot, so a correct replay reads as 'PROBE-A AG-META-WRITE-NOT-HELD' and the detector cannot tell an authorised replay write from an unauthorised one",
       "evidence": "Calibrations b20261024-8c98b7 (4/net/mesh/direct) and b20261024-a46ac0 (4/disk/caw/direct), candidate 0.90.134 attempt 18, lane tests/evidence/lanes/g4_a18_20261024T125108Z: on the replayer test3, 6 or 9 'PROBE-A AG-META-WRITE-NOT-HELD ... recov=1' lines in every one of the 20 laps (e.g. tests/evidence/batch_laps/b20261024-8c98b7/20261024T125139Z-e4d1c69f.log 'its PROBE-A lines recov=1 6 recov=0 0'), all inside the replay, none on the non-replaying survivors; found by review data/reviews/P20261024-b9e4be.md, which counts the misfire as a detector defect of MeshXFS's own. Earlier: the open-EFI gate laps of review data/reviews/P20261023-f2db37.md (4-10 a lap, each on the survivor during the replay).",
-      "next": "Fix drafted for the next attempt in tests/evidence/drafts/tree/pal/linux/xfs_buf.c: a write of a replay's image (b_mxfs_recov_image) with no grant held prints 'PROBE-A-REPLAY agno= daddr= ops= comm= pid=' with no stack instead of the unheld-write line; module parameter probe_a_replay_apart=0 reports it as before (the same-build control); compiles clean (tests/evidence/drafts/tree/tools/draft_syntax_check.sh, 0 errors 0 warnings). tests/evidence/drafts/tree/tests/foreign_replay_ag_lap.sh reads PROBE-A-REPLAY for the AGs the replay wrote and adds the check 'the replayer reported its replay's AG header images apart, none as an unheld write' (no recov=1 unheld line on the replayer). Next, on the next attempt: control (probe_a_replay_apart=0 through the lap's prep, MXFS_EXTRA_MODARGS) and verification of the lap at 4/net/mesh/direct, remove --fixed."
+      "next": "Fix drafted for the next attempt in tests/evidence/drafts/tree/pal/linux/xfs_buf.c: a write of a replay's image (b_mxfs_recov_image) with no grant held prints 'PROBE-A-REPLAY agno= daddr= ops= comm= pid=' with no stack instead of the unheld-write line; module parameter probe_a_replay_apart=0 reports it as before (the same-build control); compiles clean (tests/evidence/drafts/tree/tools/draft_syntax_check.sh, 0 errors 0 warnings). tests/evidence/drafts/tree/tests/foreign_replay_ag_lap.sh reads PROBE-A-REPLAY for the AGs the replay wrote and adds the check 'the replayer reported its replay's AG header images apart, none as an unheld write' (no recov=1 unheld line on the replayer). Next, on the next attempt: control (probe_a_replay_apart=0 through the lap's prep, MXFS_EXTRA_MODARGS) and verification of the lap at 4/net/mesh/direct, remove --fixed.",
+      "batches": [
+        {
+          "id": "b20261024-e216a7",
+          "kind": "control",
+          "row": "lap:probe_a_replay",
+          "config": "4/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^STAGE replayer ",
+          "candidate": "",
+          "build": "A27A67A3E501890BE9985E0",
+          "variant": "probe_a_replay_apart=0 (MXFS_EXTRA_MODARGS at the lap's prep: a replay's image is reported as an unheld AG write, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: the replayer reports every replay image of an AG header as PROBE-A AG-META-WRITE-NOT-HELD"
+        }
+      ],
+      "updated": "2026-10-24"
     },
     {
       "id": "D-SCST-FLAP-ARM-CLOCK-OFFSET-READS-SSH-SETUP",

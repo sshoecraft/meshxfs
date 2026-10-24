@@ -8962,6 +8962,27 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-bd4dfc",
+      "kind": "remove-fixed",
+      "record": "D-FOURKN-MERGE-LAP-OVERRUN-LEAVES-ITS-WORKER-HOLDING-THE-MOUNT",
+      "change": {
+        "control": "b20261024-1213d5",
+        "fixon": "b20261024-2daa46",
+        "cause": "tests/fourkn_merge_2node.sh bounded each node's workload (tests/fourkn_merge_worker.sh over ssh) only on the ssh client, so an overrun workload's worker kept running on the node and held /mnt/fourkn, and every following lap aborted at its unmount before insmod; the fix runs the worker under 'timeout --foreground $((WBOUND - 3))' on the node (tests/fourkn_merge_2node.sh:183-189), so it stops itself while the client still waits"
+      },
+      "argument": "Fixed and verified at both configurations the lap runs on. The record's 18 original cells are laps 30-45 and 47-48 of control b20261023-777805 at 2/disk/caw/direct4k (lane g2d_a14_merge2node_20261023T204131Z), each 'ABORT insmod test31: ... umount: /mnt/fourkn: target is busy' after an overrun worker kept the mount (record evidence). At 2/disk/caw/direct4k, attempt 19 (module A27A67A3E501890BE9985E0): control b20261024-1213d5 with the fix taken out (MERGE_NODE_BOUND=0) 10 of 10 FAIL, each leaving a worker or the mount behind after a forced overrun; verification b20261024-2daa46 sized from it 6 of 6 PASS with the overrun exposed in every lap; verify approved and applied (P20261024-20d40a, data/reviews/P20261024-20d40a.md). At 2/net/mesh/direct4k, attempt 18 (module 8DBA16AEB7FDD3066C9C1BC): control b20261024-5a5875 10 of 10 FAIL, verification b20261024-c6a721 passed, verify approved (P20261024-51f1e6). The lap's own cleanup defect found during review (fuser -k on an unmounted path) acts only after both nodes' mount and worker counts are read, so it does not touch the verdict; it is its own record, D-MERGE-OVERRUN-LAP-CLEANUP-FUSER-KILLS-ROOT-FS-USERS-WHEN-NOT-MOUNTED. An earlier control at 2/net/mesh/direct4k, b20261024-f38319, was declared and never closed; it measured nothing and is not cited.",
+      "evidence": [
+        "data/reviews/P20261024-20d40a.md",
+        "data/reviews/P20261024-51f1e6.md",
+        "tests/evidence/batch_laps/b20261024-1213d5/20261024T143410Z-8e400638.log",
+        "tests/evidence/batch_laps/b20261024-2daa46/20261024T145148Z-9527040a.log",
+        "tests/fourkn_merge_2node.sh",
+        "tests/merge_overrun_lap.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
