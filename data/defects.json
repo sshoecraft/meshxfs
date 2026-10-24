@@ -6243,7 +6243,26 @@
       "summary": "A harness lap run through tools/batch_lap.py is graded against stall_limit_s only from max_stall_ms= lines and declared --stall patterns, but tests/join_during_takeover.sh (through tests/capture_fault_gate.sh) prints its timed operations in other forms (A_UMOUNT_RC=0 ms=31006) and no lane passes --stall for it, so a 31 s last-member unmount inside a jdt gate lap was recorded PASS and counted toward verification batch b20261022-548ef2",
       "evidence": "Review of P20261023-8d639f (data/reviews/P20261023-8d639f.md): batch b20261022-548ef2 (lap:jdt_gate_fault at 2/net/mesh/direct) was launched with no --stall pattern (tests/evidence/lanes/netdirect_verify_round2_20261023T035741Z/summary.log:61); the harness wrote 'INFO A's last-member unmount: A_UMOUNT_RC=0 ms=31006' (tests/evidence/20261023T043949Z_capture_gate_jdtv1/join_during_takeover_fault.log:8); tools/batch_lap.py stall_graded reads only 'max_stall_ms=' (:301) and declared --stall patterns (:311); neither tests/capture_fault_gate.sh nor tests/join_during_takeover.sh prints max_stall_ms=, and no lane summary has passed --stall. Split out of D-BATCH-LAP-RECORDS-NO-STALL-SO-A-HARNESS-LAP-OVER-THE-STALL-LIMIT-GRADES-PASS, whose fix grades what reaches the grader.",
       "next": "Make every harness lap's timed file operations reach the grader: the jdt harness (and each harness run through batch_lap.py; list them) prints max_stall_ms= over its timed operations, or its lanes declare --stall for its ms= lines; then a control (the print or declaration taken out) and a verification through a jdt gate lap with a 31 s operation forced. ===== ===== 2026-10-23: the jdt half is in the frozen tree (tests/join_during_takeover.sh:164-170 op_ms prints max_stall_ms= after every timed mount and unmount; JDT_MAX_STALL=0 its control), but on the path the defect took it does not reach the grader: tests/capture_fault_gate.sh runs each harness with its output to $OUT/<tag>_fault.log (:157) and $OUT/<tag>_ok.log (:173) and prints only its GATE summary lines (:165, :189), and tools/batch_lap.py grades the lap's own output, so a jdt max_stall_ms= line inside a gate lap is still never read. FIX in the sibling tree /home/steve/src/mxfs-a15 for the next attempt: capture_fault_gate.sh relay_stall prints 'GATE <harness> <fault|healthy> max_stall_ms=<worst>' from the harness's log after each lap; GATE_RELAY_STALL=0 relays nothing (control). Next: a lap that runs the gate's jdt entry through batch_lap.py on a scratch queue and board with an operation over the limit forced (ARM=stall EXPECT=clean: A's takeover pass held 45 s, B's mount inside it refused, timed by op_ms at :315), reading back the recorded run: FAIL carrying max_stall_ms over the limit with both parts on; PASS without it with GATE_RELAY_STALL=0 and, separately, with JDT_MAX_STALL=0 (one control per fix site).",
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "batches": [
+        {
+          "id": "b20261023-9da1ae",
+          "kind": "control",
+          "row": "lap:jdt_gate_stall",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the gate.s jdt lap ",
+          "candidate": "",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "variant": "GATE_RELAY_STALL=0 (tests/capture_fault_gate.sh relays no harness max_stall_ms= onto its own output, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out (gate relay site): a gate lap whose jdt log holds an operation over the stall limit is recorded PASS"
+        }
+      ]
     },
     {
       "id": "D-LAST-MEMBER-UNMOUNT-LEAVES-A-DEPARTED-SLOTS-PR-KEY-UNCLASSIFIED-30S",
