@@ -10042,8 +10042,14 @@
         "tests/evidence/lanes/g2d_a19b_20261024T153135Z/step4.log",
         "tests/fourkn_merge_2node.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "approved",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-857abd.md",
+        "sha256": "9399a7b124e3222d54f439b0fcfe7968a2521d60d150047bf93e5fbbe5100259",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      }
     },
     {
       "id": "P20261024-91492a",
@@ -10061,8 +10067,14 @@
         "tests/evidence/lanes/g2d_a19b_20261024T153135Z/queue",
         "tests/fourkn_merge_2node.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-91492a.md",
+        "sha256": "27b5ec2be0bd726b88a6178b7a6ebe307e8084fe08aca5cd643aff3e01640f5c",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     },
     {
       "id": "P20261024-bef1c8",
@@ -10108,8 +10120,14 @@
         "tests/join_during_takeover.sh",
         "tests/capture_fault_gate.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-24107f.md",
+        "sha256": "c2ea007b9cf2b8fe4f6af7b1ea07fdfb452dbd65de4199f093b29cf6631ac7b8",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
