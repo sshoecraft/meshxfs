@@ -10337,8 +10337,14 @@
         "tests/evidence/batch_laps/b20261024-61fcda",
         "tests/late_register_hold_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-229ee1.md",
+        "sha256": "658496c915247eb9fe574df8c3f5654035c607a2428f5db30f1716044eefe1c7",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     },
     {
       "id": "P20261024-cb280d",
@@ -10354,8 +10360,14 @@
         "tests/evidence/batch_laps/b20261024-655b70",
         "tests/late_register_hold_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "approved",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-cb280d.md",
+        "sha256": "e93107b2b7d5b6bde378bc583a59eb9a155117b130cfad801ab8669994acc256",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      }
     },
     {
       "id": "P20261024-e7d188",
@@ -10380,8 +10392,14 @@
         "pal/linux/kern.c",
         "docs/rulings/silent-peer-death-under-the-stall-limit.md"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-e7d188.md",
+        "sha256": "f89f01fb2f717af44f964ba07a03b187436018a5980b8bc53686b2329fcd7698",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
