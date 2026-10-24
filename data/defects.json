@@ -8041,6 +8041,31 @@
           "config": "2/net/mesh/direct",
           "row": "lap:lap_bounded",
           "iso": "2026-10-24T19:32:03Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_bounded",
+          "iso": "2026-10-24T19:31:22Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_bounded",
+          "iso": "2026-10-24T19:30:41Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_bounded",
+          "iso": "2026-10-24T19:30:01Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_bounded",
+          "iso": "2026-10-24T19:29:20Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_bounded",
+          "iso": "2026-10-24T19:28:40Z"
         }
       ],
       "updated": "2026-10-24",
@@ -8061,6 +8086,39 @@
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a lap's own step bound counts another holder's lock wait, and returns while a child the step started still holds a lock"
+        },
+        {
+          "id": "b20261024-22bcc8",
+          "kind": "verify",
+          "row": "lap:lap_bounded",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "FF012B4B81CDB69CAE96883",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:lap_bounded",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-c65eda",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_LAP_BOUNDED=0 (each arm's step runs under timeout(1), as the laps bounded their own steps before the fix)",
+            "builds": [
+              "FF012B4B81CDB69CAE96883"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -8089,7 +8147,7 @@
       "opened": "2026-10-24",
       "summary": "Two harness cleanups run 'fuser -km $MNT' with no check that $MNT is still a mount point: tests/closure_mount_race.sh:97 (the joiner's clean removal) and scripts/drbd_rig.sh:2794 (the resolve test's unmount of both nodes). On a directory that is not a mount point fuser -m names every user of the root filesystem, so either cleanup run after its mount is already gone SIGKILLs the node's sshd and daemons, as tests/merge_overrun_lap.sh's did (D-MERGE-OVERRUN-LAP-CLEANUP-FUSER-KILLS-ROOT-FS-USERS-WHEN-NOT-MOUNTED, measured there 10 of 10 with the gate off)",
       "evidence": "Read from the code at the review of verify P20261024-4975c4 (data/reviews/P20261024-4975c4.md), which noted that its approval covers merge_overrun_lap.sh alone and that these two calls have no mount-point check; no run of either has been seen to kill a node's services",
-      "next": "Fix drafted for the next attempt: tests/evidence/drafts/tree/tests/closure_mount_race.sh and tests/evidence/drafts/tree/scripts/drbd_rig.sh run the fuser only while 'mountpoint -q $MNT' holds (bash -n clean). Then a lap per site that runs the cleanup with $MNT already unmounted and reads the node's ssh, journald and udevd main pids before and after it (the merge_overrun lap's check, tests/merge_overrun_lap.sh:77-96), with the guard switched off for the control.",
+      "next": "Fix drafted for the next attempt: tests/evidence/drafts/tree/tests/closure_mount_race.sh and tests/evidence/drafts/tree/scripts/drbd_rig.sh run the fuser only while 'mountpoint -q $MNT' holds (bash -n clean). Then a lap per site that runs the cleanup with $MNT already unmounted and reads the node's ssh, journald and udevd main pids before and after it (the merge_overrun lap's check, tests/merge_overrun_lap.sh:77-96), with the guard switched off for the control. ===== 2026-10-24, attempt 21 (lane tests/evidence/lanes/g2b_a21_20261024T192800Z): both prechecks and all 10 laps of control b20261024-0b9879 ABORTed before measuring, 'a harness still runs a kill of its own: scripts/drbd_rig.sh:286 fuser -km \"$m\" ... :3330 ... fuser -km $m' (step3.log, step5.log 'control b20261024-0b9879: 0 of 10 laps failed'), so the control measured nothing and the verification was refused for want of a rate (step6.log). Both sites kill only paths read from /proc/mounts as mount points, but the fix routes every such kill through fuser_mounted_cmd and the lap checks that no other remains; drafted for the next attempt in tests/evidence/drafts/tree/scripts/drbd_rig.sh (NODE_UNMOUNT and the 4K-native arm's teardown now take their command from fuser_mounted_cmd; no 'fuser -k' text left in the script). Next attempt: precheck both arms, then a fresh control and its verification.",
       "batches": [
         {
           "id": "b20261024-0b9879",
