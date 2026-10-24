@@ -9500,6 +9500,31 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-63d0ce",
+      "kind": "remove-fixed",
+      "record": "D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER",
+      "change": {
+        "control": "b20261024-65e307",
+        "fixon": "b20261024-0bf8bc",
+        "cause": "A wait answered by the local master through the already-granted shortcut (dlm/dlm.c dlm_local_answered, site=shortcut) ended its acquisition record with dlm_acq_end, which handed the record's adopted grant back as unclaimed (dlm_acq_release_grant, P958-ACQ-GRANT-RELEASED why=unclaimed mirror_unlinked=1). When the grant had been adopted between two attempts (P958-ACQ-GRANT-ADOPTED) and the resource's ledger page was then handed to the waiter (P-TAUTH-PAGE-MINE via=frozen-msg), the waiter had become the master, so the hand-back unlinked the master's own GRANTED record of the waiter's EX: the master then granted another node a conflicting EX, which the waiter's ledger refused (P-TAUTH-DOUBLE-GRANT, 110 in 6 s on test21), and the waiter later received a fresh grant with its lineage still open (P130-FALSE-FRESH) and shut its filesystem down. Fix: dlm_acq_answered_by (dlm/dlm.c:9423, called at :10983) makes a wait the shortcut answers from the entry its adopted grant installed take that grant (P958-ACQ-GRANT-CLAIMED-LOCAL), so nothing is handed back; module parameter dl_shortcut_claim (dlm/dlm.c:418-420), 0 the same-build control."
+      },
+      "argument": "Cause: reproduced in process with the hypothesis written first (tests/tauth/adopted_grant_handoff_test.sh; before the fix tests/evidence/adopted_grant_handoff/run_20261023T005430Z.log shows the adoption, the page hand-off, the unclaimed release with master = the waiter itself, and the double grant; with the fix run_20261023T005954Z.log P958-ACQ-GRANT-CLAIMED-LOCAL and no refusal; knob off run_20261023T010007Z.log fails as before) and then on the rig on the candidate's module at 8/net/mesh/mpath with tests/adopted_grant_rig_lap.sh, which forces the sequence with dl_acq_gap_ino/dl_acq_gap_ms and prints each step of the chain from the nodes' kernel logs (STEP3 P958-ACQ-GRANT-ADOPTED, STEP4 P-TAUTH-PAGE-MINE via=frozen-msg, STEP5 the shortcut answer). Control b20261024-65e307 (dl_shortcut_claim=0 on every node, build BE3695D2590A65F742F9816, lane tests/evidence/lanes/g8b_w12b_*): 9 of 9 counted laps FAIL with exposure (the 10th, 08:19:02Z, aborted in prep before the trigger and is named by D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT). Fix-on b20261024-0bf8bc (candidate 0.90.134, same build): 7 of 7 PASS with exposure, applied through the approved verify P20261024-8c611d (data/reviews/P20261024-8c611d.md). The earlier removal P20261023-778a6d was rejected only because the original board run 8/net/mesh/mpath:path_peer_withdrawn:2026-10-22T19:58:42Z also held two failures of other causes; both are now named by their own open records, D-NETMESH-SHARED-DIR-LOCK-QUEUE-JAMS-60S-AFTER-PEER-WITHDRAWS (the 66-75 s survivor stall) and D-8NETMESH-REJOIN-MOUNT-AFTER-PEER-WITHDRAWN-ONE-PATH-TIMES-OUT-AT-60S (test28's rejoin mount), so this removal settles only test21's shutdown in that run.",
+      "evidence": [
+        "data/reviews/P20261023-778a6d.md",
+        "data/reviews/P20261024-8c611d.md",
+        "tests/evidence/adopted_grant_handoff/run_20261023T005430Z.log",
+        "tests/evidence/adopted_grant_handoff/run_20261023T005954Z.log",
+        "tests/evidence/adopted_grant_handoff/run_20261023T010007Z.log",
+        "tests/adopted_grant_rig_lap.sh",
+        "tests/evidence/batch_laps/b20261024-65e307",
+        "tests/evidence/batch_laps/b20261024-0bf8bc",
+        "tests/evidence/ag6_false_grant_logs_20261022T1956Z.txt",
+        "dlm/dlm.c"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
