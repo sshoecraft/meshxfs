@@ -8998,6 +8998,16 @@
         }
       ],
       "updated": "2026-10-24"
+    },
+    {
+      "id": "D-RUN-SH-TIMEOUT-KILL-FUSER-ON-AN-UNMOUNTED-MNT-KILLS-ROOT-FS-USERS",
+      "severity": "minor",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "When a suite row runs out its budget, run.sh kills its leftovers on every node with 'fuser -k -m $MNT' (run.sh:2267) whether or not $MNT is still mounted there; on a directory that is not a mount point fuser -m names every user of the root filesystem, so on a node whose volume the row already unmounted, or whose shut-down mount was torn down, the kill SIGKILLs sshd and the node's daemons",
+      "evidence": "Read from the code at the review of removal P20261024-137b8d (data/reviews/P20261024-137b8d.md), which listed the tree's other 'fuser -km' sites; their surrounding code read 2026-10-24: run.sh:1056-1063 (TEARDOWN, gated on /proc/mounts), run.sh:1595, scripts/rig.sh:113-115, tests/setup/prep_node.sh:96-100, scripts/rig_recover.sh:92-94, scripts/pve_to_qnap_tcp.sh:23-24 and scripts/caw_preflight.sh:38-40 (each gated on mountpoint -q) are guarded; run.sh:2267 alone runs the kill with no mount test. The mechanism is the one measured 10 of 10 on tests/fuser_guard_lap.sh with its guard off (control b20261024-0f9ed6). No run has been seen to reach it here.",
+      "next": "Fix drafted for the next attempt in tests/evidence/drafts/tree/run.sh: the kill runs only while ' $MNT ' is in /proc/mounts; MXFS_TIMEOUT_KILL_MOUNT_GUARD=0 kills unguarded, as before (the control). bash -n clean. Lap: a row whose script unmounts $MNT and then outlives its budget on one node, with the node's ssh, journald, udevd and iscsid main pids and a sentinel read before and after the kill (tests/fuser_guard_lap.sh's check); control with the switch off, then a verification sized from it."
     }
   ]
 }
