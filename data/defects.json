@@ -6648,7 +6648,7 @@
           "candidate": "0.90.134",
           "build": "1BC77CFB15EF4A988DD1F56",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -7085,6 +7085,16 @@
           "batch": "b20261023-d9b09a",
           "approval": "P20261023-849aed",
           "date": "2026-10-23"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T16:34:18Z",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "batch": "b20261024-22972d",
+          "approval": "P20261024-310833",
+          "date": "2026-10-24"
         }
       ]
     },

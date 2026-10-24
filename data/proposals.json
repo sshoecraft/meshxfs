@@ -9811,14 +9811,15 @@
         "tests/evidence/batch_laps/b20261024-22972d",
         "tests/peer_window_lap.sh"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-24",
       "review": {
         "file": "data/reviews/P20261024-310833.md",
         "sha256": "09ba9bfdafe69b810849ef7dabdb93126d59a849cbc375d160febaaf88200097",
         "verdict": "approved",
         "date": "2026-10-24"
-      }
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
