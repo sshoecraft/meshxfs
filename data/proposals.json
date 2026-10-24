@@ -10018,6 +10018,49 @@
         "data/reviews/P20261024-63d0ce.md",
         "tests/adopted_grant_rig_lap.sh"
       ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-f1796b.md",
+        "sha256": "001aa67c402122c91362d0e14f068f8facb08773c65b2d117656624e883edebe",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-857abd",
+      "kind": "verify",
+      "record": "D-FOURKN-MERGE-2NODE-LAP-HOLD-CATCHES-THE-PEER-ONLY-BY-CHANCE",
+      "change": {
+        "batch": "b20261024-160255"
+      },
+      "argument": "Verification b20261024-160255 of lap:fourkn_merge_2node (tests/fourkn_merge_2node.sh with its default forced overlap: at the unmount node 1 holds one merged write of its inode block up to FORCE_MS while node 2 writes its own slot of the same block, so a lap whose forced overlap does not land is VACUOUS) at 2/disk/caw/direct4k on g2d (test31, test32), candidate 0.90.134 attempt frozen 2026-10-24T16:34:18Z, module 1BC77CFB15EF4A988DD1F56. Sized from control b20261024-7f6b7e (the lap as before the fix, variant FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0: 5 of 20 laps failed, VACUOUS with no MISCOMPARE retried; tests/evidence/lanes/g2d_a19b_20261024T153135Z/step4.log 'control b20261024-7f6b7e: 5 of 20 laps failed with the fix out'): rate 5/20, lower bound 0.0583 at delta 0.005, N = 89 at alpha 0.005, declared before the first lap (tests/evidence/lanes/g2d_a20_20261024T163432Z/step9.log first line). Result: 89 PASS, 0 FAIL of 89 planned ('verify b20261024-160255: 89 PASS, 0 FAIL of 89 planned'), every lap exposure=1 on the probe 'INFO forced overlap in inode block', each '=== fourkn_merge_2node: fails=0 miscompares=N forced=landed' with N 1 (62 laps), 2 (26) or 3 (1): every lap retried at least one MISCOMPARE, none VACUOUS; laps 67-75 s against the 130 s bound. The earlier verification on attempt 19 (b20261024-0fd280) ended on its lap 12, proposed infra-proven as P20261024-a96a97; this batch is a fresh one on attempt 20 against the same closed control.",
+      "evidence": [
+        "tests/evidence/lanes/g2d_a20_20261024T163432Z/step9.log",
+        "tests/evidence/lanes/g2d_a20_20261024T163432Z/queue",
+        "tests/evidence/lanes/g2d_a19b_20261024T153135Z/step4.log",
+        "tests/fourkn_merge_2node.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-91492a",
+      "kind": "remove-fixed",
+      "record": "D-FOURKN-MERGE-2NODE-LAP-HOLD-CATCHES-THE-PEER-ONLY-BY-CHANCE",
+      "change": {
+        "control": "b20261024-7f6b7e",
+        "fixon": "b20261024-160255",
+        "cause": "tests/fourkn_merge_2node.sh held each node's first 64 merged inode-block writes 20 ms between the read and the COMPARE AND WRITE (HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0) and nothing made the peer write that block inside a hold, so whether a lap exercised the merged write's MISCOMPARE retry was chance: in control b20261024-7f6b7e 5 of 20 laps saw no MISCOMPARE and exited VACUOUS. Fix: the lap forces the overlap once a lap as tests/suite/fourkn_merge.sh does (the workload unheld; at the unmount node 1 armed with one held merged write of up to FORCE_MS while node 2 writes its own slot of the same block), so a lap whose forced overlap does not land is VACUOUS and every other lap retries a MISCOMPARE; FORCE_MS=0 with the old hold parameters is the control."
+      },
+      "argument": "Verification b20261024-160255 of lap:fourkn_merge_2node (tests/fourkn_merge_2node.sh with its default forced overlap: at the unmount node 1 holds one merged write of its inode block up to FORCE_MS while node 2 writes its own slot of the same block, so a lap whose forced overlap does not land is VACUOUS) at 2/disk/caw/direct4k on g2d (test31, test32), candidate 0.90.134 attempt frozen 2026-10-24T16:34:18Z, module 1BC77CFB15EF4A988DD1F56. Sized from control b20261024-7f6b7e (the lap as before the fix, variant FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0: 5 of 20 laps failed, VACUOUS with no MISCOMPARE retried; tests/evidence/lanes/g2d_a19b_20261024T153135Z/step4.log 'control b20261024-7f6b7e: 5 of 20 laps failed with the fix out'): rate 5/20, lower bound 0.0583 at delta 0.005, N = 89 at alpha 0.005, declared before the first lap (tests/evidence/lanes/g2d_a20_20261024T163432Z/step9.log first line). Result: 89 PASS, 0 FAIL of 89 planned ('verify b20261024-160255: 89 PASS, 0 FAIL of 89 planned'), every lap exposure=1 on the probe 'INFO forced overlap in inode block', each '=== fourkn_merge_2node: fails=0 miscompares=N forced=landed' with N 1 (62 laps), 2 (26) or 3 (1): every lap retried at least one MISCOMPARE, none VACUOUS; laps 67-75 s against the 130 s bound. The earlier verification on attempt 19 (b20261024-0fd280) ended on its lap 12, proposed infra-proven as P20261024-a96a97; this batch is a fresh one on attempt 20 against the same closed control. The control is the lap's own variant with the forced overlap off and the old hold restored, run on attempt 19 (module A27A67A3E501890BE9985E0); the defect is in the lap's own shape, not the module, and the verification ran the fixed lap on the current attempt. With the fix every one of 89 laps landed the forced overlap and retried a MISCOMPARE; with it out 5 of 20 retried none.",
+      "evidence": [
+        "tests/evidence/lanes/g2d_a20_20261024T163432Z/step9.log",
+        "tests/evidence/lanes/g2d_a19b_20261024T153135Z/step4.log",
+        "tests/evidence/lanes/g2d_a19b_20261024T153135Z/queue",
+        "tests/fourkn_merge_2node.sh"
+      ],
       "state": "pending",
       "created": "2026-10-24"
     }
