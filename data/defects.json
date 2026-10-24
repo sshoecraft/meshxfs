@@ -5734,10 +5734,10 @@
       "opened": "2026-10-23",
       "summary": "Each node declares a silent peer dead after its own dead_threshold of unchanged heartbeat reads (dlm/disklock.c:4838-4846, the declaration at :4960-4972 prints threshold=ctx->dead_threshold) and derives its own authority lease from its own window (dlm/disklock.c:5304-5341), and no node publishes its window, so in a cluster whose nodes run different windows (a dead_timeout_ms set on some nodes only, or modules of different defaults) a survivor can declare a peer dead before that peer's lease has ended, which the window-outlasts-the-lease invariant exists to prevent.",
       "evidence": "Observed in variant lane tests/evidence/lanes/g8_mpathtmo2_20261023T143444Z, where test14 ran the default window (D-PATH-ROW-REJOIN-RELOADS-THE-MODULE-WITHOUT-THE-LANES-MODARGS-SO-A-VARIANT-LANE-RUNS-MIXED-WINDOWS) and test7-test13 a 12 s one: board_20261023T144327Z-g8_path_all_lost kmsg_test14_fromnode.gz:730 'P290-AUTH-ADMITTED ... lease_ms=30000', :48532 'P290-AUTH-SUSPENDED ... deadline_ms=162511 ... last_ok_ms=132511', :49546 'P290-AUTH-CLOSED ... reason=AUTHORITY_LEASE_EXPIRED deadline_ms=162511 now_ms=166705' (its lease ran 30 s past its last landed beat), while kmsg_test7_fromnode.gz:151120 'heartbeat expired after 5 checks ... [threshold=6 last_stamp_ms=132511 last_seen_ms=574144 now_ms=586432]' (declared 12.3 s after last seeing the stamp change), and test8-test13 the same with threshold=6. The victim had lost every path, so it could not write; integrity rested on the PR fence. The same shape in 151713Z path_all_lost (test14 lease 30000, survivors threshold=6). docs/rulings/silent-peer-death-under-the-stall-limit.md, 'Keeping the window longer than the lease': every declaration path must obey the bound. MXFS_PROTO_GEN (dlm/disklock.h, mxfs_hb_feature) refuses peers of another protocol generation, but nothing compares windows. ===== The harness defect that put test14 on the default window in that lane is D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS.",
-      "next": "Publish each node's death window in its heartbeat record and make a survivor declare a silent peer only after the longer of its own window and the peer's published one (a record that publishes none counts as the default of its attachment), with the PROTO_GEN bump the layout change needs; or refuse a mount whose window differs from a live peer's, naming both. Measure on a 2-node pair with dead_timeout_ms=12000 on one node and the default on the other: freeze the default node's beats past 12 s but inside its lease and require that the 12 s node does not declare it; control with the fix's switch off (it declares), verification sized from it. ===== 2026-10-23 (session 49): the fix is built in the sibling copy /home/steve/src/mxfs-a14, to land on the next attempt: every heartbeat record's identity block publishes its writer's window (window_ms and its complement, in the block's 8 reserved bytes, outside the identity crc, zero in records of older modules: no layout change and no PROTO_GEN bump), hb_ident_observe keeps it per incarnation, and hb_dead_threshold_for (dlm/disklock.c) makes the monitor, and its corosync and closed-peer shortcuts, hold a silent peer to the longer of this node's window and the published one (a peer publishing none is held to its attachment's default); P-HB-PEER-WINDOW logs the moment this node's own window has run out on a peer with a longer one; the declaration line prints threshold and own_threshold; dl_peer_window=0 holds every peer to this node's own window (the control). Lap tests/peer_window_lap.sh (2/disk/caw/direct: A remounted with dead_timeout_ms=12000 and dl_peer_window=ARM, B on the default window parks its heartbeat 16 s while writing; EXPOSED on P-HB-PEER-WINDOW or A's declaration; PASS when A declares nothing and B kept writing). Next, on the next attempt: a precheck (ARM=1 PASS, ARM=0 FAIL), the control and verification batches. ===== 2026-10-23 (session 50), precheck of the fix built in the sibling tree mxfs-a14 (module 79779BEAECBEA94844FDC72, not a candidate): lane /home/steve/src/mxfs-a14/tests/evidence/lanes/g2_a14_peerwin_precheck_20261023T195830Z, 2/disk/caw/direct on g2, tests/peer_window_lap.sh (A=test1 on a 12 s window, B=test2 on the default, B's heartbeat parked 16 s while it writes). ARM=1: 'EXPOSED: A's own 12000 ms window ran out on B's parked stamp (held=1 declared=0)', 'LAP peer_window PASS: A held B to B's window (1), declared nothing; B's longest operation 11 ms' (132 operations, none failed). ARM=0 (dl_peer_window=0, the same-build control): 'EXPOSED: ... (held=0 declared=1)', 'FAIL A never declared B dead got=1 want=0', 'FAIL B shut nothing down got=5', 'FAIL every one of B's operations succeeded got=60', 'FAIL test2 still writes got=0' (evidence tests/evidence/20261023T195859Z_peerwin_pwpre1 and 20261023T200026Z_peerwin_pwpre0 in mxfs-a14). The lap's BUG/Oops count matched 'DEBUG:' lines too; it now excludes them. ===== Removal NOT filed: the two passed pairs (fc852f/3ad6d0 at 2/disk/caw/direct, 5acd5e/d9b09a at 2/net/mesh/direct) do not exercise every path the fix and the record's reach (*/*/*, nodes 2) take. (1) DRBD takes other branches: on attach_drbd (set from v5_noscsi, dlm/v5_mount.c:20920-20921) hb_member_gone and hb_peer_closed return at dlm/disklock.c:798 and :833 before the fix's hb_dead_threshold_for comparison (:800, :835); the no-publication fallback (:760-762) resolves through disklock_default_dead_threshold (:5410-5414) to MXFS_DISKLOCK_DEAD_THRESHOLD instead of the SCSI one; the lease the window must outlast is window less one interval (:5424-5426), not less the reserve with suspend (:5431-5436); and the DRBD-only P163-EXCLUDED-SEEN arm (:4793-4818) declares without any window. No lap ran at */*/drbd. (2) More than two nodes: in both observed runs one survivor per victim incarnation declared on its own window at check_dead (:4951; board_20261023T144327Z-g8_path_all_lost kmsg_test13_fromnode.gz:141884, board_20261023T151713Z-g8_path_all_lost kmsg_test7_fromnode.gz:115603) and every other survivor declared through P163-FENCED-SEEN (goto fire_dead at :4474), which never calls hb_dead_threshold_for and needs a third node (e.g. kmsg_test7_fromnode.gz:151119 of 144327Z is FENCED-SEEN, prover=2647046747, so the :151120 line this record's evidence cites is a follower, not an own-window declaration). No lap ran above 2 nodes, and tests/peer_window_lap.sh takes A and B as the first and last of MXFS_NODE_LIST (:45-46). (3) Multipath has no branch of its own in the fix (attach_drbd is false on any SCSI LUN), but no lap ran at */*/mpath. Needed before a removal: peer_window control (dl_peer_window=0) and verification at 2/net/mesh/drbd and at a node count above 2 on multipath (8/disk/caw/mpath, the observed configuration), or a reviewed narrowing; also a reproducer on the record (none set: remove --fixed refuses), the summary narrowed to what the laps measured (it cites pre-fix line numbers), and harness_batch.py proof of b20261023-5acd5e against tests/evidence/candidates/0.90.134_20261023T204109Z.files.json FAILS on five files gone after the restore (scripts/scst_reload.sh and four tests/lanes/queue_*.txt), to be shown not to be lap inputs. The observed runs, 8/disk/caw/mpath:path_all_lost:2026-10-23T14:46:48Z and 8/net/mesh/mpath:path_all_lost:2026-10-23T15:20:26Z (data/criteria.runs.jsonl:9705, :9749), are PASS rows no record names; the second is net/mesh, not disk/caw.",
+      "next": "Publish each node's death window in its heartbeat record and make a survivor declare a silent peer only after the longer of its own window and the peer's published one (a record that publishes none counts as the default of its attachment), with the PROTO_GEN bump the layout change needs; or refuse a mount whose window differs from a live peer's, naming both. Measure on a 2-node pair with dead_timeout_ms=12000 on one node and the default on the other: freeze the default node's beats past 12 s but inside its lease and require that the 12 s node does not declare it; control with the fix's switch off (it declares), verification sized from it. ===== 2026-10-23 (session 49): the fix is built in the sibling copy /home/steve/src/mxfs-a14, to land on the next attempt: every heartbeat record's identity block publishes its writer's window (window_ms and its complement, in the block's 8 reserved bytes, outside the identity crc, zero in records of older modules: no layout change and no PROTO_GEN bump), hb_ident_observe keeps it per incarnation, and hb_dead_threshold_for (dlm/disklock.c) makes the monitor, and its corosync and closed-peer shortcuts, hold a silent peer to the longer of this node's window and the published one (a peer publishing none is held to its attachment's default); P-HB-PEER-WINDOW logs the moment this node's own window has run out on a peer with a longer one; the declaration line prints threshold and own_threshold; dl_peer_window=0 holds every peer to this node's own window (the control). Lap tests/peer_window_lap.sh (2/disk/caw/direct: A remounted with dead_timeout_ms=12000 and dl_peer_window=ARM, B on the default window parks its heartbeat 16 s while writing; EXPOSED on P-HB-PEER-WINDOW or A's declaration; PASS when A declares nothing and B kept writing). Next, on the next attempt: a precheck (ARM=1 PASS, ARM=0 FAIL), the control and verification batches. ===== 2026-10-23 (session 50), precheck of the fix built in the sibling tree mxfs-a14 (module 79779BEAECBEA94844FDC72, not a candidate): lane /home/steve/src/mxfs-a14/tests/evidence/lanes/g2_a14_peerwin_precheck_20261023T195830Z, 2/disk/caw/direct on g2, tests/peer_window_lap.sh (A=test1 on a 12 s window, B=test2 on the default, B's heartbeat parked 16 s while it writes). ARM=1: 'EXPOSED: A's own 12000 ms window ran out on B's parked stamp (held=1 declared=0)', 'LAP peer_window PASS: A held B to B's window (1), declared nothing; B's longest operation 11 ms' (132 operations, none failed). ARM=0 (dl_peer_window=0, the same-build control): 'EXPOSED: ... (held=0 declared=1)', 'FAIL A never declared B dead got=1 want=0', 'FAIL B shut nothing down got=5', 'FAIL every one of B's operations succeeded got=60', 'FAIL test2 still writes got=0' (evidence tests/evidence/20261023T195859Z_peerwin_pwpre1 and 20261023T200026Z_peerwin_pwpre0 in mxfs-a14). The lap's BUG/Oops count matched 'DEBUG:' lines too; it now excludes them. ===== Removal NOT filed: the two passed pairs (fc852f/3ad6d0 at 2/disk/caw/direct, 5acd5e/d9b09a at 2/net/mesh/direct) do not exercise every path the fix and the record's reach (*/*/*, nodes 2) take. (1) DRBD takes other branches: on attach_drbd (set from v5_noscsi, dlm/v5_mount.c:20920-20921) hb_member_gone and hb_peer_closed return at dlm/disklock.c:798 and :833 before the fix's hb_dead_threshold_for comparison (:800, :835); the no-publication fallback (:760-762) resolves through disklock_default_dead_threshold (:5410-5414) to MXFS_DISKLOCK_DEAD_THRESHOLD instead of the SCSI one; the lease the window must outlast is window less one interval (:5424-5426), not less the reserve with suspend (:5431-5436); and the DRBD-only P163-EXCLUDED-SEEN arm (:4793-4818) declares without any window. No lap ran at */*/drbd. (2) More than two nodes: in both observed runs one survivor per victim incarnation declared on its own window at check_dead (:4951; board_20261023T144327Z-g8_path_all_lost kmsg_test13_fromnode.gz:141884, board_20261023T151713Z-g8_path_all_lost kmsg_test7_fromnode.gz:115603) and every other survivor declared through P163-FENCED-SEEN (goto fire_dead at :4474), which never calls hb_dead_threshold_for and needs a third node (e.g. kmsg_test7_fromnode.gz:151119 of 144327Z is FENCED-SEEN, prover=2647046747, so the :151120 line this record's evidence cites is a follower, not an own-window declaration). No lap ran above 2 nodes, and tests/peer_window_lap.sh takes A and B as the first and last of MXFS_NODE_LIST (:45-46). (3) Multipath has no branch of its own in the fix (attach_drbd is false on any SCSI LUN), but no lap ran at */*/mpath. Needed before a removal: peer_window control (dl_peer_window=0) and verification at 2/net/mesh/drbd and at a node count above 2 on multipath (8/disk/caw/mpath, the observed configuration), or a reviewed narrowing; also a reproducer on the record (none set: remove --fixed refuses), the summary narrowed to what the laps measured (it cites pre-fix line numbers), and harness_batch.py proof of b20261023-5acd5e against tests/evidence/candidates/0.90.134_20261023T204109Z.files.json FAILS on five files gone after the restore (scripts/scst_reload.sh and four tests/lanes/queue_*.txt), to be shown not to be lap inputs. The observed runs, 8/disk/caw/mpath:path_all_lost:2026-10-23T14:46:48Z and 8/net/mesh/mpath:path_all_lost:2026-10-23T15:20:26Z (data/criteria.runs.jsonl:9705, :9749), are PASS rows no record names; the second is net/mesh, not disk/caw. ===== 2026-10-24: on the candidate attempt frozen 2026-10-24T06:38:23Z the SCSI default death window is 12 s (MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD 6), the same as tests/peer_window_lap.sh's SHORT_MS=12000, so a lap whose B runs the default (:46, step 1 'both nodes on the default window') no longer has a peer with the longer window and cannot expose anything. Laps on this attempt must form the pair with MXFS_EXTRA_MODARGS=dead_timeout_ms=34000 (the earlier default: B on the long window and its ~30 s lease), A then remounting with SHORT_MS=12000, PARK_MS=16000 as before; the premise check (A_premise DEAD=12000, B's DEAD=34000) shows it. Still needed for removal, per the earlier review: control (ARM=0) and verification at 2/net/mesh/drbd and at 8/disk/caw/mpath (or a reviewed narrowing), a reproducer on the record, and the summary narrowed to what the laps measured.",
       "impact": "stability",
       "impact_why": "A survivor whose death window is shorter than a live peer's lease can declare that peer dead, fence it and replay its slice while the peer still holds authority by its own lease: a node shut down by its peers while it believed itself admitted (observed with a 12 s survivor window against a 30 s victim lease).",
-      "updated": "2026-10-23",
+      "updated": "2026-10-24",
       "batches": [
         {
           "id": "b20261023-fc852f",
@@ -7418,6 +7418,36 @@
           "config": "4/disk/caw/direct",
           "row": "lap:foreign_replay_ag",
           "iso": "2026-10-24T04:31:22Z"
+        },
+        {
+          "config": "4/disk/caw/direct",
+          "row": "lap:foreign_replay_ag_p163",
+          "iso": "2026-10-24T07:06:37Z"
+        },
+        {
+          "config": "4/disk/caw/direct",
+          "row": "lap:foreign_replay_ag_p163",
+          "iso": "2026-10-24T07:00:53Z"
+        },
+        {
+          "config": "4/disk/caw/direct",
+          "row": "lap:foreign_replay_ag_p163",
+          "iso": "2026-10-24T06:58:08Z"
+        },
+        {
+          "config": "4/disk/caw/direct",
+          "row": "lap:foreign_replay_ag_p163",
+          "iso": "2026-10-24T06:55:59Z"
+        },
+        {
+          "config": "4/disk/caw/direct",
+          "row": "lap:foreign_replay_ag_p163",
+          "iso": "2026-10-24T06:48:25Z"
+        },
+        {
+          "config": "4/disk/caw/direct",
+          "row": "lap:foreign_replay_ag_p163",
+          "iso": "2026-10-24T06:45:34Z"
         }
       ],
       "batches": [
@@ -7432,14 +7462,64 @@
           "candidate": "",
           "build": "BE3695D2590A65F742F9816",
           "variant": "LAP_WAIT_P163=0 (tests/foreign_replay_ag_lap.sh reads the survivors' logs as soon as the truncates return, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: the lap reads the logs before the replayer's P163 and names no replayer"
+        },
+        {
+          "id": "b20261024-70a767",
+          "kind": "verify",
+          "row": "lap:foreign_replay_ag_p163",
+          "config": "4/disk/caw/direct",
+          "platform": "any",
+          "planned": 26,
+          "probe": "^EXPOSED: |replayer=none",
+          "candidate": "0.90.134",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:foreign_replay_ag_p163",
+            "config": "4/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-eade91",
+            "k": 6,
+            "n": 10,
+            "candidate": "",
+            "variant": "LAP_WAIT_P163=0 (tests/foreign_replay_ag_lap.sh reads the survivors' logs as soon as the truncates return, as before the fix)",
+            "builds": [
+              "BE3695D2590A65F742F9816"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.19091633133768404
         }
       ],
-      "updated": "2026-10-24"
+      "updated": "2026-10-24",
+      "rates": [
+        {
+          "row": "lap:foreign_replay_ag_p163",
+          "config": "4/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-eade91",
+          "k": 6,
+          "n": 10,
+          "candidate": "",
+          "variant": "LAP_WAIT_P163=0 (tests/foreign_replay_ag_lap.sh reads the survivors' logs as soon as the truncates return, as before the fix)",
+          "builds": [
+            "BE3695D2590A65F742F9816"
+          ],
+          "date": "2026-10-24"
+        }
+      ]
     },
     {
       "id": "D-DRBD-WRITE-BOUND-ARM-IGNORES-MXFS-GROUP-AND-ADDRESSES-TEST3-TEST4",
