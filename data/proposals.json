@@ -7236,8 +7236,15 @@
         "data/reviews/P20261024-0801cb.md",
         "data/reviews/P20261023-778a6d.md"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-8c611d.md",
+        "sha256": "45b2f088d8ead1ccdf56b9396e6fb3a34e2f887e9585ac2b4fed04799a00d739",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-7f824d",

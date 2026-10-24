@@ -4097,7 +4097,7 @@
           "candidate": "0.90.134",
           "build": "BE3695D2590A65F742F9816",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -4179,6 +4179,18 @@
           "builds": [
             "BE3695D2590A65F742F9816"
           ],
+          "date": "2026-10-24"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "8/net/mesh/mpath",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T06:38:23Z",
+          "build": "BE3695D2590A65F742F9816",
+          "batch": "b20261024-0bf8bc",
+          "approval": "P20261024-8c611d",
           "date": "2026-10-24"
         }
       ]
