@@ -2575,7 +2575,7 @@
           "candidate": "0.90.134",
           "build": "9C7B7B00C5DE523F1D378C8",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -2627,6 +2627,18 @@
           "builds": [
             "9C7B7B00C5DE523F1D378C8"
           ],
+          "date": "2026-10-23"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T01:01:07Z",
+          "build": "9C7B7B00C5DE523F1D378C8",
+          "batch": "b20261023-54d056",
+          "approval": "P20261023-639531",
           "date": "2026-10-23"
         }
       ]
@@ -6838,6 +6850,50 @@
           "config": "16/disk/caw/mpath",
           "row": "crash_audit",
           "iso": "2026-10-11T21:20:19Z"
+        }
+      ],
+      "updated": "2026-10-23"
+    },
+    {
+      "id": "D-BATCH-LAP-SUBREAPER-ZOMBIE-LUN-HOLDER-READ-LIVE-ABORTS-EVERY-THIRD-VOTE-LAP",
+      "severity": "major",
+      "nodes": 2,
+      "config": "net/mesh/drbd",
+      "opened": "2026-10-23",
+      "summary": "tools/batch_lap.py makes the lap runner a child subreaper (run_bounded, :271) but on the normal path only waits for its direct child (:275); orphans reparented to it are reaped only on the overrun path (reap, :241-249). So when scripts/drbd_rig.sh up exits and its EXIT trap kills its LUN holder (end_holders, scripts/drbd_rig.sh:236-237), the holder becomes a zombie of the lap runner and stays one until the lap ends, and tools/lun_pool.sh owner_live (:205-210) reads a zombie's /proc/<pid>/stat start time as a live owner. The lap's next drbd_rig.sh invocation (mxfs) is refused 'test1 is held by lun06's allocation', so every lap of tests/drbd_third_vote_lap.sh run through batch_lap aborts unexposed, and any batch lap that calls drbd_rig.sh twice does the same.",
+      "evidence": "Control b20261023-242a48 (lap:third_vote at 2/net/mesh/drbd, tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step13.log): laps 1-6 all 'LAP third_vote ABORT: drbd_rig.sh mxfs rc=1: lun_pool: test1 is held by lun06's allocation: <pid> ... drbd_rig 2/net/mesh/drbd test1', each naming the holder its own 'up' allocated (lap 1 1921059, lap 2 1925445, lap 3 1931039, lap 4 1934395, lap 5 1964261, lap 6 2044720), elapsed 164-168 s, exposure=0. Lap 1's log tests/evidence/batch_laps/b20261023-242a48/20261024T025637Z-e05f17b4.log:4; its up evidence tests/evidence/drbd_rig/20261024T025638Z-up/luns 'POOL_LUN id=06 ... nodes=test1 owner=1921059', and the mxfs directory 20261024T025921Z-mxfs/ was created the second up ended (21:59:21 local) and is empty. Measured on lap 6 by sampling /proc/2044720/stat every 2 ms from the host (fields 3 and 4 only; /tmp/claude-1000/-home-steve-src-mxfs/a769a645-be24-4c22-9872-1e346ff90f61/scratchpad/holder_watch3.txt): '03:10:45.265 state=S ppid=2044541 (drbd_rig.sh)' through up; '03:13:14.117 state=Z ppid=2044057 parent0=exited ppcomm=python3' when up exited and killed it; '03:13:15.336 state= (gone)', reaped only when the lap ended (lap 6 'FAIL ... 2026-10-24T03:13:15Z ... held by lun06's allocation: 2044720'). tools/lun_pool.sh starttime_of (:193-199) reads field 22 of /proc/<pid>/stat and never field 3 (state), so a zombie with the owner's start time passes owner_live. The lap calls drbd_rig.sh down, then up, then mxfs, each a separate process (tests/drbd_third_vote_lap.sh:38-42). Same-build control already in the tree: MXFS_BATCH_LAP_KILLTREE=0 (tools/batch_lap.py:265) runs the lap without the subreaper, so an orphan goes to init and is reaped at once. Earlier third_vote batch b20261023-8d5f78 aborted for a different reason (MXFS_NODES, its own record). ===== The host-side samples cited above are kept in tests/evidence/incident_third_vote_zombie_holder_20261024.txt.",
+      "next": "Hypothesis (written): the zombie window is the whole cause. Falsify with one lap of tests/drbd_third_vote_lap.sh through tools/batch_lap.py with MXFS_BATCH_LAP_KILLTREE=0 (no subreaper): if mxfs is still refused, the hypothesis is wrong. Fix at the cause, two candidates, one at a time: (a) tools/lun_pool.sh owner_live treats state Z (or X) as not live, since a zombie owns nothing; (b) tools/batch_lap.py reaps reparented orphans while it waits (a waitpid(-1, WNOHANG) loop beside proc.wait), with a switch to restore the old wait. Then a control with the switch off, a verification sized from it, and remove --fixed. The fix needs the frozen candidate's tree to change (tools/ is frozen while 0.90.134's attempt RUNs).",
+      "reproducer": "MXFS_BATCH=<batch> ./run.sh 2/net/mesh/drbd lap:third_vote (any batch lap that runs scripts/drbd_rig.sh up then another drbd_rig.sh step)",
+      "cells": [
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T02:59:22Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:02:08Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:04:54Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:07:38Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:10:27Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:third_vote",
+          "iso": "2026-10-24T03:13:15Z"
         }
       ],
       "updated": "2026-10-23"

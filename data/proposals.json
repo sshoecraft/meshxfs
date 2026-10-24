@@ -6543,8 +6543,41 @@
         "tests/drbd_rig_tag_lap.sh",
         "tools/mxfs_rig_tag.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-639531.md",
+        "sha256": "720e9a00f8acebebbacaddef4d7f4d4d9699c0519aba5ad6edb77ba928f9f6bd",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-e7a30c",
+      "kind": "remove-fixed",
+      "record": "D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN",
+      "change": {
+        "control": "b20261023-920e59",
+        "fixon": "b20261023-54d056",
+        "cause": "tools/mxfs_rig_tag.sh chose the native-XFS yardstick by the device's SCSI vendor, and /dev/drbd0 has none, so prep resolved no rig tag and fio_perf_vs_xfs at 2/net/mesh/drbd recorded SKIP rig-unknown on every run; a SKIP is not a PASS under candidate grading"
+      },
+      "argument": "FIXED AND VERIFIED. Cause: tools/mxfs_rig_tag.sh resolved the rig tag from the device's SCSI vendor; a DRBD device has none, so the resolution was empty and the DRBD board's fio_perf_vs_xfs row skipped rig-unknown (record evidence: 11 SKIP rig-unknown in tests/evidence/drbd_rig/criteria.runs.jsonl). Fix, in the frozen candidate 0.90.134 (attempt frozen 2026-10-24T01:01:07Z): a DRBD device resolves through its backing disk (drbdsetup show) and is tagged <vendor>-drbd (tools/mxfs_rig_tag.sh:137-144), with the switch MXFS_RIG_TAG_DRBD (read at :170 and :178; 0 restores the old reading). Control b20261023-920e59, the fix taken out with MXFS_RIG_TAG_DRBD=0 on the DRBD pair (tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step10.log): 10 of 10 exposed laps failed, each 'the row declined to score (rig-unknown); prep's resolution gave 'nothing''. Verification b20261023-54d056 sized from it, on the candidate (step11.log), applied under approved P20261023-639531 (data/reviews/P20261023-639531.md): 6 of 6 exposed laps passed, each 'prep resolved /dev/drbd0 to 'scst-fio-drbd' and the row scored against rig=scst-fio-drbd'. Scope, as the verify review states: the batch proves the DRBD device now resolves and the row scores instead of skipping; it says nothing about DRBD throughput, which the release drbd step's own board run grades (the row grades the latest fio_perf entry in bench.json).",
+      "evidence": [
+        "data/reviews/P20261023-639531.md",
+        "tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step10.log",
+        "tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step11.log",
+        "tools/mxfs_rig_tag.sh",
+        "tests/drbd_rig_tag_lap.sh"
+      ],
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-e7a30c.md",
+        "sha256": "c70a1fff67752fd452e509c2f467583ca805f24665b3bd8e4066419082197758",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     }
   ]
 }
