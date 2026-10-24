@@ -9115,8 +9115,14 @@
         "tests/relog_auth_lap.sh",
         "xfs/xfs_mxfs_relbar.c"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-9cdfae.md",
+        "sha256": "6d3bb61227533ef2ac1fd083f66a9c74a36214c41f20afd2ebd7b96c99e3b7ef",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     },
     {
       "id": "P20261024-79d70a",
@@ -9195,8 +9201,14 @@
         "tests/measure_settled_lap.py",
         "tools/defects.py"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-ce5c62.md",
+        "sha256": "2aa0303394943a6ce1dcb9bc867ab60ffa0be349db939ce733606585e31afe5e",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
