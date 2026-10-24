@@ -10539,6 +10539,33 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-dc2a8a",
+      "kind": "verify",
+      "record": "D-RIG-LAPS-LEAVE-LOAD-LOGS-IN-NODE-RUN-AND-A-FULL-RUN-KILLS-THE-NEXT-LOAD",
+      "change": {
+        "batch": "b20261024-017918"
+      },
+      "argument": "Verification b20261024-017918 of the fenced-ledger arm, row lap:lap_load_clean_fledger at 2/net/mesh/direct (the configuration the removal review asked for), on candidate 0.90.134 attempt 22 (build A7E90BC5313192108E35B80; release_candidate.py check: every frozen file as frozen). Declared after control b20261024-62579c (LAP_LOAD_CLEAN=0) failed 10 of 10 exposed laps on the same lane, pair (test1/test2), module and configuration (step4.log:1,5-14,17); N=6 from 10/10 at delta=alpha=0.005 (step5.log:1). All 6 laps PASS with exposure=1 and LAP_LOAD_CLEAN unset; none failed, none INCOMPLETE ('verify b20261024-017918: 6 PASS, 0 FAIL of 6 planned'). The disk/caw arm b20261024-721cc7 was applied by P20261024-8eb85b; this is the same row at 2/net/mesh/direct.",
+      "evidence": [
+        "tests/evidence/lanes/g2_a22x_20261024T225204Z/step4.log",
+        "tests/evidence/lanes/g2_a22x_20261024T225204Z/step5.log",
+        "tests/evidence/lanes/g2_a22x_20261024T225204Z/queue",
+        "tests/evidence/lanes/g2_a22x_20261024T225204Z/summary.log",
+        "tests/evidence/batch_laps/b20261024-017918",
+        "tests/evidence/batch_laps/b20261024-62579c",
+        "data/criteria.runs.jsonl"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-dc2a8a.md",
+        "sha256": "bd1a75e9bf0b9d68a060c57c0e4899989766ada6460645d8e9448cff43601746",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }

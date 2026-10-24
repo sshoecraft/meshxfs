@@ -4754,7 +4754,7 @@
           "candidate": "",
           "build": "A7E90BC5313192108E35B80",
           "variant": "dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the last member's release-all on one thread, as before the fix",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -4776,6 +4776,39 @@
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: the last member's release-all on one thread, on multipath"
+        },
+        {
+          "id": "b20261024-6ef515",
+          "kind": "verify",
+          "row": "lap:lmu",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: A's last-member unmount released",
+          "candidate": "0.90.134",
+          "build": "A7E90BC5313192108E35B80",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:lmu",
+            "config": "2/net/mesh/direct4k",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-5b7407",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the last member's release-all on one thread, as before the fix",
+            "builds": [
+              "A7E90BC5313192108E35B80"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -4808,6 +4841,21 @@
             "79779BEAECBEA94844FDC72"
           ],
           "date": "2026-10-23"
+        },
+        {
+          "row": "lap:lmu",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-5b7407",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep: the last member's release-all on one thread, as before the fix",
+          "builds": [
+            "A7E90BC5313192108E35B80"
+          ],
+          "date": "2026-10-24"
         }
       ],
       "cells": [
@@ -4910,6 +4958,56 @@
           "config": "2/net/mesh/mpath",
           "row": "lap:lmu",
           "iso": "2026-10-23T23:20:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:lmu",
+          "iso": "2026-10-24T23:34:22Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:lmu",
+          "iso": "2026-10-24T23:30:43Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:lmu",
+          "iso": "2026-10-24T23:26:34Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:lmu",
+          "iso": "2026-10-24T23:22:59Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:lmu",
+          "iso": "2026-10-24T23:18:56Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:lmu",
+          "iso": "2026-10-24T23:14:55Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:lmu",
+          "iso": "2026-10-24T23:10:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:lmu",
+          "iso": "2026-10-24T23:06:33Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:lmu",
+          "iso": "2026-10-24T23:02:06Z"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "row": "lap:lmu",
+          "iso": "2026-10-24T22:57:47Z"
         }
       ],
       "verified_at": [
@@ -7618,7 +7716,7 @@
       "opened": "2026-10-24",
       "summary": "tools/lun_pool.sh alloc waits at most 60 s for the pool lock (pool_lock, flock -w 60) and then refuses, so a prep started while another lane's allocation or bind holds the lock longer is refused 'no pool LUN of 512-byte blocks', and the run that started it ends without a verdict; nothing records which process held the lock or for how long",
       "evidence": "2026-10-24, attempt 17 of 0.90.134 (frozen 2026-10-24T10:25:09Z): lap 5 of control b20261024-bda0e1 (tests/live_holder_shard_lap.sh lhmc5 at 2/net/mesh/direct, g2) recorded INCOMPLETE rc=2 at 2026-10-24T10:41:54Z (tests/evidence/batch_laps/b20261024-bda0e1/20261024T104052Z-68ff9925.log: 'STAGE prep rc=1 wall=62s', 'LAP lh_master ABORT: prep_cluster rc=1'); its prep log tests/evidence/20261024T104052Z_lhmaster_lhmc5/prep_1.log: '--- pre-prep: VMs up at +2 s (10:40:54) ---', 'lun_pool: pool lock not taken in 60 s: /home/steve/disks/pool/.lock', 'ERROR: no pool LUN of 512-byte blocks for [test1 test2]'. In that minute lanes g4c_a17tf (a 4-node multipath prep from 10:41:37Z), g2e_a17lp (tests/lun_pool_shutdown_lap.sh, which clears records, boots and binds two nodes with --paths 2) and g2d_a17b were allocating; other preps of the same lanes logged waits of 2-16 s ('lun_pool: pool lock waited N s'). The lock's holder is not named anywhere: <pool dir> holds only lunNN.owner/.paths/.wwid/.tmo. ===== 2026-10-24, the holder named for the refusal of lap lhmc5 (2/net/mesh/direct, 10:40:54-10:41:54Z): run.sh runs its host preflight holding the pool lock (run.sh:2547, PREFLIGHT=(tools/lun_pool.sh quiet clyde_preflight.sh), 300 s wait, tools/lun_pool.sh:861-862), and the preflight's kernel-log-rate check waits inside it for any lane's VM power-up to finish (scripts/clyde_preflight.sh:252-260, /tmp/mxfs_host_powerup.lock, which scripts/lab_power.sh:159-162 holds for a whole 'up'). Lap pw8c4 of g8b took the pool lock at 10:40:47 (tests/evidence/20261024T104044Z_peerwin_pw8c4/prep.log:4 'pool LUN held at +1 s', :6 preflight starts 10:40:48), and its preflight waited 58 s (:51) on lane g4c's 'lab_power.sh up group:g4c' (tests/evidence/lanes/g4c_a17tf_20261024T104047Z/summary.log :8-9, 10:40:47-10:41:37), then passed at 10:41:54 (:62). Every alloc behind it waited: lhmc5 gave up at 60 s (10:41:54); tff2 and g4c got the lock at 10:41:54-55 after 16-17 s. No release ran under the lock in the window (no 'releasing' line in the 899 evidence files of 10:35-10:50Z; SCST shows only test17/test18's boot relogin and logout on pool-07 at 10:40:43-45 and test7-10's boot logins on pool-02 at 10:41:16-35). CAUSE: two locks taken in an order that makes the pool lock wait for a power-up: run.sh holds the pool lock while the preflight waits for the power-up lock. Next: draft the fix (run.sh waits for the power-up lock before it takes the pool lock for the preflight, and holds both, the preflight told not to wait again), with a switch for the control; a lap that starts a power-up and a prep beside it and times an alloc from a third caller. ===== 2026-10-24: fix drafted for the next attempt in tests/evidence/drafts/tree/run.sh. When the run uses the pool, run.sh takes /tmp/mxfs_host_powerup.lock shared (240 s, the preflight's own bound) before it takes the pool lock for the preflight (lun_pool.sh quiet), and holds it across the gate. The gate runs with that descriptor closed, so nothing it leaves running keeps the hold. The gate's own shared wait is then immediate, and no power-up can start while the pool is held quiet. PREFLIGHT_POWERUP_FIRST=0 waits inside the pool lock, as before: the control. Lap drafted: tests/evidence/drafts/tree/tests/pool_lock_powerup_lap.sh. It holds the power-up lock exclusive for 40 s, starts a pooled prep of the lane's group under it, and times a third caller's 'lun_pool.sh quiet true': PASS under 5 s, FAIL longer; bound 236 s. The holder logging drafted earlier (tests/evidence/drafts/tree/tools/lun_pool.sh) goes in with it. Next: apply both at the next attempt, precheck each arm once, then control and verification.",
-      "next": "Log the holder: pool_lock writes the holding pid, its command and the time it took the lock into <pool dir>/.lock.holder, and a waiter that gives up names it and how long it has held; pool_unlock logs a hold over 10 s. Then find which operation holds the lock past 60 s (a multipath bind of 4 nodes, the shutdown lap's boot inside the lock, or a node that does not answer) and either take that work out of the lock or bound the wait from the longest measured hold, with a lap that starts a prep while another lane binds.",
+      "next": "Log the holder: pool_lock writes the holding pid, its command and the time it took the lock into <pool dir>/.lock.holder, and a waiter that gives up names it and how long it has held; pool_unlock logs a hold over 10 s. Then find which operation holds the lock past 60 s (a multipath bind of 4 nodes, the shutdown lap's boot inside the lock, or a node that does not answer) and either take that work out of the lock or bound the wait from the longest measured hold, with a lap that starts a prep while another lane binds. ===== 2026-10-24, the holder log read (the logging this record's next step asked for is in the tree: tools/lun_pool.sh pool_lock :149-168 writes the holder to <pool>/.lock.holder and names it when a wait gives up; pool_unlock :169-177 logs every hold over LOCK_LOG_S=10 s to <pool>/lock.log). /home/steve/disks/pool/lock.log, 25 holds over 10 s since 2026-10-24T12:53:30Z: 20 of 20 s (all 'lun_pool.sh quiet', the hold a quiet window takes on purpose, tools/lun_pool.sh:902 pool_lock 300), 2 of 11 s, 2 of 12 s, and 1 of 52 s: '2026-10-24T19:53:05Z held 52 s by pid 1874763: lun_pool.sh alloc --owner 1874570 --size 20G --paths 2 --block-size 512 --what run.sh 8/net/mesh/mpath --group g8 ...'. An alloc binds outside the lock (:720-724) but releases a finished allocation of its nodes inside it (:687, :709, release), so the 52 s is that release's node logouts; one waiter behind it stays under 60 s, a second queued waiter does not. Next: measure release's own time inside alloc (it is not logged separately), then take the release's node work out of the lock (claim under the lock, log out after it) with a lap that starts a prep while another lane's alloc releases an 8-node mpath LUN. ===== Correction to the entry above: that the 52 s hold was the in-lock release's node logouts is read from the code (the only node work alloc does under the lock), not measured; the hypothesis to test is exactly that, by timing release inside alloc.",
       "cells": [
         {
           "config": "2/net/mesh/direct",
@@ -8845,7 +8943,7 @@
           "candidate": "0.90.134",
           "build": "A7E90BC5313192108E35B80",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -8866,6 +8964,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-740d1d",
+          "kind": "control",
+          "row": "lap:lap_load_clean_noino",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "A7E90BC5313192108E35B80",
+          "variant": "LAP_LOAD_CLEAN=0 (lap_load_end removes nothing from the nodes' /run, as the noino lap's exit did before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a noino lap leaves its load directory and logs in each node's /run"
         }
       ],
       "cells": [
@@ -9176,6 +9291,16 @@
           "build": "A7E90BC5313192108E35B80",
           "batch": "b20261024-721cc7",
           "approval": "P20261024-8eb85b",
+          "date": "2026-10-24"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T20:46:20Z",
+          "build": "A7E90BC5313192108E35B80",
+          "batch": "b20261024-017918",
+          "approval": "P20261024-dc2a8a",
           "date": "2026-10-24"
         }
       ]
