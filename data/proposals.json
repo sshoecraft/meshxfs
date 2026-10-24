@@ -9795,6 +9795,30 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-310833",
+      "kind": "verify",
+      "record": "D-SURVIVOR-DECLARES-A-PEER-DEAD-ON-ITS-OWN-WINDOW-INSIDE-THE-PEERS-LONGER-LEASE",
+      "change": {
+        "batch": "b20261024-22972d"
+      },
+      "argument": "Verification b20261024-22972d of lap:peer_window at 8/disk/caw/mpath (g8b test21-test28, candidate 0.90.134 attempt frozen 2026-10-24T16:34:18Z, build 1BC77CFB15EF4A988DD1F56, lane tests/evidence/lanes/g8b_a20b_20261024T173545Z step 4): 6 of 6 planned laps PASS with exposure=1, each 'LAP peer_window PASS: A held B to B's window (1), declared nothing', B's longest operation 12-64 ms; none failed, none dropped. Sized from control b20261024-dfe3bd (step 3, same attempt and build, dl_peer_window=0: the short-window node holds its peer to its own window, as before the fix), 10 of 10 exposed laps FAIL, lower bound 0.5887, 6 clean laps. The lap (tests/peer_window_lap.sh) remounts A on SHORT_MS and B on LONG_MS at run time, so no lap carries prep-time module arguments (the attempt-18 concern in the record's next step). The record's cells at this configuration are the five control batches' FAIL laps (1d2fde, da464a, 05c9e3, ac7f64, dfe3bd: 9+9+9+9+10 'LAP peer_window FAIL'); the four INCOMPLETE prep-bound aborts were moved to D-LAP-OWN-PREP-BOUND-COUNTS-OTHER-LANES-WAITS-AND-RETURNS-BEFORE-ITS-RUN-LETS-GO first (its evidence names each). Earlier verifications at 2/disk/caw/direct (b20261023-3ad6d0) and 2/net/mesh/direct (b20261023-d9b09a) were applied on an earlier attempt; this batch clears 8/disk/caw/mpath on this attempt.",
+      "evidence": [
+        "tests/evidence/lanes/g8b_a20b_20261024T173545Z/step3.log",
+        "tests/evidence/lanes/g8b_a20b_20261024T173545Z/step4.log",
+        "tests/evidence/batch_laps/b20261024-dfe3bd",
+        "tests/evidence/batch_laps/b20261024-22972d",
+        "tests/peer_window_lap.sh"
+      ],
+      "state": "approved",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-310833.md",
+        "sha256": "09ba9bfdafe69b810849ef7dabdb93126d59a849cbc375d160febaaf88200097",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
