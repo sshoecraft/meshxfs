@@ -9571,6 +9571,34 @@
         "tests/evidence/batch_laps/b20261024-8cb36c",
         "tests/merge_overrun_lap.sh"
       ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-4975c4.md",
+        "sha256": "90b55a4e8db2ac609e27944420c11c23d7d38ce8c7945d8918221727ac2bd2c3",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-ed2db9",
+      "kind": "remove-fixed",
+      "record": "D-MERGE-OVERRUN-LAP-CLEANUP-FUSER-KILLS-ROOT-FS-USERS-WHEN-NOT-MOUNTED",
+      "change": {
+        "control": "b20261024-37b839",
+        "fixon": "b20261024-8cb36c",
+        "cause": "tests/merge_overrun_lap.sh's cleanup ran 'fuser -k -m /mnt/fourkn' on each node after the merge run had already unmounted it; fuser -m on a directory that is not a mount point names every user of the root filesystem, so the cleanup SIGKILLed each node's sshd, journald and udevd. Measured: with the gate off (MERGE_CLEANUP_GATE=0, control b20261024-37b839) every cleanup read 'Connection to ... closed by remote host' and the main pids of ssh, systemd-journald and systemd-udevd changed across it, 10 of 10 laps. Fix: the fuser and the unmount run only while /mnt/fourkn is in /proc/mounts (tests/merge_overrun_lap.sh:79-84; MERGE_CLEANUP_GATE=0 the control)."
+      },
+      "argument": "Control b20261024-37b839 (2/disk/caw/direct4k, g2d test31/test32, attempt frozen 2026-10-24T16:34:18Z, lane tests/evidence/lanes/g2d_a20_20261024T163432Z step 7): 10 of 10 FAIL with exposure. Fix-on b20261024-8cb36c (step 8, the same attempt and build 1BC77CFB15EF4A988DD1F56): 6 of 6 PASS with exposure ('CLEANUP: 2 node(s) had /mnt/fourkn no longer mounted when the cleanup ran'), the ssh, journald and udevd pids unchanged across every cleanup, applied through the approved verify P20261024-4975c4 (data/reviews/P20261024-4975c4.md). Claim: tests/merge_overrun_lap.sh's cleanup no longer kills a node's services when its mount is gone. The two other 'fuser -km' calls with no mount-point check that this record's review noted, tests/closure_mount_race.sh:97 and scripts/drbd_rig.sh:2794, were not measured and are now their own open record, D-FUSER-KM-WITHOUT-MOUNT-CHECK-IN-CLOSURE-RACE-AND-DRBD-RESOLVE-TEST, with the same guard drafted for the next attempt. The iscsid MainPID reads 0 in every lap, so the measurement rests on the other three services, as the review says.",
+      "evidence": [
+        "data/reviews/P20261024-4975c4.md",
+        "tests/merge_overrun_lap.sh",
+        "tests/evidence/lanes/g2d_a20_20261024T163432Z/step7.log",
+        "tests/evidence/lanes/g2d_a20_20261024T163432Z/step8.log",
+        "tests/evidence/batch_laps/b20261024-37b839",
+        "tests/evidence/batch_laps/b20261024-8cb36c"
+      ],
       "state": "pending",
       "created": "2026-10-24"
     }

@@ -4408,6 +4408,25 @@
           },
           "transfer": "",
           "lower_bound": 0.5156692688606229
+        },
+        {
+          "id": "b20261024-b98f94",
+          "kind": "control",
+          "row": "chk_clean",
+          "config": "4/disk/caw/mpath",
+          "platform": "any",
+          "planned": 5,
+          "probe": "P-ACQ-SELF-ORPHAN|P-ACQ-STUCK",
+          "candidate": "0.90.134",
+          "build": "",
+          "variant": "relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)",
+          "state": "open",
+          "leaves_cluster": true,
+          "support": [
+            "path_answer_lost"
+          ],
+          "created": "2026-10-24",
+          "why": "the fix taken out, on the record's own check: does path_answer_lost then chk_clean find an nlink-1 file named twice"
         }
       ],
       "rates": [
@@ -6521,6 +6540,23 @@
         },
         {
           "id": "b20261024-ac7f64",
+          "kind": "control",
+          "row": "lap:peer_window",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out at 8 nodes on multipath: A on a 12 s window declares B, on 34 s, dead inside B's 30 s lease"
+        },
+        {
+          "id": "b20261024-dfe3bd",
           "kind": "control",
           "row": "lap:peer_window",
           "config": "8/disk/caw/mpath",
@@ -9816,7 +9852,7 @@
           "candidate": "0.90.134",
           "build": "1BC77CFB15EF4A988DD1F56",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -9907,6 +9943,18 @@
           "row": "lap:merge_cleanup",
           "iso": "2026-10-24T17:04:42Z"
         }
+      ],
+      "verified_at": [
+        {
+          "config": "2/disk/caw/direct4k",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T16:34:18Z",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "batch": "b20261024-8cb36c",
+          "approval": "P20261024-4975c4",
+          "date": "2026-10-24"
+        }
       ]
     },
     {
@@ -9993,6 +10041,16 @@
           "iso": "2026-10-24T09:22:32Z"
         }
       ]
+    },
+    {
+      "id": "D-FUSER-KM-WITHOUT-MOUNT-CHECK-IN-CLOSURE-RACE-AND-DRBD-RESOLVE-TEST",
+      "severity": "minor",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "Two harness cleanups run 'fuser -km $MNT' with no check that $MNT is still a mount point: tests/closure_mount_race.sh:97 (the joiner's clean removal) and scripts/drbd_rig.sh:2794 (the resolve test's unmount of both nodes). On a directory that is not a mount point fuser -m names every user of the root filesystem, so either cleanup run after its mount is already gone SIGKILLs the node's sshd and daemons, as tests/merge_overrun_lap.sh's did (D-MERGE-OVERRUN-LAP-CLEANUP-FUSER-KILLS-ROOT-FS-USERS-WHEN-NOT-MOUNTED, measured there 10 of 10 with the gate off)",
+      "evidence": "Read from the code at the review of verify P20261024-4975c4 (data/reviews/P20261024-4975c4.md), which noted that its approval covers merge_overrun_lap.sh alone and that these two calls have no mount-point check; no run of either has been seen to kill a node's services",
+      "next": "Fix drafted for the next attempt: tests/evidence/drafts/tree/tests/closure_mount_race.sh and tests/evidence/drafts/tree/scripts/drbd_rig.sh run the fuser only while 'mountpoint -q $MNT' holds (bash -n clean). Then a lap per site that runs the cleanup with $MNT already unmounted and reads the node's ssh, journald and udevd main pids before and after it (the merge_overrun lap's check, tests/merge_overrun_lap.sh:77-96), with the guard switched off for the control."
     }
   ]
 }
