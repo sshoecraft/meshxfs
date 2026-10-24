@@ -5940,8 +5940,15 @@
         "data/reviews/P20261023-ea2e07.md",
         "data/reviews/P20261023-b5509f.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-b984da.md",
+        "sha256": "c01816df891df30aedf569a0a81d0e43f777967bda54afd89ed2fa4ba5b42a73",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-89482a",
@@ -5978,8 +5985,15 @@
         "data/reviews/P20261023-22efac.md",
         "tests/evidence/lanes/g2b_a14_latefill_20261023T204131Z/summary.log"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-89482a.md",
+        "sha256": "d30ff4544ffb510ff292121f2528604c0d5f2f360fd118714f9e48ec70fe7f9b",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-9e1ada",
@@ -6026,8 +6040,15 @@
         "tests/evidence/lanes/g8_mpathtmo2_scst6_20261024T005026Z/step2.log",
         "tests/evidence/lanes/g8_mpathtmo2_scst6_20261024T005026Z/step4.log"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-9e1ada.md",
+        "sha256": "cd5c412caec7669eb3602d8b0918914c95a6b69aa5675f12f1566a7631ba6d21",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-09e360",
@@ -6062,8 +6083,15 @@
         "data/release_policy.json",
         "data/reviews/P20261023-6da0d2.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-09e360.md",
+        "sha256": "aa5d55c80162703a4b7cc2694610930a1fee7f78c3a63c72a129b37a3e313477",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }
