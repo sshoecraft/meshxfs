@@ -7164,6 +7164,31 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-5b7118",
+      "kind": "verify",
+      "record": "D-MPATH-MOUNT-DEGRADED-12S-WINDOW-REGISTRATION-MISSING-AND-SHUTDOWNS",
+      "change": {
+        "batch": "b20261024-f0aa12"
+      },
+      "argument": "Verification b20261024-f0aa12 of the board row path_mount_degraded at 2/net/mesh/mpath (g2b, test15/test16) on candidate 0.90.134, attempt frozen 2026-10-24T06:38:23Z, module BE3695D2590A65F742F9816, whose frozen default death window is the 12 s one (6 checks) the record's failures need, so neither arm carries a window variant. Control b20261024-241ccc on the same module with the fix's knob off (MXFS_EXTRA_MODARGS=pr_fill_bounded=0: the late-path fill runs only with 15 s of the authority lease left, as before the fix), each lap on a prep with the same arguments: 10 of 10 exposed laps failed (tests/evidence/lanes/g2b_w12c_20261024T075315Z/step4.log 'control b20261024-241ccc: 10 of 10 laps failed with the fix out'), every one on this record's cause: 'the path that was down at mount carries the victim's registration once it is back (4 registrations) (got 3)', 'late: test16's path left standing (a) completed writes in the second half of the window (N -> N) (got no)', test16's late stall 29.2-43.5 s (data/criteria.runs.jsonl:12757-12864). Plan: rate 10/10, lower bound 0.5887 at delta 0.005, N = 6 at alpha 0.005 (tests/evidence/lanes/g2b_w12c_20261024T075315Z/step12.log header). The verification ran on a plain prep (step 11, no MXFS_EXTRA_MODARGS) and passed 6 of 6 planned laps, each EXPOSED on the row's PF-LATE-B-DOWN mark (exposure=1) and PASS with fails=0, the late path's registration back (the row's 4-registrations check held), mount_one_path_ms 5193-7918 and max_stall_ms 6124-6297, under stall_limit_s (step12.log lap lines 1-6, 'verify b20261024-f0aa12: 6 PASS, 0 FAIL of 6 planned'). The batch was declared before its first lap; no lap was dropped. The record's other cell at 2/net/mesh/mpath, 2026-10-23T17:31:54Z (data/criteria.runs.jsonl:10244, a variant run of an earlier build with dead_timeout_ms=12000 and MXFS_MPATH_TMO=2, the run the record was filed on), failed the same way: 'the path that was down at mount carries the victim's registration once it is back (4 registrations) (got 3)', test18's late stall 34971 ms. Steps 6, 8 and 10 of the lane were continuations of the control that exited at once ('IndexError' finding no open control, the batch having closed at 10 laps in step 4) and ran no lap.",
+      "evidence": [
+        "tests/evidence/lanes/g2b_w12c_20261024T075315Z/step4.log",
+        "tests/evidence/lanes/g2b_w12c_20261024T075315Z/step12.log",
+        "tests/evidence/lanes/g2b_w12c_20261024T075315Z/queue",
+        "tests/mpath/path_mount_degraded.sh",
+        "docs/rulings/silent-peer-death-under-the-stall-limit.md"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-5b7118.md",
+        "sha256": "30111960682e4e2b58b9516f6779d0472671dcbb0009854505749cb8f2dbd75c",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }

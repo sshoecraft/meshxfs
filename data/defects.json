@@ -6907,7 +6907,7 @@
           "candidate": "0.90.134",
           "build": "BE3695D2590A65F742F9816",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -6989,6 +6989,18 @@
           "builds": [
             "BE3695D2590A65F742F9816"
           ],
+          "date": "2026-10-24"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/mpath",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T06:38:23Z",
+          "build": "BE3695D2590A65F742F9816",
+          "batch": "b20261024-f0aa12",
+          "approval": "P20261024-5b7118",
           "date": "2026-10-24"
         }
       ]
@@ -7602,11 +7614,44 @@
           "candidate": "",
           "build": "BE3695D2590A65F742F9816",
           "variant": "MXFS_MARKER_PARAMS=0 (run.sh marker_live_ok matches on srcversion and mount alone, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a filtered row reuses a pair whose node runs a module parameter other than the one prepped"
+        },
+        {
+          "id": "b20261024-03e428",
+          "kind": "verify",
+          "row": "lap:marker_params",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: watch_ino on \\S+ is [0-9]+, prepped ",
+          "candidate": "0.90.134",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:marker_params",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-32ccd5",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_MARKER_PARAMS=0 (run.sh marker_live_ok matches on srcversion and mount alone, as before the fix)",
+            "builds": [
+              "BE3695D2590A65F742F9816"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -7633,6 +7678,21 @@
           "batch": "b20261024-546488",
           "k": 0,
           "n": 0,
+          "candidate": "",
+          "variant": "MXFS_MARKER_PARAMS=0 (run.sh marker_live_ok matches on srcversion and mount alone, as before the fix)",
+          "builds": [
+            "BE3695D2590A65F742F9816"
+          ],
+          "date": "2026-10-24"
+        },
+        {
+          "row": "lap:marker_params",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-32ccd5",
+          "k": 10,
+          "n": 10,
           "candidate": "",
           "variant": "MXFS_MARKER_PARAMS=0 (run.sh marker_live_ok matches on srcversion and mount alone, as before the fix)",
           "builds": [
@@ -7691,6 +7751,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:marker_params",
           "iso": "2026-10-24T01:55:51Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:marker_params",
+          "iso": "2026-10-24T08:58:43Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:marker_params",
+          "iso": "2026-10-24T08:57:01Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:marker_params",
+          "iso": "2026-10-24T08:55:16Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:marker_params",
+          "iso": "2026-10-24T08:53:38Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:marker_params",
+          "iso": "2026-10-24T08:51:59Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:marker_params",
+          "iso": "2026-10-24T08:50:19Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:marker_params",
+          "iso": "2026-10-24T08:48:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:marker_params",
+          "iso": "2026-10-24T08:46:53Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:marker_params",
+          "iso": "2026-10-24T08:45:12Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:marker_params",
+          "iso": "2026-10-24T08:43:34Z"
         }
       ]
     },
