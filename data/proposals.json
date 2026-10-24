@@ -6608,6 +6608,93 @@
         "date": "2026-10-23"
       },
       "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-5897f4",
+      "kind": "verify",
+      "record": "D-CRITERIA-UNRETIRE-REFUSES-LAP-ROWS-SO-WRONG-LAP-RETIREMENTS-STAND",
+      "change": {
+        "batch": "b20261023-146167"
+      },
+      "argument": "Verification b20261023-146167 (lap:unretire_lap_row at 2/disk/caw/direct, candidate 0.90.134, attempt frozen 2026-10-24T04:13:43Z, module B947A20F3C2FE3A67ABF6F3) passed 6 of 6 exposed laps (tests/evidence/lanes/host_a15_20261024T041350Z/step2.log), sized from control b20261023-97db42 (MXFS_LAP_ANNOTATE=0, the fix's own switch in the lap's environment; 10 of 10 exposed laps failed 'criteria: nothing matches 'lap:drbd_rig_tag'', tests/evidence/lanes/host_a15_20261024T041350Z/step1.log). The lap (tests/unretire_lap_row_lap.py) runs tools/criteria.py unretire on a lap run settled by a retired_by note in a scratch copy of the tools and every file they read or write, and requires the scratch gate to list the run again; exposure is the run being a lap row's FAIL with a standing retirement and the gate not listing it. The fix (tools/criteria.py annotated_run, LAP_ANNOTATE) is in the frozen tree. The record is tooling and observed 1/any; --at names the configuration the host-only laps are filed under.",
+      "evidence": [
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step1.log",
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step2.log",
+        "tests/unretire_lap_row_lap.py",
+        "tools/criteria.py"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-8dbbc7",
+      "kind": "verify",
+      "record": "D-GUARD-AUDIT-MISSES-ONE-LINE-TYPE-NAME-DEFINITIONS",
+      "change": {
+        "batch": "b20261023-e00ce8"
+      },
+      "argument": "Verification b20261023-e00ce8 (lap:guard_audit_typed_def at 2/disk/caw/direct, candidate 0.90.134, attempt frozen 2026-10-24T04:13:43Z) passed 6 of 6 exposed laps (tests/evidence/lanes/host_a15_20261024T041350Z/step4.log), sized from control b20261023-375f4c (MXFS_GUARD_TYPED_DEF=0, the fix's own switch; 10 of 10 exposed laps failed '6 of 6 keyed to another function: dlm/v5_mount.c:27348 keyed v5_boot_k_lineage ...', tests/evidence/lanes/host_a15_20261024T041350Z/step3.log). The lap (tests/guard_audit_typed_def_lap.py) runs tools/sole_survivor_audit.py --csv on the frozen tree and finds each guard's function independently, by scanning back from the guard to the column-0 brace that opens its body and reading the definition line above it; exposure is at least one census guard inside a one-line 'type name(' definition (six: mxfs_v5_dlm_is_mds, mxfs_dlm_open_protect, four in xfs/xfs_mxfs_pubob.c). The fix (TYPED_FUNC in tools/sole_survivor_audit.py) and the re-keyed inventory (tests/criteria/sole_survivor_sites.json) are in the frozen tree. Tooling, observed 1/any; the laps are host-only, filed under 2/disk/caw/direct.",
+      "evidence": [
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step3.log",
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step4.log",
+        "tests/guard_audit_typed_def_lap.py",
+        "tools/sole_survivor_audit.py",
+        "tests/criteria/sole_survivor_sites.json"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-f8d290",
+      "kind": "verify",
+      "record": "D-HARNESS-BATCH-PROOF-COMPARES-CONTENT-ONLY-SO-A-MODE-ONLY-FIX-CANNOT-BE-PROVEN",
+      "change": {
+        "batch": "b20261023-3c3952"
+      },
+      "argument": "Verification b20261023-3c3952 (lap:proof_mode at 2/disk/caw/direct, candidate 0.90.134, attempt frozen 2026-10-24T04:13:43Z, module B947A20F3C2FE3A67ABF6F3) passed 6 of 6 exposed laps (tests/evidence/lanes/host_a15_20261024T041350Z/step6.log), sized from control b20261023-e27d82 (MXFS_PROOF_MODE=0, the fix's own switch in the lap's environment; 10 of 10 exposed laps failed 'the mode-only change is listed not at all', tests/evidence/lanes/host_a15_20261024T041350Z/step5.log). The lap (tests/proof_mode_lap.py) stamps a fresh file with tools/release_candidate.py stamp_of, chmods it 664 -> 775, stamps it again and hands both to tools/harness_batch.py compare_inputs, the comparison cmd_proof uses; exposure is the content hash unchanged and the mode changed (os.stat before and after). Fix in the frozen tree: stamp_of's sixth field (the permission bits) and compare_inputs' differs (PROOF_MODE). Tooling, observed 1/any; host-only laps filed under 2/disk/caw/direct.",
+      "evidence": [
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step5.log",
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step6.log",
+        "tests/proof_mode_lap.py",
+        "tools/harness_batch.py",
+        "tools/release_candidate.py"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-7b2508",
+      "kind": "verify",
+      "record": "D-DEFECTS-PARSE-CELL-REFUSES-A-DAY-STAMP-SO-MIGRATED-RUNS-CANNOT-BE-NAMED",
+      "change": {
+        "batch": "b20261023-ab31a2"
+      },
+      "argument": "Verification b20261023-ab31a2 (lap:cell_day_stamp at 2/disk/caw/direct, candidate 0.90.134, attempt frozen 2026-10-24T04:13:43Z, module B947A20F3C2FE3A67ABF6F3) passed 6 of 6 exposed laps (tests/evidence/lanes/host_a15_20261024T041350Z/step8.log), sized from control b20261023-4674ab (MXFS_CELL_DAY_STAMP=0, the fix's own switch; 10 of 10 exposed laps failed, update --cell refused the run, tests/evidence/lanes/host_a15_20261024T041350Z/step7.log). The lap (tests/cell_day_stamp_lap.py) works in a scratch copy of the tools and every file they read or write (tests/release_step_cell_lap.py's scratch_tree): it stops the copy's queue naming 32/net/mesh/direct:prep_cluster:2026-08-28 (an INCOMPLETE the board migration left with a date alone), requires the copy's gate to list it (exposure), runs tools/defects.py update D-32NETMESH-PREP-CLUSTER-FAILED-AFTER-9S-NO-EVIDENCE-RETAINED --cell <run>, and requires rc 0 and the gate no longer listing it. Fix in the frozen tree: tools/defects.py parse_cell's anchored form takes YYYY-MM-DD with an optional time (CELL_DAY_STAMP). Tooling, observed 1/any; host-only laps filed under 2/disk/caw/direct.",
+      "evidence": [
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step7.log",
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step8.log",
+        "tests/cell_day_stamp_lap.py",
+        "tools/defects.py"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-452ba2",
+      "kind": "verify",
+      "record": "D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP",
+      "change": {
+        "batch": "b20261023-447ece"
+      },
+      "argument": "Verification b20261023-447ece (lap:drbd_nodes_count at 2/net/mesh/drbd, candidate 0.90.134, attempt frozen 2026-10-24T04:13:43Z, module B947A20F3C2FE3A67ABF6F3) passed 6 of 6 exposed laps (tests/evidence/lanes/g2_a15_20261024T041432Z/step3.log), sized from control b20261023-2ea23d (DRBD_RIG_NODES_COUNT=0, the fix's own switch; 10 of 10 exposed laps failed 'drbd_rig: group nodes-2 has 1 nodes; DRBD dual-primary is exactly two', tests/evidence/lanes/g2_a15_20261024T041432Z/step2.log). The lap (tests/drbd_nodes_count_lap.sh) exports MXFS_NODES=2 MXFS_GROUP=g2, as a lane does, and runs scripts/drbd_rig.sh status, which makes the same node selection every subcommand makes before its case on the subcommand, and requires the status to name test1 and test2; exposure is MXFS_NODES holding a bare number at selection. Fix in the frozen tree: scripts/drbd_rig.sh PAIR (a bare number is run.sh's node count; DRBD_RIG_NODES_COUNT). The fix-on laps took 1 s each with the g2 pair powered on; the 10.72 s precheck ran with it off (ssh caps).",
+      "evidence": [
+        "tests/evidence/lanes/g2_a15_20261024T041432Z/step2.log",
+        "tests/evidence/lanes/g2_a15_20261024T041432Z/step3.log",
+        "tests/drbd_nodes_count_lap.sh",
+        "scripts/drbd_rig.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
     }
   ]
 }

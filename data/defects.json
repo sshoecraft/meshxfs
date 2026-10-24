@@ -4566,6 +4566,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-9a1ad5",
+          "kind": "control",
+          "row": "lap:tauth_nodep",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: pal/pal\\.h and dlm/dlm\\.h changed after the first build .*, which left no object a \\.d",
+          "candidate": "",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "TAUTH_DEPS=0 (tests/tauth/Makefile builds from the object rules' own header lists, as before the fix; the first build too)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: after a header change a plain make links objects built before the fix, which have no .d"
         }
       ],
       "rates": [
@@ -6533,9 +6550,128 @@
           "config": "2/net/mesh/drbd",
           "row": "lap:drbd_rig_tag",
           "iso": "2026-10-24T01:02:15Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count",
+          "iso": "2026-10-24T04:15:12Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count",
+          "iso": "2026-10-24T04:15:11Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count",
+          "iso": "2026-10-24T04:15:10Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count",
+          "iso": "2026-10-24T04:15:09Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count",
+          "iso": "2026-10-24T04:15:08Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count",
+          "iso": "2026-10-24T04:15:07Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count",
+          "iso": "2026-10-24T04:15:06Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count",
+          "iso": "2026-10-24T04:15:05Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count",
+          "iso": "2026-10-24T04:15:04Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count",
+          "iso": "2026-10-24T04:15:03Z"
         }
       ],
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "batches": [
+        {
+          "id": "b20261023-2ea23d",
+          "kind": "control",
+          "row": "lap:drbd_nodes_count",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: MXFS_NODES=",
+          "candidate": "",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "DRBD_RIG_NODES_COUNT=0 (scripts/drbd_rig.sh takes a bare number in MXFS_NODES as a node name, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a lane's MXFS_NODES=2 names a one-node group and drbd_rig.sh refuses the pair"
+        },
+        {
+          "id": "b20261023-447ece",
+          "kind": "verify",
+          "row": "lap:drbd_nodes_count",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: MXFS_NODES=",
+          "candidate": "0.90.134",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:drbd_nodes_count",
+            "config": "2/net/mesh/drbd",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-2ea23d",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "DRBD_RIG_NODES_COUNT=0 (scripts/drbd_rig.sh takes a bare number in MXFS_NODES as a node name, as before the fix)",
+            "builds": [
+              "B947A20F3C2FE3A67ABF6F3"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:drbd_nodes_count",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-2ea23d",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "DRBD_RIG_NODES_COUNT=0 (scripts/drbd_rig.sh takes a bare number in MXFS_NODES as a node name, as before the fix)",
+          "builds": [
+            "B947A20F3C2FE3A67ABF6F3"
+          ],
+          "date": "2026-10-23"
+        }
+      ]
     },
     {
       "id": "D-FSX-ROW-WORK-DIRECTORY-LEFT-ON-THE-MXFS-MOUNT-AFTER-ITS-EXIT-TRAP-RAN-RM-RF",
@@ -6573,7 +6709,129 @@
       "opened": "2026-10-23",
       "summary": "tools/defects.py parse_cell accepts a run only with a full CONFIG:ROW:YYYY-MM-DDTHH:MM:SSZ stamp, but runs migrated into the ledger on 2026-10-21 carry day-only stamps, so a record cannot name them and they can leave the incident list only by a reviewed disposition.",
       "evidence": "tools/defects.py:775 'match = re.fullmatch(r\"([^:]+):(.+):(\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\dZ)\", text.strip())' (taken while tools/criteria.py:112 RELEASE_STEP_SETTLE is on, the default). Measured 2026-10-23: 'tools/defects.py add ... --cell 32/disk/caw/mpath:prep_cluster:2026-09-10' exited 1 with \"defects: '32/disk/caw/mpath:prep_cluster:2026-09-10': a board run is CONFIG:ROW:ISO, e.g. 4/net/mesh/direct:alloc_witness:2026-10-20T07:38:35Z\". The runs it shuts out, both listed by 'tools/criteria.py incidents': data/criteria.runs.jsonl:646 (32/disk/caw/mpath prep_cluster, \"iso\": \"2026-09-10\", \"migrated\": \"2026-10-21\") and :349 (32/net/mesh/direct prep_cluster, \"iso\": \"2026-08-28\", \"migrated\": \"2026-10-21\"). With the setting off the parser splits at the first two colons (:778-780), which names a day stamp but splits a release step's row wrongly; neither form takes both.",
-      "next": "Let parse_cell's anchored form accept the stamp shapes the ledger holds (a day-only YYYY-MM-DD as well as the full time), behind a switch that restores today's pattern for the control; lap: add and drop a cell on a scratch copy of the queue for one day-stamped run and one release step's run, with the switch on and off. Then name D-32CAWMPATH-PREP-CLUSTER-FAILED-AFTER-177S-NO-EVIDENCE-RETAINED's and D-32NETMESH-PREP-CLUSTER-FAILED-AFTER-9S-NO-EVIDENCE-RETAINED's runs in those records."
+      "next": "Let parse_cell's anchored form accept the stamp shapes the ledger holds (a day-only YYYY-MM-DD as well as the full time), behind a switch that restores today's pattern for the control; lap: add and drop a cell on a scratch copy of the queue for one day-stamped run and one release step's run, with the switch on and off. Then name D-32CAWMPATH-PREP-CLUSTER-FAILED-AFTER-177S-NO-EVIDENCE-RETAINED's and D-32NETMESH-PREP-CLUSTER-FAILED-AFTER-9S-NO-EVIDENCE-RETAINED's runs in those records.",
+      "batches": [
+        {
+          "id": "b20261023-4674ab",
+          "kind": "control",
+          "row": "lap:cell_day_stamp",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "MXFS_CELL_DAY_STAMP=0 (tools/defects.py parse_cell takes only a full stamp, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: update --cell refuses a run stamped with a date alone"
+        },
+        {
+          "id": "b20261023-ab31a2",
+          "kind": "verify",
+          "row": "lap:cell_day_stamp",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:cell_day_stamp",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-4674ab",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_CELL_DAY_STAMP=0 (tools/defects.py parse_cell takes only a full stamp, as before the fix)",
+            "builds": [
+              "B947A20F3C2FE3A67ABF6F3"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "updated": "2026-10-23",
+      "rates": [
+        {
+          "row": "lap:cell_day_stamp",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-4674ab",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_CELL_DAY_STAMP=0 (tools/defects.py parse_cell takes only a full stamp, as before the fix)",
+          "builds": [
+            "B947A20F3C2FE3A67ABF6F3"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp",
+          "iso": "2026-10-24T04:15:14Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp",
+          "iso": "2026-10-24T04:15:13Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp",
+          "iso": "2026-10-24T04:15:11Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp",
+          "iso": "2026-10-24T04:15:10Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp",
+          "iso": "2026-10-24T04:15:09Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp",
+          "iso": "2026-10-24T04:15:08Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp",
+          "iso": "2026-10-24T04:15:06Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp",
+          "iso": "2026-10-24T04:15:05Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp",
+          "iso": "2026-10-24T04:15:04Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp",
+          "iso": "2026-10-24T04:15:03Z"
+        }
+      ]
     },
     {
       "id": "D-32CAWMPATH-PREP-CLUSTER-FAILED-AFTER-177S-NO-EVIDENCE-RETAINED",
@@ -6605,7 +6863,128 @@
       "evidence": "Review data/reviews/P20261023-d6c290.md (approved that removal from the snapshots' inode/ctime and the laps' rc=126 instead). The fix diff tests/evidence/controls/ of D-RELEASE-STEP-COPY-RACE-LAP-HAS-NO-EXECUTE-BIT-SO-ITS-CONTROL-RAN-NOTHING is 'old mode 100664 / new mode 100775' with no hunk; proof printed 'during the laps the fix's files differed [tests/release_step_copy_race.py] and nothing else' then FAILS on the content comparison. ===== 2026-10-24: fix in the tree (0.90.134, not yet frozen): stamp_of records the permission bits as a sixth field (drift reads fields 0, 1, 2 and 4 only, so an older five-field list still checks), and compare_inputs counts a mode difference as content when both stamps carry one (PROOF_MODE; MXFS_PROOF_MODE=0 compares hashes alone, as before). Precheck: fix on PASS (0.11 s, content=1); switch off FAIL, the file listed nowhere (0.09 s).",
       "next": "Control batch of lap:proof_mode with MXFS_PROOF_MODE=0 on the next frozen attempt (bound 2 s), a verification sized from it, remove --fixed.",
       "reproducer": "tests/proof_mode_lap.py (host only): stamps a fresh file as a control snapshot does (tools/release_candidate.py stamp_of), chmods it 664 -> 775, stamps it again and requires tools/harness_batch.py compare_inputs to list it as a content difference; MXFS_PROOF_MODE=0 is the control",
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "batches": [
+        {
+          "id": "b20261023-e27d82",
+          "kind": "control",
+          "row": "lap:proof_mode",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "MXFS_PROOF_MODE=0 (tools/harness_batch.py compare_inputs compares content hashes alone, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a mode-only change is not listed, so proof cannot find a mode-only fix's file"
+        },
+        {
+          "id": "b20261023-3c3952",
+          "kind": "verify",
+          "row": "lap:proof_mode",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:proof_mode",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-e27d82",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_PROOF_MODE=0 (tools/harness_batch.py compare_inputs compares content hashes alone, as before the fix)",
+            "builds": [
+              "B947A20F3C2FE3A67ABF6F3"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:proof_mode",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-e27d82",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_PROOF_MODE=0 (tools/harness_batch.py compare_inputs compares content hashes alone, as before the fix)",
+          "builds": [
+            "B947A20F3C2FE3A67ABF6F3"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:proof_mode",
+          "iso": "2026-10-24T04:14:50Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:proof_mode",
+          "iso": "2026-10-24T04:14:49Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:proof_mode",
+          "iso": "2026-10-24T04:14:48Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:proof_mode",
+          "iso": "2026-10-24T04:14:47Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:proof_mode",
+          "iso": "2026-10-24T04:14:46Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:proof_mode",
+          "iso": "2026-10-24T04:14:45Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:proof_mode",
+          "iso": "2026-10-24T04:14:44Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:proof_mode",
+          "iso": "2026-10-24T04:14:43Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:proof_mode",
+          "iso": "2026-10-24T04:14:42Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:proof_mode",
+          "iso": "2026-10-24T04:14:41Z"
+        }
+      ]
     },
     {
       "id": "D-8CAWMPATH-SURVIVOR-SHUTS-DOWN-ON-NOINO-EFI-WEDGE-DURING-PEER-FENCE",
@@ -6657,7 +7036,128 @@
       "evidence": "2026-10-24, review of P20261023-77b3d4 (data/reviews/P20261023-77b3d4.md): with the fixed tool the guard at dlm/v5_mount.c:27348 inside mxfs_v5_dlm_is_mds is filed under v5_boot_k_lineage; 'the fixed tool still can't name that guard's function, because it misses definitions written as type name( on one line'; the inventory note for dlm/v5_mount.c::v5_boot_k_lineage (sole_survivor_sites.json:15) describes the bodies of sole_survivor and never_multi, not the is_mds guard. ===== 2026-10-24: fix in the tree (0.90.134, not yet frozen): tools/sole_survivor_audit.py TYPED_FUNC also takes a column-0 'type name(' line not ending in ';' (first word not a keyword), still excluding NOT_FUNC macros; MXFS_GUARD_TYPED_DEF=0 takes only 'name(' lines, as before. Six guards move key: dlm/v5_mount.c:27348 v5_boot_k_lineage -> mxfs_v5_dlm_is_mds; xfs/xfs_mxfs_open.c:339 mxfs_dlm_close_release -> mxfs_dlm_open_protect; xfs/xfs_mxfs_pubob.c:812/911/968/1053 '?' -> mxfs_pubob_arm/free_pending/free_commit/free_abort (each checked against the definition above it). Inventory re-keyed with --classify (tests/criteria/sole_survivor_sites.json: the old keys keep guards 0; v5_boot_k_lineage's note now says it holds no guard; mxfs_v5_dlm_is_mds unclassified with a factual note). --check: fix on 'OK 72 guards'; MXFS_GUARD_TYPED_DEF=0 against the re-keyed inventory 'FAIL 0 new site(s), 3 grown'. Precheck of the lap: fix on PASS 6 of 6 keyed to their function (0.40 s); MXFS_GUARD_TYPED_DEF=0 FAIL 6 of 6 keyed to another (0.39 s).",
       "next": "Control batch of lap:guard_audit_typed_def with MXFS_GUARD_TYPED_DEF=0 on the next frozen attempt (bound 4 s), a verification sized from it, remove --fixed.",
       "reproducer": "tests/guard_audit_typed_def_lap.py (host only, read only): runs tools/sole_survivor_audit.py --csv and requires every census guard inside a one-line 'type name(' definition, found by scanning back to its body's opening brace, to be keyed to that definition's name; MXFS_GUARD_TYPED_DEF=0 is the control",
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "batches": [
+        {
+          "id": "b20261023-375f4c",
+          "kind": "control",
+          "row": "lap:guard_audit_typed_def",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "MXFS_GUARD_TYPED_DEF=0 (tools/sole_survivor_audit.py takes only 'name(' lines, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a guard inside a one-line 'type name(' definition is keyed to another function"
+        },
+        {
+          "id": "b20261023-e00ce8",
+          "kind": "verify",
+          "row": "lap:guard_audit_typed_def",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:guard_audit_typed_def",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-375f4c",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_GUARD_TYPED_DEF=0 (tools/sole_survivor_audit.py takes only 'name(' lines, as before the fix)",
+            "builds": [
+              "B947A20F3C2FE3A67ABF6F3"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:guard_audit_typed_def",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-375f4c",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_GUARD_TYPED_DEF=0 (tools/sole_survivor_audit.py takes only 'name(' lines, as before the fix)",
+          "builds": [
+            "B947A20F3C2FE3A67ABF6F3"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:guard_audit_typed_def",
+          "iso": "2026-10-24T04:14:29Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:guard_audit_typed_def",
+          "iso": "2026-10-24T04:14:28Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:guard_audit_typed_def",
+          "iso": "2026-10-24T04:14:27Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:guard_audit_typed_def",
+          "iso": "2026-10-24T04:14:26Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:guard_audit_typed_def",
+          "iso": "2026-10-24T04:14:25Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:guard_audit_typed_def",
+          "iso": "2026-10-24T04:14:24Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:guard_audit_typed_def",
+          "iso": "2026-10-24T04:14:23Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:guard_audit_typed_def",
+          "iso": "2026-10-24T04:14:22Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:guard_audit_typed_def",
+          "iso": "2026-10-24T04:14:21Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:guard_audit_typed_def",
+          "iso": "2026-10-24T04:14:20Z"
+        }
+      ]
     },
     {
       "id": "D-16CAWMPATH-FENCED-RETURN-SURVIVORS-WEDGE-ON-CAW-INODE-GRANTS-474S",
@@ -6744,7 +7244,26 @@
           "iso": "2026-10-24T03:24:18Z"
         }
       ],
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "batches": [
+        {
+          "id": "b20261023-c34678",
+          "kind": "control",
+          "row": "lap:drbd_zombie_holder",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: up's holder is a zombie",
+          "candidate": "",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "LUN_POOL_ZOMBIE_DEAD=0 (tools/lun_pool.sh owner_live reads a zombie owner as live, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: the holder drbd_rig.sh up killed stays a zombie of the lap runner and the next drbd_rig.sh step is refused its node"
+        }
+      ]
     },
     {
       "id": "D-CRITERIA-UNRETIRE-REFUSES-LAP-ROWS-SO-WRONG-LAP-RETIREMENTS-STAND",
@@ -6756,7 +7275,128 @@
       "evidence": "2026-10-24: applying verify P20261023-639531 of D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN retired the ten laps of control b20261023-d08fc5 (tests/evidence/drbd_rig/criteria.runs.jsonl:3588-3597), which aborted unexposed for another record's cause (review data/reviews/P20261023-e7a30c.md asks for those notes to be withdrawn). 'MXFS_OWN_RIG=1 tools/criteria.py unretire lap:drbd_rig_tag --at 2/net/mesh/drbd --iso 2026-10-24T01:02:06Z --why ...' printed 'criteria: nothing matches 'lap:drbd_rig_tag'' for each of the ten; the same command for release:drbd runs worked. ===== 2026-10-24: fix in the tree (0.90.134, not yet frozen): tools/criteria.py annotated_run takes a row lap:<name> under its configuration as it takes release:<step> (LAP_ANNOTATE; MXFS_LAP_ANNOTATE=0 looks it up as a board criterion, as before). With it the ten d08fc5 retirements were withdrawn (tests/evidence/drbd_rig/criteria.runs.jsonl:3615-3624); the same command with MXFS_LAP_ANNOTATE=0 first printed 'criteria: nothing matches 'lap:drbd_rig_tag'' and wrote nothing. Precheck of the lap: fix on PASS (1.08 s), switch off FAIL 'nothing matches' (0.71 s).",
       "next": "Control batch of lap:unretire_lap_row with MXFS_LAP_ANNOTATE=0 on the next frozen attempt (bound 6 s), a verification sized from it, remove --fixed.",
       "reproducer": "tests/unretire_lap_row_lap.py (host only, scratch tree): takes a lap run settled by a retired_by note (default 2/net/mesh/drbd:lap:drbd_rig_tag:2026-10-24T02:56:01Z), unretires it and requires the gate to list it again; MXFS_LAP_ANNOTATE=0 is the control",
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "batches": [
+        {
+          "id": "b20261023-97db42",
+          "kind": "control",
+          "row": "lap:unretire_lap_row",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "MXFS_LAP_ANNOTATE=0 (tools/criteria.py looks a lap's row up as a board criterion, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: unretire refuses a lap row, so a wrong lap retirement stands"
+        },
+        {
+          "id": "b20261023-146167",
+          "kind": "verify",
+          "row": "lap:unretire_lap_row",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "rate": {
+            "row": "lap:unretire_lap_row",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261023-97db42",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_LAP_ANNOTATE=0 (tools/criteria.py looks a lap's row up as a board criterion, as before the fix)",
+            "builds": [
+              "B947A20F3C2FE3A67ABF6F3"
+            ],
+            "date": "2026-10-23"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:unretire_lap_row",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261023-97db42",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_LAP_ANNOTATE=0 (tools/criteria.py looks a lap's row up as a board criterion, as before the fix)",
+          "builds": [
+            "B947A20F3C2FE3A67ABF6F3"
+          ],
+          "date": "2026-10-23"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:unretire_lap_row",
+          "iso": "2026-10-24T04:14:03Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:unretire_lap_row",
+          "iso": "2026-10-24T04:14:02Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:unretire_lap_row",
+          "iso": "2026-10-24T04:14:01Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:unretire_lap_row",
+          "iso": "2026-10-24T04:14:00Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:unretire_lap_row",
+          "iso": "2026-10-24T04:13:59Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:unretire_lap_row",
+          "iso": "2026-10-24T04:13:58Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:unretire_lap_row",
+          "iso": "2026-10-24T04:13:56Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:unretire_lap_row",
+          "iso": "2026-10-24T04:13:55Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:unretire_lap_row",
+          "iso": "2026-10-24T04:13:54Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:unretire_lap_row",
+          "iso": "2026-10-24T04:13:53Z"
+        }
+      ]
     }
   ]
 }
