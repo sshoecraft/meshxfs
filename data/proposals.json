@@ -10267,6 +10267,61 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-4e57a1",
+      "kind": "verify",
+      "record": "D-FUSER-KM-WITHOUT-MOUNT-CHECK-IN-CLOSURE-RACE-AND-DRBD-RESOLVE-TEST",
+      "change": {
+        "batch": "b20261024-3d5088"
+      },
+      "argument": "Verification b20261024-3d5088 of lap:fuser_guard at 2/disk/caw/mpath on candidate 0.90.134 (module A7E90BC5313192108E35B80, attempt-22 freeze tests/evidence/candidates/0.90.134_20261024T204620Z.files.json), declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2b_a22_20261024T204638Z/step9.log), sized 6 from control b20261024-0f9ed6's 10 of 10 exposed FAILs on the same module (tests/evidence/lanes/g2b_a22_20261024T204638Z/step8.log). All 6 planned laps ran, each PASS with exposure (the directory was not a mount point when the command ran), none failed or was dropped: step9.log 'verify b20261024-3d5088: 6 PASS, 0 FAIL of 6 planned'.",
+      "evidence": [
+        "tests/evidence/lanes/g2b_a22_20261024T204638Z/step9.log",
+        "tests/evidence/lanes/g2b_a22_20261024T204638Z/step8.log",
+        "tests/evidence/batch_laps/b20261024-3d5088",
+        "tests/fuser_guard_lap.sh"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-4e57a1.md",
+        "sha256": "860c79495bd769ae2e1ed594bf64aa86f2a061aaaada6c3cdaa311544d25f650",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-137b8d",
+      "kind": "remove-fixed",
+      "record": "D-FUSER-KM-WITHOUT-MOUNT-CHECK-IN-CLOSURE-RACE-AND-DRBD-RESOLVE-TEST",
+      "change": {
+        "control": "b20261024-0f9ed6",
+        "fixon": "b20261024-3d5088",
+        "cause": "tests/closure_mount_race.sh (the joiner's departure) and scripts/drbd_rig.sh (the resolve test's unmount, and its NODE_UNMOUNT and 4K-native arm teardowns) ran 'fuser -km $MNT' whether or not $MNT was still a mount point; fuser -m on a directory that is not a mount point names every user of the filesystem the directory is on, so a cleanup run after the volume was unmounted SIGKILLed every process of the node's root filesystem. Every such kill now takes its command from tests/lib/fuser_guard.sh fuser_mounted_cmd, which runs it only while 'mountpoint -q' holds."
+      },
+      "argument": "The cause is the same mechanism measured 10 of 10 on tests/merge_overrun_lap.sh (D-MERGE-OVERRUN-LAP-CLEANUP-FUSER-KILLS-ROOT-FS-USERS-WHEN-NOT-MOUNTED, review data/reviews/P20261024-4975c4.md), and this control reproduces it at the record's own sites' command: control b20261024-0f9ed6 (FUSER_MOUNT_GUARD=0, fuser_mounted_cmd printing the unguarded 'fuser -km', as both cleanups ran it before the fix) on the attempt-22 module A7E90BC5313192108E35B80 failed 10 of 10 exposed laps, each 'LAP fuser_guard FAIL: the cleanup's command on /mnt/fuserlap.<label> (no mount there) ended processes of the root filesystem on test15' (/home/steve/src/mxfs/tests/evidence/lanes/g2b_a22_20261024T204638Z/step8.log); verification b20261024-3d5088 (guard on), sized 6 from that rate, passed 6 of 6 exposed laps with the sentinel alive and every main pid unchanged (step9.log). Both sites send exactly the helper's output (tests/closure_mount_race.sh:100, scripts/drbd_rig.sh:286, :2797, :3330), and each lap's step 1 refuses to measure (ABORT) while either harness holds a 'fuser -k' of its own, so a site that kept its own command cannot pass the lap: attempt 21's control b20261024-0b9879 aborted every lap on exactly that, drbd_rig.sh:286 and :3330 then still holding their own kills, which the attempt-22 freeze routes through the helper. The verify of the fix-on batch is proposed separately for the same two batches.",
+      "evidence": [
+        "tests/evidence/lanes/g2b_a22_20261024T204638Z/step8.log",
+        "tests/evidence/lanes/g2b_a22_20261024T204638Z/step9.log",
+        "tests/evidence/batch_laps/b20261024-0f9ed6",
+        "tests/evidence/batch_laps/b20261024-3d5088",
+        "tests/fuser_guard_lap.sh",
+        "tests/lib/fuser_guard.sh",
+        "tests/closure_mount_race.sh",
+        "scripts/drbd_rig.sh",
+        "tests/evidence/lanes/g2b_a21_20261024T192800Z"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-137b8d.md",
+        "sha256": "97ebda3533864836dbb81dc13616564b406a7d47701ebf049273979531fcc3af",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
