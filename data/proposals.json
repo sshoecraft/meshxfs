@@ -10453,6 +10453,33 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-8eb85b",
+      "kind": "verify",
+      "record": "D-RIG-LAPS-LEAVE-LOAD-LOGS-IN-NODE-RUN-AND-A-FULL-RUN-KILLS-THE-NEXT-LOAD",
+      "change": {
+        "batch": "b20261024-721cc7"
+      },
+      "argument": "Verification b20261024-721cc7 of lap:lap_load_clean_fledger (tests/lap_load_end_lap.sh LAP=fledger MODE=full) at 2/disk/caw/direct on candidate 0.90.134 (module A7E90BC5313192108E35B80, attempt-22 freeze), declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2c_a22_20261024T204638Z/step7.log:1), sized 6 from control b20261024-2aa7ed's 10 of 10 exposed FAILs on the same module and pair (LAP_LOAD_CLEAN=0, tests/evidence/lanes/g2c_a22_20261024T204638Z/step6.log: each 'its /run paths were left on 2 node(s) 10 s after it returned'). All 6 planned laps ran, each PASS with exposure (the lap started its loads on both nodes and returned), none failed or was dropped: step7.log 'verify b20261024-721cc7: 6 PASS, 0 FAIL of 6 planned'.",
+      "evidence": [
+        "tests/evidence/lanes/g2c_a22_20261024T204638Z/step7.log",
+        "tests/evidence/lanes/g2c_a22_20261024T204638Z/step6.log",
+        "tests/evidence/batch_laps/b20261024-721cc7",
+        "tests/evidence/batch_laps/b20261024-2aa7ed",
+        "tests/lap_load_end_lap.sh",
+        "tests/lib/lap_load.sh",
+        "tests/fenced_ledger_rig_lap.sh"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-8eb85b.md",
+        "sha256": "ad87439ffa358f5e1e46d2b10e7d2af41425472814266dbb5952dc589da9829e",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
