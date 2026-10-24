@@ -4064,6 +4064,21 @@
           "config": "4/disk/caw/mpath",
           "row": "lap:relog_auth",
           "iso": "2026-10-24T04:30:39Z"
+        },
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "chk_clean",
+          "iso": "2026-10-24T19:37:09Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "chk_clean",
+          "iso": "2026-10-24T19:39:15Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "chk_clean",
+          "iso": "2026-10-24T20:01:10Z"
         }
       ],
       "verified_at": [
@@ -8066,6 +8081,11 @@
           "config": "2/net/mesh/direct",
           "row": "lap:lap_bounded",
           "iso": "2026-10-24T19:28:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_bounded",
+          "iso": "2026-10-24T19:35:42Z"
         }
       ],
       "updated": "2026-10-24",
