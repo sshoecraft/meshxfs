@@ -9737,14 +9737,15 @@
         "tests/evidence/lanes/g8b_a20_20261024T163432Z/step6.log",
         "tests/evidence/lanes/g8b_a20_20261024T163432Z/step8.log"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-24",
       "review": {
         "file": "data/reviews/P20261024-70e503.md",
         "sha256": "ac5e714eb33a664f6c505f87dcd137f257a1209c68cbdc9b24b3ed37d8ededa0",
         "verdict": "approved",
         "date": "2026-10-24"
-      }
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-e78725",
