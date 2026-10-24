@@ -1,14 +1,14 @@
 ---
 name: compiled-harness-oracle-blind-spots-and-delete-guard-traps
-description: Harness verdict blind spots, rig traps (/src, wait, mountpoint, relay), DRBD/inactivation product traps, investigation, rm/delegation bans
+description: Harness/oracle blind spots, rig traps, DRBD/inactivation traps, rm/delegation bans; consult-when-stuck policy; clyde silent-reset forensics
 metadata:
   type: feedback
-tags: [compiled, harness, oracle, verdict, rig, rm, permissions, delegation, drbd, fencing, inactivation, clock, relay, pve]
+tags: [compiled, harness, oracle, verdict, rig, rm, permissions, delegation, drbd, fencing, inactivation, clock, relay, pve, consult, clyde, reset, pstore, journald]
 ---
 
 # Harness and oracle blind spots, rig operation traps, product traps found through rig work, and delete/delegation guard traps
 
-Topic: running the MXFS lab rig and its harnesses without being fooled by them. Common shape: the arm, window, probe, clock, mount or command you believe is in force is not the one that ran, so a harness prints PASS/FAIL (or an investigation finds no cause) while the real failure is outside what it looked at, or a symptom that reads as a filesystem hang or refusal is really a local shell, a missing mount, a skewed clock or a host-keyed query. Also the delete/permission/delegation traps that surface when cleaning up after such runs. The user's standing process corrections and the lab-VM handling rules were split out to `compiled-user-process-corrections-and-lab-vm-rules` when this article passed the size ceiling. Folded into the original harness/oracle article: `compiled-user-process-corrections-and-rig-operating-traps` (twelve notes; all stand as written unless marked superseded), `compiled-pve-guest-lifecycle-delegation-scripts-and-rig-diagnosis-traps` (assorted; dated 2026-10-11 unless noted) and `compiled-multi-resource-drbd-fencing-and-multi-mount-harness-traps` (assorted; multi-mount DRBD work, 0.90.120/121). Backticked names ending a bullet (`trap-`, `feedback-`, `user-`, `technique-`) are the raw notes folded earlier, already deleted, kept as provenance.
+Topic: running the MXFS lab rig and its harnesses without being fooled by them. Common shape: the arm, window, probe, clock, mount or command you believe is in force is not the one that ran, so a harness prints PASS/FAIL (or an investigation finds no cause) while the real failure is outside what it looked at, or a symptom that reads as a filesystem hang or refusal is really a local shell, a missing mount, a skewed clock or a host-keyed query. Also the delete/permission/delegation traps that surface when cleaning up after such runs, and (assorted tail, last section) the consult-when-stuck policy and how to bracket a silent clyde hard reset. The user's standing process corrections and the lab-VM handling rules were split out to `compiled-user-process-corrections-and-lab-vm-rules` when this article passed the size ceiling. Folded into the original harness/oracle article: `compiled-user-process-corrections-and-rig-operating-traps` (twelve notes; all stand as written unless marked superseded), `compiled-pve-guest-lifecycle-delegation-scripts-and-rig-diagnosis-traps` (assorted; dated 2026-10-11 unless noted) and `compiled-multi-resource-drbd-fencing-and-multi-mount-harness-traps` (assorted; multi-mount DRBD work, 0.90.120/121). Absorbed by merge: `compiled-consult-policy-and-clyde-reset-forensics` (assorted). Backticked names ending a bullet (`trap-`, `feedback-`, `user-`, `technique-`) are the raw notes folded earlier, already deleted, kept as provenance.
 
 ## Harness and oracle blind spots
 
@@ -54,3 +54,22 @@ Topic: running the MXFS lab rig and its harnesses without being fooled by them. 
   - Multi-step or parallel shell work goes into a script in `tools/` or `tests/` first (example: `tools/compress_evidence.py`), then the agent runs that one script.
   - The agent prompt names the exact script and explicitly forbids `bash -c` / `sh -c` / `xargs ... sh -c`.
   - Data one-offs: `python3 - <<'EOF'` heredocs pass the checker; `bash -c` does not.
+
+## Assorted tail: consulting another model, and clyde silent resets
+
+Source: `compiled-consult-policy-and-clyde-reset-forensics` (assorted; the two topics share only "what a turn should have known"). Raw notes folded there earlier: `consult-policy-claude-md-2026-10-10-supersedes-never-consult`, `clyde-reset-time-is-not-the-journal-tail`.
+
+Consulting another model is allowed when stuck:
+- The compiled memory `compiled-model-consults-policy-and-handling-consult-output` states a binding "never consult another model" rule, sourced from a 0.90.71-era user correction.
+- The project CLAUDE.md outranks memory and now carries `RULE: CONSULT ANOTHER MODEL WHEN STUCK (User directive, 2026-10-10.)`, which is newer than that note. Consulting is allowed (expected) when genuinely stuck. It is not a replacement for instrumenting and measuring first.
+- The handling lessons in the compiled article still hold: a consult's output is a ranked list of hypotheses to instrument, never findings and never the work order; ask for hazards, not approval; verify every half of a requirement it names was built.
+- Noticed in the 0.90.131 session while weighing a design consult for the TCP per-create ledger commit (D-TCP-LEDGER-SMALLFILE).
+
+clyde reset time is not the journal tail:
+- When clyde resets with no shutdown, `journalctl -b -1` ends tens of seconds BEFORE the machine actually died: journald's mmap'd tail was never flushed. On 2026-10-16 the journal ended 12:03:32 but rig evidence files (tests/evidence/board_*/row.log) had inode mtimes up to 12:04:10 and recorded an action at that time. The kernel was alive 38 s past the journal's end.
+- How to bracket a reset: the last journal line is a lower bound only. The newest file mtime under tests/evidence (or any file written by a live process) is a later lower bound. The first line of `journalctl -b 0` is the upper bound.
+- `/src` is on clyde's root nvme filesystem (df shows /dev/nvme0n1p2), NOT NFS, despite older comments in tools/clyde_kmsg_guard.sh saying evidence goes "to /src (NFS, a different server)". A file timestamp surviving there proves only an ext4 commit, which lands before journald's lazy sync.
+- Discriminating a hardware/power reset from a kernel panic on clyde: pstore backend is `erst` and recorded the real panics (Jul-Sep 1 dirs in /var/lib/systemd/pstore). hardlockup_panic=0 and softlockup_panic=0, so a lockup HANGS rather than resets. A fatal MCE with warm reset would be reported by the next boot's mce banks. No ERST record + no mce at boot + ~2 min return = reset below the kernel.
+- clyde has no BMC (no /dev/ipmi0), no netconsole, no kdump, no UPS tooling.
+- Recurring silent resets were seen Sep 17 (x3), Sep 21, Oct 7, Oct 15, Oct 16 under unrelated workloads (idle, vLLM-only, rig-only).
+- Per-boot grep counts for AER/EDAC/NVRM/NMI are boot-time init lines (identical every boot), not errors. Check EDAC ce_count/ue_count in sysfs instead.
