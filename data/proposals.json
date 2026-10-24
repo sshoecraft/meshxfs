@@ -9266,6 +9266,66 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-71769e",
+      "kind": "remove-fixed",
+      "record": "D-PROBE-A-REPORTS-EVERY-FOREIGN-REPLAY-WRITE-AS-AN-UNHELD-AG-WRITE",
+      "change": {
+        "control": "b20261024-e216a7",
+        "fixon": "b20261024-c18ca5",
+        "cause": "PROBE-A (pal/linux/xfs_buf.c, the AG header write check at :12019-12035) reported a write as unheld whenever this node held no grant for the AG; a foreign replay writes its image of an AG header (b_mxfs_recov_image) on the replay's verdict, not under a grant, so every such write printed 'PROBE-A AG-META-WRITE-NOT-HELD ... recov=1'. The fix (:1544-1552, :12019-12022) reports a replay image's write apart as 'PROBE-A-REPLAY agno= daddr= ...' with no stack; probe_a_replay_apart=0 restores the old report (the same-build knob the control used)."
+      },
+      "argument": "Control b20261024-e216a7 (probe_a_replay_apart=0 through the lap's prep, 4/net/mesh/direct, attempt 19): 10 of 10 exposed laps FAIL on the record's own check line 'FAIL test3 reported its replay's AG header images apart (PROBE-A-REPLAY), none as an unheld write got=6..9 want=0'. Fix-on b20261024-c18ca5 (candidate 0.90.134, attempt 20, module 1BC77CFB15EF4A988DD1F56): 6 of 6 laps PASS on that check ('PASS test3 reported its replay's AG header images apart (PROBE-A-REPLAY), none as an unheld write (0)'), each exposed by '^STAGE AGs the replay wrote (PROBE-A on <node>): [<n>' (exposure=1 on every lap); laps 2 and 3 exited rc=3 because the lap's other record's overlap did not occur, which the batch's --pass/--fail lines (the record's own check) were declared to ignore, as the record's attempt-19 entry states. The trigger (a foreign replay writing AG header images on the replayer) was present in all 16 laps. This is a detector defect of MeshXFS's own: no filesystem behaviour changed; the detector now tells a replay's authorised write from an unheld one.",
+      "evidence": [
+        "tests/evidence/lanes/g4_a20_20261024T163432Z/step3.log",
+        "tests/evidence/batch_laps/b20261024-c18ca5",
+        "tests/evidence/batch_laps/b20261024-e216a7",
+        "pal/linux/xfs_buf.c",
+        "tests/foreign_replay_ag_lap.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-c96f5c",
+      "kind": "remove-fixed",
+      "record": "D-DRBD-WRITE-BOUND-ARM-IGNORES-MXFS-GROUP-AND-ADDRESSES-TEST3-TEST4",
+      "change": {
+        "control": "b20261024-c02c1e",
+        "fixon": "b20261024-45c143",
+        "cause": "tests/drbd_write_bound_arm.sh resolved its pair with 'export MXFS_NODES=${MXFS_NODES:-test3 test4}' after blanking a bare count, so with MXFS_NODES a count or unset it took test3 test4 whatever MXFS_GROUP named. The fix (tests/drbd_write_bound_arm.sh :40-52) takes MXFS_GROUP's two nodes from tools/mxfs_lab.sh when no pair is named (g2 when unset); DRBD_ARM_GROUP=0 takes test3 test4 as before (the control)."
+      },
+      "argument": "Both triggers the record names are measured, each with its fix out and in, on the arm's own resolution (tests/drbd_nodes_count_lap.sh). MXFS_NODES=2 with MXFS_GROUP=g2: control b20261024-1194fc (DRBD_ARM_GROUP=0, attempt 18) 10 of 10 FAIL, verification b20261024-efeeb2 6 of 6 PASS (requires test1 test2). MXFS_NODES unset with MXFS_GROUP=g2 (the case review P20261024-87729d found unrun, its own STEP arm_unset with probe '^EXPOSED: MXFS_NODES unset'): control b20261024-c02c1e (DRBD_ARM_GROUP=0, candidate build 1BC77CFB15EF4A988DD1F56) 10 of 10 FAIL, verification b20261024-45c143 (candidate 0.90.134, attempt 20) 6 of 6 PASS. The record was a hazard read from the code; no lap collided. Host-only laps: no file operation is timed.",
+      "evidence": [
+        "tests/evidence/lanes/host_a20_20261024T163429Z/step3.log",
+        "tests/evidence/lanes/host_a20_20261024T163429Z/step4.log",
+        "tests/drbd_nodes_count_lap.sh",
+        "tests/drbd_write_bound_arm.sh",
+        "data/reviews/P20261024-87729d.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-ffa999",
+      "kind": "remove-fixed",
+      "record": "D-MEASURE-REFUSES-A-BATCH-WHOSE-SETTLED-LAP-CHECK-BATCH-LAP-COUNTED-AS-RUN",
+      "change": {
+        "control": "b20261024-75ab90",
+        "fixon": "b20261024-92f955",
+        "cause": "Three counters of a batch's laps disagreed: check_batch_lap counted PASS, FAIL and INCOMPLETE against the plan, cmd_measure required PASS and FAIL alone to equal it, and tools/harness_batch.py's resume counted every recorded lap, so a batch holding a lap settled by a reviewed disposition could be neither measured nor resumed. The fix: plan_laps(batch) (PASS, FAIL, INCOMPLETE) is what check_batch_lap and cmd_measure count (tools/defects.py; MXFS_MEASURE_COUNT_SETTLED=0 counts PASS and FAIL only in measure, the control), and the resume's count is resume_runs(batch) (tools/harness_batch.py; MXFS_RESUME_PLAN_LAPS=0 counts every recorded lap, the control)."
+      },
+      "argument": "Both changed sites are measured with their own switch out and in. measure: control b20261024-4a72ee (MXFS_MEASURE_COUNT_SETTLED=0) 10 of 10 FAIL, verification b20261024-e3e420 6 of 6 PASS (lap:measure_settled at 2/net/mesh/direct; review P20261024-ce5c62 accepted this part as proven). resume (the part that review found only grepped): control b20261024-75ab90 (MXFS_RESUME_PLAN_LAPS=0, candidate build 1BC77CFB15EF4A988DD1F56) 10 of 10 FAIL, verification b20261024-92f955 (candidate 0.90.134, attempt 20) 6 of 6 PASS, lap:measure_resume at 2/net/mesh/direct4k, whose plan case runs resume_runs on a scratch batch of 1 FAIL and 1 INFRA lap of 2 planned and requires 1. Host-only laps on scratch copies; no file operation is timed.",
+      "evidence": [
+        "tests/evidence/lanes/host_a20_20261024T163429Z/step5.log",
+        "tests/evidence/lanes/host_a20_20261024T163429Z/step6.log",
+        "tools/defects.py",
+        "tools/harness_batch.py",
+        "data/reviews/P20261024-ce5c62.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
