@@ -8505,11 +8505,44 @@
           "candidate": "",
           "build": "468F7F30C2E190B0244AF70",
           "variant": "CPL_KMSG_FOLLOW=0 (tests/create_pace_lap.sh reads each node's ring with dmesg | awk after the creates, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: the creates rotate the lap's mark out of the ring, and the fault check grades what is left"
+        },
+        {
+          "id": "b20261024-8389c9",
+          "kind": "verify",
+          "row": "lap:create_pace",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "468F7F30C2E190B0244AF70",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:create_pace",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-482495",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "CPL_KMSG_FOLLOW=0 (tests/create_pace_lap.sh reads each node's ring with dmesg | awk after the creates, as before the fix)",
+            "builds": [
+              "468F7F30C2E190B0244AF70"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -8519,6 +8552,21 @@
           "platform": "any",
           "kind": "control",
           "batch": "b20261024-5d82a5",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "CPL_KMSG_FOLLOW=0 (tests/create_pace_lap.sh reads each node's ring with dmesg | awk after the creates, as before the fix)",
+          "builds": [
+            "468F7F30C2E190B0244AF70"
+          ],
+          "date": "2026-10-24"
+        },
+        {
+          "row": "lap:create_pace",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-482495",
           "k": 10,
           "n": 10,
           "candidate": "",
@@ -8579,6 +8627,56 @@
           "config": "2/disk/caw/direct4k",
           "row": "lap:create_pace",
           "iso": "2026-10-24T10:59:40Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T12:13:31Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T12:11:24Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T12:09:20Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T12:07:15Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T12:05:06Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T12:02:57Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T12:00:45Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T11:58:40Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T11:56:35Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:create_pace",
+          "iso": "2026-10-24T11:54:32Z"
         }
       ],
       "verified_at": [

@@ -7887,6 +7887,54 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-17e3a9",
+      "kind": "remove-fixed",
+      "record": "D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE",
+      "change": {
+        "control": "b20261024-424818",
+        "fixon": "b20261024-b1b608",
+        "cause": "The capture gate ran join_during_takeover with NFILES=4000. Under routing hash v2 (eight inode numbers to a ledger page) that authority is about 500 pages, and A's takeover pass ended within the harness's first 5 s in-flight sample, so the lap aborted 'not seen in flight' before its first measurement and the gate read the entry BROKEN without testing its capture handling. The fix runs the entry at NFILES=32000 (tests/capture_gate.manifest:86), whose pass is seen in flight, so the gate's injected first measurement is reached."
+      },
+      "argument": "Reproducer: tests/capture_fault_gate.sh <label> --only join_during_takeover on the g2 pair. Control b20261024-424818 (closed, build 468F7F30C2E190B0244AF70, the fix taken out through the gate's own GATE_ENTRY_ENV=NFILES=4000, nothing else changed): 7 of 10 laps FAIL, each ending 'not seen in flight (activations=495' to '499' (the whole ~500-page pass already done at the first sample), 86-93 s; the 3 passing laps (jdtnc1 31 s, jdtnc7 82 s, and the 11:33:23Z lap 81 s) met the injected fault at their first measurement ('GATE join_during_takeover fault: rc=2 wall=29-30s fault_line=1 abort=1 ... -> OK'), the pass caught in flight by chance at 4000 files: the measured rate is 7 of 10. Verification b20261024-b1b608 (candidate 0.90.134 attempt 2026-10-24T10:25:09Z, the same build, the manifest's NFILES=32000, no variant), sized 18 from that rate at delta=alpha=0.005: 18 of 18 PASS, each exposed ('A's lone remount' reached, exposure=1), each 'entries=1 broken=0 vacuous=0 restores=1', walls 153-194 s, worst timed operation 8270-12196 ms (under the 30 s stall limit). Configuration: the gate entry runs only on the g2 pair at 2/net/mesh/direct, the configuration of every lap here and of the release's presteps (tools/release_run.py presteps_env('g2')); the defect is the entry's own file count, not a property of any other configuration. Disposition: FIXED AND VERIFIED.",
+      "evidence": [
+        "tests/evidence/batch_laps/b20261024-424818/20261024T112227Z-22331456.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T112300Z-282b7aab.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T112428Z-ab8c0017.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T112602Z-bfec862c.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T112730Z-6f7dd083.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T112857Z-d3a2aa6a.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T113027Z-2f0036a7.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T113150Z-399b66b5.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T113323Z-6d5ba2fc.log",
+        "tests/evidence/batch_laps/b20261024-424818/20261024T113444Z-9aec3d01.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T113616Z-25e11c3b.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T113916Z-2457cd97.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T114202Z-fec55f88.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T114517Z-e059513b.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T114817Z-892f6e23.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T115057Z-8cd93cdc.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T115406Z-73603606.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T115650Z-a65d8dad.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T115928Z-5e503ddf.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T120211Z-f49a879a.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T120454Z-1211e4a0.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T120735Z-5a01a1d5.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T121019Z-ba63cc4f.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T121257Z-6e89e92a.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T121540Z-ff1a9bd6.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T121816Z-623a5284.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T122101Z-c09df3b0.log",
+        "tests/evidence/batch_laps/b20261024-b1b608/20261024T122335Z-3beeeb93.log",
+        "tests/capture_gate.manifest",
+        "tests/capture_fault_gate.sh",
+        "tests/join_during_takeover.sh",
+        "tests/evidence/lanes/g2_a17c_20261024T112110Z/step3.log",
+        "tests/evidence/lanes/g2_a17c_20261024T112110Z/step4.log"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
