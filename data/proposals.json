@@ -8752,8 +8752,15 @@
         "tests/evidence/batch_laps/b20261024-2f6ae0/20261024T132833Z-0c392782.log",
         "tests/evidence/batch_laps/b20261024-2f6ae0/20261024T132954Z-95a693b4.log"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-3e7240.md",
+        "sha256": "5c1532363df1eb0c8a9b3834c441de1af6778dcabbc0b0b8416b1003c5acf15b",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }

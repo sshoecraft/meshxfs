@@ -1122,18 +1122,29 @@
         },
         "2/net/mesh/direct": {
           "status": "PASS",
-          "measured": "elapsed=37s (fresh prep)",
+          "measured": "elapsed=35s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-24T13:43:09Z",
+          "iso": "2026-10-24T13:45:26Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 37,
+          "elapsed_s": 35,
           "build": "8DBA16AEB7FDD3066C9C1BC",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T134158Z-g2",
+          "run_id": "20261024T134434Z-g2",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=noino_convoy_chain=0",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T13:43:09Z",
+              "measured": "elapsed=37s (fresh prep)",
+              "reason": "",
+              "build": "8DBA16AEB7FDD3066C9C1BC",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T134158Z-g2",
+              "variant": "MXFS_EXTRA_MODARGS=noino_convoy_chain=0"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T13:40:34Z",
@@ -1225,16 +1236,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T132001Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T13:18:40Z",
-              "measured": "elapsed=34s (fresh prep)",
-              "reason": "",
-              "build": "8DBA16AEB7FDD3066C9C1BC",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T131735Z-g2"
             }
           ]
         },
@@ -42165,15 +42166,19 @@
           ]
         },
         "16/disk/caw/mpath": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261024T134201Z-g16b",
-          "iso": "2026-10-24T13:43:27Z",
+          "status": "FAIL",
+          "measured": "victim=test32 fenced_s=15 resumed_s=10 other_stall_ms=28186 acked=4341 elapsed=205s fails=0 max_stall_ms=31781",
+          "reason": "operation stall 31781 ms is over the 30 s limit (data/release_policy.json stall_limit_s): a stability defect;  (evidence tests/evidence/board_20261024T134201Z-g16b_path_fenced_return)",
+          "iso": "2026-10-24T13:47:13Z",
           "recorded": "2026-10-24",
+          "elapsed_s": 225,
           "build": "8DBA16AEB7FDD3066C9C1BC",
+          "outcome": "FAIL",
+          "raw_status": "PASS",
+          "budget_s": 400,
+          "run_id": "20261024T134201Z-g16b",
           "candidate": "0.90.134",
           "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
-          "run_id": "20261024T134201Z-g16b",
           "history": [
             {
               "status": "PASS",
