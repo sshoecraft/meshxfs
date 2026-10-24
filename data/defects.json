@@ -8000,7 +8000,7 @@
           "candidate": "0.90.134",
           "build": "BE3695D2590A65F742F9816",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -8038,6 +8038,18 @@
           "builds": [
             "BE3695D2590A65F742F9816"
           ],
+          "date": "2026-10-24"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "4/disk/caw/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T06:38:23Z",
+          "build": "BE3695D2590A65F742F9816",
+          "batch": "b20261024-70a767",
+          "approval": "P20261024-19cf74",
           "date": "2026-10-24"
         }
       ]

@@ -7130,8 +7130,15 @@
         "tests/evidence/lanes/g4_w12_20261024T064222Z/step3.log",
         "tests/foreign_replay_ag_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-19cf74.md",
+        "sha256": "1d06161d33030086e554dac84c5d7135fc5b671a12e34ed8704787715b86c826",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
