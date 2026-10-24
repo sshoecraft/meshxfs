@@ -7139,6 +7139,31 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-5bb16a",
+      "kind": "verify",
+      "record": "D-YIELD-SCAN-SAVE-RESTORE-OF-AG-BAST-STALL-ITERS-RACES-AND-STICKS-AT-200",
+      "change": {
+        "batch": "b20261024-4f770a"
+      },
+      "argument": "Verification b20261024-4f770a of lap:yield_stall_global at 2/net/mesh/direct (g2, test1/test2) on candidate 0.90.134, attempt frozen 2026-10-24T06:38:23Z, module BE3695D2590A65F742F9816, sized from control b20261024-3bc635 on the same module (MXFS_EXTRA_MODARGS=ag_yield_stall_global=1 on each lap's own prep: the yield scan writes the module-wide ag_bast_stall_iters and restores it, the code before the fix). The control failed 9 of 9 exposed laps (laps 2-10 of tests/evidence/lanes/g2_w12b_20261024T081715Z/step2.log: 'test1 reads ag_bast_stall_iters=200, prep loaded 600; test2 reads ag_bast_stall_iters=200, prep loaded 600', exposure=1 each). Its lap 1 (2026-10-24T08:20:18Z, rc=124, exposure=0) never ran its workload (both work files 0 bytes) and overran its bound about 95 s before prep's timer started; it is not counted in the rate and is named by D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT, which this record no longer names. Plan: rate 9/9, lower bound 0.5550 at delta 0.005, N = 7 at alpha 0.005 (step3.log header). The verification ran 7 of 7 planned laps, each EXPOSED (ag_yield_scan_overlap_n 481-704 overlapping scans of 1673-1990 per node, tests/evidence/batch_laps/b20261024-4f770a/*.log) and PASS (both nodes read ag_bast_stall_iters=600, what prep loaded): step3.log 'verify b20261024-4f770a: 7 PASS, 0 FAIL of 7 planned'. Both arms ran the same TEST ONLY hold dbg_yield_scan_hold_us=2000, written at runtime on both nodes and set back to 0 after the workload (tests/yield_stall_global_lap.sh:72, :90; header :28-38), so the laps carry no prep variant; the hold stands in for an inline drain's duration (ag_yield_drain_n=0 on this workload). Operation stalls: every node's workload ran under 'timeout WORK_S+5' (25 s, :82) and every verification lap's work files end 'work_rc=0' on both nodes (14 of 14), so no create or unlink in these laps lasted 25 s, under stall_limit_s. The batch was declared before its first lap; no lap was dropped. The record's other cells at 2/net/mesh/direct are the nine exposed control laps above, each failing on this cause.",
+      "evidence": [
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/step2.log",
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/step3.log",
+        "tests/yield_stall_global_lap.sh",
+        "tests/evidence/batch_laps/b20261024-4f770a",
+        "tests/evidence/batch_laps/b20261024-3bc635"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-5bb16a.md",
+        "sha256": "0e31352c7159dc82843b3fc779c5dfa0afd5740d59dc7bca44791fd110f879cb",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
