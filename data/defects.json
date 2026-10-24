@@ -8081,6 +8081,23 @@
       "evidence": "2026-10-24 10:3xZ: a Write of tests/typeflip_shell_dead_lap.sh went through while candidate 0.90.134 attempt 17 (frozen 2026-10-24T10:25:09Z) was RUNNING; the file was moved to tests/evidence/drafts/ at once and 'tools/release_candidate.py check 0.90.134' then printed 'every frozen file is as it was frozen'. scripts/candidate_freeze_hook.py:55-56 tests 'rel in files or rel == data/criteria.json or (rel.startswith(data/) and not mutable(rel))'; tools/release_candidate.py cmd_frozen has the same test; frozen_paths() (:96-124) walks FROZEN_DIRS, FROZEN_FILES and FROZEN_ROOT_PATTERNS, so a new file there would be frozen at the next freeze and is an addition to this one. Fix drafted for the next attempt in tests/evidence/drafts/tree/tools/release_candidate.py (would_freeze: the same roots for a path not there yet; MXFS_FREEZE_NEW_FILES=0 the control) and tests/evidence/drafts/tree/scripts/candidate_freeze_hook.py, with tests/evidence/drafts/tree/tests/freeze_hook_new_file_lap.py.",
       "next": "Apply the drafts at the next attempt; precheck tests/freeze_hook_new_file_lap.py both arms on a RUNNING candidate (fix: new 2, frozen 2, mutable 0; MXFS_FREEZE_NEW_FILES=0: new 0), then a control and a verification through tools/harness_batch.py, and remove --fixed.",
       "reproducer": "a Write tool call creating tests/<new>.sh while a candidate is RUNNING (the hook exits 0)"
+    },
+    {
+      "id": "D-LUN-POOL-LOCK-WAIT-OVER-60S-REFUSES-A-PREP-WHILE-ANOTHER-LANE-HOLDS-IT",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "tools/lun_pool.sh alloc waits at most 60 s for the pool lock (pool_lock, flock -w 60) and then refuses, so a prep started while another lane's allocation or bind holds the lock longer is refused 'no pool LUN of 512-byte blocks', and the run that started it ends without a verdict; nothing records which process held the lock or for how long",
+      "evidence": "2026-10-24, attempt 17 of 0.90.134 (frozen 2026-10-24T10:25:09Z): lap 5 of control b20261024-bda0e1 (tests/live_holder_shard_lap.sh lhmc5 at 2/net/mesh/direct, g2) recorded INCOMPLETE rc=2 at 2026-10-24T10:41:54Z (tests/evidence/batch_laps/b20261024-bda0e1/20261024T104052Z-68ff9925.log: 'STAGE prep rc=1 wall=62s', 'LAP lh_master ABORT: prep_cluster rc=1'); its prep log tests/evidence/20261024T104052Z_lhmaster_lhmc5/prep_1.log: '--- pre-prep: VMs up at +2 s (10:40:54) ---', 'lun_pool: pool lock not taken in 60 s: /home/steve/disks/pool/.lock', 'ERROR: no pool LUN of 512-byte blocks for [test1 test2]'. In that minute lanes g4c_a17tf (a 4-node multipath prep from 10:41:37Z), g2e_a17lp (tests/lun_pool_shutdown_lap.sh, which clears records, boots and binds two nodes with --paths 2) and g2d_a17b were allocating; other preps of the same lanes logged waits of 2-16 s ('lun_pool: pool lock waited N s'). The lock's holder is not named anywhere: <pool dir> holds only lunNN.owner/.paths/.wwid/.tmo.",
+      "next": "Log the holder: pool_lock writes the holding pid, its command and the time it took the lock into <pool dir>/.lock.holder, and a waiter that gives up names it and how long it has held; pool_unlock logs a hold over 10 s. Then find which operation holds the lock past 60 s (a multipath bind of 4 nodes, the shutdown lap's boot inside the lock, or a node that does not answer) and either take that work out of the lock or bound the wait from the longest measured hold, with a lap that starts a prep while another lane binds.",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lh_master",
+          "iso": "2026-10-24T10:41:54Z"
+        }
+      ]
     }
   ]
 }
