@@ -7846,6 +7846,41 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-023f87",
+      "kind": "remove-fixed",
+      "record": "D-CREATE-PACE-LAP-KERNEL-LOG-CHECK-READS-AN-EMPTY-LOG-AND-PASSES",
+      "change": {
+        "control": "b20261024-5d82a5",
+        "fixon": "b20261024-d8e843",
+        "cause": "tests/create_pace_lap.sh read each node's kernel log with 'dmesg | awk /MARK/' after the creates; once the creates rotated the lap's mark out of the ring the read was empty and the fault check graded nothing and passed. The fix follows each node's /dev/kmsg into a file from before the lap's mark to after an end mark and grades only a read holding both marks, else FAIL 'the fault check read no whole kernel log'."
+      },
+      "argument": "Reproducer: tests/create_pace_lap.sh on a 2-node group with 10000 creates and the rig's debug sites on (the original sighting cpcaw1 at 2/disk/caw/direct: test29_kmsg.txt and test30_kmsg.txt 0 lines, lap PASS). Control b20261024-5d82a5 (closed, build 468F7F30C2E190B0244AF70, the fix's own knob CPL_KMSG_FOLLOW=0, which restores the dmesg-after read under the same mark check): 10 of 10 laps FAIL 'the fault check read no whole kernel log', each EXPOSED (test31's ring no longer held the mark at the end). Verification b20261024-d8e843 (candidate 0.90.134 attempt 2026-10-24T10:25:09Z, the same build, no variant), sized 6 from that control at delta=alpha=0.005: 6 of 6 PASS, each EXPOSED, each node's read holding both marks with no gap in the kernel's record numbers between them (review P20261024-5ca267). Configuration: the defect is in the lap's own log read, which does not depend on the lock manager, the attachment or the block size; its one precondition is the ring rotating during the creates, and the EXPOSED line shows that precondition held on every lap of both batches, as the original sighting at 2/disk/caw/direct shows it held there (both files empty). Both batches ran at 2/disk/caw/direct4k, where the control reproduced the failure at 10 of 10. Disposition: FIXED AND VERIFIED.",
+      "evidence": [
+        "tests/evidence/batch_laps/b20261024-d8e843/20261024T112207Z-848c2498.log",
+        "tests/evidence/batch_laps/b20261024-d8e843/20261024T112430Z-9309a2e2.log",
+        "tests/evidence/batch_laps/b20261024-d8e843/20261024T112657Z-01e50bd6.log",
+        "tests/evidence/batch_laps/b20261024-d8e843/20261024T112921Z-e4b84dc7.log",
+        "tests/evidence/batch_laps/b20261024-d8e843/20261024T113148Z-f00eb995.log",
+        "tests/evidence/batch_laps/b20261024-d8e843/20261024T113410Z-ff1a361b.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T105631Z-40fcf617.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T105941Z-41744d78.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T110208Z-edb17b97.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T110517Z-7afda33d.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T110752Z-55c50dde.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T111020Z-b1ee6212.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T111242Z-83a8bee9.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T111501Z-ab1112a5.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T111724Z-f45fecfe.log",
+        "tests/evidence/batch_laps/b20261024-5d82a5/20261024T111951Z-4e39333a.log",
+        "data/reviews/P20261024-5ca267.md",
+        "tests/evidence/20261024T091233Z_createpace_cpcaw1/test29_kmsg.txt",
+        "tests/evidence/20261024T091233Z_createpace_cpcaw1/test30_kmsg.txt",
+        "tests/create_pace_lap.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
