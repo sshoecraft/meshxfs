@@ -1122,18 +1122,36 @@
         },
         "2/net/mesh/direct": {
           "status": "PASS",
-          "measured": "elapsed=35s (fresh prep)",
+          "measured": "elapsed=33s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-24T14:13:59Z",
+          "iso": "2026-10-24T14:18:59Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 35,
+          "elapsed_s": 33,
           "build": "8DBA16AEB7FDD3066C9C1BC",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T141310Z-g2",
-          "candidate": "0.90.134",
-          "variant": "MXFS_EXTRA_MODARGS=noino_convoy_chain=0",
+          "run_id": "20261024T141812Z-g2e",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T14:16:52Z",
+              "measured": "elapsed=31s (fresh prep)",
+              "reason": "",
+              "build": "8DBA16AEB7FDD3066C9C1BC",
+              "outcome": "PASS",
+              "run_id": "20261024T141551Z-g2e"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T14:13:59Z",
+              "measured": "elapsed=35s (fresh prep)",
+              "reason": "",
+              "build": "8DBA16AEB7FDD3066C9C1BC",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T141310Z-g2",
+              "variant": "MXFS_EXTRA_MODARGS=noino_convoy_chain=0"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T14:11:02Z",
@@ -1220,28 +1238,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T135341Z-g2",
-              "variant": "MXFS_EXTRA_MODARGS=noino_convoy_chain=0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T13:52:17Z",
-              "measured": "elapsed=36s (fresh prep)",
-              "reason": "",
-              "build": "8DBA16AEB7FDD3066C9C1BC",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T135124Z-g2",
-              "variant": "MXFS_EXTRA_MODARGS=noino_convoy_chain=0"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T13:50:00Z",
-              "measured": "elapsed=37s (fresh prep)",
-              "reason": "",
-              "build": "8DBA16AEB7FDD3066C9C1BC",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T134906Z-g2",
               "variant": "MXFS_EXTRA_MODARGS=noino_convoy_chain=0"
             }
           ]

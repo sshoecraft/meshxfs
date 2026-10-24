@@ -8857,8 +8857,14 @@
         "data/reviews/P20261024-99074f.md",
         "tests/evidence/20261024T125639Z_noinoefd_nkc1"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-16a9f2.md",
+        "sha256": "916af4194b007f6880d232263c7336092462ec279364d522d2bf0a066cde747c",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
