@@ -7879,8 +7879,14 @@
         "tests/evidence/20261024T091233Z_createpace_cpcaw1/test30_kmsg.txt",
         "tests/create_pace_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-023f87.md",
+        "sha256": "628c03153cbd5a708755793f46befc39517eed5ff451d5ef38ceffe6e9bf1da8",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
