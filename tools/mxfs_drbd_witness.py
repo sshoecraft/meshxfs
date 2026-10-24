@@ -320,6 +320,10 @@ def main():
 
     conf = fence_conf(host)
     emit("FENCE_SELF", conf.get("self") if conf else None)
+    # who decides a lost link: a node fence (agent=exec or ssh), corosync's
+    # vote (agent=self with authority=quorum), or the fixed tie-break alone
+    emit("FENCE_AGENT", conf.get("agent") if conf else None)
+    emit("FENCE_AUTHORITY", conf.get("authority") if conf else None)
     rc = newest_receipt(res) if res else None
     emit("RECEIPT_TIME", rc[0] if rc else None)
     emit("RECEIPT_PEER", rc[1] if rc else None)

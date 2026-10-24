@@ -39,8 +39,11 @@
 # RESULT INCONCLUSIVE  an arm with no reached lap.
 # Budget: per lap 4 ssh round trips + the release (bounded by the CAW poll,
 # well under 5 s on a healthy pair) + the 2 s settle: 30 s per lap.
+# RELOG_ARM=C or F runs every lap on that one arm (a batch lap's control or
+# verification, tests/relog_auth_lap.sh); unset, the laps alternate C, F as
+# above.  The RESULT line then asks only that arm's verdict of every lap.
 set -u
-cd /src/mxfs || exit 1
+cd "$(dirname "$0")/.." || exit 1
 A=${1:?shared-holder node}; B=${2:?EX-requester node}; LAPS=${3:-4}; LABEL=${4:-prauth}
 SSH=tools/mxfs_sshpass.sh
 MNT=${MXFS_MNT:-/mnt/shared}
@@ -70,7 +73,11 @@ trap restore EXIT
 fails=0; c_rep=0; f_fix=0; unreached=0
 rs 20 "$B" "mkdir -p $D && sync" >/dev/null
 for L in $(seq 1 "$LAPS"); do
-  if [ $((L % 2)) = 1 ]; then arm=C; sw=0; else arm=F; sw=1; fi
+  case "${RELOG_ARM:-}" in
+    C) arm=C; sw=0 ;;
+    F) arm=F; sw=1 ;;
+    *) if [ $((L % 2)) = 1 ]; then arm=C; sw=0; else arm=F; sw=1; fi ;;
+  esac
   tag=lap${L}$arm; MK="$MARK-$tag"; DL=$D/d$L
   for n in $A $B; do rs 15 "$n" "echo $sw > $PARAMS/relog_auth_granted_mode; echo '$MK' > /dev/kmsg" >/dev/null; done
   value_now_into swa "$A" 15 "$OUT/rv_sw_${tag}_$A.txt" '^[01]$' "switch on $A" "cat $PARAMS/relog_auth_granted_mode"
@@ -115,6 +122,10 @@ done
 rs 30 "$B" "rm -rf $D" >/dev/null
 echo "  INFO laps=$LAPS control_reproduced=$c_rep fix_refused=$f_fix unreached=$unreached fails=$fails evidence=$OUT"
 [ "$fails" = 0 ] || { echo "RESULT FAIL relogprauth: fails=$fails control_reproduced=$c_rep fix_refused=$f_fix out=$OUT"; exit 1; }
-[ "$c_rep" -ge 1 ] && [ "$f_fix" -ge 1 ] || { echo "RESULT INCONCLUSIVE relogprauth: control_reproduced=$c_rep fix_refused=$f_fix unreached=$unreached out=$OUT"; exit 3; }
+case "${RELOG_ARM:-}" in
+  C) [ "$c_rep" -ge 1 ] || { echo "RESULT INCONCLUSIVE relogprauth: arm C only, control_reproduced=0 unreached=$unreached out=$OUT"; exit 3; } ;;
+  F) [ "$f_fix" -ge 1 ] || { echo "RESULT INCONCLUSIVE relogprauth: arm F only, fix_refused=0 unreached=$unreached out=$OUT"; exit 3; } ;;
+  *) [ "$c_rep" -ge 1 ] && [ "$f_fix" -ge 1 ] || { echo "RESULT INCONCLUSIVE relogprauth: control_reproduced=$c_rep fix_refused=$f_fix unreached=$unreached out=$OUT"; exit 3; } ;;
+esac
 echo "RESULT PASS relogprauth: control_reproduced=$c_rep (a shared holder's synthetic re-log authorized and taken) fix_refused=$f_fix (refused, no re-log) unreached=$unreached out=$OUT"
 exit 0

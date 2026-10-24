@@ -76,6 +76,20 @@ broken=0; vacuous=0; entries=0; s0=$(date +%s)
 # the assertion lines printed AFTER the injection line, counted from the
 # same log the harness wrote (stderr and stdout interleaved as they came)
 verdicts_after_fault() { awk '/STAGE FAULT:/{f=1; next} f && /^  (PASS|FAIL) /{n++} END{print n+0}' "$1"; }
+# relay_stall <harness log> <what>: the worst max_stall_ms= the harness printed
+# over its timed operations, on this gate's own output.  A gate lap run through
+# tools/batch_lap.py is held to the release policy's stall limit only by the
+# max_stall_ms= lines in that output, and each harness writes into its own log
+# here: a 31 s last-member unmount inside join_during_takeover's lap was
+# recorded PASS (batch b20261022-548ef2,
+# D-HARNESS-LAP-TIMED-OPS-REACH-NO-STALL-GRADER-JDT-31S-UNMOUNT-GRADED-PASS).
+# GATE_RELAY_STALL=0 relays nothing, as before: the control.
+relay_stall() {
+    local w
+    [ "${GATE_RELAY_STALL:-1}" = 0 ] && return 0
+    w=$(grep -ao 'max_stall_ms=[0-9]*' "$1" | cut -d= -f2 | sort -n | tail -1)
+    [ -z "$w" ] || echo "GATE $2 max_stall_ms=$w (the worst timed operation the harness printed, $1)"
+}
 
 PAIR_NODES=${MXFS_NODE_LIST:-test1,test2}; PAIR_NODES=${PAIR_NODES//,/ }
 # The harnesses run on their own default nodes, test1 and test2 (a manifest
@@ -163,6 +177,7 @@ while IFS= read -r line; do
     st=OK
     [ "$rc" = 2 ] && [ "$fl" -ge 1 ] && [ "$ab" -ge 1 ] && [ "$va" = 0 ] || st=BROKEN
     echo "GATE $h fault: rc=$rc wall=${wall}s fault_line=$fl abort=$ab verdicts_after_fault=$va -> $st"
+    relay_stall "$OUT/${tag}_fault.log" "$h fault"
     [ "$st" = OK ] || { broken=$((broken+1)); grep -a '^ABORT:\|^RESULT\|STAGE FAULT' "$OUT/${tag}_fault.log" | head -4 | sed 's/^/      /' | cut -c1-220; }
     fi
     # ---- healthy lap ----
@@ -187,6 +202,7 @@ while IFS= read -r line; do
         # VACUOUS with its RESULT line, counted apart from OK, never BROKEN.
         st=OK; [ "$rc" = 0 ] || { [ "$rc" = 3 ] && [ "$fails" = 0 ] && st=VACUOUS || st=BROKEN; }
         echo "GATE $h healthy: rc=$rc wall=${wall}s fails=$fails result=[$res] device=[${dev:-none}] -> $st"
+        relay_stall "$OUT/${tag}_ok.log" "$h healthy"
         [ "$st" = VACUOUS ] && vacuous=$((vacuous+1))
         [ "$st" != BROKEN ] || { broken=$((broken+1)); grep -a '^ABORT:\|^  FAIL\|^RESULT' "$OUT/${tag}_ok.log" | head -4 | sed 's/^/      /' | cut -c1-220; }
     fi

@@ -35,30 +35,38 @@ SUITE_MEASURED_EXTRA="${SUITE_MEASURED_EXTRA:+$SUITE_MEASURED_EXTRA }seed=$SEED"
 # its last lines in the kernel log the harness captures; a passing run's log is
 # removed.  FSX_LOG_DIR moves the logs off /root for a run that is not root.
 #
-# fsx writes its own files beside the test file in $W: .fsxlog (every line it
-# printed), .fsxops (the operation history a miscompare dumps, replayable with
-# --replay-ops) and .fsxgood (the image the file should have held).  The EXIT
-# trap removes $W, so a failing check's copies of them are moved out first, to
-# the kept log's name with fsx's suffix in place of .log, and the suffixes kept
-# go into the record.  FSX_KEEP_FAIL_FILES=0 leaves them in $W to be removed
-# with it, as before: the control.
+# fsx writes its own files: .fsxlog (every line it printed), .fsxops (the
+# operation history a miscompare dumps, replayable with --replay-ops) and
+# .fsxgood (the image the file should have held).  By default it puts them
+# beside the test file in $W, which the EXIT trap removes, so a failing check
+# lost them; moving them out after the fact copied ~256 kB off an mxfs mount
+# that had just miscompared, and a check killed by the row's timeout never got
+# to the move.  fsx's own -P writes them from the start into a directory of
+# their own beside the kept log ($base.d, off the mount), so they survive
+# whatever ends the row; the directory names go into the record, and a
+# passing check's is removed with its log.  FSX_KEEP_FAIL_FILES=0 leaves them
+# in $W to be removed with it, as before: the control.
 run_fsx() {
-    local base="${FSX_LOG_DIR:-/root}/fsx.$SEED.$1" log rc f kept=""
+    local base="${FSX_LOG_DIR:-/root}/fsx.$SEED.$1" log rc f kept="" pdir="" popt=""
     log="$base.log"
-    "$FSX" -S "$SEED" -N "$1" ${2:-} "$W/fsxfile_$1" > "$log" 2>&1
+    if [ "${FSX_KEEP_FAIL_FILES:-1}" != 0 ]; then
+        pdir="$base.d"
+        mkdir -p "$pdir" && popt="-P $pdir"
+    fi
+    "$FSX" -S "$SEED" -N "$1" ${2:-} $popt "$W/fsxfile_$1" > "$log" 2>&1
     rc=$?
     if [ "$rc" -ne 0 ]; then
         SUITE_MEASURED_EXTRA="$SUITE_MEASURED_EXTRA fsx_fail_log=$(hostname):$log"
-        if [ "${FSX_KEEP_FAIL_FILES:-1}" != 0 ]; then
+        if [ -n "$popt" ]; then
             for f in fsxlog fsxops fsxgood; do
-                [ -e "$W/fsxfile_$1.$f" ] && mv -f "$W/fsxfile_$1.$f" "$base.$f" 2>/dev/null &&
-                    kept="${kept:+$kept,}$f"
+                [ -e "$pdir/fsxfile_$1.$f" ] && kept="${kept:+$kept,}$f"
             done
-            SUITE_MEASURED_EXTRA="$SUITE_MEASURED_EXTRA fsx_fail_kept=${kept:-none}"
+            SUITE_MEASURED_EXTRA="$SUITE_MEASURED_EXTRA fsx_fail_dir=$(hostname):$pdir fsx_fail_kept=${kept:-none}"
         fi
         echo "mxfs-FSXfail seed=$SEED ops=$1 rc=$rc $(tail -n 3 "$log" | tr '\n' ' ' | cut -c1-300)" > /dev/kmsg 2>/dev/null
     else
         rm -f "$log"
+        [ -n "$pdir" ] && rm -rf "$pdir"
     fi
     return "$rc"
 }

@@ -32,7 +32,11 @@ the harness once and records the lap the way run.sh records a board row's:
     (D-BATCH-LAP-RECORDS-NO-STALL-SO-A-HARNESS-LAP-OVER-THE-STALL-LIMIT-GRADES-PASS).
     MXFS_BATCH_LAP_STALL=0 measures and grades nothing, as before: the same-build control;
   - the run carries the build (`--build-from`, the tree's mxfs.ko by default), the candidate
-    (MXFS_CANDIDATE), the batch, and the batch's variant as `batch:<variant>`, as run.sh's does;
+    (MXFS_CANDIDATE), the batch, and a variant as run.sh's does: the batch's as `batch:<variant>`,
+    and the lap's own (env_variant), so a verification lap on a pair prepped with a module argument
+    never counts for the candidate as it ships
+    (D-BATCH-LAP-RECORDS-NO-VARIANT-FOR-MODULE-ARGUMENTS-SO-A-VARIANT-LAP-CAN-COUNT).
+    MXFS_BATCH_LAP_ENV_VARIANT=0 records only the batch's, as before: the same-build control;
   - it is appended, under the board's lock, to the ledger of the board that keeps the batch's
     configuration (tools/criteria.py board_for and append_ledger, as tools/release_run.py records
     its steps), which is where tools/defects.py reads the batch's laps; the lap's log is its
@@ -53,6 +57,7 @@ import argparse
 import ctypes
 import fcntl
 import glob
+import json
 import os
 import re
 import signal
@@ -334,6 +339,39 @@ def fresh_iso(board: Path, config: str, row: str) -> str:
     return iso
 
 
+#: what run.sh records as a VARIANT from its environment (run.sh, "A VARIANT is a run that changes
+#: what is measured"); a lap runs its harness in the same environment, so the same names make it one
+VARIANT_ENV = ("MXFS_EXTRA_MODARGS", "MXFS_RETIRE_CONTRACT", "MXFS_TEST_ENV", "MXFS_RIG_BUDGETS",
+               "MXFS_STRACE_RANK", "MXFS_MPATH_TMO")
+
+
+def env_variant() -> list[str]:
+    """The lap's own variant, as run.sh derives a row's: each VARIANT_ENV name set in the lap's
+    environment, RULE0_CALIBRATE=1 and a positive MXFS_SETTLE_MS, and the module arguments the
+    pair was prepped with when the marker the lap's environment names (MXFS_MARKER, else
+    MXFS_GROUP's) recorded any: a pair loaded with a non-default argument is not the candidate as it
+    ships, whoever runs the lap on it. MXFS_BATCH_LAP_ENV_VARIANT=0 records none of these, as
+    before: the same-build control."""
+    if os.environ.get("MXFS_BATCH_LAP_ENV_VARIANT", "1") == "0":
+        return []
+    parts = [f"{name}={os.environ[name]}" for name in VARIANT_ENV if os.environ.get(name)]
+    if os.environ.get("RULE0_CALIBRATE", "0") == "1":
+        parts.append("RULE0_CALIBRATE=1")
+    if re.fullmatch(r"0*[1-9]\d*", os.environ.get("MXFS_SETTLE_MS", "")):
+        parts.append(f"MXFS_SETTLE_MS={os.environ['MXFS_SETTLE_MS']}")
+    marker = os.environ.get("MXFS_MARKER") or (
+        str(ROOT / f".cluster_marker.{os.environ['MXFS_GROUP']}.json")
+        if os.environ.get("MXFS_GROUP") else "")
+    if marker:
+        try:
+            prepped = str(json.loads(Path(marker).read_text()).get("modargs") or "")
+        except (OSError, ValueError):
+            prepped = ""
+        if prepped:
+            parts.append(f"marker_modargs={prepped}")
+    return parts
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--batch", required=True)
@@ -403,8 +441,11 @@ def main() -> int:
            "batch": args.batch, "evidence": str(log.relative_to(ROOT))}
     if os.environ.get("MXFS_CANDIDATE"):
         run["candidate"] = os.environ["MXFS_CANDIDATE"]
+    lap_variant = env_variant()
     if variant:
-        run["variant"] = f"batch:{variant}"
+        lap_variant.append(f"batch:{variant}")
+    if lap_variant:
+        run["variant"] = ";".join(lap_variant)[:300]
     criteria.append_ledger(board, [run])
     del handle
     print(f"{outcome} {config}:{args.row}:{iso} {measured} -- {reason[:200]}")

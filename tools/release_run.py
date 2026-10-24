@@ -169,6 +169,11 @@ def step_freeze(run: Run) -> tuple:
 #: The pair the rig-library contract and the capture fault gate run on: their harnesses default to
 #: test1,test2 at 2/net/mesh/direct, and nine gate entries reuse that pair's live mount (NOPREP=1).
 PRESTEP_GROUP, PRESTEP_CONFIG = "g2", "2/net/mesh/direct"
+#: presteps_env tells the self-tests the group the pair was formed under and that group's marker
+#: (D-PRESTEPS-FORM-PAIR-UNDER-G2-MARKER-BUT-SELF-TESTS-READ-DEFAULT-MARKER).
+#: `MXFS_PRESTEPS_GROUP_MARKER=0` tells them the node list alone, as before that fix: the fix's
+#: control (tests/presteps_marker_read_lap.py).
+PRESTEPS_GROUP_MARKER = os.environ.get("MXFS_PRESTEPS_GROUP_MARKER", "1") != "0"
 
 
 def presteps_env(group: str) -> dict:
@@ -181,9 +186,12 @@ def presteps_env(group: str) -> dict:
     describes whatever ran there last; a prep a harness starts itself re-forms the pair outside
     the group and rewrites that default one. MXFS_GROUP carries the group into those preps
     (run.sh), and MXFS_MARKER names its marker to every tool (tools/mxfs_rig_tag.sh,
-    tests/lib/rig.sh). tests/presteps_env_lap.py checks it against the markers on disk."""
-    return {"MXFS_NODE_LIST": ",".join(lab("group", group).split()), "MXFS_GROUP": group,
-            "MXFS_MARKER": str(ROOT / f".cluster_marker.{group}.json")}
+    tests/lib/rig.sh). tests/presteps_env_lap.py checks it against the markers on disk, and
+    tests/presteps_marker_read_lap.py runs those tools in it and records the marker each opens."""
+    told = {"MXFS_NODE_LIST": ",".join(lab("group", group).split())}
+    if PRESTEPS_GROUP_MARKER:
+        told.update({"MXFS_GROUP": group, "MXFS_MARKER": str(ROOT / f".cluster_marker.{group}.json")})
+    return told
 
 
 def step_presteps(run: Run) -> tuple:

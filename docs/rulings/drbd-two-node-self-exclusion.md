@@ -210,12 +210,27 @@ nodes, no fence hardware and no third vote. Neither does this design.
     failed attempt for the boot program, which waits for the connection again
     and retries, the same as for a refused mount.
 
+12. **A pair that only this tie-break decides is not admitted.** Under it,
+    participant 1 cannot tell participant 0's death from a cut link, so it
+    freezes, restarts and stays out until participant 0 returns: the pair
+    outlives the death of participant 1 and never of participant 0, the same
+    outcome as PVE without a QDevice and as `auto_tie_breaker`. The owner's
+    requirement is that either node outlives the other's death, and no design
+    meets it without a third vote or a node fence (the survey above). So the
+    attachment's admission (`mxfs_drbd_judge_third_vote`, `dlm/drbdfence.c`)
+    refuses a pair whose `/etc/mxfs/drbd-fence.conf` has `agent=self` without
+    `authority=quorum` (or no file), and names both remedies: the vote
+    (`docs/quorum-takeover.md`), which either participant can win, or a node
+    fence. Under the vote the built-in authority still excludes, receipts,
+    guards and releases as above, with decisions 2 and 10 amended as
+    `docs/quorum-takeover.md` states, and the tie-break decides only a split
+    the vote has no answer for. `drbd_third_vote=0` admits such a pair, for
+    tests of the tie-break itself.
+
 ## What it does not cover
 
-- **Participant 0 dying.** Participant 1 cannot tell that from a cut link, so
-  it freezes, restarts, and stays out until participant 0 returns. This is
-  the same outcome as PVE without a QDevice and as `auto_tie_breaker`. The
-  log line says what to do: restore the peer, or configure a node fence.
+- **A pair with no third vote and no node fence.** It is refused at mount
+  (decision 12).
 - **Administrative bypass.** `drbdadm primary --force`, `resume-io`, clearing
   Outdated, or mounting the device outside `mxfs-drbd@` defeat the argument;
   the guide forbids them. So does writing a backing device while DRBD is

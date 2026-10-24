@@ -27,7 +27,7 @@ bound=${3:?bound in seconds}
 root=$(cd "$(dirname "$0")/.." && pwd)
 start=$(date +%s)
 while :; do
-    dir=$(ls -dt "$root/tests/evidence/lanes/${name}_"* 2>/dev/null | head -1)
+    dir=$(ls -dt "$root/tests/evidence/lanes/${name}_"* 2>/dev/null | head -1)  # harness-lint: ok - picks the lane to wait for, not a verdict; the newest run of that name is the one meant (header)
     if [ -n "$dir" ]; then
         if grep -q " step $step end rc=" "$dir/summary.log" 2>/dev/null; then
             echo "lane_after: $(basename "$dir") ended step $step after $(( $(date +%s) - start ))s"

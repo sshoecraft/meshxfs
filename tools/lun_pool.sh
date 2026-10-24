@@ -312,12 +312,22 @@ NODE_UNMOUNT='
 # (tests/fourkn_lun_shutdown_probe.sh, tests/fourkn_lun.sh).  So every login
 # here starts the unit, and the bind requires it active: open-iscsi.service on
 # Debian, Ubuntu and Proxmox VE, iscsi.service on RHEL and its rebuilds.
+#
+# LUN_POOL_ISCSI_UNIT=0 is that fix's control: no login starts the unit and no
+# bind requires it active, exactly as before the fix (each LOGIN_OK line still
+# reports the unit's state).  It reaches all three logins, the single-path, the
+# --also and the multipath one, so a lap can take the fix out of whichever bind
+# it measures without a diff held over the tree.  Default 1, the fix.
+ISCSI_UNIT_FIX=${LUN_POOL_ISCSI_UNIT:-1}
+case "$ISCSI_UNIT_FIX" in 0|1) ;; *) die "LUN_POOL_ISCSI_UNIT is 0 (the fix's control) or 1 (the fix), not '$ISCSI_UNIT_FIX'" ;; esac
+ISCSI_UNIT_START='
+            [ -n "$u" ] && systemctl start $u >/dev/null 2>&1'
+[ "$ISCSI_UNIT_FIX" = 0 ] && ISCSI_UNIT_START=""
 ISCSI_UNIT='
             u=""
             for c in open-iscsi.service iscsi.service; do
                 systemctl cat $c >/dev/null 2>&1 && { u=$c; break; }
-            done
-            [ -n "$u" ] && systemctl start $u >/dev/null 2>&1
+            done'"$ISCSI_UNIT_START"'
             unit="${u:-none}:$([ -n "$u" ] && systemctl is-active $u 2>/dev/null)"'
 
 NODE_LOGIN=$NODE_UNMOUNT'
@@ -668,9 +678,13 @@ cmd_alloc() {
             LOGIN_OK*)
                 w=$(sed -n 's/.* wwid=\([^ ]*\).*/\1/p' <<<"$line")
                 [ -n "$w" ] || { bad="$bad $n(no wwid)"; continue; }
-                case "$line" in *" iscsi_unit="*":active"*) ;;
-                    *) bad="$bad $n(logged in by hand with $(sed -n 's/.* iscsi_unit=\([^ ]*\).*/\1/p' <<<"$line"), so nothing logs it out before the network at shutdown)"; continue ;;
-                esac
+                # the fix's control (LUN_POOL_ISCSI_UNIT=0) accepts a node
+                # whose unit is not active, as every bind did before the fix
+                if [ "$ISCSI_UNIT_FIX" = 1 ]; then
+                    case "$line" in *" iscsi_unit="*":active"*) ;;
+                        *) bad="$bad $n(logged in by hand with $(sed -n 's/.* iscsi_unit=\([^ ]*\).*/\1/p' <<<"$line"), so nothing logs it out before the network at shutdown)"; continue ;;
+                    esac
+                fi
                 [ -z "$wwid" ] && wwid=$w
                 [ "$w" = "$wwid" ] || bad="$bad $n(wwid=$w!=$wwid)" ;;
             *) bad="$bad $n(${line:-unreachable})" ;;

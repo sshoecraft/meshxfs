@@ -46,7 +46,17 @@ static int mxfs_auth_withdraw_threads;
  * reporting "can't read superblock" about 40 s later. */
 static int mxfs_memb_unreached_refuse = 1;
 
+/* The DRBD attachment admits a pair only when a lost link is decided by a node
+ * fence or by corosync's vote (mxfs_drbd_judge_third_vote): under the fixed
+ * tie-break alone participant 1 never outlives participant 0.  0 is the
+ * same-build control, which admits such a pair as before. */
+static int mxfs_drbd_third_vote = 1;
+
 #ifdef __KERNEL__
+module_param_named(drbd_third_vote, mxfs_drbd_third_vote, int, 0644);
+MODULE_PARM_DESC(drbd_third_vote,
+		 "DRBD pair whose drbd-fence.conf has neither a node fence (agent=exec|ssh) nor authority=quorum: 1=refuse the mount naming both (default), 0=admit it (control)");
+
 module_param_named(memb_unreached_refuse, mxfs_memb_unreached_refuse, int, 0644);
 MODULE_PARM_DESC(memb_unreached_refuse,
 		 "TCP mount whose membership settle times out on a live peer slot discovery never reached: 1=refuse the mount naming multicast and peer= (default), 0=proceed into the lock retries (control)");
@@ -19980,7 +19990,7 @@ static int v5_tcp_dead_gate_holder(struct mxfs_v5_dlm *ctx,
 static int v5_drbd_arm(struct mxfs_v5_dlm *ctx)
 {
 	struct mxfs_pal_drbd_report *r;
-	char why[224];
+	char why[320];
 	int rc, index;
 
 	r = mxfs_pal_alloc(sizeof(*r));
@@ -19993,6 +20003,8 @@ static int v5_drbd_arm(struct mxfs_v5_dlm *ctx)
 			 rc, r->reason);
 	else
 		rc = mxfs_drbd_judge_arm(r, why, sizeof(why));
+	if (!rc && mxfs_drbd_third_vote)
+		rc = mxfs_drbd_judge_third_vote(r, why, sizeof(why));
 	if (rc) {
 		mxfs_pal_log(MXFS_LOG_ERR,
 			     "mxfs: P-DRBD-ARM-REFUSED minor=%d -- %s; a DRBD "

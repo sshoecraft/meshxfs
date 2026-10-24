@@ -267,6 +267,17 @@ marker_write() {  # nodes configuration srcver — node_list records WHICH hosts
     # cluster was prepped on, this format generation" from "a device with the
     # same name".  `gen` counts preps of this marker file; a format is a new
     # generation whatever the path.
+    # `params` records the module parameters each node runs after this prep
+    # (marker_params), so a later filtered row that finds one changed -- a row
+    # wrote a knob and left it, or reloaded the module with other arguments --
+    # refuses instead of reusing a cluster other than the one prepped.
+    local params='{}' cn plist
+    if [ "${MXFS_MARKER_PARAMS:-1}" != 0 ]; then
+        for cn in "${NODES[@]}"; do
+            plist=$(ssh_node "$cn" "$MARKER_PARAMS_CMD" 2>/dev/null | marker_params_knobs)
+            params=$(jq -c --arg n "$cn" --arg v "$plist" '. + {($n): $v}' <<<"$params")
+        done
+    fi
     local ident wwid fsid gen
     ident=$(ssh_node "${NODES[0]}" "echo $(base64 -w0 < "$REPO/tests/setup/dev_identity.sh") | base64 -d | sh -s '${DEV:-}'" 2>/dev/null | grep -a '^IDENT ' | tail -1)
     wwid=$(printf '%s\n' "$ident" | sed -n 's/.* wwid=\([^ ]*\).*/\1/p')
@@ -275,8 +286,49 @@ marker_write() {  # nodes configuration srcver — node_list records WHICH hosts
     jq -n --argjson n "$1" --arg d "$2" --arg s "$3" --arg nl "$nl" \
           --arg dev "${DEV:-}" --arg rig "$rig" --arg t "$(date -u +%FT%TZ)" \
           --arg wwid "${wwid:-}" --arg fsid "${fsid:-}" --argjson gen "$gen" \
-          --arg ma "$(prep_modargs)" \
-        '{nodes:$n, configuration:$d, srcversion:$s, node_list:$nl, dev:$dev, rig:$rig, wwid:$wwid, fsid:$fsid, gen:$gen, iso:$t, modargs:$ma}' > "$MARKER" 2>/dev/null
+          --arg ma "$(prep_modargs)" --argjson params "$params" \
+        '{nodes:$n, configuration:$d, srcversion:$s, node_list:$nl, dev:$dev, rig:$rig, wwid:$wwid, fsid:$fsid, gen:$gen, iso:$t, modargs:$ma, params:$params}' > "$MARKER" 2>/dev/null
+}
+# The parameters a row can change on a node: every one its owner can read and
+# write, as sorted name=value lines with a value's newlines folded.  Read-only
+# parameters are the module's own counters and move by themselves; write-only
+# ones are triggers with nothing to read.
+MARKER_PARAMS_CMD='cd /sys/module/mxfs/parameters 2>/dev/null && find . -maxdepth 1 -type f -perm -0600 -printf "%f\n" | LC_ALL=C sort | while read -r p; do printf "%s=%s\n" "$p" "$(tr "\n" " " < "$p" 2>/dev/null)"; done'
+# Writable counters are not knobs: a parameter whose variable the module itself
+# increments (var++, var += n, atomic_inc/add(&var)) moves with the workload --
+# most are writable only so a harness can reset them -- so a row that ran
+# anything at all would read as a changed cluster.  Named from this tree's
+# source, which built the module: each module_param / module_param_named /
+# module_param_cb gives a parameter's variable, kept when nothing increments it.
+MARKER_COUNTERS=" $(cd "$REPO" 2>/dev/null && awk '
+    FNR == NR { inc[$1] = 1; next }
+    ($2 in inc) { print $1 }' \
+    <(grep -rhoE '\b[A-Za-z_][A-Za-z0-9_]*\s*(\+\+|\+=)|\+\+\s*[A-Za-z_][A-Za-z0-9_]*|atomic(64|_long)?_(inc|add|add_return|inc_return)\s*\(\s*([^,)]*,\s*)?&\s*[A-Za-z_][A-Za-z0-9_]*' \
+          --include='*.c' --include='*.h' xfs pal dlm mxfs_clayer 2>/dev/null \
+        | grep -oE '[A-Za-z_][A-Za-z0-9_]*' | sort -u) \
+    <(find xfs pal dlm mxfs_clayer -name '*.c' -exec cat {} + 2>/dev/null | tr '\n' ' ' \
+        | grep -oE 'module_param_named\(\s*[a-z0-9_]+\s*,\s*[A-Za-z0-9_]+|module_param_cb\(\s*[a-z0-9_]+\s*,\s*&[A-Za-z0-9_]+\s*,\s*&[A-Za-z0-9_]+|module_param\(\s*[A-Za-z0-9_]+' \
+        | sed -E 's/module_param_named\(\s*([a-z0-9_]+)\s*,\s*([A-Za-z0-9_]+)/\1 \2/;
+                  s/module_param_cb\(\s*([a-z0-9_]+)\s*,\s*&[A-Za-z0-9_]+\s*,\s*&([A-Za-z0-9_]+)/\1 \2/;
+                  s/module_param\(\s*([A-Za-z0-9_]+)/\1 \1/') | sort -u | tr '\n' ' ')"
+# and one declared on the module's counter ops (module_param_cb ...
+# &mxfs_dbg_atomic_param_ops / &mxfs_pal_atomic_param_ops), whatever bumps it
+# (some through a helper taking its address); a dbg_* one is an armed count, a knob
+MARKER_COUNTERS="$MARKER_COUNTERS$(cd "$REPO" 2>/dev/null && find xfs pal dlm mxfs_clayer -name '*.c' -exec cat {} + 2>/dev/null \
+    | tr '\n' ' ' | grep -oE 'module_param_cb\(\s*[a-z0-9_]+\s*,\s*&mxfs_(dbg|pal)_atomic_param_ops' \
+    | sed -E 's/module_param_cb\(\s*([a-z0-9_]+).*/\1/' | grep -v '^dbg_' | sort -u | tr '\n' ' ')"
+marker_params_knobs() {  # stdin: name=value lines and ssh noise -> the knobs' lines only
+    local line
+    while IFS= read -r line; do
+        [[ "$line" =~ ^([a-z0-9_]+)= ]] || continue
+        [[ "$MARKER_COUNTERS" == *" ${BASH_REMATCH[1]} "* ]] && continue
+        line="${line%"${line##*[! ]}"}"   # the folded newline's trailing space
+        # watch_ino arms only above 1 (xfs/libxfs/xfs_da_btree.c, pal/linux/xfs_buf.c
+        # 'mxfs_watch_ino > 1'); every row's finish() leaves the sentinel 1
+        # (tests/suite/lib.sh), a fresh load 0: both are off
+        [ "$line" = "watch_ino=1" ] && line="watch_ino=0"
+        printf '%s\n' "$line"
+    done
 }
 # A marker match is a claim about LIVE cluster state, so verify it live: the
 # marker file survives reboots, other campaigns' module reloads, and rig
@@ -285,14 +337,24 @@ marker_write() {  # nodes configuration srcver — node_list records WHICH hosts
 # tests were recorded PASS against a stale build — hence this check.)
 marker_live_ok() {
     [ "$CFG_BASELINE" = 1 ] && return 0
-    local cn live
+    local cn live out want got
     for cn in "${NODES[@]}"; do
-        live=$(ssh_node "$cn" "cat /sys/module/mxfs/srcversion 2>/dev/null; mountpoint -q /mnt/shared && echo MOUNTED" | tr '\n' ' ')
+        out=$(ssh_node "$cn" "cat /sys/module/mxfs/srcversion 2>/dev/null; mountpoint -q /mnt/shared && echo MOUNTED; echo '--PARAMS--'; $MARKER_PARAMS_CMD")
+        live=$(printf '%s\n' "$out" | sed '/^--PARAMS--$/,$d' | tr '\n' ' ')
         live=$(echo $live)   # squeeze/trim whitespace (ssh banner filtering can pad)
         case "$live" in
             "$WANT_SRCVER MOUNTED"*) ;;
             *) echo "    marker stale: $cn live='$live' want='$WANT_SRCVER MOUNTED'"; return 1 ;;
         esac
+        # MXFS_MARKER_PARAMS=0 matches on srcversion and mount alone (control)
+        [ "${MXFS_MARKER_PARAMS:-1}" = 0 ] && continue
+        want=$(jq -r --arg n "$cn" '.params[$n] // "<none recorded>"' "$MARKER" 2>/dev/null)
+        got=$(printf '%s\n' "$out" | sed '1,/^--PARAMS--$/d' | marker_params_knobs)
+        if [ "$got" != "$want" ]; then
+            echo "    marker stale: $cn runs module parameters other than those prepped:"
+            diff <(printf '%s\n' "$want") <(printf '%s\n' "$got") | grep '^[<>]' | head -12 | sed 's/^</      prepped:/; s/^>/      live:   /'
+            return 1
+        fi
     done
     return 0
 }
@@ -1067,8 +1129,25 @@ power_cycle_node() {  # <node>  -> 0 once node is reachable and DEV present
     return 1
 }
 
+# Each prep step's start, and its end with its seconds, on the prep's own output, so a prep its
+# caller's bound killed still names the step it was in and what the others took: a capture-gate
+# lap's prep_cluster was killed at 88 s with its log ending at the LUN identity line and nothing
+# to say where the time went (D-CAPTURE-GATE-PAIR-REBUILD-TOOK-207S-AND-THE-LAP-OVERRAN-ITS-360S-BOUND).
+# `prep_step "" ""` ends the last step.
+prep_step() {  # <step> <what>
+    local now=$SECONDS
+    [ -n "${PREP_STEP_NAME:-}" ] && echo "PREP STEP $PREP_STEP_NAME end $(( now - PREP_STEP_T0 ))s"
+    PREP_STEP_NAME=$1
+    PREP_STEP_T0=$now
+    [ -n "$1" ] && echo "PREP STEP $1 start +$(( now - PREP_T0 ))s: $2"
+    return 0
+}
+
 prep_cluster() {
     echo "--- prep: $N node(s) [${NODES[*]}] configuration=$CONFIG (transport=$BASE_TRANSPORT) ---"
+    PREP_T0=$SECONDS
+    PREP_STEP_NAME=""
+    prep_step 0 "leftover mxfs on test VMs outside the set"
 
     # 0. Tear down leftover mxfs on running test VMs OUTSIDE this run's set.
     #    A downward ladder transition (4/disk/caw/mpath -> 2/disk/caw/mpath) otherwise leaves
@@ -1140,6 +1219,7 @@ prep_cluster() {
     #    reformat — and VERIFY it took.  A silently-failed teardown here left
     #    test2 running the previous run's mount in sess5 (the readiness check
     #    below can't tell a stale same-build mount from a fresh one).
+    prep_step 1 "teardown on the set"
     local n pids=() td; td=$(mktemp -d)
     for n in "${NODES[@]}"; do
         ( timeout 150 "$SSH" "$n" "$PASS" "for try in 1 2 3 4 5 6; do mountpoint -q /src && break; mkdir -p /src; timeout 12 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp 2>/dev/null; sleep 4; done
@@ -1195,6 +1275,7 @@ prep_cluster() {
     # ccmemory feedback-src-nfs-not-fstab-automount) and prep then dies at
     # step 3/4 with "prep_node.sh: No such file" — hit twice today
     # (test17/23, then test10/12/25/31 at the 32/net/mesh/direct rung).
+    prep_step 1b "/src on every node"
     local sp_tmpd sp_bad="" sp_n
     local -a sp_pids=()
     sp_tmpd=$(mktemp -d)
@@ -1212,6 +1293,7 @@ prep_cluster() {
     fi
 
     # 2. Format the shared LUN once (node1).
+    prep_step 2 "mkfs on $NODE1"
     local out
     # the nodes see this host's ~/src as /src, so a checkout beside the main
     # tree formats with its own mkfs_mxfs and loads its own module:
@@ -1270,6 +1352,7 @@ d=json.load(open(sys.argv[1])); print((d.get(sys.argv[2]) or {}).get("task_retir
     #     three members plus a mount of one that never saw a peer — reported
     #     only as "did NOT converge to 4 members".  Every joiner now binds its
     #     device to this format's fsid (and the LUN's wwid) instead.
+    prep_step 2b "LUN identity on $NODE1"
     local LUN_IDENT LUN_WWID LUN_FSID
     LUN_IDENT=$(ssh_node "$NODE1" "echo $(base64 -w0 < "$REPO/tests/setup/dev_identity.sh") | base64 -d | sh -s '$DEV'" 2>/dev/null | grep -a '^IDENT ' | tail -1)
     LUN_WWID=$(printf '%s\n' "$LUN_IDENT" | sed -n 's/.* wwid=\([^ ]*\).*/\1/p')
@@ -1280,10 +1363,12 @@ d=json.load(open(sys.argv[1])); print((d.get(sys.argv[2]) or {}).get("task_retir
     echo "PREP LUN identity: wwid=${LUN_WWID:-none} fsid=$LUN_FSID (every node binds its device to it)"
 
     # 3. Form the cluster on node1 (load module w/ transport + mount).
+    prep_step 3 "form on $NODE1 (module load and mount)"
     out=$(ssh_node "$NODE1" "MXFS_DEV='$DEV' MXFS_FSID='$LUN_FSID' MXFS_LUN_WWID='$LUN_WWID' MXFS_KO_MD5='$KO_MD5' MXFS_REPO='$NODE_REPO' MXFS_KEEP_LOADED='$KEEP_LOADED' MXFS_EXTRA_MODARGS='${MXFS_EXTRA_MODARGS:-}' MXFS_RETIRE_CONTRACT='$RETIRE_CONTRACT' bash /src/mxfs/tests/setup/prep_node.sh $BASE_TRANSPORT")
     echo "$out" | grep -q NODE_PREP_OK || { echo "PREP FAIL (form $NODE1): $out"; return 1; }
 
     # 4. Join the remaining nodes in parallel.
+    prep_step 4 "join ${NODES[*]:1}"
     pids=()
     local tmpd; tmpd=$(mktemp -d)
     for n in "${NODES[@]:1}"; do
@@ -1309,6 +1394,7 @@ d=json.load(open(sys.argv[1])); print((d.get(sys.argv[2]) or {}).get("task_retir
     #    and still asserted: every node runs the SAME build, and that build is
     #    the one currently INSTALLED on the node (which is what catches the
     #    stale-leftover-mount-on-an-old-module case this check exists for).
+    prep_step 5 "readiness on every node"
     local want_srcv ko_vermagic node_krel
     want_srcv=$(modinfo "$REPO/mxfs.ko" 2>/dev/null | awk '/^srcversion:/{print $2}')
     ko_vermagic=$(modinfo "$REPO/mxfs.ko" 2>/dev/null | awk '/^vermagic:/{print $2}')
@@ -1367,6 +1453,7 @@ d=json.load(open(sys.argv[1])); print((d.get(sys.argv[2]) or {}).get("task_retir
     # EVERY node's LATEST "MXFS-MEMBERSHIP active_count" beacon == N and stays
     # there for a short stability window.  Multi-node only; best-effort with a
     # bounded timeout so a genuine membership bug cannot hang the harness.
+    prep_step 6 "membership convergence"
     if [ "$N" -gt 1 ]; then
         local cg_t0=$SECONDS
         local cg_deadline=$(( SECONDS + 90 + 5 * N ))
@@ -1412,6 +1499,7 @@ d=json.load(open(sys.argv[1])); print((d.get(sys.argv[2]) or {}).get("task_retir
         done
         if [ "$cg_ok" = 1 ]; then
             echo "--- converged: all $N nodes report active_count=$N (stable, $(( SECONDS - cg_t0 ))s) ---"
+            prep_step "" ""
         else
             # HARD gate (sess6): proceeding unconverged runs the whole suite
             # on a split-brain cluster — 17 garbage FAILs and possible on-disk
@@ -1423,6 +1511,7 @@ d=json.load(open(sys.argv[1])); print((d.get(sys.argv[2]) or {}).get("task_retir
             return 1
         fi
     fi
+    prep_step "" ""
 }
 
 # ---------------------------------------------------------------------------
@@ -2254,8 +2343,9 @@ pull_row_artifacts() {
     # this way (journald also rotates in ~85s under probe volume, so the
     # kernlog pull above misses early rounds).  base64 shields the tar
     # stream from ssh_node's line filter.  A failing fsx check keeps its
-    # log as /root/fsx.<seed>.<ops>.log (tests/suite/fsx.sh), and only this
-    # pull brings it into the run's evidence.
+    # log as /root/fsx.<seed>.<ops>.log and fsx's own .fsxlog/.fsxops/.fsxgood
+    # in /root/fsx.<seed>.<ops>.d/ (tests/suite/fsx.sh), and only this pull
+    # brings them into the run's evidence.
     # Only what the row wrote: the node's /root keeps every earlier row's and
     # boot's files, and a pull by name alone copied a dmesg_at_fail.txt of
     # August into an October run's evidence, its old-build corruption line
@@ -2263,11 +2353,14 @@ pull_row_artifacts() {
     # (D-DIRENT-DURABILITY-CAPTURE-COPIES-STALE-DMESG-AT-FAIL-FROM-EARLIER-BOOTS).
     # The row's start mark is the node's own (mark_row_start), so no clock is
     # compared across hosts.  MXFS_PULL_SINCE_ROW=0 pulls every such file,
-    # whatever its age, as before: the control of that fix.
+    # whatever its age, as before: the control of that fix.  Its selection
+    # is the old one exactly: ls exits 2 when only one of the two globs
+    # matches, and the old pull ignored that status and took what matched,
+    # so the control's assignment must not fail the && chain either.
     if [ "${MXFS_PULL_SINCE_ROW:-1}" = 0 ]; then
-        sel="f=\$(ls -d drc_* fsx.*.log 2>/dev/null)"
+        sel="{ f=\$(ls -d drc_* fsx.*.log 2>/dev/null); true; }"
     else
-        sel="[ -e .mxfs_row_mark ] && f=\$(find . -maxdepth 3 \\( -path './drc_*' -o -name 'fsx.*.log' \\) -type f -newer .mxfs_row_mark 2>/dev/null | sed 's,^\\./,,')"
+        sel="[ -e .mxfs_row_mark ] && f=\$(find . -maxdepth 3 \\( -path './drc_*' -o -name 'fsx.*.log' -o -path './fsx.*.d/*' \\) -type f -newer .mxfs_row_mark 2>/dev/null | sed 's,^\\./,,')"
     fi
     for cn in "$@"; do
         ssh_node "$cn" "cd /root 2>/dev/null && $sel && [ -n \"\$f\" ] && tar -cf - \$f 2>/dev/null | base64" \

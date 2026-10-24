@@ -36,6 +36,18 @@ int mxfs_drbd_judge_arm(const struct mxfs_pal_drbd_report *r,
                         char *why, size_t whylen);
 
 /*
+ * Can either node of this pair outlive the other's death?  0 when a lost link
+ * is decided by a node fence (agent=exec or ssh) or by corosync's vote
+ * (agent=self with authority=quorum); -EPERM when the fixed tie-break decides
+ * alone (agent=self, the default with no /etc/mxfs/drbd-fence.conf), under
+ * which participant 1 cannot tell participant 0's death from a cut link and
+ * restarts itself instead of carrying on.  Judged at admission, so such a
+ * pair never mounts.
+ */
+int mxfs_drbd_judge_third_vote(const struct mxfs_pal_drbd_report *r,
+                               char *why, size_t whylen);
+
+/*
  * Which exclusion held.  The two are different proofs and are certified as
  * different fence kinds; neither is ever accepted as the other.
  *   STONITH  — a node fence powered the peer off and holds it off

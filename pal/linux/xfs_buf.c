@@ -11995,7 +11995,9 @@ xfs_buf_submit_ex(
 		}
 		if (!held) {
 			static atomic_t pa_dumped = ATOMIC_INIT(0);
-			mxfs_probe_ratelimited("mxfs: PROBE-A AG-META-WRITE-NOT-HELD agno=%u daddr=%lld ops=%s comm=%s pid=%d cached=%d holders=%d demoting=%d relpend=%d bflags=0x%x\n",
+			/* recov: a replay's image (b_mxfs_recov_image), whose write a
+			 * replay verdict authorised, not this node's grant */
+			mxfs_probe_ratelimited("mxfs: PROBE-A AG-META-WRITE-NOT-HELD agno=%u daddr=%lld ops=%s comm=%s pid=%d cached=%d holders=%d demoting=%d relpend=%d bflags=0x%x recov=%d\n",
 				pag_agno(pa), (long long)bp->b_maps[0].bm_bn,
 				(bp->b_ops == &xfs_bnobt_buf_ops ? "bno" :
 				 bp->b_ops == &xfs_cntbt_buf_ops ? "cnt" :
@@ -12006,7 +12008,7 @@ xfs_buf_submit_ex(
 				current->comm, current->pid,
 				pa->pag_dlm_cached, pa->pag_dlm_holders,
 				pa->pag_dlm_demoting, pa->pag_dlm_release_pending,
-				bp->b_flags);
+				bp->b_flags, bp->b_mxfs_recov_image);
 			if (atomic_cmpxchg(&pa_dumped, 0, 1) == 0)
 				mxfs_probe_stack();
 		}

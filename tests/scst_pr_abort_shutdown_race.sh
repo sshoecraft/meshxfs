@@ -38,6 +38,20 @@
 #     1, logs out, Y fires P&A on KX immediately, X logs back in }.  Asserts
 #     no BUG/Oops/CRITICAL and every P&A rc=0; reports how many landed in the
 #     window (either INFO line) — informational, the natural window is narrow.
+#   handoff  (+caw-abort-reclaim.6) knob armed at DELAY ms, one path each:
+#     Y registers KY and reserves the LU Write Exclusive Registrants Only; X
+#     registers KX1 on its path-1 session, logs path 1 out and at once in again
+#     (same ISID: a new session of the same I_T nexus while the old one is held
+#     in its teardown), then writes one 4 KiB block at the LU's end through
+#     path 1; Y then issues PREEMPT AND ABORT on KX1 while the old session is
+#     still held.  A registered nexus's write must succeed: the target must
+#     log "PR: moving reg ... from shutting-down sess" for X and no
+#     "Reservation conflict" for X's initiator before the P&A, and the P&A
+#     must abort the earlier session too ("earlier session ... of the nexus").
+#     On a target without the handoff (.5) the write is refused RESERVATION
+#     CONFLICT until the old session is freed: that run is the control.
+#     The block written is the LU's last 4 KiB; run it on a LUN the rig
+#     formats again before it is mounted.
 #
 # PRECONDITIONS: X and Y have NO mxfs mount (their sessions carry no MXFS PR
 # key; the test keys are registered with --register-ignore and removed again).
@@ -49,11 +63,15 @@
 # ~ 2 x 12 s at DELAY=4000 plus ~10 ssh round trips -> 60 s; stress arm ~3 s
 # per iteration.  the unkillable-wedge rule: no pgrep/ps.  the source-tree rule: lives in tests/.
 #
-# Usage: tests/scst_pr_abort_shutdown_race.sh <label> [window|stress] [X=test1] [Y=test2] [DELAY_MS=4000] [ITERS=20]
+# handoff arm budget: logout + login + path learn + write + P&A ~5 s inside
+# the 2 x DELAY hold (DELAY=8000 for it), then the rest of the hold and
+# cleanup: ~30 s.
+#
+# Usage: tests/scst_pr_abort_shutdown_race.sh <label> [window|stress|handoff] [X=test1] [Y=test2] [DELAY_MS=4000] [ITERS=20]
 # Env:   SPR_OUT (evidence dir, default tests/evidence/<label>_spr), MXFS_SCST_TGT
 set -u
 LABEL=${1:?label}; ARM=${2:-window}; X=${3:-test1}; Y=${4:-test2}; DELAY=${5:-4000}; ITERS=${6:-20}
-case $ARM in window|stress) ;; *) echo "arm must be window or stress"; exit 2;; esac
+case $ARM in window|stress|handoff) ;; *) echo "arm must be window, stress or handoff"; exit 2;; esac
 [ "$X" = "$Y" ] && { echo "X and Y must differ"; exit 2; }
 cd "$(dirname "$0")/.." || exit 2
 OUT=${SPR_OUT:-tests/evidence/${LABEL}_spr}; mkdir -p "$OUT"
@@ -92,7 +110,11 @@ XP1_IP=$(printf '%s\n' "$XP" | sed -n 1p | awk '{print $1}'); XP1_DEV=$(printf '
 XP2_IP=$(printf '%s\n' "$XP" | sed -n 2p | awk '{print $1}'); XP2_DEV=$(printf '%s\n' "$XP" | sed -n 2p | awk '{print $2}')
 YP1_IP=$(printf '%s\n' "$YP" | sed -n 1p | awk '{print $1}'); YP1_DEV=$(printf '%s\n' "$YP" | sed -n 1p | awk '{print $2}')
 echo "paths: X path1=$XP1_IP:/dev/$XP1_DEV path2=$XP2_IP:/dev/$XP2_DEV  Y path1=$YP1_IP:/dev/$YP1_DEV"
-[ -n "$XP1_DEV" ] && [ -n "$XP2_DEV" ] && [ -n "$YP1_DEV" ] || { echo "FAIL: could not learn 2 iSCSI paths on $X and 1 on $Y (X='$XP' Y='$YP')"; exit 3; }
+if [ "$ARM" = handoff ]; then
+    [ -n "$XP1_DEV" ] && [ -n "$YP1_DEV" ] || { echo "FAIL: could not learn an iSCSI path on $X and on $Y (X='$XP' Y='$YP')"; exit 3; }
+else
+    [ -n "$XP1_DEV" ] && [ -n "$XP2_DEV" ] && [ -n "$YP1_DEV" ] || { echo "FAIL: could not learn 2 iSCSI paths on $X and 1 on $Y (X='$XP' Y='$YP')"; exit 3; }
+fi
 XIQN=$(rsh $X "cat /etc/iscsi/initiatorname.iscsi | sed -n 's/^InitiatorName=//p'" | tail -1)
 echo "X iqn: $XIQN"
 
@@ -149,6 +171,51 @@ if [ "$ARM" = window ]; then
     [ "$adm" -ge 1 ] || { echo "FAIL: window A not exercised — no 'PR ABORT ALL admitted on session' line for $X (holdA=$holdA)"; fail=1; }
     [ "$rel" -ge 1 ] || { echo "FAIL: window B not exercised — no 'already released ... skipping' line for $X (holdB=$holdB)"; fail=1; }
     [ "$(keycount $KX1)" = 0 ] && [ "$(keycount $KX2)" = 0 ] || { echo "FAIL: a test key survived its PREEMPT AND ABORT"; fail=1; }
+    [ "$bad" = 0 ] || { echo "FAIL: BUG/Oops/CRITICAL/unexpected error on the host during the window"; fail=1; }
+elif [ "$ARM" = handoff ]; then
+    rv=$(rsh $Y "sg_persist --out --reserve --prout-type=5 --param-rk=$KY /dev/$YP1_DEV 2>&1 | grep -v 'Peripheral device type\|SCST_FIO'; echo rc=\${PIPESTATUS[0]}" | tr '\n' ' ')
+    echo "Y reserve Write Exclusive Registrants Only with $KY: $rv"
+    case "$rv" in *rc=0*) ;; *) echo "FAIL: Y could not reserve the LU"; exit 3;; esac
+    r1=$(rsh $X "sg_persist --out --register-ignore --param-sark=$KX1 /dev/$XP1_DEV 2>&1 | grep -v 'Peripheral device type\|SCST_FIO'; echo rc=\${PIPESTATUS[0]}" | tr '\n' ' ')
+    echo "X register $KX1 on path1: $r1"
+    # the block written: the LU's last 4 KiB, through path 1's own disk
+    sz=$(rsh $X "blockdev --getsize64 /dev/$XP1_DEV" | tail -1 | tr -dc 0-9)
+    [ -n "$sz" ] && [ "$sz" -gt 4096 ] || { echo "FAIL: could not read the LU's size on $X (/dev/$XP1_DEV)"; exit 3; }
+    seek=$(( sz / 4096 - 1 ))
+    xwrite() { rsh $X "dd if=/dev/zero of=/dev/$1 bs=4096 count=1 seek=$seek oflag=direct conv=notrunc status=none 2>&1 | tail -1; echo rc=\${PIPESTATUS[0]}" | tr '\n' ' '; }
+    # X is registered, so a write before the re-login goes through: the arm
+    # measures the re-login, not a missing registration
+    w0=$(xwrite "$XP1_DEV"); echo "X write before the re-login: $w0"
+    case "$w0" in *rc=0*) ;; *) echo "FAIL: X's write was refused before the re-login; the reservation or the registration is not what the arm needs"; exit 3;; esac
+    setknob "$DELAY"
+    TA=$(date -u +%FT%T.%3NZ); ta=$(date +%s%3N)
+    lo=$(logout_path $X $XP1_IP); li=$(login_path $X $XP1_IP); tl=$(( $(date +%s%3N) - ta ))
+    XP1_DEV=$(learn_paths $X | awk -v ip="$XP1_IP" '$1==ip{print $2}' | head -1)
+    w1=$(xwrite "${XP1_DEV:-null}"); tw=$(( $(date +%s%3N) - ta ))
+    echo "handoff: X logout path1 at $TA: $lo | login: $li (+${tl} ms) | path1 now /dev/${XP1_DEV:-none} | write at +${tw} ms: $w1"
+    paA=$(pa $KX1); tp=$(( $(date +%s%3N) - ta ))
+    echo "handoff: P&A $KX1 from Y at +${tp} ms: $paA"
+    sleep $(( (2 * DELAY) / 1000 + 1 ))
+    setknob 0
+    TE=$(date -u +%FT%T.%3NZ)
+    hostlog "$TA" "$TE" > "$OUT/host_kmsg.txt"
+    rr=$(rsh $Y "sg_persist --out --release --prout-type=5 --param-rk=$KY /dev/$YP1_DEV 2>&1 | grep -v 'Peripheral device type\|SCST_FIO'; echo rc=\${PIPESTATUS[0]}" | tr '\n' ' ')
+    echo "Y release: $rr"
+    echo "pr-in after: KX1=$(keycount $KX1) KY=$(keycount $KY)"
+    mov=$(grep -ac "PR: moving reg .*${X}-mxfs-node.* from shutting-down sess" "$OUT/host_kmsg.txt")
+    conf=$(grep -ac "Reservation conflict (dev .*${X}-mxfs-node" "$OUT/host_kmsg.txt")
+    earlier=$(grep -ac "PR ABORT: registrant .*${X}-mxfs-node.* earlier session .* of the nexus" "$OUT/host_kmsg.txt")
+    held=$(grep -ac "holding session .*${X}-mxfs-node.* in SHUTDOWN" "$OUT/host_kmsg.txt")
+    bad=$(grep -ac 'BUG:\|Oops\|CRITICAL ERROR\|New mgmt cmd while shutting down\|SCST_PR_ABORT_ALL failed' "$OUT/host_kmsg.txt")
+    echo "host: handoff=$mov conflicts_for_X=$conf earlier_session_aborted=$earlier held_in_shutdown=$held bad=$bad  (host_kmsg.txt $(wc -l < "$OUT/host_kmsg.txt") lines)"
+    grep -a 'PR: moving\|PR ABORT\|holding\|Reservation conflict' "$OUT/host_kmsg.txt" | cut -c1-220 | sed 's/^/  /'
+    [ "$held" -ge 1 ] && [ "$tw" -lt "$DELAY" ] || { echo "FAIL: not exercised — the old session was not held (held=$held) or the write came after the hold (+${tw} ms, hold ${DELAY} ms)"; fail=1; }
+    case "$w1" in *rc=0*) ;; *) echo "FAIL: X's write through its new path-1 session was refused although X is registered: $w1"; fail=1;; esac
+    [ "$conf" = 0 ] || { echo "FAIL: the target refused $conf command(s) of the registered nexus after its re-login"; fail=1; }
+    [ "$mov" -ge 1 ] || { echo "FAIL: the target logged no handoff of X's registrant to the new session"; fail=1; }
+    case "$paA" in *rc=0*) ;; *) echo "FAIL: the P&A did not return rc=0: $paA"; fail=1;; esac
+    [ "$earlier" -ge 1 ] || { echo "FAIL: the P&A did not abort the earlier session of X's nexus"; fail=1; }
+    [ "$(keycount $KX1)" = 0 ] || { echo "FAIL: KX1 survived its PREEMPT AND ABORT"; fail=1; }
     [ "$bad" = 0 ] || { echo "FAIL: BUG/Oops/CRITICAL/unexpected error on the host during the window"; fail=1; }
 else
     TA=$(date -u +%FT%T.%3NZ)

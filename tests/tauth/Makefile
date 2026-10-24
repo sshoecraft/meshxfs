@@ -159,7 +159,7 @@ $(LBIN): $(LOBJS)
 	$(CC) $(CFLAGS) -o $@ $(LOBJS) $(LDLIBS)
 
 clean:
-	rm -rf $(OBJDIR) $(BIN) $(LBIN) $(DBIN) $(FBIN) $(CBIN) $(UBIN) $(RBIN) $(PBIN) $(VBIN) $(SBIN) $(GBIN) $(OBIN)
+	rm -rf $(OBJDIR) $(BIN) $(LBIN) $(DBIN) $(FBIN) $(CBIN) $(UBIN) $(RBIN) $(PBIN) $(VBIN) $(SBIN) $(GBIN) $(OBIN) $(CLEAN_MORE)
 
 .PHONY: all clean
 
@@ -172,3 +172,32 @@ $(OBJDIR)/seal_barrier_test.o: seal_barrier_test.c dlm_mesh.h tauth_testlib.h $(
 
 $(XBIN): $(XOBJS)
 	$(CC) $(CFLAGS) -o $@ $(XOBJS) $(LDLIBS)
+
+# Every object also depends on each header its source includes, whatever its
+# rule above lists: the compiler writes them to obj/<name>.d as it builds the
+# object (-MMD; -MP so a header removed later is no error), and an object with
+# no .d -- one built before this -- is rebuilt once to get one.  The rules'
+# own header lists had drifted from the sources (tauth_store.h, pal/pal.h), so
+# a header change left objects that a plain make then linked stale
+# (D-TAUTH-TEST-OBJECTS-OMIT-INCLUDED-HEADERS-SO-A-HEADER-CHANGE-LINKS-STALE-CODE).
+# TAUTH_DEPS=0 builds from the rules' own lists alone, as before: the control.
+ifneq ($(TAUTH_DEPS),0)
+CPPFLAGS += -MMD -MP
+ALLOBJS := $(sort $(OBJS) $(LOBJS) $(DOBJS) $(FOBJS) $(COBJS) $(UOBJS) $(ROBJS) $(POBJS) \
+                  $(VOBJS) $(SOBJS) $(GOBJS) $(OOBJS) $(QOBJS) $(XOBJS))
+$(ALLOBJS): $(OBJDIR)/%.o: $(OBJDIR)/%.d
+$(OBJDIR)/%.d: ;
+.PRECIOUS: $(OBJDIR)/%.d
+-include $(wildcard $(OBJDIR)/*.d)
+endif
+
+# A plain 'make' builds every binary: the first rule above is an object, so it
+# was the default goal and 'make -C tests/tauth && ./tauth_test' ran whatever
+# tauth_test was already there; and all and clean name every binary
+# (D-TAUTH-MAKEFILE-DEFAULT-GOAL-IS-ONE-OBJECT-AND-CLEAN-MISSES-TWO-BINARIES).
+# TAUTH_GOAL_ALL=0 keeps the first rule's goal and the old lists: the control.
+ifneq ($(TAUTH_GOAL_ALL),0)
+.DEFAULT_GOAL := all
+all: $(XBIN)
+CLEAN_MORE := $(QBIN) $(XBIN)
+endif

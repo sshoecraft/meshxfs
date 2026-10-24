@@ -280,6 +280,8 @@ static void mxfs_drbdw_parse(struct mxfs_pal_drbd_report *r)
 	F("PEER_ADDR", peer_addr);
 	F("HANDLER_INSTALLED", handler_installed);
 	F("FENCE_SELF", fence_self);
+	F("FENCE_AGENT", fence_agent);
+	F("FENCE_AUTHORITY", fence_authority);
 	F("RECEIPT_TIME", receipt_time);
 	F("RECEIPT_PEER", receipt_peer);
 	F("RECEIPT_EPISODE", receipt_episode);

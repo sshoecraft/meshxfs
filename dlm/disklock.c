@@ -208,8 +208,19 @@ MODULE_PARM_DESC(dl_peer_window,
 		 "death window and the one it published, a peer that published "
 		 "none held to its attachment's default (1, default); 0 holds "
 		 "every peer to this node's own window (same-build control)");
+
+/* validate_lockstate checks the heartbeat half only: nothing writes a lock
+ * record any more, and on a COMPARE AND WRITE volume the region it would read
+ * is the CAW slot table, whose live slots carry MXFS_CAW_MAGIC. */
+static int mxfs_dl_validate_lockrec;
+module_param_named(dl_validate_lockrec, mxfs_dl_validate_lockrec, int, 0644);
+MODULE_PARM_DESC(dl_validate_lockrec,
+		 "at disklock init also check the first lock-record slot for the "
+		 "disklock magic, as before (1, same-build control); 0 checks the "
+		 "heartbeat slot only (default)");
 #else
 static int mxfs_dl_peer_window = 1;
+static int mxfs_dl_validate_lockrec;
 #define dl_instr_on() (0)
 #define dl_inject_take(k) (false)
 static int mxfs_dl_auth_suspend = 1;
@@ -2681,7 +2692,11 @@ static int find_lock_slot(struct mxfs_disklock_ctx *ctx,
 }
 
 /*
- * Validate existing lockstate region by checking magic on first records.
+ * Validate existing lockstate region by checking magic on the first heartbeat
+ * record.  The lock-record half is checked only under dl_validate_lockrec:
+ * no code path writes a lock record (mxfs_disklock_write_grant has no caller),
+ * and on a COMPARE AND WRITE volume lock_slot_offset(ctx, 0) is CAW slot 0, so
+ * a live slot there read as a corrupt lock record at every such mount.
  */
 static int validate_lockstate(struct mxfs_disklock_ctx *ctx)
 {
@@ -2704,6 +2719,9 @@ static int validate_lockstate(struct mxfs_disklock_ctx *ctx)
 			     hb->magic, MXFS_DISKLOCK_MAGIC);
 		return -EIO;
 	}
+
+	if (!mxfs_dl_validate_lockrec)
+		return 0;
 
 	/* Check first lock record slot */
 	rc = read_sector(ctx, lock_slot_offset(ctx, 0), buf);

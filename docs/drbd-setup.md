@@ -214,8 +214,23 @@ file it wrote is read back from disk on the new host and checked.
 
 ## 7. What happens when a node is lost
 
-Fencing is on by default and needs no configuration. The node with the lower
-DRBD address (here `pve1`) is participant 0; the other is participant 1.
+Either node carries on when the other dies only with a third vote or a node
+fence, so the pair needs one of them before it mounts. Write it into
+`/etc/mxfs/drbd-fence.conf` on both nodes:
+
+- `agent=self` and `authority=quorum`: corosync's vote, with a QDevice
+  (`corosync-qnetd` on any third machine). How the vote decides is in
+  `docs/quorum-takeover.md` ("The DRBD pair").
+- `agent=exec` or `agent=ssh`: a node fence (IPMI, a PDU, a hypervisor) that
+  powers the lost node off. The contract it must keep is in
+  `docs/attachment-methods.md` ("The fence authority is the site's").
+
+With neither (no file, or `agent=self` alone), the mount is refused and the
+kernel log names both (`dmesg | grep P-DRBD-ARM-REFUSED`). The pair's fixed
+tie-break alone would let only one of the two nodes outlive the other: the
+node with the lower DRBD address cannot be told dead from a cut cable.
+
+That node (here `pve1`) is participant 0; the other is participant 1.
 
 - **pve2 dies, or loses its network.** pve1's writes stop until DRBD notices
   (up to ~7 s with the `ping-int` above). Then pve1 isolates pve2 from itself
@@ -232,26 +247,24 @@ DRBD address (here `pve1`) is participant 0; the other is participant 1.
   `drbd_uuid_new_current`); `resume-io` does the same work without that lock.
   The driver bug itself is fixed by the patch in `upstream/linux/` in this
   repository.
-- **The replication link breaks with both nodes alive.** The same: pve1
-  carries on, and pve2 freezes, logs why, and restarts itself, then rejoins as
-  above.
+- **pve1 dies.** The same with the roles swapped: under the vote pve2 is
+  quorate without pve1 and carries on; with a node fence pve2 powers pve1 off
+  and carries on.
+- **The replication link breaks with both nodes alive.** One node carries on,
+  and the other freezes, logs why, and restarts itself, then rejoins as
+  above. Under the vote, while corosync still sees both nodes, the vote has no
+  answer for 45 s and then the fixed tie-break picks pve1; with a node fence,
+  the fence picks.
 - **pve1 is shut down or restarted on purpose.** Its unit unmounts, steps
   down and takes DRBD down before the network stops, so DRBD disconnects
   gracefully and pve2 carries on.
-- **pve1 dies.** pve2 cannot tell a dead pve1 from a cut cable, so it does not
-  take over. It freezes, logs exactly this, restarts, and waits. Bring pve1
-  back. No two-node system without a third vote or fence hardware can do
-  better: Proxmox HA and corosync's tie-breaker behave the same way.
-- **pve1 restarts while pve2 is still down.** DRBD records that pve1's copy is
-  the newer one and will not promote pve2 until it has resynced from it. So
-  pve1 gives pve2 30 s to connect, then isolates it as above and mounts alone,
-  about two and a half minutes after the boot in our tests. pve2 rejoins when
-  it is back.
-- **pve2 restarts while pve1 is down** (for example, pve2 was running alone
-  after pve1 was shut down on purpose). pve2 waits for pve1 and does not mount
-  alone. DRBD's record of which copy is newer can be left stale on disk by a
-  crash, and only pve1 may ever take the pair alone, so pve2 cannot trust that
-  record. Bring pve1 back.
+- **A node restarts while the other is still down.** Under the vote it mounts
+  alone only on its own standing exclusion of the other (it carried on when
+  the other was lost), never on DRBD's record of which copy is newer, which a
+  crash can leave stale on disk; otherwise it waits for the other node. With a
+  node fence, pve1 gives pve2 30 s to connect and then, if DRBD records pve1's
+  copy as the newer one, isolates pve2 and mounts alone, about two and a half
+  minutes after the boot in our tests; pve2 in the same case waits for pve1.
 - **A node's mount shuts down while the node stays up.** MeshXFS withdraws a
   node that lost its standing: no heartbeat of its own landed within its
   60 s authority lease, because its writes to the shared device stalled for

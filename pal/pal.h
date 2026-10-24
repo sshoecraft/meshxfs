@@ -1388,6 +1388,8 @@ struct mxfs_pal_drbd_report {
     char     peer_addr[48];
     char     handler_installed[4];
     char     fence_self[64];
+    char     fence_agent[16];   /* self, exec, ssh (rig-virsh) */
+    char     fence_authority[16]; /* quorum, or empty: the fixed tie-break */
     char     receipt_time[32];
     char     receipt_peer[64];
     char     receipt_episode[48];

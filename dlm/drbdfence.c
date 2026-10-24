@@ -117,6 +117,23 @@ int mxfs_drbd_judge_arm(const struct mxfs_pal_drbd_report *r, char *why, size_t 
     return peer_fenced(r, NULL, why, whylen);
 }
 
+int mxfs_drbd_judge_third_vote(const struct mxfs_pal_drbd_report *r, char *why, size_t whylen)
+{
+    if (!r)
+        return -EINVAL;
+    NEED(r->fence_agent[0], "the witness reports no fence agent (an older %s?)%s",
+         "mxfs_drbd_witness.py", "");
+    /* agent=self alone is the fixed tie-break: participant 1 cannot tell
+     * participant 0's death from a cut link, so it never outlives it
+     * (docs/rulings/drbd-two-node-self-exclusion.md) */
+    NEED(!eq(r->fence_agent, "self") || eq(r->fence_authority, "quorum"),
+         "no third vote and no node fence (agent=self, authority=%s): participant 1 could never "
+         "outlive participant 0; set authority=quorum (a corosync QDevice) or agent=exec|ssh in "
+         "/etc/mxfs/drbd-fence.conf%s",
+         r->fence_authority[0] ? r->fence_authority : "none", "");
+    return 0;
+}
+
 int mxfs_drbd_judge_excluded_how(const struct mxfs_pal_drbd_report *r,
                                  enum mxfs_drbd_exclusion *how, char *why, size_t whylen)
 {

@@ -475,6 +475,17 @@ MODULE_PARM_DESC(demoter_dead_claim_reap,
 	"retire a demoter claim whose owner has exited (1, default); 0 = leave it set, for a control arm");
 atomic64_t mxfs_dem_dead_reap_n;
 atomic64_t mxfs_dem_claim_wait_expired;
+
+/*
+ * A new in-core inode starts with its release state ACTIVE whatever the slab
+ * memory it was given last held (mxfs_dlm_inode_init).  0 leaves a WEDGED
+ * state in place, as before the assignment: the same-build control of
+ * tests/relstate_recycle_inject.sh.
+ */
+int mxfs_relstate_init_active = 1;
+module_param_named(relstate_init_active, mxfs_relstate_init_active, int, 0644);
+MODULE_PARM_DESC(relstate_init_active,
+	"a new in-core inode starts ACTIVE even in memory whose last occupant wedged (1, default); 0 = it inherits WEDGED (control arm)");
 atomic64_t mxfs_dem_punt_gen_reject;	/* sweep met a later claim of the slot */
 
 /*
@@ -3915,10 +3926,15 @@ mxfs_dlm_inode_init(
 	 * (path_all_lost: a fenced node remounted and could not open a file
 	 * its new mount had never touched).  Plain store, not the setter —
 	 * the setter is what refuses to leave WEDGED. */
-	if (ip->i_mxfs_rel_state == MXFS_RELSTATE_WEDGED)
-		pr_warn_ratelimited("mxfs: P-RELSTATE-RECYCLED ino=%llu prev=WEDGED -- new in-core inode allocated in memory whose last occupant wedged; starting ACTIVE\n",
-			(unsigned long long)ip->i_ino);
-	WRITE_ONCE(ip->i_mxfs_rel_state, MXFS_RELSTATE_ACTIVE);
+	if (ip->i_mxfs_rel_state == MXFS_RELSTATE_WEDGED) {
+		pr_warn_ratelimited("mxfs: P-RELSTATE-RECYCLED ino=%llu prev=WEDGED -- new in-core inode allocated in memory whose last occupant wedged; starting %s\n",
+			(unsigned long long)ip->i_ino,
+			READ_ONCE(mxfs_relstate_init_active) ? "ACTIVE" : "WEDGED (relstate_init_active=0)");
+		if (READ_ONCE(mxfs_relstate_init_active))
+			WRITE_ONCE(ip->i_mxfs_rel_state, MXFS_RELSTATE_ACTIVE);
+	} else {
+		WRITE_ONCE(ip->i_mxfs_rel_state, MXFS_RELSTATE_ACTIVE);
+	}
 	ip->i_mxfs_dscan_clean_key = ~0ULL;	/* datascan gen-gate sentinel — first miss always scans */
 	ip->i_dlm_handoff_acted_gen = 0;	/* no handoff acted on yet */
 	ip->i_dlm_dir_valid_epoch = 0;	/* base predates any tracked handoff -> first dir grant refreshes */

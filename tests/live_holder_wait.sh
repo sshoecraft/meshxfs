@@ -14,9 +14,23 @@
 # own clock; md5_W == md5_H; W logged P-LKWAIT-LIVE (TCP at PAUSE_MS > 180 s;
 # CAW only at PAUSE_MS > 480 s); zero shutdowns/splats on either node.
 #
-# the budget rule (derived): setup (H's candidates, bound 13 s, then the
-# locality probes, ~5.5 s each until one matches: ~11 s expected on two nodes,
-# 88 s for all 16) + PAUSE_MS + drain (< 10 s) + captures ~10 s.
+# the budget rule (derived): setup (H's candidates, bound 13 s on two nodes,
+# 10 s + 2 x 1.2 s per 160 objects in general, then the locality probes, ~5.4 s
+# each until one matches: ~11 s expected on two nodes, 88 s for all 16; N
+# probes expected on N members, NSHARD at most) + PAUSE_MS + drain (< 10 s) +
+# captures ~10 s.
+#
+# NODE COUNTS.  Any N >= 2 members, all named: H, W and LHW_HOLD (the other
+# mounted members).  The lap scores a REMOTE target only when H is its master
+# (the master-side counts below are taken on H), so a candidate is usable when
+# its shard is H's, which on N members is one shard in N.  The search is sized
+# from N so that no candidate is H's with probability at most 2^-16 under that
+# per-shard draw: NSHARD = ceil(16 ln 2 / -ln(1 - 1/N)) -- 16 at N=2, 39 at 4,
+# 84 at 8, 172 at 16, 350 at 32 -- from 10 x NSHARD objects.  The probe counts
+# the master's notification on EVERY named member, so a shard a third member
+# masters is reported by name (master=third:<node>) and skipped, never read as
+# W's.  N is the number of members named: a member left out of LHW_HOLD is not
+# probed, the search is sized too small, and its shards read as undetermined.
 # The read bound is PAUSE_MS/1000 + 60: a read still outstanding 60 s after
 # the pause end is a FAIL, never a reason to wait longer.
 #
@@ -69,8 +83,15 @@
 #        same-build control of
 #        D-LIVE-HOLDER-WAIT-FINDS-NO-REMOTE-MASTERED-INODE-AND-ABORTS-BEFORE-MEASURING),
 #        LH_SETUP_ONLY=1 (stop once H's candidates are made, listing them as
-#        `CANDIDATE <idx> <ino>`, remove them and exit 0: the shard lap,
-#        tests/live_holder_shard_lap.sh).
+#        `CANDIDATE <idx> <ino>`, remove them and exit 0),
+#        LH_PROBE_ONLY=1 (TCP only: run the candidate selection and the master
+#        probe exactly as a measuring lap does, then stop before the pause is
+#        armed.  It also keeps objects 1-8 -- the eight the pre-fix harness made,
+#        same names, same order, made first -- lists them as `OLD8 <idx> <ino>`,
+#        and probes every one of them the selection did not, as
+#        `INFO map idx=.. ino=.. master=..`.  Exit 0 with `PROBE-ONLY: target
+#        chosen` when the selection found its master, 2 with the selection's own
+#        ABORT when it did not: the master lap, tests/live_holder_shard_lap.sh).
 # Leaves both nodes mounted and clears the pause knobs.  Exit 0 PASS, 1 FAIL,
 # 2 INFRA/ABORT.
 set -u
@@ -216,6 +237,10 @@ mkdir -p "$OUT"
 LHW_HOLD=${LHW_HOLD:-}
 vmhold_take "live_holder_wait $LABEL" "$H" "$W" ${LHW_HOLD//,/ } \
     || { echo "ABORT: could not hold $H $W ${LHW_HOLD//,/ }"; exit 2; }
+# Every member the master probe asks (see NODE COUNTS above), and how many.
+MEMBERS="$H $W ${LHW_HOLD//,/ }"
+NMEM=$(echo $MEMBERS | wc -w)
+LH_PROBE_ONLY=${LH_PROBE_ONLY:-0}
 fails=0
 # ck: tests/lib/rig.sh (sourced above) provides it, and its version ABORTs on an EMPTY value instead of printing a FAIL about MXFS
 hd() { rsx 20 "$1" "dmesg | sed -n \"/$MARK/,\\\$p\""; }
@@ -239,7 +264,19 @@ clear_knobs() {
 # the inode is named here; on an aged filesystem every candidate is above that
 # and the lap read them all as undetermined (s585a).  Named on BOTH nodes,
 # because which one masters the inode is exactly what is being asked.
-probe_ino() { for n in "$H" "$W"; do timeout 15 $SSH "$n" "echo $1 > $P/dbg_probe_ino" >/dev/null 2>&1; done; }
+# onall <timeout> <tag> <cmd>: the command on every member at once, each with
+# its own timeout, its stdout in $OUT/<tag>_<node>.txt and its exit code in
+# $OUT/<tag>_<node>.rc, so a member that did not answer is visible by name.
+onall() {
+    local n pids=()
+    for n in $MEMBERS; do
+        ( timeout "$1" $SSH "$n" "$3" </dev/null 2>/dev/null | filt > "$OUT/$2_$n.txt"
+          echo "${PIPESTATUS[0]}" > "$OUT/$2_$n.rc" ) &
+        pids+=($!)
+    done
+    for n in "${pids[@]}"; do wait "$n"; done
+}
+probe_ino() { onall 15 probeino "echo $1 > $P/dbg_probe_ino"; }
 
 echo "=== live_holder_wait label=$LABEL H=$H W=$W pause_ms=$PAUSE_MS out=$OUT $(date -u +%FT%TZ) ==="
 TREESV=$(modinfo mxfs.ko 2>/dev/null | sed -n 's/^srcversion: *//p')
@@ -303,7 +340,7 @@ for n in "$H" "$W"; do
     [ "${g:-0}" = "1" ] || { echo "ABORT: $n has no writable dbg_probe_ino knob (build older than 0.84.0); the locality probe is blind above ino 256"; exit 2; }
 done
 MARK="LIVEWAIT-$LABEL-$$"
-for n in "$H" "$W"; do timeout 12 $SSH "$n" "echo '$MARK' > /dev/kmsg" >/dev/null 2>&1; done
+for n in $MEMBERS; do timeout 12 $SSH "$n" "echo '$MARK' > /dev/kmsg" >/dev/null 2>&1; done
 
 DM="dmesg | awk '/$MARK/{f=1} f'"
 disarm_drop() { timeout 20 $SSH "$W" "echo 0 > $P/dl_drop_lockreq_ino" >/dev/null 2>&1; }
@@ -318,14 +355,16 @@ disarm_drop() { timeout 20 $SSH "$W" "echo 0 > $P/dl_drop_lockreq_ino" >/dev/nul
 #    inode number's low three bits before hashing it (include/mxfs/mxfs_tauth.h
 #    mxfs_tauth_route_hash), so eight inodes created in a row are one or two
 #    draws, not eight.  On the 0.90.134 capture gate all eight (8389321-
-#    8389328) came back local, and the lap could not run on that formation.  H
-#    therefore creates objects until NSHARD distinct shards are represented,
-#    keeps the first object in each as its candidate and removes the rest.
-#    Each shard is its own draw, so on two nodes none of 16 is remote-mastered
-#    with probability 2^-16.  The spares stay until every candidate exists: a
-#    freed inode number is taken by the next create (measured: 160 creates in
-#    0.6 s, and one of them reused a freed number), which would draw the same
-#    shard again.
+#    8389328) came back local -- mastered by W, the requester (P7S-BAST-FIRE
+#    test1=0 test2=1 with W=test2) -- and the lap could not run on that
+#    formation.  H therefore creates objects until NSHARD distinct shards are
+#    represented, keeps the first object in each as its candidate and removes
+#    the rest.  Each shard is its own draw, so on two nodes every one of 16 is
+#    W's with probability 2^-16 (NODE COUNTS above for N members).  The spares
+#    stay until every candidate exists: a freed inode number is taken by the
+#    next create (measured: 160 creates in 0.6 s, and one of them reused a
+#    freed number), which would draw the same shard again.  LH_PROBE_ONLY=1
+#    keeps objects 1-8 as well, to the end, so their masters can be measured.
 # The digest a node reports for the target: the file's bytes, or the sorted
 # names of the directory.  Both sides of every comparison use this.
 dgst() { if [ "$TARGET" = dir ]; then echo "ls -1A '$1' | sort | md5sum | cut -d' ' -f1"; else echo "md5sum '$1' | cut -d' ' -f1"; fi; }
@@ -334,10 +373,20 @@ dgst() { if [ "$TARGET" = dir ]; then echo "ls -1A '$1' | sort | md5sum | cut -d
 redirty() { if [ "$TARGET" = dir ]; then echo ": > '$1/$2'"; elif [ "$RW" = dio_unaligned ]; then echo "dd if=/dev/urandom of='$1' bs=4096 count=1 conv=notrunc status=none"; else echo "dd if=/dev/urandom of='$1' bs=4096 count=8 status=none"; fi; }
 if [ "${LH_SHARD_SELECT:-1}" = 0 ]; then
     # control: every object is its own entry in the seen-list, so all eight are kept
-    NSHARD=8; NMAKE=8; shard_of='s=$i'
+    NSHARD=8; NMAKE=8; shard_of='s=$i'; CDESC="made back to back"
 else
-    NSHARD=16; NMAKE=160; shard_of='s=$((ino >> 3))'
+    # NODE COUNTS above: ceil(16 ln 2 / -ln(1 - 1/N)), 16 on two members
+    NSHARD=$(awk -v n="$NMEM" 'BEGIN { x = 16 * log(2) / -log(1 - 1 / n); c = int(x); if (x - c > 1e-9) c++; print c }')
+    NMAKE=$(( NSHARD * 10 )); shard_of='s=$((ino >> 3))'; CDESC="one per routing shard"
 fi
+# bound: ssh connect (ConnectTimeout 10 s) + 2x the measured 0.9-1.2 s per 160 objects for the
+# creates, the removal and the sync (file, dio_unaligned and dir modes, test1, 2026-10-22): 13 s
+# for the 160 of two members
+SETUP_S=$(( 10 + (24 * NMAKE + 1599) / 1600 ))
+# LH_PROBE_ONLY=1: objects 1..OLDN are the pre-fix harness's candidates (it made
+# OLDN back to back, first, under the same names); they are kept and listed.
+OLDN=8
+[ "$LH_PROBE_ONLY" = 1 ] && [ "$CAW" = 1 ] && { echo "ABORT: LH_PROBE_ONLY=1 measures a lock master, and CAW has none"; clear_knobs; exit 2; }
 if [ "$RW" = dio_unaligned ]; then
     # 64 KiB fallocated, first block written: the region past it stays unwritten
     # so W's unaligned overwrite-only attempt answers -EAGAIN and retries EX.
@@ -347,23 +396,29 @@ elif [ "$TARGET" = dir ]; then
 else
     mk='dd if=/dev/urandom of="$f" bs=4096 count=8 status=none'
 fi
-# bound: ssh connect (ConnectTimeout 10 s) + 2x the measured 0.9-1.2 s for 160 creates, the
-# removal and the sync (file, dio_unaligned and dir modes, test1, 2026-10-22)
-timeout 13 $SSH "$H" "
+KEEPN=0; [ "$LH_PROBE_ONLY" = 1 ] && KEEPN=$OLDN
+timeout $SETUP_S $SSH "$H" "
     seen=' '; n=0; i=0; spare=
     while [ \$n -lt $NSHARD ] && [ \$i -lt $NMAKE ]; do
         i=\$((i+1)); f='$MNT/.livewait_${LABEL}_'\$i
         $mk || exit 1
         ino=\$(stat -c %i \"\$f\") || exit 1; $shard_of
-        case \"\$seen\" in *\" \$s \"*) spare=\"\$spare \$f\"; continue ;; esac
+        [ \$i -le $KEEPN ] && echo OLD8 \$i \$ino
+        case \"\$seen\" in *\" \$s \"*) [ \$i -le $KEEPN ] || spare=\"\$spare \$f\"; continue ;; esac
         seen=\"\$seen\$s \"; n=\$((n+1)); echo \$i \$ino
     done
     [ -z \"\$spare\" ] || rm -rf \$spare
     sync
   " 2>"$OUT/h_setup.err" | filt > "$OUT/h_cands.txt"
-# the candidates H made, removed at the end of the lap or when it cannot run
+# LH_PROBE_ONLY=1: the OLD8 lines (objects 1..OLDN, kept) go to their own list
+: > "$OUT/h_old8.txt"
+if [ "$LH_PROBE_ONLY" = 1 ]; then
+    awk '$1 == "OLD8" {print $2, $3}' "$OUT/h_cands.txt" > "$OUT/h_old8.txt"
+    awk '$1 != "OLD8"' "$OUT/h_cands.txt" > "$OUT/h_cands.new" && mv "$OUT/h_cands.new" "$OUT/h_cands.txt"
+fi
+# the candidates H made (and the kept OLD8 objects), removed at the end of the lap or when it cannot run
 rm_cands() {
-    timeout 20 $SSH "$H" "rm -rf $(awk -v p="$MNT/.livewait_${LABEL}_" '{printf " %s%s", p, $1}' "$OUT/h_cands.txt")" >/dev/null 2>&1
+    timeout 20 $SSH "$H" "rm -rf $(cat "$OUT/h_cands.txt" "$OUT/h_old8.txt" | awk -v p="$MNT/.livewait_${LABEL}_" '!s[$1]++ {printf " %s%s", p, $1}')" >/dev/null 2>&1
 }
 [ "$(grep -ac . "$OUT/h_cands.txt")" = "$NSHARD" ] || {
     echo "ABORT: H made candidates in $(grep -ac . "$OUT/h_cands.txt") of $NSHARD distinct shards from $NMAKE objects: [$(filt < "$OUT/h_setup.err" | tail -3 | tr '\n' ' ')]"
@@ -378,39 +433,77 @@ ino=""; CAND=""; MLOC=""
 if [ "$CAW" = 1 ]; then
     read -r CAND ino < "$OUT/h_cands.txt"; MLOC=caw
 fi
-[ -n "$ino" ] || while read -r idx cino <&3; do
-    [ -n "$cino" ] || continue
-    cf="$MNT/.livewait_${LABEL}_$idx"
-    # H holds a conflicting grant, W reads: the MASTER of this inode is the
-    # node that fires the blocking notification, and it says so in its own
-    # log.  BOTH answers are then first-hand.
-    #
-    # The previous probe armed the request-drop knob and called a candidate
-    # LOCAL when the knob did not fire.  That reads an ABSENCE as an answer,
-    # and the absence has more than one cause: s580b picked ino 140 that way,
-    # called it local, and measured the remote path -- test1 fired 26
-    # notifications for it while test2, the node the lap was counting, fired
-    # none.  A probe whose two branches rest on different quality of evidence
-    # will keep doing that, so neither branch rests on silence now.
-    probe_ino "$cino"
+# probe_master <idx> <ino>: H holds a conflicting grant, W reads: the MASTER
+# of this inode is the node that fires the blocking notification, and it says
+# so in its own log.  BOTH answers are then first-hand.  Sets loc (remote = H,
+# local = W, third:<node> = another named member, undetermined), f1 (H's
+# count), f2 (W's) and fx (the other members' counts, "" on two members).
+#
+# The previous probe armed the request-drop knob and called a candidate
+# LOCAL when the knob did not fire.  That reads an ABSENCE as an answer,
+# and the absence has more than one cause: s580b picked ino 140 that way,
+# called it local, and measured the remote path -- test1 fired 26
+# notifications for it while test2, the node the lap was counting, fired
+# none.  A probe whose two branches rest on different quality of evidence
+# will keep doing that, so neither branch rests on silence now.
+probe_master() {
+    local cf="$MNT/.livewait_${LABEL}_$1" n c nfx=0 xnode=""
+    probe_ino "$2"
     timeout 25 $SSH "$H" "$(redirty "$cf" probe_by_h); sync" </dev/null >/dev/null 2>&1
     timeout 25 $SSH "$W" "echo 3 > /proc/sys/vm/drop_caches; $(dgst "$cf") >/dev/null 2>&1" </dev/null >/dev/null 2>&1
     sleep 3
-    f1=$(timeout 20 $SSH "$H" "$DM | grep -ac 'P7S-BAST-FIRE ino=$cino '" </dev/null 2>/dev/null | filt | tr -dc '0-9')
-    f2=$(timeout 20 $SSH "$W" "$DM | grep -ac 'P7S-BAST-FIRE ino=$cino '" </dev/null 2>/dev/null | filt | tr -dc '0-9')
-    f1=${f1:-0}; f2=${f2:-0}
-    if   [ "$f1" -ge 1 ] && [ "$f2" -eq 0 ]; then loc=remote
-    elif [ "$f2" -ge 1 ] && [ "$f1" -eq 0 ]; then loc=local
+    onall 20 fire "$DM | grep -ac 'P7S-BAST-FIRE ino=$2 '"
+    f1=$(tr -dc '0-9' < "$OUT/fire_$H.txt"); f2=$(tr -dc '0-9' < "$OUT/fire_$W.txt")
+    f1=${f1:-0}; f2=${f2:-0}; fx=""
+    for n in ${LHW_HOLD//,/ }; do
+        c=$(tr -dc '0-9' < "$OUT/fire_$n.txt"); c=${c:-0}
+        fx="$fx $n=$c"
+        [ "$c" -ge 1 ] && { nfx=$((nfx + 1)); xnode=$n; }
+    done
+    if   [ "$f1" -ge 1 ] && [ "$f2" -eq 0 ] && [ "$nfx" = 0 ]; then loc=remote
+    elif [ "$f2" -ge 1 ] && [ "$f1" -eq 0 ] && [ "$nfx" = 0 ]; then loc=local
+    elif [ "$nfx" = 1 ] && [ "$f1" -eq 0 ] && [ "$f2" -eq 0 ]; then loc=third:$xnode
     else loc=undetermined
     fi
-    echo "  INFO candidate idx=$idx ino=$cino master=$loc (P7S-BAST-FIRE $H=$f1 $W=$f2) at +$(el)s"
-    [ "$loc" = "undetermined" ] && continue
+}
+[ -n "$ino" ] || while read -r idx cino <&3; do
+    [ -n "$cino" ] || continue
+    probe_master "$idx" "$cino"
+    [ "$LH_PROBE_ONLY" = 1 ] && echo "$idx" >> "$OUT/h_probed.txt"
+    echo "  INFO candidate idx=$idx ino=$cino master=$loc (P7S-BAST-FIRE $H=$f1 $W=$f2$fx) at +$(el)s"
+    # the scoring below takes the master's counts on H (remote) or W (local);
+    # a shard another member masters, or no clear master, is not this lap's
+    case "$loc" in remote|local) ;; *) continue ;; esac
     if [ "$MASTER" = "any" ] || [ "$loc" = "$MASTER" ]; then
         ino=$cino; CAND=$idx; MLOC=$loc; break
     fi
 done 3< "$OUT/h_cands.txt"
+# LH_PROBE_ONLY=1: the selection's verdict, then the master of every kept
+# OLD8 object the selection did not probe, then stop before the pause.
+if [ "$LH_PROBE_ONLY" = 1 ]; then
+    if [ -n "$ino" ]; then
+        echo "  INFO target ino=$ino file=$MNT/.livewait_${LABEL}_$CAND master=$MLOC (wanted $MASTER) at +$(el)s"
+    else
+        echo "ABORT: none of the $NSHARD candidates ($CDESC) is $MASTER-mastered from $W — this lap cannot measure the path it names"
+    fi
+    while read -r oidx oino; do echo "OLD8 $oidx $oino"; done < "$OUT/h_old8.txt"
+    while read -r oidx oino <&3; do
+        # probed already when the selection reached it
+        awk -v i="$oidx" '$1 == i {f = 1} END {exit !f}' "$OUT/h_probed.txt" 2>/dev/null && continue
+        probe_master "$oidx" "$oino"
+        echo "  INFO map idx=$oidx ino=$oino master=$loc (P7S-BAST-FIRE $H=$f1 $W=$f2$fx) at +$(el)s"
+    done 3< "$OUT/h_old8.txt"
+    for n in $MEMBERS; do echo "PROBE-RC $n probeino=$(cat "$OUT/probeino_$n.rc" 2>/dev/null) fire=$(cat "$OUT/fire_$n.rc" 2>/dev/null)"; done
+    rm_cands; disarm_drop; clear_knobs
+    if [ -n "$ino" ]; then
+        echo "PROBE-ONLY: target chosen ino=$ino idx=$CAND master=$MLOC from $NSHARD candidates ($CDESC, members=$NMEM); nothing measured"
+        exit 0
+    fi
+    echo "PROBE-ONLY: no target from $NSHARD candidates ($CDESC, members=$NMEM); nothing measured"
+    exit 2
+fi
 [ -n "$ino" ] || {
-    echo "ABORT: none of the $NSHARD candidates (one per routing shard) is $MASTER-mastered from $W — this lap cannot measure the path it names"
+    echo "ABORT: none of the $NSHARD candidates ($CDESC) is $MASTER-mastered from $W — this lap cannot measure the path it names"
     rm_cands; disarm_drop; clear_knobs; exit 2; }
 F="$MNT/.livewait_${LABEL}_$CAND"
 probe_ino "$ino"

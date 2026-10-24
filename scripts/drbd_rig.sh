@@ -95,9 +95,9 @@
 #   MXFS_NODES        two rig nodes by name instead of a group ("test17 test18"),
 #                     so pairs beyond the two-node groups can run side by side
 #   MXFS_NODE_REPO    the tree the nodes load mxfs.ko and run the tools from, as
-#                     they see it over NFS (default /src/mxfs); it must hold the
-#                     same build as this script's tree, so a second tree under
-#                     /src can be measured without touching /src/mxfs
+#                     they see it over NFS (default /src/<this tree's directory
+#                     name>, as run.sh takes it); it must hold the same build as
+#                     this script's tree
 #   DRBD_RIG_NO_BASELINE=1   skip the backing-LUN fio legs in `up`
 #   DRBD_RIG_RESOURCES  multi-death-test: how many resources (2..9, default 3;
 #                       two pool LUNs each)
@@ -141,7 +141,15 @@ APT_BUDGET=120      # one ~1 MB package and its dependencies from the Ubuntu mir
 FIO_LEG_S=20        # ramp 5 + runtime 15, time_based
 FIO_LEG_BUDGET=60   # the leg, fio's setup and the ssh round trip, twice over
 
-NODE_REPO=${MXFS_NODE_REPO:-/src/mxfs}
+# the nodes see this tree over NFS at /src/<its directory's name>, as run.sh takes it, so a
+# sibling checkout's rig runs that checkout's module and scripts
+NODE_REPO=${MXFS_NODE_REPO:-/src/$(basename "$REPO")}
+# The module refuses a pair whose lost link only the fixed tie-break decides
+# (agent=self with no authority=quorum: participant 1 never outlives
+# participant 0), drbd_third_vote=1.  The tests of that tie-break itself load
+# the module with the refusal off: install_self_authority sets this, the node
+# fence (install_fencing) and the vote (install_quorum_authority) clear it.
+TIEBREAK_MODARGS=""
 if [ -n "${MXFS_NODES:-}" ]; then
     read -r -a NODES <<<"$MXFS_NODES"
     GROUP="nodes-${NODES[0]:-none}"
@@ -700,6 +708,8 @@ install_fencing() {
     hook_setup
     fence_setup
     local n peer delay key handler
+    TIEBREAK_MODARGS=""
+    both thirdvote "[ -w /sys/module/mxfs/parameters/drbd_third_vote ] && echo 1 > /sys/module/mxfs/parameters/drbd_third_vote; echo THIRDVOTE_OK" 15
     key=$(base64 -w0 < "$FENCE_KEY"); handler=$(base64 -w0 < "$REPO/tools/mxfs_drbd_fence_peer.sh")
     local witness; witness=$(base64 -w0 < "$REPO/tools/mxfs_drbd_witness.py")
     for n in "${NODES[@]}"; do
@@ -822,7 +832,7 @@ load_mxfs_node() {  # <node> <device for prep_node's rig tag>
     local out
     out=$(ssh_n "$1" "mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }
         grep -E '^ *[0-9]+: cs:(Connected|SyncSource|SyncTarget|WFBitMap|WFReportParams)' /proc/drbd 2>/dev/null | head -1 | sed 's/^/LINK_UP /'
-        MXFS_NO_MOUNT=1 MXFS_DEV=$2 MXFS_KO_MD5=$(md5sum "$REPO/mxfs.ko" | awk '{print $1}') MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1 | grep -aE 'NODE_PREP_(OK|FAIL)'" 180)
+        MXFS_EXTRA_MODARGS='$TIEBREAK_MODARGS' MXFS_NO_MOUNT=1 MXFS_DEV=$2 MXFS_KO_MD5=$(md5sum "$REPO/mxfs.ko" | awk '{print $1}') MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1 | grep -aE 'NODE_PREP_(OK|FAIL)'" 180)
     grep -q '^LINK_UP' <<<"$out" && die "$1: a DRBD link is up before the module load: $(grep '^LINK_UP' <<<"$out")"
     grep -q '^NODE_PREP_OK' <<<"$out" || die "$1: module load: $out"
 }
@@ -980,6 +990,7 @@ step_death_test() {
 # install_fencing writes it again afterwards.
 install_self_authority() {
     local n peer pub hostkey out src dst
+    TIEBREAK_MODARGS=drbd_third_vote=0
     # over stdin, not as an argument: the program alone is past the kernel's
     # 128 KiB limit on one argument once base64-encoded
     for n in "${NODES[@]}"; do
@@ -995,6 +1006,7 @@ install_self_authority() {
             cp -p /etc/mxfs/drbd-fence.conf /etc/mxfs/drbd-fence.conf.backup
         fi
         echo agent=self > /etc/mxfs/drbd-fence.conf
+        [ -w /sys/module/mxfs/parameters/drbd_third_vote ] && echo 0 > /sys/module/mxfs/parameters/drbd_third_vote
         [ -s /root/.ssh/id_ed25519 ] || ssh-keygen -q -t ed25519 -N '' -C mxfs-rig-selfauth -f /root/.ssh/id_ed25519 || { echo SELFAUTH_FAIL keygen; exit 1; }
         command -v nft >/dev/null || { echo SELFAUTH_FAIL no nft; exit 1; }
         echo \"SELFAUTH_OK \$(cat /root/.ssh/id_ed25519.pub) HOSTKEY \$(cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)\"" 30
@@ -1258,6 +1270,8 @@ QUORUM_RECOVER_BUDGET=42
 QUORUM_LINKONLY_BUDGET=126
 install_quorum_authority() {  # <participant 1> <participant 0>
     local n out
+    TIEBREAK_MODARGS=""
+    both thirdvote "[ -w /sys/module/mxfs/parameters/drbd_third_vote ] && echo 1 > /sys/module/mxfs/parameters/drbd_third_vote; echo THIRDVOTE_OK" 15
     "$REPO/scripts/quorum_setup.sh" "mxfs-drbd-$1-$2" "$QUORUM_QNETD" "$1=$(lab_addr "$1")" "$2=$(lab_addr "$2")" > "$EVID/quorum_setup" 2>&1 \
         || die "quorum setup: $(tail -2 "$EVID/quorum_setup" | tr '\n' ' ')"
     for n in "${NODES[@]}"; do
@@ -1969,7 +1983,7 @@ step_self_outage_test() {
     [ "${SELF_OUTAGE_RESUME:-0}" = 1 ] && resume_args=bootstrap_inject=4
     both soutprep "$NODE_DRBD_UP
         mountpoint -q /src || { mkdir -p /src; timeout 20 mount -t nfs 192.168.120.1:/src /src -o rw,vers=4.1,hard,timeo=600,retrans=2,tcp; }
-        x=; [ \"\$(hostname)\" = $p0 ] && x='$resume_args'
+        x='$TIEBREAK_MODARGS'; [ \"\$(hostname)\" = $p0 ] && x='$TIEBREAK_MODARGS $resume_args'
         MXFS_EXTRA_MODARGS=\$x MXFS_NO_MOUNT=1 MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1 | grep -a NODE_PREP" 150
     for n in "${NODES[@]}"; do
         grep -aq '^NODE_PREP_OK' "$EVID/soutprep.$n" || die "self outage test: $n: $(tail -1 "$EVID/soutprep.$n")"
@@ -3516,6 +3530,100 @@ step_status() {
     for n in "${NODES[@]}"; do echo "$n: $(tr '\n' ' ' < "$EVID/status.$n")"; done
 }
 
+# third-vote-test <1|0>: D-DRBD-PAIR-WITHOUT-QDEVICE-OR-NODE-FENCE-P1-DOES-NOT-SURVIVE-P0-DEATH.
+# The pair as a package installs it with no fence configuration: /etc/mxfs/drbd-fence.conf
+# agent=self alone, the fixed tie-break deciding a lost link.
+#   1  the module's default (drbd_third_vote=1): both nodes' mounts must be refused, the kernel
+#      naming the missing third vote (P-DRBD-ARM-REFUSED); the rig's node fence is installed
+#      again and both mount after, so the pair is left formed.
+#   0  the same-build control (drbd_third_vote=0): both mount, participant 0 is destroyed, and
+#      participant 1 must complete the recovery of its slice (P163-RECOVERY-COMPLETE) within
+#      twice the self-death recovery budget; the defect is that it never does.  The pair is
+#      left broken: participant 0 is powered on again, nothing else (the next lap's up rebuilds
+#      it).
+# Prints THIRDVOTE EXPOSED once the shape is reached, then THIRDVOTE PASS or THIRDVOTE FAIL;
+# exits 0 on PASS, 1 on FAIL, and dies (exit 1, no verdict line) on a setup failure.
+step_third_vote_test() {
+    local arm=$1 a1 a2 p0 p1 n out t0 b0 b i mark refused=0
+    case "$arm" in 0|1) ;; *) die "third-vote-test <1|0>" ;; esac
+    need_dual_primary
+    a1=$(lab_addr "$N1"); a2=$(lab_addr "$N2")
+    if python3 -I -c 'import ipaddress, sys; sys.exit(0 if ipaddress.ip_address(sys.argv[1]) < ipaddress.ip_address(sys.argv[2]) else 1)' "$a1" "$a2"; then
+        p0=$N1; p1=$N2
+    else
+        p0=$N2; p1=$N1
+    fi
+    both stop "$NODE_UNMOUNT; echo STOP_OK" 120
+    for n in "${NODES[@]}"; do
+        grep -aq '^STOP_OK' "$EVID/stop.$n" || die "third vote test: $n would not release mxfs: $(tail -1 "$EVID/stop.$n")"
+    done
+    # the stop above unloaded the module: the arm's switch goes in at the load
+    install_self_authority
+    [ "$arm" = 1 ] && TIEBREAK_MODARGS=""
+    say "third vote test (arm $arm): participant 0 $p0, participant 1 $p1; drbd-fence.conf agent=self alone on both"
+    mark="mxfs-test: third-vote-test arm=$arm $$"
+    local KO_MD5; KO_MD5=$(md5sum "$REPO/mxfs.ko" | awk '{print $1}')
+    for n in "$p0" "$p1"; do
+        ssh_n "$n" "echo '<5>$mark' > /dev/kmsg; MXFS_EXTRA_MODARGS='$TIEBREAK_MODARGS' MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1" 150 > "$EVID/tvmount.$n"
+        ssh_n "$n" "dmesg | sed -n '/$mark/,\$p' | grep -a 'P-DRBD-ARM-' | cut -c1-400" 20 > "$EVID/tvarm.$n"
+    done
+    both thirdvote "cat /sys/module/mxfs/parameters/drbd_third_vote" 15
+    for n in "${NODES[@]}"; do
+        [ "$(tr -dc '0-9' < "$EVID/thirdvote.$n")" = "$arm" ] || die "third vote test: drbd_third_vote on $n reads '$(cat "$EVID/thirdvote.$n")', not $arm"
+    done
+    echo "THIRDVOTE EXPOSED: the pair with agent=self alone asked to mount on both nodes (arm $arm)"
+    if [ "$arm" = 1 ]; then
+        for n in "$p0" "$p1"; do
+            if ! grep -aq '^NODE_PREP_OK' "$EVID/tvmount.$n" && grep -aq 'P-DRBD-ARM-REFUSED.*no third vote' "$EVID/tvarm.$n"; then
+                refused=$((refused + 1))
+                say "  $n refused: $(grep -a -o 'P-DRBD-ARM-REFUSED.*' "$EVID/tvarm.$n" | head -1 | cut -c1-240)"
+            else
+                say "  $n NOT refused for the third vote: $(grep -a 'NODE_PREP_' "$EVID/tvmount.$n" | tail -1 | cut -c1-160) | $(head -1 "$EVID/tvarm.$n" | cut -c1-200)"
+            fi
+        done
+        both stop "$NODE_UNMOUNT; echo STOP_OK" 120
+        install_fencing
+        for n in "$p0" "$p1"; do
+            ssh_n "$n" "MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1" 150 > "$EVID/tvremount.$n"
+            grep -aq '^NODE_PREP_OK' "$EVID/tvremount.$n" || say "  $n did not mount again under the rig's node fence: $(tail -1 "$EVID/tvremount.$n" | cut -c1-200)"
+        done
+        if [ "$refused" = 2 ]; then
+            echo "THIRDVOTE PASS: both nodes refused the pair with no third vote and no node fence"
+            return 0
+        fi
+        echo "THIRDVOTE FAIL: $refused of 2 nodes refused the pair with no third vote and no node fence"
+        return 1
+    fi
+    for n in "$p0" "$p1"; do
+        grep -aq '^NODE_PREP_OK' "$EVID/tvmount.$n" || die "third vote test (arm 0): $n did not mount: $(tail -1 "$EVID/tvmount.$n" | cut -c1-200) | $(head -1 "$EVID/tvarm.$n" | cut -c1-200)"
+    done
+    out=$(ssh_n "$p1" "mkdir -p $MNT/tvote && head -c 65536 /dev/urandom > $MNT/tvote/p1 && sync -f $MNT && echo WROTE" 60)
+    grep -q WROTE <<<"$out" || die "third vote test (arm 0): $p1 could not write before the death: $out"
+    b0=$(ssh_n "$p1" "cat /proc/sys/kernel/random/boot_id" 10)
+    [ ${#b0} = 36 ] || die "third vote test (arm 0): no boot id from $p1: $b0"
+    ssh_n "$p1" "dmesg -C; echo '<5>mxfs-test: third-vote-test kill $p0' > /dev/kmsg" 10 >/dev/null
+    t0=$(date +%s)
+    timeout 60 virsh -c qemu:///system destroy "$p0" >/dev/null 2>&1 || die "third vote test: virsh destroy $p0 failed"
+    say "  $p0 (participant 0) destroyed"
+    out=""
+    for i in $(seq 1 $((SELF_RECOVER_BUDGET * 2))); do
+        out=$(ssh_n "$p1" "cat /proc/sys/kernel/random/boot_id; dmesg | grep -c 'P163-RECOVERY-COMPLETE'" 10)
+        b=$(head -1 <<<"$out")
+        [ "$(sed -n 2p <<<"$out")" -ge 1 ] 2>/dev/null && break
+        [ ${#b} = 36 ] && [ "$b" != "$b0" ] && break
+        sleep 1
+    done
+    echo "$out" > "$EVID/tv_p1_after"
+    ssh_n "$p1" "awk '\$1 + 0 >= $t0' /var/lib/mxfs/drbd-fence.$RES 2>/dev/null | cut -c1-240" 15 > "$EVID/tv_p1_record"
+    "$REPO/scripts/lab_power.sh" up "$p0" > "$EVID/tv_power" 2>&1 || say "  $p0 did not boot again: $(tail -1 "$EVID/tv_power")"
+    if [ "$(sed -n 2p <<<"$out")" -ge 1 ] 2>/dev/null; then
+        echo "THIRDVOTE PASS: participant 1 ($p1) recovered participant 0's slice $(( $(date +%s) - t0 ))s after its death"
+        return 0
+    fi
+    echo "THIRDVOTE FAIL: participant 1 ($p1) did not carry on after participant 0's death: no recovery within $((SELF_RECOVER_BUDGET * 2))s (boot $b0 -> ${b:-no answer}; record: $(head -2 "$EVID/tv_p1_record" | sed 's/.*result=/result=/' | tr '\n' ' ' | cut -c1-200))"
+    return 1
+}
+
 step_down() {
     local n id
     stop_nodes
@@ -3550,6 +3658,7 @@ case "$CMD" in
     self-restart-test) evid; take_locks; hold_luns adopt; step_self_restart_test ;;
     takeover-test) evid; take_locks; hold_luns adopt; step_takeover_test "$@" ;;
     quorum-test) evid; take_locks; hold_luns adopt; step_quorum_test "$@" ;;
+    third-vote-test) evid; take_locks; hold_luns adopt; step_third_vote_test "$@" ;;
     promoter-test) evid; take_locks; hold_luns adopt; step_promoter_test "$@" ;;
     rejoin)      # [node]: the node to bring back (default $N2); the other is its survivor
         evid; take_locks; hold_luns adopt

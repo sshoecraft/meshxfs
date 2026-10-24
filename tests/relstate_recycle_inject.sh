@@ -25,9 +25,15 @@
 # Budget: create FILES on B (~1 s per 100), drop caches (~1 s), FILES x 2
 # ops on A (ms each, bounded OP_S), two kernel-log pulls: ~30 s at 200 files.
 #
+# RRI_INIT_ACTIVE=0 sets relstate_init_active=0 on A for the operations, so a
+# new inode keeps a WEDGED state its memory held (the read before the fix, the
+# same-build control); it is set back to 1 at the end.  Default 1.
+#
 # Usage: tests/relstate_recycle_inject.sh <label> <A> <B> [files]
 set -u
 LABEL=${1:?label}; A=${2:?node A}; B=${3:?node B}; FILES=${4:-200}
+INIT_ACTIVE=${RRI_INIT_ACTIVE:-1}
+case "$INIT_ACTIVE" in 0|1) ;; *) echo "RESULT: ABORT label=$LABEL stage=args RRI_INIT_ACTIVE=$INIT_ACTIVE"; exit 2 ;; esac
 OP_S=15
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd); cd "$REPO"
 SSH=tools/mxfs_sshpass.sh
@@ -39,6 +45,7 @@ fails=0
 D="$MNT/.rri_$LABEL"
 MARK="RRI-$LABEL-$$"
 KNOB=/sys/module/mxfs/parameters/dbg_relstate_wedge_on_free
+SWITCH=/sys/module/mxfs/parameters/relstate_init_active
 
 echo "=== relstate_recycle_inject label=$LABEL A=$A B=$B files=$FILES out=$OUT $(date -u +%FT%TZ) ==="
 want=$(modinfo mxfs.ko | awk '/^srcversion:/{print $2}')
@@ -70,6 +77,9 @@ sb=$(awk '/^SLAB_BEFORE/ {print $2}' "$OUT/poison.txt"); sa=$(awk '/^SLAB_AFTER/
 echo "  INFO $A mxfs_inode active objects before=$sb after=$sa"
 ckge "$A freed inodes while the knob was on (active objects fell)" "$(( ${sb:-0} - ${sa:-0} ))" 1
 
+got=$(rs 12 "$A" "echo $INIT_ACTIVE > $SWITCH && cat $SWITCH" | tr -dc '0-9')
+ck "$A's relstate_init_active reads $INIT_ACTIVE for the operations" "$got" "$INIT_ACTIVE"
+
 # one line per file: f<i> read_rc=<n> append_rc=<n> ms=<n>
 rs $(( FILES * OP_S * 2 + 30 )) "$A" "for i in \$(seq 1 $FILES); do t0=\$(date +%s%3N); timeout -s KILL $OP_S cat $D/f\$i >/dev/null 2>&1; r=\$?; timeout -s KILL $OP_S sh -c 'echo more >> $D/f'\$i 2>/dev/null; w=\$?; echo \"f\$i read_rc=\$r append_rc=\$w ms=\$(( \$(date +%s%3N) - t0 ))\"; done; echo OPS_DONE" > "$OUT/ops.txt"
 ck "$A's operation loop finished" "$(grep -ac '^OPS_DONE$' "$OUT/ops.txt")" 1
@@ -77,6 +87,7 @@ ck "$A read every file" "$(grep -ac 'read_rc=0 ' "$OUT/ops.txt")" "$FILES"
 ck "$A appended to every file" "$(grep -ac 'append_rc=0 ' "$OUT/ops.txt")" "$FILES"
 echo "  INFO $A max op pair ms=$(sed -n 's/.* ms=//p' "$OUT/ops.txt" | sort -n | tail -1)"
 grep -a -v 'read_rc=0 append_rc=0' "$OUT/ops.txt" | grep -a '^f' | head -3 | sed 's/^/    /'
+rs 12 "$A" "echo 1 > $SWITCH" >/dev/null
 
 for n in "$A" "$B"; do
     measure "$n" 30 "$OUT/kmsg_$n.txt" '^KMSG_END$' "the kernel log on $n from the run marker" "dmesg | sed -n '/$MARK/,\$p'; echo KMSG_END"
@@ -86,6 +97,7 @@ done
 recyc=$(cnt "$OUT/kmsg_$A.txt" 'P-RELSTATE-RECYCLED')
 fence=$(cnt "$OUT/kmsg_$A.txt" 'P-INODE-WEDGE-FENCE')
 echo "  INFO $A P-RELSTATE-RECYCLED=$recyc P-INODE-WEDGE-FENCE=$fence"
+[ "$recyc" -ge 1 ] 2>/dev/null && echo "EXPOSED: $A allocated $recyc new inode(s) in memory whose last occupant wedged"
 ckge "$A allocated an inode in poisoned memory (the cause was reached)" "$recyc" 1
 ck "$A refused no acquire as wedged" "$fence" 0
 

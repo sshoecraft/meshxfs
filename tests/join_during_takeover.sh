@@ -254,13 +254,22 @@ iteration() {
     tmount=$(date +%s)
     # 5. The pass, seen IN FLIGHT: the per-page activation count grew between
     #    two samples five seconds apart and is past a floor.
-    mine0=0; mine1=0; inflight=0
+    #    Every sample is printed, and a count that held still for two samples
+    #    after it started ends the wait: the pass finished before it was seen
+    #    growing, which the gate's bound otherwise cut off with nothing in the
+    #    lap's log to say so (the 48 samples take ~260 s, the gate's bound for
+    #    this entry is 228 s: D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-
+    #    IN-FLIGHT-SAMPLE's control laps, data/reviews/P20261023-c99297.md).
+    mine0=0; mine1=0; inflight=0; still=0
     for i in $(seq 1 48); do
         sleep 5
         c=$(rs 20 "$A" "$DMA | grep -ac 'P-TAUTH-PAGE-MINE page=[0-9]* via=takeover'")
         c=${c:-0}
+        echo "  INFO in-flight sample $i: activations=$c (previous $mine0) at +$(el)s"
         if [ "$c" -ge 50 ] && [ "$mine0" -ge 1 ] && [ "$c" -gt "$mine0" ]; then mine1=$c; inflight=1; break; fi
+        if [ "$c" -ge 1 ] && [ "$c" = "$mine0" ]; then still=$((still + 1)); else still=0; fi
         mine0=$c
+        [ "$still" -ge 2 ] && break
     done
     echo "  INFO takeover pass: activations_so_far=$mine1 (previous sample $mine0) in_flight=$inflight ($(( $(date +%s) - tmount )) s after the mount) at +$(el)s"
     if [ "$inflight" != "1" ]; then

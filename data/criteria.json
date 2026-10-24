@@ -1497,17 +1497,37 @@
         },
         "2/net/mesh/mpath": {
           "status": "PASS",
-          "measured": "elapsed=33s (fresh prep)",
+          "measured": "elapsed=32s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-24T00:10:51Z",
+          "iso": "2026-10-24T00:17:26Z",
           "recorded": "2026-10-23",
-          "elapsed_s": 33,
+          "elapsed_s": 32,
           "build": "79779BEAECBEA94844FDC72",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T001009Z-g2e",
+          "run_id": "20261024T001645Z-g2e",
           "candidate": "0.90.134",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T00:14:54Z",
+              "measured": "elapsed=32s (fresh prep)",
+              "reason": "",
+              "build": "79779BEAECBEA94844FDC72",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T001413Z-g2e"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T00:10:51Z",
+              "measured": "elapsed=33s (fresh prep)",
+              "reason": "",
+              "build": "79779BEAECBEA94844FDC72",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T001009Z-g2e"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T00:06:49Z",
@@ -1591,28 +1611,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261023T233712Z-g2e",
-              "variant": "MXFS_EXTRA_MODARGS=dl_relall_threads=1"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-23T23:34:05Z",
-              "measured": "elapsed=34s (fresh prep)",
-              "reason": "",
-              "build": "79779BEAECBEA94844FDC72",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261023T233321Z-g2e",
-              "variant": "MXFS_EXTRA_MODARGS=dl_relall_threads=1"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-23T23:30:03Z",
-              "measured": "elapsed=34s (fresh prep)",
-              "reason": "",
-              "build": "79779BEAECBEA94844FDC72",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261023T232919Z-g2e",
               "variant": "MXFS_EXTRA_MODARGS=dl_relall_threads=1"
             }
           ]

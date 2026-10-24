@@ -73,7 +73,13 @@
 # connect: 16 s.  Measured unwidened: 5.9-7.9 s of workload a node.  Each held
 # block can keep a worker of either node waiting its HOLD_MS, so the bound
 # adds 2 x HOLD_N x HOLD_MS, or 2 x HOLD_N x HOLD_PEER_MS for holds that wait
-# for the peer.  The forced overlap: the two settling passes 30 s each (32
+# for the peer.  The bound is enforced on the node as well as on the ssh
+# client: the worker runs under `timeout --foreground` 3 s short of it, so it
+# stops itself after the step in hand (WORKER_STOPPED) while the client still
+# waits.  Bounding the client alone left an overrun worker running on the
+# node, holding the mount, and every following lap aborted at its unmount
+# before insmod (tests/evidence/lanes/g2d_a14_merge2node_20261023T204131Z,
+# laps 30-45 and 47-48).  The forced overlap: the two settling passes 30 s each (32
 # stats of a peer-held inode, ~4 ms each, and an ssh), the changes of fb and
 # fa 15 s each, the poll for the hold 10 s, node 1's unmount 60 s, during which
 # node 2's change and unmount 60 s, the counters 10 s.  chk_mxfs of a 20 GiB
@@ -174,8 +180,8 @@ step "INFO $NF files in $(awk '{print int($2 / 8)}' "$OUT/inodes.txt" | sort -u 
 
 # both halves at once, each with its own output and exit code
 t0=$(date +%s%N)
-on "$N1" "$NREPO/tests/fourkn_merge_worker.sh $DIR 1 $ROUNDS $NF" "$WBOUND" > "$OUT/w1.txt" & p1=$!
-on "$N2" "$NREPO/tests/fourkn_merge_worker.sh $DIR 0 $ROUNDS $NF" "$WBOUND" > "$OUT/w2.txt" & p2=$!
+on "$N1" "timeout --foreground $((WBOUND - 3)) $NREPO/tests/fourkn_merge_worker.sh $DIR 1 $ROUNDS $NF" "$WBOUND" > "$OUT/w1.txt" & p1=$!
+on "$N2" "timeout --foreground $((WBOUND - 3)) $NREPO/tests/fourkn_merge_worker.sh $DIR 0 $ROUNDS $NF" "$WBOUND" > "$OUT/w2.txt" & p2=$!
 wait $p1; rc1=$?; wait $p2; rc2=$?
 step "INFO workload wall $(( ($(date +%s%N) - t0) / 1000000 )) ms; $N1: rc=$rc1 $(grep -a WORKER "$OUT/w1.txt" | tail -1); $N2: rc=$rc2 $(grep -a WORKER "$OUT/w2.txt" | tail -1)"
 ck "$N1's half ran to its end with no error" "$(grep -c "^WORKER_DONE rounds=$ROUNDS errors=0 " "$OUT/w1.txt")" 1

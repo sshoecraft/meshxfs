@@ -113,6 +113,10 @@ RELEASE_STEP_SETTLE = os.environ.get("MXFS_RELEASE_STEP_SETTLE", "1") != "0"
 RELEASE_STEP_ANNOTATE = os.environ.get("MXFS_RELEASE_STEP_ANNOTATE", "1") != "0"
 RELEASE_STEP_BOARD = os.environ.get("MXFS_RELEASE_STEP_BOARD", "1") != "0"
 RELEASE_STEP_ROUTE = os.environ.get("MXFS_RELEASE_STEP_ROUTE", "1") != "0"
+#: `incidents --at 1/any` narrows the listing to the placeholder configuration most release steps'
+#: runs are filed under, which parse_at refuses (it is no configuration of MXFS);
+#: `MXFS_RELEASE_STEP_LIST=0` hands it to parse_at, as before: the control.
+RELEASE_STEP_LIST = os.environ.get("MXFS_RELEASE_STEP_LIST", "1") != "0"
 #: An attachment verified by a rig of its own (data/configurations.json attaches.<a>.board, e.g.
 #: drbd) keeps its board there; naming such a configuration reads and writes that board, as its
 #: rig does, so `criteria.py 2/net/mesh/drbd` needs no environment. A command that names a release
@@ -1613,7 +1617,13 @@ def cmd_incidents(args) -> int:
     settled by a reviewed disposition. Nothing ages out: a failure from any build, any candidate,
     stays here until one of those happens."""
     boards = [Path(b) if os.path.isabs(b) else ROOT / b for b in args.board] if args.board else None
-    loose = incidents(parse_at(args.at) if args.at else "", boards)
+    if not args.at:
+        at = ""
+    elif RELEASE_STEP_LIST and args.at == "1/any":
+        at = args.at
+    else:
+        at = parse_at(args.at)
+    loose = incidents(at, boards)
     if not loose:
         print("every FAIL and INCOMPLETE on the release boards%s is named by an open defect "
               "record or settled" % (" at %s" % args.at if args.at else ""))
