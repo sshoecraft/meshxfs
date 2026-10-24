@@ -9713,6 +9713,32 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-70e503",
+      "kind": "remove-fixed",
+      "record": "D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS",
+      "change": {
+        "control": "b20261024-2f6ae0",
+        "fixon": "b20261024-d99c77",
+        "cause": "tests/mpath/lib.sh pf_boot_rejoin brought a killed path-row victim back by loading mxfs with the configuration's transport arguments only (mxfs_rig_modargs), not the set tests/setup/prep_node.sh loads on every other node (log_repeat_limit=0 and the lane's MXFS_EXTRA_MODARGS among them), so the rejoined victim ran module parameters different from its peers' (the original run's victim read dead_timeout_ms=0 after the rejoin while its peers ran 12000). Fix: pf_rejoin_modargs builds prep's argument set for the rejoin (tests/mpath/lib.sh:501-524) and pf_boot_rejoin loads it (:531, the insmod at :545); PF_REJOIN_PREP_ARGS=0 loads what the rejoin loaded before, the control."
+      },
+      "argument": "Resubmission of P20261024-3a6126, answering its review (data/reviews/P20261024-3a6126.md), which found the measurements sound and rejected only the text the removal would publish. (a) The record's summary, which the removal publishes as the CHANGELOG line, is narrowed to what was measured: it no longer says the rejoin sent modprobe no arguments (no lap took that branch; every rejoin line reads 'REJOIN dev=1 insmod_rc=0') nor that a rejoined victim ran the default death window while the lane ran the variant's (on this candidate the control victim ran 'death window 12000 ms' like the survivors); it names the insmod branch and the parameters that differed (log_repeat_limit, and dead_timeout_ms when the lane set one), and points at D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS for the other branches, whose own summary now says the CAW insmod branch is measured with and without extra arguments at 8 nodes. (b) The reproducer now names tests/mpath/rejoin_modargs_rig_lap.sh, the rig lap every batch ran, not the host argv recorder. (c) Three rig controls, not four: e827e0, 2f6ae0, 7cfa3f, each 10 of 10 FAIL on the record's own mismatch, which are the record's 30 cells. (d) Node count: every lap ran at 8 nodes (8/disk/caw/mpath). The original observation includes 16-node runs (test32 in lane g16b_mpathtmo2); that the fix holds at 16 nodes is not claimed from a run. pf_rejoin_modargs and pf_boot_rejoin take no node count (tests/mpath/lib.sh:501-545), which is read from the code, not measured. Measurements, unchanged from P20261024-3a6126: with the lane's extra arguments (MXFS_EXTRA_MODARGS=dead_timeout_ms=12000), control b20261024-e827e0 10 of 10 FAIL 'log_repeat_limit=1 (survivor 0), dead_timeout_ms=0 (survivor 12000)', fix-on b20261024-565ac2 6 of 6 exposed PASS, approved verify P20261024-d7c365; without extra arguments, control b20261024-2f6ae0 10 of 10 FAIL on log_repeat_limit, fix-on b20261024-d99c77 6 of 6 PASS, approved verify P20261024-3e7240; repeated on attempt 20 (frozen 2026-10-24T16:34:18Z, lane tests/evidence/lanes/g8b_a20_20261024T163432Z): control b20261024-7cfa3f 10 of 10 FAIL, verification b20261024-c553df 6 of 6 PASS. All on the byte-identical lib.sh (be693c38...e140 in the attempt 17, 18 and 20 freezes). Claim: on the CAW insmod branch at 8 nodes, a victim pf_boot_rejoin brings back now loads the same values as the survivor for force_transport, target_cache_protected, log_repeat_limit and dead_timeout_ms, with and without the lane's extra arguments. Not claimed: the contract-argument quoting, the modprobe branch, the TCP branch on the rig, 16 nodes from a run, and that a lane running two effective death windows was observed and cured.",
+      "evidence": [
+        "data/reviews/P20261024-3a6126.md",
+        "data/reviews/P20261024-d7c365.md",
+        "data/reviews/P20261024-3e7240.md",
+        "tests/mpath/lib.sh",
+        "tests/mpath/rejoin_modargs_rig_lap.sh",
+        "tests/evidence/batch_laps/b20261024-e827e0",
+        "tests/evidence/batch_laps/b20261024-565ac2",
+        "tests/evidence/batch_laps/b20261024-2f6ae0",
+        "tests/evidence/batch_laps/b20261024-d99c77",
+        "tests/evidence/lanes/g8b_a20_20261024T163432Z/step6.log",
+        "tests/evidence/lanes/g8b_a20_20261024T163432Z/step8.log"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
