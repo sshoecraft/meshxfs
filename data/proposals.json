@@ -10234,8 +10234,39 @@
         "tests/evidence/batch_laps/b20261024-395e2b/20261024T205206Z-ec8e81e2.log",
         "tests/evidence/lanes/host_a22_20261024T204635Z"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-f84fc6.md",
+        "sha256": "2c791c13777f7933b9108fe2d3b2654afcf693f6fb809f097eef493f3ae9e679",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-2e3176",
+      "kind": "verify",
+      "record": "D-LAP-OWN-PREP-BOUND-COUNTS-OTHER-LANES-WAITS-AND-RETURNS-BEFORE-ITS-RUN-LETS-GO",
+      "change": {
+        "batch": "b20261024-a4bf4d"
+      },
+      "argument": "Verification b20261024-a4bf4d of lap:lap_bounded at 2/net/mesh/direct on candidate 0.90.134 (module A7E90BC5313192108E35B80), declared before its first lap by tools/harness_batch.py verify (tests/evidence/lanes/host_a22_20261024T204635Z/step2.log: 'declared verification batch b20261024-a4bf4d ... 6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)'), sized from control b20261024-a4d6ea's 10 of 10 exposed FAILs on the same module. All 6 planned laps ran, each PASS with exposure=1 ('EXPOSED: the wait arm's step started with 19 s left of another holder's lock, over its 10 s bound'), none failed or was dropped: step2.log laps 1/6 to 6/6, 'verify b20261024-a4bf4d: 6 PASS, 0 FAIL of 6 planned'. The remove-fixed of this record was approved in data/reviews/P20261024-f84fc6.md on the same two batches.",
+      "evidence": [
+        "tests/evidence/lanes/host_a22_20261024T204635Z/step2.log",
+        "tests/evidence/lanes/host_a22_20261024T204635Z/step1.log",
+        "tests/evidence/batch_laps/b20261024-a4bf4d",
+        "data/reviews/P20261024-f84fc6.md"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-2e3176.md",
+        "sha256": "2d6d0cd13e5bf38f625d3ad4e426f75ea643962978dbb07f2d9df7cd4d8963ec",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
