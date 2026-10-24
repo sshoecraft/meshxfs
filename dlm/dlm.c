@@ -138,6 +138,48 @@ module_param_named(dl_noqueue_prepare_wouldblock, mxfs_dl_noqueue_prepare_wouldb
 MODULE_PARM_DESC(dl_noqueue_prepare_wouldblock,
 		 "an AG lock's no-queue request answers would-block when the local ledger page is not ready (1, default); 0 = it retries for the whole budget (test control)");
 /*
+ * A ledger fail-stop caused by the target refusing this node's writes
+ * (RESERVATION CONFLICT, counted at the store as target_refused) marks the node
+ * fenced, and the grants refused after it answer -ESHUTDOWN, the withdrawn-
+ * authority errno the inode-lock layer reads as fenced.  Before, the store
+ * turned the refusal into -EIO, the fail-stop refused every later grant -EIO,
+ * and the inode-lock acquire shut the filesystem down as in-core corruption
+ * (D-FENCED-NODE-INODE-LOCK-EIO-SHUTS-DOWN-AS-IN-CORE-CORRUPTION).  A fail-stop
+ * on an I/O error the target did not refuse stays -EIO.  0 = every refusal is
+ * -EIO as before: the same-build control arm, never a production value.
+ */
+int mxfs_dl_failstop_fenced_errno = 1;
+module_param_named(dl_failstop_fenced_errno, mxfs_dl_failstop_fenced_errno, int, 0644);
+MODULE_PARM_DESC(dl_failstop_fenced_errno,
+		 "a ledger fail-stop the target caused by refusing this node's writes refuses later grants as fenced, -ESHUTDOWN (1, default); 0 = -EIO (test control)");
+/*
+ * A re-send of a wait already queued at this master is decided again before
+ * it is kept (dlm_resend_redecide).  A queued wait is granted when a holder
+ * releases (promote_waiters); one held back only by an older conflicting
+ * waiter that is then removed without a grant (timed out, denied, cancelled)
+ * waits for the next release on the resource, and kept its place on every
+ * re-send meanwhile.  When no release comes it waits for good: on
+ * 8/net/mesh/direct the only holder of a directory was a dead node whose
+ * recovery was RECOVERY_BLOCKED, holding PR, compatible with the four
+ * survivors' PR waits; the master's own EX wait ahead of them was denied and
+ * freed, and their re-sends were kept for minutes
+ * (D-8NETMESH-RECOVERY-BLOCKED-LEAVES-QUEUED-SURVIVOR-ACQUIRES-PARKED-FOREVER).
+ *   dl_resend_redecide: a wait that has become grantable is granted on its
+ *     re-send, keeping its age against the waiters queued before it.
+ *   dl_rblk_deny_resend: a wait whose conflicting holder is a dead node in
+ *     RECOVERY_BLOCKED is denied on its re-send, as a new request already is.
+ * 0 = the re-send is kept as before: each the same-build control arm of its
+ * part, never a production value.
+ */
+int mxfs_dl_resend_redecide = 1;
+module_param_named(dl_resend_redecide, mxfs_dl_resend_redecide, int, 0644);
+MODULE_PARM_DESC(dl_resend_redecide,
+		 "a re-send of a queued wait that has become grantable is granted (1, default); 0 = kept in the queue (test control)");
+int mxfs_dl_rblk_deny_resend = 1;
+module_param_named(dl_rblk_deny_resend, mxfs_dl_rblk_deny_resend, int, 0644);
+MODULE_PARM_DESC(dl_rblk_deny_resend,
+		 "a re-send of a queued wait behind a dead holder in RECOVERY_BLOCKED is denied (1, default); 0 = kept in the queue (test control)");
+/*
  * An AG lock's request that asked not to queue does no ledger I/O and never
  * waits for a ledger page lock: unless its page is ready it answers
  * would-block (and, with dl_noqueue_prepare_wouldblock, returns at once), and
@@ -2051,6 +2093,40 @@ static struct mxfs_lock *find_conflicting_waiter(struct mxfs_lock *chain,
 			return lk;
 	}
 	return NULL;
+}
+
+/*
+ * Should the re-send of `wait`, a wait already queued here, be decided again
+ * instead of keeping its place?  True when it has become grantable (no holder
+ * conflicts with it and no waiter queued before it does: dl_resend_redecide),
+ * or when a holder that conflicts with it is a dead node in RECOVERY_BLOCKED,
+ * whose grant waiting cannot release (dl_rblk_deny_resend).  Under
+ * table_rwlock.
+ */
+static bool dlm_resend_redecide(struct mxfs_dlm_ctx *ctx, struct mxfs_lock *chain,
+				const struct mxfs_resource_id *resource,
+				const struct mxfs_lock *wait)
+{
+	struct mxfs_lock *lk;
+	bool conflict = false, blocked = false;
+
+	for (lk = chain; lk; lk = lk->next) {
+		if (lk == wait || !resource_equal(&lk->resource, resource) ||
+		    !lk_is_holder(lk) || lock_compat[lk->mode][wait->mode])
+			continue;
+		conflict = true;
+		if (lk->owner != ctx->local_node && ctx->recovery_blocked_cb &&
+		    ctx->recovery_blocked_cb(ctx->cb_data, lk->owner))
+			blocked = true;
+	}
+	if (blocked)
+		return READ_ONCE(mxfs_dl_rblk_deny_resend) != 0;
+	if (conflict)
+		return false;
+	if (find_conflicting_waiter(chain, resource, wait->owner, wait->mode,
+				    wait->queued_at))
+		return false;
+	return READ_ONCE(mxfs_dl_resend_redecide) != 0;
 }
 
 /*
@@ -6496,7 +6572,7 @@ static int dlm_ledger_prepare(struct mxfs_dlm_ctx *ctx,
 				     resource->type, (unsigned long long)resource->ino,
 				     resource->ag_number, ctx->ledger ? 1 : 0,
 				     ctx->ledger_failed ? 1 : 0);
-		return -EIO;
+		return ctx->ledger_fenced ? -ESHUTDOWN : -EIO;
 	}
 	gen = ctx->ledger_gen;
 	*gen_out = gen;
@@ -6883,6 +6959,7 @@ static int dlm_txn_commit(struct mxfs_dlm_ctx *ctx, struct dlm_txn *txn)
 	struct mxfs_tauth_op *ops;
 	int i, rc = 0, attempt;
 	bool stale_retried = false;
+	uint64_t refused0;
 
 	if (txn->n == 0)
 		return 0;
@@ -6892,6 +6969,7 @@ static int dlm_txn_commit(struct mxfs_dlm_ctx *ctx, struct dlm_txn *txn)
 			txn->it[i].rc = 0;
 		return 0;
 	}
+	refused0 = ctx->ledger->store.target_refused;
 	dlm_own_release_resync(ctx, txn);
 	/* TEST ONLY (dbg_cap_refuse_ino): refused as a full page refuses it */
 	if (unlikely(READ_ONCE(mxfs_dbg_cap_refuse_ino)) &&
@@ -7001,11 +7079,19 @@ static int dlm_txn_commit(struct mxfs_dlm_ctx *ctx, struct dlm_txn *txn)
 	if (rc == -EDQUOT)
 		dlm_capacity_reclaim(ctx, &txn->resource, txn->gen);
 	if (rc == -EIO || rc == -ENOTRECOVERABLE) {
-		/* fail stop: this master cannot make authority durable */
+		/* fail stop: this master cannot make authority durable.  A
+		 * failure the target caused by refusing this node's writes is a
+		 * fence, and the grants refused from here on say so
+		 * (dl_failstop_fenced_errno). */
+		bool refused = ctx->ledger->store.target_refused != refused0;
+
+		if (refused && READ_ONCE(mxfs_dl_failstop_fenced_errno))
+			ctx->ledger_fenced = true;
 		ctx->ledger_failed = true;
 		mxfs_pal_log(MXFS_LOG_ERR,
-			     "mxfs: P-TAUTH-FAILSTOP rc=%d -- ledger writes cannot be made durable; "
-			     "no further grants from this master (fail closed)", rc);
+			     "mxfs: P-TAUTH-FAILSTOP rc=%d target_refused=%d fenced=%d -- ledger "
+			     "writes cannot be made durable; no further grants from this master "
+			     "(fail closed)", rc, refused ? 1 : 0, ctx->ledger_fenced ? 1 : 0);
 	}
 	for (i = 0; i < txn->n; i++) {
 		struct dlm_txn_item *it = &txn->it[i];
@@ -7405,6 +7491,10 @@ static int dlm_txn_finalize(struct mxfs_dlm_ctx *ctx, struct dlm_txn *txn,
 			lock_free(lk);
 		}
 		it->rc = remaster ? -EAGAIN : (commit_rc ? commit_rc : -EIO);
+		/* a grant refused because the target fenced this node: -ESHUTDOWN
+		 * to the local waiter, as every later grant is (dl_failstop_fenced_errno) */
+		if (it->rc == -EIO && ctx->ledger_fenced)
+			it->rc = -ESHUTDOWN;
 	}
 	{
 		struct mxfs_lock *pb, *wk;
@@ -7457,7 +7547,8 @@ static int dlm_txn_finalize(struct mxfs_dlm_ctx *ctx, struct dlm_txn *txn,
 				pending_signal_resource(ctx, &txn->resource, MXFS_LOCK_NL,
 							(it->rc == -EAGAIN || it->rc == -EBUSY ||
 							 it->rc == -EDQUOT) ?
-										MXFS_DLM_RETRY : -EIO, 0);
+										MXFS_DLM_RETRY :
+							it->rc == -ESHUTDOWN ? -ESHUTDOWN : -EIO, 0);
 		} else {
 			struct dlm_grant_ids ids = { 0, 0, 0, it->req_id };
 
@@ -15108,6 +15199,7 @@ static int dlm_process_remote_request_body(struct mxfs_dlm_ctx *ctx,
 			if (lk->state == MXFS_LSTATE_WAITING ||
 			    lk->state == MXFS_LSTATE_BLOCKED) {
 				uint8_t old_state = lk->state;
+				bool redecide = false;
 
 				/*
 				 * Its own request parked for capacity, or a wait whose
@@ -15145,8 +15237,31 @@ static int dlm_process_remote_request_body(struct mxfs_dlm_ctx *ctx,
 				 * different request that must never inherit this one's
 				 * name.  Anything that does not match falls through to the
 				 * original replace-and-requeue.
+				 *
+				 * A matching re-send is decided again first
+				 * (dlm_resend_redecide): one that has become grantable,
+				 * or whose conflicting holder is a dead node in
+				 * RECOVERY_BLOCKED, takes the replace path too, with its
+				 * age carried, and is granted or denied there.
 				 */
 				if (req->acq_seq && lk->acq_seq == req->acq_seq &&
+				    lk->owner_inc == req->owner_inc &&
+				    lk->mode == mode && !cap_since &&
+				    dlm_resend_redecide(ctx, chain, resource, lk)) {
+					redecide = true;
+					cap_since = lk->queued_at;
+					mxfs_pal_log(MXFS_LOG_DEBUG,
+						     "mxfs: P958-ACQ-RETX-REDECIDE acq=%llu type=%u ino=%llu "
+						     "ag=%u from=%u mode=%s wait_age_ms=%llu -- re-send of a "
+						     "queued wait that is grantable now or behind a holder in "
+						     "RECOVERY_BLOCKED; decided again with its age",
+						     (unsigned long long)req->acq_seq, resource->type,
+						     (unsigned long long)resource->ino,
+						     resource->ag_number, sender, mode_name(mode),
+						     (unsigned long long)(mxfs_pal_time_ms() >= lk->queued_at ?
+							mxfs_pal_time_ms() - lk->queued_at : 0));
+				}
+				if (!redecide && req->acq_seq && lk->acq_seq == req->acq_seq &&
 				    lk->owner_inc == req->owner_inc &&
 				    lk->mode == mode && !cap_since) {
 					struct mxfs_bast_record rx_recs[MXFS_MAX_BAST_RECORDS];

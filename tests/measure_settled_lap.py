@@ -36,8 +36,12 @@ The scratch cases' laps are fixtures the lap writes into its own scratch ledger,
     PASS      every case above as stated
     FAIL      any case otherwise
 
-MXFS_MEASURE_COUNT_SETTLED=0 (tools/defects.py) counts only PASS and FAIL laps toward the plan in
-measure, as before the fix: the control. The lap hands its environment to every command.
+The fix has two parts, each with its own control, and the lap hands its environment to every
+command:
+    MXFS_MEASURE_COUNT_SETTLED=0 (tools/defects.py) counts only PASS and FAIL laps toward the plan
+        in measure, as before the fix
+    MXFS_RESUME_PLAN_LAPS=0 (tools/harness_batch.py resume_runs) counts every recorded lap in the
+        resume, as before the fix, so the plan case's resume runs none in place of the INFRA lap
 
 The tree root is the nearest directory above the lap holding tools/criteria.py and
 data/defects.json; a drafts tree beside it (its own tools/*.py) is copied over the root's tools, so
@@ -230,9 +234,17 @@ def scratch_cases(tree: Path, env: dict) -> list:
         wrong.append(f"plan: plan_laps counted {(counted.stdout + counted.stderr).strip()[-120:]}, not 1")
     if check.returncode != 0:
         wrong.append("plan: batch-check refused a lap with one place left")
-    resume = (tree / "tools" / "harness_batch.py").read_text()
-    if "defects.plan_laps(batch)" not in resume:
-        wrong.append("plan: tools/harness_batch.py's resume does not count with plan_laps")
+    # the resume itself: the function tools/harness_batch.py's control --batch takes its lap
+    # count from, run on the same batch
+    probe = ("import sys; sys.path.insert(0, 'tools'); import defects, harness_batch\n"
+             "entry, batch = defects.find_batch(defects.load(), sys.argv[1])\n"
+             "print(harness_batch.resume_runs(batch))\n")
+    resumed = command(tree, env, ["-c", probe, bid])
+    print(f"INFO the resume of scratch batch {bid} would run "
+          f"{(resumed.stdout + resumed.stderr).strip()[-120:]} lap(s)")
+    if resumed.returncode != 0 or resumed.stdout.strip() != "1":
+        wrong.append(f"plan: the resume would run {(resumed.stdout + resumed.stderr).strip()[-120:]} "
+                     f"lap(s), not the 1 place the INFRA lap left")
     return wrong
 
 

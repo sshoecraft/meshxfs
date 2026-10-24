@@ -249,7 +249,55 @@ def reap(proc, lap: dict) -> None:
                 pass
 
 
-def run_bounded(command: list, cwd, handle, bound: int) -> int:
+def waited_s(path) -> float:
+    """Seconds the lap spent waiting on locks other lanes held, from the wait ledger run.sh,
+    tools/lun_pool.sh, scripts/clyde_preflight.sh and tests/lib/runlock.sh append to
+    ('begin <pid> <epoch> <cap s> <what>', 'end <pid> <epoch>'): the union of the waits, so two
+    of the lap's processes waiting at once count once, and a wait not yet ended counts until now,
+    at most its own cap."""
+    if path is None:
+        return 0.0
+    try:
+        lines = Path(path).read_text().splitlines()
+    except OSError:
+        return 0.0
+    now, open_waits, spans = time.time(), {}, []
+    for line in lines:
+        parts = line.split()
+        try:
+            if parts[0] == "begin" and len(parts) >= 4:
+                open_waits[parts[1]] = (float(parts[2]), float(parts[3]))
+            elif parts[0] == "end" and len(parts) >= 3 and parts[1] in open_waits:
+                begin, cap = open_waits.pop(parts[1])
+                spans.append((begin, min(float(parts[2]), begin + cap)))
+        except (IndexError, ValueError):
+            continue
+    spans += [(begin, min(now, begin + cap)) for begin, cap in open_waits.values()]
+    total, reach = 0.0, None
+    for begin, end in sorted(spans):
+        if reach is None or begin > reach:
+            total += max(0.0, end - begin)
+            reach = end
+        elif end > reach:
+            total += end - reach
+            reach = end
+    return total
+
+
+def wait_ledger(log: Path):
+    """The wait ledger beside the lap's log, exported as MXFS_LAP_WAIT_FILE so every run the lap
+    starts appends its waits on other lanes to it (run_bounded). MXFS_BATCH_LAP_WAIT_EXCLUDE=0
+    keeps none, and the bound counts other lanes' waits, as before: the same-build control."""
+    if os.environ.get("MXFS_BATCH_LAP_WAIT_EXCLUDE", "1") == "0":
+        os.environ.pop("MXFS_LAP_WAIT_FILE", None)
+        return None
+    waits = log.with_suffix(".waits")
+    waits.touch()
+    os.environ["MXFS_LAP_WAIT_FILE"] = str(waits)
+    return waits
+
+
+def run_bounded(command: list, cwd, handle, bound: int, waits=None) -> int:
     """Run the lap's command for at most `bound` seconds; 124 on an overrun, as timeout(1) returns.
 
     subprocess.run(timeout=) ends only its direct child, so a harness's own children went on
@@ -261,7 +309,13 @@ def run_bounded(command: list, cwd, handle, bound: int) -> int:
     runs in a session of its own, and an overrun signals every process the lap started (its
     descendants by parent pid, the orphans reparented here, the members of its session), SIGTERM
     and then SIGKILL, and waits until none of them is left before the lap is recorded.
-    MXFS_BATCH_LAP_KILLTREE=0 ends only the direct child, as before: the same-build control."""
+    MXFS_BATCH_LAP_KILLTREE=0 ends only the direct child, as before: the same-build control.
+
+    The bound is the lap's own work: time the lap spent waiting on a lock another lane held (the
+    pool, a power-up, the host lock; `waits`, the ledger waited_s reads) extends it by as much. A
+    lap whose run waited 95 s on other lanes' allocations before its prep had started overran its
+    146 s bound before its workload ran, and was recorded a FAIL
+    (D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT)."""
     if os.environ.get("MXFS_BATCH_LAP_KILLTREE", "1") == "0":
         try:
             return subprocess.run(command, cwd=cwd, stdout=handle, stderr=subprocess.STDOUT,
@@ -271,10 +325,15 @@ def run_bounded(command: list, cwd, handle, bound: int) -> int:
     become_subreaper()
     proc = subprocess.Popen(command, cwd=cwd, stdout=handle, stderr=subprocess.STDOUT,
                             start_new_session=True)
-    try:
-        return proc.wait(timeout=bound)
-    except subprocess.TimeoutExpired:
-        pass
+    start = time.monotonic()
+    while True:
+        left = start + bound + waited_s(waits) - time.monotonic()
+        if left <= 0:
+            break
+        try:
+            return proc.wait(timeout=min(left, 1.0))
+        except subprocess.TimeoutExpired:
+            continue
     leader = proc.pid
     lap = lap_processes(leader)
     started = len(lap)
@@ -296,8 +355,8 @@ def run_bounded(command: list, cwd, handle, bound: int) -> int:
     lap = lap_processes(leader)
     left = ("gone" if not lap else "STILL ALIVE after SIGKILL: " +
             " ".join(f"{pid}({state})" for pid, state in sorted(lap.items())))
-    handle.write(f"=== the lap overran its bound of {bound}s: the {started} process(es) it had "
-                 f"started were ended ({left}) ===\n")
+    handle.write(f"=== the lap overran its bound of {bound}s (and {waited_s(waits):.0f}s it waited "
+                 f"on other lanes): the {started} process(es) it had started were ended ({left}) ===\n")
     handle.flush()
     return 124
 
@@ -411,18 +470,22 @@ def main() -> int:
           f"{', exposure probe ' + repr(probe) if probe else ''}"
           f"{', variant ' + variant if variant else ''}; bound {args.bound}s; "
           f"VMs held: {' '.join(vms) or 'none'}; log {log} ---", flush=True)
+    waits = wait_ledger(log)
     t0 = time.time()
     with handle:
         handle.write(f"=== {stamp()} {' '.join(command)} (bound {args.bound}s) ===\n")
         handle.write(f"=== VMs held for the lap: {' '.join(vms) or 'none'} ===\n")
         handle.flush()
-        rc = run_bounded(command, ROOT, handle, args.bound)
+        rc = run_bounded(command, ROOT, handle, args.bound, waits)
         elapsed = int(time.time() - t0)
-        handle.write(f"=== rc={rc} elapsed={elapsed}s ({stamp()}) ===\n")
+        waited = int(waited_s(waits))
+        handle.write(f"=== rc={rc} elapsed={elapsed}s waited_on_other_lanes={waited}s ({stamp()}) ===\n")
     text = log.read_text(errors="replace")
     outcome, reason = verdict(rc, text, args.passed, args.failed, args.bound)
     files = written_since(args.evidence, t0)
     measured = f"rc={rc} elapsed_s={elapsed}"
+    if waits is not None:
+        measured += f" waited_s={waited}"
     texts = [text] + [Path(p).read_text(errors="replace") for p in files]
     if probe:
         measured += f" exposure={count_probe(probe, texts)}"

@@ -270,6 +270,20 @@ def find_batch(bid: str) -> tuple:
     return found[0]
 
 
+def resume_runs(batch: dict) -> int:
+    """The laps a declared control has left, counted as check_batch_lap counts them: an INFRA
+    lap uses up no place in the plan, so a lap is run in its stead. Counting every recorded lap,
+    the resume ran none in place of an INFRA lap, and the batch could not be filled
+    (D-MEASURE-REFUSES-A-BATCH-WHOSE-SETTLED-LAP-CHECK-BATCH-LAP-COUNTED-AS-RUN).
+    MXFS_RESUME_PLAN_LAPS=0 counts every recorded lap, as before: the control of this part."""
+    import defects  # noqa: E402
+    if os.environ.get("MXFS_RESUME_PLAN_LAPS", "1") == "0":
+        used = defects.batch_runs(batch)
+    else:
+        used = defects.plan_laps(batch)
+    return max(int(batch["planned"]) - len(used), 0)
+
+
 def cmd_control(args) -> int:
     if bool(args.revert) == bool(args.knob):
         sys.exit("harness_batch: a control takes the fix out one way: --revert DIFF or --knob TEXT")
@@ -300,10 +314,7 @@ def cmd_control(args) -> int:
         if wrong or batch.get("config") != criteria.parse_at(args.at):
             sys.exit(f"harness_batch: {args.batch} is not this control ({', '.join(wrong) or 'config'})")
         bid = args.batch
-        # the laps left are counted as check_batch_lap counts them: an INFRA lap uses up no
-        # place in the plan (D-MEASURE-REFUSES-A-BATCH-WHOSE-SETTLED-LAP-CHECK-BATCH-LAP-COUNTED-AS-RUN)
-        import defects  # noqa: E402
-        args.runs = max(int(batch["planned"]) - len(defects.plan_laps(batch)), 0)
+        args.runs = resume_runs(batch)
     else:
         declared = run(DEFECTS + ["batch", args.record, "--kind", "control", "--row", args.row,
                                   "--at", args.at, "--build", tree_build(),

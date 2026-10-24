@@ -253,17 +253,29 @@ fi
 # for it, at most its own bound (BOOT_S, 240 s), so the sample is taken after a
 # power-up and not inside one.  Neither the threshold nor the window changes, and
 # a flood from anything else is refused as before.  LAB_POWER_LOCK=0 waits for none.
+# The wait is another lane's, not the run's own work: it is written to
+# MXFS_LAP_WAIT_FILE for the batch lap bounding this run, when one set it
+# (tools/batch_lap.py, D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT).
 if [ "${LAB_POWER_LOCK:-1}" != 0 ]; then
     t0=$SECONDS
     exec 8>>/tmp/mxfs_host_powerup.lock
+    [ -n "${MXFS_LAP_WAIT_FILE:-}" ] && echo "begin $$ $(date +%s.%N) 240 power-up (preflight)" >> "$MXFS_LAP_WAIT_FILE"
     if flock -s -w 240 8; then
         [ $(( SECONDS - t0 )) -gt 0 ] && echo "  waited $(( SECONDS - t0 )) s for a power-up to finish"
     else
         echo "  a power-up still held the host lock after 240 s; sampling anyway"
     fi
-    exec 8>&-
+    [ -n "${MXFS_LAP_WAIT_FILE:-}" ] && echo "end $$ $(date +%s.%N)" >> "$MXFS_LAP_WAIT_FILE"
+    # The shared hold is kept through the sample, so a power-up that starts
+    # after the wait waits KMSG_SECS for the sample instead of flooding it: with
+    # the lock released before the sample, an 8-VM power-up 2 s after it began
+    # put 146 attach lines into its 3 s (lap 2 of b20261024-d5be0a,
+    # D-LANE-POWER-UP-FLOODS-THE-HOST-LOG-AND-ANOTHER-LANES-PREFLIGHT-REFUSES-ITS-PREP).
+    # POWER_LOCK_THROUGH_SAMPLE=0 releases it before the sample, as before: the control.
+    [ "${POWER_LOCK_THROUGH_SAMPLE:-1}" = 0 ] && exec 8>&-
 fi
 lines=$($SUDO timeout "$KMSG_SECS" dmesg --follow-new --notime 2>/dev/null | wc -l)
+exec 8>&-
 if [ "$probe_ok" -eq 0 ] || ! $SUDO dmesg --notime >/dev/null 2>&1; then
     bad "cannot read the kernel log (dmesg_restrict=$(cat /proc/sys/kernel/dmesg_restrict 2>/dev/null))"
     bad "  the log-rate check is the flood detector — run this with sudo"

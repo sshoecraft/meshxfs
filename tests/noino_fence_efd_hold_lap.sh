@@ -54,7 +54,8 @@
 #
 # Usage: noino_fence_efd_hold_lap.sh <label>
 # Env:   MXFS_NODE_LIST (test29,test30), MXFS_CONFIG (2/disk/caw/direct), MXFS_GROUP,
-#        HOLD_MS (26000), WARM_S (10)
+#        HOLD_MS (26000), WARM_S (10), NOINO_RING_ROTATE (0; 1 fills S's ring past the mark
+#        before the hold, at most 60 s more)
 # Exit 0 PASS, 1 FAIL, 2 ABORT, 3 VACUOUS.
 set -u
 LABEL=${1:?label}
@@ -138,6 +139,21 @@ done
 [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=load wall=$(el)s evidence=$OUT"; exit 2; }
 sleep "$WARM_S"
 
+# ---- 2b. TEST ONLY: S's ring rotated past the mark before the hold
+# Whether the load's lines rotate the mark out of S's ring before the hold is looked for is
+# chance: no lap of the hold read's control at WARM_S=60 met it (b20261024-2e4683, lane g2_a19
+# step 5: ten PASS laps, HOLD-RING-ROTATED never printed).  NOINO_RING_ROTATE=1 makes it so on
+# every lap: S writes filler records to /dev/kmsg, one write each, until its ring no longer
+# holds the mark (at most 400000), with /dev/kmsg's rate limit lifted for the fill and put
+# back after it.  The followed log holds the filler too; the lap's reads of it are unchanged.
+if [ "${NOINO_RING_ROTATE:-0}" = 1 ]; then
+    measure "$S" 60 "$OUT/S_rotate.txt" '^ROTATE_MARK=[0-9]+$' "S's ring rotated past the mark" \
+        "old=\$(cat /proc/sys/kernel/printk_devkmsg); echo on > /proc/sys/kernel/printk_devkmsg; exec 3>/dev/kmsg; n=0; while [ \$n -lt 400000 ] && dmesg | grep -q '$MARK\$'; do for i in \$(seq 1 5000); do echo 'NOINOEFD-FILL $LABEL' >&3; done; n=\$((n + 5000)); done; exec 3>&-; echo \$old > /proc/sys/kernel/printk_devkmsg; echo ROTATE_LINES=\$n; echo ROTATE_MARK=\$(dmesg | grep -c '$MARK\$')"
+    echo "STAGE rotate lines=$(field "$OUT/S_rotate.txt" ROTATE_LINES) mark_in_ring=$(field "$OUT/S_rotate.txt" ROTATE_MARK) at +$(el)s"
+    ck "S's ring no longer holds the mark after the fill" "$(field "$OUT/S_rotate.txt" ROTATE_MARK)" 0
+    [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=rotate wall=$(el)s evidence=$OUT"; exit 2; }
+fi
+
 # ---- 3. the hold, and F removed
 # Whether the hold started is read from the followed log too: read from the ring after the mark
 # it is empty once the load's lines have rotated the mark out, and the lap ended VACUOUS
@@ -147,8 +163,11 @@ sleep "$WARM_S"
 HOLD_FOLLOW=${NOINO_HOLD_FROM_FOLLOW:-1}
 [ "$FOLLOW" = 1 ] || HOLD_FOLLOW=0
 if [ "$HOLD_FOLLOW" = 1 ]; then HOLD_READ="awk '/$MARK\$/{f=1} f' $KL"; else HOLD_READ="dmesg | sed -n '/$MARK/,\$p'"; fi
+# The look is bounded by a 15 s deadline, not a count of looks: a look at a ring the fill has
+# filled takes about a second, so thirty of them overran the 30 s bound below and the control
+# ABORTed (lane g2b_ringprecheck_20261024T160056Z step 3) instead of grading its empty read.
 measure "$S" 30 "$OUT/S_hold.txt" '^HOLD_SEEN=[0-9]+$' "the EFD hold on $S" \
-    "echo $HOLD_MS > $PARM/dbg_efd_hold_ms; nohup setsid rm -f $D/F > /dev/null 2>&1 < /dev/null & for t in \$(seq 1 30); do n=\$($HOLD_READ | grep -ac 'P-EFD-HOLD start='); [ \$n -gt 0 ] && break; sleep 0.5; done; echo HOLD_SEEN=\$n; echo HOLD_RING_MARK=\$(dmesg | grep -c '$MARK\$')"
+    "echo $HOLD_MS > $PARM/dbg_efd_hold_ms; nohup setsid rm -f $D/F > /dev/null 2>&1 < /dev/null & end=\$((SECONDS + 15)); n=0; while [ \$SECONDS -lt \$end ]; do n=\$($HOLD_READ | grep -ac 'P-EFD-HOLD start='); [ \$n -gt 0 ] && break; sleep 0.5; done; echo HOLD_SEEN=\$n; echo HOLD_RING_MARK=\$(dmesg | grep -c '$MARK\$')"
 HOLD_SEEN=$(field "$OUT/S_hold.txt" HOLD_SEEN)
 echo "STAGE hold seen=$HOLD_SEEN at +$(el)s"
 # the hold read's own exposure: the ring had lost the mark by the time the hold was looked for

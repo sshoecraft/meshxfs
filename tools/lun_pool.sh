@@ -135,11 +135,25 @@ ids() { local f; for f in "$POOL"/lun[0-9][0-9].img; do [ -e "$f" ] || continue;
 ssh_n() { timeout "${3:-30}" "$SSH" "$(lab_addr "$1")" "$2" </dev/null 2>&1 | grep -avE '^Warning:|^Unauthorized|^If you'; }
 die() { echo "lun_pool: $*" >&2; exit 1; }
 
+# A wait on a lock another lane holds is not the waiting lap's own work: each
+# one is written to MXFS_LAP_WAIT_FILE, when the batch lap bounding this run set
+# it, as 'begin <pid> <epoch> <cap s> <what>' and 'end <pid> <epoch>', and
+# tools/batch_lap.py extends the lap's bound by the time spent in them
+# (D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT).
+lap_wait() {  # begin <cap s> <what> | end
+    [ -n "${MXFS_LAP_WAIT_FILE:-}" ] || return 0
+    if [ "$1" = begin ]; then echo "begin $$ $(date +%s.%N) $2 $3" >> "$MXFS_LAP_WAIT_FILE"
+    else echo "end $$ $(date +%s.%N)" >> "$MXFS_LAP_WAIT_FILE"; fi
+}
+
 pool_lock() {  # serialise every decision about who holds what
     mkdir -p "$POOL" || die "cannot create $POOL"
     exec {LOCKFD}>>"$LOCKFILE" || die "cannot open $LOCKFILE"
-    local t0=$SECONDS holder
-    if ! flock -w "${1:-60}" "$LOCKFD"; then
+    local t0=$SECONDS holder got=1
+    lap_wait begin "${1:-60}" "pool lock"
+    flock -w "${1:-60}" "$LOCKFD" || got=0
+    lap_wait end
+    if [ "$got" = 0 ]; then
         holder=$(cat "$HOLDERFILE" 2>/dev/null)
         [ -n "$holder" ] && [ -d "/proc/${holder%% *}" ] || holder="${holder:-none recorded} (not running)"
         die "pool lock not taken in ${1:-60} s: $LOCKFILE; held by: $holder"
@@ -203,10 +217,11 @@ san_faults() {  # every fault in effect that can keep a command on the target fr
 scst_quiet_begin() {  # hold SCSTLOCK exclusive with no fault in effect, or fail
     local t0=$SECONDS f=""
     exec {SCSTFD}>>"$SCSTLOCK" || { echo "lun_pool: cannot open $SCSTLOCK" >&2; return 1; }
+    lap_wait begin $(( SCST_QUIET_WAIT_S + 90 )) "an SCST injector or a fault in effect"
     while :; do
         if flock -x -w 90 "$SCSTFD"; then
             f=$(san_faults)
-            [ -z "$f" ] && return 0
+            [ -z "$f" ] && { lap_wait end; return 0; }
             flock -u "$SCSTFD"
         else
             f="an injector held $SCSTLOCK 90 s"
@@ -214,6 +229,7 @@ scst_quiet_begin() {  # hold SCSTLOCK exclusive with no fault in effect, or fail
         [ $((SECONDS - t0)) -lt "$SCST_QUIET_WAIT_S" ] || break
         sleep 2
     done
+    lap_wait end
     exec {SCSTFD}>&-
     echo "lun_pool: no SCST reconfiguration: a fault stayed in effect ${SCST_QUIET_WAIT_S} s, and a reconfiguration would stall every LUN behind it: $(echo $f)" >&2
     return 1

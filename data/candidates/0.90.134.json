@@ -1,7 +1,7 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-24T14:29:24Z",
+  "created": "2026-10-24T16:34:18Z",
   "state": "RUNNING",
   "attempts": [
     {
@@ -456,14 +456,36 @@
       "dist": "",
       "packages": {},
       "steps": {}
+    },
+    {
+      "created": "2026-10-24T14:29:24Z",
+      "state": "ABANDONED",
+      "dry_run": false,
+      "srcversion": "A27A67A3E501890BE9985E0",
+      "files": "tests/evidence/candidates/0.90.134_20261024T142924Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-24T14:29:25Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-24T16:33:17Z",
+          "why": "end the attempt frozen 2026-10-24T14:29:24Z so the drafted fixes and instruments go into the next attempt: a fenced node's refused grants answered -ESHUTDOWN, a queued lock wait decided again when re-sent, the false-ENOSPC site lines, the batch-lap wait ledger, the preflight's power-up lock held through its sample, the merged-write overrun lap's gated cleanup, the merged-write row's worker-bound lap, the batch resume's lap-count switch, the DRBD node-count lap's unset case, the no-inode lap's ring-rotate arm and deadline-bounded hold look, the fenced-ledger rig lap, the DRBD backing-cut reproducer and the merged-write disk-load A/B lap"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
-  "srcversion": "A27A67A3E501890BE9985E0",
-  "module_sha256": "bd9486b6ac100f769e0cfadf0c1802df67321f85b3a6aeca532663abd881b33c",
-  "files": "tests/evidence/candidates/0.90.134_20261024T142924Z.files.json",
-  "files_count": 2641,
-  "files_digest": "8ca80fe25a0f8ba032893baca3249f9387ee022dc1cdf9f2dda599fa2536b0df",
+  "srcversion": "1BC77CFB15EF4A988DD1F56",
+  "module_sha256": "8401637f771789f4a1693ee6eb1eaaad683f6aceccad48350b87e7cc8c7ae26b",
+  "files": "tests/evidence/candidates/0.90.134_20261024T163418Z.files.json",
+  "files_count": 2646,
+  "files_digest": "ea5630404648df53f3df39fd583bb98ecd5dbd3661c53221149aa0f186db059d",
   "spec": "ec57ce06eb09c644b368cde523dfd4fa03e87d54b80a4bee31602c59f3ec175b",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
@@ -473,7 +495,7 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-24T14:29:25Z",
+      "at": "2026-10-24T16:34:18Z",
       "why": "created"
     }
   ]

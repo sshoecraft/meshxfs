@@ -429,6 +429,16 @@ RUNLOCK=/tmp/mxfs_run.lock
 # (D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT):
 # each step up to the prep prints the time since this run started.
 prep_wall() { echo "--- pre-prep: $1 at +${SECONDS} s ($(date -u +%T)) ---"; }
+# Most of it was waiting on locks other lanes held (the pool, a power-up), which
+# is not the lap's own work: each such wait is written to MXFS_LAP_WAIT_FILE,
+# when the batch lap bounding this run set it, and tools/batch_lap.py extends the
+# lap's bound by the time spent in them ('begin <pid> <epoch> <cap s> <what>',
+# 'end <pid> <epoch>'; an unended wait counts at most its cap).
+lap_wait() {  # begin <cap s> <what> | end
+    [ -n "${MXFS_LAP_WAIT_FILE:-}" ] || return 0
+    if [ "$1" = begin ]; then echo "begin $$ $(date +%s.%N) $2 $3" >> "$MXFS_LAP_WAIT_FILE"
+    else echo "end $$ $(date +%s.%N)" >> "$MXFS_LAP_WAIT_FILE"; fi
+}
 if [ -n "${MXFS_RUNLOCK_OWNER:-}" ] && [ "$MXFS_RUNLOCK_OWNER" != "$$" ] \
    && [ "$(cat "/proc/$MXFS_RUNLOCK_OWNER/comm" 2>/dev/null)" = "run.sh" ]; then
     echo "--- run lock: re-entrant invocation under run.sh pid $MXFS_RUNLOCK_OWNER (host criterion) ---"
@@ -2562,7 +2572,9 @@ PUFD=""
 if [ "$USE_POOL" = 1 ] && [ "${PREFLIGHT_POWERUP_FIRST:-1}" != 0 ] && [ "${LAB_POWER_LOCK:-1}" != 0 ]; then
     exec {PUFD}>>/tmp/mxfs_host_powerup.lock
     # the gate's own bound for a power-up (scripts/clyde_preflight.sh, BOOT_S)
+    lap_wait begin 240 "power-up"
     flock -s -w 240 "$PUFD" || echo "--- pre-prep: a power-up still held the host lock after 240 s ---"
+    lap_wait end
     prep_wall "power-up lock held shared"
 fi
 # The gate runs without the descriptor, so nothing it leaves running can keep
@@ -2622,22 +2634,27 @@ host_share() {  # hold the host lock shared; 1 if it was not obtained in its bou
     local tfd
     host_lock_skip && return 0
     exec {tfd}>>"$PERF_TURNSTILE"
-    if ! flock -w "$PERF_WAIT_S" "$tfd"; then exec {tfd}>&-; return 1; fi
+    lap_wait begin $(( 2 * PERF_WAIT_S )) "host lock (another lane's throughput row)"
+    if ! flock -w "$PERF_WAIT_S" "$tfd"; then lap_wait end; exec {tfd}>&-; return 1; fi
     exec {HOST_FD}>>"$PERF_LOCK"
     # no exclusive holder can be inside: it holds the turnstile until it is done
-    if ! flock -w "$PERF_WAIT_S" -s "$HOST_FD"; then exec {HOST_FD}>&- {tfd}>&-; HOST_FD=""; return 1; fi
+    if ! flock -w "$PERF_WAIT_S" -s "$HOST_FD"; then lap_wait end; exec {HOST_FD}>&- {tfd}>&-; HOST_FD=""; return 1; fi
+    lap_wait end
     exec {tfd}>&-
     return 0
 }
 host_exclusive() {  # hold the turnstile and the host lock exclusive
     host_lock_skip && return 0
     exec {HOST_TFD}>>"$PERF_TURNSTILE"
-    if ! flock -w "$PERF_WAIT_S" "$HOST_TFD"; then exec {HOST_TFD}>&-; HOST_TFD=""; return 1; fi
+    lap_wait begin $(( PERF_WAIT_S + PERF_DRAIN_S )) "host lock (other lanes' rows in flight)"
+    if ! flock -w "$PERF_WAIT_S" "$HOST_TFD"; then lap_wait end; exec {HOST_TFD}>&-; HOST_TFD=""; return 1; fi
     exec {HOST_FD}>>"$PERF_LOCK"
     if ! flock -w "$PERF_DRAIN_S" -x "$HOST_FD"; then
+        lap_wait end
         echo "    host lock holders still in flight after ${PERF_DRAIN_S}s: $(fuser "$PERF_LOCK" 2>/dev/null)"
         exec {HOST_FD}>&- {HOST_TFD}>&-; HOST_FD=""; HOST_TFD=""; return 1
     fi
+    lap_wait end
     return 0
 }
 # The lock keeps every other row off the host while a throughput row runs, but

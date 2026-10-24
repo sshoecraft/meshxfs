@@ -399,7 +399,9 @@ struct mxfs_dlm_ctx {
 	 * membership change (my_view_hash folded with our incarnation), the
 	 * ledger's owner_gen mirrors it, and every decision records it.
 	 * `ledger_failed` latches a proven-unrecoverable ledger state (fail
-	 * stop: no further grants; releases still ACK).
+	 * stop: no further grants; releases still ACK).  `ledger_fenced` says
+	 * the fail-stop was the target refusing this node's writes (its key is
+	 * off the LUN): the refused grants answer -ESHUTDOWN, not -EIO.
 	 */
 	struct mxfs_tauth_ledger *ledger;
 	/* heartbeat-slot -> {node, incarnation} resolver (the disklock table),
@@ -417,6 +419,7 @@ struct mxfs_dlm_ctx {
 	uint16_t                hash_version;   /* routing version; 0 = version 1 */
 	bool                    ledger_required;
 	volatile bool           ledger_failed;
+	volatile bool           ledger_fenced;
 	uint64_t                local_inc;
 	uint16_t                local_slot;
 	uint64_t                ledger_gen;

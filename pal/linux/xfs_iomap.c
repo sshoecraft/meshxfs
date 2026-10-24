@@ -443,6 +443,25 @@ xfs_iomap_write_direct(
 		error = xfs_mxfs_ag_pregrant(mp, agno);
 		return error ? error : -MXFS_ERESTART_AG;
 	}
+	/*
+	 * An allocation refused after its reservation was granted
+	 * (D-2NETMESH-FALSE-ENOSPC-ON-WRITE-AND-CHURN-WITH-19GB-FREE-DURING-NOINO-FENCE-LAP):
+	 * the AG the allocator wanted and this node's counter at that moment.
+	 */
+	if (error == -ENOSPC && mp->m_mxfs_dlm) {
+		static atomic_t	nbmapi = ATOMIC_INIT(0);
+
+		if (atomic_inc_return(&nbmapi) <= 200)
+			mxfs_probe("mxfs: P-ENOSPC-BMAPI ino=%llu off=%llu len=%llu dblocks=%u ino_agno=%u wouldblock_agno=%d fdblocks=%lld comm=%s\n",
+				(unsigned long long)ip->i_ino,
+				(unsigned long long)offset_fsb,
+				(unsigned long long)count_fsb, dblocks,
+				XFS_INO_TO_AGNO(mp, ip->i_ino),
+				tp->t_mxfs_wouldblock_agno == NULLAGNUMBER ? -1 :
+					(int)tp->t_mxfs_wouldblock_agno,
+				(long long)percpu_counter_sum(&mp->m_free[XC_FREE_BLOCKS].count),
+				current->comm);
+	}
 	if (error)
 		goto out_trans_cancel;
 

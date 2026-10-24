@@ -18,10 +18,12 @@
 # so the selection is read on the host where it is made; the g2 pair need not be up.
 #
 #   EXPOSED  MXFS_NODES held a bare number, and MXFS_GROUP named g2, when
-#            drbd_rig.sh and the arm selected their pairs
+#            drbd_rig.sh and the arm selected their pairs; and, on a line of its
+#            own, MXFS_NODES unset with MXFS_GROUP=g2 when the arm selected again
 #   PASS     the status names both g2 nodes, test1 and test2, and nothing refused;
 #            and tests/drbd_write_bound_arm.sh's own resolution of the same
-#            environment selects the same g2 pair, test1 test2
+#            environment selects the same g2 pair, test1 test2, with MXFS_NODES a
+#            bare number and with it unset
 #   FAIL     drbd_rig.sh refused the pair ('has N nodes'), or the status names
 #            another pair than test1 and test2, or the arm selected another pair
 #   ABORT    the status overran its bound or printed no node line
@@ -82,8 +84,19 @@ case "$arm" in
     DRBD_ARM_NODES*) wrong="${wrong:+$wrong; }drbd_write_bound_arm.sh selected '${arm#DRBD_ARM_NODES }', not test1 test2" ;;
     *) abort "drbd_write_bound_arm.sh printed no DRBD_ARM_NODES line: ${arm:0:200}" ;;
 esac
+# The arm's other trigger: with MXFS_NODES unset it took its default pair, test3 test4,
+# whatever MXFS_GROUP was, as with a bare count.  Its resolution is run again with the
+# variable unset, and must select the g2 pair too.
+echo "EXPOSED: MXFS_NODES unset, and MXFS_GROUP=$MXFS_GROUP when the arm selects its pair" | tee -a "$OUT/lap.log"
+arm=$(env -u MXFS_NODES DRBD_ARM_PRINT_NODES=1 timeout 5 "$REPO/tests/drbd_write_bound_arm.sh" "$LABEL" /nonexistent < /dev/null 2>&1)
+echo "STEP arm_unset rc=$? $arm" | tee -a "$OUT/lap.log"
+case "$arm" in
+    "DRBD_ARM_NODES test1 test2") echo "INFO drbd_write_bound_arm.sh with MXFS_NODES unset: the g2 pair: test1 test2" | tee -a "$OUT/lap.log" ;;
+    DRBD_ARM_NODES*) wrong="${wrong:+$wrong; }drbd_write_bound_arm.sh with MXFS_NODES unset selected '${arm#DRBD_ARM_NODES }', not test1 test2" ;;
+    *) abort "drbd_write_bound_arm.sh with MXFS_NODES unset printed no DRBD_ARM_NODES line: ${arm:0:200}" ;;
+esac
 if [ -z "$wrong" ]; then
-    echo "LAP drbd_nodes_count PASS label=$LABEL: a bare MXFS_NODES with MXFS_GROUP=g2 selected the g2 pair in drbd_rig.sh and in drbd_write_bound_arm.sh" | tee -a "$OUT/lap.log"
+    echo "LAP drbd_nodes_count PASS label=$LABEL: a bare MXFS_NODES with MXFS_GROUP=g2 selected the g2 pair in drbd_rig.sh and in drbd_write_bound_arm.sh, and MXFS_NODES unset did in drbd_write_bound_arm.sh" | tee -a "$OUT/lap.log"
     exit 0
 fi
 echo "LAP drbd_nodes_count FAIL label=$LABEL: $wrong" | tee -a "$OUT/lap.log"

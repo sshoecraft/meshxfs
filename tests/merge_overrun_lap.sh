@@ -20,18 +20,25 @@
 #   PASS     on neither node is $MNT still mounted, or a fourkn_merge_worker.sh still running,
 #            $SETTLE_S s after the run (fourkn_merge_2node.sh unmounts both nodes before it
 #            returns, on its ABORT path too, so a mount left behind is one it could not unmount)
-#   FAIL     either is so on some node
+#   FAIL     either is so on some node, or the cleanup below ended a node's own service (the
+#            main pid of ssh, systemd-journald, systemd-udevd or iscsid changed across it)
 #   ABORT    the merge lap aborted before its workload (no workload INFO line)
 # fuser -m is not the measure: on a directory that is no longer a mount point it counts every
 # user of the root filesystem, and it misses a worker that has no file open at that instant.
-# Afterwards any worker left is ended, then any process on the mount (fuser -k), and the mount
-# unmounted, so the next lap starts clean whatever this one found.
+# Afterwards any worker left is ended and, only while $MNT is still a mount point, any process
+# on it (fuser -k) and the mount unmounted, so the next lap starts clean whatever this one
+# found.  Run on a directory that was no longer a mount point, fuser -k -m SIGKILLed every user
+# of each node's root filesystem, sshd and the node's daemons with it: every cleanup of a
+# passing lap ended 'Connection to <node> closed by remote host'
+# (D-MERGE-OVERRUN-LAP-CLEANUP-FUSER-KILLS-ROOT-FS-USERS-WHEN-NOT-MOUNTED).  MERGE_CLEANUP_GATE=0
+# runs it unconditionally, as before: the control.
 #
 # Bounds (derived): fourkn_merge_2node.sh's own steps before the workload (preflight, insmod,
 # mkfs, mounts) take under 60 s; the workload is cut at its 16 s client bound; the lap's
 # unmounts, counters and chk_mxfs after it take under 130 s (its header).  So the merge run is
 # bounded at 2 x (60 + 16 + 130) = 412 s here; the settle, the counts and the cleanup at 60 s
-# a node.  A caller bounds the lap at 412 + 8 + 2 x 60 + 2 x 60 = 660 s.
+# a node, and the reads of the node's service pids either side of its cleanup 30 s each plus a
+# 2 s settle.  A caller bounds the lap at 412 + 8 + 2 x 60 + 2 x (60 + 2 x 30 + 2) = 784 s.
 #
 # Usage: tests/merge_overrun_lap.sh <label> <dev> <node1> <node2>
 # Env:   MXFS_CONFIG (as fourkn_merge_2node.sh), OVER_ROUNDS (200), SETTLE_S (8), MERGE_NODE_BOUND
@@ -56,6 +63,7 @@ ROUNDS=$OVER_ROUNDS timeout 412 "$HERE/tests/fourkn_merge_2node.sh" "$DEV" "$N1"
 mrc=$?
 sleep "$SETTLE_S"
 held=0
+unmounted=0
 for n in "$N1" "$N2"; do
     # the worker runs as a script, so its comm is fourkn_merge_wo; -C alone matches no ssh shell
     c=$(on "$n" "echo mounted=\$(grep -c ' $MNT ' /proc/mounts) workers=\$(ps -o pid= -C fourkn_merge_wo | wc -l); ps -o pid=,etimes=,args= -C fourkn_merge_wo | head -3" 60)
@@ -64,10 +72,29 @@ for n in "$N1" "$N2"; do
     echo "  $n: mounted=${m:-?} workers=${w:-?} $SETTLE_S s after the merge run; $(grep -av 'mounted=' <<<"$c" | tr '\n' '|' | cut -c1-200)"
     [ -n "$m" ] && [ -n "$w" ] || { echo "LAP merge_overrun ABORT: $n's mount and worker count unreadable: $(tr '\n' '|' <<<"$c" | cut -c1-200)"; exit 2; }
     [ "$m" -gt 0 ] || [ "$w" -gt 0 ] && held=$((held + 1))
+    [ "$m" = 0 ] && unmounted=$((unmounted + 1))
 done
+SVCS="ssh systemd-journald systemd-udevd iscsid"
+svcpids() { on "$1" "echo SVCPIDS \$(systemctl show -p MainPID --value $SVCS 2>/dev/null | tr '\n' ' ')" 30 | grep -a '^SVCPIDS ' | tail -1; }
+GATE="grep -q ' $MNT ' /proc/mounts && "
+[ "${MERGE_CLEANUP_GATE:-1}" = 0 ] && GATE=""
+killed=0
 for n in "$N1" "$N2"; do
-    on "$n" "kill \$(ps -o pid= -C fourkn_merge_wo) 2>/dev/null; sleep 1; fuser -k -m $MNT >/dev/null 2>&1; sleep 2; grep -q ' $MNT ' /proc/mounts && timeout 55 umount $MNT; grep -c ' $MNT ' /proc/mounts" 60 > "$OUT/cleanup_$n.txt"
+    before=$(svcpids "$n")
+    on "$n" "kill \$(ps -o pid= -C fourkn_merge_wo) 2>/dev/null; sleep 1; ${GATE}{ fuser -k -m $MNT >/dev/null 2>&1; sleep 2; }; grep -q ' $MNT ' /proc/mounts && timeout 55 umount $MNT; grep -c ' $MNT ' /proc/mounts" 60 > "$OUT/cleanup_$n.txt"
+    sleep 2
+    after=$(svcpids "$n")
+    echo "  $n: cleanup $(tr '\n' '|' < "$OUT/cleanup_$n.txt" | cut -c1-120); main pids of $SVCS: before [${before#SVCPIDS }] after [${after#SVCPIDS }]"
+    [ -n "$before" ] || { echo "LAP merge_overrun ABORT: $n's service pids unreadable before the cleanup"; exit 2; }
+    # unreadable after it is the same harm: the cleanup took the node's ssh down with the rest
+    [ "$before" = "$after" ] || killed=$((killed + 1))
 done
+# the cleanup is graded on every lap, VACUOUS ones too: it runs whether or not the workload overran
+echo "CLEANUP: $unmounted node(s) had $MNT no longer mounted when the cleanup ran"
+if [ "$killed" != 0 ]; then
+    echo "LAP merge_overrun FAIL: the cleanup ended a service on $killed node(s) (a main pid of $SVCS changed across it)"
+    exit 1
+fi
 wl=$(grep -a 'INFO workload wall' "$OUT/merge.txt" | tail -1)
 echo "  merge run rc=$mrc: ${wl:-no workload line}"
 [ -n "$wl" ] || { echo "LAP merge_overrun ABORT: the merge lap ended before its workload: $(grep -a 'ABORT' "$OUT/merge.txt" | tail -1 | cut -c1-200)"; exit 2; }

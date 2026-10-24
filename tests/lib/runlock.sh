@@ -33,11 +33,18 @@ runlock_take() {  # <file> <shared|exclusive> <what> [wait_s] -> 0 if taken; the
     case $wait_s in ''|*[!0-9]*) wait_s=0 ;; esac
     [ "$wait_s" -gt 0 ] && wflag="-w $wait_s"
     exec {fd}>>"$file" || return 1
+    # a wait on another run is not the waiting lap's own work: written to
+    # MXFS_LAP_WAIT_FILE for the batch lap bounding this run, when one set it
+    # (tools/batch_lap.py)
+    [ "$wait_s" -gt 0 ] && [ -n "${MXFS_LAP_WAIT_FILE:-}" ] && \
+        echo "begin $$ $(date +%s.%N) $wait_s lock $file" >> "$MXFS_LAP_WAIT_FILE"
     # shellcheck disable=SC2086  # wflag is "-n" or "-w <s>" by design
     if ! flock $wflag $flag "$fd"; then
+        [ "$wait_s" -gt 0 ] && [ -n "${MXFS_LAP_WAIT_FILE:-}" ] && echo "end $$ $(date +%s.%N)" >> "$MXFS_LAP_WAIT_FILE"
         exec {fd}>&-
         return 1
     fi
+    [ "$wait_s" -gt 0 ] && [ -n "${MXFS_LAP_WAIT_FILE:-}" ] && echo "end $$ $(date +%s.%N)" >> "$MXFS_LAP_WAIT_FILE"
     # Only an exclusive holder rewrites the holder line: shared holders
     # append, so the file names every group run holding the rig.
     if [ "$mode" = exclusive ]; then

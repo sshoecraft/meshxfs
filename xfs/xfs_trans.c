@@ -29,6 +29,7 @@
 #include "xfs_sb.h"
 #include "xfs_ag.h"	/* -488: xfs_perag_put (seam AG-want ref) */
 #include "xfs_mxfs_dlm.h"  /* mxfs_trans_drain_ag_unlocks */
+#include "../dlm/v5_mount.h"	/* mxfs_v5_dlm_is_single_node */
 
 struct kmem_cache	*xfs_trans_cache;
 
@@ -387,6 +388,26 @@ retry:
 			(void *)_RET_IP_);
 	}
 	error = xfs_trans_reserve(tp, resp, blocks, rtextents);
+	/*
+	 * Which reservation refused, with what this node's counter held then
+	 * (D-2NETMESH-FALSE-ENOSPC-ON-WRITE-AND-CHURN-WITH-19GB-FREE-DURING-NOINO-FENCE-LAP:
+	 * a create, a write and a rename were refused ENOSPC with ~19 GiB free and
+	 * nothing in the kernel log said where).  single=1 is a node whose
+	 * counters the ENOSPC sweep below does not refresh.
+	 */
+	if (error == -ENOSPC && mp->m_mxfs_dlm) {
+		static atomic_t	nresv = ATOMIC_INIT(0);
+
+		if (atomic_inc_return(&nresv) <= 200)
+			mxfs_probe("mxfs: P-ENOSPC-TRESV blocks=%u rtx=%u logres=%u retry=%d fdblocks=%lld resblks_avail=%llu delalloc=%lld single=%d caller=%pS comm=%s\n",
+				blocks, rtextents, resp->tr_logres,
+				want_retry ? 1 : 0,
+				(long long)percpu_counter_sum(&mp->m_free[XC_FREE_BLOCKS].count),
+				(unsigned long long)mp->m_free[XC_FREE_BLOCKS].res_avail,
+				(long long)percpu_counter_sum(&mp->m_delalloc_blks),
+				mxfs_v5_dlm_is_single_node(mp->m_mxfs_dlm) ? 1 : 0,
+				(void *)_RET_IP_, current->comm);
+	}
 	if (error == -ENOSPC && want_retry) {
 		xfs_trans_cancel(tp);
 

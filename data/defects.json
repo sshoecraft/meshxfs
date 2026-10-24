@@ -8797,7 +8797,26 @@
           "iso": "2026-10-24T12:55:17Z"
         }
       ],
-      "updated": "2026-10-24"
+      "updated": "2026-10-24",
+      "batches": [
+        {
+          "id": "b20261024-4ead75",
+          "kind": "control",
+          "row": "lap:batch_lap_wait",
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "variant": "MXFS_BATCH_LAP_WAIT_EXCLUDE=0 (no wait ledger: the lap's bound counts another holder's lock wait, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a command that only waited on another holder's pool lock is ended at its lap's bound"
+        }
+      ]
     },
     {
       "id": "D-LUN-POOL-LOCK-WAIT-OVER-60S-REFUSES-A-PREP-WHILE-ANOTHER-LANE-HOLDS-IT",
