@@ -8981,8 +8981,15 @@
         "tests/fourkn_merge_2node.sh",
         "tests/merge_overrun_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-bd4dfc.md",
+        "sha256": "26754842a9ac86e3af3fee1817f8673b88eea0f15f1e277afe6dfefaf2f7c10c",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
