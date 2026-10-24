@@ -8598,7 +8598,7 @@
           "candidate": "0.90.134",
           "build": "A27A67A3E501890BE9985E0",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -8688,6 +8688,18 @@
           "config": "2/net/mesh/drbd",
           "row": "lap:drbd_arm_group",
           "iso": "2026-10-24T14:31:05Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T14:29:24Z",
+          "build": "A27A67A3E501890BE9985E0",
+          "batch": "b20261024-efeeb2",
+          "approval": "P20261024-d8bd3f",
+          "date": "2026-10-24"
         }
       ]
     },
