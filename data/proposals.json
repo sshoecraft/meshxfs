@@ -6216,8 +6216,14 @@
         "data/criteria.runs.jsonl",
         "data/release_policy.json"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-6483b0.md",
+        "sha256": "89895d3fc7616855cede8cec9fe3c46cf8e24c836673e86b38a4603878a593ac",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-fe0120",
