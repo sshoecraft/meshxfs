@@ -7256,8 +7256,14 @@
         "tests/evidence/batch_laps/b20261024-32ccd5",
         "tests/evidence/batch_laps/b20261023-0ff36b"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "approved",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-7f824d.md",
+        "sha256": "4377398f33849fcba61528ad435664c0873acccbffdcdc5a2f1d7e98eac7e2df",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
