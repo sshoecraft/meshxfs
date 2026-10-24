@@ -1042,15 +1042,35 @@
           "status": "PASS",
           "measured": "skipped (marker matched 2/net/mesh/direct)",
           "reason": "",
-          "iso": "2026-10-24T02:04:48Z",
+          "iso": "2026-10-24T02:05:55Z",
           "recorded": "2026-10-23",
           "elapsed_s": 0,
           "build": "9C7B7B00C5DE523F1D378C8",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T020433Z-g2",
+          "run_id": "20261024T020540Z-g2",
           "candidate": "0.90.134",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T02:05:39Z",
+              "measured": "elapsed=31s (fresh prep)",
+              "reason": "",
+              "build": "9C7B7B00C5DE523F1D378C8",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T020458Z-g2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T02:04:48Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct)",
+              "reason": "",
+              "build": "9C7B7B00C5DE523F1D378C8",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T020433Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T02:04:24Z",
@@ -1130,26 +1150,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T015935Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T01:57:57Z",
-              "measured": "skipped (marker matched 2/net/mesh/direct)",
-              "reason": "",
-              "build": "9C7B7B00C5DE523F1D378C8",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T015743Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T01:57:32Z",
-              "measured": "skipped (marker matched 2/net/mesh/direct)",
-              "reason": "",
-              "build": "9C7B7B00C5DE523F1D378C8",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T015717Z-g2"
             }
           ]
         },
@@ -2315,15 +2315,25 @@
           "status": "PASS",
           "measured": "checks=9 passed=9 failed=0",
           "reason": "",
-          "iso": "2026-10-24T02:04:55Z",
+          "iso": "2026-10-24T02:06:02Z",
           "recorded": "2026-10-23",
           "elapsed_s": 2,
           "build": "9C7B7B00C5DE523F1D378C8",
           "outcome": "PASS",
           "budget_s": 10,
-          "run_id": "20261024T020433Z-g2",
+          "run_id": "20261024T020540Z-g2",
           "candidate": "0.90.134",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T02:04:55Z",
+              "measured": "checks=9 passed=9 failed=0",
+              "reason": "",
+              "build": "9C7B7B00C5DE523F1D378C8",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T020433Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T02:04:31Z",
@@ -2413,16 +2423,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T015504Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-21T23:34:14Z",
-              "measured": "checks=9 passed=9 failed=0",
-              "reason": "",
-              "build": "0988C50EC610F82EE08D135",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261021T233228Z-g2b"
             }
           ]
         },
@@ -39624,14 +39624,17 @@
       "detector": "tests/mpath/path_mount_degraded.sh (host-coordinated; F8 of docs/mpath-verification.md): the other nodes run tests/mpath/pathload.py throughout. The last node unmounts on two paths; its path on network a is taken down at the hypervisor and, once multipathd has failed it, the node mounts (bound 60 s) and runs the load; path a is restored and reinstated (bound 60 s) and the target must then hold the node's key on both paths; path b is taken down for 40 s and the node's I/O must continue on path a; with b still down the node unmounts; b is restored and the target must hold no registration of the node; the node mounts again. PASS only when every mount and unmount returned 0, the stall at the late fault is under tools/mpath_settings.sh stall-bound with zero errors and the kept path carrying the writes, zero double grants, every acknowledged file read back by sha256 from another node, no shutdown/withdrawal/death/BUG in any kernel log, and the registration counts are 2(N-1), 2N, 2(N-1), 2N at the four checkpoints.",
       "per_config": {
         "2/net/mesh/mpath": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261024T020200Z-g2e",
-          "iso": "2026-10-24T02:02:28Z",
+          "status": "PASS",
+          "measured": "victim=test18 mount_one_path_ms=6740 late_stall_ms=6126 reinstate_a_s=19 reinstate_b_s=6 acked=10963 elapsed=171s fails=0 max_stall_ms=6126",
+          "reason": " (evidence tests/evidence/board_20261024T020200Z-g2e_path_mount_degraded)",
+          "iso": "2026-10-24T02:05:24Z",
           "recorded": "2026-10-23",
+          "elapsed_s": 174,
           "build": "9C7B7B00C5DE523F1D378C8",
-          "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
+          "outcome": "PASS",
+          "budget_s": 300,
           "run_id": "20261024T020200Z-g2e",
+          "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
           "history": [
             {
               "status": "FAIL",

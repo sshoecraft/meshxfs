@@ -6165,8 +6165,14 @@
         "CHANGELOG.md",
         "data/reviews/P20261023-2f64df.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "approved",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-d6c290.md",
+        "sha256": "131b27547e9538f361bf2c83712b7478ec23ecacbee72dc9729cf5a9195fa173",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      }
     },
     {
       "id": "P20261023-6483b0",
@@ -6240,8 +6246,14 @@
         "data/reviews/P20261023-b32dc8.md",
         "data/reviews/P20261023-495519.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-fe0120.md",
+        "sha256": "bac06181726db18685e2876fffc357a448c51144b86beaf59223ee9caaf2a1bd",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     }
   ]
 }
