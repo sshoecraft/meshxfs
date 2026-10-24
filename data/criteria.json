@@ -288,16 +288,38 @@
           "status": "PASS",
           "measured": "skipped (marker matched 4/disk/caw/mpath)",
           "reason": "",
-          "iso": "2026-10-24T19:50:43Z",
+          "iso": "2026-10-24T19:56:37Z",
           "recorded": "2026-10-24",
           "elapsed_s": 0,
           "build": "FF012B4B81CDB69CAE96883",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T195021Z-g4b",
+          "run_id": "20261024T195616Z-g4b",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T19:56:15Z",
+              "measured": "elapsed=45s (fresh prep)",
+              "reason": "",
+              "build": "FF012B4B81CDB69CAE96883",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T195509Z-g4b",
+              "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T19:50:43Z",
+              "measured": "skipped (marker matched 4/disk/caw/mpath)",
+              "reason": "",
+              "build": "FF012B4B81CDB69CAE96883",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T195021Z-g4b",
+              "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T19:50:19Z",
@@ -384,26 +406,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T183858Z-g4b"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T18:35:46Z",
-              "measured": "skipped (marker matched 4/disk/caw/mpath)",
-              "reason": "",
-              "build": "1BC77CFB15EF4A988DD1F56",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T183525Z-g4b"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T18:32:06Z",
-              "measured": "skipped (marker matched 4/disk/caw/mpath)",
-              "reason": "",
-              "build": "1BC77CFB15EF4A988DD1F56",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T183144Z-g4b"
             }
           ]
         },
@@ -411,16 +413,38 @@
           "status": "PASS",
           "measured": "skipped (marker matched 8/disk/caw/mpath)",
           "reason": "",
-          "iso": "2026-10-24T19:48:37Z",
+          "iso": "2026-10-24T19:56:07Z",
           "recorded": "2026-10-24",
           "elapsed_s": 0,
           "build": "FF012B4B81CDB69CAE96883",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T194801Z-g8b",
+          "run_id": "20261024T195534Z-g8b",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T19:55:33Z",
+              "measured": "elapsed=66s (fresh prep)",
+              "reason": "",
+              "build": "FF012B4B81CDB69CAE96883",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T195356Z-g8b",
+              "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T19:48:37Z",
+              "measured": "skipped (marker matched 8/disk/caw/mpath)",
+              "reason": "",
+              "build": "FF012B4B81CDB69CAE96883",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T194801Z-g8b",
+              "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T19:47:59Z",
@@ -505,26 +529,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T180952Z-g8b"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T18:08:52Z",
-              "measured": "elapsed=54s (fresh prep)",
-              "reason": "",
-              "build": "1BC77CFB15EF4A988DD1F56",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T180727Z-g8b"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T18:06:27Z",
-              "measured": "elapsed=55s (fresh prep)",
-              "reason": "",
-              "build": "1BC77CFB15EF4A988DD1F56",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T180501Z-g8b"
             }
           ]
         },
@@ -1768,17 +1772,27 @@
         },
         "8/net/mesh/mpath": {
           "status": "PASS",
-          "measured": "elapsed=60s (fresh prep)",
+          "measured": "elapsed=53s (fresh prep)",
           "reason": "",
-          "iso": "2026-10-24T19:01:41Z",
+          "iso": "2026-10-24T19:55:28Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 60,
-          "build": "1BC77CFB15EF4A988DD1F56",
+          "elapsed_s": 53,
+          "build": "FF012B4B81CDB69CAE96883",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261024T190012Z-g8b",
+          "run_id": "20261024T195337Z-g8",
           "candidate": "0.90.134",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T19:01:41Z",
+              "measured": "elapsed=60s (fresh prep)",
+              "reason": "",
+              "build": "1BC77CFB15EF4A988DD1F56",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T190012Z-g8b"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T18:59:16Z",
@@ -1868,16 +1882,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T183713Z-g8b"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T18:35:41Z",
-              "measured": "elapsed=58s (fresh prep)",
-              "reason": "",
-              "build": "1BC77CFB15EF4A988DD1F56",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T183413Z-g8b"
             }
           ]
         },
@@ -43876,19 +43880,27 @@
       "detector": "tests/mpath/path_answer_lost.sh (host-coordinated; F9): under tests/mpath/pathload.py on every node, every frame toward the last node on path a is dropped at the hypervisor (scripts/san_net.sh mute) for 40 s while its own frames still arrive, the mute is lifted and the path reinstated, and the same is done on path b. PASS only when the victim's kernel log shows at least one resent COMPARE AND WRITE that met its own write (P-CAW-ANSWER-LOST-LANDED), per fault every node's longest stall is under tools/mpath_settings.sh stall-bound with zero errors and the kept path carrying the writes, zero double grants, every acknowledged file reads back by sha256 from another node, no shutdown/withdrawal/death/BUG, and the target's reservation keys are unchanged.",
       "per_config": {
         "4/disk/caw/mpath": {
-          "status": "PASS",
-          "measured": "victim=test20 injected=40 landed=21 unresolved=19 stall_a_ms=6328 stall_b_ms=6387 acked=3227 elapsed=163s fails=0 max_stall_ms=6387",
-          "reason": " (evidence tests/evidence/board_20261024T195021Z-g4b_path_answer_lost)",
-          "iso": "2026-10-24T19:53:38Z",
+          "status": "PENDING",
+          "measured": "",
+          "reason": "executing 20261024T195616Z-g4b",
+          "iso": "2026-10-24T19:56:44Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 168,
           "build": "FF012B4B81CDB69CAE96883",
-          "outcome": "PASS",
-          "budget_s": 300,
-          "run_id": "20261024T195021Z-g4b",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)",
+          "run_id": "20261024T195616Z-g4b",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T19:53:38Z",
+              "measured": "victim=test20 injected=40 landed=21 unresolved=19 stall_a_ms=6328 stall_b_ms=6387 acked=3227 elapsed=163s fails=0 max_stall_ms=6387",
+              "reason": " (evidence tests/evidence/board_20261024T195021Z-g4b_path_answer_lost)",
+              "build": "FF012B4B81CDB69CAE96883",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T195021Z-g4b",
+              "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T19:47:44Z",
@@ -43982,16 +43994,6 @@
               "outcome": "PASS",
               "run_id": "20261023T231404Z-g4",
               "variant": "MXFS_EXTRA_MODARGS=rel_abort_keeps_acquiring=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-23T23:11:46Z",
-              "measured": "victim=test6 injected=40 landed=19 unresolved=21 stall_a_ms=19809 stall_b_ms=15650 acked=3603 elapsed=170s fails=0 max_stall_ms=19809",
-              "reason": " (evidence tests/evidence/board_20261023T230836Z-g4_path_answer_lost)",
-              "build": "79779BEAECBEA94844FDC72",
-              "outcome": "PASS",
-              "run_id": "20261023T230836Z-g4",
-              "variant": "MXFS_EXTRA_MODARGS=rel_abort_keeps_acquiring=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1"
             }
           ]
         },
@@ -44072,19 +44074,27 @@
           ]
         },
         "8/disk/caw/mpath": {
-          "status": "PASS",
-          "measured": "victim=test28 injected=40 landed=18 unresolved=22 stall_a_ms=6156 stall_b_ms=6488 acked=3043 elapsed=176s fails=0 max_stall_ms=7700",
-          "reason": " (evidence tests/evidence/board_20261024T194801Z-g8b_path_answer_lost)",
-          "iso": "2026-10-24T19:51:52Z",
+          "status": "PENDING",
+          "measured": "",
+          "reason": "executing 20261024T195534Z-g8b",
+          "iso": "2026-10-24T19:56:19Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 186,
           "build": "FF012B4B81CDB69CAE96883",
-          "outcome": "PASS",
-          "budget_s": 300,
-          "run_id": "20261024T194801Z-g8b",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)",
+          "run_id": "20261024T195534Z-g8b",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T19:51:52Z",
+              "measured": "victim=test28 injected=40 landed=18 unresolved=22 stall_a_ms=6156 stall_b_ms=6488 acked=3043 elapsed=176s fails=0 max_stall_ms=7700",
+              "reason": " (evidence tests/evidence/board_20261024T194801Z-g8b_path_answer_lost)",
+              "build": "FF012B4B81CDB69CAE96883",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T194801Z-g8b",
+              "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T19:44:44Z",
@@ -44157,12 +44167,6 @@
               "iso": "2026-10-20T18:33:54Z",
               "measured": "victim=test28 injected=40 landed=15 unresolved=25 stall_a_ms=15675 stall_b_ms=16703 acked=3596 elapsed=185s fails=0",
               "reason": " (evidence tests/evidence/board_20261020T173246Z-g8b_path_answer_lost)"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-20T10:43:53Z",
-              "measured": "victim=test28 injected=40 landed=17 unresolved=23 stall_a_ms=17573 stall_b_ms=16334 acked=6952 elapsed=193s fails=0",
-              "reason": " (evidence tests/evidence/board_20261020T093919Z-g8b_path_answer_lost)"
             }
           ]
         },
@@ -45031,14 +45035,25 @@
         "4/disk/caw/mpath": {
           "status": "PENDING",
           "measured": "",
-          "reason": "executing 20261024T195021Z-g4b",
-          "iso": "2026-10-24T19:53:38Z",
+          "reason": "running 20261024T195616Z-g4b",
+          "iso": "2026-10-24T19:56:42Z",
           "recorded": "2026-10-24",
           "build": "FF012B4B81CDB69CAE96883",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)",
-          "run_id": "20261024T195021Z-g4b",
+          "run_id": "20261024T195616Z-g4b",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T19:54:40Z",
+              "measured": "nodes_pass=4/4 hostload=12.30 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261024T195021Z-g4b fsid=7ca94991-8129-413f-bb5b-e81d7cafd914 witness=tests/evidence/alloc_witness/20261024T195021Z-g4b/witness.txt",
+              "reason": "",
+              "build": "FF012B4B81CDB69CAE96883",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T195021Z-g4b",
+              "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T19:48:43Z",
@@ -45131,33 +45146,31 @@
               "outcome": "PASS",
               "run_id": "20261023T230836Z-g4",
               "variant": "MXFS_EXTRA_MODARGS=rel_abort_keeps_acquiring=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-23T14:59:07Z",
-              "measured": "nodes_pass=4/4 hostload=11.79 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261023T145444Z-g4 fsid=f9f4ac21-593b-4ac6-aec3-11c1dbec8bdf witness=tests/evidence/alloc_witness/20261023T145444Z-g4/witness.txt",
-              "reason": "",
-              "build": "08D63764A9352FBDD5A76CD",
-              "outcome": "PASS",
-              "run_id": "20261023T145444Z-g4",
-              "variant": "MXFS_EXTRA_MODARGS=rel_abort_keeps_acquiring=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1"
             }
           ]
         },
         "8/disk/caw/mpath": {
-          "status": "PASS",
-          "measured": "nodes_pass=8/8 hostload=7.39 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261024T194801Z-g8b fsid=e7028cb5-1019-45ba-a4d7-6190405754d0 witness=tests/evidence/alloc_witness/20261024T194801Z-g8b/witness.txt",
-          "reason": "",
-          "iso": "2026-10-24T19:52:56Z",
+          "status": "PENDING",
+          "measured": "",
+          "reason": "running 20261024T195534Z-g8b",
+          "iso": "2026-10-24T19:56:12Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 54,
           "build": "FF012B4B81CDB69CAE96883",
-          "outcome": "PASS",
-          "budget_s": 120,
-          "run_id": "20261024T194801Z-g8b",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)",
+          "run_id": "20261024T195534Z-g8b",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T19:52:56Z",
+              "measured": "nodes_pass=8/8 hostload=7.39 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261024T194801Z-g8b fsid=e7028cb5-1019-45ba-a4d7-6190405754d0 witness=tests/evidence/alloc_witness/20261024T194801Z-g8b/witness.txt",
+              "reason": "",
+              "build": "FF012B4B81CDB69CAE96883",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T194801Z-g8b",
+              "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T19:45:50Z",
@@ -45225,12 +45238,6 @@
               "status": "PASS",
               "iso": "2026-10-20T10:44:50Z",
               "measured": "nodes_pass=8/8 hostload=5.91 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261020T093919Z-g8b fsid=7f5533c7-248d-45b7-ad78-9758a0034ade witness=tests/evidence/alloc_witness/20261020T093919Z-g8b/witness.txt",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-20T02:27:47Z",
-              "measured": "nodes_pass=8/8 hostload=8.89 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261020T021918Z-g8b fsid=ff67641d-6e8c-4fee-b508-ac4028e1cc94 witness=tests/evidence/alloc_witness/20261020T021918Z-g8b/witness.txt",
               "reason": ""
             }
           ]
@@ -46505,14 +46512,26 @@
         "4/disk/caw/mpath": {
           "status": "PENDING",
           "measured": "",
-          "reason": "running 20261024T195021Z-g4b",
-          "iso": "2026-10-24T19:50:48Z",
+          "reason": "running 20261024T195616Z-g4b",
+          "iso": "2026-10-24T19:56:42Z",
           "recorded": "2026-10-24",
           "build": "FF012B4B81CDB69CAE96883",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)",
-          "run_id": "20261024T195021Z-g4b",
+          "run_id": "20261024T195616Z-g4b",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T19:55:08Z",
+              "measured": "nodes_pass=4/4 hostload=12.07 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=8064 ledger_holders=0 umount_ms=869 remount_ms=6614 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261024T195446Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261024T195021Z-g4b/witness.txt exposure=0",
+              "reason": "",
+              "build": "FF012B4B81CDB69CAE96883",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T195021Z-g4b",
+              "batch": "b20261024-0ebcba",
+              "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T19:49:11Z",
@@ -46609,34 +46628,32 @@
               "outcome": "PASS",
               "run_id": "20261023T230836Z-g4",
               "variant": "MXFS_EXTRA_MODARGS=rel_abort_keeps_acquiring=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-23T14:59:29Z",
-              "measured": "nodes_pass=4/4 hostload=9.02 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=15936 ledger_holders=0 umount_ms=792 remount_ms=6691 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_4node_20261023T145914Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261023T145444Z-g4/witness.txt",
-              "reason": "",
-              "build": "08D63764A9352FBDD5A76CD",
-              "outcome": "PASS",
-              "run_id": "20261023T145444Z-g4",
-              "variant": "MXFS_EXTRA_MODARGS=rel_abort_keeps_acquiring=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1"
             }
           ]
         },
         "8/disk/caw/mpath": {
-          "status": "PASS",
-          "measured": "nodes_pass=8/8 hostload=6.77 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=10112 ledger_holders=0 umount_ms=589 remount_ms=6027 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_8node_20261024T195303Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261024T194801Z-g8b/witness.txt exposure=0",
-          "reason": "",
-          "iso": "2026-10-24T19:53:32Z",
+          "status": "PENDING",
+          "measured": "",
+          "reason": "running 20261024T195534Z-g8b",
+          "iso": "2026-10-24T19:56:12Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 12,
           "build": "FF012B4B81CDB69CAE96883",
-          "outcome": "PASS",
-          "budget_s": 180,
-          "run_id": "20261024T194801Z-g8b",
           "candidate": "0.90.134",
-          "batch": "b20261024-2e30a0",
           "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)",
+          "run_id": "20261024T195534Z-g8b",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-24T19:53:32Z",
+              "measured": "nodes_pass=8/8 hostload=6.77 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=10112 ledger_holders=0 umount_ms=589 remount_ms=6027 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_8node_20261024T195303Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261024T194801Z-g8b/witness.txt exposure=0",
+              "reason": "",
+              "build": "FF012B4B81CDB69CAE96883",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261024T194801Z-g8b",
+              "batch": "b20261024-2e30a0",
+              "variant": "MXFS_EXTRA_MODARGS=relog_auth_granted_mode=0;MXFS_TEST_ENV=PF_KEEP_KMSG=1;batch:relog_auth_granted_mode=0 (a shared CAW bit authorizes a re-log as an exclusive one, as before the fix)"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T19:46:28Z",
@@ -46707,12 +46724,6 @@
               "status": "PASS",
               "iso": "2026-10-20T10:45:17Z",
               "measured": "nodes_pass=8/8 hostload=6.64 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=20864 ledger_holders=0 umount_ms=904 remount_ms=6667 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_8node_20261020T104459Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261020T093919Z-g8b/witness.txt",
-              "reason": ""
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-20T02:28:09Z",
-              "measured": "nodes_pass=8/8 hostload=7.75 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=12544 ledger_holders=0 umount_ms=1061 remount_ms=6612 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_8node_20261020T022754Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261020T021918Z-g8b/witness.txt",
               "reason": ""
             }
           ]
