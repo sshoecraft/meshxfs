@@ -6609,11 +6609,44 @@
           "candidate": "",
           "build": "8DBA16AEB7FDD3066C9C1BC",
           "variant": "PF_REJOIN_PREP_ARGS=0 (tests/mpath/lib.sh pf_boot_rejoin loads mxfs with the configuration's transport arguments only, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a victim killed and rejoined by pf_boot_rejoin loads other module arguments than the prep gave every node"
+        },
+        {
+          "id": "b20261024-d99c77",
+          "kind": "verify",
+          "row": "lap:rejoin_modargs_rig",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "8DBA16AEB7FDD3066C9C1BC",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:rejoin_modargs_rig",
+            "config": "8/disk/caw/mpath",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-2f6ae0",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "PF_REJOIN_PREP_ARGS=0 (tests/mpath/lib.sh pf_boot_rejoin loads mxfs with the configuration's transport arguments only, as before the fix)",
+            "builds": [
+              "8DBA16AEB7FDD3066C9C1BC"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -6644,6 +6677,21 @@
           "variant": "PF_REJOIN_PREP_ARGS=0 (tests/mpath/lib.sh pf_boot_rejoin loads mxfs with the configuration's transport arguments only, as before the fix)",
           "builds": [
             "468F7F30C2E190B0244AF70"
+          ],
+          "date": "2026-10-24"
+        },
+        {
+          "row": "lap:rejoin_modargs_rig",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-2f6ae0",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "PF_REJOIN_PREP_ARGS=0 (tests/mpath/lib.sh pf_boot_rejoin loads mxfs with the configuration's transport arguments only, as before the fix)",
+          "builds": [
+            "8DBA16AEB7FDD3066C9C1BC"
           ],
           "date": "2026-10-24"
         }
@@ -6748,6 +6796,56 @@
           "config": "8/disk/caw/mpath",
           "row": "lap:rejoin_modargs_rig",
           "iso": "2026-10-24T10:59:31Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T13:31:09Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T13:29:54Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T13:28:33Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T13:27:11Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T13:25:50Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T13:24:27Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T13:23:05Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T13:21:42Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T13:20:28Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:rejoin_modargs_rig",
+          "iso": "2026-10-24T13:19:12Z"
         }
       ],
       "reproducer": "tests/rejoin_modargs_lap.sh: runs tests/mpath/lib.sh pf_boot_rejoin and pf_rejoin_modargs on the host with ssh and virsh replaced by a recorder, and compares the insmod argv the rejoin would send with prep_node.sh's for the same environment (MXFS_CONFIG=8/net/mesh/mpath MXFS_EXTRA_MODARGS=dead_timeout_ms=12000); PF_REJOIN_PREP_ARGS=0 is the control"
@@ -8435,7 +8533,7 @@
       "config": "*/*/*",
       "opened": "2026-10-24",
       "summary": "A batch lap's bound (tools/batch_lap.py) counts the time run.sh spends before its prep's own timer starts, in the runlock, tools/lun_pool.sh alloc and the preflight run under 'lun_pool.sh quiet' (pool_lock 300, tools/lun_pool.sh:855-856), and nothing logs that time: lap ysc1 of tests/yield_stall_global_lap.sh lost about 95 s there and overran its 146 s bound before its workload ran.",
-      "evidence": "2026-10-24, lane tests/evidence/lanes/g2_w12b_20261024T081715Z step 2 (control b20261024-3bc635, 2/net/mesh/direct, test1/test2, module BE3695D2590A65F742F9816): lap 1 (tests/evidence/batch_laps/b20261024-3bc635/20261024T081751Z-a5254db2.log) started 08:17:52Z, printed both nodes' after-prep lines, then 'the lap overran its bound of 146s', rc=124 at 08:20:18Z; its workload files tests/evidence/20261024T081752Z_yieldstall_ysc1/test{1,2}_work.txt are 0 bytes with mtime 08:20:09Z, so the 20 s workload started 9 s before the bound. The prep's ledger line (data/criteria.runs.jsonl:12803, run_id 20261024T081753Z-g2) says elapsed_s=39 recorded at 08:20:07Z; elapsed is measured from run.sh:2721 (t0, after preflight) to :2725, so about 95 s passed between RUN_ID (08:17:53Z, run.sh:400) and t0 with no timestamped line anywhere (run.sh writes no prep log; clyde_preflight.sh and lun_pool.sh keep none; the lap captures prep's output in a variable, tests/yield_stall_global_lap.sh:66, and prints it only on failure). In the same minute other lanes' laps allocated and prepped pool LUNs: 20261024T081753Z_adoptgrant_agc1/prep.log (8 nodes, g8b) mtime 08:18:54Z, 20261024T081747Z_fragag_fra16_caw3/prep.log (g4) 08:18:57Z, 20261024T081902Z_adoptgrant_agc2/prep.log 08:20:29Z. Laps 2-10 of the same batch spent 37-38 s in prep and ran 76-86 s. The hypothesis that the 95 s was pool_lock waits behind those allocations is unproven: no timestamp shows where the time went. ===== 2026-10-24, a second lap started the same second: lap 1 of control b20261024-65e307 (tests/adopted_grant_rig_lap.sh agc1, lane tests/evidence/lanes/g8b_w12b_20261024T081750Z step 1, 8/net/mesh/mpath, g8b) began its prep at 08:17:53Z and aborted at 61 s with exposure 0; its whole prep log (tests/evidence/20261024T081753Z_adoptgrant_agc1/prep.log, 3 lines): '--- run lock: group g8b [test21 ... test28] shares the rig; holds its nodes and 8/net/mesh/mpath ---', 'lun_pool: pool lock not taken in 60 s: /home/steve/disks/pool/.lock', 'ERROR: no pool LUN of 512-byte blocks for [test21 ... test28] (tools/lun_pool.sh status)'. So in the minute from 08:17:53Z the host-wide pool lock (tools/lun_pool.sh pool_lock, flock -w 60 for alloc) was held more than 60 s by someone else, while lap ysc1 on g2 (run.sh started 08:17:53Z) spent about 95 s before its prep's timer, and g4's lap fra16 (prep.log mtime 08:18:57Z) was preparing. Who held it, and for how long, is not recorded: lun_pool.sh logs no holder or wait. ===== 2026-10-24, a third lap of the same shape on an earlier attempt: lap 3 of control b20261023-0ff36b (tests/marker_params_lap.sh mpc3, 2/net/mesh/direct, g2, build 9C7B7B00C5DE523F1D378C8), started 01:58:06Z, ended 'LAP marker_params ABORT label=mpc3: prep_cluster overran its 88 s bound', rc=2 at 88 s, its evidence directory empty (tests/evidence/batch_laps/b20261023-0ff36b/20261024T015806Z-32f6fc66.log); laps 1-2 and 4-10 of that batch prepped inside the bound. Which phase took the time (runlock, pool lock, preflight or the prep itself) is not recorded, the same gap as above. ===== 2026-10-24, control b20261024-8c3ba5 lap 5 (lane tests/evidence/lanes/g2d_w12_20261024T091138Z step 2, 2/disk/caw/direct4k, test31/test32, module BE3695D2590A65F742F9816): tests/marker_params_lap.sh's first filtered row (timeout -k 5 44 ./run.sh ... precond_readiness, tests/marker_params_lap.sh:70) was killed at its 44 s bound (rc=124) before the row ran. prep.log was last written 09:21:47.9Z, row1.log's first line after the run lock and the pool line is '=== clyde_preflight (2026-10-24T09:22:28Z) ===' and row1.log was last written 09:22:30.98Z (tests/evidence/20261024T092057Z_markerparams_mpc4k5/row1.log, 31 lines, 22 of them clyde_preflight.sh:151 '/proc/<pid>/stat: No such file or directory'), so about 41 s went to run.sh's run lock and lun_pool.sh before the preflight began, logged nowhere; the lap ABORTed 'the untouched pair was not reused (rc=124)', exposure 0. ===== 2026-10-24, attempt 17 (frozen 10:25:09Z, the pre-prep timing lines in run.sh): lap 4 of control b20261024-1d2fde (tests/peer_window_lap.sh pw8c4 at 8/disk/caw/mpath, g8b) recorded INCOMPLETE at 10:42:46Z: 'STAGE prep rc=124 wall=121s', 'RESULT: ABORT label=pw8c4 stage=prep' (tests/evidence/batch_laps/b20261024-1d2fde/20261024T104044Z-d6eb481f.log). Its prep log (tests/evidence/20261024T104044Z_peerwin_pw8c4/prep.log): '--- pre-prep: run lock taken at +1 s (10:40:47) ---', 'VMs up at +1 s', 'pool LUN held at +1 s', 'preflight starts at +2 s (10:40:48)', '  waited 58 s for a power-up to finish', 'preflight passed at +68 s (10:41:54)': scripts/clyde_preflight.sh waited on the host power-up lock while lane g4c_a17tf powered test7-test10 up (10:40:47Z), and the lap's 'timeout 120 ./run.sh ... prep_cluster' (tests/peer_window_lap.sh:69) counted those 66 s, so the 8-node prep (71-96 s measured) ran out. The wait is the power-up lock's own design (scripts/lab_power.sh, D-LANE-POWER-UP-FLOODS-THE-HOST-LOG-AND-ANOTHER-LANES-PREFLIGHT-REFUSES-ITS-PREP), so with the lock every power-up of another lane is now time counted against a lap's prep bound instead of a refusal.",
+      "evidence": "2026-10-24, lane tests/evidence/lanes/g2_w12b_20261024T081715Z step 2 (control b20261024-3bc635, 2/net/mesh/direct, test1/test2, module BE3695D2590A65F742F9816): lap 1 (tests/evidence/batch_laps/b20261024-3bc635/20261024T081751Z-a5254db2.log) started 08:17:52Z, printed both nodes' after-prep lines, then 'the lap overran its bound of 146s', rc=124 at 08:20:18Z; its workload files tests/evidence/20261024T081752Z_yieldstall_ysc1/test{1,2}_work.txt are 0 bytes with mtime 08:20:09Z, so the 20 s workload started 9 s before the bound. The prep's ledger line (data/criteria.runs.jsonl:12803, run_id 20261024T081753Z-g2) says elapsed_s=39 recorded at 08:20:07Z; elapsed is measured from run.sh:2721 (t0, after preflight) to :2725, so about 95 s passed between RUN_ID (08:17:53Z, run.sh:400) and t0 with no timestamped line anywhere (run.sh writes no prep log; clyde_preflight.sh and lun_pool.sh keep none; the lap captures prep's output in a variable, tests/yield_stall_global_lap.sh:66, and prints it only on failure). In the same minute other lanes' laps allocated and prepped pool LUNs: 20261024T081753Z_adoptgrant_agc1/prep.log (8 nodes, g8b) mtime 08:18:54Z, 20261024T081747Z_fragag_fra16_caw3/prep.log (g4) 08:18:57Z, 20261024T081902Z_adoptgrant_agc2/prep.log 08:20:29Z. Laps 2-10 of the same batch spent 37-38 s in prep and ran 76-86 s. The hypothesis that the 95 s was pool_lock waits behind those allocations is unproven: no timestamp shows where the time went. ===== 2026-10-24, a second lap started the same second: lap 1 of control b20261024-65e307 (tests/adopted_grant_rig_lap.sh agc1, lane tests/evidence/lanes/g8b_w12b_20261024T081750Z step 1, 8/net/mesh/mpath, g8b) began its prep at 08:17:53Z and aborted at 61 s with exposure 0; its whole prep log (tests/evidence/20261024T081753Z_adoptgrant_agc1/prep.log, 3 lines): '--- run lock: group g8b [test21 ... test28] shares the rig; holds its nodes and 8/net/mesh/mpath ---', 'lun_pool: pool lock not taken in 60 s: /home/steve/disks/pool/.lock', 'ERROR: no pool LUN of 512-byte blocks for [test21 ... test28] (tools/lun_pool.sh status)'. So in the minute from 08:17:53Z the host-wide pool lock (tools/lun_pool.sh pool_lock, flock -w 60 for alloc) was held more than 60 s by someone else, while lap ysc1 on g2 (run.sh started 08:17:53Z) spent about 95 s before its prep's timer, and g4's lap fra16 (prep.log mtime 08:18:57Z) was preparing. Who held it, and for how long, is not recorded: lun_pool.sh logs no holder or wait. ===== 2026-10-24, a third lap of the same shape on an earlier attempt: lap 3 of control b20261023-0ff36b (tests/marker_params_lap.sh mpc3, 2/net/mesh/direct, g2, build 9C7B7B00C5DE523F1D378C8), started 01:58:06Z, ended 'LAP marker_params ABORT label=mpc3: prep_cluster overran its 88 s bound', rc=2 at 88 s, its evidence directory empty (tests/evidence/batch_laps/b20261023-0ff36b/20261024T015806Z-32f6fc66.log); laps 1-2 and 4-10 of that batch prepped inside the bound. Which phase took the time (runlock, pool lock, preflight or the prep itself) is not recorded, the same gap as above. ===== 2026-10-24, control b20261024-8c3ba5 lap 5 (lane tests/evidence/lanes/g2d_w12_20261024T091138Z step 2, 2/disk/caw/direct4k, test31/test32, module BE3695D2590A65F742F9816): tests/marker_params_lap.sh's first filtered row (timeout -k 5 44 ./run.sh ... precond_readiness, tests/marker_params_lap.sh:70) was killed at its 44 s bound (rc=124) before the row ran. prep.log was last written 09:21:47.9Z, row1.log's first line after the run lock and the pool line is '=== clyde_preflight (2026-10-24T09:22:28Z) ===' and row1.log was last written 09:22:30.98Z (tests/evidence/20261024T092057Z_markerparams_mpc4k5/row1.log, 31 lines, 22 of them clyde_preflight.sh:151 '/proc/<pid>/stat: No such file or directory'), so about 41 s went to run.sh's run lock and lun_pool.sh before the preflight began, logged nowhere; the lap ABORTed 'the untouched pair was not reused (rc=124)', exposure 0. ===== 2026-10-24, attempt 17 (frozen 10:25:09Z, the pre-prep timing lines in run.sh): lap 4 of control b20261024-1d2fde (tests/peer_window_lap.sh pw8c4 at 8/disk/caw/mpath, g8b) recorded INCOMPLETE at 10:42:46Z: 'STAGE prep rc=124 wall=121s', 'RESULT: ABORT label=pw8c4 stage=prep' (tests/evidence/batch_laps/b20261024-1d2fde/20261024T104044Z-d6eb481f.log). Its prep log (tests/evidence/20261024T104044Z_peerwin_pw8c4/prep.log): '--- pre-prep: run lock taken at +1 s (10:40:47) ---', 'VMs up at +1 s', 'pool LUN held at +1 s', 'preflight starts at +2 s (10:40:48)', '  waited 58 s for a power-up to finish', 'preflight passed at +68 s (10:41:54)': scripts/clyde_preflight.sh waited on the host power-up lock while lane g4c_a17tf powered test7-test10 up (10:40:47Z), and the lap's 'timeout 120 ./run.sh ... prep_cluster' (tests/peer_window_lap.sh:69) counted those 66 s, so the 8-node prep (71-96 s measured) ran out. The wait is the power-up lock's own design (scripts/lab_power.sh, D-LANE-POWER-UP-FLOODS-THE-HOST-LOG-AND-ANOTHER-LANES-PREFLIGHT-REFUSES-ITS-PREP), so with the lock every power-up of another lane is now time counted against a lap's prep bound instead of a refusal. ===== 2026-10-24, attempt 18, lane g8b_a18 control b20261024-da464a lap 1 (pw8c1, tests/evidence/batch_laps/b20261024-da464a/20261024T125316Z-91854c37.log): 'STAGE prep rc=124 wall=121s' then 'RESULT: ABORT label=pw8c1 stage=prep', recorded INCOMPLETE; tests/peer_window_lap.sh:69 bounds its own prep at 'timeout 120 ./run.sh ... prep_cluster', and that prep (tests/evidence/20261024T125316Z_peerwin_pw8c1/prep.log) spent 81 s before its prep began: run lock +1 s, VMs up +2 s, 'lun_pool: lun12: its finished allocation holds test21; releasing it' and 'pool LUN held at +24 s', preflight starts +26 s, 'power-up lock held shared at +74 s' (48 s behind other lanes' power-ups: g2e_a18 started 12:53:38Z, the lane starter's 75 s stagger), preflight passed +81 s; the prep was killed at 120 s inside 'PREP STEP 4 ... join', 39 s into it (an 8-node join takes 71-81 s, this record's earlier table). So a lap-internal prep bound counts the same pre-prep waits as tools/batch_lap.py's. The INCOMPLETE leaves the control unmeasurable (measure refuses an unsettled lap; g8b step 3 plan-verify refused 'no measured rate').",
       "next": "Instrument first: run.sh prints a timestamped line when it takes the runlock, when lun_pool.sh alloc returns, when the preflight starts and ends (and lun_pool.sh quiet when it gets pool_lock and how long it waited), and the laps that capture prep output keep it in their evidence directory; then read a lap started while another lane allocates an 8-node LUN. If pool_lock waits are the cause, either a lap's bound covers only its own work (batch_lap.py starts the clock after prep, or prep reports its pre-t0 wait and the lap subtracts it), or lanes' allocations are serialized so a lap never waits on another's; a control with the change off. ===== 2026-10-24, the instrument read: 118 preps logged run.sh's pre-prep lines on attempt 2026-10-24T10:25:09Z (prep.log, prep_N.log, pair_restore_1.log and lane step logs; parser and table in the session scratchpad, not kept). Run start to 'preflight passed': n=117, min 9 s, median 10 s, max 68 s; start to 'preflight starts' median 3 s (max 28 s, a 16-20 s pool-lock wait before 'pool LUN held' on g4/g4c/g8b); 'preflight starts' to 'passed' median 7 s. The 68 s one is tests/evidence/20261024T104044Z_peerwin_pw8c4/prep.log:6-62, 'waited 58 s for a power-up to finish' inside the preflight while holding the pool, whose batch lap (b20261024-1d2fde) then ran out its prep bound (STAGE prep rc=124 wall=121s); lap lhmc5 (b20261024-bda0e1) gave up on the pool lock after 60 s at the same minute (prep_1.log: 'pool lock not taken in 60 s'). So the pre-prep time past ~10 s came from waiting on another lane: the pool lock, and a power-up waited out inside it (D-LUN-POOL-LOCK-WAIT-OVER-60S-REFUSES-A-PREP-WHILE-ANOTHER-LANE-HOLDS-IT, whose power-up-first ordering is in attempt 2026-10-24T~13Z). A lap's bound still counts a power-up wait of up to 240 s before its prep. Next: decide the bound's start (after the shared power-up hold, which run.sh now logs as 'power-up lock held shared') with a lap that starts a batch lap during another group's power-up, and a control.",
       "cells": [
         {
@@ -8462,6 +8560,11 @@
           "config": "8/disk/caw/mpath",
           "row": "lap:peer_window",
           "iso": "2026-10-24T10:42:46Z"
+        },
+        {
+          "config": "8/disk/caw/mpath",
+          "row": "lap:peer_window",
+          "iso": "2026-10-24T12:55:17Z"
         }
       ],
       "updated": "2026-10-24"
