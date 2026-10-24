@@ -54,7 +54,9 @@
 # start 30 + 4 s of load + detection (17 checks, 34.8 s measured) + recovery
 # (7-9 s measured) + the truncates, which wait for it: bound 120 + kernel logs
 # 3 x 30 + unmounts 3 x 70 + chk_mxfs of the volume, bound 180 + V back up
-# (lab_power, BOOT_S 240) = about 1290 s.  Caller bound 1300 s.
+# (lab_power, BOOT_S 240) = about 1290 s, plus the wait for the recovery's
+# line when the truncates return before it (4b, at most 53 s from the kill) =
+# about 1343 s.  Caller bound 1350 s.
 #
 # Usage: tests/foreign_replay_ag_lap.sh <label>
 # Env:   MXFS_NODE_LIST (four nodes, the last the victim), MXFS_CONFIG
@@ -154,6 +156,34 @@ for n in "${SURV[@]}"; do
     grep -aq '^ABORT' "$OUT/${n}_trunc.out" && { cat "$OUT/${n}_trunc.out"; abort truncates "$n's truncates were not captured"; }
 done
 echo "STAGE truncates returned at +$(el)s"
+
+# ---- 4b. the recovery has completed somewhere before the logs are read
+# A truncate that needs nothing the victim held returns before the replay ends,
+# so the logs read at once could hold no P163-RECOVERY-COMPLETE yet, and the lap
+# failed that no survivor replayed
+# (D-FOREIGN-REPLAY-AG-LAP-READS-SURVIVOR-LOGS-BEFORE-P163-AND-FINDS-NO-REPLAYER).
+# Wait for the line on some survivor, bounded from the kill: detection at the
+# longest window a node may run (17 checks, 34.8 s measured) plus twice the
+# recovery's measured 7-9 s, 53 s.  None in that bound is an ABORT: the lap
+# measured nothing, it is not a verdict on the replay.  LAP_WAIT_P163=0 reads at
+# once, as before: the control.
+P163_BOUND_MS=53000
+if [ "${LAP_WAIT_P163:-1}" != 0 ]; then
+    seen=""
+    while [ -z "$seen" ]; do
+        for n in "${SURV[@]}"; do
+            # rs reports filt's status, not the remote command's: read a token
+            if rs 10 "$n" "dmesg | sed -n '/$MARK/,\$p' | grep -aq 'P163-RECOVERY-COMPLETE slot=${SLOT[$V]} ' && echo P163_SEEN" | grep -q '^P163_SEEN$'; then
+                seen=$n; break
+            fi
+        done
+        [ -n "$seen" ] && break
+        [ $(( $(date +%s%3N) - T_KILL )) -ge $P163_BOUND_MS ] && \
+            abort recovery "no survivor logged P163-RECOVERY-COMPLETE for $V's slot ${SLOT[$V]} within ${P163_BOUND_MS} ms of the kill"
+        sleep 2
+    done
+    echo "STAGE recovery complete on $seen by +$(( $(date +%s%3N) - T_KILL )) ms after the kill"
+fi
 
 # ---- 5. each survivor's kernel log since the mark, on its own clock
 for n in "${SURV[@]}"; do

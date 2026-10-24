@@ -179,6 +179,9 @@ MODULE_PARM_DESC(foreign_replay_token_enforce,
                  "legacy, refused for clustered RW mounts; setter fails "
                  "closed on F2 domain admission, release_proof_enforce and "
                  "icluster_dlm=1)");
+module_param_named(fr_stab_early, mxfs_fr_stab_early, int, 0644);
+MODULE_PARM_DESC(fr_stab_early,
+	"1: a live recovery's replayer starts the victim slice's stability proof once the fence certificate is durable, before the prover seals the manifest; 0 (default): after the claim, as before");
 module_param_named(fr_stab_prefetch, mxfs_fr_stab_prefetch, int, 0644);
 MODULE_PARM_DESC(fr_stab_prefetch,
 	"/445: pipeline DEPTH of victim-slice snapshot stability proofs run on workers ahead of the mount-cohort barrier's replays (each holds ~68 MiB); 0 = inline only, default 3, max 8");
@@ -1476,6 +1479,26 @@ mxfs_dlm_foreign_replay_work_fn(
 						"freplay-classify");
 				continue;
 			}
+		}
+		if (auth == -EPERM && READ_ONCE(mxfs_fr_stab_early)) {
+			/* the certificate may already prove the exclusion while
+			 * its prover seals the manifest: the slice's stability
+			 * proof, reads only, needs nothing more */
+			mxfs_epoch_t tag =
+				mxfs_v5_dlm_recovery_exclusion_durable(
+					mp->m_mxfs_dlm, slot);
+
+			if (tag)
+				mxfs_xlog_snap_prefetch_tagged(mp, slot, tag);
+		} else if (auth) {
+			/* not ours to replay, or no longer pending: an early
+			 * proof of this slot must not outlive the death it
+			 * was armed for */
+			mxfs_xlog_snap_prefetch_settle(mp, slot, 0);
+		} else {
+			mxfs_xlog_snap_prefetch_settle(mp, slot,
+				mxfs_v5_dlm_recovery_pending_epoch(
+					mp->m_mxfs_dlm, slot));
 		}
 		if (auth) {
 			xfs_alert(mp,

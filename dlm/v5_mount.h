@@ -352,6 +352,13 @@ int  mxfs_v5_dlm_recovery_complete(struct mxfs_v5_dlm *ctx,
  * sleeps MXFS_RECOV_ABANDON_MS.
  */
 int  mxfs_v5_dlm_recovery_acquire(struct mxfs_v5_dlm *ctx, uint32_t dead_slot);
+/* Read-only: the pending victim's incarnation when a durable certificate
+ * proves its exclusion (SNAPSHOTTING or later), else 0; and the pending
+ * victim's incarnation, 0 when the slot has none. */
+mxfs_epoch_t mxfs_v5_dlm_recovery_exclusion_durable(struct mxfs_v5_dlm *ctx,
+						    uint32_t dead_slot);
+mxfs_epoch_t mxfs_v5_dlm_recovery_pending_epoch(struct mxfs_v5_dlm *ctx,
+						uint32_t dead_slot);
 /* After a refused acquire: how long to wait before the next one — short while
  * a live peer is still finishing the fence, `idle_ms` otherwise. */
 uint32_t mxfs_v5_dlm_recovery_wait_ms(struct mxfs_v5_dlm *ctx, uint32_t dead_slot,

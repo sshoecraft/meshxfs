@@ -9810,11 +9810,33 @@ static bool recov_fence_auth_holds(const struct mxfs_disklock_ctx *ctx,
 	       d->fence_term   == auth->fence_term;
 }
 
+/* The certificate checks of mxfs_recov_cert_proves_exclusion, with the lowest
+ * stage they accept: FENCED for every gate that authorises a mutation,
+ * SNAPSHOTTING only for mxfs_disklock_recovery_exclusion_durable. */
+static bool recov_cert_proves_exclusion_at(const struct mxfs_recov_desc *d,
+					   uint32_t fs_gen, int slot,
+					   mxfs_node_id_t victim,
+					   mxfs_epoch_t victim_epoch,
+					   unsigned int min_stage,
+					   const char **why);
+
 bool mxfs_recov_cert_proves_exclusion(const struct mxfs_recov_desc *d,
 				      uint32_t fs_gen, int slot,
 				      mxfs_node_id_t victim,
 				      mxfs_epoch_t victim_epoch,
 				      const char **why)
+{
+	return recov_cert_proves_exclusion_at(d, fs_gen, slot, victim,
+					      victim_epoch,
+					      MXFS_RECOV_STAGE_FENCED, why);
+}
+
+static bool recov_cert_proves_exclusion_at(const struct mxfs_recov_desc *d,
+					   uint32_t fs_gen, int slot,
+					   mxfs_node_id_t victim,
+					   mxfs_epoch_t victim_epoch,
+					   unsigned int min_stage,
+					   const char **why)
 {
 	const char *reason = NULL;
 
@@ -9881,7 +9903,7 @@ bool mxfs_recov_cert_proves_exclusion(const struct mxfs_recov_desc *d,
 	}
 
 	/* State: an INTENT is not a fence (rule-1 amendment). */
-	if (d->stage < MXFS_RECOV_STAGE_FENCED) {
+	if (d->stage < min_stage) {
 		reason = d->stage == MXFS_RECOV_STAGE_FENCING ?
 		    "fencing ATTEMPT only -- no exclusion has been proved yet" :
 		    d->stage == MXFS_RECOV_STAGE_SNAPSHOTTING ?
@@ -11556,6 +11578,51 @@ out:
 	mxfs_pal_free(again);
 	mxfs_pal_free(want);
 	return rc;
+}
+
+/*
+ * Whether the victim's descriptor already carries a durable certificate that
+ * proves its exclusion: at SNAPSHOTTING (the prover's fence-time manifest
+ * still to be scanned and sealed) or at any later stage.  Read-only.  It
+ * authorises nothing that mutates: a replayer waiting for the seal may begin
+ * only read-only work whose soundness rests on the exclusion alone, the slice's
+ * stability proof (xfs/xfs_mxfs_recovery.c, fr_stab_early); the claim, the
+ * replay and every purge still wait for mxfs_disklock_recovery_claim.
+ */
+bool mxfs_disklock_recovery_exclusion_durable(struct mxfs_disklock_ctx *ctx,
+					      int slot, mxfs_node_id_t victim,
+					      mxfs_epoch_t victim_epoch)
+{
+	struct mxfs_disklock_heartbeat *cur;
+	const struct mxfs_recov_desc *d;
+	const char *why = NULL;
+	bool ok = false;
+	int rc;
+
+	if (!ctx || !ctx->dev || slot < 0 || slot >= MXFS_DISKLOCK_HB_SLOTS ||
+	    !victim || !victim_epoch)
+		return false;
+	cur = mxfs_pal_alloc(sizeof(*cur));
+	if (!cur)
+		return false;
+	mxfs_pal_mutex_lock(ctx->lock);
+	rc = mxfs_pal_bdev_read_prio(ctx->dev, ctx->base_offset +
+				     (uint64_t)slot * MXFS_DISKLOCK_RECORD_SIZE,
+				     cur, sizeof(*cur));
+	mxfs_pal_mutex_unlock(ctx->lock);
+	if (rc >= 0) {
+		d = recov_desc_of(cur);
+		ok = d && d->victim_node == victim &&
+		     inc_eq(d->victim_epoch, victim_epoch) &&
+		     recov_cert_proves_exclusion_at(d,
+				ctx->have_fs_identity ? ctx->fs_gen : 0, slot,
+				victim, victim_epoch,
+				MXFS_RECOV_STAGE_SNAPSHOTTING, &why) &&
+		     mxfs_disklock_cert_method_ok(ctx, d->fence_kind,
+				cert_basis_of_kind(d->fence_kind), &why);
+	}
+	mxfs_pal_free(cur);
+	return ok;
 }
 
 int mxfs_disklock_recovery_claim(struct mxfs_disklock_ctx *ctx, int slot,

@@ -17747,6 +17747,40 @@ static int v5_takeover_fits_budget(uint32_t budget_ms, uint32_t dead_slot,
 	return 0;
 }
 
+/*
+ * The incarnation of @dead_slot's pending victim when a durable certificate
+ * already proves its exclusion (at SNAPSHOTTING, before the prover has sealed
+ * the fence-time manifest, or later), else 0.  Read-only: the replay driver may
+ * start the slice's stability proof against it (fr_stab_early), which needs
+ * the exclusion and nothing more; the claim and every mutation still wait for
+ * mxfs_v5_dlm_recovery_acquire.
+ */
+mxfs_epoch_t mxfs_v5_dlm_recovery_exclusion_durable(struct mxfs_v5_dlm *ctx,
+						    uint32_t dead_slot)
+{
+	mxfs_epoch_t epoch = mxfs_v5_dlm_recovery_pending_epoch(ctx, dead_slot);
+	mxfs_node_id_t node;
+
+	if (!epoch)
+		return 0;
+	node = mxfs_disklock_pending_node(ctx->disklock, (int)dead_slot);
+	if (!node || !mxfs_disklock_recovery_exclusion_durable(ctx->disklock,
+							       (int)dead_slot,
+							       node, epoch))
+		return 0;
+	return epoch;
+}
+
+/* The incarnation of @dead_slot's pending victim, 0 when none is pending. */
+mxfs_epoch_t mxfs_v5_dlm_recovery_pending_epoch(struct mxfs_v5_dlm *ctx,
+						uint32_t dead_slot)
+{
+	if (!ctx || !ctx->disklock || dead_slot >= MXFS_DISKLOCK_HB_SLOTS ||
+	    !mxfs_disklock_recovery_is_pending(ctx->disklock, (int)dead_slot))
+		return 0;
+	return mxfs_disklock_pending_epoch(ctx->disklock, (int)dead_slot);
+}
+
 int mxfs_v5_dlm_recovery_acquire(struct mxfs_v5_dlm *ctx, uint32_t dead_slot)
 {
 	return mxfs_v5_dlm_recovery_acquire_bounded(ctx, dead_slot, 0);

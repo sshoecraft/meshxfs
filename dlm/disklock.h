@@ -3137,6 +3137,11 @@ int mxfs_disklock_recovery_claim(struct mxfs_disklock_ctx *ctx, int slot,
 				 mxfs_node_id_t victim,
 				 mxfs_epoch_t victim_epoch,
 				 struct mxfs_recov_auth *out_auth);
+/* Read-only: the victim's descriptor carries a durable certificate proving its
+ * exclusion, at SNAPSHOTTING or later.  Authorises no mutation. */
+bool mxfs_disklock_recovery_exclusion_durable(struct mxfs_disklock_ctx *ctx,
+					      int slot, mxfs_node_id_t victim,
+					      mxfs_epoch_t victim_epoch);
 /*
  * out_fence_kind (optional): set to the certificate's fence_kind, but ONLY
  * when the gate answers 0 — i.e. only from a descriptor that validated

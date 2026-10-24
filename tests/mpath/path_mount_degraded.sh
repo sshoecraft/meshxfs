@@ -93,6 +93,12 @@ ck "the path that was down at mount carries the victim's registration once it is
 # 4. the path that was down at mount must carry the I/O
 T0=$(now_ms)
 link "$V" b down
+# The mark a batch's exposure probe reads (PF-LATE-B-DOWN): the victim's load is
+# running and the path it mounted on is gone, so its writes must now go down the
+# path that held no registration at mount -- where a build that never
+# registered that path had a write refused and shut the filesystem down
+# (D-MPATH-MOUNT-DEGRADED-12S-WINDOW-REGISTRATION-MISSING-AND-SHUTDOWNS).
+rs 10 "$V" "echo 'PF-LATE-B-DOWN $PFMARK: path b down under load; I/O must use the path that was down at mount' > /dev/kmsg" > /dev/null
 echo "  INFO $V path b DOWN at $(date -u +%T), holding ${HOLD}s: I/O must continue on the path that was down at mount"
 sleep $((HOLD / 2)); state "$V" late_mid
 sleep $((HOLD - HOLD / 2)); state "$V" late_end

@@ -183,6 +183,10 @@ void	mxfs_freplay_verdict_free(struct mxfs_freplay_verdict *verdict);
 
 /* barrier-side prefetch of the next victim's slice stability proof */
 void	mxfs_xlog_snap_prefetch(struct xfs_mount *mp, uint32_t slot);
+void	mxfs_xlog_snap_prefetch_tagged(struct xfs_mount *mp, uint32_t slot,
+				       uint64_t victim_tag);
+void	mxfs_xlog_snap_prefetch_settle(struct xfs_mount *mp, uint32_t slot,
+				       uint64_t victim_tag);
 void	mxfs_xlog_snap_prefetch_cancel(struct xfs_mount *mp);
 int	mxfs_xlog_recover_foreign_slice(struct xfs_mount *mp,
 				uint32_t dead_slot,

@@ -28,9 +28,23 @@ REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 SSHP="$REPO/tools/mxfs_sshpass.sh"
 LABEL=${1:?label}
 KO=${2:?mxfs.ko}
+# MXFS_NODES is also the node count run.sh gives every row, and a lane queue
+# exports it: taken as names, a count of 2 made a one-node pair named '2'
+# (D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP, as
+# scripts/drbd_rig.sh did).  A bare number is a count, not a pair, so the default
+# pair is used.  DRBD_RIG_NODES_COUNT=0 takes it as names, as before: the control.
+if [ "${DRBD_RIG_NODES_COUNT:-1}" != 0 ] && [[ "${MXFS_NODES:-}" =~ ^[0-9]+$ ]]; then
+    MXFS_NODES=""
+fi
 export MXFS_NODES=${MXFS_NODES:-test3 test4}
 export MXFS_NODE_REPO=${MXFS_NODE_REPO:-/src/mxfs}
 read -r -a NODES <<<"$MXFS_NODES"
+# DRBD_ARM_PRINT_NODES=1: print the pair this arm selected and stop, before any
+# evidence, module or node is touched (tests/drbd_nodes_count_lap.sh reads it)
+if [ "${DRBD_ARM_PRINT_NODES:-0}" = 1 ]; then
+    echo "DRBD_ARM_NODES ${NODES[*]}"
+    exit 0
+fi
 EVID="$REPO/tests/evidence/drbd_write_bound_arm/$(date -u +%Y%m%dT%H%M%SZ)-$LABEL"
 mkdir -p "$EVID" || exit 1
 say() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$EVID/arm.log"; }

@@ -17,18 +17,21 @@
 # so the selection is read on the host where it is made; the g2 pair need not be up.
 #
 #   EXPOSED  MXFS_NODES held a bare number when drbd_rig.sh selected its pair
-#   PASS     the status names both g2 nodes, test1 and test2, and nothing refused
+#   PASS     the status names both g2 nodes, test1 and test2, and nothing refused;
+#            and tests/drbd_write_bound_arm.sh's own resolution of the same
+#            MXFS_NODES selects its default pair, test3 test4
 #   FAIL     drbd_rig.sh refused the pair ('has N nodes'), or the status names
-#            another pair than test1 and test2
+#            another pair than test1 and test2, or the arm selected another pair
 #   ABORT    the status overran its bound or printed no node line
 #
 # The control is DRBD_RIG_NODES_COUNT=0 in this lap's environment, which
 # drbd_rig.sh inherits: a bare number is taken as a node name, as before the fix.
 #
 # Bound, derived: 'status' is a pool listing on the host and one ssh round to each
-# node with its own 20 s cap (step_status, 'both status ... 20'), so the lap is
-# bounded at 25 s, the ssh cap and the listing; the precheck took 11 s with the g2
-# pair powered off.  A batch bounds the lap at twice what its precheck measures.
+# node with its own 20 s cap (step_status, 'both status ... 20'), so the status is
+# bounded at 25 s, the ssh cap and the listing; the arm's resolution at 5 s (it
+# stops before touching any node); 30 s in all.  Prechecks: 11 s with the g2 pair
+# powered off (status alone), 1.4-1.9 s with both parts on 2026-10-24.
 #
 # Usage: tests/drbd_nodes_count_lap.sh <label>
 #        DRBD_RIG_NODES_COUNT=0 tests/drbd_nodes_count_lap.sh <label>   (control)
@@ -50,15 +53,30 @@ rc=$?
 echo "STEP status rc=$rc wall=$(( $(date +%s) - t0 )) s" | tee -a "$OUT/lap.log"
 [ "$rc" = 124 ] && abort "drbd_rig.sh status overran its ${BOUND} s bound"
 
-if grep -q 'DRBD dual-primary is exactly two' "$OUT/status.txt"; then
-    echo "LAP drbd_nodes_count FAIL label=$LABEL: drbd_rig.sh refused the pair: $(grep -m1 'exactly two' "$OUT/status.txt")" | tee -a "$OUT/lap.log"
-    exit 1
-fi
+wrong=""
 named=$(grep -oE '^test[0-9]+:' "$OUT/status.txt" | tr -d ':' | sort -u | tr '\n' ' ')
-[ -n "$named" ] || abort "the status printed no '<node>:' line (rc=$rc)"
-if [ "$named" = "test1 test2 " ]; then
-    echo "LAP drbd_nodes_count PASS label=$LABEL: the status names the g2 pair: $named" | tee -a "$OUT/lap.log"
+if grep -q 'DRBD dual-primary is exactly two' "$OUT/status.txt"; then
+    wrong="drbd_rig.sh refused the pair: $(grep -m1 'exactly two' "$OUT/status.txt")"
+elif [ -z "$named" ]; then
+    abort "the status printed no '<node>:' line (rc=$rc)"
+elif [ "$named" = "test1 test2 " ]; then
+    echo "INFO drbd_rig.sh: the status names the g2 pair: $named" | tee -a "$OUT/lap.log"
+else
+    wrong="the status names '$named', not test1 test2"
+fi
+# The same node resolution in tests/drbd_write_bound_arm.sh, which read MXFS_NODES
+# as names too; DRBD_ARM_PRINT_NODES=1 stops it right after the resolution, so no
+# module or node is touched.  Its default pair is test3 test4.
+arm=$(DRBD_ARM_PRINT_NODES=1 timeout 5 "$REPO/tests/drbd_write_bound_arm.sh" "$LABEL" /nonexistent < /dev/null 2>&1)
+echo "STEP arm rc=$? $arm" | tee -a "$OUT/lap.log"
+case "$arm" in
+    "DRBD_ARM_NODES test3 test4") echo "INFO drbd_write_bound_arm.sh: its default pair: test3 test4" | tee -a "$OUT/lap.log" ;;
+    DRBD_ARM_NODES*) wrong="${wrong:+$wrong; }drbd_write_bound_arm.sh selected '${arm#DRBD_ARM_NODES }', not test3 test4" ;;
+    *) abort "drbd_write_bound_arm.sh printed no DRBD_ARM_NODES line: ${arm:0:200}" ;;
+esac
+if [ -z "$wrong" ]; then
+    echo "LAP drbd_nodes_count PASS label=$LABEL: a bare MXFS_NODES selected the group's pair in drbd_rig.sh and the default pair in drbd_write_bound_arm.sh" | tee -a "$OUT/lap.log"
     exit 0
 fi
-echo "LAP drbd_nodes_count FAIL label=$LABEL: the status names '$named', not test1 test2" | tee -a "$OUT/lap.log"
+echo "LAP drbd_nodes_count FAIL label=$LABEL: $wrong" | tee -a "$OUT/lap.log"
 exit 1

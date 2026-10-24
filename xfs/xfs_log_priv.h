@@ -677,6 +677,10 @@ struct xlog {
 int mxfs_xlog_slice_snapshot(struct xlog *log);
 /* prefetch the NEXT victim's stability proof (barrier); cancel at unmount */
 void mxfs_xlog_snap_prefetch(struct xfs_mount *mp, uint32_t slot);
+void mxfs_xlog_snap_prefetch_tagged(struct xfs_mount *mp, uint32_t slot,
+				    uint64_t victim_tag);
+void mxfs_xlog_snap_prefetch_settle(struct xfs_mount *mp, uint32_t slot,
+				    uint64_t victim_tag);
 void mxfs_xlog_snap_prefetch_cancel(struct xfs_mount *mp);
 
 /*

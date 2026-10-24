@@ -288,6 +288,21 @@ int mxfs_fr_stab_deadline_ms = 45000;
  * barrier's order.  0 disables (inline only); capped at MXFS_SNAP_PF_MAX.
  */
 int mxfs_fr_stab_prefetch = 3;
+/*
+ * fr_stab_early: a live recovery's replayer starts the slice's stability proof
+ * on a worker once the victim's certificate is durable (descriptor at
+ * SNAPSHOTTING: exclusion proved), instead of after the prover has sealed the
+ * fence-time manifest and the replayer's claim succeeds.  The proof is reads
+ * only and rests on the exclusion alone, as the bootstrap barrier's prefetch
+ * does; measured at 16 nodes the replayer waited 2.1-2.2 s for the seal and
+ * then 4.6-5.2 s for the proof, in series, inside every survivor's stall
+ * (D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S).  The
+ * entry is tagged with the victim's incarnation, and the replay driver drops
+ * one that names another (mxfs_xlog_snap_prefetch_settle), so a proof armed for
+ * a death another survivor replayed is never consumed for a later death in the
+ * same slot.  0 (default) starts the proof after the claim, as before.
+ */
+int mxfs_fr_stab_early;
 
 /*
  * The stability proof itself, on a raw {targ, log-relative start, bytes}
@@ -430,6 +445,7 @@ struct mxfs_snap_pf {
 	unsigned int		wall_ms;
 	int			rc;
 	unsigned long		t_start;
+	uint64_t		victim_tag;	/* incarnation, 0 = untagged */
 	struct completion	done;
 };
 static struct mxfs_snap_pf	*mxfs_snap_pf[MXFS_SNAP_PF_MAX];
@@ -473,6 +489,21 @@ void
 mxfs_xlog_snap_prefetch(
 	struct xfs_mount	*mp,
 	uint32_t		slot)
+{
+	mxfs_xlog_snap_prefetch_tagged(mp, slot, 0);
+}
+
+/*
+ * As mxfs_xlog_snap_prefetch, for the victim incarnation @victim_tag (0: the
+ * barrier's own, untagged).  An entry already armed for the slot is left
+ * alone whatever its tag; mxfs_xlog_snap_prefetch_settle decides whether it
+ * may be consumed.
+ */
+void
+mxfs_xlog_snap_prefetch_tagged(
+	struct xfs_mount	*mp,
+	uint32_t		slot,
+	uint64_t		victim_tag)
 {
 	struct mxfs_snap_pf	*pf;
 	uint32_t		slice;
@@ -520,14 +551,48 @@ mxfs_xlog_snap_prefetch(
 			 (xfs_daddr_t)slice * mp->m_mxfs_log_slice_bblks;
 	pf->bytes = BBTOB(mp->m_mxfs_log_slice_bblks);
 	pf->t_start = jiffies;
+	pf->victim_tag = victim_tag;
 	init_completion(&pf->done);
 	INIT_WORK(&pf->work, mxfs_snap_pf_fn);
 	mxfs_snap_pf[free] = pf;
 	queue_work(system_unbound_wq, &pf->work);
 	mutex_unlock(&mxfs_snap_pf_lock);
 	xfs_notice(mp,
-	"MXFS: P-FRSTAB-PREFETCH slot=%u bytes=%u inflight=%d depth=%d -- stability proof of a coming victim's slice started on a worker",
-		   slot, pf->bytes, inflight + 1, depth);
+	"MXFS: P-FRSTAB-PREFETCH slot=%u bytes=%u inflight=%d depth=%d victim_tag=%llu -- stability proof of a coming victim's slice started on a worker",
+		   slot, pf->bytes, inflight + 1, depth,
+		   (unsigned long long)victim_tag);
+}
+
+/*
+ * Drop @mp's tagged prefetch of @slot unless it was armed for the victim
+ * incarnation @victim_tag (0: drop any tagged entry of the slot).  The replay
+ * driver calls it once its claim decides who replays: a proof armed early for
+ * one death must never be consumed for another death in the same slot, whose
+ * slice it never saw.  Untagged entries (the bootstrap barrier's) are the
+ * barrier's to manage and are left alone.
+ */
+void
+mxfs_xlog_snap_prefetch_settle(
+	struct xfs_mount	*mp,
+	uint32_t		slot,
+	uint64_t		victim_tag)
+{
+	int			i;
+
+	mutex_lock(&mxfs_snap_pf_lock);
+	for (i = 0; i < MXFS_SNAP_PF_MAX; i++) {
+		struct mxfs_snap_pf *c = mxfs_snap_pf[i];
+
+		if (!c || c->mp != mp || c->slot != slot || !c->victim_tag ||
+		    c->victim_tag == victim_tag)
+			continue;
+		xfs_notice(mp,
+	"MXFS: P-FRSTAB-EARLY-DROPPED slot=%u armed_for=%llu now=%llu -- an early stability proof armed for another death of this slot is discarded, never consumed",
+			   slot, (unsigned long long)c->victim_tag,
+			   (unsigned long long)victim_tag);
+		mxfs_snap_pf_drop_locked(i);
+	}
+	mutex_unlock(&mxfs_snap_pf_lock);
 }
 
 /* Drop any prefetch belonging to @mp (log unmount / barrier exit). */
