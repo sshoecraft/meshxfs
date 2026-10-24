@@ -126,11 +126,15 @@ drives_nodes() {  # this host holds the lab's node credentials (as tools/mxfs_ss
 #     replicated device is a rig of its own: every write it acknowledges has
 #     reached both nodes' disks, so native XFS on it is not native XFS on the
 #     LUN beneath it.
+#   $2 is MXFS_RIG_TAG_DRBD: 0 reads a DRBD device like any other, finds no
+#   vendor and resolves nothing, as before the DRBD branch existed: the control
+#   of D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN.
 NODE_PROBE='
 d=$(readlink -f "$1" 2>/dev/null) || exit 1
 b=$(basename "$d")
-case "$b" in
-    drbd[0-9]*)
+case "${2:-1}:$b" in
+    0:*) ;;
+    *:drbd[0-9]*)
         m=${b#drbd}
         k=$(drbdsetup show 2>/dev/null | awk -v m="$m" '"'"'
             $1 == "device" && $2 == "minor" { gsub(/;/, "", $3); cur = $3 }
@@ -163,7 +167,7 @@ platform_suffix() {  # platform_suffix <dmi sys_vendor>
 
 if ! drives_nodes; then
     [ -b "$(readlink -f "$DEV" 2>/dev/null)" ] || exit 1
-    answer=$(bash -c "$NODE_PROBE" probe "$DEV" 2>/dev/null)
+    answer=$(bash -c "$NODE_PROBE" probe "$DEV" "${MXFS_RIG_TAG_DRBD:-1}" 2>/dev/null)
 else
     # MXFS_RIG_NODE first: the prep that establishes the identity may be
     # writing a marker for the first time (a new rig group's), and a marker
@@ -171,7 +175,7 @@ else
     NODE=${MXFS_RIG_NODE:-$(mk node_list | cut -d, -f1)}
     [ -n "$NODE" ] && [ -x "$REPO/tools/mxfs_sshpass.sh" ] || exit 1
     answer=$(timeout 25 "$REPO/tools/mxfs_sshpass.sh" "$NODE" \
-        "echo $(printf '%s' "$NODE_PROBE" | base64 -w0) | base64 -d | bash -s -- '$DEV'" 2>/dev/null)
+        "echo $(printf '%s' "$NODE_PROBE" | base64 -w0) | base64 -d | bash -s -- '$DEV' '${MXFS_RIG_TAG_DRBD:-1}'" 2>/dev/null)
 fi
 vendor=$(printf '%s\n' "$answer" | sed -n 's/^RIGVENDOR=//p' | head -1)
 vendor=$(sanitise "${vendor:-}")

@@ -40,11 +40,18 @@
 #     window (either INFO line) — informational, the natural window is narrow.
 #   handoff  (+caw-abort-reclaim.6) knob armed at DELAY ms, one path each:
 #     Y registers KY and reserves the LU Write Exclusive Registrants Only; X
-#     registers KX1 on its path-1 session, logs path 1 out and at once in again
-#     (same ISID: a new session of the same I_T nexus while the old one is held
-#     in its teardown), then writes one 4 KiB block at the LU's end through
-#     path 1; Y then issues PREEMPT AND ABORT on KX1 while the old session is
-#     still held.  A registered nexus's write must succeed: the target must
+#     registers KX1 on its path-1 session, then that session's TCP connection
+#     is reset (ss -K, as a path flap resets it) and iscsid recovers the same
+#     session: it logs in again with the same ISID, so the target sees a new
+#     session of the same I_T nexus while the old one is held in its teardown.
+#     X then writes one 4 KiB block at the LU's end through path 1; Y then
+#     issues PREEMPT AND ABORT on KX1 while the old session is still held.
+#     A logout and a login cannot stand in for the reset: open-iscsi builds a
+#     session's ISID from its session id, and a login after a logout is a new
+#     session with a new id, so a different I_T nexus that holds no
+#     registration (measured 2026-10-24 on .6: ISIDs 0x100003d0200 and
+#     0x200003d0200 for sids 1 and 2, and every write after such a re-login
+#     refused RESERVATION CONFLICT, as SPC requires).  A registered nexus's write must succeed: the target must
 #     log "PR: moving reg ... from shutting-down sess" for X and no
 #     "Reservation conflict" for X's initiator before the P&A, and the P&A
 #     must abort the earlier session too ("earlier session ... of the nexus").
@@ -63,9 +70,10 @@
 # ~ 2 x 12 s at DELAY=4000 plus ~10 ssh round trips -> 60 s; stress arm ~3 s
 # per iteration.  the unkillable-wedge rule: no pgrep/ps.  the source-tree rule: lives in tests/.
 #
-# handoff arm budget: logout + login + path learn + write + P&A ~5 s inside
-# the 2 x DELAY hold (DELAY=8000 for it), then the rest of the hold and
-# cleanup: ~30 s.
+# handoff arm budget: connection reset + iscsid's re-login (polled up to 20 s,
+# 0.2 s apart) + path learn + write + P&A ~5 s inside the 2 x DELAY hold
+# (DELAY=8000 for it), then the rest of the hold and cleanup: ~30 s, and at
+# most ~45 s if the re-login takes the whole poll.
 #
 # Usage: tests/scst_pr_abort_shutdown_race.sh <label> [window|stress|handoff] [X=test1] [Y=test2] [DELAY_MS=4000] [ITERS=20]
 # Env:   SPR_OUT (evidence dir, default tests/evidence/<label>_spr), MXFS_SCST_TGT
@@ -122,6 +130,13 @@ echo "X iqn: $XIQN"
 yr=$(rsh $Y "sg_persist --out --register-ignore --param-sark=$KY /dev/$YP1_DEV 2>&1 | grep -v 'Peripheral device type\|SCST_FIO'; echo rc=\${PIPESTATUS[0]}" | tr '\n' ' ')
 echo "Y register $KY on /dev/$YP1_DEV: $yr"
 case "$yr" in *rc=0*) ;; *) echo "FAIL: Y could not register its key"; exit 3;; esac
+# A run killed before its cleanup leaves KY registered on whichever of Y's nexuses it used, and
+# the handoff arm's reservation held by it, so this run's RESERVE through another nexus is refused
+# (seen: a SIGKILLed qualification, then 'Y could not reserve the LU' twice). A PREEMPT naming Y's
+# own key removes KY from every other nexus and, when one of them holds the reservation, moves it
+# here; it touches no other key. The RELEASE then leaves the LU unreserved by the test.
+py=$(rsh $Y "sg_persist --out --preempt --prout-type=5 --param-rk=$KY --param-sark=$KY /dev/$YP1_DEV 2>&1 | grep -v 'Peripheral device type\|SCST_FIO'; echo rc=\${PIPESTATUS[0]}; sg_persist --out --release --prout-type=5 --param-rk=$KY /dev/$YP1_DEV 2>&1 | grep -v 'Peripheral device type\|SCST_FIO'; echo rc=\${PIPESTATUS[0]}" | tr '\n' ' ')
+echo "Y purge of stale $KY (preempt own key, release): $py"
 pa() {   # PREEMPT AND ABORT key $1 from Y; echoes "rc=N <text>"
     # --prout-type is mandatory for PREEMPT (type 5 = WE-RO, what MXFS fences with);
     # without it SCST answers ILLEGAL REQUEST before the PR path is even reached.
@@ -189,10 +204,14 @@ elif [ "$ARM" = handoff ]; then
     case "$w0" in *rc=0*) ;; *) echo "FAIL: X's write was refused before the re-login; the reservation or the registration is not what the arm needs"; exit 3;; esac
     setknob "$DELAY"
     TA=$(date -u +%FT%T.%3NZ); ta=$(date +%s%3N)
-    lo=$(logout_path $X $XP1_IP); li=$(login_path $X $XP1_IP); tl=$(( $(date +%s%3N) - ta ))
+    # reset path 1's connection, then wait (on the node, in one ssh) to see the session leave
+    # LOGGED_IN and come back to it: iscsid's recovery of the same session, the same ISID
+    rc1=$(rsh $X "h=\$(readlink -f /sys/block/$XP1_DEV/device/../..); s=\$(basename \$h); sid=\${s#session}; ss -K dst $XP1_IP dport = :3260 >/dev/null 2>&1; echo kill_rc=\$? \$s; seen=; for i in \$(seq 1 100); do st=\$(iscsiadm -m session -r \$sid -P1 2>/dev/null | sed -n 's/.*iSCSI Session State: //p'); [ \"\$st\" != LOGGED_IN ] && seen=\${seen:-\$st@\$i}; [ -n \"\$seen\" ] && [ \"\$st\" = LOGGED_IN ] && { echo left=\$seen back=LOGGED_IN@\$i; exit 0; }; sleep 0.2; done; echo left=\${seen:-never} back=no last=\$st" | tr '\n' ' ')
+    tl=$(( $(date +%s%3N) - ta ))
     XP1_DEV=$(learn_paths $X | awk -v ip="$XP1_IP" '$1==ip{print $2}' | head -1)
     w1=$(xwrite "${XP1_DEV:-null}"); tw=$(( $(date +%s%3N) - ta ))
-    echo "handoff: X logout path1 at $TA: $lo | login: $li (+${tl} ms) | path1 now /dev/${XP1_DEV:-none} | write at +${tw} ms: $w1"
+    echo "handoff: X path1 connection reset at $TA: $rc1 (+${tl} ms; 0.2 s polls) | path1 now /dev/${XP1_DEV:-none} | write at +${tw} ms: $w1"
+    case "$rc1" in *back=LOGGED_IN*) ;; *) echo "FAIL: not exercised — X's path-1 session did not leave LOGGED_IN and recover after its connection reset: $rc1"; fail=1;; esac
     paA=$(pa $KX1); tp=$(( $(date +%s%3N) - ta ))
     echo "handoff: P&A $KX1 from Y at +${tp} ms: $paA"
     sleep $(( (2 * DELAY) / 1000 + 1 ))
@@ -210,8 +229,9 @@ elif [ "$ARM" = handoff ]; then
     echo "host: handoff=$mov conflicts_for_X=$conf earlier_session_aborted=$earlier held_in_shutdown=$held bad=$bad  (host_kmsg.txt $(wc -l < "$OUT/host_kmsg.txt") lines)"
     grep -a 'PR: moving\|PR ABORT\|holding\|Reservation conflict' "$OUT/host_kmsg.txt" | cut -c1-220 | sed 's/^/  /'
     # the knob holds the old session twice, DELAY in SHUTDOWN and DELAY more with its refcount at
-    # zero and its tgt_devs still linked (the registrant still on them); the logout itself waits out
-    # the first (measured 8.4 s at DELAY=8000), so the write lands in the second, which is the gap
+    # zero and its tgt_devs still linked (the registrant still on them); the reset waits for
+    # neither, so a write before both holds end lands while the old tgt_dev still holds the
+    # registrant, which is the gap
     [ "$held" -ge 1 ] && [ "$tw" -lt $(( 2 * DELAY )) ] || { echo "FAIL: not exercised — the old session was not held (held=$held) or the write came after both holds (+${tw} ms, holds 2 x ${DELAY} ms)"; fail=1; }
     case "$w1" in *rc=0*) ;; *) echo "FAIL: X's write through its new path-1 session was refused although X is registered: $w1"; fail=1;; esac
     [ "$conf" = 0 ] || { echo "FAIL: the target refused $conf command(s) of the registered nexus after its re-login"; fail=1; }

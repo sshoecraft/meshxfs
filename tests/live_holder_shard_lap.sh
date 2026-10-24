@@ -65,6 +65,18 @@
 #   members.  The lap: 44 + 0.5 + 49.5 = 94 s on the control (188 s at 2x),
 #   44 + 0.5 + 130.5 = 175 s with the fix (350 s at 2x).
 #
+# FORMED AGAIN UNTIL EXPOSED.  Exposure is a property of the formation (one in
+# two on two members, as the shard model predicts, measured: one exposed in
+# three fix-in prechecks, one in three controls), and a verification batch
+# counts only exposed laps while every planned lap uses up its count, so a lap
+# that is not exposed spends a verification lap on nothing.  With LHS_REFORM=1
+# the lap forms the pair again and reruns steps 1-6, up to LHS_TRIES formations
+# (default 8: an unexposed lap is 0.5^8 = 0.4% on two members), and grades the
+# first exposed one; every formation's evidence is kept (_<try> suffixes).  So
+# a lap's bound is its tries times the one-formation bound above: 8 x 188 s on
+# the control, 8 x 350 s with the fix, at the worst, and a batch bounds a lap at
+# twice what its precheck measured, never at the worst case alone.
+#
 # Usage: tests/live_holder_shard_lap.sh <label> [H] [W]
 # Env:   MXFS_NODE_LIST (test1,test2), MXFS_CONFIG (2/net/mesh/direct),
 #        MXFS_GROUP (passed to run.sh), LHS_REFORM (1; 0 = the pair is formed),
@@ -84,6 +96,8 @@ HOLD=${HOLD#,}
 MEMBERS="$H $W ${HOLD//,/ }"
 NMEM=$(echo $MEMBERS | wc -w)
 LHS_REFORM=${LHS_REFORM:-1}
+TRIES=${LHS_TRIES:-8}
+[ "$LHS_REFORM" = 1 ] || TRIES=1
 SEL=${LH_SHARD_SELECT:-1}
 SSH=tools/mxfs_sshpass.sh
 OLDN=8
@@ -101,44 +115,47 @@ else
 fi
 HB=$(( (2 * (63 + 54 * P) + 9) / 10 ))
 
-echo "LAP lh_master start $(date -u +%FT%TZ) label=$LABEL H=$H W=$W hold=${HOLD:-none} members=$NMEM shard_select=$SEL reform=$LHS_REFORM harness_bound=${HB}s out=$OUT"
+echo "LAP lh_master start $(date -u +%FT%TZ) label=$LABEL H=$H W=$W hold=${HOLD:-none} members=$NMEM shard_select=$SEL reform=$LHS_REFORM tries=$TRIES harness_bound=${HB}s out=$OUT"
+
+for t in $(seq 1 "$TRIES"); do
+echo "TRY $t of $TRIES at +$(el)s"
 
 # 1. a fresh formation: fresh mkfs seed, fresh per-mount node ids
 if [ "$LHS_REFORM" = 1 ]; then
     GROUPARG=()
     [ -n "${MXFS_GROUP:-}" ] && GROUPARG=(--group "$MXFS_GROUP")
-    MXFS_FORCE_PREP=1 timeout -k 5 88 ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster < /dev/null > "$OUT/prep.log" 2>&1
+    MXFS_FORCE_PREP=1 timeout -k 5 88 ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster < /dev/null > "$OUT/prep_$t.log" 2>&1
     prc=$?
-    echo "STAGE prep rc=$prc wall=$(el)s $(grep -am1 'prep OK\|FAIL' "$OUT/prep.log" | cut -c1-140)"
+    echo "STAGE prep rc=$prc wall=$(el)s $(grep -am1 'prep OK\|FAIL' "$OUT/prep_$t.log" | cut -c1-140)"
     [ "$prc" = 124 ] && echo "LAP lh_master: prep_cluster overran its 88 s bound (rc 124)"
-    [ "$prc" = 0 ] || { echo "LAP lh_master ABORT: prep_cluster rc=$prc (evidence $OUT/prep.log)"; exit 2; }
+    [ "$prc" = 0 ] || { echo "LAP lh_master ABORT: prep_cluster rc=$prc (evidence $OUT/prep_$t.log)"; exit 2; }
 fi
 
 # 2. each member's node id and the routing version it opened (evidence, not verdict)
 pids=()
 for n in $MEMBERS; do
-    ( timeout 15 $SSH "$n" "dmesg | grep -a 'TCP DLM initialized' | tail -1; dmesg | grep -a 'P-TAUTH-OPEN' | tail -1" < /dev/null > "$OUT/member_$n.txt" 2>/dev/null
-      echo $? > "$OUT/member_$n.rc" ) &
+    ( timeout 15 $SSH "$n" "dmesg | grep -a 'TCP DLM initialized' | tail -1; dmesg | grep -a 'P-TAUTH-OPEN' | tail -1" < /dev/null > "$OUT/member_${n}_$t.txt" 2>/dev/null
+      echo $? > "$OUT/member_${n}_$t.rc" ) &
     pids+=($!)
 done
 for p in "${pids[@]}"; do wait "$p"; done
 HV=""
 for n in $MEMBERS; do
-    id=$(grep -ao 'node_id=[0-9]*' "$OUT/member_$n.txt" | tail -1 | cut -d= -f2)
-    sl=$(grep -ao 'slot=-\?[0-9]*' "$OUT/member_$n.txt" | tail -1 | cut -d= -f2)
-    hv=$(grep -ao 'hash_version=[0-9]*' "$OUT/member_$n.txt" | tail -1 | cut -d= -f2)
-    np=$(grep -ao 'npages=[0-9]*' "$OUT/member_$n.txt" | tail -1 | cut -d= -f2)
-    echo "MEMBER $n rc=$(cat "$OUT/member_$n.rc") node_id=${id:-unread} slot=${sl:-unread} routing_npages=${np:-unread} hash_version=${hv:-unread}"
-    echo "${id:-unread} $n" >> "$OUT/view.txt"
+    id=$(grep -ao 'node_id=[0-9]*' "$OUT/member_${n}_$t.txt" | tail -1 | cut -d= -f2)
+    sl=$(grep -ao 'slot=-\?[0-9]*' "$OUT/member_${n}_$t.txt" | tail -1 | cut -d= -f2)
+    hv=$(grep -ao 'hash_version=[0-9]*' "$OUT/member_${n}_$t.txt" | tail -1 | cut -d= -f2)
+    np=$(grep -ao 'npages=[0-9]*' "$OUT/member_${n}_$t.txt" | tail -1 | cut -d= -f2)
+    echo "MEMBER $n rc=$(cat "$OUT/member_${n}_$t.rc") node_id=${id:-unread} slot=${sl:-unread} routing_npages=${np:-unread} hash_version=${hv:-unread}"
+    echo "${id:-unread} $n" >> "$OUT/view_$t.txt"
     HV="$HV ${hv:-unread}"
 done
 HVS=$(echo $HV | tr ' ' '\n' | sort -u | tr '\n' ' ')
-echo "VIEW active list sorted by node id (index = page % $NMEM): $(sort -n "$OUT/view.txt" | awk '{printf "%s%s(%s)", (NR > 1 ? " " : ""), $1, $2}')"
+echo "VIEW active list sorted by node id (index = page % $NMEM): $(sort -n "$OUT/view_$t.txt" | awk '{printf "%s%s(%s)", (NR > 1 ? " " : ""), $1, $2}')"
 echo "ROUTING hash_version per member: ${HVS% }"
 
 # 3. the harness's selection and master probe, stopped before the pause
-hlog="$OUT/harness.log"
-LH_PROBE_ONLY=1 LHW_HOLD="$HOLD" timeout -k 5 "$HB" tests/live_holder_wait.sh "lhm_$LABEL" "$H" "$W" < /dev/null > "$hlog" 2>&1
+hlog="$OUT/harness_$t.log"
+LH_PROBE_ONLY=1 LHW_HOLD="$HOLD" timeout -k 5 "$HB" tests/live_holder_wait.sh "lhm_${LABEL}_$t" "$H" "$W" < /dev/null > "$hlog" 2>&1
 hrc=$?
 grep -a '^===\|^  INFO candidate\|^  INFO map\|^  INFO target\|^OLD8\|^PROBE-\|^ABORT' "$hlog" | cut -c1-240
 [ "$hrc" = 124 ] || [ "$hrc" = 137 ] && { echo "LAP lh_master ABORT: the harness overran its ${HB} s bound (rc $hrc)"; exit 2; }
@@ -154,20 +171,20 @@ awk -v H="$H" -v W="$W" '
         }
         node = (m == "remote") ? H : (m == "local") ? W : (m ~ /^third:/) ? substr(m, 7) : "-"
         print idx, ino, m, node, kind
-    }' "$hlog" > "$OUT/masters.txt"
-awk '$1 == "OLD8" {print $2, $3}' "$hlog" > "$OUT/old8.txt"
+    }' "$hlog" > "$OUT/masters_$t.txt"
+awk '$1 == "OLD8" {print $2, $3}' "$hlog" > "$OUT/old8_$t.txt"
 while read -r idx ino m node kind; do
-    role=$kind; awk -v i="$idx" '$1 == i {f = 1} END {exit !f}' "$OUT/old8.txt" && role="$role,old8"
+    role=$kind; awk -v i="$idx" '$1 == i {f = 1} END {exit !f}' "$OUT/old8_$t.txt" && role="$role,old8"
     echo "MASTER ino=$ino idx=$idx master=$m node=$node role=$role"
-done < "$OUT/masters.txt"
+done < "$OUT/masters_$t.txt"
 
 # 5. exposure: the pre-fix harness's eight, as the probe measured them
-n8=$(grep -ac . "$OUT/old8.txt")
+n8=$(grep -ac . "$OUT/old8_$t.txt")
 read -r o8h o8w o8t o8u o8m <<< "$(awk -v H="$H" -v W="$W" '
     FILENAME == ARGV[1] { m[$1] = $4; next }
     { if (!($1 in m)) mis++; else if (m[$1] == H) h++; else if (m[$1] == W) w++; else if (m[$1] == "-") u++; else t++ }
-    END { print h + 0, w + 0, t + 0, u + 0, mis + 0 }' "$OUT/masters.txt" "$OUT/old8.txt")"
-o8inos=$(awk '{printf "%s%s", (NR > 1 ? " " : ""), $2}' "$OUT/old8.txt")
+    END { print h + 0, w + 0, t + 0, u + 0, mis + 0 }' "$OUT/masters_$t.txt" "$OUT/old8_$t.txt")"
+o8inos=$(awk '{printf "%s%s", (NR > 1 ? " " : ""), $2}' "$OUT/old8_$t.txt")
 if [ "$n8" = "$OLDN" ] && [ "$o8h" = 0 ] && [ "$o8u" = 0 ] && [ "$o8m" = 0 ]; then
     echo "EXPOSED: the pre-fix harness's $OLDN candidates [$o8inos] were all measured mastered off H=$H (W=$W: $o8w, third: $o8t); it would have aborted on this formation"
     exposed=1
@@ -195,10 +212,14 @@ awk -v sb="$SB" '
             n++
         }
         printf "SHARD-MODEL: shard_bits=%d shards_measured=%d multi_inode_shards=%d disagreeing=%d\n", sb, n, multi, bad
-    }' "$OUT/masters.txt" | sort
+    }' "$OUT/masters_$t.txt" | sort
 
-# 7. the verdict: what the harness's own selection did
-echo "LAP lh_master candidates=$(grep -ac '^  INFO candidate' "$hlog") harness_rc=$hrc exposed=$exposed evidence=$OUT"
+[ "$exposed" = 1 ] && break
+[ "$t" -lt "$TRIES" ] && echo "TRY $t not exposed: forming the pair again"
+done
+
+# 7. the verdict: what the harness's own selection did, on the first exposed formation (or the last)
+echo "LAP lh_master candidates=$(grep -ac '^  INFO candidate' "$hlog") harness_rc=$hrc exposed=$exposed tries=$t evidence=$OUT"
 if [ "$hrc" = 0 ] && grep -aq '^PROBE-ONLY: target chosen' "$hlog"; then
     if [ "$SEL" = 0 ] && [ "$exposed" = 1 ]; then
         echo "LAP lh_master ABORT: the control's candidates are the eight, measured off H, yet its selection chose a target: the probe disagrees with itself"
