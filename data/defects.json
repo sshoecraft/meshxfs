@@ -8950,6 +8950,17 @@
         }
       ],
       "updated": "2026-10-24"
+    },
+    {
+      "id": "D-CREATE-PACE-LAP-KERNEL-LOG-CHECK-READS-AN-EMPTY-LOG-AND-PASSES",
+      "severity": "minor",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "tests/create_pace_lap.sh reads each node's kernel log from its mark with 'dmesg | awk /MARK/' after the creates and grades it for a fault signature; when the creates have rotated the mark out of the node's ring (every mxfs debug site prints on the rig), the read is empty and the check passes, so a PASS asserts 'no fault signature' having read nothing.",
+      "evidence": "2026-10-24, lap cpcaw1 at 2/disk/caw/direct (lane tests/evidence/lanes/g2c_w12e_20261024T090026Z step 3, candidate 0.90.134 attempt 2026-10-24T06:38:23Z): 'LAP create_pace PASS: CREATED=10000 failed=0 ...; test30 listed all 10000'; its kernel-log files tests/evidence/20261024T091233Z_createpace_cpcaw1/test29_kmsg.txt and test30_kmsg.txt are 0 lines each (wc -l), so the fault check (tests/create_pace_lap.sh:78-88) graded two empty files.",
+      "next": "Make the lap capture each node's kernel log across the creates (a reader of /dev/kmsg started before the loop, or the mark found in the read) and refuse a PASS when the mark is not in what it read (ABORT, naming it), with a switch for the control; then a control and verification where the creates rotate the ring (the default rig, 10000 creates on disk/caw), and remove --fixed.",
+      "reproducer": "tests/create_pace_lap.sh <label> 2/disk/caw/direct on a 2-node group (NFILES=10000, the rig's debug sites on): both <node>_kmsg.txt files empty and the lap PASS"
     }
   ]
 }

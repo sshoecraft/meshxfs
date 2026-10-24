@@ -7389,8 +7389,14 @@
         "tests/evidence/20261024T042539Z_fragag_frcal_caw1/test4_trunc.txt",
         "tests/evidence/20261024T042824Z_fragag_frcal_caw2/test4_trunc.txt"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "approved",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-eaee65.md",
+        "sha256": "4ee32ff014e4d8981822a4b28ee9616860f55600c246f4229ff7681da07e2f7d",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
