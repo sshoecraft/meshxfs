@@ -8715,7 +8715,7 @@
           "candidate": "0.90.134",
           "build": "8DBA16AEB7FDD3066C9C1BC",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -8805,6 +8805,18 @@
           "config": "2/net/mesh/direct",
           "row": "lap:noino_kmsg_follow",
           "iso": "2026-10-24T12:59:15Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T12:49:30Z",
+          "build": "8DBA16AEB7FDD3066C9C1BC",
+          "batch": "b20261024-ba4adb",
+          "approval": "P20261024-99074f",
+          "date": "2026-10-24"
         }
       ]
     },

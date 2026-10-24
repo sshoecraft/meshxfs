@@ -8812,6 +8812,33 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-99074f",
+      "kind": "verify",
+      "record": "D-NOINO-LAP-READS-KERNEL-LOG-AFTER-THE-MARK-ROTATED-OUT-AND-GRADES-NOTHING",
+      "change": {
+        "batch": "b20261024-ba4adb"
+      },
+      "argument": "The defect is the lap's kernel-log read: tests/noino_fence_efd_hold_lap.sh read each node's ring after the run, and when the run's lines rotated the lap's mark out of the ring the read was empty and the lap graded S's fence on nothing. The fix (in the frozen 0.90.134 attempt-18 tree, module 8DBA16AEB7FDD3066C9C1BC) follows each node's /dev/kmsg into a file from before the marks to an end mark written after the run, and a read that does not hold both marks FAILs stage=kmsg instead of grading the fence. Control b20261024-2d9920 (lap:noino_kmsg_follow at 2/net/mesh/direct on g2 test1/test2, NOINO_KMSG_FOLLOW=0: the ring read afterwards, as before the fix, under the same mark check; lane tests/evidence/lanes/g2_a18_20261024T125603Z step2.log): 10 of 10 laps FAILed, every one 'the lap read no whole kernel log ... holds 0 line(s) and not both the lap's marks' on one node (laps 1, 5, 6, 7, 8) or both (laps 2, 3, 4, 9, 10); e.g. tests/evidence/20261024T125639Z_noinoefd_nkc1/test2_kmsg.txt holds one line, KMSG_END. So the control shows the root cause (an empty read on the network lock manager's log volume) in every lap; the inputs before/after record shows the tree unchanged across it. Verification b20261024-ba4adb, sized by tools/defects.py from that rate (6 clean laps, lower bound 0.5887 at delta 0.005), on the same pair with the fix on and no variant on any lap (ledger variant field empty on all 6; lane tests/evidence/lanes/g2_a18_20261024T125603Z step3.log): 6 of 6 PASS 'KMSG-WHOLE: both nodes' kernel log reads hold both of the lap's marks'; each node's read holds 86245-164399 lines (tests/evidence/20261024T132237Z_noinoefd_nkv1 .. 20261024T133439Z_noinoefd_nkv6, *_kmsg.txt). What this does not test: whether S's no-inode fence meets the held chain; laps 2, 4 and 6 ended VACUOUS (rc=3, S's fence did not meet the hold) and laps 1, 3 and 5 passed the lap's own checks (rc=0) with worst operation stalls 16664, 22478 and 7930 ms. That fence is D-8CAWMPATH-SURVIVOR-SHUTS-DOWN-ON-NOINO-EFI-WEDGE-DURING-PEER-FENCE's, whose control now runs on this lap with the follow in (same lane, step 4).",
+      "evidence": [
+        "tests/evidence/lanes/g2_a18_20261024T125603Z/step2.log",
+        "tests/evidence/lanes/g2_a18_20261024T125603Z/step3.log",
+        "tests/evidence/controls/b20261024-2d9920.20261024T125637Z.inputs.before.json",
+        "tests/evidence/controls/b20261024-2d9920.20261024T125637Z.inputs.after.json",
+        "tests/evidence/20261024T125639Z_noinoefd_nkc1",
+        "tests/evidence/20261024T132237Z_noinoefd_nkv1",
+        "tests/evidence/20261024T133439Z_noinoefd_nkv6"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-99074f.md",
+        "sha256": "6f1f22ca1c9535f8e4e392372e38b3200bf6f95ba44459c89dd24cdde0d20ee6",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
