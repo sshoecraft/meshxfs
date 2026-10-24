@@ -7321,8 +7321,15 @@
         "data/reviews/P20261024-5cc4d1.md",
         "data/defects.json"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-92dc9c.md",
+        "sha256": "70dcf8c3cb431c7fdf21ab772ca6359774b83501ff42a155c40f80195412f989",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
