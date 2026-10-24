@@ -7371,6 +7371,17 @@
         }
       ],
       "updated": "2026-10-23"
+    },
+    {
+      "id": "D-FSX-ROW-WORK-DIRECTORY-LEFT-ON-THE-MXFS-MOUNT-AFTER-ITS-EXIT-TRAP-RAN-RM-RF",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "Work directories of tests/suite/fsx.sh ($MNT/.suite_fsx.<host>.<pid>, removed by the row's EXIT trap 'rm -rf \"$W\" 2>/dev/null', tests/suite/fsx.sh:19-22) are left on the mxfs mount: on 2/disk/caw/direct (test1, candidate 0.90.134 build 9C7B7B00C5DE523F1D378C8) one was present throughout control b20261023-636cd6 and a second appeared before the first lap of verification b20261023-989617; what left them, and whether the rm -rf failed on mxfs or raced a writer, is not known",
+      "evidence": "tests/fsx_fail_files_node.sh:64-65 counts 'ls -d $MNT/.suite_fsx.$(hostname).*' after each row: every lap of control b20261023-636cd6 (10 logs, tests/evidence/batch_laps/b20261023-636cd6/, 2026-10-24T01:03:32Z on) prints 'work directories left on the mount: 1'; every lap of verification b20261023-989617 (6 logs, tests/evidence/batch_laps/b20261023-989617/, from 01:03:47Z) prints '... left on the mount: 2'. The count does not grow lap by lap, so most rows' traps removed their directory; one was already there at the first control lap and one more appeared between 01:03:3xZ and the first verification lap's count. The trap's rm -rf discards its errors (tests/suite/fsx.sh:22). Noted in data/reviews/P20261023-e9c692.md. The lap's second writer (tests/fsx_fail_files_node.sh:38-47) dd's into fsxfile_* with no O_EXCL while the trap runs, which could recreate a file between rm's unlink and its rmdir; nothing has measured that.",
+      "next": "On a formed 2/disk/caw/direct pair before any fsx lap: list /mnt/shared/.suite_fsx.* (names carry the creating row's pid; ls -la --full-time of each and its contents), then run the fsx_fail_files lap and the plain fsx row each with the trap's rm -rf logging its stderr and exit status, and the second writer stopped before the trap; establish whether rm -rf on mxfs failed (and with what errno) or the writer recreated a file inside the directory before its rmdir.",
+      "reproducer": "tests/fsx_fail_files_lap.sh <label> test1 on a formed 2/disk/caw/direct pair, reading the 'work directories left on the mount' count before and after each lap"
     }
   ]
 }
