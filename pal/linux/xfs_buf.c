@@ -1540,11 +1540,13 @@ int mxfs_recov_slots_own = 1;
 module_param_named(recov_slots_own, mxfs_recov_slots_own, int, 0644);
 /*
  * PROBE-A reports a write of an AG header this node holds no grant for.  A
- * foreign replay's image (b_mxfs_recov_image) is written on the replay's
- * verdict, not this node's grant, so it is reported apart, as PROBE-A-REPLAY,
- * with no stack: on every replay the probe read as an unauthorised write and
- * dumped a stack once a boot
- * (D-PROBE-A-REPORTS-EVERY-FOREIGN-REPLAY-WRITE-AS-AN-UNHELD-AG-WRITE).
+ * foreign replay's image (b_mxfs_recov_image) written by the replaying task
+ * (m_mxfs_freplay_task, set for the length of the replay) is written on the
+ * replay's verdict, not this node's grant, so it is reported apart, as
+ * PROBE-A-REPLAY, with no stack: on every replay the probe read as an
+ * unauthorised write and dumped a stack once a boot
+ * (D-PROBE-A-REPORTS-EVERY-FOREIGN-REPLAY-WRITE-AS-AN-UNHELD-AG-WRITE).  A
+ * tagged image any other task writes keeps the full unheld-write report.
  * 0 = every such write is PROBE-A AG-META-WRITE-NOT-HELD, as before: the
  * same-build control.
  */
@@ -12016,9 +12018,14 @@ xfs_buf_submit_ex(
 					current->comm);
 		}
 		if (!held && bp->b_mxfs_recov_image &&
+		    READ_ONCE(bp->b_mount->m_mxfs_freplay_task) == current &&
 		    READ_ONCE(mxfs_probe_a_replay_apart)) {
-			/* a replay's image, whose write the replay's verdict
-			 * authorised, not this node's grant */
+			/* a replay's image, written by the replaying task while
+			 * it replays: the replay's verdict authorised it, not
+			 * this node's grant.  The tag alone is not enough: a
+			 * tagged buffer another task writes (xfsaild pushing it
+			 * after the replay, once the grant is gone) is the stale
+			 * write PROBE-A exists for, and takes the full report */
 			mxfs_probe_ratelimited("mxfs: PROBE-A-REPLAY agno=%u daddr=%lld ops=%s comm=%s pid=%d -- a foreign replay's image of an AG header, written on the replay's verdict (this node holds no grant for the AG)\n",
 				pag_agno(pa), (long long)bp->b_maps[0].bm_bn,
 				(bp->b_ops == &xfs_bnobt_buf_ops ? "bno" :

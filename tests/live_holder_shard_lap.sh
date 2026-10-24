@@ -124,7 +124,7 @@ echo "TRY $t of $TRIES at +$(el)s"
 if [ "$LHS_REFORM" = 1 ]; then
     GROUPARG=()
     [ -n "${MXFS_GROUP:-}" ] && GROUPARG=(--group "$MXFS_GROUP")
-    MXFS_FORCE_PREP=1 timeout -k 5 88 ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster < /dev/null > "$OUT/prep_$t.log" 2>&1
+    MXFS_FORCE_PREP=1 python3 tools/lap_bounded.py 88 -- ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster < /dev/null > "$OUT/prep_$t.log" 2>&1
     prc=$?
     echo "STAGE prep rc=$prc wall=$(el)s $(grep -am1 'prep OK\|FAIL' "$OUT/prep_$t.log" | cut -c1-140)"
     [ "$prc" = 124 ] && echo "LAP lh_master: prep_cluster overran its 88 s bound (rc 124)"

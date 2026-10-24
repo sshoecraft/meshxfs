@@ -55,15 +55,22 @@
 # Usage: noino_fence_efd_hold_lap.sh <label>
 # Env:   MXFS_NODE_LIST (test29,test30), MXFS_CONFIG (2/disk/caw/direct), MXFS_GROUP,
 #        HOLD_MS (26000), WARM_S (10), NOINO_RING_ROTATE (0; 1 fills S's ring past the mark
-#        before the hold, at most 60 s more)
+#        before the hold, at most 60 s more), LAP_LOAD_STOP and LAP_LOAD_CLEAN (1; 0 the
+#        controls of tests/lib/lap_load.sh), LAP_ABORT_AFTER_LOAD (0; 1 ABORTs after the warm-up)
 # Exit 0 PASS, 1 FAIL, 2 ABORT, 3 VACUOUS.
 set -u
 LABEL=${1:?label}
 cd "$(dirname "$0")" || exit 2
+HERE=$(pwd)
 # the tree root holds run.sh and tests/lib/rig.sh both: a draft of run.sh alone beside the lap
 # is not a root
 while { [ ! -f run.sh ] || [ ! -f tests/lib/rig.sh ]; } && [ "$(pwd)" != / ]; do cd ..; done
 [ -f run.sh ] || { echo "ABORT: no tree root above $0"; exit 2; }
+# the lap_bounded.py and lap_load.sh beside this lap's tests/ (a draft's own), else the tree's
+LB=$HERE/../tools/lap_bounded.py
+[ -f "$LB" ] || LB=tools/lap_bounded.py
+LL=$HERE/lib/lap_load.sh
+[ -f "$LL" ] || LL=tests/lib/lap_load.sh
 NREPO=/src/$(basename "$(pwd)")
 export MXFS_NODE_LIST=${MXFS_NODE_LIST:-test29,test30}
 export MXFS_CONFIG=${MXFS_CONFIG:-2/disk/caw/direct}
@@ -77,6 +84,7 @@ OUT=tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_noinoefd_$LABEL
 mkdir -p "$OUT"
 fails=0
 . tests/lib/rig.sh
+. "$LL"
 MARK="NOINOEFD-MARK-$LABEL-$$"
 D=$MNT/noinoefd_$LABEL
 LD=/run/noinoefd_$LABEL
@@ -87,7 +95,7 @@ field(){ grep -aoE "(^| )$2=[^ ]*" "$1" | head -1 | cut -d= -f2; }
 
 GROUPARG=()
 [ -n "${MXFS_GROUP:-}" ] && GROUPARG=(--group "$MXFS_GROUP")
-MXFS_FORCE_PREP=1 timeout 120 ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster > "$OUT/prep.log" 2>&1
+MXFS_FORCE_PREP=1 python3 "$LB" 120 -- ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster > "$OUT/prep.log" 2>&1
 prc=$?
 echo "STAGE prep rc=$prc wall=$(el)s"
 [ $prc = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=prep wall=$(el)s evidence=$OUT"; exit 2; }
@@ -108,8 +116,17 @@ stop_follow() {
         rs 15 "$n" "kill \$(cat $KL.pid 2>/dev/null) 2>/dev/null; rm -f $KL $KL.pid" > /dev/null 2>&1
     done
 }
+# Every exit once the loads may have started ends them and removes their /run files
+# (tests/lib/lap_load.sh): the lap stopped them only on its normal path, so one that ABORTed
+# after starting them left them running into the next lap's prep, and no exit removed their
+# logs, which filled the node's /run.
+LOADS=0
+lap_exit() {
+    [ "$LOADS" = 1 ] && lap_load_end "$LD" "$OUT" "$S" "$R"
+    [ "$FOLLOW" = 1 ] && stop_follow
+}
+trap lap_exit EXIT
 if [ "$FOLLOW" = 1 ]; then
-    trap stop_follow EXIT
     for n in "$S" "$R"; do
         rs 20 "$n" "rm -f $KL $KL.pid; nohup setsid sh -c 'echo \$\$ > $KL.pid; exec cat /dev/kmsg > $KL' > /dev/null 2>&1 < /dev/null & echo started" > /dev/null
     done
@@ -132,12 +149,16 @@ if [ "$FOLLOW" = 1 ]; then
 fi
 
 # ---- 2. the load on both nodes
+LOADS=1
 for n in "$S" "$R"; do
     measure "$n" 30 "$OUT/${n}_load_start.txt" '^LOAD_STARTED$' "$n's load started" \
         "rm -rf $LD; mkdir -p $LD; rm -f $LD.stop; nohup setsid python3 $NREPO/tests/mpath/pathload.py run $n $MNT $LD $LD.stop > $LD.out 2>&1 < /dev/null & echo LOAD_STARTED"
 done
 [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=load wall=$(el)s evidence=$OUT"; exit 2; }
 sleep "$WARM_S"
+# TEST ONLY: LAP_ABORT_AFTER_LOAD=1 ends the lap here with its loads running, as an ABORT after
+# the loads start does (tests/lap_load_end_lap.sh)
+[ "${LAP_ABORT_AFTER_LOAD:-0}" = 1 ] && { echo "RESULT: ABORT label=$LABEL stage=forced wall=$(el)s evidence=$OUT"; exit 2; }
 
 # ---- 2b. TEST ONLY: S's ring rotated past the mark before the hold
 # Whether the load's lines rotate the mark out of S's ring before the hold is looked for is

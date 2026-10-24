@@ -40,7 +40,10 @@
 #
 # Bounds, from what each step should take: power-down and power-up are
 # lab_power.sh's own (it bounds each guest); a pool allocation 30 s a node; the
-# drbd-utils and fio install 120 s (scripts/drbd_rig.sh APT_BUDGET); create-md
+# drbd-utils and fio install 120 s (scripts/drbd_rig.sh APT_BUDGET); a guest
+# without the drbd module gets linux-modules-extra for its kernel (113 MB,
+# fetched once to the host's cache in 10 s measured, bound 60; copied over the
+# lab network, 60; dpkg -i with its depmod, 120); create-md
 # and up 60 s; connect 30 s (CONNECT_BUDGET); 1 GiB synced at a pool LUN's
 # ~180 MiB/s in ~6 s, 60 s; the cut 5 s plus fio's 30 s, watched 60 s; a guest
 # that panicked reboots after 25 s and answers ssh in 20-120 s, 240 s (BOOT_S).
@@ -61,6 +64,8 @@ RES=cutrepro
 MINOR=30
 PORT=7830
 SIZE=1G
+# the host's cache of linux-modules-extra packages, one per guest kernel (data, not code)
+DEBS=$HOME/.cache/mxfs-lab/debs
 OUT=tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_drbdcut_$LABEL
 mkdir -p "$OUT"
 exec > >(tee -a "$OUT/run.log") 2>&1
@@ -134,7 +139,26 @@ B64=$(base64 -w0 <<<"$RESFILE")
 for n in "$N1" "$N2"; do
     on "$n" "command -v drbdadm >/dev/null && command -v fio >/dev/null || { DEBIAN_FRONTEND=noninteractive timeout 110 apt-get install -y -q drbd-utils fio >/dev/null 2>&1; systemctl disable --now drbd >/dev/null 2>&1; }; command -v drbdadm >/dev/null && command -v fio >/dev/null && command -v lvm >/dev/null && echo TOOLS_OK" 120 > "$OUT/tools.$n.txt"
     grep -q TOOLS_OK "$OUT/tools.$n.txt" || abort "$n lacks drbdadm, fio or lvm: $(tail -2 "$OUT/tools.$n.txt" | tr '\n' ' ')"
-    on "$n" "modprobe drbd && echo $B64 | base64 -d > /etc/drbd.d/$RES.res && drbdadm -- --force create-md $RES < /dev/null > /tmp/cutrepro_md.log 2>&1 && drbdadm up $RES > /tmp/cutrepro_up.log 2>&1 && echo MD_UP_OK || { tail -3 /tmp/cutrepro_md.log /tmp/cutrepro_up.log; }" 60 > "$OUT/up.$n.txt"
+    # the drbd module is in Ubuntu's linux-modules-extra, which a guest built without it lacks
+    # (attempt 20: test29 'modprobe: FATAL: Module drbd not found'); the package for the guest's
+    # exact kernel is fetched once into the host's cache and copied in
+    on "$n" "modinfo -F filename drbd >/dev/null 2>&1 && echo MOD_OK; uname -r" 20 > "$OUT/mod.$n.txt"
+    if ! grep -q '^MOD_OK$' "$OUT/mod.$n.txt"; then
+        krel=$(grep -v MOD_OK "$OUT/mod.$n.txt" | tail -n 1)
+        [ -n "$krel" ] || abort "$n: no kernel release read"
+        mkdir -p "$DEBS"
+        deb=$(ls "$DEBS"/linux-modules-extra-"$krel"_*.deb 2>/dev/null | head -1)
+        if [ -z "$deb" ]; then
+            ( cd "$DEBS" && timeout 60 apt-get download "linux-modules-extra-$krel" ) > "$OUT/deb_fetch.txt" 2>&1
+            deb=$(ls "$DEBS"/linux-modules-extra-"$krel"_*.deb 2>/dev/null | head -1)
+        fi
+        [ -n "$deb" ] || abort "$n: no linux-modules-extra-$krel package: $(tail -n 2 "$OUT/deb_fetch.txt" 2>/dev/null | tr '\n' ' ')"
+        timeout 60 "$SSH" "$(lab_addr "$n")" SCP "$deb" /tmp/modules-extra.deb > "$OUT/deb_copy.$n.txt" 2>&1 || abort "$n: copying $deb failed: $(tail -n 2 "$OUT/deb_copy.$n.txt" | tr '\n' ' ')"
+        on "$n" "dpkg -i /tmp/modules-extra.deb > /tmp/modules-extra.log 2>&1; rm -f /tmp/modules-extra.deb; modinfo -F filename drbd >/dev/null 2>&1 && echo MOD_OK || tail -n 3 /tmp/modules-extra.log" 120 > "$OUT/mod_install.$n.txt"
+        grep -q '^MOD_OK$' "$OUT/mod_install.$n.txt" || abort "$n: the drbd module did not install: $(tr '\n' ' ' < "$OUT/mod_install.$n.txt")"
+        say "$n: installed $(basename "$deb") for its drbd module"
+    fi
+    on "$n" "modprobe drbd && echo $B64 | base64 -d > /etc/drbd.d/$RES.res && drbdadm -- --force create-md $RES < /dev/null > /tmp/cutrepro_md.log 2>&1 && drbdadm up $RES > /tmp/cutrepro_up.log 2>&1 && echo MD_UP_OK || { tail -n 3 /tmp/cutrepro_md.log /tmp/cutrepro_up.log; }" 60 > "$OUT/up.$n.txt"
     grep -q MD_UP_OK "$OUT/up.$n.txt" || abort "$n: create-md/up: $(tr '\n' ' ' < "$OUT/up.$n.txt")"
 done
 on "$N1" "for i in \$(seq 1 30); do [ \"\$(drbdadm cstate $RES)\" = Connected ] && { echo CONNECTED; break; }; sleep 1; done" 40 > "$OUT/connect.txt"

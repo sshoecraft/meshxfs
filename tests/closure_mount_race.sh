@@ -56,6 +56,7 @@ BOOT_WAIT="${BOOT_WAIT:-240}"
 # mount when it has one; MXFS_DEV names a candidate that must be that LUN.
 # mxfs_dev_resolve (tests/lib/rig.sh) ABORTs on anything else, never defaults
 . "$(dirname "$0")/lib/rig.sh"
+. "$(dirname "$0")/lib/fuser_guard.sh"
 mxfs_dev_resolve "$PROBE_HOST"; DEV=$MXFS_DEV_RESOLVED
 KO_MD5=$(md5sum "$REPO/mxfs.ko" 2>/dev/null | awk '{print $1}')
 
@@ -94,7 +95,9 @@ echo "victim $VICTIM holds heartbeat slot $VSLOT"
 #    The join is still genuinely cold at the layer this test is about: fresh
 #    module, fresh mount, no cached membership, no retained slot.
 echo "--- removing $JOINER from the cluster cleanly (umount + rmmod)"
-"$SSH" "$JOINER" "fuser -km $MNT >/dev/null 2>&1; sleep 1;
+# fuser -m on a directory that is not a mount point names every user of the root filesystem,
+# sshd included, so it runs only while $MNT is mounted (tests/lib/fuser_guard.sh)
+"$SSH" "$JOINER" "$(fuser_mounted_cmd "$MNT" 1)
      umount $MNT >/dev/null 2>&1 || umount -f $MNT >/dev/null 2>&1 || umount -l $MNT >/dev/null 2>&1
      for i in 1 2 3 4 5 6 7 8; do rmmod mxfs >/dev/null 2>&1 && break; sleep 2; done" >/dev/null 2>&1
 staged=$("$SSH" "$JOINER" "mountpoint -q /src && [ -b $DEV ] && [ -f /src/mxfs/mxfs.ko ] &&

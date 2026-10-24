@@ -72,7 +72,7 @@ fi
 
 GROUPARG=()
 [ -n "${MXFS_GROUP:-}" ] && GROUPARG=(--group "$MXFS_GROUP")
-MXFS_FORCE_PREP=1 timeout 120 ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster > "$OUT/prep.log" 2>&1
+MXFS_FORCE_PREP=1 python3 tools/lap_bounded.py 120 -- ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster > "$OUT/prep.log" 2>&1
 prc=$?
 echo "STAGE prep rc=$prc wall=$(el)s  $(grep -am1 'prep OK\|FAIL' "$OUT/prep.log" | cut -c1-140)"
 [ $prc = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=prep evidence=$OUT"; exit 2; }

@@ -10129,6 +10129,27 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-345728",
+      "kind": "remove-fixed",
+      "record": "D-FOURKN-MERGE-2NODE-LAP-HOLD-CATCHES-THE-PEER-ONLY-BY-CHANCE",
+      "change": {
+        "control": "b20261024-7f6b7e",
+        "fixon": "b20261024-160255",
+        "cause": "tests/fourkn_merge_2node.sh held each node's first 64 merged inode-block writes 20 ms between the read and the COMPARE AND WRITE (HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0) and nothing made the peer write that block inside a hold, so whether a lap exercised the merged write's MISCOMPARE retry was chance: in control b20261024-7f6b7e 5 of 20 laps saw no MISCOMPARE and exited VACUOUS. Fix: the lap forces the overlap once a lap as tests/suite/fourkn_merge.sh does (the workload unheld; at the unmount node 1 armed with one held merged write of up to FORCE_MS while node 2 writes its own slot of the same block), so a lap whose forced overlap does not land is VACUOUS and every other lap retries a MISCOMPARE; FORCE_MS=0 with the old hold parameters is the control."
+      },
+      "argument": "Resubmission of P20261024-91492a, answering its review (data/reviews/P20261024-91492a.md), which found the cause measured, the control (b20261024-7f6b7e, 5 of 20 VACUOUS, the lap's own variant FORCE_MS=0 HOLD_N=64 HOLD_MS=20 HOLD_PEER_MS=0, same script sha256 as the verification) and the verification (b20261024-160255, 89 of 89 PASS with exposure, N = 89 recomputed, every lap forced=landed with 1-3 miscompares; verify P20261024-857abd approved and applied) sound, and rejected only because the record named runs whose logs show other failures. Those cells are now off the record, each with its reason (defects.py update --drop-cell): 18 INCOMPLETE aborts of 2026-10-23T21:17:05Z-21:21:53Z already retired by the removal of D-FOURKN-MERGE-LAP-OVERRUN-LEAVES-ITS-WORKER-HOLDING-THE-MOUNT; 20 insmod aborts of 2026-10-24T12:57:15Z-13:01:14Z already retired by the removal of D-FOURKN-MERGE-LAPS-ABORT-AT-INSMOD-WHILE-THE-LANES-PREP-MOUNT-HOLDS-THE-MODULE; 2026-10-24T13:12:16Z, named by the open D-FOURKN-MERGE-WORKLOAD-OVERRAN-16S-WHEN-EVERY-CAW-TOOK-TWICE-AS-LONG; and the two overruns 2026-10-23T21:16:56Z and 21:21:34Z, which no record held, now held by the new open record D-FOURKN-MERGE-CONTROL-LAPS-OVERRAN-130S-SLOW-MOUNTS-AND-BUSY-UNMOUNTS with their log lines and a next step. The 29 cells left are each a FAIL 'VACUOUS no swap miscompared' of lap:fourkn_merge_2node at 2/disk/caw/direct4k (2026-10-23T20:21:55Z-21:48:54Z and 2026-10-24T13:15:30Z-15:51:59Z), the failure this cause explains and the verification shows gone. Correction to the earlier argument: the verification's laps ran 68-91 s (not 67-75 s), all inside the 130 s bound; the attempt-19 verification b20261024-0fd280 ended on a FAIL whose infra-proven proposal P20261024-a96a97 was rejected, and that run is held by the open D-FOURKN-MERGE-LAP-REMOUNT-HUNG-68S-AND-WORKERS-RAN-3-OF-20-ROUNDS-UNEXPLAINED, not by this record.",
+      "evidence": [
+        "tests/evidence/lanes/g2d_a20_20261024T163432Z/step9.log",
+        "tests/evidence/lanes/g2d_a19b_20261024T153135Z/step4.log",
+        "tests/evidence/lanes/g2d_a19b_20261024T153135Z/queue",
+        "tests/fourkn_merge_2node.sh",
+        "data/reviews/P20261024-91492a.md",
+        "data/reviews/P20261024-857abd.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }

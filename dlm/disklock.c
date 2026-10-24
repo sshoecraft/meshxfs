@@ -5217,6 +5217,30 @@ hb_blind_sleep:
 	mxfs_pal_free(hb);
 
 	mxfs_pal_log(MXFS_LOG_DEBUG, "disklock: heartbeat thread exiting");
+	ctx->hb_exited = true;
+}
+
+/*
+ * No beat of this context can still reach the LUN: the heartbeat thread has
+ * returned and no heartbeat I/O is queued or running on a worker, abandoned
+ * ones included (an abandoned beat is still a command the target may execute).
+ * The heartbeat stops itself once authority is closed (P290-AUTH-HB-STOP), but
+ * its thread can be mid-beat when the closure lands.
+ */
+bool mxfs_disklock_hb_quiet(struct mxfs_disklock_ctx *ctx)
+{
+	struct mxfs_disklock_hbio *p;
+	int outstanding = 0;
+
+	if (!ctx || !READ_ONCE(ctx->hb_exited))
+		return false;
+	p = ctx->hbio;
+	if (p) {
+		mxfs_pal_mutex_lock(p->lock);
+		outstanding = p->outstanding;
+		mxfs_pal_mutex_unlock(p->lock);
+	}
+	return outstanding == 0;
 }
 
 struct mxfs_disklock_ctx *mxfs_disklock_create(mxfs_bdev_t *dev,
@@ -5591,6 +5615,7 @@ int mxfs_disklock_start_heartbeat(struct mxfs_disklock_ctx *ctx)
 			     "disklock: heartbeat I/O workers failed to start; the "
 			     "heartbeat thread issues its own I/O this mount");
 
+	ctx->hb_exited = false;
 	ctx->hb_thread = mxfs_pal_thread_create(disklock_hb_fn, ctx);
 	if (!ctx->hb_thread) {
 		hbio_stop(ctx);

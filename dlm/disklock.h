@@ -2061,6 +2061,14 @@ struct mxfs_disklock_ctx {
 	bool                    boot_adopted;
 	mxfs_thread_t           *hb_thread;
 	/*
+	 * The heartbeat thread has returned: set as its last act, cleared by
+	 * mxfs_disklock_start_heartbeat.  A fence-path break leaves ctx->running
+	 * true and hb_thread set with the thread gone, so neither says whether a
+	 * beat can still be issued; a node that registers its key again after an
+	 * out-of-band removal (v5_pr_surrender_tick) must know that none can.
+	 */
+	volatile bool           hb_exited;
+	/*
 	 * part D: heartbeat-stall watchdog.  hb_stage/hb_stage_ms are
 	 * written only by the heartbeat thread and read racily by the watchdog
 	 * (diagnostic tolerance — a torn read costs one poll, never a false
@@ -2599,6 +2607,9 @@ const char *mxfs_caw_cap_name(enum mxfs_caw_cap cap);
 /* Heartbeat */
 int  mxfs_disklock_start_heartbeat(struct mxfs_disklock_ctx *ctx);
 void mxfs_disklock_stop_heartbeat(struct mxfs_disklock_ctx *ctx);
+/* no beat of this context can still reach the LUN (thread returned, no
+ * heartbeat I/O outstanding) */
+bool mxfs_disklock_hb_quiet(struct mxfs_disklock_ctx *ctx);
 
 /* v0.11.76 (D3): clear our heartbeat record's ACTIVE flag on CLEAN
  * teardown (FUA).  Without this every past tenure stays ACTIVE on the

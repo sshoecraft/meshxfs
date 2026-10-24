@@ -705,6 +705,8 @@ VARIANT="${VARIANT:0:300}"
 # lap reached the defect's trigger; the lap is counted only if it did.
 BATCH="${MXFS_BATCH:-}"
 BATCH_ROW=""
+BATCH_LAP_ROWS=""
+LAP_MARKED=""
 BATCH_PROBE=""
 declare -A LAP_UP=()
 if [ -n "$BATCH" ]; then
@@ -716,11 +718,23 @@ if [ -n "$BATCH" ]; then
             && [[ " ${batch_rows[*]} " == *" alloc_witness "* ]]; then
         batch_rows=(chk_clean)
     fi
-    [ "${#batch_rows[@]}" -eq 1 ] || {
+    # Several rows: the batch's own row and the supporting rows it declared
+    # (defects.py batch --support), which batch-check names and checks.  The
+    # lap's exposure is read from the start of the first of them, since the
+    # trigger is often in the supporting row (path_answer_lost before chk_clean).
+    # MXFS_BATCH_SUPPORT=0 refuses them, as before: the control.
+    if [ "${#batch_rows[@]}" -gt 1 ] && [ "${MXFS_BATCH_SUPPORT:-1}" = 0 ]; then
+        echo "ERROR: MXFS_BATCH=$BATCH runs one lap of one row; name exactly that row (got: ${ONLY[*]:-the whole board})"; exit 2
+    fi
+    [ "${#batch_rows[@]}" -ge 1 ] || {
         echo "ERROR: MXFS_BATCH=$BATCH runs one lap of one row; name exactly that row (got: ${ONLY[*]:-the whole board})"; exit 2; }
-    BATCH_ROW="${batch_rows[0]}"
-    batch_out=$(python3 "$REPO/tools/defects.py" batch-check "$BATCH" --row "$BATCH_ROW" --at "$CONFIG" \
+    BATCH_LAP_ROWS=" ${batch_rows[*]} "
+    batch_row_args=()
+    for x in "${batch_rows[@]}"; do batch_row_args+=(--row "$x"); done
+    batch_out=$(python3 "$REPO/tools/defects.py" batch-check "$BATCH" "${batch_row_args[@]}" --at "$CONFIG" \
                 ${CANDIDATE:+--candidate "$CANDIDATE"}) || { echo "ERROR: batch $BATCH refused this lap (above)"; exit 2; }
+    BATCH_ROW=$(sed -n 's/^ROW=//p' <<<"$batch_out")
+    [ -n "$BATCH_ROW" ] || { echo "ERROR: batch $BATCH: batch-check named no row"; exit 2; }
     BATCH_PROBE=$(sed -n 's/^PROBE=//p' <<<"$batch_out")
     batch_variant=$(sed -n 's/^VARIANT=//p' <<<"$batch_out")
     [ -n "$batch_variant" ] && VARIANT="$VARIANT${VARIANT:+;}batch:$batch_variant"
@@ -2992,7 +3006,9 @@ for row in "${ROWS[@]}"; do
     fi
     [ $(( SECONDS - pw0 )) -gt 0 ] && echo "    (waited $(( SECONDS - pw0 ))s for $hlw)"
     [ "$hl" = host_exclusive ] && { host_quiesce; host_sample_start "$name" "$budget"; }
-    [ -n "$BATCH" ] && [ "$name" = "$BATCH_ROW" ] && lap_mark_start
+    if [ -n "$BATCH" ] && [ -z "$LAP_MARKED" ] && [[ "$BATCH_LAP_ROWS" == *" $name "* ]]; then
+        lap_mark_start; LAP_MARKED=1
+    fi
     mark_executing "$name"
     case "$coord" in
         none) run_none "$name" "$cat" "$budget" ;;

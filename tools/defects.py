@@ -1182,8 +1182,21 @@ def cmd_batch_check(data: dict, args) -> int:
     row leaves the cluster down (so the next lap re-forms it)."""
     criteria = board_tool()
     config = criteria.parse_at(args.batch_at)
-    check_batch_lap(args.batch, args.row, config, args.candidate or "")
     _, batch = find_batch(data, args.batch)
+    row = args.row[0]
+    if len(args.row) > 1:
+        # A lap of several rows: the batch's own row and the supporting rows it declared, which
+        # run in the same invocation and are recorded but not counted.
+        if batch["row"] not in args.row:
+            sys.exit("defects: batch %s is for row %s, which the lap does not run (got: %s)"
+                     % (args.batch, batch["row"], " ".join(args.row)))
+        for r in args.row:
+            if r != batch["row"] and r not in batch.get("support", []):
+                sys.exit("defects: batch %s does not declare %s as a supporting row (--support)"
+                         % (args.batch, r))
+        row = batch["row"]
+    check_batch_lap(args.batch, row, config, args.candidate or "")
+    print("ROW=%s" % row)
     print("PROBE=%s" % batch.get("probe", ""))
     print("LEAVES_CLUSTER=%d" % (1 if batch.get("leaves_cluster") else 0))
     print("VARIANT=%s" % batch.get("variant", ""))
@@ -2035,7 +2048,9 @@ def main() -> int:
 
     check = subs.add_parser("batch-check", help="may this lap run? (run.sh asks before a lap)")
     check.add_argument("batch")
-    check.add_argument("--row", required=True)
+    check.add_argument("--row", required=True, action="append",
+                       help="the lap's row; given again for each supporting row the lap also "
+                            "runs (the batch's --support)")
     check.add_argument("--at", dest="batch_at", metavar="CONFIGURATION", required=True)
     check.add_argument("--candidate")
 

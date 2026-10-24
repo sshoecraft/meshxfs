@@ -27,6 +27,16 @@
 #        hbpause  V's heartbeat pauses HB_PAUSE_MS (dl_inject_hb_pause_ms) while
 #                 its data path runs: P expires it and fences it with its own
 #                 PREEMPT AND ABORT, and V finds its key gone
+#        shutdown V's filesystem is shut down under its load (XFS_IOC_GOINGDOWN,
+#                 NOLOGFLUSH), so V declares a voluntary death (P-WITHDRAW, its
+#                 heartbeat stopped, P163-WITHDRAW-STAMP) and a peer fences it on
+#                 the stamp: the incident's order.  test21 shut down first (a
+#                 metadata read failed in a transaction, 19:56:11), its key was
+#                 gone 3 s later, and its 31,510 refused publishes began 5 s after
+#                 that (tests/evidence/flood_test21_20261022T200054Z/
+#                 test21_kernlog_boot.gz, decompressed lines 819048-819197); the
+#                 preempt and pause arms withdraw V through P277 or the lease
+#                 instead, and reached nothing at 2 or 8 nodes
 #   4. P's load runs on OBS_S, then both loads stop.
 #   EXPOSED  V logged P290-AUTH-CLOSED and, after it, a peer's page request or
 #            hand-off reached V's ledger (P-TAUTH-PUBLISH-FAIL,
@@ -70,6 +80,25 @@
 #            bounded series, is printed, not graded here.)
 #   VACUOUS  no verdict within VERDICT_S.
 #
+# GRADE=certify grades whether the survivors prove V's exclusion at all after an
+# out-of-band removal of its key (INJECT=preempt: a plain PREEMPT, no MXFS fence
+# behind it) at 3 nodes or more
+# (D-OUT-OF-BAND-KEY-REMOVAL-AT-3-PLUS-NODES-FENCE-SERIES-STALLS-SURVIVORS-126S):
+# the prover found the key absent with no successor named and no sole-survivor
+# gate, re-drove 22 times over 126 s into RECOVERY_BLOCKED, and survivor
+# operations stalled the whole time.  The fix (module parameter pr_surrender,
+# dlm/v5_mount.c v5_pr_surrender_tick): V, once nothing of it can write,
+# registers its key again, so the prover's re-drive finds it and certifies with
+# PREEMPT AND ABORT.  SURRENDER, when set, is written to V's pr_surrender before
+# the injection (1, the fix; 0, as before: the control); unset, the module's
+# default.  OBS_S must cover the death window, the fence and its re-drives.
+#   EXPOSED  V found its own key gone (P277) and a survivor's fence met the key
+#            absent (P-PR-FENCE-ABSENT)
+#   PASS     a survivor certified V's fence (P236-FENCE-CERTIFIED), none declared
+#            the recovery blocked (P238-FENCE-BLOCKED), and no survivor
+#            operation took over the 30 s stall limit; no BUG or Oops.
+#   VACUOUS  V never found its key gone, or no fence met it absent.
+#
 # Bounds (derived): prep on a pair measured 53-104 s, bound 120; the load start
 # 30 a node; WARM_S 10; the injection 30 (ssh) or the pause's arm 12; OBS_S 40
 # (hbpause: the 12 s death window, the fence and replay, measured under 25 s on a
@@ -78,18 +107,25 @@
 #
 # Usage: fenced_ledger_rig_lap.sh <label>
 # Env:   MXFS_NODE_LIST (test17,test18), MXFS_CONFIG (2/net/mesh/direct), MXFS_GROUP,
-#        INJECT (preempt|hbpause, preempt), PARK (1), WARM_S (10), OBS_S (40),
+#        INJECT (preempt|hbpause|shutdown, preempt), PARK (1), WARM_S (10), OBS_S (40),
 #        HB_PAUSE_MS (45000), GRACE_S (5), LATE_S (15), GRADE (ledger|reason|
 #        survivors, ledger), FENCED_ERRNO (unset), RESEND_REDECIDE (unset),
-#        RBLK_DENY_RESEND (unset), VERDICT_S (200)
+#        RBLK_DENY_RESEND (unset), VERDICT_S (200), SURRENDER (unset; GRADE=certify), LAP_LOAD_STOP and LAP_LOAD_CLEAN (1; 0 the
+#        controls of tests/lib/lap_load.sh), LAP_ABORT_AFTER_LOAD (0; 1 ABORTs after the warm-up)
 # Exit 0 PASS, 1 FAIL, 2 ABORT, 3 VACUOUS.
 set -u
 LABEL=${1:?label}
 cd "$(dirname "$0")" || exit 2
+HERE=$(pwd)
 # the tree root holds run.sh and tests/lib/rig.sh both: a draft of this lap run from a copy of
 # tests/ alone finds the tree's own tools
 while { [ ! -f run.sh ] || [ ! -f tests/lib/rig.sh ]; } && [ "$(pwd)" != / ]; do cd ..; done
 [ -f run.sh ] || { echo "ABORT: no tree root above $0"; exit 2; }
+# the lap_bounded.py beside this lap's tests/ (a draft's own), else the tree's
+LB=$HERE/../tools/lap_bounded.py
+[ -f "$LB" ] || LB=tools/lap_bounded.py
+LL=$HERE/lib/lap_load.sh
+[ -f "$LL" ] || LL=tests/lib/lap_load.sh
 NREPO=/src/$(basename "$(pwd)")
 export MXFS_NODE_LIST=${MXFS_NODE_LIST:-test17,test18}
 export MXFS_CONFIG=${MXFS_CONFIG:-2/net/mesh/direct}
@@ -113,15 +149,17 @@ FENCED_ERRNO=${FENCED_ERRNO:-}
 RESEND_REDECIDE=${RESEND_REDECIDE:-}
 RBLK_DENY_RESEND=${RBLK_DENY_RESEND:-}
 VERDICT_S=${VERDICT_S:-200}
-case $INJECT in preempt|hbpause) ;; *) echo "INJECT must be preempt or hbpause"; exit 2;; esac
-case $GRADE in ledger|reason|survivors) ;; *) echo "GRADE must be ledger, reason or survivors"; exit 2;; esac
-for v in "$FENCED_ERRNO" "$RESEND_REDECIDE" "$RBLK_DENY_RESEND"; do
-    case $v in ''|0|1) ;; *) echo "FENCED_ERRNO, RESEND_REDECIDE and RBLK_DENY_RESEND must be 0 or 1"; exit 2;; esac
+SURRENDER=${SURRENDER:-}
+case $INJECT in preempt|hbpause|shutdown) ;; *) echo "INJECT must be preempt, hbpause or shutdown"; exit 2;; esac
+case $GRADE in ledger|reason|survivors|certify) ;; *) echo "GRADE must be ledger, reason, survivors or certify"; exit 2;; esac
+for v in "$FENCED_ERRNO" "$RESEND_REDECIDE" "$RBLK_DENY_RESEND" "$SURRENDER"; do
+    case $v in ''|0|1) ;; *) echo "FENCED_ERRNO, RESEND_REDECIDE, RBLK_DENY_RESEND and SURRENDER must be 0 or 1"; exit 2;; esac
 done
 OUT=tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_fledger_$LABEL
 mkdir -p "$OUT"
 fails=0
 . tests/lib/rig.sh
+. "$LL"
 MARK="FLEDGER-MARK-$LABEL-$$"
 LD=/run/fledger_$LABEL
 KL=/root/fledger.$LABEL.$$.kmsg
@@ -134,16 +172,20 @@ cnt_after() { awk -v a="$2" -v p="$3" 'index($0, a) { f = 1 } f && $0 ~ p { n++ 
 
 GROUPARG=()
 [ -n "${MXFS_GROUP:-}" ] && GROUPARG=(--group "$MXFS_GROUP")
-MXFS_FORCE_PREP=1 timeout 120 ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster > "$OUT/prep.log" 2>&1
+MXFS_FORCE_PREP=1 python3 "$LB" 120 -- ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster > "$OUT/prep.log" 2>&1
 prc=$?
 echo "STAGE prep rc=$prc wall=$(el)s"
 [ $prc = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=prep wall=$(el)s evidence=$OUT"; exit 2; }
 mxfs_dev_resolve "$P"; DEV=$MXFS_DEV_RESOLVED
 
+# Once the loads may have started, every exit also waits for them to end and removes their /run
+# files (tests/lib/lap_load.sh): no exit removed them, and fifteen laps filled a node's /run.
+LOADS=0
 stop_all() {
     for n in "${NODES[@]}"; do
         rs 15 "$n" "touch $LD.stop; kill \$(cat $KL.pid 2>/dev/null) 2>/dev/null; rm -f $KL.pid; echo 1 > $PARM/dl_auth_closed_park 2>/dev/null; echo 0 > $PARM/dl_inject_hb_pause_ms 2>/dev/null" > /dev/null 2>&1
     done
+    [ "$LOADS" = 1 ] && lap_load_end "$LD" "$OUT" "${NODES[@]}"
 }
 trap stop_all EXIT
 
@@ -166,12 +208,16 @@ done
 [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=follow wall=$(el)s evidence=$OUT"; exit 2; }
 
 # ---- 2. the load on both nodes
+LOADS=1
 for n in "${NODES[@]}"; do
     measure "$n" 30 "$OUT/${n}_load_start.txt" '^LOAD_STARTED$' "$n's load started" \
         "rm -rf $LD; mkdir -p $LD; rm -f $LD.stop; nohup setsid python3 $NREPO/tests/mpath/pathload.py run $n $MNT $LD $LD.stop > $LD.out 2>&1 < /dev/null & echo LOAD_STARTED"
 done
 [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=load wall=$(el)s evidence=$OUT"; exit 2; }
 sleep "$WARM_S"
+# TEST ONLY: LAP_ABORT_AFTER_LOAD=1 ends the lap here with its loads running, as an ABORT after
+# the loads start does (tests/lap_load_end_lap.sh)
+[ "${LAP_ABORT_AFTER_LOAD:-0}" = 1 ] && { echo "RESULT: ABORT label=$LABEL stage=forced wall=$(el)s evidence=$OUT"; exit 2; }
 
 # ---- 3. the park switch on V, then the injection
 measure "$V" 20 "$OUT/V_park.txt" '^PARK=[0-9]+$' "V's park switch" \
@@ -181,6 +227,17 @@ if [ -n "$FENCED_ERRNO" ]; then
     measure "$V" 20 "$OUT/V_errno.txt" '^FERRNO=' "V's fail-stop errno switch" \
         "echo $FENCED_ERRNO > $PARM/dl_failstop_fenced_errno; echo FERRNO=\$(cat $PARM/dl_failstop_fenced_errno 2>/dev/null || echo absent)"
     ck "V's dl_failstop_fenced_errno reads back" "$(field "$OUT/V_errno.txt" FERRNO)" "$FENCED_ERRNO"
+fi
+if [ -n "$SURRENDER" ]; then
+    measure "$V" 20 "$OUT/V_surrender.txt" '^SURRENDER=' "V's surrender switch" \
+        "echo $SURRENDER > $PARM/pr_surrender; echo SURRENDER=\$(cat $PARM/pr_surrender 2>/dev/null || echo absent)"
+    ck "V's pr_surrender reads back" "$(field "$OUT/V_surrender.txt" SURRENDER)" "$SURRENDER"
+fi
+if [ "$GRADE" = certify ]; then
+    # the prover's absent-key line is a debug one
+    for n in "${NODES[@]}"; do
+        rs 15 "$n" "echo 'format \"P-PR-FENCE-ABSENT\" +p' > /sys/kernel/debug/dynamic_debug/control 2>/dev/null" > /dev/null 2>&1
+    done
 fi
 for pair in "dl_resend_redecide=$RESEND_REDECIDE" "dl_rblk_deny_resend=$RBLK_DENY_RESEND"; do
     pn=${pair%%=*}; pv=${pair#*=}
@@ -198,6 +255,10 @@ if [ "$INJECT" = preempt ]; then
     # MXFS reserves with
     measure "$P" 30 "$OUT/inject.txt" '^INJECT_RC=[0-9]+$' "P's preempt of V's key" \
         "sg_persist --out --preempt --prout-type=7 --param-rk=$PKEY --param-sark=$VKEY $DEV 2>&1 | grep -v 'Peripheral device type\|SCST_FIO'; echo INJECT_RC=\${PIPESTATUS[0]}"
+elif [ "$INJECT" = shutdown ]; then
+    # 0x8004587d = XFS_IOC_GOINGDOWN, flag 2 = NOLOGFLUSH (tests/d379b_dirty_depart_peer_fence.sh:83)
+    measure "$V" 30 "$OUT/inject.txt" '^INJECT_RC=[0-9]+$' "V's filesystem shutdown" \
+        "python3 -c \"import fcntl, os, struct; d = os.open('$MNT', os.O_RDONLY); fcntl.ioctl(d, 0x8004587d, struct.pack('I', 2)); os.close(d)\" && echo INJECT_RC=0 || echo INJECT_RC=1; sleep 2; grep -a 'P-WITHDRAW\|P163-WITHDRAW-STAMP' $KL | tail -2 | cut -c1-200"
 else
     measure "$V" 30 "$OUT/inject.txt" '^INJECT_RC=[0-9]+$' "V's heartbeat pause" \
         "echo $HB_PAUSE_MS > $PARM/dl_inject_hb_pause_ms || { echo INJECT_RC=1; exit 0; }; for i in 1 2 3 4 5 6; do sleep 2; grep -aq P-HB-INJECT-PAUSE $KL && break; done; grep -a P-HB-INJECT-PAUSE $KL | tail -1 | cut -c1-200; grep -aq P-HB-INJECT-PAUSE $KL && echo INJECT_RC=0 || echo INJECT_RC=2"
@@ -300,6 +361,44 @@ if [ "$GRADE" = survivors ]; then
         echo "LAP fenced_ledger_survivors PASS: after RECOVERY_BLOCKED every survivor's operations ended within 30 s, with an error or without"
     else
         echo "LAP fenced_ledger_survivors FAIL: $fails check(s) failed"
+    fi
+    echo "RESULT: $( [ $fails = 0 ] && echo PASS || echo FAIL ) label=$LABEL fails=$fails wall=$(el)s evidence=$OUT"
+    [ $fails = 0 ]; exit
+fi
+
+if [ "$GRADE" = certify ]; then
+    VGONE=$(cnt "$OUT/${V}_kmsg.txt" 'P277-PR-FULLSTATUS own key .* ABSENT\|P277-PR-READKEYS own key .* absent')
+    SURR=$(cnt "$OUT/${V}_kmsg.txt" 'P-PR-SURRENDER ')
+    ABSENT=0; CERT=0; BLOCKED=0
+    for n in "${SURV[@]}"; do
+        ABSENT=$(( ABSENT + $(cnt "$OUT/${n}_kmsg.txt" 'P-PR-FENCE-ABSENT') ))
+        CERT=$(( CERT + $(cnt "$OUT/${n}_kmsg.txt" 'P236-FENCE-CERTIFIED') ))
+        BLOCKED=$(( BLOCKED + $(cnt "$OUT/${n}_kmsg.txt" 'P238-FENCE-BLOCKED') ))
+    done
+    echo "STAGE certify: V key_gone=$VGONE surrender_lines=$SURR; survivors fence_absent=$ABSENT certified=$CERT blocked=$BLOCKED"
+    grep -a 'P-PR-SURRENDER\|P277-PR-FULLSTATUS\|P131-SELF-FENCE' "$OUT/${V}_kmsg.txt" | sed 's/.*mxfs: /    /' | cut -c1-220 | head -6
+    for n in "${SURV[@]}"; do
+        grep -a 'P236-FENCE-CERTIFIED\|P238-FENCE-BLOCKED\|P236-FENCEKIND' "$OUT/${n}_kmsg.txt" | sed "s/.*mxfs: /    $n: /" | cut -c1-220 | head -3
+    done
+    for n in "${NODES[@]}"; do
+        ck "$n: zero BUG / Oops" "$(cnt "$OUT/${n}_kmsg.txt" '^BUG:\|[^E]BUG:\|kernel BUG at\|Oops')" 0
+    done
+    if [ "$VGONE" = 0 ] || [ "$ABSENT" = 0 ]; then
+        echo "  V found its key gone $VGONE time(s) and the survivors' fences met it absent $ABSENT time(s): the out-of-band removal never reached a fence"
+        echo "RESULT: VACUOUS label=$LABEL stage=no-absent wall=$(el)s evidence=$OUT"; exit 3
+    fi
+    echo "EXPOSED: V found its key gone and a survivor's fence met it absent ($ABSENT time(s))"
+    if [ "$CERT" -gt 0 ]; then echo "  PASS a survivor certified V's fence ($CERT line(s))"
+    else echo "  FAIL no survivor certified V's fence within the window"; fails=$((fails+1)); fi
+    if [ "$BLOCKED" = 0 ]; then echo "  PASS no survivor declared V's recovery blocked"
+    else echo "  FAIL a survivor declared V's recovery blocked ($BLOCKED line(s))"; fails=$((fails+1)); fi
+    if [ "${MAX_MS:-0}" -le 30000 ] 2>/dev/null; then echo "  PASS the survivors' longest operation ${MAX_MS} ms is within the 30 s stall limit"
+    else echo "  FAIL the survivors' longest operation ${MAX_MS:-?} ms is over the 30 s stall limit"; fails=$((fails+1)); fi
+    for n in "${SURV[@]}"; do ck "$n's load reported" "$(cnt "$OUT/${n}_load.txt" '^PATHLOAD ')" 1; done
+    if [ $fails = 0 ]; then
+        echo "LAP fenced_ledger_certify PASS: V's key left out of band and the survivors proved its exclusion; longest survivor operation ${MAX_MS} ms"
+    else
+        echo "LAP fenced_ledger_certify FAIL: $fails check(s) failed (certified=$CERT blocked=$BLOCKED max_op_ms=${MAX_MS:-0})"
     fi
     echo "RESULT: $( [ $fails = 0 ] && echo PASS || echo FAIL ) label=$LABEL fails=$fails wall=$(el)s evidence=$OUT"
     [ $fails = 0 ]; exit

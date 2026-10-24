@@ -62,12 +62,12 @@ knob() {  # knob <value|''>: write watch_ino on NODE when a value is given; prin
         </dev/null 2>&1 | grep -avE '^Warning:|^Unauthorized|^If you|^$' | tail -1
 }
 
-MXFS_FORCE_PREP=1 timeout -k 5 88 ./run.sh "$CONFIG" --group "$GROUP" prep_cluster </dev/null > "$OUT/prep.log" 2>&1
+MXFS_FORCE_PREP=1 python3 tools/lap_bounded.py 88 -- ./run.sh "$CONFIG" --group "$GROUP" prep_cluster </dev/null > "$OUT/prep.log" 2>&1
 rc=$?
 [ "$rc" = 124 ] && abort "prep_cluster overran its 88 s bound"
 grep -aq '^=== prep_cluster OK ' "$OUT/prep.log" || abort "prep_cluster did not pass (rc=$rc, $OUT/prep.log)"
 
-timeout -k 5 44 ./run.sh "$CONFIG" --group "$GROUP" precond_readiness </dev/null > "$OUT/row1.log" 2>&1
+python3 tools/lap_bounded.py 44 -- ./run.sh "$CONFIG" --group "$GROUP" precond_readiness </dev/null > "$OUT/row1.log" 2>&1
 rc=$?
 grep -aq 'skipping prep' "$OUT/row1.log" \
     || abort "the untouched pair was not reused (rc=$rc): $(grep -a 'marker stale\|ERROR' "$OUT/row1.log" | head -3 | tr '\n' ' ')"
@@ -80,7 +80,7 @@ got=$(knob "$want")
 [ "$got" = "$want" ] || abort "watch_ino on $NODE read '$got' after writing $want"
 echo "EXPOSED: watch_ino on $NODE is $got, prepped $prepped"
 
-timeout -k 5 44 ./run.sh "$CONFIG" --group "$GROUP" precond_readiness </dev/null > "$OUT/row2.log" 2>&1
+python3 tools/lap_bounded.py 44 -- ./run.sh "$CONFIG" --group "$GROUP" precond_readiness </dev/null > "$OUT/row2.log" 2>&1
 rc2=$?
 restored=$(knob "$prepped")
 echo "STEP watch_ino restored on $NODE: $restored"

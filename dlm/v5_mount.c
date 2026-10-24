@@ -1503,6 +1503,9 @@ struct mxfs_v5_dlm {
 	 */
 	uint64_t                        resv_health_next_ms;
 	uint64_t                        pr_fill_next_ms;        /* next look for a path with no registration */
+	bool                            pr_surrender_done;      /* v5_pr_surrender_tick decided, once per incarnation */
+	bool                            pr_surrender_watch;     /* registered again; until a fence of this incarnation certifies */
+	int                             pr_surrender_read_fails; /* own-slot descriptor reads that failed */
 	/*
 	 * TEST ONLY (dbg_resv_health_pause_ms).  The proactive half of a fenced
 	 * node's containment is this tick; the reactive half needs the node to be
@@ -11004,6 +11007,180 @@ static void v5_pr_fill_tick(struct mxfs_v5_dlm *ctx, uint64_t now)
 	}
 }
 
+/*
+ * D-OUT-OF-BAND-KEY-REMOVAL-AT-3-PLUS-NODES-FENCE-SERIES-STALLS-SURVIVORS-126S,
+ * D-8NETMESH-RECOVERY-BLOCKED-LEAVES-QUEUED-SURVIVOR-ACQUIRES-PARKED-FOREVER
+ * (docs/rulings/out-of-band-key-removal-surrender.md).  A member whose key a
+ * PREEMPT removed with no MXFS fence behind it leaves the prover at
+ * KEY_ABSENT_UNPROVEN: the key absent and no successor named, exclusion is
+ * provable only by a sole survivor, so at three nodes or more the series ran
+ * 126 s into RECOVERY_BLOCKED (8/net/mesh/direct) and the slice was never
+ * replayed.  A plain PREEMPT aborts nothing, so commands the member's nexuses
+ * had queued may still execute; a PREEMPT AND ABORT of a key registered from
+ * those nexuses aborts them, whenever they were queued.
+ *
+ * So such a member, still running, makes its own exclusion provable.  Once
+ * nothing of it can write to the LUN — its authority closed on the PR
+ * conflict, so every gated writer refuses and the ledger publisher parks, and
+ * no heartbeat beat can still land — it registers its key again on every path,
+ * and the survivors' unchanged re-drive finds the key and certifies with the
+ * usual PREEMPT AND ABORT.  Its own slot decides whether the key went by a
+ * fence of this incarnation: a descriptor naming this incarnation that has
+ * certified, or whose attempt has passed its command-submission boundary
+ * (MXFS_RECOV_F_FENCE_CMD_MAY_HAVE_RUN), means a peer's PREEMPT may have
+ * removed it, and that fence proves exclusion itself; registering then would
+ * only leave a registration under a dead incarnation.  An attempt that found
+ * the key already absent submitted nothing and leaves no such mark.  A
+ * descriptor that cannot be read leaves the node unregistered.  Decided once
+ * per incarnation; a registration made here is kept, never unregistered by
+ * this node, so only a peer's preempt removes it.
+ *
+ * This is the one REGISTER a closed incarnation makes: the health and fill
+ * ticks are skipped once authority is gone because a re-register would undo
+ * its own fence, and here no fence of its own removed the key.
+ *
+ * pr_surrender=0: the node never registers again, as before: the same-build
+ * control.
+ */
+static int mxfs_pr_surrender = 1;
+#ifdef __KERNEL__
+module_param_named(pr_surrender, mxfs_pr_surrender, int, 0644);
+MODULE_PARM_DESC(pr_surrender,
+		 "a node whose PR key was removed with no fence of its own behind it registers it again once nothing of it can write, so a peer's PREEMPT AND ABORT proves its exclusion (default 1); 0 never registers again (same-build control)");
+#endif
+/* own-slot descriptor reads that may fail (I/O, an unreadable image) before
+ * the node gives the surrender up: one a PR-worker tick */
+#define V5_PR_SURRENDER_READ_TRIES	10
+
+/*
+ * After a surrender, until a fence of this incarnation has certified: then the
+ * registration has done its job.  A PREEMPT AND ABORT has removed it already.
+ * A certificate made with the key absent (the sole-survivor gate, which a
+ * prover may reach between this node's read of its slot and its REGISTER)
+ * leaves it standing under a dead incarnation, and so does the slot passing to
+ * another incarnation: it is given back.  A slot with no descriptor is a fence
+ * not begun yet, or one already finished and cleared; it is left as it is.
+ */
+static void v5_pr_surrender_watch(struct mxfs_v5_dlm *ctx)
+{
+	struct mxfs_recov_desc d = { 0 };
+	uint64_t key = ctx->scsipr->local_key;
+	int slot = ctx->disklock->local_slot;
+	int rc;
+
+	if (mxfs_disklock_recovery_read(ctx->disklock, slot, &d))
+		return;
+	if (d.victim_epoch == (uint64_t)ctx->disklock->epoch &&
+	    d.stage < MXFS_RECOV_STAGE_FENCED)
+		return;
+	ctx->pr_surrender_watch = false;
+	if (!mxfs_scsipr_key_present(ctx->scsipr, key)) {
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P-PR-SURRENDER-PREEMPTED node=%u slot=%d key=0x%llx "
+			     "stage=%u kind=%u prover=%u -- the fence of this node "
+			     "certified and the key it registered again is gone",
+			     ctx->node_id, slot, (unsigned long long)key, d.stage,
+			     d.fence_kind, d.fence_prover_node);
+		return;
+	}
+	rc = mxfs_scsipr_surrender_return(ctx->scsipr);
+	mxfs_pal_log(MXFS_LOG_ERR,
+		     "mxfs: P-PR-SURRENDER-RETURNED node=%u slot=%d key=0x%llx rc=%d "
+		     "stage=%u kind=%u epoch_match=%d -- %s with the key this node "
+		     "registered again still standing, so it is unregistered",
+		     ctx->node_id, slot, (unsigned long long)key, rc, d.stage,
+		     d.fence_kind,
+		     d.victim_epoch == (uint64_t)ctx->disklock->epoch,
+		     d.victim_epoch == (uint64_t)ctx->disklock->epoch ?
+		     "the fence of this node certified" :
+		     "the slot is another incarnation's");
+}
+
+static void v5_pr_surrender_tick(struct mxfs_v5_dlm *ctx)
+{
+	struct mxfs_authority *a = ctx->authority;
+	struct mxfs_recov_desc d = { 0 };
+	const char *desc;
+	uint64_t key;
+	int slot, rc;
+
+	if (ctx->pr_surrender_watch) {
+		v5_pr_surrender_watch(ctx);
+		return;
+	}
+	if (!READ_ONCE(mxfs_pr_surrender) || ctx->pr_surrender_done ||
+	    !ctx->scsipr || !ctx->disklock || !a || !mxfs_authority_closed(a) ||
+	    READ_ONCE(a->close_reason) != MXFS_SELF_FENCE_PR_CONFLICT_FENCED)
+		return;
+	/* a key this context does not hold as its live registration (never
+	 * registered, or retained as a fence target) is not one to give back */
+	if (!ctx->scsipr->registered)
+		return;
+	if (!mxfs_disklock_hb_quiet(ctx->disklock))
+		return;         /* a beat may still land: wait for it */
+	key = ctx->scsipr->local_key;
+	slot = ctx->disklock->local_slot;
+	if (slot < 0) {
+		ctx->pr_surrender_done = true;
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P-PR-SURRENDER-REFUSED node=%u key=0x%llx -- this "
+			     "node holds no heartbeat slot, so it cannot read whether "
+			     "a fence of its own removed the key; not registering",
+			     ctx->node_id, (unsigned long long)key);
+		return;
+	}
+	rc = mxfs_disklock_recovery_read(ctx->disklock, slot, &d);
+	if (rc == 0 && d.victim_epoch == (uint64_t)ctx->disklock->epoch &&
+	    (d.stage >= MXFS_RECOV_STAGE_FENCED ||
+	     (d.stage == MXFS_RECOV_STAGE_FENCING &&
+	      (d.flags & MXFS_RECOV_F_FENCE_CMD_MAY_HAVE_RUN)))) {
+		ctx->pr_surrender_done = true;
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P-PR-SURRENDER-NOT-NEEDED node=%u slot=%d "
+			     "key=0x%llx stage=%u flags=0x%x prover=%u -- a fence of "
+			     "this incarnation has %s, so a peer's PREEMPT may have "
+			     "removed the key and that fence proves exclusion; not "
+			     "registering", ctx->node_id, slot,
+			     (unsigned long long)key, d.stage, d.flags,
+			     d.fence_prover_node,
+			     d.stage >= MXFS_RECOV_STAGE_FENCED ? "certified" :
+			     "passed its command-submission boundary");
+		return;
+	}
+	if (rc && rc != -ENOENT) {
+		if (++ctx->pr_surrender_read_fails < V5_PR_SURRENDER_READ_TRIES)
+			return;
+		ctx->pr_surrender_done = true;
+		mxfs_pal_log(MXFS_LOG_ERR,
+			     "mxfs: P-PR-SURRENDER-REFUSED node=%u slot=%d key=0x%llx "
+			     "rc=%d -- %d reads of this node's own slot descriptor "
+			     "failed, so whether a fence of its own removed the key is "
+			     "unknown; not registering", ctx->node_id, slot,
+			     (unsigned long long)key, rc,
+			     ctx->pr_surrender_read_fails);
+		return;
+	}
+	desc = rc == -ENOENT ? "none" :
+	       d.victim_epoch != (uint64_t)ctx->disklock->epoch ?
+	       "another incarnation's" : d.stage == MXFS_RECOV_STAGE_FENCING ?
+	       "fencing, nothing submitted" : "not fencing";
+	ctx->pr_surrender_done = true;
+	rc = mxfs_scsipr_surrender(ctx->scsipr);
+	if (rc == 0)
+		ctx->pr_surrender_watch = true;
+	mxfs_pal_log(MXFS_LOG_ERR,
+		     "mxfs: P-PR-SURRENDER node=%u slot=%d key=0x%llx rc=%d "
+		     "slot_desc=%s -- %s",
+		     ctx->node_id, slot, (unsigned long long)key, rc, desc,
+		     rc == 0 ?
+		     "this node's key was removed with no fence of its own behind "
+		     "it and nothing of it writes to the LUN any more: registered "
+		     "again on every path and kept, so a peer's PREEMPT AND ABORT "
+		     "proves its exclusion and aborts what its nexuses queued" :
+		     "the key could not be registered again; a peer's fence stays "
+		     "at KEY_ABSENT_UNPROVEN");
+}
+
 static void v5_fence_retry_worker_fn(void *arg)
 {
 	struct mxfs_v5_dlm *ctx = arg;
@@ -11197,6 +11374,8 @@ static void v5_fence_retry_worker_fn(void *arg)
 			v5_resv_health_tick(ctx, now);
 			v5_pr_fill_tick(ctx, now);
 		}
+		/* closed authority only: see the function */
+		v5_pr_surrender_tick(ctx);
 		/*
 		 * 0.89.66: a SECOND injector, holding off ONLY the withdrawal pump
 		 * while the gate call above still runs every tick.  The knob above

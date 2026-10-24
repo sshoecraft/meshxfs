@@ -1,7 +1,7 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-24T16:34:18Z",
+  "created": "2026-10-24T19:27:48Z",
   "state": "RUNNING",
   "attempts": [
     {
@@ -478,14 +478,36 @@
       "dist": "",
       "packages": {},
       "steps": {}
+    },
+    {
+      "created": "2026-10-24T16:34:18Z",
+      "state": "ABANDONED",
+      "dry_run": false,
+      "srcversion": "1BC77CFB15EF4A988DD1F56",
+      "files": "tests/evidence/candidates/0.90.134_20261024T163418Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-24T16:34:18Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-24T19:26:55Z",
+          "why": "end the attempt frozen 2026-10-24T16:34:18Z so the drafted fixes and instruments go into the next attempt: the out-of-band key removal's surrender registration (pr_surrender), the fenced-ledger lap's certify grading, the two rig laps' load end and /run cleanup, the guarded fuser kills, the lap-bounded prep steps, run.sh's declared supporting rows, PROBE-A's replay-task split, the DRBD backing-cut reproducer's module install and the 32-node reproducer"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
-  "srcversion": "1BC77CFB15EF4A988DD1F56",
-  "module_sha256": "8401637f771789f4a1693ee6eb1eaaad683f6aceccad48350b87e7cc8c7ae26b",
-  "files": "tests/evidence/candidates/0.90.134_20261024T163418Z.files.json",
-  "files_count": 2646,
-  "files_digest": "ea5630404648df53f3df39fd583bb98ecd5dbd3661c53221149aa0f186db059d",
+  "srcversion": "FF012B4B81CDB69CAE96883",
+  "module_sha256": "32a7e2f10ac90b7e8d88026850e5b42427e398aabb7cd1d984bf0ea3fa0b7a86",
+  "files": "tests/evidence/candidates/0.90.134_20261024T192748Z.files.json",
+  "files_count": 2653,
+  "files_digest": "48d7d03e6d0eeac6818f56ed62ef9f4beb5be46344f060839f452c8e15eff818",
   "spec": "ec57ce06eb09c644b368cde523dfd4fa03e87d54b80a4bee31602c59f3ec175b",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
@@ -495,7 +517,7 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-24T16:34:18Z",
+      "at": "2026-10-24T19:27:48Z",
       "why": "created"
     }
   ]

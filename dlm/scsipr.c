@@ -208,6 +208,54 @@ int mxfs_scsipr_fill_paths(struct mxfs_scsipr_ctx *ctx, uint64_t fence_ms)
 	return rc;
 }
 
+/*
+ * Register this node's key again after it left the target with no fence of
+ * this incarnation behind it (an out-of-band PREEMPT), so that a peer's
+ * re-driven fence finds the key and proves this node's exclusion with PREEMPT
+ * AND ABORT, which also aborts every command its nexuses still have queued
+ * (docs/rulings/out-of-band-key-removal-surrender.md).  The caller has
+ * established that nothing of this node writes to the LUN any more.  The
+ * register is the mount's: the same-key probe first, then REGISTER, on every
+ * path of a multipath map, verified by READ KEYS; a nexus holding another key
+ * refuses.  On success the registration is kept as the fence target: this
+ * context never unregisters it (registered = false, as for a key retained on
+ * a refused mount), so only a peer's preempt removes it.
+ */
+int mxfs_scsipr_surrender(struct mxfs_scsipr_ctx *ctx)
+{
+	int rc;
+
+	if (!ctx || !ctx->dev || !ctx->local_key)
+		return -EINVAL;
+	scsipr_dep_enter(ctx, "surrender");
+	rc = scsipr_register_locked(ctx, false);
+	if (rc == 0)
+		ctx->registered = false;
+	mxfs_scsipr_departure_unlock();
+	return rc;
+}
+
+/*
+ * Give back a registration mxfs_scsipr_surrender made, once a fence of this
+ * incarnation certified without removing it.  The unregister is the
+ * departure's (every path, absence verified by PR IN); a failed one leaves the
+ * key as a fence target, never as this context's live registration.
+ */
+int mxfs_scsipr_surrender_return(struct mxfs_scsipr_ctx *ctx)
+{
+	int rc;
+
+	if (!ctx || !ctx->dev || !ctx->local_key)
+		return -EINVAL;
+	scsipr_dep_enter(ctx, "surrender-return");
+	ctx->registered = true;
+	rc = scsipr_unregister_locked(ctx);
+	if (rc)
+		ctx->registered = false;
+	mxfs_scsipr_departure_unlock();
+	return rc;
+}
+
 int mxfs_scsipr_reserve(struct mxfs_scsipr_ctx *ctx)
 {
 	int rc;

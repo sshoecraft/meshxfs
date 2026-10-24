@@ -124,6 +124,7 @@ set -u
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 . "$REPO/tools/mxfs_lab.sh"
 . "$REPO/tests/lib/runlock.sh"
+. "$REPO/tests/lib/fuser_guard.sh"
 SSH="$REPO/tools/mxfs_sshpass.sh"
 POOL="$REPO/tools/lun_pool.sh"
 CONFIG=2/net/mesh/drbd
@@ -2791,7 +2792,9 @@ step_resolve_test() {
     devt_scsi=$(sed -n 's/.* dev=\([0-9:]*\) .*/\1/p' <<<"$out" | tail -1)
 
     # dm over DRBD: matches the backing disk by content, must be refused
-    both um "fuser -km $MNT 2>/dev/null; sleep 1; timeout 30 umount $MNT; mountpoint -q $MNT && echo UM_FAIL || echo UM_OK" 60
+    # fuser -m on a directory that is not a mount point names every user of the root
+    # filesystem, sshd included, so it runs only while $MNT is mounted (tests/lib/fuser_guard.sh)
+    both um "$(fuser_mounted_cmd "$MNT" 1) mountpoint -q $MNT && timeout 30 umount $MNT; mountpoint -q $MNT && echo UM_FAIL || echo UM_OK" 60
     for n in "${NODES[@]}"; do grep -q UM_OK "$EVID/um.$n" || die "resolve test: $n would not unmount: $(cat "$EVID/um.$n")"; done
     out=$(ssh_n "$N1" "timeout 20 dmsetup create mxfs_rt_drbd --table \"0 \$(blockdev --getsz $DRBD_DEV) linear $DRBD_DEV 0\" && echo DM_OK" 30)
     grep -q DM_OK <<<"$out" || die "resolve test: dm over $DRBD_DEV: $out"

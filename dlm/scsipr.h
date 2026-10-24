@@ -1896,6 +1896,14 @@ int mxfs_scsipr_self_check(struct mxfs_scsipr_ctx *ctx, int live_members);
  * Callable while fenced: PR IN is permitted to unregistered initiators. */
 int mxfs_scsipr_fenced_check(struct mxfs_scsipr_ctx *ctx);
 
+/* register this node's key again after an out-of-band removal, as the fence
+ * target a peer's PREEMPT AND ABORT proves exclusion on; the registration is
+ * kept (never unregistered by this context).  0 registered and verified. */
+int mxfs_scsipr_surrender(struct mxfs_scsipr_ctx *ctx);
+/* unregister it again once a fence of this incarnation certified with it
+ * still standing */
+int mxfs_scsipr_surrender_return(struct mxfs_scsipr_ctx *ctx);
+
 /* v0.11.80 (D8): provisioning-time conformance probe — call once after
  * register+reserve; logs whether per-node PR is actually usable on this
  * target/topology (own key visible ⇒ active; not visible ⇒ advisory). */
