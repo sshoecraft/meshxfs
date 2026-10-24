@@ -1,8 +1,8 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-24T04:13:43Z",
-  "state": "ABANDONED",
+  "created": "2026-10-24T06:38:23Z",
+  "state": "RUNNING",
   "attempts": [
     {
       "created": "2026-10-21T21:26:41Z",
@@ -368,14 +368,36 @@
       "dist": "",
       "packages": {},
       "steps": {}
+    },
+    {
+      "created": "2026-10-24T04:13:43Z",
+      "state": "ABANDONED",
+      "dry_run": false,
+      "srcversion": "B947A20F3C2FE3A67ABF6F3",
+      "files": "tests/evidence/candidates/0.90.134_20261024T041343Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-24T04:13:43Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-24T05:44:27Z",
+          "why": "The attempt frozen 2026-10-24T04:13:43Z cannot qualify: about 48 open records still block claimed configurations, and their next steps need frozen files changed (the default death window cut to 6 checks with the legacy window kept for peers that publish none, the foreign-replay lap's wait for recovery, the host-quiet lock for lane power-ups, a test-only ledger page cap, the merge lap's node-bound switch, laps for the self-fenced publisher, release-step cells, the DRBD write-bound arm's node count and the DRBD oops reproduction without MeshXFS). Batches running on it (third_vote, EFI-wedge and 16-node reproductions) finish on its tree before any file they run changes; no new attempt is frozen until they end."
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
-  "srcversion": "B947A20F3C2FE3A67ABF6F3",
-  "module_sha256": "182fab47e912abdec6d76e04cde857409822118251161e303c15d98f49d7e63a",
-  "files": "tests/evidence/candidates/0.90.134_20261024T041343Z.files.json",
-  "files_count": 2604,
-  "files_digest": "e7f3e8e76836b989b235ca686c9d63505bce1b9b745b5f9e2221848ee7f4c92c",
+  "srcversion": "BE3695D2590A65F742F9816",
+  "module_sha256": "08a5ccfb026031cb4e156b95e73b9218b3e24958f77f6341ce292375c2b6ca7e",
+  "files": "tests/evidence/candidates/0.90.134_20261024T063823Z.files.json",
+  "files_count": 2624,
+  "files_digest": "4ce796bae9966e579ac630f4559a246ba564f09eec76ab512e4939bbc86c02dd",
   "spec": "ec57ce06eb09c644b368cde523dfd4fa03e87d54b80a4bee31602c59f3ec175b",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
@@ -385,13 +407,8 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-24T04:13:43Z",
+      "at": "2026-10-24T06:38:23Z",
       "why": "created"
-    },
-    {
-      "state": "ABANDONED",
-      "at": "2026-10-24T05:44:27Z",
-      "why": "The attempt frozen 2026-10-24T04:13:43Z cannot qualify: about 48 open records still block claimed configurations, and their next steps need frozen files changed (the default death window cut to 6 checks with the legacy window kept for peers that publish none, the foreign-replay lap's wait for recovery, the host-quiet lock for lane power-ups, a test-only ledger page cap, the merge lap's node-bound switch, laps for the self-fenced publisher, release-step cells, the DRBD write-bound arm's node count and the DRBD oops reproduction without MeshXFS). Batches running on it (third_vote, EFI-wedge and 16-node reproductions) finish on its tree before any file they run changes; no new attempt is frozen until they end."
     }
   ]
 }

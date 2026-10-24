@@ -3322,6 +3322,23 @@
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: on a pair with agent=self alone, participant 1 does not carry on after participant 0's death"
+        },
+        {
+          "id": "b20261024-bf44b8",
+          "kind": "control",
+          "row": "lap:third_vote",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the pair with agent=self alone asked to mount on both nodes",
+          "candidate": "",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "drbd_third_vote=0 (ARM=0: the module admits a dual-primary pair with no third vote and no node fence, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: on a pair with agent=self alone, participant 1 does not carry on after participant 0's death"
         }
       ],
       "rates": [
@@ -6195,7 +6212,7 @@
           "iso": "2026-10-23T17:32:15Z"
         }
       ],
-      "updated": "2026-10-23",
+      "updated": "2026-10-24",
       "batches": [
         {
           "id": "b20261023-d5c90b",
@@ -6246,6 +6263,40 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-544904",
+          "kind": "control",
+          "row": "path_mount_degraded",
+          "config": "2/disk/caw/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "PF-LATE-B-DOWN",
+          "candidate": "",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "pr_fill_bounded=0 (MXFS_EXTRA_MODARGS: the late-path fill runs only with 15 s of the authority lease left, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a path down at mount is never registered under the 8 s lease, and its writes are refused once the other path fails"
+        },
+        {
+          "id": "b20261024-239fb6",
+          "kind": "control",
+          "row": "path_mount_degraded",
+          "config": "4/disk/caw/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "PF-LATE-B-DOWN",
+          "candidate": "",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "pr_fill_bounded=0 (MXFS_EXTRA_MODARGS: the late-path fill runs only with 15 s of the authority lease left, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a path down at mount is never registered under the 8 s lease, and its writes are refused once the other path fails"
         }
       ],
       "rates": [
@@ -7179,9 +7230,59 @@
           "config": "2/net/mesh/drbd",
           "row": "lap:drbd_nodes_count",
           "iso": "2026-10-24T04:15:03Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count2",
+          "iso": "2026-10-24T06:40:03Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count2",
+          "iso": "2026-10-24T06:40:02Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count2",
+          "iso": "2026-10-24T06:40:01Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count2",
+          "iso": "2026-10-24T06:40:00Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count2",
+          "iso": "2026-10-24T06:39:59Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count2",
+          "iso": "2026-10-24T06:39:58Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count2",
+          "iso": "2026-10-24T06:39:57Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count2",
+          "iso": "2026-10-24T06:39:56Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count2",
+          "iso": "2026-10-24T06:39:55Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_nodes_count2",
+          "iso": "2026-10-24T06:39:54Z"
         }
       ],
-      "updated": "2026-10-23",
+      "updated": "2026-10-24",
       "batches": [
         {
           "id": "b20261023-2ea23d",
@@ -7232,6 +7333,56 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-8420d4",
+          "kind": "control",
+          "row": "lap:drbd_nodes_count2",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: MXFS_NODES=",
+          "candidate": "",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "DRBD_RIG_NODES_COUNT=0 (scripts/drbd_rig.sh and tests/drbd_write_bound_arm.sh take a bare number in MXFS_NODES as a node name, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a lane's MXFS_NODES=2 names a one-node pair in drbd_rig.sh and in drbd_write_bound_arm.sh"
+        },
+        {
+          "id": "b20261024-8ef8c9",
+          "kind": "verify",
+          "row": "lap:drbd_nodes_count2",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: MXFS_NODES=",
+          "candidate": "0.90.134",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "",
+          "state": "passed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:drbd_nodes_count2",
+            "config": "2/net/mesh/drbd",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-8420d4",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "DRBD_RIG_NODES_COUNT=0 (scripts/drbd_rig.sh and tests/drbd_write_bound_arm.sh take a bare number in MXFS_NODES as a node name, as before the fix)",
+            "builds": [
+              "BE3695D2590A65F742F9816"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "rates": [
@@ -7249,6 +7400,33 @@
             "B947A20F3C2FE3A67ABF6F3"
           ],
           "date": "2026-10-23"
+        },
+        {
+          "row": "lap:drbd_nodes_count2",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-8420d4",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "DRBD_RIG_NODES_COUNT=0 (scripts/drbd_rig.sh and tests/drbd_write_bound_arm.sh take a bare number in MXFS_NODES as a node name, as before the fix)",
+          "builds": [
+            "BE3695D2590A65F742F9816"
+          ],
+          "date": "2026-10-24"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T06:38:23Z",
+          "build": "BE3695D2590A65F742F9816",
+          "batch": "b20261024-8ef8c9",
+          "approval": "P20261024-289caf",
+          "date": "2026-10-24"
         }
       ]
     },
@@ -7339,9 +7517,59 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-456074",
+          "kind": "control",
+          "row": "lap:cell_day_stamp3",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "MXFS_CELL_DAY_STAMP=0 (tools/defects.py parse_cell takes only a full stamp, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: update --cell and --drop-cell refuse a run stamped with a date alone"
+        },
+        {
+          "id": "b20261024-f44959",
+          "kind": "verify",
+          "row": "lap:cell_day_stamp3",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:cell_day_stamp3",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-456074",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_CELL_DAY_STAMP=0 (tools/defects.py parse_cell takes only a full stamp, as before the fix)",
+            "builds": [
+              "BE3695D2590A65F742F9816"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
-      "updated": "2026-10-23",
+      "updated": "2026-10-24",
       "rates": [
         {
           "row": "lap:cell_day_stamp",
@@ -7357,6 +7585,21 @@
             "B947A20F3C2FE3A67ABF6F3"
           ],
           "date": "2026-10-23"
+        },
+        {
+          "row": "lap:cell_day_stamp3",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-456074",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_CELL_DAY_STAMP=0 (tools/defects.py parse_cell takes only a full stamp, as before the fix)",
+          "builds": [
+            "BE3695D2590A65F742F9816"
+          ],
+          "date": "2026-10-24"
         }
       ],
       "cells": [
@@ -7409,6 +7652,56 @@
           "config": "2/disk/caw/direct",
           "row": "lap:cell_day_stamp",
           "iso": "2026-10-24T04:15:03Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp3",
+          "iso": "2026-10-24T06:42:49Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp3",
+          "iso": "2026-10-24T06:42:47Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp3",
+          "iso": "2026-10-24T06:42:44Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp3",
+          "iso": "2026-10-24T06:42:41Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp3",
+          "iso": "2026-10-24T06:42:38Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp3",
+          "iso": "2026-10-24T06:42:36Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp3",
+          "iso": "2026-10-24T06:42:33Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp3",
+          "iso": "2026-10-24T06:42:31Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp3",
+          "iso": "2026-10-24T06:42:28Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:cell_day_stamp3",
+          "iso": "2026-10-24T06:42:25Z"
         }
       ],
       "verified_at": [
@@ -7516,7 +7809,129 @@
       "summary": "tests/release_step_cell_lap.py drives its removal and named-removal dispositions through RECORD = D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED (:78), a record that has since been removed from the live queue, and every scratch tree is a copy of that queue (scratch_tree, :117-120); name() looks the record up with next() (:172), which raises StopIteration in the probe, and name() turns the rc=1 into a RuntimeError (:176-177) that main() does not catch, so the lap dies with a traceback before printing STEP_CELL_LAP PASS or FAIL. The lap can no longer re-measure the release-step parse it was written for.",
       "evidence": "2026-10-24, on candidate 0.90.134 attempt frozen 2026-10-24T04:13:43Z: 'timeout 30 python3 tests/release_step_cell_lap.py' exited 1 after the infra, amend and removal dispositions of 1/any:release:boards:2026-10-21T19:29:49Z, ending 'RuntimeError: name rc=1: Traceback ... File \"<string>\", line 4, in <module> StopIteration' (tests/evidence/day_stamp_release_step/release_step_cell_lap_20261024.out). It was run to re-measure release-step stamps after the day-stamp fix in tools/defects.py parse_cell (:783-785).",
       "next": "Give the lap a record of its own in each scratch tree (added through the scratch queue's own load and save, as unname() edits it) instead of naming a live one, behind a switch that names the live record as before (the control: it dies as above while the live queue lacks the record); then a control batch, a verification sized from it, remove --fixed. The fix changes a frozen file, so it lands on the next attempt.",
-      "reproducer": "timeout 30 python3 tests/release_step_cell_lap.py on any tree whose queue lacks D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED"
+      "reproducer": "timeout 30 python3 tests/release_step_cell_lap.py on any tree whose queue lacks D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED",
+      "batches": [
+        {
+          "id": "b20261024-b2d2ef",
+          "kind": "control",
+          "row": "lap:release_step_cell",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "MXFS_STEP_LAP_OWN_RECORD=0 (tests/release_step_cell_lap.py names the live record and keeps the live annotations, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: the lap names a record the live queue no longer holds and dies without a verdict"
+        },
+        {
+          "id": "b20261024-f5a69d",
+          "kind": "verify",
+          "row": "lap:release_step_cell",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:release_step_cell",
+            "config": "2/disk/caw/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-b2d2ef",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_STEP_LAP_OWN_RECORD=0 (tests/release_step_cell_lap.py names the live record and keeps the live annotations, as before the fix)",
+            "builds": [
+              "BE3695D2590A65F742F9816"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "updated": "2026-10-24",
+      "rates": [
+        {
+          "row": "lap:release_step_cell",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-b2d2ef",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_STEP_LAP_OWN_RECORD=0 (tests/release_step_cell_lap.py names the live record and keeps the live annotations, as before the fix)",
+          "builds": [
+            "BE3695D2590A65F742F9816"
+          ],
+          "date": "2026-10-24"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-24T06:39:33Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-24T06:39:28Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-24T06:39:22Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-24T06:39:16Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-24T06:39:10Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-24T06:39:05Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-24T06:38:59Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-24T06:38:53Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-24T06:38:47Z"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "row": "lap:release_step_cell",
+          "iso": "2026-10-24T06:38:42Z"
+        }
+      ]
     },
     {
       "id": "D-LANE-POWER-UP-FLOODS-THE-HOST-LOG-AND-ANOTHER-LANES-PREFLIGHT-REFUSES-ITS-PREP",
@@ -7526,7 +7941,7 @@
       "opened": "2026-10-23",
       "summary": "Rig lanes start independently, and a lane's first step (scripts/lab_power.sh up group:<g>) writes the host kernel log at well over the host-safety preflight's 40 lines/s limit while its VMs attach to the bridges; a prep that another lane's lap runs inside that second is refused by its own preflight (run.sh ABORTED: host-safety preflight failed) and the lap aborts unexposed. Nothing orders one lane's power-up against another lane's preps: scripts/lane_after.sh exists for it but no lane is required to use it, and a lap such as tests/relog_auth_lap.sh keeps no prep output, so the refusal's gate is not in the lap's evidence.",
       "evidence": "2026-10-24: lane g4c_a15_relogauth (control b20261023-3629b7, lap:relog_auth at 4/disk/caw/mpath) lap 2 'LAP relog_auth ABORT: prep_cluster rc=3: === run.sh ABORTED: host-safety preflight failed at 4/disk/caw/mpath ===' at 04:30:49Z, 10 s after it began (tests/evidence/batch_laps/b20261023-3629b7/20261024T043039Z-85bc441d.log). Lane g8b_a15_peerwithdrawn started 'scripts/lab_power.sh up group:g8b' at 04:30:46Z. The host kernel log (journalctl -k, clyde) holds 146 lines in the second 04:30:46Z, all VM attach lines ('vnetN: entered promiscuous mode' x27, 'mxsana/mxsanb/brN: port N(vnetN) entered blocking state' x18 each, forwarding/disabled states), and 20 in 04:30:43Z: about 49 lines/s over the gate's 3 s sample, against KMSG_MAX 40 (scripts/clyde_preflight.sh:65, :261-262). Run again at 04:3x with no lane starting, the gate reported 'kernel log ~0 lines/s' and 0 failures. The lane starts were this session's: two lanes (g2c, g4c) started together at 04:28 and g8b at 04:30:46 without scripts/lane_after.sh. ===== 2026-10-24: no longer names 4/disk/caw/mpath:lap:relog_auth:2026-10-24T04:30:39Z, named by D-CAWMPATH-NLINK1-FILE-NAMED-TWICE-AFTER-ANSWER-LOST: named here by mistake: 04:30:39Z is lap 1 of control b20261023-3629b7, which ran and reproduced ('LAP relog_auth FAIL: A re-logged the directory core under its shared hold'); it is D-CAWMPATH-NLINK1-FILE-NAMED-TWICE-AFTER-ANSWER-LOST's run. The preflight refusals are 04:30:50Z and 04:37:59Z, named here instead",
-      "next": "Make the lane start safe by construction rather than by the starter's care: scripts/rig_lane.sh serializes every lane's lab_power up (and pool LUN allocation) behind one host-wide lock that a prep's preflight also takes, or run.sh's preflight retries its log-rate sample once past a lane's power-up it can name; with a switch restoring today's independent starts for the control. Lap: two lanes started together on disjoint groups, one powering up while the other preps; the control's prep is refused at the gate, the fix's is not. Also keep each lap's prep output (tests/relog_auth_lap.sh discards it).",
+      "next": "Make the lane start safe by construction rather than by the starter's care: scripts/rig_lane.sh serializes every lane's lab_power up (and pool LUN allocation) behind one host-wide lock that a prep's preflight also takes, or run.sh's preflight retries its log-rate sample once past a lane's power-up it can name; with a switch restoring today's independent starts for the control. Lap: two lanes started together on disjoint groups, one powering up while the other preps; the control's prep is refused at the gate, the fix's is not. Also keep each lap's prep output (tests/relog_auth_lap.sh discards it). ===== 2026-10-24, design for the next attempt (code read: scripts/lab_power.sh:151-160 starts every domain at once, up_one :92-94 'virsh start' is where a guest's tap device joins the bridge and the host logs it; scripts/clyde_preflight.sh's log-rate gate samples dmesg --follow-new for KMSG_SECS and refuses above KMSG_MAX, with no knowledge of a power-up in flight): lab_power.sh up holds an exclusive flock on one host-wide file (/tmp/mxfs_host_powerup.lock) from its first 'virsh start' until every domain it started answers ssh, and the preflight's log-rate check first takes the same lock shared, waiting at most the longest measured power-up (lab_power.sh BOOT_S) before it samples, so a prep samples the log after a power-up instead of inside it. Neither the threshold nor the sample changes, and a flood from anything other than a power-up is still refused. LAB_POWER_LOCK=0 takes no lock on either side: the control. Lap: two lanes on disjoint groups started together, one powering a 4-node group up while the other's prep runs; the control's prep refused 'kernel log is producing ~N lines/s', the fix's prep waits and passes, each lap keeping its prep output. Until it lands, lanes are started at least 75 s apart (done for the w12 lanes).",
       "reproducer": "start scripts/rig_lane.sh on group A whose first step is scripts/lab_power.sh up of 8 VMs while a lap on group B runs ./run.sh prep_cluster in the same 3 s",
       "cells": [
         {
@@ -7563,7 +7978,38 @@
           "row": "lap:foreign_replay_ag",
           "iso": "2026-10-24T04:31:22Z"
         }
-      ]
+      ],
+      "batches": [
+        {
+          "id": "b20261024-eade91",
+          "kind": "control",
+          "row": "lap:foreign_replay_ag_p163",
+          "config": "4/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: |replayer=none",
+          "candidate": "",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "LAP_WAIT_P163=0 (tests/foreign_replay_ag_lap.sh reads the survivors' logs as soon as the truncates return, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: the lap reads the logs before the replayer's P163 and names no replayer"
+        }
+      ],
+      "updated": "2026-10-24"
+    },
+    {
+      "id": "D-DRBD-WRITE-BOUND-ARM-IGNORES-MXFS-GROUP-AND-ADDRESSES-TEST3-TEST4",
+      "severity": "minor",
+      "nodes": 2,
+      "config": "net/mesh/drbd",
+      "opened": "2026-10-24",
+      "summary": "tests/drbd_write_bound_arm.sh, given a bare node count in MXFS_NODES (the fix of D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP), and with MXFS_NODES unset, uses its built-in default pair test3/test4 and ignores MXFS_GROUP, so run from a lane of another group it addresses test3/test4, which belong to group g4 (test3-test6), a lane that may be running on them",
+      "evidence": "Code read: tests/drbd_write_bound_arm.sh:36-41 ('MXFS_NODES=\"\"' for a bare number, then 'export MXFS_NODES=${MXFS_NODES:-test3 test4}'); found by review data/reviews/P20261024-289caf.md, whose laps (tests/evidence/batch_laps/b20261024-8ef8c9) print the arm selecting test3 test4 from a g2 lane. No run has yet collided: this is a hazard read from the code and the laps' own selection, not an observed failure.",
+      "next": "Make the arm resolve its pair as scripts/drbd_rig.sh does (MXFS_GROUP's nodes when MXFS_NODES is a count or unset), with a switch for the control; a lap that runs the arm's node resolution with MXFS_GROUP=g2 and requires test1 test2; control (switch off) prints test3 test4; verification; remove --fixed.",
+      "updated": "2026-10-24"
     }
   ]
 }

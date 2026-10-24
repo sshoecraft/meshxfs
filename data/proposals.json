@@ -6979,6 +6979,81 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-289caf",
+      "kind": "verify",
+      "record": "D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP",
+      "change": {
+        "batch": "b20261024-8ef8c9"
+      },
+      "argument": "Verification b20261024-8ef8c9 (lap:drbd_nodes_count2 at 2/net/mesh/drbd, candidate 0.90.134 attempt frozen 2026-10-24T06:38:23Z, module BE3695D2590A65F742F9816) was declared before its first lap and sized from control b20261024-8420d4 (10 of 10 laps failed with DRBD_RIG_NODES_COUNT=0, the fix taken out of both scripts on the same frozen tree, closed on that build): 6 laps planned, 6 PASS, 0 FAIL, each exposure=1 ('^EXPOSED: MXFS_NODES=' probe) and each printing 'LAP drbd_nodes_count PASS ... a bare MXFS_NODES selected the group's pair in drbd_rig.sh and the default pair in drbd_write_bound_arm.sh'. This answers review P20261023-452ba2: the lap now resolves both scripts' node selection (drbd_rig.sh status and drbd_write_bound_arm.sh with DRBD_ARM_PRINT_NODES=1) under MXFS_NODES=2, and both scripts carry the fix under the one switch (scripts/drbd_rig.sh:156-162, tests/drbd_write_bound_arm.sh:31-41). A grep of scripts/ tests/ tools/ run.sh for readers that take MXFS_NODES as names (read -r -a, for ... in $MXFS_NODES, ${MXFS_NODES:-test...}) finds only tests/drbd_write_bound_arm.sh:39,41, which the fix covers. The record's cells at 2/net/mesh/drbd are the lane g2_a16_20261024T010135Z laps whose drbd_rig.sh up refused 'group nodes-2 has 1 nodes' (third_vote, drbd_rig_tag; see the record's evidence) and this record's own control laps.",
+      "evidence": [
+        "tests/evidence/lanes/g2_w12_20261024T063950Z/step2.log",
+        "tests/evidence/lanes/g2_w12_20261024T063950Z/step3.log",
+        "tests/evidence/batch_laps/b20261024-8420d4",
+        "tests/evidence/batch_laps/b20261024-8ef8c9",
+        "tests/evidence/candidates/0.90.134_20261024T063823Z.files.json",
+        "scripts/drbd_rig.sh",
+        "tests/drbd_write_bound_arm.sh",
+        "tests/drbd_nodes_count_lap.sh",
+        "data/reviews/P20261023-452ba2.md"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-289caf.md",
+        "sha256": "61a50a33b2bde3625756e8721ed984acc583caa29404266749f57c92127831fd",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-c3f747",
+      "kind": "verify",
+      "record": "D-RELEASE-STEP-CELL-LAP-NAMES-A-REMOVED-RECORD-AND-DIES-WITHOUT-A-VERDICT",
+      "change": {
+        "batch": "b20261024-f5a69d"
+      },
+      "argument": "Verification b20261024-f5a69d (lap:release_step_cell, recorded at 2/disk/caw/direct; the lap is host-only because the defect lives in tests/release_step_cell_lap.py and the tools/defects.py scratch queues it drives on the lab host, no VM involved), candidate 0.90.134 attempt frozen 2026-10-24T06:38:23Z, was declared before its first lap and sized from control b20261024-b2d2ef on the same frozen tree: with MXFS_STEP_LAP_OWN_RECORD=0 (the lap names the live record D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED and keeps the live annotations, the code before the fix) 10 of 10 laps FAIL rc=1 with a Traceback before any STEP_CELL_LAP verdict, each exposure=4, the record's reproduced failure. Fix on: 6 planned, 6 PASS, 0 FAIL, each 'STEP_CELL_LAP PASS all 12 dispositions settled their run (3 key shapes x infra, amend, removal, named removal) and every take-back listed it', exposure=12, 26-27 s each. The record's cells are exactly the ten control laps.",
+      "evidence": [
+        "tests/evidence/lanes/host_w12_20261024T063834Z/step1.log",
+        "tests/evidence/lanes/host_w12_20261024T063834Z/step2.log",
+        "tests/evidence/batch_laps/b20261024-b2d2ef",
+        "tests/evidence/batch_laps/b20261024-f5a69d",
+        "tests/release_step_cell_lap.py",
+        "tests/evidence/candidates/0.90.134_20261024T063823Z.files.json"
+      ],
+      "state": "approved",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-c3f747.md",
+        "sha256": "41bb041ece11aa488e31d8136ce6976cff9fd4d4f300f6a28ab681481df86581",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      }
+    },
+    {
+      "id": "P20261024-f9ae18",
+      "kind": "remove-fixed",
+      "record": "D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP",
+      "change": {
+        "control": "b20261024-8420d4",
+        "fixon": "b20261024-8ef8c9",
+        "cause": "scripts/drbd_rig.sh and tests/drbd_write_bound_arm.sh read MXFS_NODES as the pair's node names, while run.sh and lane queues set it to a node count; a bare count such as 2 became a one-node pair named '2' and drbd_rig.sh refused 'group nodes-2 has 1 nodes; DRBD dual-primary is exactly two'. Fixed by taking a bare number in MXFS_NODES as a count in both scripts (drbd_rig.sh selects the group, MXFS_GROUP default g2; the arm uses its default pair), DRBD_RIG_NODES_COUNT=0 restoring the old reading."
+      },
+      "argument": "Control b20261024-8420d4 (DRBD_RIG_NODES_COUNT=0 on the frozen candidate 0.90.134 attempt 2026-10-24T06:38:23Z, module BE3695D2590A65F742F9816) failed 10 of 10 exposed laps of tests/drbd_nodes_count_lap.sh with the refusal in both scripts; verification b20261024-8ef8c9 sized from it passed 6 of 6 exposed laps and was approved and applied (P20261024-289caf, data/reviews/P20261024-289caf.md). The record's cells are all at 2/net/mesh/drbd: the g2_a16 lane's third_vote and drbd_rig_tag laps that aborted on this refusal (the record's evidence, moved here by review P20261023-e7a30c) and this record's own control laps; the applied verify retired them. The defect lives in two host-side scripts that select nodes before any node is touched, so the lap needs no DRBD state; the reach is 2/net/mesh/drbd, the only configuration the two scripts serve. Reproducer set on the record.",
+      "evidence": [
+        "data/reviews/P20261024-289caf.md",
+        "tests/evidence/lanes/g2_w12_20261024T063950Z/step2.log",
+        "tests/evidence/lanes/g2_w12_20261024T063950Z/step3.log",
+        "tests/drbd_nodes_count_lap.sh",
+        "scripts/drbd_rig.sh",
+        "tests/drbd_write_bound_arm.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
