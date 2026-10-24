@@ -1647,10 +1647,10 @@
       "opened": "2026-10-19",
       "summary": "A shared LUN with 4096-byte logical blocks (4K-native, what most new arrays present) cannot be formatted: mkfs.mxfs fails at its first write, and every on-disk layout and I/O path assumes 512-byte logical blocks.",
       "evidence": "2026-10-19 (session 1c324e00), tests/fourkn_lun.sh + tests/fourkn_mount_probe.sh, log tests/evidence/fourkn_20261019.log: an SCST vdisk_fileio LUN with blocksize=4096 bound to test31/test32 (blockdev --getss 4096, --getpbsz 4096). Published 0.90.130 (v0.90.130 source rebuilt to srcversion 1E9C0DE7364AD47BCDDE54A, the release's) and the 0.90.131 release build (8DAEC6B8298ADB049222D74) both: 'mkfs.mxfs: pwrite at offset 4096 failed: Invalid argument', rc=1, at the journal superblock, the first write (a 512-byte O_DIRECT pwrite, tools/mkfs_mxfs.c write_sectors called with 512 bytes from format_journal); both mounts then refused 'Invalid superblock magic number'. Nothing is written before the failure. The 512-byte assumption is everywhere (scout, raw file:line): mkfs writes XFS sectsize 512 (tools/mkfs_mxfs.c:97, :1004) and log sectsize 0; MXFS_JOURNAL_SECTOR_SIZE 512 (dlm/journal.h:57); the per-sector SCSI COMPARE AND WRITE sends LBA = byte offset / 512, 1 block, 1024 bytes (pal/linux/kern.c:8406-8421, caw_manual_bio :8221, :8242) with no block-size check; only the whole-page swap checks bdev_logical_block_size == 512 (:8683); dlm/mount.c:1913 a 1024-byte CAW buffer; MXFS_TAUTH_ROOT_BYTES 512; tools/mxfs_admin.c:205 refuses sectsize != 512. The rig has only ever served 512-byte LUNs (scripts/scst_setup.sh:54 blocksize=512). UNEXPLAINED: a tester (gyptazy.com blog, 0.90.130, fdisk 'Sector size (logical/physical): 4096 bytes / 16384 bytes') reported mkfs.mxfs 'formatted successfully' through every region; a 512-byte O_DIRECT write on a device whose kernel logical block size is 4096 cannot succeed, and their mount output is not shown.",
-      "next": "1. Fail closed with the cause: mkfs.mxfs (BLKSSZGET) and the mount (bdev_logical_block_size of the device) refuse a logical block size other than 512 with a message naming it, so no layout written for 512 can ever be mounted on a 4K-native device. 2. Learn what the tester's kernel saw: blockdev --getss and --getpbsz on their /dev/sdc and their mount output. 3. 4K-native support, design written first: the format's sector size, the journal sector, the disklock and ledger units and the CAW unit all taken from the device's logical block size; then a rig LUN of each size in the release matrix (scripts/scst_setup.sh blocksize) so both are verified. ===== 2026-10-19 (session 1c324e00) OWNER DECISION: 4K-native support is NOT in 0.90.131 (it ships refusing 4K-native LUNs at format, as 0.90.130 does); it is the work of 0.90.132. Approved: write the 4K-native design first (docs/, before any patch): sector size from the device at format; every structure two nodes write independently (disklock slots, journal slot headers, recovery manifests, authority-ledger roots, PR registrant and bootstrap records) in a logical block of its own, never a shared 4 KiB block (a read-modify-write of a shared block between nodes is corruption); CAW LBA, block count and buffers in device logical blocks (pal/linux/kern.c caw_manual_bio and callers); tools (chk_mxfs, resize_mxfs, mxfs_admin, caw_verify); 512-byte devices keep today's layout. First deliverable of 0.90.132: mkfs and mount refuse a logical block size other than 512 with a message naming it. Then a 4096-byte rig LUN class (scripts/scst_setup.sh blocksize) in the release matrix.",
+      "next": "1. Fail closed with the cause: mkfs.mxfs (BLKSSZGET) and the mount (bdev_logical_block_size of the device) refuse a logical block size other than 512 with a message naming it, so no layout written for 512 can ever be mounted on a 4K-native device. 2. Learn what the tester's kernel saw: blockdev --getss and --getpbsz on their /dev/sdc and their mount output. 3. 4K-native support, design written first: the format's sector size, the journal sector, the disklock and ledger units and the CAW unit all taken from the device's logical block size; then a rig LUN of each size in the release matrix (scripts/scst_setup.sh blocksize) so both are verified. ===== 2026-10-19 (session 1c324e00) OWNER DECISION: 4K-native support is NOT in 0.90.131 (it ships refusing 4K-native LUNs at format, as 0.90.130 does); it is the work of 0.90.132. Approved: write the 4K-native design first (docs/, before any patch): sector size from the device at format; every structure two nodes write independently (disklock slots, journal slot headers, recovery manifests, authority-ledger roots, PR registrant and bootstrap records) in a logical block of its own, never a shared 4 KiB block (a read-modify-write of a shared block between nodes is corruption); CAW LBA, block count and buffers in device logical blocks (pal/linux/kern.c caw_manual_bio and callers); tools (chk_mxfs, resize_mxfs, mxfs_admin, caw_verify); 512-byte devices keep today's layout. First deliverable of 0.90.132: mkfs and mount refuse a logical block size other than 512 with a message naming it. Then a 4096-byte rig LUN class (scripts/scst_setup.sh blocksize) in the release matrix. ===== 2026-10-24, for the release's final layout check (a 512-byte volume byte for byte identical to the one 0.90.132's mkfs writes): 0.90.132's mkfs takes its timestamps from time(NULL) and ignores SOURCE_DATE_EPOCH (honoured from 0.90.134, tools/mkfs_mxfs.c:309-320, :2130), while tests/mkfs_layout_identity.py image pins SOURCE_DATE_EPOCH=1700000000 (:30) for every binary, so 0.90.132's image carries the second it ran in and can never match. Next attempt: let the image subcommand take its epoch from the environment (e.g. MKFS_IDENTITY_EPOCH, default 1700000000), format with 0.90.132's packaged mkfs.mxfs (from the v0.90.132 release .deb) and read the second it wrote from its superblock or its IMAGE.mkfs.txt, then format with the candidate's mkfs at that epoch and compare; a format that crossed a second boundary is repeated. Control: the same comparison with a byte flipped (the test's own).",
       "impact": "noblock",
       "impact_why": "Measured on a 4096-byte-logical LUN: 0.90.130 and 0.90.131 mkfs refuse at the first write (nothing written) and the mount refuses the unformatted device; no data written, no node stopped. A functional gap, not a crossing of the integrity or stability bar.",
-      "updated": "2026-10-19"
+      "updated": "2026-10-24"
     },
     {
       "id": "D-MKFS-PRINTS-GIB-LABELLED-GB",
@@ -7071,366 +7071,6 @@
       "updated": "2026-10-23"
     },
     {
-      "id": "D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP",
-      "severity": "minor",
-      "nodes": 2,
-      "config": "net/mesh/drbd",
-      "opened": "2026-10-23",
-      "summary": "MXFS_NODES carries two meanings in the tree: run.sh hands each row a node count (run.sh:1612, :1710, :1985) and laps such as tests/path_abort_kmsg_lap.sh:44,50 read it as one, while scripts/drbd_rig.sh:95,153-155 (and tests/drbd_write_bound_arm.sh:31-33) read it as the pair's node names. A lane queue that exports the count for the first kind makes drbd_rig.sh take '2' as a node name, form group nodes-2 with one node, and refuse 'DRBD dual-primary is exactly two', so every DRBD lap in that lane ABORTs with no exposure.",
-      "evidence": "Lane tests/evidence/lanes/g2_a16_20261024T010135Z (queue tests/evidence/lanes/queue_g2_next.txt, which exports MXFS_NODES=2 for the g2 pair), candidate 0.90.134 attempt frozen 2026-10-24T01:00Z, build 9C7B7B00C5DE523F1D378C8: step2 'scripts/drbd_rig.sh up' rc=2 'drbd_rig: group nodes-2 has 1 nodes; DRBD dual-primary is exactly two'. Step3 control b20261023-d08fc5 (lap:drbd_rig_tag): 10 of 10 laps FAIL rc=2 exposure=0, step3.log 'LAP drbd_rig_tag ABORT: not exposed (/dev/drbd0 on test1 is /dev/drbd0, minor=0, backing disk=)', the DRBD pair never having been brought up. Step6 control b20261023-8d5f78 (lap:third_vote): 10 of 10 FAIL rc=2 exposure=0, step6.log:5 'LAP third_vote ABORT: drbd_rig.sh up rc=2: drbd_rig: group nodes-2 has 1 nodes'. Both controls closed with 0 exposed laps and bound nothing; the step4 and step7 verifications were refused (no measured failure). ===== 2026-10-24: the ten laps of control b20261023-d08fc5 (lap:drbd_rig_tag at 2/net/mesh/drbd, 01:02:06Z-01:02:15Z) are this record's: lane tests/evidence/lanes/g2_a16_20261024T010135Z exported MXFS_NODES=2 (summary.log:7), its 'scripts/drbd_rig.sh up' step ended rc=2 in 0 s (:11-12), and every lap aborted 'LAP drbd_rig_tag ABORT: not exposed (/dev/drbd0 on test1 is '/dev/drbd0', minor='0', backing disk='' ...' (tests/evidence/drbd_rig/criteria.runs.jsonl, batch b20261023-d08fc5; lap logs tests/evidence/batch_laps/b20261023-d08fc5/). Moved here from D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN per review data/reviews/P20261023-e7a30c.md.",
-      "next": "Next attempt: give drbd_rig.sh's pair its own variable (or refuse a value that is not two node names, naming the clash), with a switch for the control; a lap that runs drbd_rig.sh up with MXFS_NODES=2 exported must form the g2 pair. Until then a lane that runs DRBD laps must not export MXFS_NODES; rerun the two DRBD controls and verifications from a queue without it. ===== 2026-10-24: fix built in the sibling tree /home/steve/src/mxfs-a17 for the next attempt: scripts/drbd_rig.sh takes a bare number in MXFS_NODES as run.sh's node count and selects the group (MXFS_GROUP, default g2); DRBD_RIG_NODES_COUNT=0 takes it as a node name, as before: the control. New lap tests/drbd_nodes_count_lap.sh (MXFS_NODES=2 MXFS_GROUP=g2 scripts/drbd_rig.sh status; PASS when the status names test1 and test2, FAIL on the refusal; bound 25 s). Precheck from the sibling with g2 up (module 9C7B7B00C5DE523F1D378C8): fix in, tests/evidence/20261024T010753Z_drbdnodes_pre_on1 (in mxfs-a17) 'LAP drbd_nodes_count PASS label=pre_on1: the status names the g2 pair: test1 test2', 11 s; control DRBD_RIG_NODES_COUNT=0, 20261024T010804Z_drbdnodes_pre_off1 'LAP drbd_nodes_count FAIL ... drbd_rig: group nodes-2 has 1 nodes; DRBD dual-primary is exactly two', 0 s. Next: merge into the main tree before the next freeze, control batch (10 laps, knob DRBD_RIG_NODES_COUNT=0, bound 25 s, probe '^EXPOSED: MXFS_NODES=2'), verification on the frozen attempt, remove --fixed. ===== 2026-10-24: verify P20261023-452ba2 REJECTED (data/reviews/P20261023-452ba2.md): the batches' laps passed (6 of 6, b20261023-447ece) but the fix covers scripts/drbd_rig.sh only, while tests/drbd_write_bound_arm.sh:31-33 and :60 still read MXFS_NODES as names ('export MXFS_NODES=${MXFS_NODES:-test3 test4}', 'read -r -a NODES <<<\"$MXFS_NODES\"'), unchanged in the frozen attempt. Next, on the next attempt: give drbd_write_bound_arm.sh the same count handling under the same switch, extend tests/drbd_nodes_count_lap.sh to run that script's node resolution with MXFS_NODES=2, then a new control and verification.",
-      "reproducer": "MXFS_NODES=2 scripts/drbd_rig.sh up (rc=2, 'group nodes-2 has 1 nodes')",
-      "cells": [
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:third_vote",
-          "iso": "2026-10-24T01:02:20Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:third_vote",
-          "iso": "2026-10-24T01:02:21Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:third_vote",
-          "iso": "2026-10-24T01:02:22Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:third_vote",
-          "iso": "2026-10-24T01:02:23Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:third_vote",
-          "iso": "2026-10-24T01:02:24Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:third_vote",
-          "iso": "2026-10-24T01:02:25Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:third_vote",
-          "iso": "2026-10-24T01:02:26Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:third_vote",
-          "iso": "2026-10-24T01:02:27Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:third_vote",
-          "iso": "2026-10-24T01:02:28Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:third_vote",
-          "iso": "2026-10-24T01:02:29Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:06Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:07Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:08Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:09Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:10Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:11Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:12Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:13Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:14Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_rig_tag",
-          "iso": "2026-10-24T01:02:15Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count",
-          "iso": "2026-10-24T04:15:12Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count",
-          "iso": "2026-10-24T04:15:11Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count",
-          "iso": "2026-10-24T04:15:10Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count",
-          "iso": "2026-10-24T04:15:09Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count",
-          "iso": "2026-10-24T04:15:08Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count",
-          "iso": "2026-10-24T04:15:07Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count",
-          "iso": "2026-10-24T04:15:06Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count",
-          "iso": "2026-10-24T04:15:05Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count",
-          "iso": "2026-10-24T04:15:04Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count",
-          "iso": "2026-10-24T04:15:03Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count2",
-          "iso": "2026-10-24T06:40:03Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count2",
-          "iso": "2026-10-24T06:40:02Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count2",
-          "iso": "2026-10-24T06:40:01Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count2",
-          "iso": "2026-10-24T06:40:00Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count2",
-          "iso": "2026-10-24T06:39:59Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count2",
-          "iso": "2026-10-24T06:39:58Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count2",
-          "iso": "2026-10-24T06:39:57Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count2",
-          "iso": "2026-10-24T06:39:56Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count2",
-          "iso": "2026-10-24T06:39:55Z"
-        },
-        {
-          "config": "2/net/mesh/drbd",
-          "row": "lap:drbd_nodes_count2",
-          "iso": "2026-10-24T06:39:54Z"
-        }
-      ],
-      "updated": "2026-10-24",
-      "batches": [
-        {
-          "id": "b20261023-2ea23d",
-          "kind": "control",
-          "row": "lap:drbd_nodes_count",
-          "config": "2/net/mesh/drbd",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: MXFS_NODES=",
-          "candidate": "",
-          "build": "B947A20F3C2FE3A67ABF6F3",
-          "variant": "DRBD_RIG_NODES_COUNT=0 (scripts/drbd_rig.sh takes a bare number in MXFS_NODES as a node name, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: a lane's MXFS_NODES=2 names a one-node group and drbd_rig.sh refuses the pair"
-        },
-        {
-          "id": "b20261023-447ece",
-          "kind": "verify",
-          "row": "lap:drbd_nodes_count",
-          "config": "2/net/mesh/drbd",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: MXFS_NODES=",
-          "candidate": "0.90.134",
-          "build": "B947A20F3C2FE3A67ABF6F3",
-          "variant": "",
-          "state": "open",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:drbd_nodes_count",
-            "config": "2/net/mesh/drbd",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-2ea23d",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "DRBD_RIG_NODES_COUNT=0 (scripts/drbd_rig.sh takes a bare number in MXFS_NODES as a node name, as before the fix)",
-            "builds": [
-              "B947A20F3C2FE3A67ABF6F3"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        },
-        {
-          "id": "b20261024-8420d4",
-          "kind": "control",
-          "row": "lap:drbd_nodes_count2",
-          "config": "2/net/mesh/drbd",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: MXFS_NODES=",
-          "candidate": "",
-          "build": "BE3695D2590A65F742F9816",
-          "variant": "DRBD_RIG_NODES_COUNT=0 (scripts/drbd_rig.sh and tests/drbd_write_bound_arm.sh take a bare number in MXFS_NODES as a node name, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "why": "the fix taken out: a lane's MXFS_NODES=2 names a one-node pair in drbd_rig.sh and in drbd_write_bound_arm.sh"
-        },
-        {
-          "id": "b20261024-8ef8c9",
-          "kind": "verify",
-          "row": "lap:drbd_nodes_count2",
-          "config": "2/net/mesh/drbd",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: MXFS_NODES=",
-          "candidate": "0.90.134",
-          "build": "BE3695D2590A65F742F9816",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "rate": {
-            "row": "lap:drbd_nodes_count2",
-            "config": "2/net/mesh/drbd",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261024-8420d4",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "DRBD_RIG_NODES_COUNT=0 (scripts/drbd_rig.sh and tests/drbd_write_bound_arm.sh take a bare number in MXFS_NODES as a node name, as before the fix)",
-            "builds": [
-              "BE3695D2590A65F742F9816"
-            ],
-            "date": "2026-10-24"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:drbd_nodes_count",
-          "config": "2/net/mesh/drbd",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-2ea23d",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "DRBD_RIG_NODES_COUNT=0 (scripts/drbd_rig.sh takes a bare number in MXFS_NODES as a node name, as before the fix)",
-          "builds": [
-            "B947A20F3C2FE3A67ABF6F3"
-          ],
-          "date": "2026-10-23"
-        },
-        {
-          "row": "lap:drbd_nodes_count2",
-          "config": "2/net/mesh/drbd",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261024-8420d4",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "DRBD_RIG_NODES_COUNT=0 (scripts/drbd_rig.sh and tests/drbd_write_bound_arm.sh take a bare number in MXFS_NODES as a node name, as before the fix)",
-          "builds": [
-            "BE3695D2590A65F742F9816"
-          ],
-          "date": "2026-10-24"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/net/mesh/drbd",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-24T06:38:23Z",
-          "build": "BE3695D2590A65F742F9816",
-          "batch": "b20261024-8ef8c9",
-          "approval": "P20261024-289caf",
-          "date": "2026-10-24"
-        }
-      ]
-    },
-    {
       "id": "D-FSX-ROW-WORK-DIRECTORY-LEFT-ON-THE-MXFS-MOUNT-AFTER-ITS-EXIT-TRAP-RAN-RM-RF",
       "severity": "major",
       "nodes": 1,
@@ -7808,7 +7448,7 @@
       "opened": "2026-10-23",
       "summary": "tests/release_step_cell_lap.py drives its removal and named-removal dispositions through RECORD = D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED (:78), a record that has since been removed from the live queue, and every scratch tree is a copy of that queue (scratch_tree, :117-120); name() looks the record up with next() (:172), which raises StopIteration in the probe, and name() turns the rc=1 into a RuntimeError (:176-177) that main() does not catch, so the lap dies with a traceback before printing STEP_CELL_LAP PASS or FAIL. The lap can no longer re-measure the release-step parse it was written for.",
       "evidence": "2026-10-24, on candidate 0.90.134 attempt frozen 2026-10-24T04:13:43Z: 'timeout 30 python3 tests/release_step_cell_lap.py' exited 1 after the infra, amend and removal dispositions of 1/any:release:boards:2026-10-21T19:29:49Z, ending 'RuntimeError: name rc=1: Traceback ... File \"<string>\", line 4, in <module> StopIteration' (tests/evidence/day_stamp_release_step/release_step_cell_lap_20261024.out). It was run to re-measure release-step stamps after the day-stamp fix in tools/defects.py parse_cell (:783-785).",
-      "next": "Give the lap a record of its own in each scratch tree (added through the scratch queue's own load and save, as unname() edits it) instead of naming a live one, behind a switch that names the live record as before (the control: it dies as above while the live queue lacks the record); then a control batch, a verification sized from it, remove --fixed. The fix changes a frozen file, so it lands on the next attempt.",
+      "next": "Give the lap a record of its own in each scratch tree (added through the scratch queue's own load and save, as unname() edits it) instead of naming a live one, behind a switch that names the live record as before (the control: it dies as above while the live queue lacks the record); then a control batch, a verification sized from it, remove --fixed. The fix changes a frozen file, so it lands on the next attempt. ===== 2026-10-24: control b20261024-b2d2ef (MXFS_STEP_LAP_OWN_RECORD=0, 10 of 10 FAIL, Traceback at name()) and verification b20261024-f5a69d (6 of 6 PASS, exposure=12 each) on attempt 2026-10-24T06:38:23Z; the verify was approved and applied (P20261024-c3f747, data/reviews/P20261024-c3f747.md). Not yet removable: the one switch takes out two parts at once (tests/release_step_cell_lap.py:323-325): own_record (the record of its own, this defect's fix) and unsettle (clearing the live ledger's annotations of the lap's runs in each scratch tree, without which the scratch gate would no longer list a run the live queue has since settled). The control crashed at the first key, so it isolates only the record lookup. Next attempt: a second switch for unsettle alone (MXFS_STEP_LAP_UNSETTLE=0), a control with own_record on and unsettle off (expected: 'ABORT: the scratch gate does not list <run> before <how>' on a run the live ledger settles), a verification sized from it, then propose remove --fixed citing both controls.",
       "reproducer": "timeout 30 python3 tests/release_step_cell_lap.py on any tree whose queue lacks D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED",
       "batches": [
         {
@@ -7839,7 +7479,7 @@
           "candidate": "0.90.134",
           "build": "BE3695D2590A65F742F9816",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -7930,6 +7570,18 @@
           "config": "2/disk/caw/direct",
           "row": "lap:release_step_cell",
           "iso": "2026-10-24T06:38:42Z"
+        }
+      ],
+      "verified_at": [
+        {
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T06:38:23Z",
+          "build": "BE3695D2590A65F742F9816",
+          "batch": "b20261024-f5a69d",
+          "approval": "P20261024-c3f747",
+          "date": "2026-10-24"
         }
       ]
     },

@@ -7025,14 +7025,15 @@
         "tests/release_step_cell_lap.py",
         "tests/evidence/candidates/0.90.134_20261024T063823Z.files.json"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-24",
       "review": {
         "file": "data/reviews/P20261024-c3f747.md",
         "sha256": "41bb041ece11aa488e31d8136ce6976cff9fd4d4f300f6a28ab681481df86581",
         "verdict": "approved",
         "date": "2026-10-24"
-      }
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-f9ae18",
@@ -7051,6 +7052,32 @@
         "tests/drbd_nodes_count_lap.sh",
         "scripts/drbd_rig.sh",
         "tests/drbd_write_bound_arm.sh"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-f9ae18.md",
+        "sha256": "3a480bcf1f771b0b0f05a3a09e6a769ea96e81f42911c5177cd87cd7bac44e60",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-ea7043",
+      "kind": "verify",
+      "record": "D-DEFECTS-PARSE-CELL-REFUSES-A-DAY-STAMP-SO-MIGRATED-RUNS-CANNOT-BE-NAMED",
+      "change": {
+        "batch": "b20261024-f44959"
+      },
+      "argument": "Verification b20261024-f44959 (lap:cell_day_stamp3, tests/cell_day_stamp_lap.py extended with the parts review P20261023-499ec5 asked for, recorded at 2/disk/caw/direct; host-only, because the defect is tools/defects.py parse_cell on the lab host, no VM involved), candidate 0.90.134 attempt frozen 2026-10-24T06:38:23Z, was declared before its first lap and sized from control b20261024-456074 on the same frozen tree. Control (MXFS_CELL_DAY_STAMP=0, parse_cell's anchored full-stamp pattern as before the fix): 10 of 10 FAIL 'FAIL: 2 of 3 parts': update --cell of the day-stamped run 32/net/mesh/direct:prep_cluster:2026-08-28 refused rc=1 'a board run is CONFIG:ROW:ISO', and the same run's --drop-cell refused rc=1, while the release step's run 1/any:release:boards:2026-10-21T19:29:49Z is named rc=0 and leaves the gate (the release-step form works with the switch off as on, as the review asked to show). Fix on: 6 planned, 6 PASS, 0 FAIL, each exposure=1 ('EXPOSED: the unfiltered gate lists ... a run stamped with a date alone') and 'PASS: a day-stamped run named and dropped, and a release step's run named, each settling the gate as the command says'. The record's cells are the twenty control laps of b20261023-4674ab and b20261024-456074, all at 2/disk/caw/direct.",
+      "evidence": [
+        "tests/evidence/lanes/host_w12_20261024T063834Z/step3.log",
+        "tests/evidence/lanes/host_w12_20261024T063834Z/step4.log",
+        "tests/evidence/batch_laps/b20261024-456074",
+        "tests/evidence/batch_laps/b20261024-f44959",
+        "tests/cell_day_stamp_lap.py",
+        "data/reviews/P20261023-499ec5.md"
       ],
       "state": "pending",
       "created": "2026-10-24"
