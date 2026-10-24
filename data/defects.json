@@ -6312,6 +6312,23 @@
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a path down at mount is never registered under the 8 s lease, and its writes are refused once the other path fails"
+        },
+        {
+          "id": "b20261024-cefbf5",
+          "kind": "control",
+          "row": "path_mount_degraded",
+          "config": "2/disk/caw/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "PF-LATE-B-DOWN",
+          "candidate": "",
+          "build": "BE3695D2590A65F742F9816",
+          "variant": "pr_fill_bounded=0 (MXFS_EXTRA_MODARGS: the late-path fill runs only with 15 s of the authority lease left, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a path down at mount is never registered under the 8 s lease, and its writes are refused once the other path fails"
         }
       ],
       "rates": [
@@ -7114,266 +7131,6 @@
       ]
     },
     {
-      "id": "D-DEFECTS-PARSE-CELL-REFUSES-A-DAY-STAMP-SO-MIGRATED-RUNS-CANNOT-BE-NAMED",
-      "severity": "minor",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-23",
-      "summary": "tools/defects.py parse_cell accepts a run only with a full CONFIG:ROW:YYYY-MM-DDTHH:MM:SSZ stamp, but runs migrated into the ledger on 2026-10-21 carry day-only stamps, so a record cannot name them and they can leave the incident list only by a reviewed disposition.",
-      "evidence": "tools/defects.py:775 'match = re.fullmatch(r\"([^:]+):(.+):(\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\dZ)\", text.strip())' (taken while tools/criteria.py:112 RELEASE_STEP_SETTLE is on, the default). Measured 2026-10-23: 'tools/defects.py add ... --cell 32/disk/caw/mpath:prep_cluster:2026-09-10' exited 1 with \"defects: '32/disk/caw/mpath:prep_cluster:2026-09-10': a board run is CONFIG:ROW:ISO, e.g. 4/net/mesh/direct:alloc_witness:2026-10-20T07:38:35Z\". The runs it shuts out, both listed by 'tools/criteria.py incidents': data/criteria.runs.jsonl:646 (32/disk/caw/mpath prep_cluster, \"iso\": \"2026-09-10\", \"migrated\": \"2026-10-21\") and :349 (32/net/mesh/direct prep_cluster, \"iso\": \"2026-08-28\", \"migrated\": \"2026-10-21\"). With the setting off the parser splits at the first two colons (:778-780), which names a day stamp but splits a release step's row wrongly; neither form takes both.",
-      "next": "Let parse_cell's anchored form accept the stamp shapes the ledger holds (a day-only YYYY-MM-DD as well as the full time), behind a switch that restores today's pattern for the control; lap: add and drop a cell on a scratch copy of the queue for one day-stamped run and one release step's run, with the switch on and off. Then name D-32CAWMPATH-PREP-CLUSTER-FAILED-AFTER-177S-NO-EVIDENCE-RETAINED's and D-32NETMESH-PREP-CLUSTER-FAILED-AFTER-9S-NO-EVIDENCE-RETAINED's runs in those records. ===== 2026-10-24: verify P20261023-7b2508 applied (b20261023-ab31a2, 6 of 6 at 2/disk/caw/direct on attempt 2026-10-24T04:13:43Z); removal P20261023-499ec5 REJECTED (data/reviews/P20261023-499ec5.md): no lap named a release step's run (1/any:release:boards:2026-10-21T19:29:49Z) through update --cell with the switch on and off, and no lap dropped a cell, as this record's next step asks. tests/release_step_cell_lap.py could not measure it: D-RELEASE-STEP-CELL-LAP-NAMES-A-REMOVED-RECORD-AND-DIES-WITHOUT-A-VERDICT. Next, on the next attempt: extend tests/cell_day_stamp_lap.py (its scratch queue's own record) with a release-step run's update --cell and a day-stamped --drop-cell, each with MXFS_CELL_DAY_STAMP on and off; a new control and verification on that lap; then the removal.",
-      "batches": [
-        {
-          "id": "b20261023-4674ab",
-          "kind": "control",
-          "row": "lap:cell_day_stamp",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: ",
-          "candidate": "",
-          "build": "B947A20F3C2FE3A67ABF6F3",
-          "variant": "MXFS_CELL_DAY_STAMP=0 (tools/defects.py parse_cell takes only a full stamp, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "why": "the fix taken out: update --cell refuses a run stamped with a date alone"
-        },
-        {
-          "id": "b20261023-ab31a2",
-          "kind": "verify",
-          "row": "lap:cell_day_stamp",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "B947A20F3C2FE3A67ABF6F3",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-23",
-          "rate": {
-            "row": "lap:cell_day_stamp",
-            "config": "2/disk/caw/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261023-4674ab",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_CELL_DAY_STAMP=0 (tools/defects.py parse_cell takes only a full stamp, as before the fix)",
-            "builds": [
-              "B947A20F3C2FE3A67ABF6F3"
-            ],
-            "date": "2026-10-23"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        },
-        {
-          "id": "b20261024-456074",
-          "kind": "control",
-          "row": "lap:cell_day_stamp3",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^EXPOSED: ",
-          "candidate": "",
-          "build": "BE3695D2590A65F742F9816",
-          "variant": "MXFS_CELL_DAY_STAMP=0 (tools/defects.py parse_cell takes only a full stamp, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "why": "the fix taken out: update --cell and --drop-cell refuse a run stamped with a date alone"
-        },
-        {
-          "id": "b20261024-f44959",
-          "kind": "verify",
-          "row": "lap:cell_day_stamp3",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^EXPOSED: ",
-          "candidate": "0.90.134",
-          "build": "BE3695D2590A65F742F9816",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "rate": {
-            "row": "lap:cell_day_stamp3",
-            "config": "2/disk/caw/direct",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261024-456074",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MXFS_CELL_DAY_STAMP=0 (tools/defects.py parse_cell takes only a full stamp, as before the fix)",
-            "builds": [
-              "BE3695D2590A65F742F9816"
-            ],
-            "date": "2026-10-24"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "updated": "2026-10-24",
-      "rates": [
-        {
-          "row": "lap:cell_day_stamp",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261023-4674ab",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_CELL_DAY_STAMP=0 (tools/defects.py parse_cell takes only a full stamp, as before the fix)",
-          "builds": [
-            "B947A20F3C2FE3A67ABF6F3"
-          ],
-          "date": "2026-10-23"
-        },
-        {
-          "row": "lap:cell_day_stamp3",
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261024-456074",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MXFS_CELL_DAY_STAMP=0 (tools/defects.py parse_cell takes only a full stamp, as before the fix)",
-          "builds": [
-            "BE3695D2590A65F742F9816"
-          ],
-          "date": "2026-10-24"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp",
-          "iso": "2026-10-24T04:15:14Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp",
-          "iso": "2026-10-24T04:15:13Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp",
-          "iso": "2026-10-24T04:15:11Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp",
-          "iso": "2026-10-24T04:15:10Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp",
-          "iso": "2026-10-24T04:15:09Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp",
-          "iso": "2026-10-24T04:15:08Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp",
-          "iso": "2026-10-24T04:15:06Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp",
-          "iso": "2026-10-24T04:15:05Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp",
-          "iso": "2026-10-24T04:15:04Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp",
-          "iso": "2026-10-24T04:15:03Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp3",
-          "iso": "2026-10-24T06:42:49Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp3",
-          "iso": "2026-10-24T06:42:47Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp3",
-          "iso": "2026-10-24T06:42:44Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp3",
-          "iso": "2026-10-24T06:42:41Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp3",
-          "iso": "2026-10-24T06:42:38Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp3",
-          "iso": "2026-10-24T06:42:36Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp3",
-          "iso": "2026-10-24T06:42:33Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp3",
-          "iso": "2026-10-24T06:42:31Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp3",
-          "iso": "2026-10-24T06:42:28Z"
-        },
-        {
-          "config": "2/disk/caw/direct",
-          "row": "lap:cell_day_stamp3",
-          "iso": "2026-10-24T06:42:25Z"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/disk/caw/direct",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-24T06:38:23Z",
-          "build": "BE3695D2590A65F742F9816",
-          "batch": "b20261024-f44959",
-          "approval": "P20261024-ea7043",
-          "date": "2026-10-24"
-        }
-      ],
-      "reproducer": "MXFS_CELL_DAY_STAMP=0 tests/cell_day_stamp_lap.py (on any tree: update --cell and --drop-cell of 32/net/mesh/direct:prep_cluster:2026-08-28 exit 1 'a board run is CONFIG:ROW:ISO')"
-    },
-    {
       "id": "D-32CAWMPATH-PREP-CLUSTER-FAILED-AFTER-177S-NO-EVIDENCE-RETAINED",
       "severity": "high",
       "nodes": 1,
@@ -7381,7 +7138,15 @@
       "opened": "2026-10-23",
       "summary": "A 32/disk/caw/mpath cluster prep failed after 177 s (ledger stamp 2026-09-10); the ledger keeps only 'prep failed', and no log, node kernel log or run id of it survives, so what failed is not known.",
       "evidence": "data/criteria.runs.jsonl:646 {\"build\": null, \"config\": \"32/disk/caw/mpath\", \"elapsed_s\": 177, \"iso\": \"2026-09-10\", \"kind\": \"run\", \"measured\": \"elapsed=177s\", \"migrated\": \"2026-10-21\", \"outcome\": \"INCOMPLETE\", \"reason\": \"prep failed\", \"row\": \"prep_cluster\", \"status\": \"FAIL\"} (the same line also sits in tests/evidence/drbd_rig/criteria.runs.jsonl:1055 and data/criteria.pvephys.runs.jsonl:535). The previous prep there passed: data/criteria.runs.jsonl:645 '2026-09-04T14:41:33Z ... elapsed=104s (fresh prep)'. Searched with no hit: CHANGELOG.md for 'prep_cluster:2026-09-10'; tests/evidence (now /src/mxfs-evidence) for board_32* and for files dated 2026-09-10; session transcripts (the oldest kept is from 2026-09-26). The run is not named as a cell: tools/defects.py refuses its day-only stamp (D-DEFECTS-PARSE-CELL-REFUSES-A-DAY-STAMP-SO-MIGRATED-RUNS-CANNOT-BE-NAMED).",
-      "next": "Once parse_cell takes a day stamp: tools/defects.py update <this id> --cell 32/disk/caw/mpath:prep_cluster:2026-09-10. A prep that fails 177 s in has passed mkfs and is in mounting or formation; run run.sh prep_cluster at 32/disk/caw/mpath (or the largest disk/caw/mpath cluster the rig forms) on the current candidate under its derived budget, keeping run.sh's prep output and every node's kernel log, until a prep fails or a measured number pass."
+      "next": "Once parse_cell takes a day stamp: tools/defects.py update <this id> --cell 32/disk/caw/mpath:prep_cluster:2026-09-10. A prep that fails 177 s in has passed mkfs and is in mounting or formation; run run.sh prep_cluster at 32/disk/caw/mpath (or the largest disk/caw/mpath cluster the rig forms) on the current candidate under its derived budget, keeping run.sh's prep output and every node's kernel log, until a prep fails or a measured number pass.",
+      "cells": [
+        {
+          "config": "32/disk/caw/mpath",
+          "row": "prep_cluster",
+          "iso": "2026-09-10"
+        }
+      ],
+      "updated": "2026-10-24"
     },
     {
       "id": "D-32NETMESH-PREP-CLUSTER-FAILED-AFTER-9S-NO-EVIDENCE-RETAINED",
@@ -7391,7 +7156,15 @@
       "opened": "2026-10-23",
       "summary": "A 32/net/mesh/direct cluster prep failed after 9 s (ledger stamp 2026-08-28); the ledger keeps only 'prep failed', and no log, node kernel log or run id of it survives, so what failed is not known.",
       "evidence": "data/criteria.runs.jsonl:349 {\"build\": null, \"config\": \"32/net/mesh/direct\", \"elapsed_s\": 9, \"iso\": \"2026-08-28\", \"kind\": \"run\", \"measured\": \"elapsed=9s\", \"migrated\": \"2026-10-21\", \"outcome\": \"INCOMPLETE\", \"reason\": \"prep failed\", \"row\": \"prep_cluster\", \"status\": \"FAIL\"} (the same line also sits in tests/evidence/drbd_rig/criteria.runs.jsonl:896 and data/criteria.pvephys.runs.jsonl:416). The previous prep there: data/criteria.runs.jsonl:304 '2026-07-28T21:51:13Z ... skipped (marker matched 32/net/mesh/direct)'. Searched with no hit: CHANGELOG.md for 'prep_cluster:2026-08-28'; tests/evidence (now /src/mxfs-evidence) for board_32* and for files dated 2026-08-28; session transcripts (the oldest kept is from 2026-09-26). The run is not named as a cell: tools/defects.py refuses its day-only stamp (D-DEFECTS-PARSE-CELL-REFUSES-A-DAY-STAMP-SO-MIGRATED-RUNS-CANNOT-BE-NAMED).",
-      "next": "Once parse_cell takes a day stamp: tools/defects.py update <this id> --cell 32/net/mesh/direct:prep_cluster:2026-08-28. A prep that fails 9 s in stopped before or at mkfs (preflight, pool binding, module load, device resolution); run run.sh prep_cluster at 32/net/mesh/direct (or the largest net/mesh/direct cluster the rig forms) on the current candidate under its derived budget, keeping run.sh's prep output, until a prep fails or a measured number pass."
+      "next": "Once parse_cell takes a day stamp: tools/defects.py update <this id> --cell 32/net/mesh/direct:prep_cluster:2026-08-28. A prep that fails 9 s in stopped before or at mkfs (preflight, pool binding, module load, device resolution); run run.sh prep_cluster at 32/net/mesh/direct (or the largest net/mesh/direct cluster the rig forms) on the current candidate under its derived budget, keeping run.sh's prep output, until a prep fails or a measured number pass.",
+      "cells": [
+        {
+          "config": "32/net/mesh/direct",
+          "row": "prep_cluster",
+          "iso": "2026-08-28"
+        }
+      ],
+      "updated": "2026-10-24"
     },
     {
       "id": "D-8CAWMPATH-SURVIVOR-SHUTS-DOWN-ON-NOINO-EFI-WEDGE-DURING-PEER-FENCE",
