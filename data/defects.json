@@ -2533,6 +2533,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-bda0e1",
+          "kind": "control",
+          "row": "lap:lh_master",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the pre-fix harness's 8 candidates",
+          "candidate": "",
+          "build": "468F7F30C2E190B0244AF70",
+          "variant": "LH_SHARD_SELECT=0 (tests/live_holder_wait.sh makes eight candidates back to back and keeps them all, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: none of the eight candidates made back to back is remote-mastered on a formation that puts them all in one shard, and the harness aborts before measuring"
         }
       ],
       "rates": [
@@ -6244,6 +6261,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-1d2fde",
+          "kind": "control",
+          "row": "lap:peer_window",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "468F7F30C2E190B0244AF70",
+          "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out at 8 nodes on multipath: A on a 12 s window declares B, on 34 s, dead inside B's 30 s lease"
         }
       ],
       "rates": [
@@ -7630,7 +7664,26 @@
           "iso": "2026-10-24T02:00:35Z"
         }
       ],
-      "updated": "2026-10-24"
+      "updated": "2026-10-24",
+      "batches": [
+        {
+          "id": "b20261024-bd6103",
+          "kind": "control",
+          "row": "lap:noino_fence_efd_hold",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 16,
+          "probe": "^EXPOSED: S held an EFD",
+          "candidate": "",
+          "build": "468F7F30C2E190B0244AF70",
+          "variant": "noino_convoy_chain=0 (MXFS_EXTRA_MODARGS: mxfs_noino_freeze_is_convoy excuses only AG waits, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a node whose own extent-free chain holds the AIL minimum past the no-inode fence's stall budget shuts itself down"
+        }
+      ]
     },
     {
       "id": "D-IN-GATE-PREP-RUN-SH-WITHOUT-GROUP-REWRITES-THE-DEFAULT-MARKER",
