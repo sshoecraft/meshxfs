@@ -10400,6 +10400,59 @@
         "verdict": "rejected",
         "date": "2026-10-24"
       }
+    },
+    {
+      "id": "P20261024-00fcf0",
+      "kind": "verify",
+      "record": "D-NOINO-LAP-ABORT-LEAVES-ITS-LOADS-RUNNING-INTO-THE-NEXT-LAP",
+      "change": {
+        "batch": "b20261024-63b965"
+      },
+      "argument": "Verification b20261024-63b965 of lap:lap_load_stop at 2/disk/caw/direct on candidate 0.90.134 (module A7E90BC5313192108E35B80, attempt-22 freeze tests/evidence/candidates/0.90.134_20261024T204620Z.files.json), declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2c_a22_20261024T204638Z/step5.log), sized 6 from control b20261024-613417's 10 of 10 exposed FAILs on the same module and pair (tests/evidence/lanes/g2c_a22_20261024T204638Z/step4.log, LAP_LOAD_STOP=0). All 6 planned laps ran, each PASS with exposure (the lap's loads started on both nodes, each <node>_load_start.txt LOAD_STARTED, and the lap returned), none failed or was dropped: step5.log 'verify b20261024-63b965: 6 PASS, 0 FAIL of 6 planned'.",
+      "evidence": [
+        "tests/evidence/lanes/g2c_a22_20261024T204638Z/step5.log",
+        "tests/evidence/lanes/g2c_a22_20261024T204638Z/step4.log",
+        "tests/evidence/batch_laps/b20261024-63b965",
+        "tests/lap_load_end_lap.sh"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-00fcf0.md",
+        "sha256": "196cdf4db5d8692164d24c7180f58e50260c2de1254a7520c08d0aab3d1f990a",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-dca9fa",
+      "kind": "remove-fixed",
+      "record": "D-NOINO-LAP-ABORT-LEAVES-ITS-LOADS-RUNNING-INTO-THE-NEXT-LAP",
+      "change": {
+        "control": "b20261024-613417",
+        "fixon": "b20261024-63b965",
+        "cause": "tests/noino_fence_efd_hold_lap.sh touched its nodes' pathload stop files only on its normal path, so a lap that ABORTed after starting the loads exited with both loads still running, on through the next lap's forced prep. Its EXIT trap now calls tests/lib/lap_load.sh lap_load_end once the loads may have started (LOADS=1 before the starts), which touches each node's stop file and waits at most 45 s for that node's pathload of the lap's directory to exit, on every exit path."
+      },
+      "argument": "Control b20261024-613417 (LAP_LOAD_STOP=0: lap_load_end neither touches the stop files nor waits, as the lap's exit was before the fix) of tests/lap_load_end_lap.sh LAP=noino MODE=abort on the attempt-22 module A7E90BC5313192108E35B80 at 2/disk/caw/direct failed 10 of 10 exposed laps, each 'a load of the lap still ran on 2 node(s) ... 10 s after it returned' (tests/evidence/lanes/g2c_a22_20261024T204638Z/step4.log); verification b20261024-63b965 with the fix on, sized 6 from that rate on the same module and pair, passed 6 of 6 exposed laps, each 'no load of the lap ran and none of its /run paths was left on any node 10 s after it returned' (tests/evidence/lanes/g2c_a22_20261024T204638Z/step5.log). The lap forces the record's own shape (an ABORT after both loads started) through the record's own script, so exposure is the record's trigger, not a proxy; attempt 21's prechecks at the same site (tests/evidence/lanes/g2c_a21_20261024T192800Z, llp1 PASS, llp0 FAIL) showed the same split. The defect is in the rig lap's shell exit path, which has no lock-manager or attachment dependence, so the 2/disk/caw/direct measurement carries to the 2/net/mesh/direct lane it was seen on. The verify of the fix-on batch is proposed separately.",
+      "evidence": [
+        "tests/evidence/lanes/g2c_a22_20261024T204638Z/step4.log",
+        "tests/evidence/lanes/g2c_a22_20261024T204638Z/step5.log",
+        "tests/evidence/batch_laps/b20261024-613417",
+        "tests/evidence/batch_laps/b20261024-63b965",
+        "tests/lap_load_end_lap.sh",
+        "tests/lib/lap_load.sh",
+        "tests/noino_fence_efd_hold_lap.sh",
+        "tests/evidence/lanes/g2c_a21_20261024T192800Z"
+      ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-dca9fa.md",
+        "sha256": "87bfafc7acdbc2390b18a168a66ded01fcb1cb8aecd7da41c7fb87fe7369b842",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
