@@ -209,7 +209,10 @@ elif [ "$ARM" = handoff ]; then
     bad=$(grep -ac 'BUG:\|Oops\|CRITICAL ERROR\|New mgmt cmd while shutting down\|SCST_PR_ABORT_ALL failed' "$OUT/host_kmsg.txt")
     echo "host: handoff=$mov conflicts_for_X=$conf earlier_session_aborted=$earlier held_in_shutdown=$held bad=$bad  (host_kmsg.txt $(wc -l < "$OUT/host_kmsg.txt") lines)"
     grep -a 'PR: moving\|PR ABORT\|holding\|Reservation conflict' "$OUT/host_kmsg.txt" | cut -c1-220 | sed 's/^/  /'
-    [ "$held" -ge 1 ] && [ "$tw" -lt "$DELAY" ] || { echo "FAIL: not exercised — the old session was not held (held=$held) or the write came after the hold (+${tw} ms, hold ${DELAY} ms)"; fail=1; }
+    # the knob holds the old session twice, DELAY in SHUTDOWN and DELAY more with its refcount at
+    # zero and its tgt_devs still linked (the registrant still on them); the logout itself waits out
+    # the first (measured 8.4 s at DELAY=8000), so the write lands in the second, which is the gap
+    [ "$held" -ge 1 ] && [ "$tw" -lt $(( 2 * DELAY )) ] || { echo "FAIL: not exercised — the old session was not held (held=$held) or the write came after both holds (+${tw} ms, holds 2 x ${DELAY} ms)"; fail=1; }
     case "$w1" in *rc=0*) ;; *) echo "FAIL: X's write through its new path-1 session was refused although X is registered: $w1"; fail=1;; esac
     [ "$conf" = 0 ] || { echo "FAIL: the target refused $conf command(s) of the registered nexus after its re-login"; fail=1; }
     [ "$mov" -ge 1 ] || { echo "FAIL: the target logged no handoff of X's registrant to the new session"; fail=1; }

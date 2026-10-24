@@ -22,11 +22,14 @@
 #      and blocks are in V's AGs.  Each survivor then changes the mode of its
 #      share of them (file i to survivor i mod 3), so it holds those inodes'
 #      grants and V's go back.
-#   3. V runs a create-and-allocate load in its own directory, unsynced, so its
-#      journal holds changes to its AGs' headers; V is destroyed under it.
-#   4. At once, each survivor truncates its share to 0 (each file's extents
-#      freed in the file's AG under that AG's grant), timing every truncate on
-#      its own clock.
+#   3. V runs a create-and-allocate load in the files' own directory, unsynced,
+#      so its journal holds changes to the headers of the AG the files are in
+#      (a new directory's inodes go to another AG, and a file's near its
+#      directory's); V is destroyed under it.
+#   4. At once, each survivor truncates its share to 0, every file of it
+#      concurrently (each file's extents freed in the file's AG under that AG's
+#      grant), timing every truncate on its own clock.  Concurrent, so every
+#      truncate is issued while the replay runs, not only a survivor's first.
 #   5. The replayer is the survivor that logs P163-RECOVERY-COMPLETE for V's
 #      slot.  Its ladder entry, after the slice replay, is that line's time
 #      less its total= ms.  The AGs the replay wrote are the agno= of its
@@ -114,7 +117,7 @@ echo "STAGE geometry agblklog=$AGBLKLOG inopblog=$INOPBLOG agshift=$AGSHIFT"
 
 # ---- 2. V's files, and each survivor takes the grants of its share
 measure "$V" 60 "$OUT/V_files.txt" '^FILES_END$' "V's files" \
-    "mkdir -p $D/v $D/load || exit 1; i=0; while [ \$i -lt $NF ]; do f=$D/v/f\$i; fallocate -l ${NF_MB}M \$f || break; echo FILE \$i \$(stat -c %i \$f); i=\$((i+1)); done; sync -f $MNT; echo FILES_END"
+    "mkdir -p $D/v || exit 1; i=0; while [ \$i -lt $NF ]; do f=$D/v/f\$i; fallocate -l ${NF_MB}M \$f || break; echo FILE \$i \$(stat -c %i \$f); i=\$((i+1)); done; sync -f $MNT; echo FILES_END"
 [ "$(cnt "$OUT/V_files.txt" '^FILE ')" = "$NF" ] || abort files "V made $(cnt "$OUT/V_files.txt" '^FILE ') of $NF files"
 declare -A AGOF
 while read -r _ i ino; do AGOF[$i]=$(( ino >> AGSHIFT )); done < <(grep -a '^FILE ' "$OUT/V_files.txt")
@@ -130,9 +133,9 @@ done
 
 # ---- 3. V's unsynced load, and V's death
 measure "$V" 30 "$OUT/V_load.txt" '^LOAD_STARTED$' "V's load" \
-    "nohup setsid bash -c 'i=0; while :; do fallocate -l 1M $D/load/l\$i; i=\$((i+1)); done' </dev/null >/dev/null 2>&1 & echo LOAD_STARTED"
+    "nohup setsid bash -c 'i=0; while :; do fallocate -l 1M $D/v/l\$i; i=\$((i+1)); done' </dev/null >/dev/null 2>&1 & echo LOAD_STARTED"
 sleep 4
-measure "$V" 20 "$OUT/V_load_n.txt" '^LOADN=' "V's load is writing" "echo LOADN=\$(ls -f $D/load | grep -c '^l')"
+measure "$V" 20 "$OUT/V_load_n.txt" '^LOADN=' "V's load is writing" "echo LOADN=\$(ls -f $D/v | grep -c '^l')"
 ckge "V's load made files" "$(field "$OUT/V_load_n.txt" LOADN)" 10
 [ $fails = 0 ] || abort load "V's load did not run"
 virsh -c qemu:///system destroy "$V" > "$OUT/destroy.txt" 2>&1 || abort kill "virsh destroy $V: $(cat "$OUT/destroy.txt")"
@@ -144,7 +147,7 @@ for j in 0 1 2; do
     n=${SURV[$j]}
     list=$(for i in $(seq 0 $((NF - 1))); do [ $((i % 3)) = $j ] && printf '%s ' "$i"; done)
     ( measure "$n" 120 "$OUT/${n}_trunc.txt" '^TRUNC_END$' "$n's truncates" \
-        "for i in $list; do t0=\$(date +%s%3N); truncate -s 0 $D/v/f\$i; rc=\$?; t1=\$(date +%s%3N); echo OP \$i \$t0 \$t1 \$rc; done; echo TRUNC_END" ) > "$OUT/${n}_trunc.out" 2>&1 &
+        "for i in $list; do ( t0=\$(date +%s%3N); truncate -s 0 $D/v/f\$i; rc=\$?; t1=\$(date +%s%3N); echo OP \$i \$t0 \$t1 \$rc ) & done; wait; echo TRUNC_END" ) > "$OUT/${n}_trunc.out" 2>&1 &
 done
 wait
 for n in "${SURV[@]}"; do

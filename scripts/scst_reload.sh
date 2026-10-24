@@ -159,8 +159,35 @@ timeout 60 $SUDO "$SCSTADMIN" -noprompt -config "$OUT/before.conf" > "$OUT/confi
     || { restore_old; fail "scstadmin -config failed: $(tail -3 "$OUT/config.out")"; }
 timeout 60 $SUDO "$SCSTADMIN" -nonkey -write_config "$OUT/after.conf" > "$OUT/write_after.out" 2>&1 \
     || fail "scstadmin -write_config after the reload failed (the new target is up; compare by hand)"
-# the dump's header names the time it was written; everything else must match
-if ! diff <(grep -v '^#' "$OUT/before.conf") <(grep -v '^#' "$OUT/after.conf") > "$OUT/config.diff"; then
+# the dump's header names the time it was written; everything else must match, except SCST's own
+# copy manager target: SCST adds every device to it as the device is created, at the next free
+# LUN, so applying before.conf lists each device there twice (0.., then the saved numbers).  Its
+# LUNs are not exported to any initiator.  And a device attribute the configuration sets (t10_dev_id,
+# thin_provisioned) is printed among the key attributes afterwards, above where the live dump had
+# it: so each block is compared as its set of lines, every attribute with its value.
+conf_cmp() {
+    python3 - "$1" <<'PY'
+import sys
+path, seen = [], {}
+for line in open(sys.argv[1]):
+    s = line.strip()
+    if not s or s.startswith("#"):
+        continue
+    if s.endswith("{"):
+        path.append(s[:-1].strip())
+        seen.setdefault(" / ".join(path), set())
+    elif s == "}":
+        path.pop()
+    else:
+        seen.setdefault(" / ".join(path), set()).add(s)
+for block in sorted(seen):
+    if block.startswith("TARGET_DRIVER copy_manager"):
+        continue
+    for s in sorted(seen[block]):
+        print(block, "::", s)
+PY
+}
+if ! diff <(conf_cmp "$OUT/before.conf") <(conf_cmp "$OUT/after.conf") > "$OUT/config.diff"; then
     step "the restored configuration differs from the saved one ($(wc -l < "$OUT/config.diff") diff lines, $OUT/config.diff):"
     head -20 "$OUT/config.diff"
     fail "configuration not restored exactly (the new modules stay loaded; fix the difference)"
