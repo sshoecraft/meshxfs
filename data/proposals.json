@@ -6525,6 +6525,26 @@
         "verdict": "rejected",
         "date": "2026-10-23"
       }
+    },
+    {
+      "id": "P20261023-639531",
+      "kind": "verify",
+      "record": "D-DRBD-FIO-PERF-VS-XFS-SKIPS-RIG-UNKNOWN-SO-THE-DRBD-BOARD-CANNOT-GO-GREEN",
+      "change": {
+        "batch": "b20261023-54d056"
+      },
+      "argument": "Verification batch b20261023-54d056 (lap:drbd_rig_tag at 2/net/mesh/drbd, candidate 0.90.134, attempt frozen 2026-10-24T01:01:07Z (data/candidates/0.90.134.json, state RUNNING), module 9C7B7B00C5DE523F1D378C8) was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step11.log:1, '6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)'). The lap runs where the defect lives, on the DRBD pair: the lane brought it up first (summary.log:27-28, step 9 'scripts/drbd_rig.sh up' rc=0 343 s), and tests/drbd_rig_tag_lap.sh does prep's rig resolution of /dev/drbd0 as run.sh marker_write makes it, then runs tests/suite/fio_perf_vs_xfs.sh on test1 against a marker shaped as prep writes it; exposure is the lap's own probe that /dev/drbd0 on test1 is a DRBD minor over a backing disk ('^EXPOSED: /dev/drbd0 on test1 is DRBD minor [0-9]+ over '). Sized from control b20261023-920e59 (step10.log), MXFS_RIG_TAG_DRBD=0 in the lap's environment (tools/mxfs_rig_tag.sh reads a DRBD device like any other disk, finds no vendor and resolves nothing, as before the fix; the switch is read at tools/mxfs_rig_tag.sh:170 and :178), closed with 10 of 10 exposed laps failing, each 'the row declined to score (rig-unknown); prep's resolution gave 'nothing'' (step10.log lap 1 2026-10-24T02:56:01Z ... 'control b20261023-920e59: 10 of 10 laps failed with the fix out'). All 6 verification laps PASS with exposure=1, each 'prep resolved /dev/drbd0 to 'scst-fio-drbd' and the row scored against rig=scst-fio-drbd (PASS)' in 1519-1542 ms (step11.log, 'verify b20261023-54d056: 6 PASS, 0 FAIL of 6 planned'; tests/evidence/batch_laps/b20261023-54d056). An earlier control b20261023-d08fc5 of the same lap closed 0 of 0: its laps aborted unexposed because that lane exported MXFS_NODES=2, which scripts/drbd_rig.sh reads as node names (its own record, D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP); this lane cleared MXFS_NODES before the DRBD steps (summary.log 'env MXFS_NODES='). What this verifies is the rig resolution and the row scoring on the DRBD pair; the release drbd step's own board run is not part of it.",
+      "evidence": [
+        "tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step10.log",
+        "tests/evidence/lanes/g2_a16_followup_20261024T015355Z/step11.log",
+        "tests/evidence/lanes/g2_a16_followup_20261024T015355Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-54d056",
+        "tests/evidence/batch_laps/b20261023-920e59",
+        "tests/drbd_rig_tag_lap.sh",
+        "tools/mxfs_rig_tag.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
     }
   ]
 }
