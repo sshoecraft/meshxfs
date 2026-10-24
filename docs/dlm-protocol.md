@@ -1198,7 +1198,7 @@ custody model and keeps the terminal refusal.
 The section above is the TCP DLM.  On the default CAW transport there is no
 lock master; the sequence is:
 
-1. Disklock heartbeat slot of B stops advancing; after the dead window (17 checks, 34 s, on SCSI; 31, 62 s, on DRBD or shared) each
+1. Disklock heartbeat slot of B stops advancing; after the dead window (6 checks, 12 s, on SCSI; 31, 62 s, on DRBD or shared) each
    survivor logs `node in slot N is no longer responding ... initiating
    recovery` and retires B's identity (P164-DEAD-NOTE).
 2. SCSI-PR fence: a prover writes a durable FENCE-INTENT, issues PREEMPT AND

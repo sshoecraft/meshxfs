@@ -101,8 +101,9 @@ verdict; the expected figure from the settings is only a prediction.
 **A node that has lost every path says so (F7).** Its beats do not fail, they
 stand queued: with the settings of T4 multipath fails I/O only `no_path_retry`
 intervals after the last path is gone, about 35 s after the loss, by which
-time the node's own authority lease (30 s) has already suspended and closed. Its
-peers could only learn of the loss by waiting out the death window (34 s on SCSI), and
+time the node's own authority lease (30 s, at the 34 s window SCSI used then) had
+already suspended and closed. Its peers could only learn of the loss by waiting
+out the death window, and
 every one of their operations that needs a lock the node held waited with
 them. The node is still a corosync member, though, and that network is the one
 it did not lose. So a survivor whose own beats land, after three checks of a
