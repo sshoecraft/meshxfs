@@ -9033,8 +9033,15 @@
         "tests/evidence/batch_laps/b20261024-b07bc3",
         "tests/scst_pr_abort_shutdown_race.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-3be2dc.md",
+        "sha256": "ee536a8aaaff1327a64ca6854d2862fc61c0e991d386f36cede95c357278e90e",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-467d89",
@@ -9055,8 +9062,14 @@
         "tests/tauth/Makefile",
         "tests/tauth_header_dep_lap.sh"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-467d89.md",
+        "sha256": "c46ede01f1c4de3a8f23c30fba1ea8d59e3e0954eade35a3e089695408edfe84",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
