@@ -738,7 +738,10 @@ static void hb_ident_freeze_victim(struct mxfs_disklock_ctx *ctx,
  * lease of the default window dead 12.3 s after its last landed beat.  So the
  * checks a silent peer's stamp must stand for are the longer of this node's
  * window and the one the peer publishes in its identity block; a peer that
- * publishes none is held to the default window of the attachment.
+ * publishes none runs a module from before publication, whose SCSI window was
+ * 17 checks, so it is held to that (MXFS_DISKLOCK_SCSI_LEGACY_DEAD_THRESHOLD),
+ * not to this module's shorter default; on DRBD or shared, to the 31 checks
+ * every module has used there.
  * dl_peer_window=0 holds every peer to this node's own window, as before: the
  * same-build control.
  */
@@ -758,7 +761,8 @@ static int hb_dead_threshold_for(const struct mxfs_disklock_ctx *ctx,
 	    inc_eq(o->epoch, nt->last_epoch))
 		w = o->window_ms;
 	if (!w)
-		w = disklock_default_dead_threshold(ctx) *
+		w = (ctx->attach_drbd ? MXFS_DISKLOCK_DEAD_THRESHOLD :
+					MXFS_DISKLOCK_SCSI_LEGACY_DEAD_THRESHOLD) *
 		    MXFS_DISKLOCK_HB_INTERVAL_MS;
 	k = (w + MXFS_DISKLOCK_HB_INTERVAL_MS - 1) / MXFS_DISKLOCK_HB_INTERVAL_MS;
 	return (int)(k > ctx->dead_threshold ? k : ctx->dead_threshold);
@@ -766,7 +770,7 @@ static int hb_dead_threshold_for(const struct mxfs_disklock_ctx *ctx,
 
 /*
  * THE DEAD WINDOW, SHORTENED BY COROSYNC.  The full window (dead_threshold
- * checks, 34 s on SCSI) exists so that a live node whose heartbeat writes
+ * checks, 12 s on SCSI) exists so that a live node whose heartbeat writes
  * stall, in a path failover or a SCSI error-handling ladder, is not declared
  * dead and fenced.  That stall is in the storage; corosync runs over the
  * hosts' network and keeps such a node a member.  A node whose stamp has stood
@@ -12157,7 +12161,7 @@ void mxfs_disklock_monitor_node(struct mxfs_disklock_ctx *ctx,
  * v0.5.0: override the dead-declaration window.  The monitor declares a
  * peer dead after dead_threshold consecutive stale heartbeat samples at
  * MXFS_DISKLOCK_HB_INTERVAL_MS each; 0 restores the attachment's default
- * (34 s on SCSI, 62 s on DRBD or shared).  Test rigs need fast fail-detect — crash
+ * (12 s on SCSI, 62 s on DRBD or shared).  Test rigs need fast fail-detect — crash
  * recovery (lock purge + foreign-slice replay) is gated on this.
  * Floor of 2 samples: one stale sample is sampling-phase noise, not death.
  */

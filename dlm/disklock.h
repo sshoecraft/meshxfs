@@ -190,35 +190,41 @@
 /*
  * The dead window in checks.  31 (62 s) on a DRBD or shared attachment, whose
  * authority lease is derived FROM the window (below).  On a SCSI attachment the
- * derivation runs the other way: the window only has to outlast the 30 s
- * authority lease, so that a node whose beats stopped landing has closed its
- * own authority before any peer can declare it dead.
+ * derivation runs the other way: the lease is the window less a 4 s reserve
+ * (MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS), so that a node whose beats stopped
+ * landing has stopped admitting operations before any peer can declare it dead.
  *
  *   A peer's count of equal checks starts no earlier than the read that first
  *   saw the stale stamp, which is after that beat landed, which is after the
  *   node anchored its deadline.  Checks are never closer together than one
  *   interval (the monitor sleeps a full interval after each pass, it never
- *   catches up), so the declaration comes at least 17 x 2 s = 34 s after the
- *   anchor.  The lease ends 30 s after it.  The 4 s between them covers the
+ *   catches up), so the declaration comes at least 6 x 2 s = 12 s after the
+ *   anchor.  The lease ends 8 s after it.  The 4 s between them covers the
  *   pump's lateness (one 250 ms tick) and guest clock rate error (±500 ppm
- *   each way is 34 ms across the window), with 3.7 s to spare.
+ *   each way is 12 ms across the window), with 3.7 s to spare.
  *
- * WHY THE WINDOW IS NOT SHORTER YET (D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-
- * SURVIVORS-STALL-OVER-30S, docs/rulings/silent-peer-death-under-the-stall-limit.md).
- * A window longer than a LIVE node's longest gap between landed beats is what
- * keeps a live node from being declared dead and fenced.  At 10 checks (20 s,
- * dead_timeout_ms=20000) survivors stalled 25.7-28.8 s on a silent death at 2
- * and 4 nodes, but across a single-path failover every live survivor's beats
- * landed 18.2-19.1 s apart at 4 and 8 nodes, 0.9-1.7 s inside the 20 s bound:
- * every one suspended and resumed, and a slower failover would have had a live
- * node fenced.  The gap has to shrink before the window can.  Its cause, read
- * from one node's whole kernel log of that run: the path, dead but still online
- * until its session's replacement timeout, held each heartbeat I/O in turn (the
- * identity read for its 8 s bound, then the beat, then the monitor's reads
- * through the map) for 15 s after the death.  Heartbeat I/O now passes over a
- * path it got no answer from within one interval and moves to another path of
- * the LU (dlm/disklock.c, HB_IO_READ_PRIO; pal/linux/kern.c, A PATH THAT IS DEAD
- * BUT STILL ONLINE), which is to be measured before the window moves.
+ * WHY 6 CHECKS (D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S,
+ * docs/rulings/silent-peer-death-under-the-stall-limit.md).  At 17 checks (34 s)
+ * survivors waited out the window on a silent death and stalled 37-61 s, over
+ * the 30 s stall limit, at 2, 4, 8 and 16 nodes on both lock managers.  The
+ * window is an availability number, not a safety one: it has to outlast a LIVE
+ * node's longest gap between landed beats, or a live node is declared dead and
+ * fenced.  At 10 checks a single-path failover left live survivors' beats
+ * 18.2-19.1 s apart, because the dead but still online path held each heartbeat
+ * I/O in turn; heartbeat I/O now passes over a path it got no answer from within
+ * one interval and moves to another path of the LU (dlm/disklock.c,
+ * HB_IO_READ_PRIO; pal/linux/kern.c, A PATH THAT IS DEAD BUT STILL ONLINE), and
+ * the longest live gap measured since is 4.1 s.  With the window at 12 s every
+ * multipath fault row at 4 and 8 nodes on both lock managers kept its worst
+ * stall at 22.9 s or under, and no live node was suspended or closed (P290-AUTH-
+ * SUSPENDED and -CLOSED only on the victims).  dead_timeout_ms restores any
+ * other window; dead_timeout_ms=34000 is the old one, the same-build control.
+ *
+ * A PEER THAT PUBLISHES NO WINDOW (a module from before window publication,
+ * earlier than 0.90.134) runs the old 17-check window and its 30 s lease, so it is
+ * held to MXFS_DISKLOCK_SCSI_LEGACY_DEAD_THRESHOLD, never to this node's shorter
+ * default (hb_dead_threshold_for): declaring it at 12 s would act on its death
+ * inside its own lease.
  *
  * What made the other 28 s of the 62 s window necessary there is the term the
  * lease comment below cannot bound: commands the node submitted that may still
@@ -239,7 +245,8 @@
  * and purge after the declaration took under a second.
  */
 #define MXFS_DISKLOCK_DEAD_THRESHOLD    31
-#define MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD 17
+#define MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD 6
+#define MXFS_DISKLOCK_SCSI_LEGACY_DEAD_THRESHOLD 17
 
 /*
  * THE LOCAL AUTHORITY LEASE (0.89.20).  How long a landed heartbeat buys this
@@ -266,7 +273,7 @@
  *   commands take to become incapable of executing.
  *
  *   That is the window on a DRBD or shared attachment.  On a SCSI attachment
- *   the window is 34 s (MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD) and the lease is
+ *   the window is 12 s (MXFS_DISKLOCK_SCSI_DEAD_THRESHOLD) and the lease is
  *   derived from it: the 4 s below it covers the first two terms, and the
  *   third is closed by the fence certificate's reservation rather than by
  *   time — derived where that constant is defined.
@@ -309,12 +316,12 @@
  * docs/rulings/silent-peer-death-under-the-stall-limit.md, "Keeping the window
  * longer than the lease").
  *
- * The lease is the window less MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS: 30 s at the
- * 34 s window.  The reserve is what lies between this node's last
+ * The lease is the window less MXFS_DISKLOCK_SCSI_LEASE_RESERVE_MS: 8 s at the
+ * 12 s window (30 s at a 34 s one).  The reserve is what lies between this node's last
  * admission and the earliest instant a peer can declare it dead (the peer's
  * count runs from its first sight of the last landed stamp, so at least the
  * window after that beat's ISSUE): the guest clock error (+-500 ppm each way,
- * 2 x 500 ppm of the window, 34 ms at 34 s) and the time the operations
+ * 2 x 500 ppm of the window, 12 ms at 12 s) and the time the operations
  * admitted before the deadline take to complete.  Admission itself is decided
  * at the gate against the deadline (mxfs_authority_ok compares the clock), so no
  * timer's lateness extends it.
@@ -2149,7 +2156,7 @@ struct mxfs_disklock_ctx {
 	mxfs_node_id_t                   slot_node_id[MXFS_DISKLOCK_HB_SLOTS];
 
 	/* v0.5.0: dead-declaration threshold in stale HB samples.  Defaults
-	 * to the attachment's window (disklock_default_dead_threshold: 34 s on
+	 * to the attachment's window (disklock_default_dead_threshold: 12 s on
 	 * a PR-fenced SCSI attachment, 62 s on DRBD or shared); overridden via
 	 * mxfs_disklock_set_dead_timeout_ms (dead_timeout_ms param), which
 	 * sets dead_window_set so a later attachment change keeps it. */

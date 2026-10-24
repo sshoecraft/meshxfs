@@ -49,8 +49,9 @@ removal leaving it listed). The lap hands its environment to every command.
 Bound, derived: each command is one interpreter reading the queue (1.5 MB), the proposals and the
 primary board and ledger (6 MB); a disposition is 3-5 commands and the gate twice. Measured on the
 tree of 2026-10-23 with every disposition settling: all nine of the first three ways with their
-copies (~10 MB each) in 15.1 s, so about 20 s for twelve. A batch lap is bounded at 2x that, 40 s;
-each command at 20 s.
+copies (~10 MB each) in 15.1 s. Measured on the tree of 2026-10-24 (a 12k-line ledger, its copy
+rewritten by unsettle for each of the twelve): all twelve in 26.8 s. A batch lap is bounded at 2x
+that, 54 s; each command at 20 s.
 
 Usage: tests/release_step_cell_lap.py
 Exit: 0 PASS, 1 FAIL, 2 the lap could not measure.
@@ -74,8 +75,19 @@ TAKE_BACK = {"amend": "unamend", "removal": "unretire", "named": "unretire"}
 #: the fix's switches (tools/criteria.py), one per part
 SWITCHES = ("MXFS_RELEASE_STEP_SETTLE", "MXFS_RELEASE_STEP_ANNOTATE", "MXFS_RELEASE_STEP_BOARD",
             "MXFS_RELEASE_STEP_ROUTE")
-#: the record the removal disposition names the run in and removes, in the scratch tree only
-RECORD = "D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED"
+#: the record the removal disposition names the run in and removes, in the scratch tree only.
+#: The lap adds it to each scratch queue itself: the live record it used to name was removed from
+#: the queue, so every scratch tree, a copy of that queue, lacked it, and the lap died at name()
+#: with a StopIteration before any verdict
+#: (D-RELEASE-STEP-CELL-LAP-NAMES-A-REMOVED-RECORD-AND-DIES-WITHOUT-A-VERDICT).
+#: The same holds for the live ledger's annotations of the lap's runs (unsettle).
+#: MXFS_STEP_LAP_OWN_RECORD=0 names the live record, adds none and keeps the live annotations,
+#: as before: the control.
+RECORD = "D-RELEASE-STEP-CELL-LAP-SCRATCH-RECORD"
+LIVE_RECORD = "D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED"
+OWN_RECORD = os.environ.get("MXFS_STEP_LAP_OWN_RECORD", "1") != "0"
+if not OWN_RECORD:
+    RECORD = LIVE_RECORD
 COMMAND_BOUND = 20
 KEY = re.compile(r"([^:]+):(.+):(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)")
 PROPOSAL = re.compile(r"\bproposal (P\d{8}-[0-9a-f]{6})\b")
@@ -160,6 +172,49 @@ def unname(tree: Path, key: tuple) -> None:
     out = command(tree, ["-c", probe] + list(key))
     if out.returncode != 0:
         raise RuntimeError(f"unname rc={out.returncode}: {(out.stdout + out.stderr).strip()[-300:]}")
+
+
+def unsettle(tree: Path, key: tuple) -> None:
+    """The scratch ledgers lose every annotation of the run (an infra, detector-defect, retired_by
+    or withdrawn line the live ledger holds for it), so the scratch gate lists the run whatever
+    the live tree has since done with it: the live ledger settled two of the three runs after
+    the lap was written, and the lap aborted that its gate did not list them. Only the scratch
+    copies are rewritten; the run lines themselves are kept."""
+    config, row, iso = key
+    ledgers = [tree / "data" / "criteria.runs.jsonl"]
+    ledgers += [(tree / board).with_name((tree / board).stem + ".runs.jsonl") for board in own_boards()]
+    for ledger in ledgers:
+        if not ledger.exists():
+            continue
+        kept = []
+        for line in ledger.read_text().splitlines(keepends=True):
+            if f'"{iso}"' in line:
+                try:
+                    item = json.loads(line)
+                except ValueError:
+                    item = {}
+                if (item.get("kind") not in (None, "run")
+                        and (item.get("config"), item.get("row"), item.get("iso")) == key):
+                    continue
+            kept.append(line)
+        ledger.write_text("".join(kept))
+
+
+def own_record(tree: Path) -> None:
+    """The scratch queue gains the record the removal dispositions name and remove, through the
+    queue's own load and save, so the lap depends on no record of the live queue."""
+    probe = ("import sys, datetime; sys.path.insert(0, 'tools'); import defects\n"
+             "data = defects.load()\n"
+             "if any(r['id'] == sys.argv[1] for r in data['defects']):\n"
+             "    sys.exit('the scratch queue already holds ' + sys.argv[1])\n"
+             "data['defects'].append({'id': sys.argv[1], 'severity': 'minor', 'nodes': 1,\n"
+             "    'config': '*/*/*', 'opened': datetime.date.today().isoformat(),\n"
+             "    'summary': 'scratch record of tests/release_step_cell_lap.py: its removal'\n"
+             "               ' dispositions name a release step run in it and remove it'})\n"
+             "defects.save(data)\n")
+    out = command(tree, ["-c", probe, RECORD])
+    if out.returncode != 0:
+        raise RuntimeError(f"own_record rc={out.returncode}: {(out.stdout + out.stderr).strip()[-300:]}")
 
 
 def name(tree: Path, key: tuple) -> None:
@@ -248,7 +303,7 @@ def live_run(key: tuple) -> dict | None:
 
 
 def main() -> int:
-    for switch in SWITCHES + ("MXFS_RELEASE_STEP_COPY",):
+    for switch in SWITCHES + ("MXFS_RELEASE_STEP_COPY", "MXFS_STEP_LAP_OWN_RECORD"):
         print(f"INFO {switch}={os.environ.get(switch) or '(unset)'}")
     keys = {}
     for run in RUNS:
@@ -265,6 +320,9 @@ def main() -> int:
             if True:
                 tree = scratch_tree(base / f"{number:02d}")
                 unname(tree, keys[run])
+                if OWN_RECORD:
+                    unsettle(tree, keys[run])
+                    own_record(tree)
                 before = listed(tree, run)
                 if before is None:
                     print(f"ABORT: the scratch gate could not be read before {how} of {run}")

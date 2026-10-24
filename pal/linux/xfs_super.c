@@ -3829,7 +3829,7 @@ static struct mxfs_cache_caps mxfs_cache_caps;
 
 /*
  * DEAD-NODE DETECTION WINDOW in ms.  0 = the attachment's disklock default
- * (34 s on SCSI, 62 s on DRBD or shared).  Test rigs set e.g. 15000 so crash
+ * (12 s on SCSI, 62 s on DRBD or shared).  Test rigs set e.g. 15000 so crash
  * recovery — lock purge + foreign-slice replay — fires promptly.
  *
  * — THE NAME `lease_timeout_ms` IS A LIE, and it is kept only for
@@ -6970,7 +6970,7 @@ MODULE_PARM_DESC(block_cache_max,
 
 module_param_named(dead_timeout_ms, mxfs_dead_timeout_ms, uint, 0644);
 MODULE_PARM_DESC(dead_timeout_ms,
-	"Dead-node detection window in ms (0 = 34 s on SCSI, 62 s on DRBD or shared). Gates lock "
+	"Dead-node detection window in ms (0 = 12 s on SCSI, 62 s on DRBD or shared). Gates lock "
 	"purge + foreign log-slice replay after a peer dies.  This is the "
 	"DISKLOCK heartbeat threshold; the lease timeout is separate, fixed "
 	"at 600 s, and deliberately does not track it.");
@@ -7142,7 +7142,7 @@ init_xfs_fs(void)
 		       "dead-detection threshold.  Use dead_timeout_ms.  The "
 		       "lease timeout stays 600000 ms by design .\n",
 		       mxfs_lease_timeout_ms);
-	printk(KERN_INFO "mxfs: dead_timeout_ms=%u (0 = 34 s on SCSI, 62 s on DRBD or shared)\n",
+	printk(KERN_INFO "mxfs: dead_timeout_ms=%u (0 = 12 s on SCSI, 62 s on DRBD or shared)\n",
 	       mxfs_resolve_dead_timeout_ms());
 	/* (docs/whole-cluster-restart.md build item 1): read the host
 	 * and boot identities ONCE per module load; the P-HOSTID line is the
