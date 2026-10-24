@@ -9964,8 +9964,15 @@
         "docs/rulings/silent-peer-death-under-the-stall-limit.md",
         "data/defects.json"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-3b8625.md",
+        "sha256": "a7c36818024e316f994d9c16c99ed85b313b3b98c73925f10210a66b7beaf22f",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-65e4fc",
