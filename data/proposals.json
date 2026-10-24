@@ -10174,6 +10174,36 @@
         "tests/merge_row_overrun_lap.sh",
         "tests/suite/fourkn_merge.sh"
       ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-9b8254.md",
+        "sha256": "9f486936fa1f074181638f43382e4ee90992ad63b66dd2b04608b4b80071ec82",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-16ea51",
+      "kind": "remove-fixed",
+      "record": "D-FOURKN-MERGE-SUITE-ROW-WORKER-BOUNDED-ONLY-ON-THE-SSH-CLIENT",
+      "change": {
+        "control": "b20261024-864e45",
+        "fixon": "b20261024-25e23b",
+        "cause": "tests/suite/fourkn_merge.sh ran each node's tests/fourkn_merge_worker.sh bounded only on the ssh client (rs \"$WBOUND\"), so a workload that overran WBOUND left the worker running on its node with the mount open after the row ended. Fix: the worker runs under 'timeout --foreground $((WBOUND - 3))' on its node; FOURKN_MERGE_NODE_BOUND=0 bounds the client alone, as before (the control)."
+      },
+      "argument": "The row (criteria fourkn_merge) applies to */*/direct4k at 2 nodes only (data/criteria.json, applies_to '*/*/direct4k', min_nodes 2, max_nodes 2), so the record reaches exactly 2/disk/caw/direct4k and 2/net/mesh/direct4k, and both are verified on candidate 0.90.134: at 2/disk/caw/direct4k control b20261024-6b3b92 (FOURKN_MERGE_NODE_BOUND=0, 9 of 10 exposed laps FAIL 'a worker still ran on N node(s) 8 s after the row's overrun') and verification b20261024-6336a2 (9 of 9 PASS, verify P20261024-4d60f6 applied, attempt frozen 2026-10-24T16:34:18Z, module 1BC77CFB15EF4A988DD1F56); at 2/net/mesh/direct4k control b20261024-864e45 (8 of 10 exposed laps FAIL, the same line; the 2 PASS laps' unbounded workers finished within the 8 s) and verification b20261024-25e23b (13 of 13 PASS, each 'EXPOSED: the row's workload ran N ms against a node-side bound of 13 s and a client bound of 16 s' and 'no worker ran on either node 8 s after the row's overrun', verify P20261024-9b8254 applied, attempt frozen 2026-10-24T19:27:48Z, module FF012B4B81CDB69CAE96883). Each control is the same module with the fix's switch off. The record's 17 cells are the two controls' 17 failing laps (2/disk/caw/direct4k 16:47:23Z-16:54:33Z, 2/net/mesh/direct4k 19:32:22Z-19:39:48Z), each a FAIL on that line, the failure this cause explains; both verifies retired them. The record's summary states what the controls showed: workers left running after the row's overrun (the review of P20261024-9b8254 also read 'target is busy' unmounts in the control).",
+      "evidence": [
+        "tests/evidence/lanes/g2d_a21_20261024T192800Z/step4.log",
+        "tests/evidence/lanes/g2d_a21_20261024T192800Z/step5.log",
+        "tests/evidence/lanes/g2d_a20_20261024T163432Z/step4.log",
+        "tests/evidence/lanes/g2d_a20_20261024T163432Z/step5.log",
+        "tests/suite/fourkn_merge.sh",
+        "tests/merge_row_overrun_lap.sh",
+        "data/reviews/P20261024-4d60f6.md",
+        "data/reviews/P20261024-9b8254.md"
+      ],
       "state": "pending",
       "created": "2026-10-24"
     }
