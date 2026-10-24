@@ -7116,6 +7116,22 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-19cf74",
+      "kind": "verify",
+      "record": "D-FOREIGN-REPLAY-AG-LAP-READS-SURVIVOR-LOGS-BEFORE-P163-AND-FINDS-NO-REPLAYER",
+      "change": {
+        "batch": "b20261024-70a767"
+      },
+      "argument": "Verification b20261024-70a767 of lap:foreign_replay_ag_p163 at 4/disk/caw/direct (g4, test3-test6) on candidate 0.90.134, attempt frozen 2026-10-24T06:38:23Z, module BE3695D2590A65F742F9816, sized from control b20261024-eade91 on the same module (LAP_WAIT_P163=0, the lap reads the survivors' logs as soon as the truncates return, as before the fix): 6 of 10 exposed laps failed (tests/evidence/lanes/g4_w12_20261024T064222Z/step2.log, 'control b20261024-eade91: 6 of 10 laps failed with the fix out'). The verification ran 26 of 26 planned laps, each EXPOSED and PASS with the replayer found (step3.log 'verify b20261024-70a767: 26 PASS, 0 FAIL of 26 planned'; lap lines 1-26 rc=0 exposure=1). The batch was declared before its first lap (step3.log's header); no lap was dropped.",
+      "evidence": [
+        "tests/evidence/lanes/g4_w12_20261024T064222Z/step2.log",
+        "tests/evidence/lanes/g4_w12_20261024T064222Z/step3.log",
+        "tests/foreign_replay_ag_lap.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
