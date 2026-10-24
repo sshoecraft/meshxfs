@@ -7582,6 +7582,73 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-128791",
+      "kind": "infra-proven",
+      "record": null,
+      "change": {
+        "config": "2/net/mesh/direct",
+        "row": "lap:lh_master",
+        "iso": "2026-10-24T10:41:54Z"
+      },
+      "argument": "This run is lap 5 of control batch b20261024-bda0e1 (D-LIVE-HOLDER-WAIT-FINDS-NO-REMOTE-MASTERED-INODE-AND-ABORTS-BEFORE-MEASURING, knob LH_SHARD_SELECT=0). It measured nothing, and the rig refused it before any MXFS code ran. The lap log (tests/evidence/batch_laps/b20261024-bda0e1/20261024T104052Z-68ff9925.log) shows only :5 'STAGE prep rc=1 wall=62s', :6 'LAP lh_master ABORT: prep_cluster rc=1', :7 '=== rc=2 elapsed=61s'. The prep log it names (tests/evidence/20261024T104052Z_lhmaster_lhmc5/prep_1.log:4) ends at 'lun_pool: pool lock not taken in 60 s: /home/steve/disks/pool/.lock', printed by tools/lun_pool.sh alloc, the host-side LUN pool allocator. That is a flock on a file on the lab host, taken before any node is touched: no module was loaded, no mkfs or mount ran, and no node command was issued. Other rig lanes (g2c, g2d, g2e, g4, g4c, g8b) were preparing their own pool LUNs in the same minutes. The refusal is a defect of the rig's tooling, recorded as D-LUN-POOL-LOCK-WAIT-OVER-60S-REFUSES-A-PREP-WHILE-ANOTHER-LANE-HOLDS-IT, not of MXFS. Every other lap of the batch that got past prep ended FAIL with exposure=1 (the defect reproducing), so this lap's absence hides no MXFS result. The batch will run one more lap in its place (harness_batch.py control --batch).",
+      "evidence": [
+        "tests/evidence/batch_laps/b20261024-bda0e1/20261024T104052Z-68ff9925.log",
+        "tests/evidence/20261024T104052Z_lhmaster_lhmc5/prep_1.log",
+        "tools/lun_pool.sh"
+      ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-128791.md",
+        "sha256": "78186103cbb0ebb9b9ccb0983b56f426e63bc2174609364f2308a9a6f06fc880",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
+    },
+    {
+      "id": "P20261024-2ab72a",
+      "kind": "infra-proven",
+      "record": null,
+      "change": {
+        "config": "8/disk/caw/mpath",
+        "row": "lap:peer_window",
+        "iso": "2026-10-24T10:42:46Z"
+      },
+      "argument": "This run is lap 4 of control batch b20261024-1d2fde (D-SURVIVOR-DECLARES-A-PEER-DEAD-ON-ITS-OWN-WINDOW-INSIDE-THE-PEERS-LONGER-LEASE, ARM=0). It measured nothing, and the lap's own prep bound cut it short during a prep that was progressing normally. The lap log (tests/evidence/batch_laps/b20261024-1d2fde/20261024T104044Z-d6eb481f.log) shows :4 'STAGE prep rc=124 wall=121s' and :5 'RESULT: ABORT label=pw8c4 stage=prep'. The lap ran no workload. Its prep log (tests/evidence/20261024T104044Z_peerwin_pw8c4/prep.log) shows the time going to the host, before MXFS ran: the host preflight started at +2 s (:6). At :51 the preflight printed 'waited 58 s for a power-up to finish', a wait in scripts/clyde_preflight.sh's kernel-log-rate check for another rig lane's VM power-up. It passed at +68 s (:62, 10:41:54). Only then did the prep start. It ran normally: teardown 3 s with every node's threads joined (:67-75), mkfs 12 s (:78-80), form 6 s (:84-85), join of the seven peers 18 s (:86-87). It was in readiness at +41 s of prep (:88) when the lap's timeout 120 on run.sh prep_cluster (tests/peer_window_lap.sh) fired, 121 s after the lap began. The bound counts the host's preflight wait. That is a harness defect, recorded on D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT (its 2026-10-24 attempt-17 update names this lap), not an MXFS one. The prep log shows no MXFS error, shutdown or stall. Every other lap of the batch ended FAIL with exposure=1, the defect reproducing. The batch will run one more lap in its place.",
+      "evidence": [
+        "tests/evidence/batch_laps/b20261024-1d2fde/20261024T104044Z-d6eb481f.log",
+        "tests/evidence/20261024T104044Z_peerwin_pw8c4/prep.log",
+        "scripts/clyde_preflight.sh"
+      ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-2ab72a.md",
+        "sha256": "0f5bba9e4d98e28335bf6e750db19cdad7c75bfc03c40c0314a8e9129f4f158f",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
+    },
+    {
+      "id": "P20261024-6ce1e5",
+      "kind": "infra-proven",
+      "record": null,
+      "change": {
+        "config": "8/disk/caw/mpath",
+        "row": "lap:peer_window",
+        "iso": "2026-10-24T10:42:46Z"
+      },
+      "argument": "Resubmission of P20261024-2ab72a, which was rejected for want of the nodes' kernel logs over the window MXFS ran in (data/reviews/P20261024-2ab72a.md). This run is lap 4 (pw8c4) of control batch b20261024-1d2fde (ARM=0). It measured nothing, and the lap's own prep bound cut it short during a prep that was progressing normally. THE HOST FAILED FIRST: prep.log :51 'waited 58 s for a power-up to finish' (scripts/clyde_preflight.sh's kernel-log-rate check waiting on another lane's power-up), and the preflight passed at +68 s (:62, 10:41:54Z). Then mkfs took 12 s, form 6 s and the join of seven peers 18 s (:78-87), and readiness began at +41 s (:88). tests/peer_window_lap.sh's 'timeout 120' on run.sh prep_cluster then fired, 121 s after the lap began (lap log :4 'STAGE prep rc=124 wall=121s'). THE NODES' KERNEL LOGS OVER THE WHOLE WINDOW, read from each guest's own dmesg ring after the fact: tests/evidence/20261024T104044Z_peerwin_pw8c4/dmesg_window/test21.txt .. test28.txt, every line stamped 10:41:40Z-10:43:00Z. Every ring reaches back to the node's boot at 10:33:15-10:33:30, so nothing in the window rotated out. In each file: (a) the only lines before 10:42:00 are the prep's teardown at 10:41:57 of the previous lap's mounts. test28's teardown shows that earlier lap's withdrawn node (P306-CAW-RELEASE-POISONED, P259-DEPART-UNCLEAN, sd FAILED): lap 3 is a control FAIL, with its own verdict and evidence, and its fence and withdrawal are the defect the control reproduces. (b) From 10:42:00, the module load (test21 10:42:15, the others 10:42:20), then 'Ending clean mount' on all eight (test21 10:42:18, the others 10:42:33-10:42:36), then the nodes idle until the next lap's teardown. A scan of 10:42:00-10:42:59 for 'Shutting down filesystem', BUG, Oops, 'WARNING: CPU', Call Trace, 'blocked for more than', I/O error, corrupt, force_shutdown, any -FAIL probe, ESTALE, DEPART-UNCLEAN, POISONED and 'FAILED Result' finds nothing. Its only hits are one 'reservation conflict' pair (sd 3:0:0:0 and sd 4:0:0:0) per node, 0.4-1.3 s after that node's module load. That pair is the module's baseline at every load: test22_load_baseline.txt (the same dmesg ring) shows exactly one pair after each of test22's nine loads from 10:34:22 to 10:52:46, every one followed by a clean mount, including the loads of laps that completed with a verdict. So no MXFS error, shutdown or stall occurred while MXFS ran in this lap. The time went to the host's preflight wait, which the lap's bound counts. That is a harness defect, recorded on D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT. Correction to the earlier proposal: lap 8 (20261024T105000Z-24f2b9f9.log) was still running when that proposal was reviewed. The batch will run one more lap in place of this one.",
+      "evidence": [
+        "tests/evidence/batch_laps/b20261024-1d2fde/20261024T104044Z-d6eb481f.log",
+        "tests/evidence/20261024T104044Z_peerwin_pw8c4/prep.log",
+        "tests/evidence/20261024T104044Z_peerwin_pw8c4/dmesg_window",
+        "data/reviews/P20261024-2ab72a.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
