@@ -10480,6 +10480,65 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-b148a3",
+      "kind": "verify",
+      "record": "D-LAST-MEMBER-UMOUNT-AFTER-A-15K-PAGE-HANDBACK-TAKES-31S-OVER-THE-STALL-LIMIT",
+      "change": {
+        "batch": "b20261023-756620"
+      },
+      "argument": "Verification batch b20261023-756620 (lap:lmu at 2/net/mesh/mpath on the g2e pair test17/test18, candidate 0.90.134, module 79779BEAECBEA94844FDC72 as the batch records) was declared by tools/harness_batch.py verify before its first lap (tests/evidence/lanes/g2e_lmu_mpath_20261023T231554Z/step3.log first line: 'declared verification batch b20261023-756620 ... 6 clean laps (rate 10/10, lower bound 0.5887, delta 0.005, alpha 0.005)'). It is sized from the control closed just before it on the same lane, build and pair, b20261023-07077e (tests/evidence/lanes/g2e_lmu_mpath_20261023T231554Z/step2.log): dl_relall_threads=1 through MXFS_EXTRA_MODARGS on each lap's own prep, the last member's release-all on one thread as before the fix; 10 of 10 exposed laps FAIL, A's last-member unmount 42584-70921 ms against the 30000 ms limit (e.g. 'LAP lmu FAIL: A's last-member unmount rc=0 took 42996 ms, limit 30000 (threads=1)'). With k=n=10, L = 0.005^(1/10) = 0.5887 and N = ceil(ln 0.005 / ln(1 - 0.5887)) = 6. Each of the 6 laps (tests/last_member_umount_lap.sh lmumv<n> 2/net/mesh/mpath, NFILES=40000 as the control) is PASS with exposure=1 on its lap line (the probe '^EXPOSED: A's last-member unmount released' matched: 39818-39914 grants released), A's unmount 10404-19852 ms of 30000 with threads=8, the module default. No lap failed, none INCOMPLETE, none dropped: step3.log ends 'verify b20261023-756620: 6 PASS, 0 FAIL of 6 planned'. The lap grades the stall itself (tests/last_member_umount_lap.sh:69-74 fails any unmount of 30000 ms or more), so a slow PASS cannot hide behind a missing max_stall_ms. This applies the multipath arm of the record's attachments; the review of removal P20261023-2ed8d3 asked for this pair at each net/mesh attachment, and the 4K-native pair and the disk/caw measurement are running in lanes g2d_a22x and g2b_a22x.",
+      "evidence": [
+        "tests/evidence/lanes/g2e_lmu_mpath_20261023T231554Z/step2.log",
+        "tests/evidence/lanes/g2e_lmu_mpath_20261023T231554Z/step3.log",
+        "tests/evidence/lanes/g2e_lmu_mpath_20261023T231554Z/summary.log",
+        "tests/evidence/batch_laps/b20261023-756620",
+        "tests/evidence/batch_laps/b20261023-07077e",
+        "tests/last_member_umount_lap.sh",
+        "tests/last_member_umount_trace.sh"
+      ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-b148a3.md",
+        "sha256": "704c92a6dfded4c7cc0f2fb2c93c6ff4e319ad551c4eaec9f844458bf8133727",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
+    },
+    {
+      "id": "P20261024-0dde63",
+      "kind": "remove-disproved",
+      "record": "D-DRBD-RIG-NODE-OOPS-IN-DRBD-CHANGE-SYNC-ON-AN-LVM-READ-WHOSE-BACKING-BIO-FAILED",
+      "change": {},
+      "argument": "DISPROVED as a MeshXFS defect by the direct reproduction the review of P20261024-c64f70 names as its third way (data/reviews/P20261024-c64f70.md:72): on a pair with no MeshXFS at all, DRBD up on pool LUNs, the backing path cut by non-MeshXFS means while O_DIRECT aio reads run on the DRBD device, the same oops. tests/drbd_backing_cut_repro.sh on test29/test30 reproduced it 6 times in 6 tries. (a) tests/evidence/lanes/g2c_a22_20261024T204638Z step 11 (dbc22x1..3, tests/evidence/20261024T223820Z_drbdcut_dbc22x1, 20261024T224319Z_drbdcut_dbc22x2, 20261024T224544Z_drbdcut_dbc22x3): each boot checked TAINT=0 MXFS_MOD=0 RULES=0 PKGS=0 UNITS_ENABLED=0 UNITS_ACTIVE=0 (run.log:2-3), but two mxfs scripts were still on disk (MXFS_BINS=/usr/sbin/mxfs_fenced_path_reset.sh /usr/sbin/mxfs_lu_reset_witness.py), not run by anything (no unit, rule or package). (b) So tests/evidence/lanes/g2c_a22d_20261024T225929Z moved every mxfs file in /usr/sbin, /usr/local/sbin, /usr/bin, /usr/local/bin, the systemd unit directories and /lib/modules to /root/mxfs_parked on both nodes first (step2.log: 'PARKED /usr/sbin/mxfs_fenced_path_reset.sh', 'PARKED /usr/sbin/mxfs_lu_reset_witness.py', 'LEFT=0 MODFILES=0' on each node, no mxfs.ko under /lib/modules), ran the three tries again (step3.log, dbc22y1..3: tests/evidence/20261024T230001Z_drbdcut_dbc22y1, 20261024T230233Z_drbdcut_dbc22y2, 20261024T230507Z_drbdcut_dbc22y3), each boot 'TAINT=0 MXFS_MOD=0 RULES=0 PKGS=0 UNITS_ENABLED=0 UNITS_ACTIVE=0 MXFS_BINS=' (run.log:2-3), and moved them back after (step5.log 'RESTORED ...', 'STILL_PARKED=0'). Each of the six: 'cut: FIO_RUNNING=2 DEV_BEFORE=present' (fio libaio O_DIRECT randread QD32 and an lvm pvscan --cache loop on /dev/drbd<N>, then iscsiadm logs N1 out of its own pool target, tests/drbd_backing_cut_repro.sh:173 on), N1's serial console from the host's copy: 'BUG: kernel NULL pointer dereference, address: 0000000000000010', 'Oops: 0000 [#1] PREEMPT SMP PTI', 'Comm: kworker/<n>:<n>H Not tainted 6.8.0-101-generic', 'RIP: 0010:__drbd_change_sync+0x56/0x440 [drbd]', call trace '__req_mod+0x269/0xa60 [drbd]', 'drbd_request_endio+0x99/0x1a0 [drbd]', 'bio_endio', 'Kernel panic - not syncing: Fatal exception', and N1 rebooted (a new boot_id, run.log:8); 0 lines naming mxfs in any of the three y consoles, mxfs absent from 'Modules linked in'. That is the record's oops: the same function and offset (__drbd_change_sync+0x56), the same address (0x10) and the same completion chain (__req_mod+0x269 <- drbd_request_endio <- bio_endio) as tests/evidence/netconsole.log:96144-96200 and the earlier instance the c64f70 review compared, with the backing bio failed because the backing disk's iSCSI session was gone. A crash that the stock drbd module produces with no MeshXFS code in the boot, on disk or in any unit, is not a MeshXFS defect; what the rig did that cut a backing session under DRBD is the rig's matter, not this record's.",
+      "evidence": [
+        "tests/evidence/lanes/g2c_a22_20261024T204638Z/step11.log",
+        "tests/evidence/lanes/g2c_a22_20261024T204638Z/summary.log",
+        "tests/evidence/lanes/g2c_a22d_20261024T225929Z/step2.log",
+        "tests/evidence/lanes/g2c_a22d_20261024T225929Z/step3.log",
+        "tests/evidence/lanes/g2c_a22d_20261024T225929Z/step5.log",
+        "tests/evidence/lanes/g2c_a22d_20261024T225929Z/summary.log",
+        "tests/evidence/lanes/queue_g2c_a22d.txt",
+        "tests/evidence/20261024T223820Z_drbdcut_dbc22x1",
+        "tests/evidence/20261024T224319Z_drbdcut_dbc22x2",
+        "tests/evidence/20261024T224544Z_drbdcut_dbc22x3",
+        "tests/evidence/20261024T230001Z_drbdcut_dbc22y1",
+        "tests/evidence/20261024T230233Z_drbdcut_dbc22y2",
+        "tests/evidence/20261024T230507Z_drbdcut_dbc22y3",
+        "tests/drbd_backing_cut_repro.sh",
+        "tests/evidence/netconsole.log",
+        "data/reviews/P20261024-c64f70.md"
+      ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-0dde63.md",
+        "sha256": "9d52368eb43ff79e791e3d341cb1113ac3df9a0d8c0f45ee0042117b030d7365",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
