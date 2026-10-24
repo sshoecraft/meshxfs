@@ -7451,6 +7451,60 @@
         "run.sh",
         "data/reviews/P20261024-d2a027.md"
       ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-30a744.md",
+        "sha256": "bb0559d5c56461b883b050fc048917eaf2107ef69c88f9c0aeecd9d9b4f226d4",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-3874e6",
+      "kind": "verify",
+      "record": "D-MPATH-MOUNT-DEGRADED-12S-WINDOW-REGISTRATION-MISSING-AND-SHUTDOWNS",
+      "change": {
+        "batch": "b20261024-b7bbc1"
+      },
+      "argument": "Verification b20261024-b7bbc1 of row path_mount_degraded at 4/net/mesh/mpath (g4c, test7-test10, victim test10) on candidate 0.90.134, attempt frozen 2026-10-24T06:38:23Z, module BE3695D2590A65F742F9816, lane tests/evidence/lanes/g4c_w12c_20261024T073330Z (its queue copy tests/evidence/lanes/g4c_w12c_20261024T073330Z/queue). Control b20261024-db9c82 (tests/evidence/lanes/g4c_w12c_20261024T073330Z/step4.log), run after a prep with MXFS_EXTRA_MODARGS=pr_fill_bounded=0 (step 3; the late-path fill runs only with 15 s of the authority lease left, the code before the fix; a same-build module parameter, nothing reverted), failed 10 of 10 exposed laps, each FAIL with late_stall_ms 31651-42251 and fails=9 or 10 (e.g. 'lap 2/10: FAIL ... late_stall_ms=41805 ... fails=10 max_stall_ms=41805 exposure=1'). Steps 6, 8 and 10 (continuations of the control) refused at once ('defects: --runs is the number of laps; at least 1') because the control had already closed at 10 laps; they ran no lap. Steps 11-16 are preps with the variant, step 17 a plain prep (no extra module arguments, rc=0), and step 18 the verification, declared after the control closed (rate 10/10, lower bound 0.5887, 6 laps at delta 0.005, alpha 0.005): 6 of 6 PASS, each exposure=1 (the PF-LATE-B-DOWN probe), fails=0, late_stall_ms 6194-6917, max_stall_ms 6194-6917 (under the 30 s stall limit), mount_one_path_ms 4898-5599, 'verify b20261024-b7bbc1: 6 PASS, 0 FAIL of 6 planned'. No lap was dropped. run.sh enforced the row's 300 s budget; laps took 161-168 s.",
+      "evidence": [
+        "tests/evidence/lanes/g4c_w12c_20261024T073330Z/queue",
+        "tests/evidence/lanes/g4c_w12c_20261024T073330Z/step4.log",
+        "tests/evidence/lanes/g4c_w12c_20261024T073330Z/step17.log",
+        "tests/evidence/lanes/g4c_w12c_20261024T073330Z/step18.log",
+        "tests/evidence/lanes/g4c_w12c_20261024T073330Z/summary.log"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-3874e6.md",
+        "sha256": "139769cd11edf34910b72eab9784d7d1e36e4fa08b6565007f129584096284ad",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-495cc8",
+      "kind": "verify",
+      "record": "D-FSX-SH-EXIT-TRAP-REMOVES-FSX-OWN-FSXLOG-AND-FSXGOOD-WITH-THE-WORK-DIR",
+      "change": {
+        "batch": "b20261024-7a8bf4"
+      },
+      "argument": "Verification b20261024-7a8bf4 of lap:fsx_fail_files at 2/net/mesh/direct, on a formed pair (g2, test1/test2; the laps ran on test1's /mnt/shared mxfs mount, not on the host: 'LAP fsx_fail_files start ... node=test1 mount=/mnt/shared tree=/src/mxfs'), candidate 0.90.134 attempt frozen 2026-10-24T06:38:23Z, module BE3695D2590A65F742F9816, lane tests/evidence/lanes/g2_w12b_20261024T081715Z (queue copy tests/evidence/lanes/g2_w12b_20261024T081715Z/queue:22-23). This answers review P20261023-fe0120 (the earlier net/mesh control ran on the host's /dev/shm with no VM, and no lap looked where fsx put its files). The lap (tests/fsx_fail_files_lap.sh) runs tests/suite/fsx.sh on the node with an overwriting writer so both fsx checks miscompare (EXPOSED: 'the fsx row failed both checks on the mxfs mount'), then lists what survived: PASS when each failed check's log and its .fsxlog, .fsxops and .fsxgood survived the row, FAIL naming each one removed. Control b20261024-4fea60 (step 7, FSX_KEEP_FAIL_FILES=0, a same-tree environment switch: fsx.sh runs fsx without -P as before the fix) after the oracle self-check 'tests/fsx_fail_files_lap.sh fxoracle test1' (rc=0): 10 of 10 exposed laps FAIL 'removed with the row: fsx.<seed>.100000.d/fsxfile_100000.fsxlog ... .fsxops ... .fsxgood fsx.<seed>.50000.d/...' (tests/evidence/lanes/g2_w12b_20261024T081715Z/step7.log). Verification (step 8, declared after the control closed; rate 10/10, lower bound 0.5887, 6 laps): 6 of 6 PASS exposure=1 'each failed check's log and its .fsxlog, .fsxops and .fsxgood survived the row in /root' (tests/evidence/lanes/g2_w12b_20261024T081715Z/step8.log; e.g. tests/evidence/batch_laps/b20261024-7a8bf4/20261024T090952Z-3a85cad4.log lists /root/fsx.15981461.100000.d with fsxfile_100000.fsxgood 92420, .fsxlog 4876, .fsxops 2591 bytes). Where fsx itself put its files, read afterwards on test1 from fsx's own 'Log of operations saved to' line in each surviving check log (tests/evidence/fsx_saved_to_20261024T094859Z.txt, the commands and output verbatim): control lap fxc1 (seed 1704717646) '/root/fsx.1704717646.100000.log:149: Log of operations saved to \"/mnt/shared/.suite_fsx.test1.217967/fsxfile_100000.fsxops\"' and :151 the .fsxgood in the same work directory, likewise for the 50000 check (:282, :284), and no /root/fsx.1704717646.*.d directory exists; verification lap fxv1 (seed 15981461) ':106: Log of operations saved to \"/root/fsx.15981461.100000.d/fsxfile_100000.fsxops\"' and :108 the .fsxgood under /root/fsx.15981461.100000.d, likewise at :209, :211. So without the fix fsx wrote them into the row's work directory on the mount, which the EXIT trap removes, and with it into /root. No lap was dropped; laps took about 1 s each of the 38 s bound.",
+      "evidence": [
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/queue",
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/step7.log",
+        "tests/evidence/lanes/g2_w12b_20261024T081715Z/step8.log",
+        "tests/evidence/fsx_saved_to_20261024T094859Z.txt",
+        "tests/fsx_fail_files_lap.sh",
+        "tests/suite/fsx.sh",
+        "tests/evidence/batch_laps/b20261024-7a8bf4",
+        "tests/evidence/batch_laps/b20261024-4fea60",
+        "data/reviews/P20261023-fe0120.md"
+      ],
       "state": "pending",
       "created": "2026-10-24"
     }
