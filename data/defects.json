@@ -9991,7 +9991,7 @@
       "opened": "2026-10-24",
       "summary": "PROBE-A (pal/linux/xfs_buf.c :11975-12024), the always-on detector of an AG header write by a node that holds no grant for the AG, fires on every AG header image a foreign replay writes (b_mxfs_recov_image, written on the replay's verdict, not a grant) and dumps a stack once a boot, so a correct replay reads as 'PROBE-A AG-META-WRITE-NOT-HELD' and the detector cannot tell an authorised replay write from an unauthorised one",
       "evidence": "Calibrations b20261024-8c98b7 (4/net/mesh/direct) and b20261024-a46ac0 (4/disk/caw/direct), candidate 0.90.134 attempt 18, lane tests/evidence/lanes/g4_a18_20261024T125108Z: on the replayer test3, 6 or 9 'PROBE-A AG-META-WRITE-NOT-HELD ... recov=1' lines in every one of the 20 laps (e.g. tests/evidence/batch_laps/b20261024-8c98b7/20261024T125139Z-e4d1c69f.log 'its PROBE-A lines recov=1 6 recov=0 0'), all inside the replay, none on the non-replaying survivors; found by review data/reviews/P20261024-b9e4be.md, which counts the misfire as a detector defect of MeshXFS's own. Earlier: the open-EFI gate laps of review data/reviews/P20261023-f2db37.md (4-10 a lap, each on the survivor during the replay).",
-      "next": "Fix drafted for the next attempt in tests/evidence/drafts/tree/pal/linux/xfs_buf.c: a write of a replay's image (b_mxfs_recov_image) with no grant held prints 'PROBE-A-REPLAY agno= daddr= ops= comm= pid=' with no stack instead of the unheld-write line; module parameter probe_a_replay_apart=0 reports it as before (the same-build control); compiles clean (tests/evidence/drafts/tree/tools/draft_syntax_check.sh, 0 errors 0 warnings). tests/evidence/drafts/tree/tests/foreign_replay_ag_lap.sh reads PROBE-A-REPLAY for the AGs the replay wrote and adds the check 'the replayer reported its replay's AG header images apart, none as an unheld write' (no recov=1 unheld line on the replayer). Next, on the next attempt: control (probe_a_replay_apart=0 through the lap's prep, MXFS_EXTRA_MODARGS) and verification of the lap at 4/net/mesh/direct, remove --fixed. ===== 2026-10-24, attempt 19 (lane tests/evidence/lanes/g4_a19_*): control b20261024-e216a7 (probe_a_replay_apart=0) failed 10 of 10 exposed laps, every one on '  FAIL test3 reported its replay's AG header images apart (PROBE-A-REPLAY), none as an unheld write got=6..9 want=0', three of them (pac192, pac198, pac1910) laps with no survivor overlap that printed 'RESULT: VACUOUS ... stage=no-overlap' before the FAIL. Verification b20261024-d04ebf (fix in): 4 PASS, 0 FAIL, 2 INCOMPLETE of 6: pav191 and pav195 (tests/evidence/batch_laps/b20261024-d04ebf/20261024T155307Z-6f080bed.log, 20261024T160239Z-12a0cdfd.log) met the trigger (replay wrote AGs [3 4], the record's check PASSed with 0) but had no overlap, so the lap exited VACUOUS rc=3 with no 'LAP ... PASS' line and batch_lap graded them INCOMPLETE: the lap's PASS line needs the other record's overlap exposure, its FAIL line does not. The batch cannot reach 6 PASSes. Attempt 20 (tests/evidence/lanes/queue_g4_a20.txt): a fresh verification against the same control, passing on the record's own check line, failing on any failed check, exposed by '^STAGE AGs the replay wrote (PROBE-A on <node>): [<n>'; then remove --fixed.",
+      "next": "Fix drafted for the next attempt in tests/evidence/drafts/tree/pal/linux/xfs_buf.c: a write of a replay's image (b_mxfs_recov_image) with no grant held prints 'PROBE-A-REPLAY agno= daddr= ops= comm= pid=' with no stack instead of the unheld-write line; module parameter probe_a_replay_apart=0 reports it as before (the same-build control); compiles clean (tests/evidence/drafts/tree/tools/draft_syntax_check.sh, 0 errors 0 warnings). tests/evidence/drafts/tree/tests/foreign_replay_ag_lap.sh reads PROBE-A-REPLAY for the AGs the replay wrote and adds the check 'the replayer reported its replay's AG header images apart, none as an unheld write' (no recov=1 unheld line on the replayer). Next, on the next attempt: control (probe_a_replay_apart=0 through the lap's prep, MXFS_EXTRA_MODARGS) and verification of the lap at 4/net/mesh/direct, remove --fixed. ===== 2026-10-24, attempt 19 (lane tests/evidence/lanes/g4_a19_*): control b20261024-e216a7 (probe_a_replay_apart=0) failed 10 of 10 exposed laps, every one on '  FAIL test3 reported its replay's AG header images apart (PROBE-A-REPLAY), none as an unheld write got=6..9 want=0', three of them (pac192, pac198, pac1910) laps with no survivor overlap that printed 'RESULT: VACUOUS ... stage=no-overlap' before the FAIL. Verification b20261024-d04ebf (fix in): 4 PASS, 0 FAIL, 2 INCOMPLETE of 6: pav191 and pav195 (tests/evidence/batch_laps/b20261024-d04ebf/20261024T155307Z-6f080bed.log, 20261024T160239Z-12a0cdfd.log) met the trigger (replay wrote AGs [3 4], the record's check PASSed with 0) but had no overlap, so the lap exited VACUOUS rc=3 with no 'LAP ... PASS' line and batch_lap graded them INCOMPLETE: the lap's PASS line needs the other record's overlap exposure, its FAIL line does not. The batch cannot reach 6 PASSes. Attempt 20 (tests/evidence/lanes/queue_g4_a20.txt): a fresh verification against the same control, passing on the record's own check line, failing on any failed check, exposed by '^STAGE AGs the replay wrote (PROBE-A on <node>): [<n>'; then remove --fixed. ===== 2026-10-24 (session 84): verification b20261024-c18ca5 (attempt 20, 6 of 6 PASS) applied (P20261024-2e04a7). Removal P20261024-71769e rejected (data/reviews/P20261024-71769e.md): the fix exempts any write of a tagged buffer (b_mxfs_recov_image) whoever writes it and whenever, so a tagged buffer xfsaild writes back after the grant is gone, the stale write PROBE-A exists for, would also print the stackless PROBE-A-REPLAY line; the lap's check cannot fail with the fix on; the control ran on attempt 19's build; and the claim that a replay's writes are authorised is what D-FOREIGN-REPLAY-WRITES-AG-HEADERS-WITHOUT-THE-AG-LOCK is still establishing. Measured since: every PROBE-A-REPLAY line of verification lap pav202 came from the replaying task (tests/evidence/20261024T164944Z_fragag_pav202/test3_kmsg.txt:3-8, 6 lines, all 'comm=kworker/u5:1 pid=34'). Fix narrowed, drafted for the next attempt (tests/evidence/drafts/tree/pal/linux/xfs_buf.c, the PROBE-A site and the knob's comment): the apart report needs the tag AND bp->b_mount->m_mxfs_freplay_task == current (the task mxfs_xlog_recover_foreign_slice sets for the length of the replay, xfs/xfs_log.c:1274/:1346); a tagged image written by any other task keeps the full unheld-write report and stack, so the lap's 'none as an unheld write' check can now fail with the fix on. Compiles clean (tools/draft_syntax_check.sh pal/linux/xfs_buf.c: errors=0 warnings=0). Next attempt: control (probe_a_replay_apart=0) and verification on the same build; the removal waits on D-FOREIGN-REPLAY-WRITES-AG-HEADERS-WITHOUT-THE-AG-LOCK, which decides whether a replay's AG writes are authorised.",
       "batches": [
         {
           "id": "b20261024-e216a7",
@@ -10192,11 +10192,73 @@
           "candidate": "",
           "build": "1BC77CFB15EF4A988DD1F56",
           "variant": "FENCED_ERRNO=0 (dl_failstop_fenced_errno=0: a grant refused after the target refused this node's ledger writes answers -EIO, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a fenced node's refused ledger writes reach the inode lock as -EIO and it shuts down as in-core corruption"
+        },
+        {
+          "id": "b20261024-f88ead",
+          "kind": "verify",
+          "row": "lap:fenced_reason",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 281,
+          "probe": "^EXPOSED: V's ledger fail-stopped",
+          "candidate": "0.90.134",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:fenced_reason",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-f40646",
+            "k": 2,
+            "n": 6,
+            "candidate": "",
+            "variant": "FENCED_ERRNO=0 (dl_failstop_fenced_errno=0: a grant refused after the target refused this node's ledger writes answers -EIO, as before the fix)",
+            "builds": [
+              "1BC77CFB15EF4A988DD1F56"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.01872069310482079
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:fenced_reason",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-f40646",
+          "k": 2,
+          "n": 6,
+          "candidate": "",
+          "variant": "FENCED_ERRNO=0 (dl_failstop_fenced_errno=0: a grant refused after the target refused this node's ledger writes answers -EIO, as before the fix)",
+          "builds": [
+            "1BC77CFB15EF4A988DD1F56"
+          ],
+          "date": "2026-10-24"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fenced_reason",
+          "iso": "2026-10-24T16:54:30Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:fenced_reason",
+          "iso": "2026-10-24T16:50:21Z"
         }
       ]
     },
