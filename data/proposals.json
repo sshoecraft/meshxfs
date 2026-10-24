@@ -6398,6 +6398,85 @@
       ],
       "state": "pending",
       "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-0a91d6",
+      "kind": "detector-defect",
+      "record": null,
+      "change": {
+        "config": "2/net/mesh/direct",
+        "row": "release:platforms",
+        "iso": "2026-10-21T20:12:33Z"
+      },
+      "argument": "DETECTOR DEFECT in the release harness, not a fault of the candidate or of any platform. The run is the platforms step of dry-run candidate 0.90.133-2 (data/candidates/0.90.133-2.json dry_run=True; its run log tests/evidence/candidates/0.90.133-2.run.log:2 'dry run: ... scope {... \"platforms\": [\"ubuntu2404\"] ...}'). Its whole log is three lines, tests/evidence/candidates/0.90.133-2.platforms.log:1-3: '=== 2026-10-21T20:12:33Z tests/full_verify.sh 0.90.133 ===' / 'PLATFORMS leaves out pve9, which has no run of 0.90.133-2 to be graded on' / '=== rc=2'. THE CAUSE IS THE ONE THAT LOG SHOWS (the ground of rejected P20261022-52eada, data/reviews/P20261022-52eada.md:80-86: the refusal comes from tests/full_verify.sh:107-109, which reads no package): the harness graded every released platform even for a dry run scoped to one, so a dry run of ubuntu2404 alone was refused because pve9 had no run. THE FIX, in the tree: tests/full_verify.sh:99-106, GRADED is every released platform except for a dry-run candidate, which is graded on its own subset (:105 GRADED=\"$PLATFORMS\"). The failing attempt froze tests/full_verify.sh sha256 13d7ba097726d80f..., 20070 bytes (tests/evidence/candidates/0.90.133-2.files.json); the tree's file is 0ccb92184629dd1b..., 20553 bytes, mtime 2026-10-21 15:40:09 CDT (20:40:09Z), after this run and before the PASS below. REPRODUCED 2026-10-24 (evidence file tests/evidence/incident_platforms_dryrun_20261024.txt): with the fix's branch not taken (MXFS_CANDIDATE unset, so GRADED is every released platform as before the fix) and the run's own inputs, 'PLATFORMS=ubuntu2404 MXFS_LOGTAG=0.90.133-2 tests/full_verify.sh 0.90.133' printed exactly 'PLATFORMS leaves out pve9, which has no run of 0.90.133-2 to be graded on', rc=2, and wrote no log; the fix's branch condition (:103-104) run alone on data/candidates/0.90.133-2.json returns 0 (dry run), so with the fix this run grades ubuntu2404 alone and :107-109 passes it. THE CLUSTER AND THE CANDIDATE DID NOTHING WRONG IN THIS RUN BECAUSE THE STEP REACHED NO NODE: the script exits at :109 before it opens its log at :113 and before any platform round; no tests/evidence/full_verify_0.90.133* file exists (count 0), so the FAIL makes no claim about any platform, package or node, as with approved release:build detector-defect P20261022-8059bb ('the FAIL makes no claim about the candidate'). PASSED SINCE on the fixed detector: data/criteria.runs.jsonl:7129, release:platforms PASS 2026-10-22T01:55:36Z, candidate 0.90.134 attempt 20261021T230333Z, itself a dry run scoped to platforms ['ubuntu2404'] (tests/evidence/candidates/0.90.134_20261021T230333Z.run.log:1), which froze tests/full_verify.sh 0ccb9218... (its files.json), the fixed file; evidence tests/evidence/full_verify_0.90.134_20261021T230333Z.log. GAP, declared: no platforms round ever ran on this run's module 71AC6107043DD5BE3D9181A; the argument rests on the step reaching no node, not on a later pass of the same module. No MXFS kernel log exists for the run because no node was used.",
+      "evidence": [
+        "tests/evidence/incident_platforms_dryrun_20261024.txt",
+        "tests/evidence/candidates/0.90.133-2.platforms.log",
+        "tests/evidence/candidates/0.90.133-2.run.log",
+        "tests/evidence/candidates/0.90.133-2.files.json",
+        "tests/evidence/candidates/0.90.134_20261021T230333Z.files.json",
+        "tests/evidence/candidates/0.90.134_20261021T230333Z.run.log",
+        "tests/evidence/full_verify_0.90.134_20261021T230333Z.log",
+        "tests/full_verify.sh",
+        "data/candidates/0.90.133-2.json",
+        "data/criteria.runs.jsonl",
+        "data/reviews/P20261022-52eada.md",
+        "data/reviews/P20261022-8059bb.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-a64619",
+      "kind": "infra-proven",
+      "record": null,
+      "change": {
+        "config": "4/net/mesh/direct",
+        "row": "chk_clean",
+        "iso": "2026-10-10T14:02:46Z"
+      },
+      "argument": "This run (4/net/mesh/direct:chk_clean:2026-10-10T14:02:46Z). INFRA PROVEN: the tree's userspace tools were removed mid-run by the owner's own 'make clean' in /home/steve/src/mxfs (which the nodes read as /src/mxfs over NFS), not by MXFS. POSITIVE EVIDENCE FROM OUTSIDE MXFS THAT PRECEDES THE FAILURE (evidence file tests/evidence/incident_chk_missing_make_clean_20261024.txt section 2, session transcript /home/steve/.claude/projects/-home-steve-src-mxfs/f8bde765-67db-4d8d-baab-ed21dc859593.jsonl): at :1275 (14:15:21Z) the session found xfs/ and dlm/ last changed at 08:53:32-33 CDT (13:53:32Z) and the tree empty of .o files, mxfs.ko, Module.symvers and modules.order, a full top-level make clean during the board run of tests/release_rig_gates.sh 0.90.117 rg117 (running since before 13:53:29Z, :857), and asked the owner; at :1279 (14:31:51Z) the owner answered 'yes i did ... to back it up'. The top-level Makefile's clean runs 'make -C tools clean', which is 'rm -f ' with TOOLS = mkfs_mxfs chk_mxfs resize_mxfs mxfs_admin fua_verify (Makefile:17-19, tools/Makefile:15, :35-36). The clean (13:53Z) precedes the chk_clean failure (14:02:46Z) and the crash_audit chk at 14:05:45Z. Last good chk_mxfs before it: board_20261010T130907Z-g2_crash_audit/chk_test1.txt 'chk_mxfs v0.90.99 -- checking /dev/drbd0' at 13:25Z; the tools were rebuilt at 14:11Z (transcript :1247 'make tools rc=0'). THE FAILURES ARE EXACTLY THAT ABSENCE, in every lane of the same run: run_chk_clean_20261010T134422Z-{g4/test3,g2/test1,g2b/test15,g8/test7} 'RESULT: FAIL ... measured=setup | reason=chk tool missing /src/mxfs/tools/chk_mxfs' (tests/tooling/chk_clean.sh:40, :162-165), and board_20261010T134422Z-{g2,g2b,g4,g8}_crash_audit/chk_test*.txt 'bash: line 1: /src/mxfs/tools/chk_mxfs: No such file or directory' / 'CHK_RC=127'; stage 2's prep failed the same way, board_4-disk-caw-direct_g4b_rg117s2.log:80 'FS_PREP_FAIL: mkfs tool not found/executable at /src/mxfs/tools/mkfs_mxfs'. The 4/net/mesh/direct crash_audit row ended ABORT (board_4-net-mesh-direct_g4_rg117s1.log:80) after its oracle had passed: oracle.log:64 'RESULT: PASS label=ca_20261010T134422Z-g4 acked=876 replay_s=72', every acknowledged file readable with its md5 (:53, :60); only the post-run chk, which could not execute, was missing. NO MXFS SIGNATURE in the run's kernel logs (section 8): the four chk_clean kernlogs and the crash_audit dmesg captures hold no BUG, Oops, WARNING, shutdown, corruption or hung-task line (0 each); the board's own kernel_health passed, board_4-net-mesh-direct_g4_rg117s1.log:69 'PASS kernel_health (nodes_pass=4/4 ... hits=0 kinds=[])'. The prep had mounted all four nodes on build B3240CC63168EA159224A2C (:33).",
+      "evidence": [
+        "tests/evidence/incident_chk_missing_make_clean_20261024.txt",
+        "/home/steve/.claude/projects/-home-steve-src-mxfs/f8bde765-67db-4d8d-baab-ed21dc859593.jsonl",
+        "tests/evidence/run_chk_clean_20261010T134422Z-g4",
+        "tests/evidence/board_20261010T134422Z-g4_crash_audit",
+        "tests/evidence/board_4-net-mesh-direct_g4_rg117s1.log",
+        "tests/evidence/board_4-disk-caw-direct_g4b_rg117s2.log",
+        "tests/evidence/20261010T140317Z_tcpdr_ca_20261010T134422Z-g4",
+        "Makefile",
+        "tools/Makefile",
+        "tests/tooling/chk_clean.sh",
+        "data/criteria.runs.jsonl"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
+    },
+    {
+      "id": "P20261023-b0fdf1",
+      "kind": "infra-proven",
+      "record": null,
+      "change": {
+        "config": "4/net/mesh/direct",
+        "row": "crash_audit",
+        "iso": "2026-10-10T14:05:46Z"
+      },
+      "argument": "This run (4/net/mesh/direct:crash_audit:2026-10-10T14:05:46Z). INFRA PROVEN: the tree's userspace tools were removed mid-run by the owner's own 'make clean' in /home/steve/src/mxfs (which the nodes read as /src/mxfs over NFS), not by MXFS. POSITIVE EVIDENCE FROM OUTSIDE MXFS THAT PRECEDES THE FAILURE (evidence file tests/evidence/incident_chk_missing_make_clean_20261024.txt section 2, session transcript /home/steve/.claude/projects/-home-steve-src-mxfs/f8bde765-67db-4d8d-baab-ed21dc859593.jsonl): at :1275 (14:15:21Z) the session found xfs/ and dlm/ last changed at 08:53:32-33 CDT (13:53:32Z) and the tree empty of .o files, mxfs.ko, Module.symvers and modules.order, a full top-level make clean during the board run of tests/release_rig_gates.sh 0.90.117 rg117 (running since before 13:53:29Z, :857), and asked the owner; at :1279 (14:31:51Z) the owner answered 'yes i did ... to back it up'. The top-level Makefile's clean runs 'make -C tools clean', which is 'rm -f ' with TOOLS = mkfs_mxfs chk_mxfs resize_mxfs mxfs_admin fua_verify (Makefile:17-19, tools/Makefile:15, :35-36). The clean (13:53Z) precedes the chk_clean failure (14:02:46Z) and the crash_audit chk at 14:05:45Z. Last good chk_mxfs before it: board_20261010T130907Z-g2_crash_audit/chk_test1.txt 'chk_mxfs v0.90.99 -- checking /dev/drbd0' at 13:25Z; the tools were rebuilt at 14:11Z (transcript :1247 'make tools rc=0'). THE FAILURES ARE EXACTLY THAT ABSENCE, in every lane of the same run: run_chk_clean_20261010T134422Z-{g4/test3,g2/test1,g2b/test15,g8/test7} 'RESULT: FAIL ... measured=setup | reason=chk tool missing /src/mxfs/tools/chk_mxfs' (tests/tooling/chk_clean.sh:40, :162-165), and board_20261010T134422Z-{g2,g2b,g4,g8}_crash_audit/chk_test*.txt 'bash: line 1: /src/mxfs/tools/chk_mxfs: No such file or directory' / 'CHK_RC=127'; stage 2's prep failed the same way, board_4-disk-caw-direct_g4b_rg117s2.log:80 'FS_PREP_FAIL: mkfs tool not found/executable at /src/mxfs/tools/mkfs_mxfs'. The 4/net/mesh/direct crash_audit row ended ABORT (board_4-net-mesh-direct_g4_rg117s1.log:80) after its oracle had passed: oracle.log:64 'RESULT: PASS label=ca_20261010T134422Z-g4 acked=876 replay_s=72', every acknowledged file readable with its md5 (:53, :60); only the post-run chk, which could not execute, was missing. NO MXFS SIGNATURE in the run's kernel logs (section 8): the four chk_clean kernlogs and the crash_audit dmesg captures hold no BUG, Oops, WARNING, shutdown, corruption or hung-task line (0 each); the board's own kernel_health passed, board_4-net-mesh-direct_g4_rg117s1.log:69 'PASS kernel_health (nodes_pass=4/4 ... hits=0 kinds=[])'. The prep had mounted all four nodes on build B3240CC63168EA159224A2C (:33).",
+      "evidence": [
+        "tests/evidence/incident_chk_missing_make_clean_20261024.txt",
+        "/home/steve/.claude/projects/-home-steve-src-mxfs/f8bde765-67db-4d8d-baab-ed21dc859593.jsonl",
+        "tests/evidence/run_chk_clean_20261010T134422Z-g4",
+        "tests/evidence/board_20261010T134422Z-g4_crash_audit",
+        "tests/evidence/board_4-net-mesh-direct_g4_rg117s1.log",
+        "tests/evidence/board_4-disk-caw-direct_g4b_rg117s2.log",
+        "tests/evidence/20261010T140317Z_tcpdr_ca_20261010T134422Z-g4",
+        "Makefile",
+        "tools/Makefile",
+        "tests/tooling/chk_clean.sh",
+        "data/criteria.runs.jsonl"
+      ],
+      "state": "pending",
+      "created": "2026-10-23"
     }
   ]
 }
