@@ -8761,6 +8761,57 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-b9e4be",
+      "kind": "remove-disproved",
+      "record": "D-FOREIGN-REPLAY-WRITES-AG-HEADERS-WITHOUT-THE-AG-LOCK",
+      "change": {},
+      "argument": "DISPROVED: a foreign replay's AG header writes cannot erase a live peer's change, because no live node changes a replayed AG until the replay has ended; PROBE-A fires on those writes because it tests only the replaying node's own grant. (1) Measured, candidate 0.90.134 attempt 18 (module 8DBA16AEB7FDD3066C9C1BC), lane tests/evidence/lanes/g4_a18_20261024T125108Z (g4, test3-test6, the victim test6 destroyed with an unsynced allocate loop running in the files' directory), tests/foreign_replay_ag_lap.sh with each truncate mapped by its file's data extents: calibration b20261024-8c98b7 at 4/net/mesh/direct and b20261024-a46ac0 at 4/disk/caw/direct, 20 laps, all 20 exposed (in each, 30-32 of the survivors' truncates were in an AG the replay wrote, issued during the replay by a node other than the replayer), and in all 20 'completed before it ended: 0': every live change to a replayed AG waited for the replayer's ladder entry (P163-RECOVERY-COMPLETE, clocks joined by ssh round trip); 48 of 48 truncates returned 0 in every lap and chk_mxfs found the volume clean in every lap (chk.txt CHK_RC=0 'filesystem clean'). PROBE-A AG-META-WRITE-NOT-HELD fired only on the replayer test3, 6 or 9 lines a lap, every one recov=1 (a replay image, b_mxfs_recov_image), and 0 lines on test4 and test5 in all 20 laps; the AGs it named are the AGs the replay wrote. In 7 laps some files' extents were in an AG the replay did not write, and in none were the inodes outside the replayed AGs (the H-FRA1 shape did not occur). The one step-log FAIL (b20261024-8c98b7 lap 13:15:13Z, its lap log 'PASS ... fails=0', 30 truncates exposed, 0 early, chk clean) is an operation stall of 30872 ms, named on D-SILENT-PEER-DEATH-TAKES-35S-TO-DETECT-SO-SURVIVORS-STALL-OVER-30S, not this record. (2) Why, from the code: an AG image reaches pass 2 only with an APPLY verdict, and for class AG that needs the block's AG to be the token's resource held by the victim's slot at death in the fence-time manifest, with the live record agreeing or the attempt aborting P-RMAN-POSTSEAL-MUTATION (xfs/xfs_log_recover.c mxfs_shadow_eval_token :3484, mxfs_report_replay_authority :3867, :4030; :3417, :4540); a live node's conflicting acquire of that AG waits behind the victim's frozen grant until the recovery-complete ladder retires it, on TCP (dlm/v5_mount.c v5_tcp_declare_dead :14083, v5_dead_grants_retire :18480) and on CAW behind the victim's slot bits until mxfs_dlm_caw_purge_node (:19004); the probe (pal/linux/xfs_buf.c :11975-12024) reads only this node's grant fields, and prints recov= (b_mxfs_recov_image, set for a replay's pass-2 buffers, pal/linux/xfs_buf_item_recover.c :1574). (3) The record's cells: 4/net/mesh/direct lap:foreign_replay_ag 08:52:06Z and 08:56:56Z and lap:foreign_replay_ag_p163 09:15:38Z and 09:29:14Z ended 'RESULT: VACUOUS ... stage=no-overlap' ('no survivor other than the replayer changed an AG the replay was writing, so nothing here tests the exclusion'; logs cited): the lap's own unexposed outcome, with every other check passing and chk clean, not a filesystem failure. 4/net/mesh/direct crash_audit 2026-10-10T14:05:46Z (ledger INCOMPLETE 'run died while this test was executing'): its oracle passed ('RESULT: PASS ... acked=876', every acknowledged file read its md5 after drop_caches), its 9 PROBE-A lines are all test5's, the replayer, during its replay of the victim's slice (dmesg_survivors.txt), and the post-run audit could not run because tools/chk_mxfs was absent from the tree ('/src/mxfs/tools/chk_mxfs: No such file or directory', CHK_RC=127, chk_test3.out); its headers were never audited, and the measurement above, on the current candidate, is what shows a live peer's change to a replayed AG cannot land before the replay ends. The detector's inability to tell a replay write from an unauthorised one (recov=1) is a detector change, not this record.",
+      "evidence": [
+        "tests/evidence/batch_laps/b20261024-8c98b7/20261024T125139Z-e4d1c69f.log",
+        "tests/evidence/batch_laps/b20261024-8c98b7/20261024T125354Z-7dace72e.log",
+        "tests/evidence/batch_laps/b20261024-8c98b7/20261024T125710Z-9b067a17.log",
+        "tests/evidence/batch_laps/b20261024-8c98b7/20261024T125946Z-99eebfe4.log",
+        "tests/evidence/batch_laps/b20261024-8c98b7/20261024T130204Z-479c2e2f.log",
+        "tests/evidence/batch_laps/b20261024-8c98b7/20261024T130430Z-9da1dc72.log",
+        "tests/evidence/batch_laps/b20261024-8c98b7/20261024T130717Z-06739553.log",
+        "tests/evidence/batch_laps/b20261024-8c98b7/20261024T131008Z-daf30d7d.log",
+        "tests/evidence/batch_laps/b20261024-8c98b7/20261024T131238Z-a3601f97.log",
+        "tests/evidence/batch_laps/b20261024-8c98b7/20261024T131514Z-b365848b.log",
+        "tests/evidence/batch_laps/b20261024-a46ac0/20261024T131752Z-7dd0bf7e.log",
+        "tests/evidence/batch_laps/b20261024-a46ac0/20261024T132022Z-04cf5e6b.log",
+        "tests/evidence/batch_laps/b20261024-a46ac0/20261024T132239Z-1e60afd1.log",
+        "tests/evidence/batch_laps/b20261024-a46ac0/20261024T132504Z-29c34897.log",
+        "tests/evidence/batch_laps/b20261024-a46ac0/20261024T132736Z-c7c88f1e.log",
+        "tests/evidence/batch_laps/b20261024-a46ac0/20261024T133001Z-808744f1.log",
+        "tests/evidence/batch_laps/b20261024-a46ac0/20261024T133221Z-4bc25871.log",
+        "tests/evidence/batch_laps/b20261024-a46ac0/20261024T133441Z-7e761fe4.log",
+        "tests/evidence/batch_laps/b20261024-a46ac0/20261024T133700Z-abcf3825.log",
+        "tests/evidence/batch_laps/b20261024-a46ac0/20261024T133940Z-07ecc51d.log",
+        "tests/evidence/lanes/g4_a18_20261024T125108Z/step2.log",
+        "tests/evidence/lanes/g4_a18_20261024T125108Z/step3.log",
+        "tests/evidence/batch_laps/b20261024-0f5859/20261024T084936Z-3196956a.log",
+        "tests/evidence/batch_laps/b20261024-0f5859/20261024T085428Z-f1b4f413.log",
+        "tests/evidence/batch_laps/b20261024-dcf30c/20261024T091324Z-d67e26b5.log",
+        "tests/evidence/batch_laps/b20261024-dcf30c/20261024T092706Z-0bc3052a.log",
+        "tests/evidence/20261010T140317Z_tcpdr_ca_20261010T134422Z-g4/dmesg_survivors.txt",
+        "tests/evidence/board_20261010T134422Z-g4_crash_audit/oracle.log",
+        "tests/evidence/board_20261010T134422Z-g4_crash_audit/chk_test3.out",
+        "tests/foreign_replay_ag_lap.sh",
+        "xfs/xfs_log_recover.c",
+        "dlm/v5_mount.c",
+        "pal/linux/xfs_buf.c",
+        "pal/linux/xfs_buf_item_recover.c"
+      ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-b9e4be.md",
+        "sha256": "db4531dc1e525435688514e2a892cc235ba4b2a5a82c6f7458a3e36ef99b58c0",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
