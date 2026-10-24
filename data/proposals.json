@@ -7933,8 +7933,15 @@
         "tests/evidence/lanes/g2_a17c_20261024T112110Z/step3.log",
         "tests/evidence/lanes/g2_a17c_20261024T112110Z/step4.log"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-17e3a9.md",
+        "sha256": "cc5b6dc2db1df0c96fdbefaec011c8f0af9f2d6f49b6f9f4cd66425e6e2df263",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-bad0c4",
