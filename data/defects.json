@@ -2810,6 +2810,11 @@
           "config": "2/net/mesh/direct",
           "row": "lap:jdt_gate_stall",
           "iso": "2026-10-24T02:32:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T02:34:06Z"
         }
       ],
       "updated": "2026-10-23",
