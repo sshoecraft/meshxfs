@@ -6451,8 +6451,15 @@
         "data/reviews/P20261022-52eada.md",
         "data/reviews/P20261022-8059bb.md"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-0a91d6.md",
+        "sha256": "c23c1463add2b6663c81c9d5569580a0469b0881feb7af4877dfa589e63eaed0",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-a64619",
@@ -6477,8 +6484,15 @@
         "tests/tooling/chk_clean.sh",
         "data/criteria.runs.jsonl"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-a64619.md",
+        "sha256": "957588d822dc328e5fafdd2a53dab0a1f6403cac63d87c3a935c370a838e4682",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     },
     {
       "id": "P20261023-b0fdf1",
@@ -6503,8 +6517,14 @@
         "tests/tooling/chk_clean.sh",
         "data/criteria.runs.jsonl"
       ],
-      "state": "pending",
-      "created": "2026-10-23"
+      "state": "rejected",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-b0fdf1.md",
+        "sha256": "901f929dd25e869f53f87049406de6598cab53e6e43c377371f9bcf45c033eb9",
+        "verdict": "rejected",
+        "date": "2026-10-23"
+      }
     }
   ]
 }

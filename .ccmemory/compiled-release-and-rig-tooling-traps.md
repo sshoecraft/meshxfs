@@ -1,6 +1,6 @@
 ---
 name: compiled-release-and-rig-tooling-traps
-description: Release/rig traps (errorfc, defects.py -w, empty dist, glibc), release-claim rulings, DRBD 9 policy, no model consults, i_dlm_state ACQUIRING
+description: Release/rig traps (errorfc, defects.py -w, empty dist, glibc), release-claim rulings, DRBD 9 policy, consult when stuck (old ban superseded), i_dlm_state ACQUIRING
 metadata:
   type: feedback
 tags: [compiled, release, packaging, rig, defects, platforms, claims, drbd, dlm, ilock, trap, consult, gpt, astra, rules, owner-decision]
@@ -103,14 +103,16 @@ Source: `compiled-model-consults-policy-and-handling-consult-output` (ten notes,
 
 ### Current rule (binding)
 
-Never call `mcp__ask_gpt__query`, `mcp__ask_astra__query` or `mcp__ask_fable__query`, on any model, for any question: not a hard-to-reverse design choice, not a stuck loop. Own the decision: read the code and references, instrument, measure. Stuck means the next step is a new instrument or hypothesis; a blocker only the user can clear is reported as one. Source: `feedback-never-consult-another-model` (user, 0.90.71, after a session asked GPT how to recover a withdrawn DRBD mount: stop asking GPT, then "don't ask anybody anything"). The user backed it with a web check that Opus 5.5 on max leads GPT-6 Astra on agentic coding (Terminal-Bench 4.0 66.4% vs 57.9%) and full-repo coding (FrontierCode 54.4% vs 53.3%); Astra leads only on math, abstract reasoning and computer use.
+SUPERSEDED. The project CLAUDE.md carries `RULE: CONSULT ANOTHER MODEL WHEN STUCK` (user directive, 2026-10-10), which outranks every memory. When stuck, consult (Astra first, as the owner asked on 2026-10-23: "are you asking astra for help on stuff you get stuck on?"). Sessions kept reading the never-consult paragraph below as binding and consulted nobody for weeks, which the owner had to ask about. A consult's output is still hypotheses to instrument, never findings. If Astra/GPT return HTTP 429 `credit_balance_exhausted`, the OpenAI account is out of credits: report that as a blocker only the owner can clear, and try `mcp__ask_fable__query`.
+
+Old rule, kept only as history and NOT in force: Never call `mcp__ask_gpt__query`, `mcp__ask_astra__query` or `mcp__ask_fable__query`, on any model, for any question: not a hard-to-reverse design choice, not a stuck loop. Own the decision: read the code and references, instrument, measure. Stuck means the next step is a new instrument or hypothesis; a blocker only the user can clear is reported as one. Source: `feedback-never-consult-another-model` (user, 0.90.71, after a session asked GPT how to recover a withdrawn DRBD mount: stop asking GPT, then "don't ask anybody anything"). The user backed it with a web check that Opus 5.5 on max leads GPT-6 Astra on agentic coding (Terminal-Bench 4.0 66.4% vs 57.9%) and full-repo coding (FrontierCode 54.4% vs 53.3%); Astra leads only on math, abstract reasoning and computer use.
 
 ### How the policy moved (chronological; later entries supersede)
 
 1. First Astra use: called exactly once, on the foreign-slot replay-gating defect, asking for hazards rather than approval. It rejected folding an epoch into the XFS log cycle field and exposed a false premise (reapplying a flushed image is not idempotent). The defect stayed open, so the honest claim was "prevented a wrong turn", not "closes defects faster". The call ran over 120 s. Astra is an OpenAI model, so it sits in the same family the user had already limited. The user never authorized routine use; a conditional ("if it helps close defects faster") is not permission. `astra-consult-was-used-once-and-was-substantive-but-has-not-yet-closed-a-defect`
 2. User corrected a Fable session twice for consulting GPT on a fencing design, then objected to the strict-never rewrite as an extreme swing; the intermediate rule allowed consults for hard-to-reverse designs, unconverged loops, and more readily on Opus fallback. `feedback-gpt-consults-are-a-last-resort` and `feedback-no-gpt-consults-when-running-on-fable`. The retained design-choice clause was treated by sessions as permission, which is why the corrections did not stick.
-3. Both of those are superseded by the never-consult rule above. Do not follow the old "Opus-fallback session may consult GPT" clause.
-4. Autonomy note: `feedback-when-the-user-is-afk-take-the-recommended-default-never-ask` says that when the user is AFK on a handed-over task, take the "(Recommended)" option at design forks and list each decision in the final report so it can be reversed. Its aside that a design consult is "still fine" is obsolete; consulting is prohibited. Project hard prohibitions still apply (no host reboot, no git unasked, no widened timeouts).
+3. Both of those were superseded by the never-consult rule, itself now superseded by the CLAUDE.md consult-when-stuck rule. Do not follow the old "Opus-fallback session may consult GPT" clause.
+4. Autonomy note: `feedback-when-the-user-is-afk-take-the-recommended-default-never-ask` says that when the user is AFK on a handed-over task, take the "(Recommended)" option at design forks and list each decision in the final report so it can be reversed. Its aside that a design consult is "still fine" matches the current CLAUDE.md consult-when-stuck rule. Project hard prohibitions still apply (no host reboot, no git unasked, no widened timeouts).
 
 ### Treating consult output already in hand
 
