@@ -8154,6 +8154,23 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-a4d6ea",
+          "kind": "control",
+          "row": "lap:lap_bounded",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "A7E90BC5313192108E35B80",
+          "variant": "MXFS_LAP_BOUNDED=0 (each arm's step runs under timeout(1), as the laps bounded their own steps before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a lap's own step bound counts another holder's lock wait, and returns while a child the step started still holds a lock"
         }
       ],
       "rates": [
