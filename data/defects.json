@@ -3936,8 +3936,8 @@
       "config": "*/*/*",
       "opened": "2026-10-22",
       "summary": "A node whose filesystem has shut down and whose PR key is gone (self-fenced) keeps its mount and its authority-ledger publisher, which retries every page it holds against RESERVATION CONFLICT about 100 times a second without end (P-TAUTH-PUBLISH-FAIL rc=-52, then P-TAUTH-RECONCILE, per page), so a fenced node hammers the shared LUN and floods the target's log until it is powered off.",
-      "evidence": "test21 on 8/net/mesh/mpath, build 9594B08726D6732D2ED5E87, after D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER shut its filesystem down at 19:56:11 (ledger run 8/net/mesh/mpath:path_peer_withdrawn:2026-10-22T19:58:42Z). Its kernel log (tests/evidence/flood_test21_20261022T200054Z/test21_kernlog_boot.gz, decompressed lines): 819084-819089 (19:56:14) P305-RESV-HEALTH state=SELF_GONE, P277-PR-FULLSTATUS own key ABSENT, P277-FENCED-SELF-WITHDRAW, P131-SELF-FENCE [PR_CONFLICT_FENCED]; 823160-823163 (19:56:32) P-PR-OWNKEY-GONE, P-PR-SELFFENCE, P131-SELF-FENCE [PR_KEY_PREEMPTED]; first 'P-TAUTH-PUBLISH-FAIL page=182 copy=0 seq=47 rc=-52 -- uncertain' at 819197 (19:56:19), last at 914587 (20:01:55, the log's end): 31,510 of them, every one rc=-52, over 85 distinct pages, each followed by P-TAUTH-RECONCILE; per minute 4070, 5149, 4790, 5949, 5984, 5568 (19:56-20:01), each matched by an 'sd 4:0:0:0: reservation conflict' line; 530 P-TAUTH-FROZEN-NOT-CONSUMED rc=-5 in the same span. test21's state at 20:00:55 (tests/evidence/flood_test21_20261022T200054Z/test21_state.txt): /dev/mapper/mpatha still mounted on /mnt/shared, both paths active. On the lab host the target logged ~100 'Reservation conflict (dev mxfspool04, initiator test21)' lines a second (6,031 in the minute to 20:00:44, all test21), and mxfs-clyde-guard halted the rig on FLOOD at 19:57:21 (.rig_halt, snapshot /src/mxfs/.evidence/guard_20261022_195717_34475: 400 of 400 lines that conflict). The flood stopped when test21 was destroyed at ~20:01:00 (0 conflicts in the next 5 s). ===== 2026-10-23 (session 49): 8/net/mesh/mpath path_peer_withdrawn twice on candidate 0.90.134's module C54C14B681D148267D084FC as variants (MXFS_TEST_ENV=PF_KEEP_KMSG=1, default window and path settings; lane tests/evidence/lanes/g8_a13_peerwithdrawn_kmsg_20261023T192856Z): both PASS, 'victim=test14 recovered_two_paths_s=8 recovered_one_path_s=9 reinstate_s=21 survivor_stall_two_ms=9687 survivor_stall_one_ms=9065 ... fails=0 max_stall_ms=10439' (tests/evidence/board_20261023T193036Z-g8_path_peer_withdrawn/row.log) and 'recovered_two_paths_s=9 recovered_one_path_s=10 reinstate_s=18 survivor_stall_two_ms=6202 survivor_stall_one_ms=7154 ... max_stall_ms=7535' (board_20261023T193518Z-g8_path_peer_withdrawn/row.log), every node's whole kernel log kept (kmsg_<node>_fromnode.gz). Two passes dispose of nothing; they say the row alone does not reach this record's trigger on this module, so its rig lap has to force it.",
-      "next": "Find where the ledger publisher decides to retry an uncertain publish (dlm/ tauth publish and reconcile paths) and what it consults about the node's state: a shut-down, self-fenced mount must stop publishing (and stop every other write) once its key is gone, not retry each page forever. Reproduce on a 2-node TCP pair: shut a node's filesystem down while it holds ledger pages and preempt its key, then count its P-TAUTH-PUBLISH-FAIL lines and the target's conflicts per second. ===== Verify P20261023-6664ba (batch b20261023-c63530) was rejected (data/reviews/P20261023-6664ba.md): every lap was four simulated nodes in one process on the lab host, whose authority close is a stub flag and whose ledger file never refuses a write, so no lap could produce the RESERVATION CONFLICT retry loop (0 P-TAUTH-PUBLISH-FAIL lines in any control or verify log). Needed: board-row laps at 8/net/mesh/mpath on the candidate's module where a node's filesystem shuts down and its PR key is preempted while its peers still name it, with a kernel-log probe on the fenced node (P290-AUTH-CLOSED, then a peer's LOCK_REQ/FREEZE_REQ/FROZEN reaching it, or the fix's P-TAUTH-*-AUTH-CLOSED lines), graded on no P-TAUTH-PUBLISH-FAIL loop, no target 'Reservation conflict ... initiator' flood and no survivor operation stalled past 30 s; a rate for those laps (a control there with the fix reverted, or a --transfer for the reviewer to check); and a drift check cited after the last lap. ===== Removal P20261023-6c4c99 was rejected (data/reviews/P20261023-6c4c99.md): the control is the frozen source with only the fix reversed and the batches are sound, but the harness's store never refuses a write (tests/tauth/fenced_node_ledger_test.c:23-25), so neither batch had a RESERVATION CONFLICT, an uncertain publish or a reconcile; in test21's log the FROZEN arm accounts for at least 28,034 of 31,510 refused publishes (670 printed + 27,364 suppressed), and the other ~3,476 are pinned on dlm_page_ensure_mine only by reading (dlm/dlm.c:4629 logs nothing when its write fails). Needed: a real-target run with the fix out and in on the candidate's module (the record's 2-node TCP step is the template), counting P-TAUTH-PUBLISH-FAIL and the target's conflicts per second after P290-AUTH-CLOSED (fix out the flood, fix in none plus P-TAUTH-PAGE-AUTH-CLOSED or P-TAUTH-HANDOFF-AUTH-CLOSED), or a harness store that refuses a closed node's writes; a probe on the dlm_page_acquire activation (dlm/dlm.c:4629) so every refused publish is traced to a gated entry point; the fix-on batch passed through an approved verify first. The rig run's 75 s stall and test28's mount timeout are now named by D-NETMESH-SHARED-DIR-LOCK-QUEUE-JAMS-60S-AFTER-PEER-WITHDRAWS and D-8NETMESH-REJOIN-MOUNT-AFTER-PEER-WITHDRAWN-ONE-PATH-TIMES-OUT-AT-60S.",
+      "evidence": "test21 on 8/net/mesh/mpath, build 9594B08726D6732D2ED5E87, after D-8NETMESH-SURVIVOR-SHUTDOWN-FALSE-FRESH-AG-GRANT-AFTER-TAKEOVER shut its filesystem down at 19:56:11 (ledger run 8/net/mesh/mpath:path_peer_withdrawn:2026-10-22T19:58:42Z). Its kernel log (tests/evidence/flood_test21_20261022T200054Z/test21_kernlog_boot.gz, decompressed lines): 819084-819089 (19:56:14) P305-RESV-HEALTH state=SELF_GONE, P277-PR-FULLSTATUS own key ABSENT, P277-FENCED-SELF-WITHDRAW, P131-SELF-FENCE [PR_CONFLICT_FENCED]; 823160-823163 (19:56:32) P-PR-OWNKEY-GONE, P-PR-SELFFENCE, P131-SELF-FENCE [PR_KEY_PREEMPTED]; first 'P-TAUTH-PUBLISH-FAIL page=182 copy=0 seq=47 rc=-52 -- uncertain' at 819197 (19:56:19), last at 914587 (20:01:55, the log's end): 31,510 of them, every one rc=-52, over 85 distinct pages, each followed by P-TAUTH-RECONCILE; per minute 4070, 5149, 4790, 5949, 5984, 5568 (19:56-20:01), each matched by an 'sd 4:0:0:0: reservation conflict' line; 530 P-TAUTH-FROZEN-NOT-CONSUMED rc=-5 in the same span. test21's state at 20:00:55 (tests/evidence/flood_test21_20261022T200054Z/test21_state.txt): /dev/mapper/mpatha still mounted on /mnt/shared, both paths active. On the lab host the target logged ~100 'Reservation conflict (dev mxfspool04, initiator test21)' lines a second (6,031 in the minute to 20:00:44, all test21), and mxfs-clyde-guard halted the rig on FLOOD at 19:57:21 (.rig_halt, snapshot /src/mxfs/.evidence/guard_20261022_195717_34475: 400 of 400 lines that conflict). The flood stopped when test21 was destroyed at ~20:01:00 (0 conflicts in the next 5 s). ===== 2026-10-23 (session 49): 8/net/mesh/mpath path_peer_withdrawn twice on candidate 0.90.134's module C54C14B681D148267D084FC as variants (MXFS_TEST_ENV=PF_KEEP_KMSG=1, default window and path settings; lane tests/evidence/lanes/g8_a13_peerwithdrawn_kmsg_20261023T192856Z): both PASS, 'victim=test14 recovered_two_paths_s=8 recovered_one_path_s=9 reinstate_s=21 survivor_stall_two_ms=9687 survivor_stall_one_ms=9065 ... fails=0 max_stall_ms=10439' (tests/evidence/board_20261023T193036Z-g8_path_peer_withdrawn/row.log) and 'recovered_two_paths_s=9 recovered_one_path_s=10 reinstate_s=18 survivor_stall_two_ms=6202 survivor_stall_one_ms=7154 ... max_stall_ms=7535' (board_20261023T193518Z-g8_path_peer_withdrawn/row.log), every node's whole kernel log kept (kmsg_<node>_fromnode.gz). Two passes dispose of nothing; they say the row alone does not reach this record's trigger on this module, so its rig lap has to force it. ===== 2026-10-24 (session 79): a real-target rig lap, drafted and held (tests/evidence/drafts/held/tests/fenced_ledger_rig_lap.sh: prep, both nodes on pathload, V's dl_auth_closed_park set at run time, then V's authority closed by P's plain PREEMPT of V's key or by V's heartbeat paused 45 s; 40 s of P's load), prechecked at 2/net/mesh/direct on g2e (V=test17, P=test18, attempt-18 module 8DBA16AEB7FDD3066C9C1BC). All four arms VACUOUS stage=no-request: V logged P290-AUTH-CLOSED (PR_CONFLICT_FENCED after preempt, AUTHORITY_LEASE_EXPIRED after the pause) and withdrew, and nothing reached its ledger afterwards (P-TAUTH-PUBLISH-FAIL, -FROZEN-NOT-CONSUMED, -PAGE-AUTH-CLOSED, -HANDOFF-AUTH-CLOSED all 0 after the closure; preempt PARK=1 had 6 refused publishes 0.9 s BEFORE it). Host conflicts from V: 7 and 184 (preempt, PARK=1 and 0), 0 and 0 (pause). P's side (test18_kmsg.txt): after the preempt P declared V dead only on heartbeat expiry ~11 s later, fenced it by a witnessed LU reset, replayed its slice and completed recovery (P163-RECOVERY-COMPLETE total=303/352 ms); after the pause P saw P163-WITHDRAW-SEEN and fenced by PREEMPT AND ABORT. P's longest operation 18530/20896 ms (preempt), 10602/10962 ms (pause). P then logged 'heartbeat received from unknown node <V>' 51-59 times to the end. Evidence tests/evidence/20261024T141549Z_fledger_flp1, 20261024T141810Z_fledger_flp0, 20261024T142009Z_fledger_flh1, 20261024T142210Z_fledger_flh0 (stdout.txt in each). So at two nodes the only peer is the recoverer and stops routing to V once it declares it; the incident's peers kept routing to a withdrawn test21 for minutes (P-LEASE-WITHDRAWN-RENEWAL 'kept for mastership retention' is logged in every lap here too).",
+      "next": "Find where the ledger publisher decides to retry an uncertain publish (dlm/ tauth publish and reconcile paths) and what it consults about the node's state: a shut-down, self-fenced mount must stop publishing (and stop every other write) once its key is gone, not retry each page forever. Reproduce on a 2-node TCP pair: shut a node's filesystem down while it holds ledger pages and preempt its key, then count its P-TAUTH-PUBLISH-FAIL lines and the target's conflicts per second. ===== Verify P20261023-6664ba (batch b20261023-c63530) was rejected (data/reviews/P20261023-6664ba.md): every lap was four simulated nodes in one process on the lab host, whose authority close is a stub flag and whose ledger file never refuses a write, so no lap could produce the RESERVATION CONFLICT retry loop (0 P-TAUTH-PUBLISH-FAIL lines in any control or verify log). Needed: board-row laps at 8/net/mesh/mpath on the candidate's module where a node's filesystem shuts down and its PR key is preempted while its peers still name it, with a kernel-log probe on the fenced node (P290-AUTH-CLOSED, then a peer's LOCK_REQ/FREEZE_REQ/FROZEN reaching it, or the fix's P-TAUTH-*-AUTH-CLOSED lines), graded on no P-TAUTH-PUBLISH-FAIL loop, no target 'Reservation conflict ... initiator' flood and no survivor operation stalled past 30 s; a rate for those laps (a control there with the fix reverted, or a --transfer for the reviewer to check); and a drift check cited after the last lap. ===== Removal P20261023-6c4c99 was rejected (data/reviews/P20261023-6c4c99.md): the control is the frozen source with only the fix reversed and the batches are sound, but the harness's store never refuses a write (tests/tauth/fenced_node_ledger_test.c:23-25), so neither batch had a RESERVATION CONFLICT, an uncertain publish or a reconcile; in test21's log the FROZEN arm accounts for at least 28,034 of 31,510 refused publishes (670 printed + 27,364 suppressed), and the other ~3,476 are pinned on dlm_page_ensure_mine only by reading (dlm/dlm.c:4629 logs nothing when its write fails). Needed: a real-target run with the fix out and in on the candidate's module (the record's 2-node TCP step is the template), counting P-TAUTH-PUBLISH-FAIL and the target's conflicts per second after P290-AUTH-CLOSED (fix out the flood, fix in none plus P-TAUTH-PAGE-AUTH-CLOSED or P-TAUTH-HANDOFF-AUTH-CLOSED), or a harness store that refuses a closed node's writes; a probe on the dlm_page_acquire activation (dlm/dlm.c:4629) so every refused publish is traced to a gated entry point; the fix-on batch passed through an approved verify first. The rig run's 75 s stall and test28's mount timeout are now named by D-NETMESH-SHARED-DIR-LOCK-QUEUE-JAMS-60S-AFTER-PEER-WITHDRAWS and D-8NETMESH-REJOIN-MOUNT-AFTER-PEER-WITHDRAWN-ONE-PATH-TIMES-OUT-AT-60S. ===== The lap at 4 nodes or more, where peers other than the recoverer keep a withdrawn node as master under mastership retention (the incident's 8/net/mesh/mpath shape): V withdrawn by the preempt while two peers run load in the shared directory, the probe counting what reaches V's ledger after P290; precheck both PARK arms before any batch.",
       "cells": [
         {
           "config": "8/net/mesh/mpath",
@@ -4230,7 +4230,7 @@
           "lower_bound": 0.5887040186524746
         }
       ],
-      "updated": "2026-10-23",
+      "updated": "2026-10-24",
       "rates": [
         {
           "row": "lap:fenced_node_ledger",
@@ -6277,6 +6277,23 @@
           "probe": "^EXPOSED: ",
           "candidate": "",
           "build": "8DBA16AEB7FDD3066C9C1BC",
+          "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out at 8 nodes on multipath: A on a 12 s window declares B, on 34 s, dead inside B's 30 s lease"
+        },
+        {
+          "id": "b20261024-05c9e3",
+          "kind": "control",
+          "row": "lap:peer_window",
+          "config": "8/disk/caw/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "A27A67A3E501890BE9985E0",
           "variant": "dl_peer_window=0 (ARM=0: the short-window node holds its peer to its own window, as before the fix)",
           "state": "open",
           "leaves_cluster": false,
@@ -8501,7 +8518,128 @@
       "summary": "tests/drbd_write_bound_arm.sh, given a bare node count in MXFS_NODES (the fix of D-MXFS-NODES-COUNT-TO-RUN-SH-NAMES-TO-DRBD-RIG-LANE-ABORTS-EVERY-DRBD-LAP), and with MXFS_NODES unset, uses its built-in default pair test3/test4 and ignores MXFS_GROUP, so run from a lane of another group it addresses test3/test4, which belong to group g4 (test3-test6), a lane that may be running on them",
       "evidence": "Code read: tests/drbd_write_bound_arm.sh:36-41 ('MXFS_NODES=\"\"' for a bare number, then 'export MXFS_NODES=${MXFS_NODES:-test3 test4}'); found by review data/reviews/P20261024-289caf.md, whose laps (tests/evidence/batch_laps/b20261024-8ef8c9) print the arm selecting test3 test4 from a g2 lane. No run has yet collided: this is a hazard read from the code and the laps' own selection, not an observed failure.",
       "next": "Make the arm resolve its pair as scripts/drbd_rig.sh does (MXFS_GROUP's nodes when MXFS_NODES is a count or unset), with a switch for the control; a lap that runs the arm's node resolution with MXFS_GROUP=g2 and requires test1 test2; control (switch off) prints test3 test4; verification; remove --fixed. ===== 2026-10-24: the arm's fix is in attempt 18's frozen tree (tests/drbd_write_bound_arm.sh :40-52: with no pair named it takes MXFS_GROUP's two nodes from tools/mxfs_lab.sh group, g2 when unset; DRBD_ARM_GROUP=0 takes test3 test4, the control), and tests/drbd_nodes_count_lap.sh in that tree still expects the arm's old default pair (:72-74), so it would fail with the fix in. Lap drafted for the next attempt in tests/evidence/drafts/tree/tests/drbd_nodes_count_lap.sh: the arm part requires the g2 pair, test1 test2, from MXFS_NODES=2 MXFS_GROUP=g2 (EXPOSED names both), and DRBD_ARM_GROUP=0 in the lap's environment is this record's control (DRBD_RIG_NODES_COUNT=0 stays the earlier record's). Precheck on attempt 18's tree of the arm's own resolution (DRBD_ARM_PRINT_NODES=1 MXFS_NODES=2 MXFS_GROUP=g2): fix 'DRBD_ARM_NODES test1 test2', DRBD_ARM_GROUP=0 'DRBD_ARM_NODES test3 test4'; MXFS_NODES unset with MXFS_GROUP=g2b 'DRBD_ARM_NODES test15 test16'. Next, on the next attempt with the draft applied (host lane, bound 30 s a lap as the lap derives): control --row lap:drbd_arm_group --at 2/net/mesh/drbd --knob 'DRBD_ARM_GROUP=0' -- env DRBD_ARM_GROUP=0 tests/drbd_nodes_count_lap.sh dag{lap}, probe '^EXPOSED: ', pass '^LAP drbd_nodes_count PASS', fail '^LAP drbd_nodes_count FAIL'; the verification sized from it; remove --fixed.",
-      "updated": "2026-10-24"
+      "updated": "2026-10-24",
+      "batches": [
+        {
+          "id": "b20261024-1194fc",
+          "kind": "control",
+          "row": "lap:drbd_arm_group",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "A27A67A3E501890BE9985E0",
+          "variant": "DRBD_ARM_GROUP=0 (tests/drbd_write_bound_arm.sh takes test3 test4 whatever the group, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: from a g2 lane the arm addresses test3 test4, group g4's nodes"
+        },
+        {
+          "id": "b20261024-efeeb2",
+          "kind": "verify",
+          "row": "lap:drbd_arm_group",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "A27A67A3E501890BE9985E0",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:drbd_arm_group",
+            "config": "2/net/mesh/drbd",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-1194fc",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "DRBD_ARM_GROUP=0 (tests/drbd_write_bound_arm.sh takes test3 test4 whatever the group, as before the fix)",
+            "builds": [
+              "A27A67A3E501890BE9985E0"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
+        }
+      ],
+      "rates": [
+        {
+          "row": "lap:drbd_arm_group",
+          "config": "2/net/mesh/drbd",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-1194fc",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "DRBD_ARM_GROUP=0 (tests/drbd_write_bound_arm.sh takes test3 test4 whatever the group, as before the fix)",
+          "builds": [
+            "A27A67A3E501890BE9985E0"
+          ],
+          "date": "2026-10-24"
+        }
+      ],
+      "cells": [
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_arm_group",
+          "iso": "2026-10-24T14:31:18Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_arm_group",
+          "iso": "2026-10-24T14:31:17Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_arm_group",
+          "iso": "2026-10-24T14:31:15Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_arm_group",
+          "iso": "2026-10-24T14:31:14Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_arm_group",
+          "iso": "2026-10-24T14:31:12Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_arm_group",
+          "iso": "2026-10-24T14:31:11Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_arm_group",
+          "iso": "2026-10-24T14:31:09Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_arm_group",
+          "iso": "2026-10-24T14:31:08Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_arm_group",
+          "iso": "2026-10-24T14:31:06Z"
+        },
+        {
+          "config": "2/net/mesh/drbd",
+          "row": "lap:drbd_arm_group",
+          "iso": "2026-10-24T14:31:05Z"
+        }
+      ]
     },
     {
       "id": "D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED",
@@ -8927,6 +9065,56 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261024-4a72ee",
+          "kind": "control",
+          "row": "lap:measure_settled",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "A27A67A3E501890BE9985E0",
+          "variant": "MXFS_MEASURE_COUNT_SETTLED=0 (defects.py measure counts only PASS and FAIL laps toward the plan, as before the fix)",
+          "state": "closed",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: a batch at its full plan holding a settled INCOMPLETE lap cannot be measured"
+        },
+        {
+          "id": "b20261024-e3e420",
+          "kind": "verify",
+          "row": "lap:measure_settled",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "A27A67A3E501890BE9985E0",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:measure_settled",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-4a72ee",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "MXFS_MEASURE_COUNT_SETTLED=0 (defects.py measure counts only PASS and FAIL laps toward the plan, as before the fix)",
+            "builds": [
+              "A27A67A3E501890BE9985E0"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "updated": "2026-10-24",
@@ -8943,6 +9131,21 @@
           "variant": "MXFS_MEASURE_COUNT_SETTLED=0 (defects.py measure counts only PASS and FAIL laps toward the plan, as before the fix)",
           "builds": [
             "8DBA16AEB7FDD3066C9C1BC"
+          ],
+          "date": "2026-10-24"
+        },
+        {
+          "row": "lap:measure_settled",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-4a72ee",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "MXFS_MEASURE_COUNT_SETTLED=0 (defects.py measure counts only PASS and FAIL laps toward the plan, as before the fix)",
+          "builds": [
+            "A27A67A3E501890BE9985E0"
           ],
           "date": "2026-10-24"
         }
@@ -8997,6 +9200,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:measure_settled",
           "iso": "2026-10-24T12:50:18Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:measure_settled",
+          "iso": "2026-10-24T14:30:30Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:measure_settled",
+          "iso": "2026-10-24T14:30:26Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:measure_settled",
+          "iso": "2026-10-24T14:30:22Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:measure_settled",
+          "iso": "2026-10-24T14:30:18Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:measure_settled",
+          "iso": "2026-10-24T14:30:14Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:measure_settled",
+          "iso": "2026-10-24T14:30:10Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:measure_settled",
+          "iso": "2026-10-24T14:30:05Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:measure_settled",
+          "iso": "2026-10-24T14:30:01Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:measure_settled",
+          "iso": "2026-10-24T14:29:57Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:measure_settled",
+          "iso": "2026-10-24T14:29:53Z"
         }
       ],
       "verified_at": [
