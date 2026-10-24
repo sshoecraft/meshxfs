@@ -6837,6 +6837,30 @@
         "date": "2026-10-23"
       },
       "applied": "2026-10-23"
+    },
+    {
+      "id": "P20261023-1e08c7",
+      "kind": "verify",
+      "record": "D-TAUTH-TEST-OBJECTS-OMIT-INCLUDED-HEADERS-SO-A-HEADER-CHANGE-LINKS-STALE-CODE",
+      "change": {
+        "batch": "b20261023-489db7"
+      },
+      "argument": "Verification b20261023-489db7 (lap:tauth_nodep at 2/disk/caw/direct, candidate 0.90.134, attempt frozen 2026-10-24T04:13:43Z, module B947A20F3C2FE3A67ABF6F3) passed 6 of 6 exposed laps, every shared object and dlm_ledger_test carrying both header marks after a plain make (tests/evidence/lanes/host_a15_20261024T041350Z/step10.log), sized from control b20261023-9a1ad5 (TAUTH_DEPS=0, the fix's own switch, with TAUTH_FIRST_NODEP=1 in both arms: the first build too runs without dependency files, so the lap starts from objects built before the Makefile fix; 10 of 10 exposed laps failed 'a plain make linked stale objects: obj/tauth_store.o ...', tests/evidence/lanes/host_a15_20261024T041350Z/step9.log). This is the branch of the fix that no lap had run (review P20261023-c062a3): objects with no .d from before the fix. The lap (tests/tauth_header_dep_lap.sh, bound 74 s, twice its longest measured lap) builds the tauth tests, changes pal/pal.h and dlm/dlm.h, runs a plain make and requires every object that includes them to carry the new marks. Host-only make: the configuration is only the ledger key.",
+      "evidence": [
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step9.log",
+        "tests/evidence/lanes/host_a15_20261024T041350Z/step10.log",
+        "tests/tauth_header_dep_lap.sh",
+        "tests/tauth/Makefile"
+      ],
+      "state": "applied",
+      "created": "2026-10-23",
+      "review": {
+        "file": "data/reviews/P20261023-1e08c7.md",
+        "sha256": "5250abc5d3e0d78e1eba0b384da6141db47cc9e4473fa9121e57f7282916e13f",
+        "verdict": "approved",
+        "date": "2026-10-23"
+      },
+      "applied": "2026-10-23"
     }
   ]
 }

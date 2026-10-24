@@ -2982,9 +2982,26 @@
           },
           "transfer": "",
           "lower_bound": 0.5887040186524746
+        },
+        {
+          "id": "b20261023-a1d925",
+          "kind": "control",
+          "row": "lap:lunpool_shutdown",
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^LAP lunpool_shutdown also exposed",
+          "candidate": "",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "LUN_POOL_ISCSI_UNIT=0 (tools/lun_pool.sh logs a node in by hand and starts no open-iscsi.service, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: after a recordless boot the --also bind leaves both nodes logged in by hand with the unit inactive, and they hang at shutdown"
         }
       ],
-      "updated": "2026-10-22",
+      "updated": "2026-10-23",
       "rates": [
         {
           "row": "lap:lunpool_shutdown",
@@ -3915,7 +3932,26 @@
           "why": "PRE-ASSERT on test21: chk_clean left test21 unmounted on its CORRUPT verdict (run_chk_clean_20261019T142249Z-g8b/test21:3)"
         }
       ],
-      "updated": "2026-10-23"
+      "updated": "2026-10-23",
+      "batches": [
+        {
+          "id": "b20261023-3629b7",
+          "kind": "control",
+          "row": "lap:relog_auth",
+          "config": "4/disk/caw/mpath",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "variant": "ARM=0 (relog_auth_granted_mode=0: a shared CAW bit authorizes the re-log as an exclusive one, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "the fix taken out: a node holding a directory shared re-logs its out-of-date core at release"
+        }
+      ]
     },
     {
       "id": "D-2CAWMPATH-FENCED-RETURN-FENCE-NEVER-LANDED-SURVIVOR-ERRORS-236S",
@@ -4463,7 +4499,7 @@
       "opened": "2026-10-23",
       "summary": "tests/tauth/Makefile's object rules did not list every header their sources include (no rule lists pal/pal.h; dlm_shared.o's and pal_user.o's name only their source file), so a plain make after a header change kept objects built before it: with pal/pal.h and dlm/dlm.h changed, 'make all' recompiled 10 of 19 objects and left tauth_store.o, tauth_ledger.o and pal_user.o (which include pal/pal.h) and dlm_shared.o (which includes both) as they were while it relinked dlm_ledger_test, which links all four; with pal/pal.h alone changed, a make of the five shared objects left all five, dlm.o too, as they were",
       "evidence": "tests/tauth/Makefile:131-132 '$(OBJDIR)/dlm_shared.o: $(TOP)/dlm/dlm_shared.c | $(OBJDIR)'; :146-147 tauth_store.o prerequisites tauth_store.c tauth_store.h mxfs_tauth.h; :149-150 tauth_ledger.o prerequisites tauth_ledger.c tauth_ledger.h tauth_store.h mxfs_tauth.h; tests/tauth/adopted_grant_handoff_test.sh:27 'make obj/dlm.o obj/dlm_shared.o obj/tauth_ledger.o obj/tauth_store.o obj/pal_user.o'. Found by the review of P20261023-867053 (data/reviews/P20261023-867053.md): the three objects linked into that verification's binary were built before the last write of pal/pal.h and dlm/dlm.h, which they include. ===== 2026-10-23, FIX in the tree (not yet controlled or verified): tests/tauth/shared_objs.sh tauth_shared_objs <top> <outdir> compiles dlm.o, dlm_shared.o, tauth_ledger.o, tauth_store.o and pal_user.o from clean into the caller's scratch directory with the Makefile's flags; adopted_grant_handoff_test.sh, fenced_node_ledger_test.sh and capacity_park_test.sh link those (capacity_park_test.sh also linked its binary into the tree, a frozen file; it now links into its scratch directory); env_knob_ab.sh and formation_unspent_ab.sh build their binary with make -B (every object recompiled) and refuse while a candidate freezes it. The Makefile is unchanged. Precheck on the host: fix in PASS (all 5 objects carry the mark, 19 s); TAUTH_SHARED_FROM_CLEAN=0 FAIL (dlm.o dlm_shared.o tauth_ledger.o tauth_store.o pal_user.o all stale, 10 s). The three scripts pass on the fix (adopted_grant_handoff 25 s, fenced_node_ledger 19 s, capacity_park 20 s) and tests/tauth_freeze_lap.py PASS: none of the 2550 frozen files changed. ===== 2026-10-24: the branch review P20261023-b6b6f9 found unmeasured (an object with no .d, built before the fix) now has a lap variant: tests/tauth_header_dep_lap.sh with TAUTH_FIRST_NODEP=1 builds first with TAUTH_DEPS=0 (no .d files; EXPOSED requires none), marks pal/pal.h and dlm/dlm.h, then runs a plain make all with the lap's own TAUTH_DEPS. Precheck on the host: TAUTH_DEPS=1 PASS, 19 of 19 objects recompiled, every shared object and dlm_ledger_test carries both marks (37 s); TAUTH_DEPS=0 FAIL, 10 recompiled, tauth_store.o, pal_user.o, dlm_shared.o and others lack the pal/pal.h mark (31 s). The lap's bound re-derived as twice the longest measured lap, 74 s.",
-      "next": "On the next frozen attempt: control and verification of lap:tauth_header_dep with TAUTH_FIRST_NODEP=1 (control TAUTH_DEPS=0; bound 74 s), then a removal citing both branches (the .d branch: control b20261023-af4605 and verification b20261023-fa4170 if carried, or redone on the attempt). The record's other sites (tests/tauth/shared_objs.sh and the two A/B scripts' make -B, review P20261023-c062a3) stay claimed only where measured.",
+      "next": "On the next frozen attempt: control and verification of lap:tauth_header_dep with TAUTH_FIRST_NODEP=1 (control TAUTH_DEPS=0; bound 74 s), then a removal citing both branches (the .d branch: control b20261023-af4605 and verification b20261023-fa4170 if carried, or redone on the attempt). The record's other sites (tests/tauth/shared_objs.sh and the two A/B scripts' make -B, review P20261023-c062a3) stay claimed only where measured. ===== 2026-10-24: verify P20261023-1e08c7 applied (b20261023-489db7, the no-.d branch, 6 of 6 at 2/disk/caw/direct on attempt 2026-10-24T04:13:43Z, from control b20261023-9a1ad5 10 of 10). Removal NOT filed: the fix is an edit of tests/tauth/Makefile, and this record's own earlier next step made that edit wait for the owner's direction. A search of every human-authored message in the 87 session transcripts since 2026-10-20 found no message mentioning a Makefile at all (0 hits, scanner in this session's scratchpad), so no direction is on record. Whether the edit stands is the owner's decision; until the owner confirms it (or directs it reverted), the removal is held.",
       "reproducer": "tests/tauth_header_dep_lap.sh [label] (host only, 30-37 s, bound 70 s): in a scratch copy of dlm/, pal/, include/ and tests/tauth/ (sources and the Makefile only), 'make all', then a lap-unique mark added inside the include guards of pal/pal.h and dlm/dlm.h, a plain 'make all' again (no -B, no clean), then every shared object must carry the mark of each of the two headers its source includes (read from gcc -MM) and dlm_ledger_test both. EXPOSED: on every lap. TAUTH_DEPS=0 in the lap's environment (tests/tauth/Makefile:184) builds from the rules' own header lists, as before the fix: the control.",
       "updated": "2026-10-23",
       "batches": [
@@ -4595,7 +4631,7 @@
           "candidate": "0.90.134",
           "build": "B947A20F3C2FE3A67ABF6F3",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-23",
@@ -4826,6 +4862,16 @@
           "build": "9C7B7B00C5DE523F1D378C8",
           "batch": "b20261023-fa4170",
           "approval": "P20261023-5851c2",
+          "date": "2026-10-23"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T04:13:43Z",
+          "build": "B947A20F3C2FE3A67ABF6F3",
+          "batch": "b20261023-489db7",
+          "approval": "P20261023-1e08c7",
           "date": "2026-10-23"
         }
       ]
@@ -5207,6 +5253,25 @@
           "config": "4/net/mesh/direct",
           "row": "crash_audit",
           "iso": "2026-10-10T14:05:46Z"
+        }
+      ],
+      "batches": [
+        {
+          "id": "b20261023-2549fe",
+          "kind": "calibrate",
+          "row": "lap:foreign_replay_ag",
+          "config": "4/disk/caw/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-23",
+          "why": "measurement for remove --disproved: does a live survivor's change to a replayed AG ever complete before the replay's ladder entry"
         }
       ]
     },
@@ -7119,6 +7184,47 @@
       "evidence": "2026-10-24, on candidate 0.90.134 attempt frozen 2026-10-24T04:13:43Z: 'timeout 30 python3 tests/release_step_cell_lap.py' exited 1 after the infra, amend and removal dispositions of 1/any:release:boards:2026-10-21T19:29:49Z, ending 'RuntimeError: name rc=1: Traceback ... File \"<string>\", line 4, in <module> StopIteration' (tests/evidence/day_stamp_release_step/release_step_cell_lap_20261024.out). It was run to re-measure release-step stamps after the day-stamp fix in tools/defects.py parse_cell (:783-785).",
       "next": "Give the lap a record of its own in each scratch tree (added through the scratch queue's own load and save, as unname() edits it) instead of naming a live one, behind a switch that names the live record as before (the control: it dies as above while the live queue lacks the record); then a control batch, a verification sized from it, remove --fixed. The fix changes a frozen file, so it lands on the next attempt.",
       "reproducer": "timeout 30 python3 tests/release_step_cell_lap.py on any tree whose queue lacks D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED"
+    },
+    {
+      "id": "D-LANE-POWER-UP-FLOODS-THE-HOST-LOG-AND-ANOTHER-LANES-PREFLIGHT-REFUSES-ITS-PREP",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "Rig lanes start independently, and a lane's first step (scripts/lab_power.sh up group:<g>) writes the host kernel log at well over the host-safety preflight's 40 lines/s limit while its VMs attach to the bridges; a prep that another lane's lap runs inside that second is refused by its own preflight (run.sh ABORTED: host-safety preflight failed) and the lap aborts unexposed. Nothing orders one lane's power-up against another lane's preps: scripts/lane_after.sh exists for it but no lane is required to use it, and a lap such as tests/relog_auth_lap.sh keeps no prep output, so the refusal's gate is not in the lap's evidence.",
+      "evidence": "2026-10-24: lane g4c_a15_relogauth (control b20261023-3629b7, lap:relog_auth at 4/disk/caw/mpath) lap 2 'LAP relog_auth ABORT: prep_cluster rc=3: === run.sh ABORTED: host-safety preflight failed at 4/disk/caw/mpath ===' at 04:30:49Z, 10 s after it began (tests/evidence/batch_laps/b20261023-3629b7/20261024T043039Z-85bc441d.log). Lane g8b_a15_peerwithdrawn started 'scripts/lab_power.sh up group:g8b' at 04:30:46Z. The host kernel log (journalctl -k, clyde) holds 146 lines in the second 04:30:46Z, all VM attach lines ('vnetN: entered promiscuous mode' x27, 'mxsana/mxsanb/brN: port N(vnetN) entered blocking state' x18 each, forwarding/disabled states), and 20 in 04:30:43Z: about 49 lines/s over the gate's 3 s sample, against KMSG_MAX 40 (scripts/clyde_preflight.sh:65, :261-262). Run again at 04:3x with no lane starting, the gate reported 'kernel log ~0 lines/s' and 0 failures. The lane starts were this session's: two lanes (g2c, g4c) started together at 04:28 and g8b at 04:30:46 without scripts/lane_after.sh.",
+      "next": "Make the lane start safe by construction rather than by the starter's care: scripts/rig_lane.sh serializes every lane's lab_power up (and pool LUN allocation) behind one host-wide lock that a prep's preflight also takes, or run.sh's preflight retries its log-rate sample once past a lane's power-up it can name; with a switch restoring today's independent starts for the control. Lap: two lanes started together on disjoint groups, one powering up while the other preps; the control's prep is refused at the gate, the fix's is not. Also keep each lap's prep output (tests/relog_auth_lap.sh discards it).",
+      "reproducer": "start scripts/rig_lane.sh on group A whose first step is scripts/lab_power.sh up of 8 VMs while a lap on group B runs ./run.sh prep_cluster in the same 3 s",
+      "cells": [
+        {
+          "config": "4/disk/caw/mpath",
+          "row": "lap:relog_auth",
+          "iso": "2026-10-24T04:30:39Z"
+        }
+      ]
+    },
+    {
+      "id": "D-FOREIGN-REPLAY-AG-LAP-READS-SURVIVOR-LOGS-BEFORE-P163-AND-FINDS-NO-REPLAYER",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-23",
+      "summary": "tests/foreign_replay_ag_lap.sh reads each survivor's kernel log (step 5, :158-175) as soon as the survivors' truncates have returned, and names the replayer only from a P163-RECOVERY-COMPLETE line for the victim's slot. The truncates can return before the replaying node prints P163 (they wait for the dead node's grants to go, which happens inside the recovery-complete ladder, before its final line), so a lap can read the logs with no P163 in them: it then has no replayer, counts the real replayer's AG header writes as a non-replayer's, and FAILs with exposed=0 although every survivor check it can grade passed.",
+      "evidence": "2026-10-24, calibration b20261023-2549fe (lap:foreign_replay_ag at 4/disk/caw/direct, candidate 0.90.134 attempt 2026-10-24T04:13:43Z): laps 1 and 2 FAIL 'LAP foreign_replay_ag FAIL: 2 check(s) failed (exposed=0 early=0 failed_ops=0 replayer=none)'. Lap 1 (tests/evidence/20261024T042539Z_fragag_frcal_caw1): test3_kmsg.txt holds the declaration '[140.637435] ... node in slot 2 is no longer responding ... threshold=17', six 'PROBE-A AG-META-WRITE-NOT-HELD agno=2 ... recov=1' at 145.971-145.977, and no P163 line; its CLK line shows the log read at uptime 148.10, 2.1 s after the replay's writes; the truncates had returned 41 s after the kill; 'no survivor logged P163-RECOVERY-COMPLETE for test6's slot 2', 'FAIL test3 (not the replayer) wrote no AG header without its grant got=6', every other check PASS, chk_mxfs clean. The prechecks (tests/evidence/20261024T002626Z_fragag_frpre2_caw, build 9C7B7B00) found P163 at 270.1 s. The lane was stopped after lap 2 (the rest would measure the lap, not the replay).",
+      "next": "Wait for P163-RECOVERY-COMPLETE of the victim's slot on some survivor (bounded: the recovery's measured 7-9 s after the declaration, x2) before reading the logs, and ABORT, not FAIL, when none appears in that bound; switch LAP_WAIT_P163=0 for the control (reads at once, as now). Then re-run the calibration batches at 4/disk/caw/direct and 4/net/mesh/direct on the next attempt.",
+      "reproducer": "tests/foreign_replay_ag_lap.sh at 4/disk/caw/direct on build B947A20F3C2FE3A67ABF6F3: 2 of 2 laps",
+      "cells": [
+        {
+          "config": "4/disk/caw/direct",
+          "row": "lap:foreign_replay_ag",
+          "iso": "2026-10-24T04:28:23Z"
+        },
+        {
+          "config": "4/disk/caw/direct",
+          "row": "lap:foreign_replay_ag",
+          "iso": "2026-10-24T04:31:22Z"
+        }
+      ]
     }
   ]
 }
