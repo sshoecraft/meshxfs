@@ -2815,6 +2815,31 @@
           "config": "2/net/mesh/direct",
           "row": "lap:jdt_gate_stall",
           "iso": "2026-10-24T02:34:06Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T02:37:04Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T02:38:31Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T02:39:58Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T02:41:24Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T02:42:54Z"
         }
       ],
       "updated": "2026-10-23",
