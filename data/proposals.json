@@ -9705,8 +9705,14 @@
         "tests/evidence/lanes/g8b_a20_20261024T163432Z/step6.log",
         "tests/evidence/lanes/g8b_a20_20261024T163432Z/step8.log"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-3a6126.md",
+        "sha256": "93a7220dd292f06a4b8263aa2494efaf951af4a1fb655d7198a9a3f7bd722361",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     }
   ]
 }
