@@ -9266,14 +9266,38 @@
       "opened": "2026-10-24",
       "summary": "A node whose PR key was removed out of band shut its filesystem down on a log error, self-fenced, withdrew and registered its key again (surrender); it ended the lap with its superblock buffer lock stuck (P-BUFLOCK-STUCK xfs_sb hold=4, waiter xfs_buf_item_unpin), and the next prep's teardown could not make it release mxfs: the teardown ran past the next lap's 120 s prep bound, and the lap after that found 'test3 did not release mxfs' and power-cycled it",
       "evidence": "Verification b20261024-eed56a of lap:oob_surrender at 4/net/mesh/direct (candidate 0.90.134, module A7E90BC5313192108E35B80, lane tests/evidence/lanes/g4_a22_20261024T204638Z step5.log). Lap 2 (osq22v2, PASS), V=test3: tests/evidence/20261024T213646Z_fledger_osq22v2/test3_kmsg.txt:12667 'mxfs (sda): Filesystem has been shut down due to log error (0x2).' (usec 2856547727), :12669 P-SESSION-POISON, :12671 P-WITHDRAW, :12828 'P290-AUTH-CLOSED ... reason=PR_CONFLICT_FENCED', :12830 P131-SELF-FENCE [PR_CONFLICT_FENCED], :12860 'P-PR-SURRENDER node=3827643565 slot=0 key=0xf11c2181b182f898 rc=0', :12897 'P-PR-SURRENDER-PREEMPTED ... the fence of this node certified and the key it registered again is gone', :12901 (usec 2886753173, the last line before the lap's end mark) 'P-BUFLOCK-STUCK daddr=0 len=1 ops=xfs_sb flags=0x200020 hold=4 pin=0 err=0 lock_ip=__xfs_trans_getsb+0x23/0xf0 [mxfs] ioend_seen=1 relse_seen=0 syncw=0 ... waiter=xfs_buf_item_unpin+0x83/0x1a0 [mxfs] comm=kworker/1:1H'. Lap 3 (osq22v3): tests/evidence/20261024T213923Z_fledger_osq22v3/prep.log:60 'PREP STEP 1 start +0s: teardown on the set' (preflight passed at 21:39:35Z, :56), :61 'the lap overran its bound of 120s (and 0s it waited on other lanes): the 9 process(es) it had started were ended', recorded INCOMPLETE rc=2 with no verdict. Lap 4 (osq22v4): tests/evidence/20261024T214125Z_fledger_osq22v4/prep.log:69-71 test4-6 UNLOAD_THREADS live=0, :72 '--- prep: test3 did not release mxfs / lost /src (or unreachable) \u2014 escalating ---', :73 'power-cycling test3 (virsh destroy+start)', :74 'PREP STEP 1 end 52s'; its prep took 119 s of the lap's 120. In the 15 other laps of control b20261024-395e2b and this verification the teardown took 5-32 s with no escalation. No kernel log of test3 between 21:39Z and its power cycle at ~21:41:3xZ exists: the lap's follower ended at its end mark, the guest journal is volatile, and the host's netconsole log has not been written since 2026-10-17. The teardown's per-node output (run.sh:1290 mktemp -d) is not kept.",
-      "next": "Reproduce with the victim's whole kernel log kept past the lap's end (a follower left running to the next prep's teardown, or a sysrq-w and /proc/<pid>/stack of the umount and of every D-state task on V taken during the teardown), and keep run.sh's per-node teardown output (/<node>) in the prep's evidence. Hypothesis H-SFV1 (unproven): after the log-error shutdown the superblock buffer stays locked by a transaction whose unpin never runs (the log is shut down), so the unmount's log force or sb write waits on it forever; falsified if the stuck umount's stack is not under xfs_buf_lock of the sb buffer. Separately: the fenced-ledger lap's 120 s prep bound does not cover prep's own escalation (a power cycle, ~45 s), which a fenced victim makes likely.",
+      "next": "Reproduce with the victim's whole kernel log kept past the lap's end (a follower left running to the next prep's teardown, or a sysrq-w and /proc/<pid>/stack of the umount and of every D-state task on V taken during the teardown), and keep run.sh's per-node teardown output (/<node>) in the prep's evidence. Hypothesis H-SFV1 (unproven): after the log-error shutdown the superblock buffer stays locked by a transaction whose unpin never runs (the log is shut down), so the unmount's log force or sb write waits on it forever; falsified if the stuck umount's stack is not under xfs_buf_lock of the sb buffer. Separately: the fenced-ledger lap's 120 s prep bound does not cover prep's own escalation (a power cycle, ~45 s), which a fenced victim makes likely. ===== Instrument drafted for the next attempt: tests/evidence/drafts/tree/tests/fenced_ledger_rig_lap.sh release_all keeps a non-releasing node's D-state and umount stacks (<node>_wedged_stacks.txt) before it power-cycles it; read them from the next LEFT-WEDGED line.",
       "cells": [
         {
           "config": "4/net/mesh/direct",
           "row": "lap:oob_surrender",
           "iso": "2026-10-24T21:41:24Z"
         }
-      ]
+      ],
+      "updated": "2026-10-24"
+    },
+    {
+      "id": "D-FLEDGER-LAP-PREP-BOUND-LEAVES-NO-ROOM-FOR-THE-PREVIOUS-LAPS-WEDGED-NODES",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "tests/fenced_ledger_rig_lap.sh bounds its prep at 120 s, derived from a prep of healthy nodes, but its own laps leave nodes that cannot release mxfs (a self-fenced victim, or survivors whose operations the recovery-blocked control arm parks forever), and run.sh's teardown then escalates to a power cycle (45-56 s) inside that bound, so the next lap's prep runs past 120 s and the lap ends INCOMPLETE with no verdict, using up a place in its batch",
+      "evidence": "8/net/mesh/direct lap rbc222 (control b20261024-59d234 of D-8NETMESH-RECOVERY-BLOCKED-LEAVES-QUEUED-SURVIVOR-ACQUIRES-PARKED-FOREVER, lane tests/evidence/lanes/g8_a22_20261024T204638Z, module A7E90BC5313192108E35B80) after rbc221 FAILed with survivors parked: tests/evidence/batch_laps/b20261024-59d234/20261024T215142Z-2d1c0b19.log 'STAGE prep rc=124 wall=121s'; tests/evidence/20261024T215142Z_fledger_rbc222/prep.log:58-59 'test8 did not release mxfs ...', 'test10 did not release mxfs ...', :60-61 power-cycling both, :62 'PREP STEP 1 end 56s', steps 2-6 to +106 s, :81 'the lap overran its bound of 120s (and 0s it waited on other lanes)'. 4/net/mesh/direct lap osq22v3 (verification b20261024-eed56a): the previous lap's self-fenced victim test3 did not release (D-SELF-FENCED-VICTIM-HOLDS-SB-BUFFER-AND-ITS-MXFS-NEVER-RELEASES-AT-TEARDOWN) and the teardown ran past the bound (tests/evidence/20261024T213923Z_fledger_osq22v3/prep.log:60-61); the lap after it, osq22v4, escalated and its prep took 119 s of 120 (tests/evidence/20261024T214125Z_fledger_osq22v4/prep.log:72-74).",
+      "next": "Either the lap leaves no node it wedged (at its own end, under its own derived bound, power-cycle any node whose mount its fault left unreleasable, which it knows from its own grading: the victim after a self-fence, survivors still parked), or its prep bound includes the measured escalation. Then a control (the old order) and a verification with consecutive laps whose fault wedges a node. ===== Fix drafted for the next attempt in tests/evidence/drafts/tree/tests/fenced_ledger_rig_lap.sh (bash -n clean): stop_all, the lap's EXIT trap, runs release_all, which unmounts every node (30 s each, at once); a node still holding the mount is reported LEFT-WEDGED, its D-state and umount stacks plus a sysrq-w and its last 150 kernel lines are kept as <node>_wedged_stacks.txt, and it is power-cycled (virsh destroy, scripts/lab_power.sh up, 112 s). FLEDGER_RELEASE_END=0 is the control. The stacks are also the instrument hypothesis H-SFV1 of D-SELF-FENCED-VICTIM-HOLDS-SB-BUFFER-AND-ITS-MXFS-NEVER-RELEASES-AT-TEARDOWN needs.",
+      "cells": [
+        {
+          "config": "8/net/mesh/direct",
+          "row": "lap:rblk_survivors",
+          "iso": "2026-10-24T21:53:43Z"
+        },
+        {
+          "config": "4/net/mesh/direct",
+          "row": "lap:oob_surrender",
+          "iso": "2026-10-24T21:41:24Z"
+        }
+      ],
+      "updated": "2026-10-24"
     }
   ]
 }
