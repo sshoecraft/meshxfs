@@ -44048,8 +44048,8 @@
         "8/disk/caw/mpath": {
           "status": "PENDING",
           "measured": "",
-          "reason": "running 20261024T193342Z-g8b",
-          "iso": "2026-10-24T19:34:22Z",
+          "reason": "executing 20261024T193342Z-g8b",
+          "iso": "2026-10-24T19:34:28Z",
           "recorded": "2026-10-24",
           "build": "FF012B4B81CDB69CAE96883",
           "candidate": "0.90.134",
