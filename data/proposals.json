@@ -9873,6 +9873,60 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-234c4f",
+      "kind": "remove-fixed",
+      "record": "D-MPATH-MOUNT-DEGRADED-12S-WINDOW-REGISTRATION-MISSING-AND-SHUTDOWNS",
+      "change": {
+        "control": "b20261024-cefbf5",
+        "fixon": "b20261024-51ea88",
+        "cause": "With a 12 s death window the authority lease is 8 s, and the only registration of a multipath path after a mount, v5_pr_fill_tick, ran only while at least V5_PR_FILL_MIN_LEASE_MS (15000 ms) of the lease remained, so a path that was down when the node mounted was never registered: the victim mounted 'P-PR-PATHS-REGISTERED ... paths=2 registered=1 unreachable=1', its path came back with no P-PR-PATH-FILLED, and when the other path failed its I/O on the unregistered path drew SCSI RESERVATION CONFLICT, which shut its filesystem down (P277-RESV-CONFLICT, P-WITHDRAW; at 4 nodes the CAW lock I/O failing -95 first, then 'DLM inode lock unrecoverable' and the in-memory-corruption shutdown), with the late stall, the errors and the death declarations the row counted. Fix (dlm/v5_mount.c:10950-11005, dlm/disklock.c:3270 mxfs_authority_fence_earliest_ms, mxfs_scsipr_fill_paths): the fill runs whenever the authority admits writes and issues each late REGISTER only if its command timeout ends before the earliest time a peer may fence this node (the last landed heartbeat plus the death window less the clock error), and takes out of service a path whose REGISTER has no known outcome; pr_fill_bounded=0 keeps the 15 s admission with no bound, the control."
+      },
+      "argument": "The cause is read from instrumented runs, not inferred. The record's two first runs (board_20261023T165407Z-g2e and T165456Z-g4, each victim's whole kernel log read in order, record evidence) show the victim mounting with one path registered, the down path reinstated with no P-PR-PATH-FILLED anywhere, then the other path failing and the next I/O on the unregistered path answered 'reservation conflict', followed by the withdrawal; the code's only post-mount registration returned while remaining lease < 15000 ms, and the 12 s window's lease is 8000 ms ('authority lease 8000 ms, death window 12000 ms'). The record's measured split over every path_mount_degraded row with kept kernel logs: 12000 ms windows filled=0 and FAIL each (4 rows), 34000 ms windows filled=1 and PASS each (2 rows). Controls, the fix's knob off (pr_fill_bounded=0) on a build whose frozen default window is the 12 s one, no other variant: 2/disk/caw/mpath b20261024-cefbf5 10 of 10 failed (tests/evidence/lanes/g2b_w12b_20261024T070007Z/step3.log), 4/disk/caw/mpath b20261024-239fb6 10 of 10 (g4c_w12_20261024T064338Z/step4.log laps 1-3, g4c_w12b_20261024T070211Z/step4.log laps 4-10), 2/net/mesh/mpath b20261024-241ccc 10 of 10 (g2b_w12c_20261024T075315Z/step4.log), 4/net/mesh/mpath b20261024-db9c82 10 of 10 (g4c_w12c_20261024T073330Z/step4.log); every failing lap on this record's checks (the down path missing the victim's registration once back, the victim's late stall 25-43 s, errors and shutdowns). Fix-on verifications, each sized from its configuration's control (10/10, lower bound 0.5887, N = 6), declared before the first lap, plain prep, every lap EXPOSED on PF-LATE-B-DOWN and PASS with fails=0, registration back on the returning path, worst stall under 30 s: 2/disk/caw/mpath b20261024-51ea88 6/6 and 4/disk/caw/mpath b20261024-54eb79 6/6 on attempt 2026-10-24T16:34:18Z (module 1BC77CFB15EF4A988DD1F56; approved P20261024-8b8f14, P20261024-b2328f, applied); 2/net/mesh/mpath b20261024-f0aa12 6/6 and 4/net/mesh/mpath b20261024-b7bbc1 6/6 on attempt 2026-10-24T06:38:23Z (module BE3695D2590A65F742F9816, which carries the same fill code; approved P20261024-5b7118, P20261024-3874e6, applied). These four configurations are every configuration the record's cells name. What the removal publishes is the record's summary: the observed failure at 2 and 4 nodes, disk/caw/mpath, on the 12 s window (registration one short on the returning path, the long late stall, errors, shutdowns); the fix-on batches show none of those on either lock manager at either size. The residual hazard the second consult named (a REGISTER delayed at the target past a fence) is what the fix's admission bound and quarantine address; no lap measured a REGISTER answering after its bound (no P-PR-PATH-FILL-LATE or P-PR-PATH-QUARANTINED is claimed here). The two earlier verifications that ended on a FAIL (b20261024-408f0a, b20261024-fd8125, attempt 2026-10-24T06:38:23Z) failed only on a survivor's type-flip ESTALE, a cell of D-CAW-MKDIR-LOOKUP-ESTALE-TYPEFLIP-UNRESOLVED (data/reviews/P20261024-eae930.md), and are not applied.",
+      "evidence": [
+        "tests/evidence/lanes/g2b_w12b_20261024T070007Z/step3.log",
+        "tests/evidence/lanes/g4c_w12_20261024T064338Z/step4.log",
+        "tests/evidence/lanes/g4c_w12b_20261024T070211Z/step4.log",
+        "tests/evidence/lanes/g2b_w12c_20261024T075315Z/step4.log",
+        "tests/evidence/lanes/g4c_w12c_20261024T073330Z/step4.log",
+        "tests/evidence/lanes/g2b_a20md_20261024T180153Z/step4.log",
+        "tests/evidence/lanes/g4b_a20md_20261024T180156Z/step5.log",
+        "tests/evidence/lanes/g2b_w12c_20261024T075315Z/step12.log",
+        "tests/evidence/lanes/g4c_w12c_20261024T073330Z/step18.log",
+        "data/reviews/P20261024-8b8f14.md",
+        "data/reviews/P20261024-b2328f.md",
+        "data/reviews/P20261024-5b7118.md",
+        "data/reviews/P20261024-3874e6.md",
+        "data/reviews/P20261024-eae930.md",
+        "dlm/v5_mount.c",
+        "dlm/disklock.c",
+        "docs/rulings/silent-peer-death-under-the-stall-limit.md"
+      ],
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-234c4f.md",
+        "sha256": "0f5b3abf45ed03969839a20a6a9d85d16e133e319dbc4468e22e915455a400ec",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
+    },
+    {
+      "id": "P20261024-56b663",
+      "kind": "narrow",
+      "record": "D-LATE-PATH-REGISTER-TIMED-OUT-MAY-EXECUTE-AFTER-A-FENCE-AND-RESTORE-THE-KEY",
+      "change": {
+        "config": "*/*/mpath"
+      },
+      "argument": "The hazard is a late REGISTER issued by the late-path fill, and the fill issues one only on a device-mapper multipath map that the node registered per path at mount. Read from the code: mxfs_pr_paths_get (pal/linux/kern.c:5772-5782) returns no path for a block device that is a partition or whose disk name does not begin 'dm-', and otherwise collects the SCSI devices that are slaves of the dm disk; the mount's per-path REGISTER, mxfs_pr_mp_register (:6816-6825), returns 1 'not a multipath map' when it finds no path, so no per-path map (struct mxfs_pr_map) is recorded; and mxfs_pal_scsi_pr_fill_paths returns 0 at once when the device has no per-path map registered with this key (:7120-7125, 'not a map this node registered per path'). The attachments of data/configurations.json: direct and direct4k are each node's own initiator on one path, an in-guest iSCSI login (the LUN is a plain SCSI disk), pass is the hypervisor's initiator passing a SCSI LUN into the VM, and drbd and shared are not implemented; only mpath ('each node's own initiator over two or more paths, assembled by dm-multipath') puts the volume on a dm- disk with SCSI slaves. So on direct, direct4k and pass the fill never runs and no late REGISTER is issued. The record stays open and blocking at every mpath configuration, every node count and both lock managers, and on the Proxmox VE multipath rows.",
+      "evidence": [
+        "pal/linux/kern.c",
+        "data/configurations.json",
+        "docs/rulings/silent-peer-death-under-the-stall-limit.md"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }

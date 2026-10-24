@@ -8014,11 +8014,28 @@
           "candidate": "",
           "build": "1BC77CFB15EF4A988DD1F56",
           "variant": "GATE_RELAY_STALL=0 (tests/capture_fault_gate.sh relays no harness's max_stall_ms= onto its own output, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a gate lap's over-limit operation never reaches the grader and the lap is recorded PASS"
+        },
+        {
+          "id": "b20261024-0d52d0",
+          "kind": "control",
+          "row": "lap:jdt_gate_stall",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 10,
+          "probe": "^EXPOSED: the gate",
+          "candidate": "",
+          "build": "1BC77CFB15EF4A988DD1F56",
+          "variant": "JDT_MAX_STALL=0 (tests/join_during_takeover.sh prints no max_stall_ms= after its timed operations, as before the fix)",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "why": "the fix taken out: jdt's over-limit operation is printed only as an ms= INFO line and the lap is recorded PASS"
         }
       ],
       "rates": [
@@ -8051,6 +8068,21 @@
             "9C7B7B00C5DE523F1D378C8"
           ],
           "date": "2026-10-23"
+        },
+        {
+          "row": "lap:jdt_gate_stall",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-126e02",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "GATE_RELAY_STALL=0 (tests/capture_fault_gate.sh relays no harness's max_stall_ms= onto its own output, as before the fix)",
+          "builds": [
+            "1BC77CFB15EF4A988DD1F56"
+          ],
+          "date": "2026-10-24"
         }
       ],
       "cells": [
@@ -8153,6 +8185,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:jdt_gate_stall",
           "iso": "2026-10-24T02:37:04Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T18:56:34Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T18:55:14Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T18:53:53Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T18:52:30Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T18:51:06Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T18:49:44Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T18:48:17Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T18:46:58Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T18:45:37Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:jdt_gate_stall",
+          "iso": "2026-10-24T18:44:17Z"
         }
       ]
     },
@@ -9918,6 +10000,18 @@
       "evidence": "Lane tests/evidence/lanes/g2_a20_20261024T163432Z: step 7 (nrr20a, 18:03:53Z) ended 'ABORT: S's ring rotated past the mark did not complete: MXFS-RS-STATUS v=1 host=test1 rc=124' / 'RESULT: ABORT label=nrr20a stage=capture' (step7.log:6-7) after both loads had started; at 18:09:58Z test2 still ran 'python3 /src/mxfs/tests/mpath/pathload.py run test2 /mnt/shared /run/noinoefd_nrr20a /run/noinoefd_nrr20a.stop' (pid 72115, 306 s old; stack and state in tests/evidence/20261024T1812Z_nrr20a_dstate_test2/test2_state.txt). Its ops log (test2_ops_errors.txt there): ok to 1792865234664 (18:07:14Z), then from 1792865238480 (18:07:18Z, 25 s into step 8's forced prep of the pair) every operation ERR ENOENT (874717 mutex, 874716 churn, 874714 write, 87472 list), ok again only once step 8's own load had made the directories anew; its final report 'PATHLOAD node=test2 laps=898785 ok=74615 err=2711619 ... double_grant=0' and /run/noinoefd_nrr20a held 124 MB. It stopped once its stop file was touched by hand (session 86).",
       "next": "A trap on every exit after the loads start touches both nodes' stop files and waits for the loads to end (the lap's existing 45 s report bound) before the lap exits; then a lap that forces an ABORT after the loads start (e.g. a capture bound of 0 on S) and reads both nodes for a pathload of its label 10 s after the lap returned, with the trap switched off for the control. ===== 2026-10-24 (session 87): fix drafted for the next attempt: tests/evidence/drafts/tree/tests/lib/lap_load.sh lap_load_end, called from the drafted tests/noino_fence_efd_hold_lap.sh's EXIT trap once its loads may have started (LOADS=1 before the starts), touches each node's stop file and waits at most 45 s for its pathload of the lap's directory to exit; LAP_LOAD_STOP=0 neither touches nor waits, the lap's exit as before: the control. Lap tests/evidence/drafts/tree/tests/lap_load_end_lap.sh LAP=noino MODE=abort (the lap's test-only LAP_ABORT_AFTER_LOAD=1 ABORTs it right after the warm-up with its loads running) reads every node 10 s after the lap returned: a pathload of the label still running FAILs. Precheck queued at the end of tests/evidence/lanes/queue_solo_a20.txt (g2c, 2/disk/caw/direct: llp1 fix, llp0 control); then a control and verification at 2/net/mesh/direct, where the failure was seen, on the next attempt.",
       "updated": "2026-10-24"
+    },
+    {
+      "id": "D-LATE-PATH-REGISTER-TIMED-OUT-MAY-EXECUTE-AFTER-A-FENCE-AND-RESTORE-THE-KEY",
+      "severity": "critical",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "The late-path fill (mxfs_pal_scsi_pr_fill_paths, pal/linux/kern.c:7105-7244) admits a REGISTER on a path that holds no registration of the node only if now + MXFS_PR_PATH_TIMEOUT_MS (5 s) + 1 s is before the earliest time a peer may fence the node (:7211-7226), and a REGISTER whose outcome is unknown is followed by an unregister and the path taken offline (:7230-7238, mxfs_pr_path_quarantine :7086-7103). Nothing establishes that a command the initiator gave up on after its timeout can no longer execute at the target: the ruling says a REGISTER is bounded only by a confirmed end of the original task, not by an abort sent or a later READ KEYS, and that taking the path offline does not stop a write already queued at the target behind the delayed REGISTER. A REGISTER executed after the fence puts the fenced key back on its nexus, and no READ KEYS can tell.",
+      "evidence": "Design ruling docs/rulings/silent-peer-death-under-the-stall-limit.md: ':237-251' (B, the time from admission until the REGISTER has completed or can no longer execute, includes 'a confirmed cancellation, not merely an ABORT TASK sent'; 'If cancellation has no enforced upper bound, no finite threshold proves the absence of a registration after the fence'; a timed-out REGISTER's nexus is quarantined and 'only an established end of the original task releases it'), ':256-260' (what must be measured first: admission-to-dispatch delay, when the timeout fires, how SCST cancels a queued or running PR OUT, transport recovery and any hidden retry), ':300-306' (the late REGISTER is a fencing problem of its own; three ways to close it). Code: pal/linux/kern.c:7214 admission against the initiator's timeout only; :7230-7235 unknown outcome -> unregister and SDEV_OFFLINE, with no confirmation that the original task ended at the target. Raised by review data/reviews/P20261024-234c4f.md, which rejected the removal of D-MPATH-MOUNT-DEGRADED-12S-WINDOW-REGISTRATION-MISSING-AND-SHUTDOWNS for leaving this untracked. No run has shown it: no P-PR-PATH-FILL-LATE or P-PR-PATH-QUARANTINED line has been read from any rig log.",
+      "next": "Measure B on the rig, as the ruling lists, at 2/disk/caw/mpath: hold one path of a node unanswering (the target's portal for that path dropped at the host, or the SCST device's commands held), let the fill issue its REGISTER there (dbg_pr_fill_pause_ms to place it), and read from the target side (SCST's PR log for that I_T nexus) whether and when the REGISTER executes against when mxfs_prout_path returned and what the SCSI error handler did (abort task, LU reset, session drop). If every timed-out REGISTER is shown ended at the target before the initiator call returns, the admission bound holds and that measurement is the evidence; if one can execute later, close it in the fence (an unresolved REGISTER keeps the certificate from being issued, or the fence aborts the tasks of every nexus of the LU), with a same-build switch and a lap that delays a REGISTER past a peer's PREEMPT AND ABORT.",
+      "impact": "integrity",
+      "impact_why": "a hazard read from the code against a design ruling, not yet observed: a REGISTER that executes at the target after a peer's PREEMPT AND ABORT registers the fenced node's key again on that nexus, so a write the node still has queued there can land after the survivors replayed its log (docs/rulings/silent-peer-death-under-the-stall-limit.md:300-306)"
     }
   ]
 }
