@@ -10063,6 +10063,46 @@
       ],
       "state": "pending",
       "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-bef1c8",
+      "kind": "verify",
+      "record": "D-HARNESS-LAP-TIMED-OPS-REACH-NO-STALL-GRADER-JDT-31S-UNMOUNT-GRADED-PASS",
+      "change": {
+        "batch": "b20261024-e405a1"
+      },
+      "argument": "Verification b20261024-e405a1 of lap:jdt_gate_stall (tests/jdt_gate_stall_lap.py: the capture gate's join_during_takeover entry on its default arm with JDT_FORCE_OP_S = stall_limit_s + 1, so B's first unmount sleeps 31 s inside its timed window; the lap PASSes only if the gate records that lap FAIL carrying the stall) at 2/net/mesh/direct on g2 (test1, test2), candidate 0.90.134 attempt frozen 2026-10-24T16:34:18Z, module 1BC77CFB15EF4A988DD1F56, lane prep tests/evidence/lanes/g2_a20b_20261024T181224Z step 3 (MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2 prep_cluster, rc 0). The record's fix has two sites, each with its own switch and its own control on the same attempt and pair: GATE_RELAY_STALL=0 (tests/capture_fault_gate.sh relays no harness max_stall_ms= onto its own output), control b20261024-126e02, 10 of 10 failed (tests/evidence/lanes/g2_a20b_20261024T181224Z/step4.log), and JDT_MAX_STALL=0 (tests/join_during_takeover.sh prints no max_stall_ms= after its timed operations), control b20261024-0d52d0, 10 of 10 failed (tests/evidence/lanes/g2_a20b_20261024T181224Z/step5.log); every control lap 'FAIL: the gate lap with an operation at ~32000 ms was recorded PASS without a stall'. The verification was declared before its first lap against control b20261024-126e02 (rate 10/10, lower bound 0.5887 at delta 0.005, N = 6 at alpha 0.005; the other control's rate is the same, so its N is the same) and ran with both sites on: 6 of 6 PASS, exposure=1 each, each 'PASS: the gate lap with an operation at 31660-32392 ms was recorded FAIL carrying its stall' (tests/evidence/lanes/g2_a20b_20261024T181224Z/step6.log, 'verify b20261024-e405a1: 6 PASS, 0 FAIL of 6 planned'). The only parameter differing between the control arms and the verification is the site's switch (tests/evidence/lanes/g2_a20b_20261024T181224Z/queue lines 22-24).",
+      "evidence": [
+        "tests/evidence/lanes/g2_a20b_20261024T181224Z/step6.log",
+        "tests/evidence/lanes/g2_a20b_20261024T181224Z/step4.log",
+        "tests/evidence/lanes/g2_a20b_20261024T181224Z/step5.log",
+        "tests/evidence/lanes/g2_a20b_20261024T181224Z/queue",
+        "tests/jdt_gate_stall_lap.py"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-24107f",
+      "kind": "remove-fixed",
+      "record": "D-HARNESS-LAP-TIMED-OPS-REACH-NO-STALL-GRADER-JDT-31S-UNMOUNT-GRADED-PASS",
+      "change": {
+        "control": "b20261024-126e02",
+        "fixon": "b20261024-e405a1",
+        "cause": "A harness lap run through tools/batch_lap.py is graded against the stall limit only by the max_stall_ms= lines its output carries. tests/join_during_takeover.sh printed each timed mount's and unmount's time only as ms= on its own line, and tests/capture_fault_gate.sh did not relay a harness's max_stall_ms= onto its own output, so a 31 s last-member unmount inside a gate lap was recorded PASS (batch b20261022-548ef2). Fix, two sites: join_during_takeover.sh prints max_stall_ms=<worst so far> after every timed mount and unmount (JDT_MAX_STALL=0 prints none, its control), and capture_fault_gate.sh relays it (GATE_RELAY_STALL=0 relays none, its control)."
+      },
+      "argument": "Verification b20261024-e405a1 of lap:jdt_gate_stall (tests/jdt_gate_stall_lap.py: the capture gate's join_during_takeover entry on its default arm with JDT_FORCE_OP_S = stall_limit_s + 1, so B's first unmount sleeps 31 s inside its timed window; the lap PASSes only if the gate records that lap FAIL carrying the stall) at 2/net/mesh/direct on g2 (test1, test2), candidate 0.90.134 attempt frozen 2026-10-24T16:34:18Z, module 1BC77CFB15EF4A988DD1F56, lane prep tests/evidence/lanes/g2_a20b_20261024T181224Z step 3 (MXFS_FORCE_PREP=1 ./run.sh 2/net/mesh/direct --group g2 prep_cluster, rc 0). The record's fix has two sites, each with its own switch and its own control on the same attempt and pair: GATE_RELAY_STALL=0 (tests/capture_fault_gate.sh relays no harness max_stall_ms= onto its own output), control b20261024-126e02, 10 of 10 failed (tests/evidence/lanes/g2_a20b_20261024T181224Z/step4.log), and JDT_MAX_STALL=0 (tests/join_during_takeover.sh prints no max_stall_ms= after its timed operations), control b20261024-0d52d0, 10 of 10 failed (tests/evidence/lanes/g2_a20b_20261024T181224Z/step5.log); every control lap 'FAIL: the gate lap with an operation at ~32000 ms was recorded PASS without a stall'. The verification was declared before its first lap against control b20261024-126e02 (rate 10/10, lower bound 0.5887 at delta 0.005, N = 6 at alpha 0.005; the other control's rate is the same, so its N is the same) and ran with both sites on: 6 of 6 PASS, exposure=1 each, each 'PASS: the gate lap with an operation at 31660-32392 ms was recorded FAIL carrying its stall' (tests/evidence/lanes/g2_a20b_20261024T181224Z/step6.log, 'verify b20261024-e405a1: 6 PASS, 0 FAIL of 6 planned'). The only parameter differing between the control arms and the verification is the site's switch (tests/evidence/lanes/g2_a20b_20261024T181224Z/queue lines 22-24). Each site was taken out alone in its own control and each control failed every lap, so each site is necessary for the gate to carry the stall; the verification with both in passed every lap.",
+      "evidence": [
+        "tests/evidence/lanes/g2_a20b_20261024T181224Z/step4.log",
+        "tests/evidence/lanes/g2_a20b_20261024T181224Z/step5.log",
+        "tests/evidence/lanes/g2_a20b_20261024T181224Z/step6.log",
+        "tests/evidence/lanes/g2_a20b_20261024T181224Z/queue",
+        "tests/jdt_gate_stall_lap.py",
+        "tests/join_during_takeover.sh",
+        "tests/capture_fault_gate.sh"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
