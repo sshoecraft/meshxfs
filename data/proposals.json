@@ -9553,8 +9553,14 @@
         "tests/evidence/lanes/g8b_a20_20261024T163432Z/step6.log",
         "tests/evidence/lanes/g8b_a20_20261024T163432Z/step8.log"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-f8709b.md",
+        "sha256": "6b4eb2dbb4dce27bbb0b498c31d21b5e104329680b1ad6da6fb458d577e39bcc",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     },
     {
       "id": "P20261024-4975c4",
@@ -9598,6 +9604,67 @@
         "tests/evidence/lanes/g2d_a20_20261024T163432Z/step8.log",
         "tests/evidence/batch_laps/b20261024-37b839",
         "tests/evidence/batch_laps/b20261024-8cb36c"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-ed2db9.md",
+        "sha256": "59d4ba0c443a7324ebd0fa2b914fe5cdf05a3e0645043efa5a8d7a834d80a531",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-79d9d4",
+      "kind": "remove-fixed",
+      "record": "D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS",
+      "change": {
+        "control": "b20261024-2f6ae0",
+        "fixon": "b20261024-d99c77",
+        "cause": "tests/mpath/lib.sh pf_boot_rejoin brought a killed path-row victim back by loading mxfs with the configuration's transport arguments only (mxfs_rig_modargs), not the set tests/setup/prep_node.sh loads on every other node (log_repeat_limit=0 and the lane's MXFS_EXTRA_MODARGS among them), so the rejoined victim ran module parameters different from its peers' (the original run's victim read dead_timeout_ms=0 after the rejoin while its peers ran 12000). Fix: pf_rejoin_modargs builds prep's argument set for the rejoin (tests/mpath/lib.sh:501-524) and pf_boot_rejoin loads it (:531, the insmod at :545); PF_REJOIN_PREP_ARGS=0 loads what the rejoin loaded before, the control."
+      },
+      "argument": "Resubmission of P20261024-f8709b, answering its review (data/reviews/P20261024-f8709b.md). Measured on the rig at 8/disk/caw/mpath (the CAW insmod branch, no extra arguments) by tests/mpath/rejoin_modargs_rig_lap.sh, which kills and rejoins the victim through pf_boot_rejoin and reads /sys/module/mxfs/parameters on the victim and a survivor. Control b20261024-2f6ae0 (PF_REJOIN_PREP_ARGS=0): 10 of 10 FAIL with exposure. Fix-on b20261024-d99c77: 6 of 6 PASS with exposure, applied through the approved verify P20261024-3e7240. Repeated on attempt 20 (frozen 2026-10-24T16:34:18Z, lane tests/evidence/lanes/g8b_a20_20261024T163432Z): control b20261024-7cfa3f 10 of 10 FAIL, verification b20261024-c553df 6 of 6 PASS. Scope: this removal claims only the CAW insmod branch with no extra arguments. The three branches no lap took, modprobe (lib.sh:545), the retirement-contract argument (:522-523) and TCP on the rig (:521), are now the open record D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS, and the ten 2/net/mesh/direct argv-recorder cells of control b20261023-c6d354 (which ran the TCP branch with no VM) were moved onto that record with --drop-cell, so this removal retires none of them. Correction to the earlier argument: D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS is not open; it was removed as fixed and verified (CHANGELOG.md).",
+      "evidence": [
+        "data/reviews/P20261024-f8709b.md",
+        "data/reviews/P20261024-3e7240.md",
+        "tests/mpath/lib.sh",
+        "tests/mpath/rejoin_modargs_rig_lap.sh",
+        "tests/evidence/batch_laps/b20261024-2f6ae0",
+        "tests/evidence/batch_laps/b20261024-d99c77",
+        "tests/evidence/lanes/g8b_a20_20261024T163432Z/step6.log",
+        "tests/evidence/lanes/g8b_a20_20261024T163432Z/step8.log"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-3c9c10",
+      "kind": "noblock",
+      "record": "D-SINGLE-WRITER-CREATE-PACE-6-TO-18MS-ON-2CAW-SO-THE-LMU-LAP-OVERRAN-360S",
+      "change": {
+        "impact": "noblock",
+        "objective": "Pace: a single writer's create in a fresh directory on a shared LUN should cost at most 2x native XFS for the same loop (CLAUDE.md, RULE: TIMEOUTS ARE PERFORMANCE ASSERTIONS, NOT SAFETY NETS). Measured mean per create: 6.0-6.4 ms on 2/disk/caw/direct and 2.3-3.5 ms on 2/net/mesh/mpath, against 0.063 ms for the same loop on a local root filesystem (record evidence; native XFS on a pool LUN not yet measured): far over 2x.",
+        "assertions": "tests/create_pace_lap.sh with its kernel-log follow (the fix of the removed D-CREATE-PACE-LAP-KERNEL-LOG-CHECK-READS-AN-EMPTY-LOG-AND-PASSES): every one of 10000 creates returned success (CREATED=10000 failed=0), the peer listed all 10000 names, and both nodes' kernel logs, followed from before the lap's mark to after its end mark, hold no BUG:, Oops, hung_task, 'blocked for more than', 'Shutting down filesystem' or Corruption (:106); a read missing either mark fails the lap. Twelve laps, all LAP create_pace PASS.",
+        "max_stall_s": 0.27
+      },
+      "argument": "Resubmission of P20261024-9a0e1a answering its review (data/reviews/P20261024-9a0e1a.md). Only completed, fully logged runs are cited, all on the fixed lap: (a) verification batch b20261024-8389c9, six laps cpdv1..cpdv6 at 2/disk/caw/direct (lane tests/evidence/lanes/g2b_a17cpd_20261024T115152Z step 3, test15 writer, test16 lister): mean 6008-6426 us, worst single create 75.6-232.8 ms; (b) six laps cpnmf1..cpnmf6 at 2/net/mesh/mpath on candidate 0.90.134 attempt frozen 2026-10-24T16:34:18Z (lane tests/evidence/lanes/g2b_a20cp_20261024T172800Z step 2, test15 writer, test16 lister), run because the review asked for net/mesh laps on the fixed lap: mean 2269-3450 us, worst 50.8-269.2 ms; each lap's test15_kmsg.txt and test16_kmsg.txt hold both the start and end marks (two CREATEPACE lines each). The worst create across all twelve cited runs is 269.219 ms (cpnmf6), so --max-stall-s 0.27, two orders of magnitude under stall_limit_s=30. The lmucaw1..3 laps and cpnm1 are not cited. Every name exists and is listed by the peer, and no node logged a fault: nothing is lost or corrupted and nothing crashed, hung or shut down. The 2x-native objective is violated, which is why the record stays open; noblock disposes of nothing.",
+      "evidence": [
+        "tests/evidence/20261024T172814Z_createpace_cpnmf1",
+        "tests/evidence/20261024T172950Z_createpace_cpnmf2",
+        "tests/evidence/20261024T173135Z_createpace_cpnmf3",
+        "tests/evidence/20261024T173315Z_createpace_cpnmf4",
+        "tests/evidence/20261024T173452Z_createpace_cpnmf5",
+        "tests/evidence/20261024T173629Z_createpace_cpnmf6",
+        "tests/evidence/batch_laps/b20261024-8389c9/20261024T121337Z-b5a71870.log",
+        "tests/evidence/batch_laps/b20261024-8389c9/20261024T121546Z-ec4d3546.log",
+        "tests/evidence/batch_laps/b20261024-8389c9/20261024T121800Z-645d447e.log",
+        "tests/evidence/batch_laps/b20261024-8389c9/20261024T122007Z-d16e3b08.log",
+        "tests/evidence/batch_laps/b20261024-8389c9/20261024T122216Z-854ab202.log",
+        "tests/evidence/batch_laps/b20261024-8389c9/20261024T122424Z-cad2fe48.log",
+        "tests/evidence/lanes/g2b_a20cp_20261024T172800Z/step2.log",
+        "tests/evidence/lanes/g2b_a17cpd_20261024T115152Z/summary.log",
+        "tests/create_pace_lap.sh"
       ],
       "state": "pending",
       "created": "2026-10-24"

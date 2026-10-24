@@ -6937,7 +6937,7 @@
       "config": "*/*/*",
       "opened": "2026-10-23",
       "summary": "A path row that kills its victim brings it back through tests/mpath/lib.sh pf_boot_rejoin, which loaded mxfs with the configuration's module arguments only (mxfs_rig_modargs: target_cache_protected, force_transport and the rig's contract), not prep_node.sh's set (log_repeat_limit=0 and the lane's MXFS_EXTRA_MODARGS among them; tests/setup/prep_node.sh:242, :248), and sent modprobe no arguments at all, so a rejoined victim ran the default death window while every other node of the lane ran the variant's. That the mismatch then carried into the following rows, because run.sh's marker match reads no loaded parameter, is its own record, D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS.",
-      "evidence": "Sweep of lanes tests/evidence/lanes/g8_mpathtmo2_20261023T143444Z and g16b_mpathtmo2_20261023T143733Z (both exporting MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, summary.log:6): board_20261023T144020Z-g8_path_fence_degraded kmsg_test14_fromnode.gz:665 'mxfs: dead_timeout_ms=0 (0 = 34 s on SCSI, 62 s on DRBD or shared)', :701 'authority lease 30000 ms, death window 34000 ms', against test7-test13 '=12000' and 'authority lease 8000 ms, death window 12000 ms'; the same for test14 in 144327Z path_all_lost, 144649Z path_peer_withdrawn, 151409Z path_fence_degraded, 151713Z path_all_lost, and for test32 in 144449Z, 144842Z, 150343Z, 150725Z and 151125Z (16 nodes). The step logs of every row after a lane's first prep print '--- cluster already prepped for <config> (srcver=08D63764A9352FBDD5A76CD) \u2014 skipping prep ---' (g8 step4-12 and step14-22, g16b step4-7 and step9-12). test14 came back on 12000 only after a forced prep (151048Z path_fenced_return kmsg_test14 :157277). Every row passed; the runs were variants and grade nothing. The survivors declared on their own 12 s window, so the stalls those rows measured are the survivors' at that window. ===== 2026-10-24 rig precheck at 8/disk/caw/mpath on attempt 2026-10-24T06:38:23Z (lane tests/evidence/lanes/g8b_w14_20261024T100411Z, g8b test21-test28, MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, a forced prep before each lap): tests/mpath/rejoin_modargs_rig_lap.sh fix on, steps 3 and 5: 'EXPOSED: test21 reads the lane's dead_timeout_ms=12000 back ...' and 'LAP rejoin_modargs_rig PASS: the rejoined victim test28 reads every prep argument as test21 does (5: force_transport target_cache_protected log_repeat_limit target_retire_contract dead_timeout_ms)'; control PF_REJOIN_PREP_ARGS=0, step 7: EXPOSED and 'LAP rejoin_modargs_rig FAIL: the rejoined victim test28 loaded other arguments than the survivor test21: log_repeat_limit=1 (survivor 0), dead_timeout_ms=0 (survivor 12000)'.",
+      "evidence": "Sweep of lanes tests/evidence/lanes/g8_mpathtmo2_20261023T143444Z and g16b_mpathtmo2_20261023T143733Z (both exporting MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, summary.log:6): board_20261023T144020Z-g8_path_fence_degraded kmsg_test14_fromnode.gz:665 'mxfs: dead_timeout_ms=0 (0 = 34 s on SCSI, 62 s on DRBD or shared)', :701 'authority lease 30000 ms, death window 34000 ms', against test7-test13 '=12000' and 'authority lease 8000 ms, death window 12000 ms'; the same for test14 in 144327Z path_all_lost, 144649Z path_peer_withdrawn, 151409Z path_fence_degraded, 151713Z path_all_lost, and for test32 in 144449Z, 144842Z, 150343Z, 150725Z and 151125Z (16 nodes). The step logs of every row after a lane's first prep print '--- cluster already prepped for <config> (srcver=08D63764A9352FBDD5A76CD) \u2014 skipping prep ---' (g8 step4-12 and step14-22, g16b step4-7 and step9-12). test14 came back on 12000 only after a forced prep (151048Z path_fenced_return kmsg_test14 :157277). Every row passed; the runs were variants and grade nothing. The survivors declared on their own 12 s window, so the stalls those rows measured are the survivors' at that window. ===== 2026-10-24 rig precheck at 8/disk/caw/mpath on attempt 2026-10-24T06:38:23Z (lane tests/evidence/lanes/g8b_w14_20261024T100411Z, g8b test21-test28, MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, a forced prep before each lap): tests/mpath/rejoin_modargs_rig_lap.sh fix on, steps 3 and 5: 'EXPOSED: test21 reads the lane's dead_timeout_ms=12000 back ...' and 'LAP rejoin_modargs_rig PASS: the rejoined victim test28 reads every prep argument as test21 does (5: force_transport target_cache_protected log_repeat_limit target_retire_contract dead_timeout_ms)'; control PF_REJOIN_PREP_ARGS=0, step 7: EXPOSED and 'LAP rejoin_modargs_rig FAIL: the rejoined victim test28 loaded other arguments than the survivor test21: log_repeat_limit=1 (survivor 0), dead_timeout_ms=0 (survivor 12000)'. ===== 2026-10-24: no longer names 2/net/mesh/direct:lap:rejoin_modargs:2026-10-23T20:48:00Z, named by D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS; 2/net/mesh/direct:lap:rejoin_modargs:2026-10-23T20:48:01Z, named by D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS; 2/net/mesh/direct:lap:rejoin_modargs:2026-10-23T20:48:02Z, named by D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS; 2/net/mesh/direct:lap:rejoin_modargs:2026-10-23T20:48:03Z, named by D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS; 2/net/mesh/direct:lap:rejoin_modargs:2026-10-23T20:48:04Z, named by D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS; 2/net/mesh/direct:lap:rejoin_modargs:2026-10-23T20:48:05Z, named by D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS; 2/net/mesh/direct:lap:rejoin_modargs:2026-10-23T20:48:06Z, named by D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS; 2/net/mesh/direct:lap:rejoin_modargs:2026-10-23T20:48:07Z, named by D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS; 2/net/mesh/direct:lap:rejoin_modargs:2026-10-23T20:48:08Z, named by D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS; 2/net/mesh/direct:lap:rejoin_modargs:2026-10-23T20:48:09Z, named by D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS: the ten argv-recorder laps of control b20261023-c6d354 ran the TCP branch (MXFS_CONFIG=8/net/mesh/mpath) without a VM; that branch is now D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS, which names these runs",
       "next": "Make the rejoin load the module with the lane's arguments as prep does (MXFS_EXTRA_MODARGS appended to mxfs_rig_modargs in tests/mpath/lib.sh, and wherever else a row reloads mxfs on a node it restarted), and make run.sh's marker match also compare each node's loaded parameters with the ones requested, so a mismatch re-preps instead of skipping; a lap that kills a victim in one row and reads every node's /sys/module/mxfs/parameters/dead_timeout_ms in the next; control with the fix's switch off, verification sized from it, remove --fixed. ===== ===== 2026-10-23: tests/mpath/lib.sh is sourced by every row of the running lanes g4_mpathtmo2_k6 and g2e_mpathtmo2_k6, so the edit waits until both have ended (an edit mid-lane changes what the rest of the lane measures). The two halves each cure the symptom alone (the rejoin loading the lane's arguments, or run.sh re-prepping on a mismatch), so a control with one switch off would still pass the next-row read: give each half its own switch and its own lap. The rejoin half: pf_boot_rejoin's insmod (tests/mpath/lib.sh:519) takes mxfs_rig_modargs only, while prep_node.sh loads $MODARGS ${MXFS_EXTRA_MODARGS} and the retire_contract argument (tests/setup/prep_node.sh:242, :248); its lap reads the victim's /sys/module/mxfs/parameters inside the same row, right after the rejoin. The marker half: a lap that reloads mxfs on one node of a formed pair with other arguments, then runs a row and requires the row to re-prep (run.sh marker_matches compares only the arguments requested at prep, run.sh:299-302). ===== 2026-10-23: the marker half (run.sh marker_matches/marker_live_ok, run.sh:286-303, reading no node's loaded parameters) is split out as D-RUN-SH-MARKER-NEVER-READS-LOADED-PARAMS-SO-ROWS-SKIP-PREP-ON-LEFTOVER-KNOBS, because rows other than the rejoin still leave parameters changed (path_fenced_return.sh:65-69, crash_consistency.sh:41, :58); this record is the rejoin half alone, measured by control b20261023-c6d354 and verification b20261023-abfebf. ===== ===== 2026-10-23: removal P20261023-7bd24f REJECTED (data/reviews/P20261023-7bd24f.md): besides the open fix-on batch, tests/rejoin_modargs_lap.sh only records the argv a node's shell would receive (no VM, no module load), every lap ran MXFS_CONFIG=8/net/mesh/mpath (the TCP branch, lib.sh:521 ft=1) while both observed runs were CAW (8/ and 16/disk/caw/mpath), the modprobe branch and the contract-argument quoting were not graded, and the ledger rows were filed at 2/net/mesh/direct. Next: a rig lap at 8/disk/caw/mpath that kills and rejoins the victim through pf_boot_rejoin and reads /sys/module/mxfs/parameters/dead_timeout_ms (and every prep argument) on the victim and a survivor after the rejoin, its rows at the configuration it ran; its PF_REJOIN_PREP_ARGS=0 control, a verification sized from it, then the removal, the claim narrowed to the branches run. ===== 2026-10-24: verify P20261024-d7c365 (b20261024-565ac2, 6 of 6 exposed PASS) was APPROVED (data/reviews/P20261024-d7c365.md, after P20261024-52e185 was rejected for overclaiming) but cannot be applied: every lap ran on a pair prepped with MXFS_EXTRA_MODARGS=dead_timeout_ms=12000, so each run carries variant 'marker_modargs=dead_timeout_ms=12000' and tools/defects.py unplanned_variant counts none of them toward a verification (the refusal mislabels them unexposed: D-VERIFY-REFUSAL-NAMES-VARIANT-LAPS-AS-UNEXPOSED). The control also failed on prep's own log_repeat_limit (1 against the survivors' 0), so the lap can expose without any extra argument. Draft for the next attempt: tests/evidence/drafts/tree/tests/mpath/rejoin_modargs_rig_lap.sh needs no MXFS_EXTRA_MODARGS and is EXPOSED when the survivor reads prep's log_repeat_limit=0 back (and any extra arguments the lane loads). Next attempt: control (PF_REJOIN_PREP_ARGS=0) and verification at 8/disk/caw/mpath with no MXFS_EXTRA_MODARGS, then remove --fixed claiming only what the review allows (not the contract quoting, the modprobe branch, the TCP branch on the rig, nor a lane running mixed windows); the approved variant batch stays as supporting evidence for the extra-argument half.",
       "updated": "2026-10-24",
       "batches": [
@@ -7205,56 +7205,6 @@
         }
       ],
       "cells": [
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rejoin_modargs",
-          "iso": "2026-10-23T20:48:09Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rejoin_modargs",
-          "iso": "2026-10-23T20:48:08Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rejoin_modargs",
-          "iso": "2026-10-23T20:48:07Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rejoin_modargs",
-          "iso": "2026-10-23T20:48:06Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rejoin_modargs",
-          "iso": "2026-10-23T20:48:05Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rejoin_modargs",
-          "iso": "2026-10-23T20:48:04Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rejoin_modargs",
-          "iso": "2026-10-23T20:48:03Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rejoin_modargs",
-          "iso": "2026-10-23T20:48:02Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rejoin_modargs",
-          "iso": "2026-10-23T20:48:01Z"
-        },
-        {
-          "config": "2/net/mesh/direct",
-          "row": "lap:rejoin_modargs",
-          "iso": "2026-10-23T20:48:00Z"
-        },
         {
           "config": "8/disk/caw/mpath",
           "row": "lap:rejoin_modargs_rig",
@@ -9813,151 +9763,6 @@
       "updated": "2026-10-24"
     },
     {
-      "id": "D-MERGE-OVERRUN-LAP-CLEANUP-FUSER-KILLS-ROOT-FS-USERS-WHEN-NOT-MOUNTED",
-      "severity": "major",
-      "nodes": 1,
-      "config": "*/*/*",
-      "opened": "2026-10-24",
-      "summary": "tests/merge_overrun_lap.sh's cleanup runs 'fuser -k -m /mnt/fourkn' on each node whether or not /mnt/fourkn is still a mount point (:69); on a directory that is not a mount point fuser -m matches every user of the root filesystem (the script's own header, :25-26), so a passing lap, whose merge run already unmounted both nodes, SIGKILLs processes across each node's root filesystem, its own ssh session included",
-      "evidence": "Found by the release-reviewer in review data/reviews/P20261024-20d40a.md: every cleanup file of verification batch b20261024-2daa46 (2/disk/caw/direct4k, lane tests/evidence/lanes/g2d_a19_20261024T143222Z step 5; tests/evidence/*_mergeoverrun_*/cleanup_test31.txt, cleanup_test32.txt) reads 'Connection to <node> closed by remote host.'; tests/merge_overrun_lap.sh:69 'kill ... fourkn_merge_wo; sleep 1; fuser -k -m $MNT ...; grep -q \" $MNT \" /proc/mounts && timeout 55 umount $MNT' runs the fuser unconditionally, while :25-26 says 'on a directory that is no longer a mount point it counts every user of the root filesystem'. The lap's verdict is read before the cleanup (:58-67) and is unaffected; what the kill takes down on the node (agents, a following lap's tools) is not measured. ===== 2026-10-24, observed on the rig: in every lap of verification b20261024-2daa46 the cleanup's ssh ended 'Connection to 192.168.120.117 closed by remote host' (test31) and '...120.152 closed by remote host' (test32), and printed nothing of its own (tests/evidence/20261024T145547Z_mergeoverrun_mov19d3, 145744Z_mov19d4, 145932Z_mov19d5, 150120Z_mov19d6: cleanup_test31.txt, cleanup_test32.txt): the fuser -k -m on the unmounted /mnt/fourkn killed the node's sshd session with everything else on the root filesystem. Control b20261024-d5be0a then ran on those nodes without a reboot. Other fuser -k -m sites with no mount-point gate on the same line, not examined for whether their mount can be absent: tests/closure_mount_race.sh:97, scripts/drbd_rig.sh:2794.",
-      "next": "Run the fuser only while /mnt/fourkn is a mount point (grep ' /mnt/fourkn ' /proc/mounts && fuser -k -m ...), with a switch restoring the unconditional kill for the control; lap: the merge_overrun lap followed by a check that a marker process started on each node before the cleanup is still alive after it (control: killed). ===== Drafted in tests/evidence/drafts/tree/tests/merge_overrun_lap.sh: fuser -k and the unmount run only while /mnt/fourkn is still in /proc/mounts; the lap reads the main pids of ssh, systemd-journald, systemd-udevd and iscsid on each node before and after its cleanup and FAILs when one changed (graded on every lap, VACUOUS ones too, with a 'CLEANUP: N node(s) had /mnt/fourkn no longer mounted' exposure line); MERGE_CLEANUP_GATE=0 runs the fuser unconditionally, as before, for the control.",
-      "reproducer": "tests/merge_overrun_lap.sh on a 2/disk/caw/direct4k pair (any passing lap): the cleanup's ssh session is closed by the remote host",
-      "updated": "2026-10-24",
-      "batches": [
-        {
-          "id": "b20261024-37b839",
-          "kind": "control",
-          "row": "lap:merge_cleanup",
-          "config": "2/disk/caw/direct4k",
-          "platform": "any",
-          "planned": 10,
-          "probe": "^CLEANUP: [12] node",
-          "candidate": "",
-          "build": "1BC77CFB15EF4A988DD1F56",
-          "variant": "MERGE_CLEANUP_GATE=0 (fuser -k -m /mnt/fourkn runs whether or not it is a mount point, as before the fix)",
-          "state": "closed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "why": "the fix taken out: the cleanup SIGKILLs every user of each node's root filesystem, its services with them"
-        },
-        {
-          "id": "b20261024-8cb36c",
-          "kind": "verify",
-          "row": "lap:merge_cleanup",
-          "config": "2/disk/caw/direct4k",
-          "platform": "any",
-          "planned": 6,
-          "probe": "^CLEANUP: [12] node",
-          "candidate": "0.90.134",
-          "build": "1BC77CFB15EF4A988DD1F56",
-          "variant": "",
-          "state": "passed",
-          "leaves_cluster": false,
-          "support": [],
-          "created": "2026-10-24",
-          "rate": {
-            "row": "lap:merge_cleanup",
-            "config": "2/disk/caw/direct4k",
-            "platform": "any",
-            "kind": "control",
-            "batch": "b20261024-37b839",
-            "k": 10,
-            "n": 10,
-            "candidate": "",
-            "variant": "MERGE_CLEANUP_GATE=0 (fuser -k -m /mnt/fourkn runs whether or not it is a mount point, as before the fix)",
-            "builds": [
-              "1BC77CFB15EF4A988DD1F56"
-            ],
-            "date": "2026-10-24"
-          },
-          "transfer": "",
-          "lower_bound": 0.5887040186524746
-        }
-      ],
-      "rates": [
-        {
-          "row": "lap:merge_cleanup",
-          "config": "2/disk/caw/direct4k",
-          "platform": "any",
-          "kind": "control",
-          "batch": "b20261024-37b839",
-          "k": 10,
-          "n": 10,
-          "candidate": "",
-          "variant": "MERGE_CLEANUP_GATE=0 (fuser -k -m /mnt/fourkn runs whether or not it is a mount point, as before the fix)",
-          "builds": [
-            "1BC77CFB15EF4A988DD1F56"
-          ],
-          "date": "2026-10-24"
-        }
-      ],
-      "cells": [
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:merge_cleanup",
-          "iso": "2026-10-24T17:18:30Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:merge_cleanup",
-          "iso": "2026-10-24T17:17:01Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:merge_cleanup",
-          "iso": "2026-10-24T17:15:30Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:merge_cleanup",
-          "iso": "2026-10-24T17:14:02Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:merge_cleanup",
-          "iso": "2026-10-24T17:12:31Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:merge_cleanup",
-          "iso": "2026-10-24T17:10:56Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:merge_cleanup",
-          "iso": "2026-10-24T17:09:23Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:merge_cleanup",
-          "iso": "2026-10-24T17:07:45Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:merge_cleanup",
-          "iso": "2026-10-24T17:06:16Z"
-        },
-        {
-          "config": "2/disk/caw/direct4k",
-          "row": "lap:merge_cleanup",
-          "iso": "2026-10-24T17:04:42Z"
-        }
-      ],
-      "verified_at": [
-        {
-          "config": "2/disk/caw/direct4k",
-          "platform": "any",
-          "candidate": "0.90.134",
-          "attempt": "2026-10-24T16:34:18Z",
-          "build": "1BC77CFB15EF4A988DD1F56",
-          "batch": "b20261024-8cb36c",
-          "approval": "P20261024-4975c4",
-          "date": "2026-10-24"
-        }
-      ]
-    },
-    {
       "id": "D-2NETMESH-FALSE-ENOSPC-ON-WRITE-AND-CHURN-WITH-19GB-FREE-DURING-NOINO-FENCE-LAP",
       "severity": "high",
       "nodes": 2,
@@ -10051,6 +9856,69 @@
       "summary": "Two harness cleanups run 'fuser -km $MNT' with no check that $MNT is still a mount point: tests/closure_mount_race.sh:97 (the joiner's clean removal) and scripts/drbd_rig.sh:2794 (the resolve test's unmount of both nodes). On a directory that is not a mount point fuser -m names every user of the root filesystem, so either cleanup run after its mount is already gone SIGKILLs the node's sshd and daemons, as tests/merge_overrun_lap.sh's did (D-MERGE-OVERRUN-LAP-CLEANUP-FUSER-KILLS-ROOT-FS-USERS-WHEN-NOT-MOUNTED, measured there 10 of 10 with the gate off)",
       "evidence": "Read from the code at the review of verify P20261024-4975c4 (data/reviews/P20261024-4975c4.md), which noted that its approval covers merge_overrun_lap.sh alone and that these two calls have no mount-point check; no run of either has been seen to kill a node's services",
       "next": "Fix drafted for the next attempt: tests/evidence/drafts/tree/tests/closure_mount_race.sh and tests/evidence/drafts/tree/scripts/drbd_rig.sh run the fuser only while 'mountpoint -q $MNT' holds (bash -n clean). Then a lap per site that runs the cleanup with $MNT already unmounted and reads the node's ssh, journald and udevd main pids before and after it (the merge_overrun lap's check, tests/merge_overrun_lap.sh:77-96), with the guard switched off for the control."
+    },
+    {
+      "id": "D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS",
+      "severity": "major",
+      "nodes": 1,
+      "config": "*/*/*",
+      "opened": "2026-10-24",
+      "summary": "Three branches of tests/mpath/lib.sh pf_boot_rejoin (a killed path-row victim's rejoin) are not shown to load the module parameters every other node of the lane loads: the modprobe branch, taken when the node has no /root/mxfs.ko.prep and the module comes from the installed package (lib.sh:545; before the fix it sent modprobe no arguments at all, prep_node.sh:244-248), the retirement-contract argument (target_retire_contract, lib.sh:522-523, never set in any lap), and the TCP branch (force_transport=1, lib.sh:521) on the rig. A rejoined victim on any of them may run a death window or other knobs different from its peers'. The CAW insmod branch with no extra arguments is measured (D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS).",
+      "evidence": "Split from D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS by the review of its removal P20261024-f8709b (data/reviews/P20261024-f8709b.md): every rig lap ran insmod at 8/disk/caw/mpath with no contract set; the only TCP laps are the argv-recorder laps of control b20261023-c6d354, whose ten runs are this record's cells",
+      "next": "Lap tests/mpath/rejoin_modargs_rig_lap.sh variants: (1) the victim's /root/mxfs.ko.prep removed before the kill so the rejoin takes modprobe (with the package's module installed), (2) MXFS_RETIRE_CONTRACT set on the lane, (3) MXFS_CONFIG=8/net/mesh/mpath on the rig; each graded on the rejoined victim's /sys/module/mxfs/parameters against a survivor's, with PF_REJOIN_PREP_ARGS=0 as its control, then a verification per branch.",
+      "cells": [
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rejoin_modargs",
+          "iso": "2026-10-23T20:48:00Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rejoin_modargs",
+          "iso": "2026-10-23T20:48:01Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rejoin_modargs",
+          "iso": "2026-10-23T20:48:02Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rejoin_modargs",
+          "iso": "2026-10-23T20:48:03Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rejoin_modargs",
+          "iso": "2026-10-23T20:48:04Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rejoin_modargs",
+          "iso": "2026-10-23T20:48:05Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rejoin_modargs",
+          "iso": "2026-10-23T20:48:06Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rejoin_modargs",
+          "iso": "2026-10-23T20:48:07Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rejoin_modargs",
+          "iso": "2026-10-23T20:48:08Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:rejoin_modargs",
+          "iso": "2026-10-23T20:48:09Z"
+        }
+      ],
+      "updated": "2026-10-24"
     }
   ]
 }
