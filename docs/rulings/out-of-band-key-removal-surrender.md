@@ -61,6 +61,13 @@ the series' length.
 
 ## Open
 
+- How the departed node tells an out-of-band removal from a proper fence. After a peer's
+  PREEMPT AND ABORT under a durable fence intent naming it, the exclusion is already proved, and
+  a REGISTER would only leave a stray registration under a dead incarnation: the reason
+  `mxfs_scsipr_fill_paths` (dlm/scsipr.c:187-195) registers only while the node still holds
+  authority. The surrender has to read the fencing descriptor of its own slot first and
+  re-register only when no fence intent names this incarnation, and never after a certificate
+  for it exists.
 - Whether the departed node's PR code can reach every path's nexus after its key was removed,
   and how it learns the set of nexuses it used (the PAL enumerates the logical unit's paths for
   the isolation check, `mxfs_pal_lu_paths_offline`).

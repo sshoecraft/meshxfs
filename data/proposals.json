@@ -9635,8 +9635,14 @@
         "tests/evidence/lanes/g8b_a20_20261024T163432Z/step6.log",
         "tests/evidence/lanes/g8b_a20_20261024T163432Z/step8.log"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-79d9d4.md",
+        "sha256": "eed95e72f50a6712237150a7fefc8332e00558f9e4318c2b438fe926342bc344",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     },
     {
       "id": "P20261024-3c9c10",
@@ -9665,6 +9671,39 @@
         "tests/evidence/lanes/g2b_a20cp_20261024T172800Z/step2.log",
         "tests/evidence/lanes/g2b_a17cpd_20261024T115152Z/summary.log",
         "tests/create_pace_lap.sh"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-3c9c10.md",
+        "sha256": "9c47dc76d9a06ca2bec048b078a86cdc1cef4a637de9210bd57f8f49960ce28c",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-3a6126",
+      "kind": "remove-fixed",
+      "record": "D-PATH-ROW-REJOIN-DROPS-THE-LANES-MODARGS-SO-A-LANE-RUNS-MIXED-WINDOWS",
+      "change": {
+        "control": "b20261024-2f6ae0",
+        "fixon": "b20261024-d99c77",
+        "cause": "tests/mpath/lib.sh pf_boot_rejoin brought a killed path-row victim back by loading mxfs with the configuration's transport arguments only (mxfs_rig_modargs), not the set tests/setup/prep_node.sh loads on every other node (log_repeat_limit=0 and the lane's MXFS_EXTRA_MODARGS among them), so the rejoined victim ran module parameters different from its peers' (the original run's victim read dead_timeout_ms=0 after the rejoin while its peers ran 12000). Fix: pf_rejoin_modargs builds prep's argument set for the rejoin (tests/mpath/lib.sh:501-524) and pf_boot_rejoin loads it (:531, the insmod at :545); PF_REJOIN_PREP_ARGS=0 loads what the rejoin loaded before, the control."
+      },
+      "argument": "Resubmission of P20261024-79d9d4, answering its review (data/reviews/P20261024-79d9d4.md) by citing the extra-argument half. Both halves were measured on the rig at 8/disk/caw/mpath (the CAW insmod branch) by tests/mpath/rejoin_modargs_rig_lap.sh, which kills and rejoins the victim through pf_boot_rejoin and compares /sys/module/mxfs/parameters on the victim and a survivor, all on the byte-identical lib.sh (be693c38...e140 in the attempt 17, 18 and 20 freezes). (1) With the lane's extra arguments (MXFS_EXTRA_MODARGS=dead_timeout_ms=12000): control b20261024-e827e0, 10 of 10 FAIL 'log_repeat_limit=1 (survivor 0), dead_timeout_ms=0 (survivor 12000)'; fix-on b20261024-565ac2, 6 of 6 PASS with exposure, approved verify P20261024-d7c365 (data/reviews/P20261024-d7c365.md). (2) Without extra arguments: control b20261024-2f6ae0, 10 of 10 FAIL on log_repeat_limit; fix-on b20261024-d99c77, 6 of 6 PASS, approved verify P20261024-3e7240; repeated on attempt 20 (frozen 2026-10-24T16:34:18Z, lane tests/evidence/lanes/g8b_a20_20261024T163432Z): control b20261024-7cfa3f 10 of 10 FAIL, verification b20261024-c553df 6 of 6 PASS. Claim: on the CAW insmod branch, a victim that pf_boot_rejoin brings back now loads the same values as the survivor for force_transport, target_cache_protected, log_repeat_limit and dead_timeout_ms, with and without the lane's extra arguments. Not claimed, within P20261024-d7c365's limits: the contract-argument quoting, the modprobe branch and the TCP branch on the rig (all three now the open record D-PATH-ROW-REJOIN-MODPROBE-CONTRACT-AND-TCP-BRANCHES-LOAD-OTHER-PARAMS, which also names the ten 2/net/mesh/direct argv-recorder cells), and that a lane running mixed effective death windows was observed and cured: on this candidate the default SCSI window (12 s) equals the variant's, so the control victim ran 'death window 12000 ms' like the survivors and no lap produced two windows. The record's cells this removal retires are the laps of the four rig controls above, each the record's own failure (the victim's loaded parameters differing from the survivor's).",
+      "evidence": [
+        "data/reviews/P20261024-79d9d4.md",
+        "data/reviews/P20261024-d7c365.md",
+        "data/reviews/P20261024-3e7240.md",
+        "tests/mpath/lib.sh",
+        "tests/mpath/rejoin_modargs_rig_lap.sh",
+        "tests/evidence/batch_laps/b20261024-e827e0",
+        "tests/evidence/batch_laps/b20261024-565ac2",
+        "tests/evidence/batch_laps/b20261024-2f6ae0",
+        "tests/evidence/batch_laps/b20261024-d99c77",
+        "tests/evidence/lanes/g8b_a20_20261024T163432Z/step6.log",
+        "tests/evidence/lanes/g8b_a20_20261024T163432Z/step8.log"
       ],
       "state": "pending",
       "created": "2026-10-24"
