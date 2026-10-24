@@ -8522,7 +8522,7 @@
           "candidate": "0.90.134",
           "build": "468F7F30C2E190B0244AF70",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -8688,6 +8688,16 @@
           "build": "468F7F30C2E190B0244AF70",
           "batch": "b20261024-d8e843",
           "approval": "P20261024-5ca267",
+          "date": "2026-10-24"
+        },
+        {
+          "config": "2/disk/caw/direct",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T10:25:09Z",
+          "build": "468F7F30C2E190B0244AF70",
+          "batch": "b20261024-8389c9",
+          "approval": "P20261024-26e073",
           "date": "2026-10-24"
         }
       ]
