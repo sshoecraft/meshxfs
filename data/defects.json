@@ -2645,7 +2645,7 @@
           "candidate": "",
           "build": "468F7F30C2E190B0244AF70",
           "variant": "LH_SHARD_SELECT=0 (tests/live_holder_wait.sh makes eight candidates back to back and keeps them all, as before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -2684,6 +2684,21 @@
             "08D63764A9352FBDD5A76CD"
           ],
           "date": "2026-10-23"
+        },
+        {
+          "row": "lap:lh_master",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-bda0e1",
+          "k": 9,
+          "n": 9,
+          "candidate": "",
+          "variant": "LH_SHARD_SELECT=0 (tests/live_holder_wait.sh makes eight candidates back to back and keeps them all, as before the fix)",
+          "builds": [
+            "468F7F30C2E190B0244AF70"
+          ],
+          "date": "2026-10-24"
         }
       ],
       "verified_at": [
