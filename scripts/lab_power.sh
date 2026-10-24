@@ -40,6 +40,14 @@ VIRSH="virsh -c qemu:///system"
 FENCE_STATE="${MXFS_FENCE_STATE:-$HOME/.local/state/mxfs-rig-fence}"
 BOOT_S=240
 SHUTDOWN_S=90
+# A power-up floods the host's kernel log (each guest's iSCSI logins), and a lane
+# whose prep runs the preflight meanwhile was refused for the rate
+# (D-LANE-POWER-UP-FLOODS-THE-HOST-LOG-AND-ANOTHER-LANES-PREFLIGHT-REFUSES-ITS-PREP).
+# `up` holds this host-wide lock exclusive from its first start until every domain
+# it started answers ssh; scripts/clyde_preflight.sh takes it shared before it
+# samples the log rate.  Two power-ups wait for each other at most BOOT_S.
+# LAB_POWER_LOCK=0 takes no lock here or in the preflight, as before: the control.
+POWER_LOCK=/tmp/mxfs_host_powerup.lock
 
 say() { echo "[$(date -u +%T)] $*"; }
 state() { timeout 30 $VIRSH domstate "$1" 2>/dev/null | head -1; }
@@ -146,6 +154,16 @@ done
 if [ "$verb" = state ]; then
     for d in "${DOMS[@]}"; do state_one "$d"; done
     exit 0
+fi
+
+if [ "$verb" = up ] && [ "${LAB_POWER_LOCK:-1}" != 0 ]; then
+    exec 9>>"$POWER_LOCK"
+    t0=$SECONDS
+    if flock -x -w "$BOOT_S" 9; then
+        say "host power-up lock held (waited $(( SECONDS - t0 )) s)"
+    else
+        say "host power-up lock not taken in $BOOT_S s; powering up without it"
+    fi
 fi
 
 # every domain at once, each with its own exit code

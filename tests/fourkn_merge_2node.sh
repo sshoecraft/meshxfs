@@ -180,8 +180,13 @@ step "INFO $NF files in $(awk '{print int($2 / 8)}' "$OUT/inodes.txt" | sort -u 
 
 # both halves at once, each with its own output and exit code
 t0=$(date +%s%N)
-on "$N1" "timeout --foreground $((WBOUND - 3)) $NREPO/tests/fourkn_merge_worker.sh $DIR 1 $ROUNDS $NF" "$WBOUND" > "$OUT/w1.txt" & p1=$!
-on "$N2" "timeout --foreground $((WBOUND - 3)) $NREPO/tests/fourkn_merge_worker.sh $DIR 0 $ROUNDS $NF" "$WBOUND" > "$OUT/w2.txt" & p2=$!
+# MERGE_NODE_BOUND=0 bounds the ssh client alone, as before the fix: the control
+# of D-FOURKN-MERGE-LAP-OVERRUN-LEAVES-ITS-WORKER-HOLDING-THE-MOUNT
+NODEBOUND="timeout --foreground $((WBOUND - 3)) "
+[ "${MERGE_NODE_BOUND:-1}" = 0 ] && NODEBOUND=""
+step "INFO the worker's node-side bound: ${NODEBOUND:-none (MERGE_NODE_BOUND=0)}"
+on "$N1" "$NODEBOUND$NREPO/tests/fourkn_merge_worker.sh $DIR 1 $ROUNDS $NF" "$WBOUND" > "$OUT/w1.txt" & p1=$!
+on "$N2" "$NODEBOUND$NREPO/tests/fourkn_merge_worker.sh $DIR 0 $ROUNDS $NF" "$WBOUND" > "$OUT/w2.txt" & p2=$!
 wait $p1; rc1=$?; wait $p2; rc2=$?
 step "INFO workload wall $(( ($(date +%s%N) - t0) / 1000000 )) ms; $N1: rc=$rc1 $(grep -a WORKER "$OUT/w1.txt" | tail -1); $N2: rc=$rc2 $(grep -a WORKER "$OUT/w2.txt" | tail -1)"
 ck "$N1's half ran to its end with no error" "$(grep -c "^WORKER_DONE rounds=$ROUNDS errors=0 " "$OUT/w1.txt")" 1

@@ -52,7 +52,11 @@ RECORD = "D-HARNESS-LAP-TIMED-OPS-REACH-NO-STALL-GRADER-JDT-31S-UNMOUNT-GRADED-P
 ROW = "lap:jdt_gate_stall_inner"
 AT = "2/net/mesh/direct"
 LAP_BOUND = 1200
-MANIFEST_LINE = "join_during_takeover | 228 | {bound} | NFILES=4000 |\n"
+# At NFILES=4000 the pass is ~500 pages and ended inside jdt's first in-flight sample, so every
+# lap of the first control aborted before the stall arm's hold (b20261023-9da1ae, laps 1-5:
+# 'the takeover pass was not seen in flight (activations=493 ...)'). JDT_PASS_PACE_MS=30 holds
+# the pass 30 ms a page until it is seen, ~15 s for ~500 pages, inside the bound below.
+MANIFEST_LINE = "join_during_takeover | 228 | {bound} | NFILES=4000 JDT_PASS_PACE_MS=30 |\n"
 GATE_OK = re.compile(r"^GATE join_during_takeover healthy: rc=0 .*-> OK$", re.M)
 OP_MS = re.compile(r"^  INFO .*\bms=(\d+)", re.M)
 

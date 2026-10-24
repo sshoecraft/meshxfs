@@ -51,7 +51,8 @@
 # The timeouts are the harness's own caller bound (its header derives it);
 # a lap that overruns is recorded with rc=124 and is BROKEN, never re-run.
 # <env> is the environment for both laps (NOPREP=1 to reuse the live mount)
-# or '-' for none.
+# or '-' for none.  With --only, GATE_ENTRY_ENV (NAME=value words) is added after
+# that entry's <env> and overrides it: a control's variant, the manifest untouched.
 #
 # Usage: tests/capture_fault_gate.sh <label> [--healthy|--healthy-only] [--only <harness>] [manifest]
 set -u
@@ -154,6 +155,11 @@ while IFS= read -r line; do
     [ -x "tests/$h.sh" ] || { echo "GATE $h: BROKEN (tests/$h.sh is not executable or missing)"; broken=$((broken+1)); continue; }
     case $tf in ''|*[!0-9]*) echo "GATE $h: BROKEN (no fault-lap timeout in the manifest)"; broken=$((broken+1)); continue ;; esac
     [ "$env" = '-' ] && env=
+    # The control of an entry's own environment (join_during_takeover's NFILES,
+    # D-JOIN-DURING-TAKEOVER-GATE-PASS-ENDS-BEFORE-ITS-IN-FLIGHT-SAMPLE) runs the
+    # entry with other values without editing the frozen manifest: with --only,
+    # GATE_ENTRY_ENV's NAME=value words follow the manifest's, so env(1) takes them.
+    [ -n "$ONLY" ] && [ -n "${GATE_ENTRY_ENV:-}" ] && env="$env $GATE_ENTRY_ENV"
     entries=$((entries+1))
     tag=${h//[^A-Za-z0-9_]/_}
     # a harness whose label is not its first positional (`<A> <B> [laps]

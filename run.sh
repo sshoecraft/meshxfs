@@ -424,6 +424,11 @@ RUNLOCK=/tmp/mxfs_run.lock
 # lock — its ancestor holds it for the same logical run.  A stale/dead owner
 # pid falls through to the normal lock path.
 . "$REPO/tests/lib/runlock.sh"
+# A batch lap's bound counts everything this run does before its prep, and three
+# laps spent ~95 s there with nothing logged about where
+# (D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT):
+# each step up to the prep prints the time since this run started.
+prep_wall() { echo "--- pre-prep: $1 at +${SECONDS} s ($(date -u +%T)) ---"; }
 if [ -n "${MXFS_RUNLOCK_OWNER:-}" ] && [ "$MXFS_RUNLOCK_OWNER" != "$$" ] \
    && [ "$(cat "/proc/$MXFS_RUNLOCK_OWNER/comm" 2>/dev/null)" = "run.sh" ]; then
     echo "--- run lock: re-entrant invocation under run.sh pid $MXFS_RUNLOCK_OWNER (host criterion) ---"
@@ -439,6 +444,7 @@ elif [ -n "$GROUP" ]; then
     runlock_nodes "$what" "${NODES[@]}" || exit 3
     runlock_config "$CFG_SLUG" "$what" || exit 3
     echo "--- run lock: group $GROUP [${NODES[*]}] shares the rig; holds its nodes and $CONFIG ---"
+    prep_wall "run lock taken"
     export MXFS_RUNLOCK_OWNER=$$
     # The VM pool (tools/vm_pool.sh): the group's VMs are started if they are
     # off, and once this run ends they are shut off unless a run or a driver's
@@ -447,6 +453,7 @@ elif [ -n "$GROUP" ]; then
     # filesystem's.
     "$REPO/tools/vm_pool.sh" up "${NODES[@]}" \
         || { echo "ERROR: could not start [${NODES[*]}] (tools/vm_pool.sh up)"; exit 3; }
+    prep_wall "VMs up"
     # Started from a subshell that exits at once, so the helper is never a
     # child of this shell: it waits for this run to exit, and this run's bare
     # `wait`s (one per parallel step) waited for it in turn, so every run.sh
@@ -487,6 +494,7 @@ if ! flock -n 9; then
 fi
 echo "$$ $(date -u +%FT%TZ) run.sh $CONFIG ${ONLY[*]:-}" >&9
 export MXFS_RUNLOCK_OWNER=$$
+prep_wall "run lock taken"
 fi
 
 # Borrow this run's LUN, now that the run holds its nodes.  The allocation
@@ -518,6 +526,7 @@ if [ "$USE_POOL" = 1 ]; then
                     --what "run.sh $CONFIG${GROUP:+ --group $GROUP} run_id=$RUN_ID" "${NODES[@]}") \
             || { echo "ERROR: no pool LUN of $CFG_BLOCK_SIZE-byte blocks for [${NODES[*]}] (tools/lun_pool.sh status)"; exit 1; }
     fi
+    prep_wall "pool LUN held"
     pool_field() { sed -n "s/.* $1=\([^ ]*\).*/\1/p" <<<"$POOL_LINE"; }
     DEV=$(pool_field dev)
     RIG_TGT=$(pool_field target)
@@ -2536,11 +2545,14 @@ finalize_pending() {
 # ---------------------------------------------------------------------------
 PREFLIGHT=("$REPO/scripts/clyde_preflight.sh")
 [ "$USE_POOL" = 1 ] && PREFLIGHT=("$REPO/tools/lun_pool.sh" quiet "${PREFLIGHT[@]}")
+prep_wall "preflight starts"
 if ! "${PREFLIGHT[@]}"; then
+    prep_wall "preflight refused"
     echo "=== run.sh ABORTED: host-safety preflight failed at ${CONFIG} ===" >&2
     echo "    Do not widen or skip this to make a run start.  Fix the host." >&2
     exit 3
 fi
+prep_wall "preflight passed"
 
 # ---------------------------------------------------------------------------
 # Cluster prep decision (2026-07-14): see the MARKER comment near the top of

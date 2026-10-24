@@ -248,6 +248,21 @@ if ! $SUDO dmesg --follow-new --help >/dev/null 2>&1 &&
 else
     probe_ok=1
 fi
+# A lane's power-up floods the log while its guests log in (scripts/lab_power.sh
+# holds /tmp/mxfs_host_powerup.lock exclusive until every guest answers ssh): wait
+# for it, at most its own bound (BOOT_S, 240 s), so the sample is taken after a
+# power-up and not inside one.  Neither the threshold nor the window changes, and
+# a flood from anything else is refused as before.  LAB_POWER_LOCK=0 waits for none.
+if [ "${LAB_POWER_LOCK:-1}" != 0 ]; then
+    t0=$SECONDS
+    exec 8>>/tmp/mxfs_host_powerup.lock
+    if flock -s -w 240 8; then
+        [ $(( SECONDS - t0 )) -gt 0 ] && echo "  waited $(( SECONDS - t0 )) s for a power-up to finish"
+    else
+        echo "  a power-up still held the host lock after 240 s; sampling anyway"
+    fi
+    exec 8>&-
+fi
 lines=$($SUDO timeout "$KMSG_SECS" dmesg --follow-new --notime 2>/dev/null | wc -l)
 if [ "$probe_ok" -eq 0 ] || ! $SUDO dmesg --notime >/dev/null 2>&1; then
     bad "cannot read the kernel log (dmesg_restrict=$(cat /proc/sys/kernel/dmesg_restrict 2>/dev/null))"

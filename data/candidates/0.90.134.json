@@ -1,7 +1,7 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-24T06:38:23Z",
+  "created": "2026-10-24T10:25:09Z",
   "state": "RUNNING",
   "attempts": [
     {
@@ -390,14 +390,36 @@
       "dist": "",
       "packages": {},
       "steps": {}
+    },
+    {
+      "created": "2026-10-24T06:38:23Z",
+      "state": "ABANDONED",
+      "dry_run": false,
+      "srcversion": "BE3695D2590A65F742F9816",
+      "files": "tests/evidence/candidates/0.90.134_20261024T063823Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-24T06:38:23Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-24T10:22:20Z",
+          "why": "end the attempt frozen 2026-10-24T06:38:23Z so the drafted fixes (type-flip shell-dead relookup, noino convoy chain, auth-closed park switch, lane power-up lock, pre-prep timing, create-pace kernel-log follower, fourkn merge node bound, peer-window premise, jdt pass pacing, DRBD third-vote keep-loaded, capture gate entry env, release-step unsettle switch, drbd write-bound group, mkfs layout against) go into the next attempt"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
-  "srcversion": "BE3695D2590A65F742F9816",
-  "module_sha256": "08a5ccfb026031cb4e156b95e73b9218b3e24958f77f6341ce292375c2b6ca7e",
-  "files": "tests/evidence/candidates/0.90.134_20261024T063823Z.files.json",
-  "files_count": 2624,
-  "files_digest": "4ce796bae9966e579ac630f4559a246ba564f09eec76ab512e4939bbc86c02dd",
+  "srcversion": "468F7F30C2E190B0244AF70",
+  "module_sha256": "31be675909391950770b40442b1bc5faa9a0508c34f5c97fed6fd539f00d62ad",
+  "files": "tests/evidence/candidates/0.90.134_20261024T102509Z.files.json",
+  "files_count": 2630,
+  "files_digest": "6c5517a3626bb7d7acd812b97bb55e69b90920efea7702a18c72166b27b4c402",
   "spec": "ec57ce06eb09c644b368cde523dfd4fa03e87d54b80a4bee31602c59f3ec175b",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
@@ -407,7 +429,7 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-24T06:38:23Z",
+      "at": "2026-10-24T10:25:09Z",
       "why": "created"
     }
   ]

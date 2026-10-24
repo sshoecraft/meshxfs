@@ -27,8 +27,10 @@
 #      HOLD_C_MS.  The platter must show R's page ACTIVE under B, or the routing was predicted
 #      wrong and the lap ABORTs.
 #   2. A writes R with dl_acq_gap_ino=R: its first attempt queues at B behind C, times out after
-#      MXFS_LOCK_ACQUIRE_WAIT_MS (6 s), and A is held GAP_MS with no pending entry
-#      (P958-ACQ-GAP).  C's hold outlasts that first attempt.
+#      MXFS_LOCK_ACQUIRE_WAIT_MS (1 s, include/mxfs/mxfs_dlm.h), and A is held GAP_MS with no
+#      pending entry (P958-ACQ-GAP).  C's hold outlasts that first attempt.  So A's write takes
+#      about 1 s + GAP_MS + HOLD_A_MS (29.4-29.8 s at the defaults, 20000 and 8000, in
+#      verification b20261024-0bf8bc): lengthening either knob crosses the 30 s stall limit.
 #   3. C's hold ends and C releases: B promotes A, and the grant lands in A's gap
 #      (P958-ACQ-GRANT-ADOPTED ino=R on A).  A's own one-shot iolock hold is armed now.
 #   4. D unmounts cleanly while A is still in its gap: R's page moves from B to A

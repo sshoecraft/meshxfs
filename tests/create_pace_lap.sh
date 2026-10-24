@@ -13,10 +13,12 @@
 # loop on native XFS made on that device (mkfs.xfs -f, mounted at /mnt/createpace_xfs), the
 # yardstick the 2x ceiling is read against.
 #
-#   PASS     every create returned 0, B listed all NFILES names, no fault signature on either node;
-#            the lap prints the pace (mean and worst create) and max_stall_ms= the worst create
-#   FAIL     a create failed, B's listing is short, a fault signature was logged, or the stage did
-#            not finish inside its bound
+#   PASS     every create returned 0, B listed all NFILES names, no fault signature on either node
+#            in a kernel log read that holds the lap's mark and its end mark; the lap prints the
+#            pace (mean and worst create) and max_stall_ms= the worst create
+#   FAIL     a create failed, B's listing is short, a fault signature was logged, a node's kernel
+#            log read lacks either mark, or the stage did not finish inside its bound
+#   EXPOSED  printed for a node whose kernel ring no longer holds the mark at the end of the lap
 #   ABORT    the pair could not be formed
 #
 # Bound, derived from the measured pace: 18.2 ms a create at its worst (test1_sample2.txt of
@@ -46,6 +48,19 @@ prep=$(MXFS_FORCE_PREP=1 ./run.sh "$CONFIG" ${MXFS_GROUP:+--group "$MXFS_GROUP"}
 rc=$?
 [ "$rc" = 0 ] || { echo "LAP create_pace ABORT: prep_cluster rc=$rc: $(echo "$prep" | tail -2 | tr '\n' ' ' | cut -c1-240)"; exit 2; }
 MARK="CREATEPACE-$LABEL-$$"
+# Every mxfs debug site prints on the rig, so 10000 creates rotate the lap's mark out of a node's
+# kernel ring, and 'dmesg | awk /MARK/' then reads nothing and finds no fault
+# (D-CREATE-PACE-LAP-KERNEL-LOG-CHECK-READS-AN-EMPTY-LOG-AND-PASSES).  Each node's /dev/kmsg is
+# followed into /root from before the mark to after an end mark, and the fault check grades only
+# a read that holds both.  CPL_KMSG_FOLLOW=0 reads the ring afterwards, as before: the control.
+FOLLOW=${CPL_KMSG_FOLLOW:-1}
+KL=/root/createpace.$LABEL.$$.kmsg
+if [ "$FOLLOW" != 0 ]; then
+    for n in "$A" "$B"; do
+        rs 20 "$n" "rm -f $KL $KL.pid; nohup setsid sh -c 'echo \$\$ > $KL.pid; exec cat /dev/kmsg > $KL' > /dev/null 2>&1 < /dev/null & echo started" > /dev/null
+    done
+    sleep 1
+fi
 for n in "$A" "$B"; do
     v=$(rs 20 "$n" "echo '$MARK' > /dev/kmsg; echo m=\$(grep -c ' mxfs ' /proc/mounts)")
     [ "$v" = "m=1" ] || { echo "LAP create_pace ABORT: $n is not mounted after the prep ($v)"; exit 2; }
@@ -75,8 +90,18 @@ if [ -n "${NATIVE_DEV:-}" ]; then
     fi
     echo "  native XFS on $A ($NATIVE_DEV): ${native:-not measured: $(tr '\n' ' ' < "$OUT/native_mount.txt" | cut -c1-160)}"
 fi
+unread=""
 for n in "$A" "$B"; do
-    rs 30 "$n" "dmesg | awk '/$MARK/{f=1} f'" > "$OUT/${n}_kmsg.txt"
+    ring=$(rs 20 "$n" "echo '$MARK-END' > /dev/kmsg; dmesg | grep -c '$MARK\$'")
+    [ "${ring:-0}" = 0 ] && echo "EXPOSED: $n's kernel ring no longer holds the lap's mark"
+    if [ "$FOLLOW" != 0 ]; then
+        sleep 1
+        rs 30 "$n" "kill \$(cat $KL.pid) 2>/dev/null; awk '/$MARK\$/{f=1} f' $KL; rm -f $KL $KL.pid" > "$OUT/${n}_kmsg.txt"
+    else
+        rs 30 "$n" "dmesg | awk '/$MARK\$/{f=1} f'" > "$OUT/${n}_kmsg.txt"
+    fi
+    grep -aq "$MARK\$" "$OUT/${n}_kmsg.txt" && grep -aq "$MARK-END" "$OUT/${n}_kmsg.txt" \
+        || unread="$unread $n's kernel log read holds $(wc -l < "$OUT/${n}_kmsg.txt") line(s) and not both the lap's marks;"
 done
 fault=$(grep -ah 'BUG:\|Oops\|hung_task\|blocked for more than\|Shutting down filesystem\|Corruption' "$OUT/${A}_kmsg.txt" "$OUT/${B}_kmsg.txt" | head -3)
 worst_us=$(echo "$res" | sed -n 's/.* worst_us=\([0-9]*\).*/\1/p')
@@ -86,6 +111,7 @@ fail=""
 case "$res" in "CREATED=$NFILES failed=0 "*|"") ;; *) fail="$fail creates on $A: $res;" ;; esac
 [ "${listed:-0}" = "$NFILES" ] || fail="$fail $B listed ${listed:-none} of $NFILES;"
 [ -z "$fault" ] || fail="$fail fault signature: $(echo "$fault" | tr '\n' ' ' | cut -c1-200);"
+[ -z "$unread" ] || fail="$fail the fault check read no whole kernel log:$unread"
 if [ -n "$fail" ]; then
     echo "LAP create_pace FAIL:$fail evidence=$OUT"; exit 1
 fi

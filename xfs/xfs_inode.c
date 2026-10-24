@@ -2661,6 +2661,8 @@ retry_iget:
 						&coh_gen);
 				bool		p201_entry_behind;
 				bool		p201_platter_contra;
+				bool		p201_shell_dead;
+				extern int mxfs_typeflip_relookup_shell_dead;
 
 				if (atomic_inc_return(&p201_n) <= 2000)
 					mxfs_probe("mxfs: P207-COHERENT-TRUTH ino=%llu coh_mode=0%o coh_gen=%u incore_mode=0%o incore_gen=%u dirent_ft=%u dlm_mode=%d dlm_state=%d name=%.*s\n",
@@ -2767,8 +2769,30 @@ retry_iget:
 					(coh_mode == 0 ||
 					 xfs_mode_to_ftype(coh_mode) != dirent_ftype);
 
+				/*
+				 * The platter can also agree with the entry
+				 * while the shell is another incarnation: a live
+				 * image of the entry's type in a generation not
+				 * the shell's.  Measured on 2/disk/caw/mpath and
+				 * 4/disk/caw/mpath (path_mount_degraded): LOCK's
+				 * number went file and directory from four
+				 * nodes, the resolver's three retires each got a
+				 * file again within 100 ms, and it ended on a
+				 * poisoned file shell with coh_mode=040755 in a
+				 * new generation and the parent flagged stale.
+				 * The shell is the dead side; reading the parent
+				 * again resolves the name from what it says now,
+				 * and a fresh get reads the incarnation it names.
+				 */
+				p201_shell_dead = mxfs_typeflip_relookup_shell_dead &&
+					!p201_entry_behind && !p201_platter_contra &&
+					VFS_I(*ipp)->i_mode != 0 &&
+					coh_mode != 0 && coh_mode != 0xFFFF &&
+					xfs_mode_to_ftype(coh_mode) == dirent_ftype &&
+					coh_gen != VFS_I(*ipp)->i_generation;
+
 				if ((VFS_I(*ipp)->i_mode == 0 || p201_entry_behind ||
-				     p201_platter_contra ||
+				     p201_platter_contra || p201_shell_dead ||
 				     (mxfs_typeflip_force_unresolved == 2 &&
 				      relookups == 0)) && relookups < 3 &&
 				    !xfs_is_shutdown(dp->i_mount)) {
@@ -2783,7 +2807,8 @@ retry_iget:
 						p201_entry_behind ? "reused-live" :
 						p201_platter_contra ?
 						  (coh_mode == 0 ? "platter-free" :
-						   "platter-other") : "forced",
+						   "platter-other") :
+						p201_shell_dead ? "shell-dead" : "forced",
 						current->comm);
 					xfs_irele(*ipp);
 					*ipp = NULL;

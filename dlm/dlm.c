@@ -120,6 +120,19 @@ MODULE_PARM_DESC(dl_relall_threads,
  * exhausted budgets and 18 hung-task reports in one leg of 7 installs;
  * knob 1: none).
  */
+/*
+ * A node whose authority over the LUN has closed parks every request on a
+ * ledger page and answers no FREEZE_REQ or FROZEN (dlm_page_ensure_mine,
+ * dlm_handle_handoff): each would be a ledger write the target refuses
+ * (D-SELF-FENCED-NODE-LEDGER-PUBLISHER-RETRIES-FOREVER-ON-RESERVATION-CONFLICT,
+ * 31,510 refused publishes in five minutes on 8/net/mesh/mpath).  0 = the
+ * page is activated and the hand-off answered as before: the same-build
+ * control arm, never a production value.
+ */
+int mxfs_dl_auth_closed_park = 1;
+module_param_named(dl_auth_closed_park, mxfs_dl_auth_closed_park, int, 0644);
+MODULE_PARM_DESC(dl_auth_closed_park,
+		 "a node whose authority over the LUN has closed parks ledger page requests and answers no page hand-off (1, default); 0 = test control");
 int mxfs_dl_noqueue_prepare_wouldblock = 1;
 module_param_named(dl_noqueue_prepare_wouldblock, mxfs_dl_noqueue_prepare_wouldblock, int, 0644);
 MODULE_PARM_DESC(dl_noqueue_prepare_wouldblock,
@@ -4992,7 +5005,7 @@ static int dlm_page_ensure_mine(struct mxfs_dlm_ctx *ctx, uint32_t page, uint64_
 	 * The request parks as one on a page in transition does, and the requester
 	 * re-routes once the view no longer names this node.
 	 */
-	if (dlm_authority_lost(ctx)) {
+	if (READ_ONCE(mxfs_dl_auth_closed_park) && dlm_authority_lost(ctx)) {
 		ctx->handoff_auth_closed++;
 		mxfs_probe_ratelimited(
 		    "mxfs: P-TAUTH-PAGE-AUTH-CLOSED page=%u state=%u total=%llu -- parked: this incarnation's authority over the LUN is closed, so the page is neither activated nor decided on here\n",
@@ -5203,7 +5216,7 @@ int mxfs_dlm_process_page_handoff(struct mxfs_dlm_ctx *ctx, mxfs_node_id_t sende
 	 * mount does.
 	 */
 	if ((msg->kind == MXFS_HANDOFF_FREEZE_REQ || msg->kind == MXFS_HANDOFF_FROZEN) &&
-	    dlm_authority_lost(ctx)) {
+	    READ_ONCE(mxfs_dl_auth_closed_park) && dlm_authority_lost(ctx)) {
 		ctx->handoff_auth_closed++;
 		pr_warn_ratelimited(
 		    "mxfs: P-TAUTH-HANDOFF-AUTH-CLOSED kind=%u page=%u from=%u total=%llu -- this incarnation's authority over the LUN is closed: no page is prepared or activated here\n",

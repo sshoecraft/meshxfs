@@ -128,7 +128,13 @@ die() { echo "lun_pool: $*" >&2; exit 1; }
 pool_lock() {  # serialise every decision about who holds what
     mkdir -p "$POOL" || die "cannot create $POOL"
     exec {LOCKFD}>>"$LOCKFILE" || die "cannot open $LOCKFILE"
+    local t0=$SECONDS
     flock -w "${1:-60}" "$LOCKFD" || die "pool lock not taken in ${1:-60} s: $LOCKFILE"
+    # a run's time before its prep is counted against a batch lap's bound
+    # (D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT):
+    # say how long the lock took, on stderr, which no caller parses
+    [ $(( SECONDS - t0 )) -gt 0 ] && echo "lun_pool: pool lock waited $(( SECONDS - t0 )) s" >&2
+    return 0
 }
 pool_unlock() { exec {LOCKFD}>&-; }
 

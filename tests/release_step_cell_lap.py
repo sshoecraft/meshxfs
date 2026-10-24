@@ -81,11 +81,14 @@ SWITCHES = ("MXFS_RELEASE_STEP_SETTLE", "MXFS_RELEASE_STEP_ANNOTATE", "MXFS_RELE
 #: with a StopIteration before any verdict
 #: (D-RELEASE-STEP-CELL-LAP-NAMES-A-REMOVED-RECORD-AND-DIES-WITHOUT-A-VERDICT).
 #: The same holds for the live ledger's annotations of the lap's runs (unsettle).
-#: MXFS_STEP_LAP_OWN_RECORD=0 names the live record, adds none and keeps the live annotations,
-#: as before: the control.
+#: Each part has a switch of its own, so the control of one reaches the code it is about:
+#: MXFS_STEP_LAP_OWN_RECORD=0 names the live record and adds none, as before;
+#: MXFS_STEP_LAP_UNSETTLE=0 keeps the live annotations in the scratch ledgers, as before.
+#: OWN_RECORD=0 also keeps them, since the earlier code did neither.
 RECORD = "D-RELEASE-STEP-CELL-LAP-SCRATCH-RECORD"
 LIVE_RECORD = "D-RELEASE-RUN-STEP-INCIDENTS-CANNOT-BE-SETTLED"
 OWN_RECORD = os.environ.get("MXFS_STEP_LAP_OWN_RECORD", "1") != "0"
+UNSETTLE = OWN_RECORD and os.environ.get("MXFS_STEP_LAP_UNSETTLE", "1") != "0"
 if not OWN_RECORD:
     RECORD = LIVE_RECORD
 COMMAND_BOUND = 20
@@ -303,7 +306,8 @@ def live_run(key: tuple) -> dict | None:
 
 
 def main() -> int:
-    for switch in SWITCHES + ("MXFS_RELEASE_STEP_COPY", "MXFS_STEP_LAP_OWN_RECORD"):
+    for switch in SWITCHES + ("MXFS_RELEASE_STEP_COPY", "MXFS_STEP_LAP_OWN_RECORD",
+                              "MXFS_STEP_LAP_UNSETTLE"):
         print(f"INFO {switch}={os.environ.get(switch) or '(unset)'}")
     keys = {}
     for run in RUNS:
@@ -320,8 +324,9 @@ def main() -> int:
             if True:
                 tree = scratch_tree(base / f"{number:02d}")
                 unname(tree, keys[run])
-                if OWN_RECORD:
+                if UNSETTLE:
                     unsettle(tree, keys[run])
+                if OWN_RECORD:
                     own_record(tree)
                 before = listed(tree, run)
                 if before is None:

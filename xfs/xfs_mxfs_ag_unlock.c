@@ -227,6 +227,26 @@ MODULE_PARM_DESC(typeflip_relookup_platter,
 	"an unresolved type flip reads the parent again when the coherent platter image is free or of another type than the entry; 0 = control; 1=on (default)");
 
 /*
+ * The third case of an unresolved type flip: the coherent platter image is a
+ * live inode of the type the entry names, in another generation than the
+ * in-core shell, so the shell is the dead side.  1 reads the parent again
+ * (with the other type-flip relookups, at most 3) instead of failing the lookup
+ * -ESTALE.  Measured on 2/disk/caw/mpath and 4/disk/caw/mpath
+ * (path_mount_degraded, candidate 0.90.134): the shared mutex directory LOCK's
+ * number went regular file and directory from four nodes; the resolver
+ * retired three file shells within 100 ms, each re-get a file again, then
+ * reloaded a poisoned file shell for the rest of its rounds, and
+ * P207-COHERENT-TRUTH read coh_mode=040755 with a new generation against the
+ * file shell: neither other term held and pathload's mkdir failed ESTALE.
+ * 0 = the two terms above alone (the same-build control).
+ */
+int mxfs_typeflip_relookup_shell_dead = 1;
+EXPORT_SYMBOL(mxfs_typeflip_relookup_shell_dead);
+module_param_named(typeflip_relookup_shell_dead, mxfs_typeflip_relookup_shell_dead, int, 0644);
+MODULE_PARM_DESC(typeflip_relookup_shell_dead,
+	"an unresolved type flip reads the parent again when the coherent platter image is the entry's type in another generation than the in-core shell; 0 = control; 1=on (default)");
+
+/*
  * When the poisoned-shell arm of xfs_lookup runs out of its retire budget, it
  * reads the parent again (bounded with the type-flip relookups, at most 3)
  * instead of failing the lookup -ESTALE.  Measured on 4/disk/caw/mpath (the

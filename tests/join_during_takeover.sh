@@ -75,6 +75,13 @@
 #        (default 6: a coin flip six times).
 #        JDT_MAX_STALL=0 prints no max_stall_ms= line (default 1; 0 is the
 #        control of the stall grading below).
+#        JDT_PASS_PACE_MS (default 0, none; clean only): A's takeover pass
+#        waits this long between pages (dl_takeover_pause_ms) from A's lone
+#        remount until the pass is seen in flight.  Under routing hash v2 a
+#        small NFILES is a pass of a few hundred pages that ends inside the
+#        first in-flight sample (4000 files: ~500 pages in 5.1 s); 30 ms a
+#        page keeps such a pass in flight for the samples, so a lap that needs
+#        the pass seen (the stall arm) can run at that NFILES.
 #
 # STALLS.  A lap run through tools/batch_lap.py is held to the release
 # policy's stall limit only by the max_stall_ms= lines it prints; the ms= of
@@ -236,6 +243,11 @@ iteration() {
     #    nodemand: the on-demand defence is switched off before any request
     #    can meet it.
     [ "$ARM" = "nodemand" ] && [ "$EXPECT" = "clean" ] && { kn=$(knobs 1 0); echo "  INFO A knobs for the arm: ${kn:-no result}"; }
+    if [ "${JDT_PASS_PACE_MS:-0}" != 0 ] && [ "$EXPECT" = "clean" ]; then
+        kn=$(knobs "$([ "$ARM" = nodemand ] && echo 1 || echo 0)" "$JDT_PASS_PACE_MS")
+        echo "  INFO A's pass paced at ${JDT_PASS_PACE_MS} ms a page until it is seen in flight: ${kn:-no result}"
+        [[ "$kn" == *"/$JDT_PASS_PACE_MS"* ]] || abort_reform "A did not take the pass pace ($kn)"
+    fi
     # A second marker on A, written just before the remount: everything the
     # lap counts on A from here on — the pass in flight, the activations at
     # issue and return, the pass summary, the on-demand services — belongs
@@ -272,6 +284,11 @@ iteration() {
         [ "$still" -ge 2 ] && break
     done
     echo "  INFO takeover pass: activations_so_far=$mine1 (previous sample $mine0) in_flight=$inflight ($(( $(date +%s) - tmount )) s after the mount) at +$(el)s"
+    # the pace ends once the pass is seen; the stall arm replaces it with its
+    # own hold below, with no unpaced gap in which the rest of the pass could run
+    if [ "${JDT_PASS_PACE_MS:-0}" != 0 ] && [ "$EXPECT" = "clean" ] && [ "$ARM" != "stall" ]; then
+        kn=$(knobs "$([ "$ARM" = nodemand ] && echo 1 || echo 0)" 0); echo "  INFO A's pass pace cleared: ${kn:-no result}"
+    fi
     if [ "$inflight" != "1" ]; then
         local done_line
         done_line=$(rs 20 "$A" "$DMA | grep -a 'P-TAUTH-TAKEOVER departed\|P-TAUTH-ORPHAN-SWEEP by' | tail -1")

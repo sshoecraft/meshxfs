@@ -1,0 +1,164 @@
+#!/bin/bash
+# noino_fence_efd_hold_lap.sh — does a node shut itself down when a peer's BAST
+# needs a no-inode release while one of its own extent-free chains is held?
+#
+# WHY THIS EXISTS.  D-8CAWMPATH-SURVIVOR-SHUTS-DOWN-ON-NOINO-EFI-WEDGE-DURING-PEER-FENCE:
+# on 8/disk/caw/mpath the live survivor test7 shut its filesystem down while its
+# peers fenced the frozen test14.  A peer's BAST for a no-inode grant ran the
+# release's drain fence (xfs/xfs_mxfs_noino.c mxfs_noino_drain_fence), the AIL
+# minimum stayed at an extent-free intent whose EFD had not committed, and after
+# MXFS_NOINO_STALL_TRIES (8) bounded pushes with no AG wait in flight
+# (mxfs_noino_freeze_is_convoy counts only those) the fence gave up:
+# P-NOINO-DRAIN-STUCK, P-NOINO-RELFENCE-WEDGE, shutdown.  What held that EFD is
+# not known (H2 in the record: a seam relock behind the frozen victim).  This lap
+# holds an EFD on purpose (dbg_efd_hold_ms: the EFI forced durable, the EFD
+# transaction parked) while both nodes run the path rows' load, whose churn in a
+# shared directory is where no-inode releases come from (a peer's create reusing
+# a number this node still holds a corpse grant for; tests/noino_acq_takeover_ab.sh),
+# so it shows whether an EFD chain held past the fence's stall budget shuts the
+# node down, whatever holds it.
+#
+# History of the lap (lanes g2c_w12, g2c_w12b, 2026-10-24): stats of S's evicted
+# files on R drew PR BASTs that S served in ~10 ms each without a fence, VACUOUS
+# 4 of 4 (tests/evidence/20261024T082305Z_noinoefd_nfe30a and later): those were
+# not no-inode releases.  With pathload's churn on both nodes (lane g2c_w12c) one
+# 30 s lap in two met a no-inode release inside the hold, and that one shut S down
+# (the minimum was the removed file's inode item, whose ILOCK the held chain keeps).
+#
+# The fix: mxfs_noino_freeze_is_convoy counts a minimum held by a local chain in
+# flight (an intent item, or an inode item whose ILOCK is held) as a convoy, which
+# the 45-try wall still bounds.  The control is the module parameter
+# noino_convoy_chain=0 on the lap's own prep (MXFS_EXTRA_MODARGS), which excuses
+# only AG waits, as before.  HOLD_MS defaults to 26000: past the fence's stall
+# budget (8 bounded pushes, ~20 s), so the control still gives up inside the hold,
+# and under the 30 s stall limit, so the fix-on arm's peer waiting out the held
+# chain is not itself a stall failure (R's longest operation was 30909 ms at 30000).
+#
+# SHAPE (S = first node, R = last node of MXFS_NODE_LIST):
+#   1. prep the pair; S writes a 4 MiB file F.
+#   2. both nodes run tests/mpath/pathload.py in the mount, detached.
+#   3. after WARM_S, S arms dbg_efd_hold_ms=HOLD_MS and removes F: its
+#      inactivation logs the EFI, forces it durable and parks the EFD
+#      (P-EFD-HOLD start); the load keeps committing newer items behind it.
+#   4. the load runs on HOLD_MS/1000 + 30 s, then both stop.
+#   EXPOSED  S logged P-EFD-HOLD start and its no-inode fence met the frozen
+#            minimum (P-NOINO-DRAIN-RETRY, -CONVOY, -DRAIN-STUCK or P-AILMIN).
+#   PASS     S never shut down (no P-NOINO-RELFENCE-WEDGE, P-NOINO-DRAIN-STUCK,
+#            'Shutting down'), both loads ended with err=0 and double_grant=0,
+#            both nodes still mounted and writing, no BUG or Oops.
+#
+# Bounds (derived): prep on a pair measured 53-104 s, bound 120; F's write 30;
+# the load start 30 a node; WARM_S 10; the hold start 15; the run
+# HOLD_MS/1000 + 30; the load's stop 45 (tests/mpath/lib.sh's bound on its
+# report); reads 6 x 30.  Caller bound 2 x the precheck's wall.
+#
+# Usage: noino_fence_efd_hold_lap.sh <label>
+# Env:   MXFS_NODE_LIST (test29,test30), MXFS_CONFIG (2/disk/caw/direct), MXFS_GROUP,
+#        HOLD_MS (26000), WARM_S (10)
+# Exit 0 PASS, 1 FAIL, 2 ABORT, 3 VACUOUS.
+set -u
+LABEL=${1:?label}
+cd "$(dirname "$0")" || exit 2
+while [ ! -f run.sh ] && [ "$(pwd)" != / ]; do cd ..; done
+[ -f run.sh ] || { echo "ABORT: no tree root above $0"; exit 2; }
+NREPO=/src/$(basename "$(pwd)")
+export MXFS_NODE_LIST=${MXFS_NODE_LIST:-test29,test30}
+export MXFS_CONFIG=${MXFS_CONFIG:-2/disk/caw/direct}
+S=${MXFS_NODE_LIST%%,*}
+R=${MXFS_NODE_LIST##*,}
+MNT=/mnt/shared
+PARM=/sys/module/mxfs/parameters
+HOLD_MS=${HOLD_MS:-26000}
+WARM_S=${WARM_S:-10}
+OUT=tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_noinoefd_$LABEL
+mkdir -p "$OUT"
+fails=0
+. tests/lib/rig.sh
+MARK="NOINOEFD-MARK-$LABEL-$$"
+D=$MNT/noinoefd_$LABEL
+LD=/run/noinoefd_$LABEL
+echo "=== noino_fence_efd_hold_lap label=$LABEL config=$MXFS_CONFIG S=$S R=$R hold_ms=$HOLD_MS warm_s=$WARM_S $(date -u +%FT%TZ) ==="
+s0=$(date +%s)
+el() { echo $(( $(date +%s) - s0 )); }
+field(){ grep -aoE "(^| )$2=[^ ]*" "$1" | head -1 | cut -d= -f2; }
+
+GROUPARG=()
+[ -n "${MXFS_GROUP:-}" ] && GROUPARG=(--group "$MXFS_GROUP")
+MXFS_FORCE_PREP=1 timeout 120 ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster > "$OUT/prep.log" 2>&1
+prc=$?
+echo "STAGE prep rc=$prc wall=$(el)s"
+[ $prc = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=prep wall=$(el)s evidence=$OUT"; exit 2; }
+
+# ---- 1. F on S, and the marks
+measure "$S" 30 "$OUT/S_setup.txt" '^SETUP_RC=[0-9]+$' "S's file F" \
+    "test -w $PARM/dbg_efd_hold_ms || { echo SETUP_RC=90; exit 0; }; mkdir -p $D || { echo SETUP_RC=91; exit 0; }; dd if=/dev/urandom of=$D/F bs=1M count=4 conv=fsync status=none || { echo SETUP_RC=93; exit 0; }; echo $MARK > /dev/kmsg; echo SETUP_RC=0"
+ck "S's file written" "$(field "$OUT/S_setup.txt" SETUP_RC)" 0
+[ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=setup wall=$(el)s evidence=$OUT"; exit 2; }
+rs 15 "$R" "echo $MARK > /dev/kmsg" > /dev/null 2>&1
+
+# ---- 2. the load on both nodes
+for n in "$S" "$R"; do
+    measure "$n" 30 "$OUT/${n}_load_start.txt" '^LOAD_STARTED$' "$n's load started" \
+        "rm -rf $LD; mkdir -p $LD; rm -f $LD.stop; nohup setsid python3 $NREPO/tests/mpath/pathload.py run $n $MNT $LD $LD.stop > $LD.out 2>&1 < /dev/null & echo LOAD_STARTED"
+done
+[ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=load wall=$(el)s evidence=$OUT"; exit 2; }
+sleep "$WARM_S"
+
+# ---- 3. the hold, and F removed
+measure "$S" 30 "$OUT/S_hold.txt" '^HOLD_SEEN=[0-9]+$' "the EFD hold on $S" \
+    "echo $HOLD_MS > $PARM/dbg_efd_hold_ms; nohup setsid rm -f $D/F > /dev/null 2>&1 < /dev/null & for t in \$(seq 1 30); do n=\$(dmesg | sed -n '/$MARK/,\$p' | grep -ac 'P-EFD-HOLD start='); [ \$n -gt 0 ] && break; sleep 0.5; done; echo HOLD_SEEN=\$n"
+HOLD_SEEN=$(field "$OUT/S_hold.txt" HOLD_SEEN)
+echo "STAGE hold seen=$HOLD_SEEN at +$(el)s"
+
+# ---- 4. the run, then both loads stopped
+sleep $(( HOLD_MS / 1000 + 30 ))
+for n in "$S" "$R"; do
+    measure "$n" 60 "$OUT/${n}_load.txt" '^LOADREC_END$' "$n's load record" \
+        "touch $LD.stop; for t in \$(seq 1 45); do grep -q '^PATHLOAD ' $LD.out 2>/dev/null && break; sleep 1; done; grep '^PATHLOAD ' $LD.out; awk '{ d=\$2-\$1; if (d>m) m=d } END { print \"MAXOP_MS=\" m+0 }' $LD/ops.log; grep -c ' ERR ' $LD/ops.log | sed 's/^/ERRS=/'; echo LOADREC_END"
+done
+rs 15 "$S" "echo 0 > $PARM/dbg_efd_hold_ms" > /dev/null 2>&1
+for n in "$S" "$R"; do
+    echo "STAGE $n: $(grep -a '^PATHLOAD ' "$OUT/${n}_load.txt" | cut -c1-200) max_op_ms=$(field "$OUT/${n}_load.txt" MAXOP_MS)"
+done
+MAX_MS=$(for n in "$S" "$R"; do field "$OUT/${n}_load.txt" MAXOP_MS; done | sort -n | tail -1)
+echo "max_stall_ms=${MAX_MS:-0}"
+
+for n in "$S" "$R"; do
+    measure "$n" 30 "$OUT/${n}_kmsg.txt" '^KMSG_END$' "$n's kernel log since the mark" \
+        "dmesg | sed -n '/$MARK/,\$p' | cut -c1-700; echo KMSG_END"
+done
+grep -a 'P-EFD-HOLD\|P-NOINO-DRAIN\|P-NOINO-CONVOY\|P-NOINO-RELFENCE\|P-AILMIN\|Shutting down\|no longer responding' "$OUT/${S}_kmsg.txt" "$OUT/${R}_kmsg.txt" \
+    | sed 's/.*mxfs: /    /' | cut -c1-260 | head -20
+if [ "$HOLD_SEEN" != 1 ]; then
+    echo "  S's EFD hold never started, so no chain was held"
+    echo "RESULT: VACUOUS label=$LABEL stage=hold wall=$(el)s evidence=$OUT"; exit 3
+fi
+FENCE_N=$(cnt "$OUT/${S}_kmsg.txt" 'P-NOINO-DRAIN-RETRY\|P-NOINO-CONVOY\|P-NOINO-DRAIN-STUCK\|P-AILMIN')
+if [ "$FENCE_N" = 0 ]; then
+    echo "  S's no-inode fence never met the held chain, so nothing here measures it"
+    echo "RESULT: VACUOUS label=$LABEL stage=no-fence wall=$(el)s evidence=$OUT"; exit 3
+fi
+echo "EXPOSED: S held an EFD for ${HOLD_MS} ms and its no-inode fence met the frozen minimum ($FENCE_N line(s))"
+
+# ---- 5. the verdict
+ck "S's fence did not give up" "$(cnt "$OUT/${S}_kmsg.txt" 'P-NOINO-DRAIN-STUCK\|P-NOINO-RELFENCE-WEDGE')" 0
+ck "S shut nothing down" "$(cnt "$OUT/${S}_kmsg.txt" 'Shutting down filesystem')" 0
+for n in "$S" "$R"; do
+    ck "$n's load reported" "$(cnt "$OUT/${n}_load.txt" '^PATHLOAD ')" 1
+    ck "$n's load: no operation failed" "$(field "$OUT/${n}_load.txt" ERRS)" 0
+    ck "$n's load: no double grant" "$(field "$OUT/${n}_load.txt" double_grant)" 0
+    measure "$n" 30 "$OUT/${n}_after.txt" '^AFTER_END$' "$n still mounted and writable" \
+        "grep -c ' $MNT ' /proc/mounts | sed 's/^/MOUNTED=/'; timeout 20 sh -c 'printf after > $D/after_$n && sync -f $MNT' && echo WROTE; echo AFTER_END"
+    ck "$n is still mounted" "$(field "$OUT/${n}_after.txt" MOUNTED)" 1
+    ck "$n still writes" "$(cnt "$OUT/${n}_after.txt" '^WROTE$')" 1
+    # a dynamic-debug line reads "DEBUG:", which a bare 'BUG:' also matches
+    ck "$n: zero BUG / Oops" "$(cnt "$OUT/${n}_kmsg.txt" '^BUG:\|[^E]BUG:\|kernel BUG at\|Oops')" 0
+done
+
+if [ $fails = 0 ]; then
+    echo "LAP noino_fence_efd_hold PASS: S held an EFD ${HOLD_MS} ms under load through no-inode releases and stayed up; longest operation ${MAX_MS} ms"
+else
+    echo "LAP noino_fence_efd_hold FAIL: $fails check(s) failed (max_op_ms=${MAX_MS:-0})"
+fi
+echo "RESULT: $( [ $fails = 0 ] && echo PASS || echo FAIL ) label=$LABEL fails=$fails wall=$(el)s evidence=$OUT"
+[ $fails = 0 ]

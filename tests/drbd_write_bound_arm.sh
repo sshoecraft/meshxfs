@@ -14,7 +14,8 @@
 #
 # Usage: tests/drbd_write_bound_arm.sh <label> <mxfs.ko>
 # Env:
-#   MXFS_NODES      "A B", the rig pair (default "test3 test4")
+#   MXFS_NODES      "A B", the rig pair (default: MXFS_GROUP's two nodes)
+#   MXFS_GROUP      the rig group whose two nodes are used when no pair is named (g2)
 #   MXFS_NODE_REPO  the tree as the nodes see it over NFS; must be this
 #                   script's tree (default /src/mxfs)
 #   anything tests/pve_pair_write_bound.sh takes (LOAD_S, DIO_JOBS, BUF_JOBS,
@@ -36,7 +37,20 @@ KO=${2:?mxfs.ko}
 if [ "${DRBD_RIG_NODES_COUNT:-1}" != 0 ] && [[ "${MXFS_NODES:-}" =~ ^[0-9]+$ ]]; then
     MXFS_NODES=""
 fi
-export MXFS_NODES=${MXFS_NODES:-test3 test4}
+# With no pair named, the arm takes MXFS_GROUP's two nodes (g2 when unset), as
+# scripts/drbd_rig.sh does: it used test3 test4 whatever the lane's group, so a lane
+# on g2 had its arm address another group's nodes
+# (D-DRBD-WRITE-BOUND-ARM-IGNORES-MXFS-GROUP-AND-ADDRESSES-TEST3-TEST4).
+# DRBD_ARM_GROUP=0 uses test3 test4, as before: the control.
+if [ -z "${MXFS_NODES:-}" ]; then
+    if [ "${DRBD_ARM_GROUP:-1}" != 0 ]; then
+        MXFS_NODES=$("$REPO/tools/mxfs_lab.sh" group "${MXFS_GROUP:-g2}") \
+            || { echo "ABORT: no rig group ${MXFS_GROUP:-g2} in the lab file"; exit 2; }
+    else
+        MXFS_NODES="test3 test4"
+    fi
+fi
+export MXFS_NODES
 export MXFS_NODE_REPO=${MXFS_NODE_REPO:-/src/mxfs}
 read -r -a NODES <<<"$MXFS_NODES"
 # DRBD_ARM_PRINT_NODES=1: print the pair this arm selected and stop, before any

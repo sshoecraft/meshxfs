@@ -781,6 +781,22 @@ mxfs_noino_any_agwait(
 	return NULLAGNUMBER;
 }
 
+/*
+ * D-8CAWMPATH-SURVIVOR-SHUTS-DOWN-ON-NOINO-EFI-WEDGE-DURING-PEER-FENCE: a frozen
+ * minimum that no AG wait accounts for can still belong to a local transaction
+ * chain in flight: an intent item stays the minimum until its chain commits the
+ * done item, and an inode item cannot be flushed while the chain holds the
+ * inode's ILOCK.  Such a chain was waiting out a frozen peer's death window,
+ * fence and replay (~20 s at a 12 s window), and holding one EFD 30 s on a
+ * healthy pair (dbg_efd_hold_ms) did the same; the 8-stall budget shut the node
+ * down both times.  It is a convoy, not a wedge.  noino_convoy_chain=0 excuses
+ * only AG waits, as before: the same-build control.
+ */
+int mxfs_noino_convoy_chain = 1;
+module_param_named(noino_convoy_chain, mxfs_noino_convoy_chain, int, 0644);
+MODULE_PARM_DESC(noino_convoy_chain,
+	"no-inode fence: an AIL minimum held by a local chain in flight (an intent item, or an inode item whose ILOCK is held) is a convoy, not charged as a wedge (default 1; 0 = only AG waits)");
+
 static bool
 mxfs_noino_freeze_is_convoy(
 	struct xfs_mount	*mp,
@@ -796,6 +812,7 @@ mxfs_noino_freeze_is_convoy(
 	unsigned int		type = 0;
 	u64			since = 0;
 	bool			convoy = false;
+	bool			chain = false;
 
 	*agno_out = NULLAGNUMBER;
 	*item_type_out = 0;
@@ -824,10 +841,26 @@ mxfs_noino_freeze_is_convoy(
 			struct xfs_inode_log_item *iip =
 				container_of(lip, struct xfs_inode_log_item,
 					     ili_item);
-			if (iip->ili_inode)
-				item_ag = XFS_INO_TO_AGNO(mp,
-						iip->ili_inode->i_ino);
+			if (iip->ili_inode) {
+				struct xfs_inode *ip = iip->ili_inode;
+
+				item_ag = XFS_INO_TO_AGNO(mp, ip->i_ino);
+				/* a trylock and its raw release never
+				 * sleep; the item in the AIL keeps the inode
+				 * from reclaim while ail_lock is held.  ILOCK
+				 * nowait takes no DLM holder, so the release
+				 * must not end one (xfs_iunlock_nodlm). */
+				if (READ_ONCE(mxfs_noino_convoy_chain)) {
+					if (xfs_ilock_nowait(ip, XFS_ILOCK_SHARED))
+						xfs_iunlock_nodlm(ip, XFS_ILOCK_SHARED);
+					else
+						chain = true;
+				}
+			}
 		}
+		if (READ_ONCE(mxfs_noino_convoy_chain) &&
+		    xlog_item_is_intent(lip))
+			chain = true;
 	}
 	spin_unlock(&ailp->ail_lock);
 	*item_type_out = type;
@@ -864,6 +897,14 @@ mxfs_noino_freeze_is_convoy(
 	}
 	if (convoy && since)
 		*wait_ms_out = (ktime_get_ns() - since) / 1000000;
+	if (!convoy && chain) {
+		static atomic_t p_chain_n = ATOMIC_INIT(0);
+
+		if (atomic_inc_return(&p_chain_n) <= 200)
+			pr_warn("mxfs: P-NOINO-CONVOY-CHAIN item=0x%x ag=%u intent=%d -- AIL min held by a local chain in flight; not charged as a wedge\n",
+				type, item_ag, type == XFS_LI_INODE ? 0 : 1);
+		convoy = true;
+	}
 	return convoy;
 }
 

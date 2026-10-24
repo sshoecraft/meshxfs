@@ -3,6 +3,7 @@
 
     tests/mkfs_layout_identity.py image MKFS IMAGE SIZE_MIB [SECTOR_BYTES [MKFS_ARG...]]
     tests/mkfs_layout_identity.py compare REFERENCE CANDIDATE
+    tests/mkfs_layout_identity.py against REF_MKFS MKFS DIR SIZE_MIB [SECTOR_BYTES]
 
 image    formats IMAGE, a sparse file of SIZE_MIB MiB, through a loop device whose logical
          blocks are SECTOR_BYTES (512 by default; 4096 makes a 4K-native device), with the
@@ -15,6 +16,11 @@ image    formats IMAGE, a sparse file of SIZE_MIB MiB, through a loop device who
 compare  every range of bytes in which two images differ, named by the region of the
          reference's MXFS envelope it lies in (and, in the XFS data area, by allocation
          group and block).  Identical images exit 0.
+against  formats DIR/reference.img with REF_MKFS, a mkfs that ignores SOURCE_DATE_EPOCH and
+         stamps the wall clock (0.90.132's, from dpkg-deb -x of its package), inside one
+         wall-clock second, read before and after; a format that straddles a second is done
+         again.  Then DIR/candidate.img with MKFS, its SOURCE_DATE_EPOCH that second, and the
+         two are compared as above.  Exit as compare.
 
 The loop device and the bind mount need root, so those commands go through `sudo -n`.
 mkfs's own output is kept beside the image (IMAGE.mkfs.txt), with the fixed bytes
@@ -37,6 +43,9 @@ REPORT = 40
 # 512 took 0.1 s, sudo and the namespace included (2026-10-22).
 LOSETUP_S = 10
 MKFS_S = 30
+# against: formats tried for one that starts and ends in the same second; at 0.1 s a format,
+# three straddling one in a row would mean the clock read is broken, not bad luck.
+SECOND_TRIES = 3
 
 # struct mxfs_ondisk_super (include/mxfs/mxfs_super.h): the region offsets and sizes
 ENVELOPE = (("journal", 48, 56), ("disklock", 64, 72), ("manifests", 112, 120),
@@ -50,7 +59,7 @@ def sudo(args, timeout):
                           capture_output=True, text=True)
 
 
-def cmd_image(mkfs, image, size_mib, sector, extra):
+def cmd_image(mkfs, image, size_mib, sector, extra, epoch=EPOCH):
     if not os.access(mkfs, os.X_OK):
         print("ABORT: %s is not an executable mkfs" % mkfs)
         return 2
@@ -67,7 +76,7 @@ def cmd_image(mkfs, image, size_mib, sector, extra):
         return 2
     try:
         start = time.monotonic()
-        run = sudo(["env", "SOURCE_DATE_EPOCH=" + EPOCH, "unshare", "-m", "sh", "-c",
+        run = sudo(["env", "SOURCE_DATE_EPOCH=" + epoch, "unshare", "-m", "sh", "-c",
                     'r=$1 m=$2 d=$3; shift 3; mount --bind "$r" /dev/urandom && exec "$m" "$@" -f "$d"',
                     "sh", rand, os.path.abspath(mkfs), loop] + extra, MKFS_S)
         wall = time.monotonic() - start
@@ -151,6 +160,30 @@ def cmd_compare(ref, cand):
     return 0 if not ranges else 1
 
 
+def cmd_against(ref_mkfs, mkfs, out, size_mib, sector):
+    os.makedirs(out, exist_ok=True)
+    ref, cand = os.path.join(out, "reference.img"), os.path.join(out, "candidate.img")
+    second = None
+    for attempt in range(1, SECOND_TRIES + 1):
+        before = int(time.time())
+        rc = cmd_image(ref_mkfs, ref, size_mib, sector, [])
+        after = int(time.time())
+        if rc != 0:
+            return rc
+        print("  reference format %d: wall clock %d to %d" % (attempt, before, after))
+        if before == after:
+            second = str(before)
+            break
+    if second is None:
+        print("ABORT: %d reference formats each straddled a second" % SECOND_TRIES)
+        return 2
+    rc = cmd_image(mkfs, cand, size_mib, sector, [], epoch=second)
+    if rc != 0:
+        return rc
+    print("  candidate formatted at SOURCE_DATE_EPOCH=%s, the reference's second" % second)
+    return cmd_compare(ref, cand)
+
+
 def main(argv):
     if len(argv) >= 5 and argv[1] == "image":
         try:
@@ -162,6 +195,14 @@ def main(argv):
             return cmd_image(argv[2], argv[3], size, sector, argv[6:])
     if len(argv) == 4 and argv[1] == "compare":
         return cmd_compare(argv[2], argv[3])
+    if len(argv) in (6, 7) and argv[1] == "against":
+        try:
+            size = int(argv[5])
+            sector = int(argv[6]) if len(argv) > 6 else 512
+        except ValueError:
+            size = sector = 0
+        if size > 0 and sector in (512, 4096):
+            return cmd_against(argv[2], argv[3], argv[4], size, sector)
     sys.stderr.write(__doc__)
     return 2
 

@@ -86,7 +86,16 @@ ck "A runs the short window" "$(field "$OUT/${A}_premise.txt" DEAD)" "$SHORT_MS"
 ck "A loaded dl_peer_window" "$(field "$OUT/${A}_premise.txt" PW)" "$ARM"
 ck "A's mount derived its lease from the short window" \
     "$(grep -ac "authority lease $(( SHORT_MS - 4000 )) ms, death window $SHORT_MS ms" "$OUT/${A}_premise.txt")" 1
-ck "B runs the default window" "$(field "$OUT/${B}_premise.txt" DEAD)" 0
+# B runs the window the prep loaded: the module's default (dead_timeout_ms=0), or
+# the lane's own dead_timeout_ms in MXFS_EXTRA_MODARGS.  Since the default window
+# became 12 s, a B on the default runs A's window and the lap measures nothing, so
+# a lane gives B the earlier 34 s window that way; the premise required 0 and
+# refused every such lap (pw8pc1-pw8pf2, tests/evidence/lanes/g8b_w14b_20261024T100536Z).
+# Either way B's mount must derive a window longer than A's.
+B_DEAD=$(sed -n 's/.*\bdead_timeout_ms=\([0-9]*\).*/\1/p' <<<"${MXFS_EXTRA_MODARGS:-}")
+ck "B runs the prep's window" "$(field "$OUT/${B}_premise.txt" DEAD)" "${B_DEAD:-0}"
+B_WIN=$(grep -aoE 'death window [0-9]+ ms' "$OUT/${B}_premise.txt" | tail -1 | grep -oE '[0-9]+')
+ck "B's mount runs a longer window than A's ($SHORT_MS ms)" "$([ "${B_WIN:-0}" -gt "$SHORT_MS" ] && echo 1 || echo 0)" 1
 [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=premise evidence=$OUT"; exit 2; }
 
 # ---- 3. B's writer, detached on B, and the park

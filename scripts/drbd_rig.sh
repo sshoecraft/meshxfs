@@ -288,6 +288,11 @@ NODE_UNMOUNT='
     grep -q " mxfs " /proc/mounts && { echo "STOP_FAIL still mounted: $(grep " mxfs " /proc/mounts | cut -d" " -f2 | tr "\n" " ")"; exit 1; }
     for t in 1 2 3 4 5; do lsmod | grep -q "^mxfs " || break; rmmod mxfs 2>/dev/null && break; sleep 2; done
     lsmod | grep -q "^mxfs " && { echo STOP_FAIL mxfs still loaded; exit 1; }'
+# The same unmount, leaving the module loaded: a load with the DRBD link up holds
+# a CPU past DRBD's PingAck and the peer's fence handler powers the node off
+# (D-MODULE-LOAD-HOLDS-A-CPU-930MS-PAST-DRBD-PING-TIMEOUT).
+NODE_UNMOUNT_KEEP=${NODE_UNMOUNT%%    for t in 1 2 3 4 5; do lsmod*}'
+    echo STOP_OK'
 NODE_STOP=$NODE_UNMOUNT'
     if [ -e /etc/drbd.d/'"$RES"'.res ] && lsmod | grep -q "^drbd "; then
         timeout 30 drbdadm down '"$RES"' >/dev/null 2>&1
@@ -3566,18 +3571,32 @@ step_third_vote_test() {
     else
         p0=$N2; p1=$N1
     fi
-    both stop "$NODE_UNMOUNT; echo STOP_OK" 120
+    # D-DRBD-THIRD-VOTE-RESTORE-POWER-FENCED-LIVE-TEST2-AND-LEFT-IT-INHIBITED: the step
+    # unloaded the module and loaded it again for each mount, with the link up, and once the
+    # rig's node fence was back a load held a CPU past DRBD's PingAck: the peer powered the
+    # loading node off and left it inhibited (lap 4 of b20261024-013807, test2).  The step now
+    # unmounts without unloading, sets the arm's switch at runtime and mounts on the loaded
+    # module.  TV_KEEP_LOADED=0 unloads and loads again, as before: the control.
+    local keep=1 unmount="$NODE_UNMOUNT_KEEP" prep_keep="MXFS_KEEP_LOADED=1 "
+    if [ "${TV_KEEP_LOADED:-1}" = 0 ]; then keep=0; unmount="$NODE_UNMOUNT"; prep_keep=""; fi
+    both stop "$unmount; echo STOP_OK" 120
     for n in "${NODES[@]}"; do
         grep -aq '^STOP_OK' "$EVID/stop.$n" || die "third vote test: $n would not release mxfs: $(tail -1 "$EVID/stop.$n")"
     done
-    # the stop above unloaded the module: the arm's switch goes in at the load
     install_self_authority
     [ "$arm" = 1 ] && TIEBREAK_MODARGS=""
+    if [ "$keep" = 1 ]; then
+        both tvswitch "lsmod | grep -q '^mxfs ' || { echo TVSWITCH_FAIL mxfs not loaded; exit 1; }; echo $arm > /sys/module/mxfs/parameters/drbd_third_vote && echo TVSWITCH_OK" 15
+        for n in "${NODES[@]}"; do
+            grep -aq '^TVSWITCH_OK' "$EVID/tvswitch.$n" || die "third vote test: $n: $(tail -1 "$EVID/tvswitch.$n")"
+        done
+    fi
+    say "third vote test: module kept loaded across the step: $keep (TV_KEEP_LOADED)"
     say "third vote test (arm $arm): participant 0 $p0, participant 1 $p1; drbd-fence.conf agent=self alone on both"
     mark="mxfs-test: third-vote-test arm=$arm $$"
     local KO_MD5; KO_MD5=$(md5sum "$REPO/mxfs.ko" | awk '{print $1}')
     for n in "$p0" "$p1"; do
-        ssh_n "$n" "echo '<5>$mark' > /dev/kmsg; MXFS_EXTRA_MODARGS='$TIEBREAK_MODARGS' MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1" 150 > "$EVID/tvmount.$n"
+        ssh_n "$n" "echo '<5>$mark' > /dev/kmsg; ${prep_keep}MXFS_EXTRA_MODARGS='$TIEBREAK_MODARGS' MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1" 150 > "$EVID/tvmount.$n"
         ssh_n "$n" "dmesg | sed -n '/$mark/,\$p' | grep -a 'P-DRBD-ARM-' | cut -c1-400" 20 > "$EVID/tvarm.$n"
     done
     both thirdvote "cat /sys/module/mxfs/parameters/drbd_third_vote" 15
@@ -3594,12 +3613,21 @@ step_third_vote_test() {
                 say "  $n NOT refused for the third vote: $(grep -a 'NODE_PREP_' "$EVID/tvmount.$n" | tail -1 | cut -c1-160) | $(head -1 "$EVID/tvarm.$n" | cut -c1-200)"
             fi
         done
-        both stop "$NODE_UNMOUNT; echo STOP_OK" 120
+        both stop "$unmount; echo STOP_OK" 120
         install_fencing
+        local remounted=0
         for n in "$p0" "$p1"; do
-            ssh_n "$n" "MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1" 150 > "$EVID/tvremount.$n"
-            grep -aq '^NODE_PREP_OK' "$EVID/tvremount.$n" || say "  $n did not mount again under the rig's node fence: $(tail -1 "$EVID/tvremount.$n" | cut -c1-200)"
+            ssh_n "$n" "${prep_keep}MXFS_DEV=$DRBD_DEV MXFS_KO_MD5=$KO_MD5 MXFS_REPO=$NODE_REPO bash $NODE_REPO/tests/setup/prep_node.sh tcp 2>&1" 150 > "$EVID/tvremount.$n"
+            if grep -aq '^NODE_PREP_OK' "$EVID/tvremount.$n"; then
+                remounted=$((remounted + 1))
+            else
+                say "  $n did not mount again under the rig's node fence: $(tail -1 "$EVID/tvremount.$n" | cut -c1-200)$([ -e "$FENCE_STATE/$n.inhibit" ] && echo "; fenced and inhibited: $(head -1 "$FENCE_STATE/$n.inhibit")")"
+            fi
         done
+        if [ "$remounted" != 2 ]; then
+            echo "THIRDVOTE FAIL: $remounted of 2 nodes mounted again under the rig's node fence (refused for the third vote: $refused of 2)"
+            return 1
+        fi
         if [ "$refused" = 2 ]; then
             echo "THIRDVOTE PASS: both nodes refused the pair with no third vote and no node fence"
             return 0
