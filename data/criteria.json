@@ -39542,15 +39542,18 @@
           ]
         },
         "2/net/mesh/mpath": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261025T010544Z-g2e",
-          "iso": "2026-10-25T01:06:04Z",
+          "status": "PASS",
+          "measured": "victim=test18 flaps=10 flap_s=4 stall_ms=4082 settle_s=8 acked=7036 elapsed=169s fails=0 max_stall_ms=4082",
+          "reason": " (evidence tests/evidence/board_20261025T010544Z-g2e_path_flap)",
+          "iso": "2026-10-25T01:08:57Z",
           "recorded": "2026-10-24",
+          "elapsed_s": 172,
           "build": "A7E90BC5313192108E35B80",
+          "outcome": "PASS",
+          "budget_s": 240,
+          "run_id": "20261025T010544Z-g2e",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
-          "run_id": "20261025T010544Z-g2e",
           "history": [
             {
               "status": "PASS",
