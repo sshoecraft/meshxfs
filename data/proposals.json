@@ -10671,8 +10671,14 @@
         "tests/fenced_ledger_rig_lap.sh",
         "tests/evidence/lanes/g2c_a22_20261024T204638Z"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "rejected",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-de8aa9.md",
+        "sha256": "e0c5e2f9231acd018183725e818bdd41a3b009fac38090462c83417e2357c3b8",
+        "verdict": "rejected",
+        "date": "2026-10-24"
+      }
     },
     {
       "id": "P20261024-364644",
@@ -10697,8 +10703,15 @@
         "tests/evidence/lanes/g2c_a22_20261024T204638Z",
         "tests/evidence/lanes/g2cx_a21_20261024T200045Z"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-364644.md",
+        "sha256": "a1993ad2133424ce471dc5b605f9756e3dcddac67ac7548e37117567296554d5",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
