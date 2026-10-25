@@ -46798,15 +46798,19 @@
           ]
         },
         "8/disk/caw/mpath": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261025T011320Z-g8b",
-          "iso": "2026-10-25T01:18:20Z",
+          "status": "PASS",
+          "measured": "nodes_pass=8/8 hostload=4.54 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=11136 ledger_holders=0 umount_ms=1063 remount_ms=6856 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_8node_20261025T011828Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261025T011320Z-g8b/witness.txt exposure=117",
+          "reason": "",
+          "iso": "2026-10-25T01:19:04Z",
           "recorded": "2026-10-24",
+          "elapsed_s": 13,
           "build": "A7E90BC5313192108E35B80",
-          "candidate": "0.90.134",
-          "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
+          "outcome": "PASS",
+          "budget_s": 180,
           "run_id": "20261025T011320Z-g8b",
+          "candidate": "0.90.134",
+          "batch": "b20261024-802114",
+          "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
           "history": [
             {
               "status": "PASS",
