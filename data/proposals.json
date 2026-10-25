@@ -10611,8 +10611,15 @@
         "tests/evidence/batch_laps/b20261024-1f0178",
         "data/criteria.runs.jsonl"
       ],
-      "state": "pending",
-      "created": "2026-10-24"
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-137079.md",
+        "sha256": "15bd35b396e0bed392d112edc99fea28c96dde0886d80171197f590e691c697e",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }

@@ -4821,7 +4821,7 @@
           "candidate": "0.90.134",
           "build": "A7E90BC5313192108E35B80",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -5127,6 +5127,16 @@
           "build": "A7E90BC5313192108E35B80",
           "batch": "b20261024-6ef515",
           "approval": "P20261024-01be9e",
+          "date": "2026-10-24"
+        },
+        {
+          "config": "2/net/mesh/mpath",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T20:46:20Z",
+          "build": "A7E90BC5313192108E35B80",
+          "batch": "b20261024-5e5265",
+          "approval": "P20261024-137079",
           "date": "2026-10-24"
         }
       ]
