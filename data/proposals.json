@@ -10648,6 +10648,57 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-de8aa9",
+      "kind": "remove-fixed",
+      "record": "D-RIG-LAPS-LEAVE-LOAD-LOGS-IN-NODE-RUN-AND-A-FULL-RUN-KILLS-THE-NEXT-LOAD",
+      "change": {
+        "control": "b20261024-740d1d",
+        "fixon": "b20261024-c79a08",
+        "cause": "tests/noino_fence_efd_hold_lap.sh and tests/fenced_ledger_rig_lap.sh started each node's pathload with its logs in the node's /run and no exit removed them. Both laps now end their loads from their EXIT trap through tests/lib/lap_load.sh lap_load_end (noino :125, fenced-ledger :204), which keeps each node's .out, failed operations and ops tail in the lap's evidence and then removes <ld>, <ld>.out and <ld>.stop from the node's /run (lap_load.sh:39); LAP_LOAD_CLEAN=0 removes nothing, as before."
+      },
+      "argument": "The record was seen at 2/net/mesh/direct (lane g2_a20, test1's /run 100% after 15 fenced_reason laps). Both call sites were controlled and verified there on attempt 22 (module A7E90BC5313192108E35B80, lane tests/evidence/lanes/g2_a22x_20261024T225204Z, queue steps 4-7, the lap tests/lap_load_end_lap.sh MODE=full reading every node 10 s after the lap returned). Noino site: control b20261024-740d1d (LAP_LOAD_CLEAN=0) failed 10 of 10 exposed laps, each 'LAP lap_load_end FAIL: ... its /run paths were left on 2 node(s)' with 'LOAD-END test1 ... left=3' and 'LOAD-END test2 ... left=3'; verification b20261024-c79a08, sized 6 from 10/10 and declared before its first lap, passed 6 of 6 exposed laps with left=0 on both nodes (verify P20261024-103f1b applied). Fenced-ledger site: control b20261024-62579c 10 of 10 exposed FAIL (left=3 on both), verification b20261024-017918 6 of 6 exposed PASS (left=0; verify P20261024-dc2a8a applied). The same pairs at 2/disk/caw/direct (g2c_a22: control b20261024-2aa7ed 10/10 and verification b20261024-721cc7 6/6 for the fenced-ledger site, verify P20261024-8eb85b applied; control b20261024-812eac 10/10 for the noino site) show the same at the other lock manager; the noino verification there, b20261024-06f62f, is not cited (lap 5 settled INCOMPLETE by a preflight refusal). Every cell the record names is a lap of one of these four controls (the fix taken out, failing on this cause) or of the two disk/caw ones; the record's summary was narrowed to what the controls reproduced, the paths left on every node. The fenced-ledger lap's own verdict was VACUOUS (rc=3) in its laps; this record is about what the lap leaves, which the cleanup row reads directly, not about that lap's grading.",
+      "evidence": [
+        "tests/evidence/lanes/g2_a22x_20261024T225204Z",
+        "tests/evidence/batch_laps/b20261024-740d1d",
+        "tests/evidence/batch_laps/b20261024-c79a08",
+        "tests/evidence/batch_laps/b20261024-62579c",
+        "tests/evidence/batch_laps/b20261024-017918",
+        "tests/lib/lap_load.sh",
+        "tests/lap_load_end_lap.sh",
+        "tests/noino_fence_efd_hold_lap.sh",
+        "tests/fenced_ledger_rig_lap.sh",
+        "tests/evidence/lanes/g2c_a22_20261024T204638Z"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
+    },
+    {
+      "id": "P20261024-364644",
+      "kind": "remove-fixed",
+      "record": "D-RIG-LAPS-LEAVE-LOAD-LOGS-IN-NODE-RUN-AND-A-FULL-RUN-KILLS-THE-NEXT-LOAD",
+      "change": {
+        "control": "b20261024-740d1d",
+        "fixon": "b20261024-c79a08",
+        "cause": "tests/noino_fence_efd_hold_lap.sh and tests/fenced_ledger_rig_lap.sh started each node's pathload with its logs in the node's /run and no exit removed them. Both laps now end their loads from their EXIT trap through tests/lib/lap_load.sh lap_load_end (noino :125, fenced-ledger :204), which keeps each node's .out, failed operations and ops tail in the lap's evidence and then removes <ld>, <ld>.out and <ld>.stop from the node's /run (lap_load.sh:39); LAP_LOAD_CLEAN=0 removes nothing, as before."
+      },
+      "argument": "Supersedes P20261024-de8aa9, whose cell account was wrong: nine INCOMPLETE laps of the attempt-21 controls were still named here; they were refused by the host preflight before any load started and are now named on D-LANE-POWER-UP-FLOODS-THE-HOST-LOG-AND-ANOTHER-LANES-PREFLIGHT-REFUSES-ITS-PREP (dropped here with that evidence). The record was seen at 2/net/mesh/direct (lane g2_a20, test1's /run 100% after 15 fenced_reason laps). Both call sites were controlled and verified there on attempt 22 (module A7E90BC5313192108E35B80, lane tests/evidence/lanes/g2_a22x_20261024T225204Z, queue steps 4-7, the lap tests/lap_load_end_lap.sh MODE=full reading every node 10 s after the lap returned). Noino site: control b20261024-740d1d (LAP_LOAD_CLEAN=0) failed 10 of 10 exposed laps, each 'LAP lap_load_end FAIL: ... its /run paths were left on 2 node(s)' with 'LOAD-END test1 ... left=3' and 'LOAD-END test2 ... left=3'; verification b20261024-c79a08, sized 6 from 10/10 and declared before its first lap, passed 6 of 6 exposed laps with left=0 on both nodes (verify P20261024-103f1b applied). Fenced-ledger site: control b20261024-62579c 10 of 10 exposed FAIL (left=3 on both), verification b20261024-017918 6 of 6 exposed PASS (left=0; verify P20261024-dc2a8a applied). At 2/disk/caw/direct, the other lock manager: fenced-ledger control b20261024-2aa7ed 10/10 FAIL and verification b20261024-721cc7 6/6 PASS (verify P20261024-8eb85b applied); noino control b20261024-812eac 10/10 FAIL; the noino verification there, b20261024-06f62f, is not cited (its lap 5 settled INCOMPLETE on a preflight refusal). Every cell the record now names is a FAIL lap of a control with the fix out (b20261024-79e9ea and b20261024-6f44cf on attempt 21's module FF012B4B81CDB69CAE96883, b20261024-2aa7ed, -812eac, -62579c and -740d1d on attempt 22's), each failing on this cause ('its /run paths were left on 2 node(s)'). The summary was narrowed to what the controls reproduced, the paths left on every node. The fenced-ledger lap's own verdict was VACUOUS (rc=3) in its laps; this record is about what the lap leaves, which the cleanup row reads directly, not about that lap's grading.",
+      "evidence": [
+        "tests/evidence/lanes/g2_a22x_20261024T225204Z",
+        "tests/evidence/batch_laps/b20261024-740d1d",
+        "tests/evidence/batch_laps/b20261024-c79a08",
+        "tests/evidence/batch_laps/b20261024-62579c",
+        "tests/evidence/batch_laps/b20261024-017918",
+        "tests/lib/lap_load.sh",
+        "tests/lap_load_end_lap.sh",
+        "tests/noino_fence_efd_hold_lap.sh",
+        "tests/fenced_ledger_rig_lap.sh",
+        "tests/evidence/lanes/g2c_a22_20261024T204638Z",
+        "tests/evidence/lanes/g2cx_a21_20261024T200045Z"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
