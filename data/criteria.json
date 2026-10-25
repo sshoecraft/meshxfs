@@ -44104,15 +44104,18 @@
           ]
         },
         "8/disk/caw/mpath": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261025T001524Z-g8b",
-          "iso": "2026-10-25T00:16:11Z",
+          "status": "PASS",
+          "measured": "victim=test28 injected=40 landed=23 unresolved=17 stall_a_ms=6334 stall_b_ms=6233 acked=3577 elapsed=182s fails=0 max_stall_ms=6865",
+          "reason": " (evidence tests/evidence/board_20261025T001524Z-g8b_path_answer_lost)",
+          "iso": "2026-10-25T00:19:23Z",
           "recorded": "2026-10-24",
+          "elapsed_s": 191,
           "build": "A7E90BC5313192108E35B80",
+          "outcome": "PASS",
+          "budget_s": 300,
+          "run_id": "20261025T001524Z-g8b",
           "candidate": "0.90.134",
           "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
-          "run_id": "20261025T001524Z-g8b",
           "history": [
             {
               "status": "PASS",
@@ -45217,8 +45220,8 @@
         "8/disk/caw/mpath": {
           "status": "PENDING",
           "measured": "",
-          "reason": "running 20261025T001524Z-g8b",
-          "iso": "2026-10-25T00:16:03Z",
+          "reason": "executing 20261025T001524Z-g8b",
+          "iso": "2026-10-25T00:19:24Z",
           "recorded": "2026-10-24",
           "build": "A7E90BC5313192108E35B80",
           "candidate": "0.90.134",
