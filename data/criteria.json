@@ -45227,15 +45227,18 @@
           ]
         },
         "8/disk/caw/mpath": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261025T005854Z-g8b",
-          "iso": "2026-10-25T01:02:52Z",
+          "status": "PASS",
+          "measured": "nodes_pass=8/8 hostload=8.00 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261025T005854Z-g8b fsid=e6e16936-2915-44ec-90c2-8a404ee6fdea witness=tests/evidence/alloc_witness/20261025T005854Z-g8b/witness.txt",
+          "reason": "",
+          "iso": "2026-10-25T01:03:54Z",
           "recorded": "2026-10-24",
+          "elapsed_s": 51,
           "build": "A7E90BC5313192108E35B80",
+          "outcome": "PASS",
+          "budget_s": 120,
+          "run_id": "20261025T005854Z-g8b",
           "candidate": "0.90.134",
           "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
-          "run_id": "20261025T005854Z-g8b",
           "history": [
             {
               "status": "PASS",
@@ -46782,8 +46785,8 @@
         "8/disk/caw/mpath": {
           "status": "PENDING",
           "measured": "",
-          "reason": "running 20261025T005854Z-g8b",
-          "iso": "2026-10-25T00:59:33Z",
+          "reason": "executing 20261025T005854Z-g8b",
+          "iso": "2026-10-25T01:03:54Z",
           "recorded": "2026-10-24",
           "build": "A7E90BC5313192108E35B80",
           "candidate": "0.90.134",
