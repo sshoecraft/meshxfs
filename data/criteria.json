@@ -414,16 +414,38 @@
           "status": "PASS",
           "measured": "skipped (marker matched 8/disk/caw/mpath)",
           "reason": "",
-          "iso": "2026-10-25T00:52:13Z",
+          "iso": "2026-10-25T00:59:29Z",
           "recorded": "2026-10-24",
           "elapsed_s": 0,
           "build": "A7E90BC5313192108E35B80",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261025T005141Z-g8b",
+          "run_id": "20261025T005854Z-g8b",
           "candidate": "0.90.134",
           "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T00:58:53Z",
+              "measured": "elapsed=54s (fresh prep)",
+              "reason": "",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T005727Z-g8b",
+              "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T00:52:13Z",
+              "measured": "skipped (marker matched 8/disk/caw/mpath)",
+              "reason": "",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T005141Z-g8b",
+              "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-25T00:51:39Z",
@@ -510,28 +532,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261025T002234Z-g8b",
-              "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-25T00:22:33Z",
-              "measured": "elapsed=54s (fresh prep)",
-              "reason": "",
-              "build": "A7E90BC5313192108E35B80",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261025T002108Z-g8b",
-              "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-25T00:15:58Z",
-              "measured": "skipped (marker matched 8/disk/caw/mpath)",
-              "reason": "",
-              "build": "A7E90BC5313192108E35B80",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261025T001524Z-g8b",
               "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
             }
           ]
@@ -1134,15 +1134,35 @@
           "status": "PASS",
           "measured": "skipped (marker matched 2/net/mesh/direct)",
           "reason": "",
-          "iso": "2026-10-25T00:57:26Z",
+          "iso": "2026-10-25T01:00:24Z",
           "recorded": "2026-10-24",
           "elapsed_s": 0,
           "build": "A7E90BC5313192108E35B80",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261025T005712Z-g2",
+          "run_id": "20261025T010009Z-g2",
           "candidate": "0.90.134",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T01:00:08Z",
+              "measured": "elapsed=34s (fresh prep)",
+              "reason": "",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T005919Z-g2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T00:57:26Z",
+              "measured": "skipped (marker matched 2/net/mesh/direct)",
+              "reason": "",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T005712Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-25T00:57:10Z",
@@ -1222,26 +1242,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261025T001028Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-25T00:08:49Z",
-              "measured": "elapsed=37s (fresh prep)",
-              "reason": "",
-              "build": "A7E90BC5313192108E35B80",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261025T000757Z-g2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-25T00:06:17Z",
-              "measured": "elapsed=38s (fresh prep)",
-              "reason": "",
-              "build": "A7E90BC5313192108E35B80",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261025T000524Z-g2"
             }
           ]
         },
@@ -1677,18 +1677,51 @@
         },
         "2/net/mesh/mpath": {
           "status": "PASS",
-          "measured": "elapsed=35s (fresh prep)",
+          "measured": "skipped (marker matched 2/net/mesh/mpath)",
           "reason": "",
-          "iso": "2026-10-25T00:57:27Z",
+          "iso": "2026-10-25T01:01:57Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 35,
+          "elapsed_s": 0,
           "build": "A7E90BC5313192108E35B80",
           "outcome": "PASS",
           "budget_s": 300,
-          "run_id": "20261025T005637Z-g2e",
+          "run_id": "20261025T010142Z-g2e",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T01:01:40Z",
+              "measured": "elapsed=39s (fresh prep)",
+              "reason": "",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T010046Z-g2e",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T00:57:51Z",
+              "measured": "skipped (marker matched 2/net/mesh/mpath)",
+              "reason": "",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T005728Z-g2e",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T00:57:27Z",
+              "measured": "elapsed=35s (fresh prep)",
+              "reason": "",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T005637Z-g2e",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-25T00:53:40Z",
@@ -1760,38 +1793,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T234659Z-g2b"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T23:44:35Z",
-              "measured": "elapsed=32s (fresh prep)",
-              "reason": "",
-              "build": "A7E90BC5313192108E35B80",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T234347Z-g2b"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T23:40:21Z",
-              "measured": "elapsed=34s (fresh prep)",
-              "reason": "",
-              "build": "A7E90BC5313192108E35B80",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T233932Z-g2b",
-              "variant": "MXFS_EXTRA_MODARGS=dl_relall_threads=1"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T23:36:43Z",
-              "measured": "elapsed=33s (fresh prep)",
-              "reason": "",
-              "build": "A7E90BC5313192108E35B80",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T233554Z-g2b",
-              "variant": "MXFS_EXTRA_MODARGS=dl_relall_threads=1"
             }
           ]
         },
@@ -39539,19 +39540,38 @@
           ]
         },
         "2/net/mesh/mpath": {
-          "status": "PASS",
-          "measured": "victim=test18 flaps=10 flap_s=4 stall_ms=6254 settle_s=3 acked=4596 elapsed=168s fails=0 max_stall_ms=6254",
-          "reason": " (evidence tests/evidence/board_20261025T005318Z-g2e_path_flap)",
-          "iso": "2026-10-25T00:56:36Z",
+          "status": "PENDING",
+          "measured": "",
+          "reason": "executing 20261025T010142Z-g2e",
+          "iso": "2026-10-25T01:02:02Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 171,
           "build": "A7E90BC5313192108E35B80",
-          "outcome": "PASS",
-          "budget_s": 240,
-          "run_id": "20261025T005318Z-g2e",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
+          "run_id": "20261025T010142Z-g2e",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T01:00:45Z",
+              "measured": "victim=test18 flaps=10 flap_s=4 stall_ms=6276 settle_s=3 acked=5851 elapsed=165s fails=0 max_stall_ms=6276",
+              "reason": " (evidence tests/evidence/board_20261025T005728Z-g2e_path_flap)",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T005728Z-g2e",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T00:56:36Z",
+              "measured": "victim=test18 flaps=10 flap_s=4 stall_ms=6254 settle_s=3 acked=4596 elapsed=168s fails=0 max_stall_ms=6254",
+              "reason": " (evidence tests/evidence/board_20261025T005318Z-g2e_path_flap)",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T005318Z-g2e",
+              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-24T14:59:33Z",
@@ -39636,26 +39656,6 @@
               "build": "9C7B7B00C5DE523F1D378C8",
               "outcome": "PASS",
               "run_id": "20261024T015253Z-g2e",
-              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T01:51:05Z",
-              "measured": "victim=test18 flaps=10 flap_s=4 stall_ms=1128 settle_s=1 acked=3966 elapsed=169s fails=0 max_stall_ms=2547",
-              "reason": " (evidence tests/evidence/board_20261024T014754Z-g2e_path_flap)",
-              "build": "9C7B7B00C5DE523F1D378C8",
-              "outcome": "PASS",
-              "run_id": "20261024T014754Z-g2e",
-              "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
-            },
-            {
-              "status": "FAIL",
-              "iso": "2026-10-24T00:54:46Z",
-              "measured": "victim=test18 flaps=10 flap_s=4 stall_ms=77221 settle_s=5 acked=32617 elapsed=170s fails=11 max_stall_ms=120377",
-              "reason": "F4: test18's longest stall, ms (got 77221); F4: no operation on test18 returned an error (got 3232989); F4_after: test18's longest stall, ms (got 120377); F4_after: test18's load kept completing operations through the window (got no); F4_after: no operation on test18 returned an error (got 1255354); test18: no operation returned an error in the whole run (got 5371774); test17 acknowledged files (>",
-              "build": "9C7B7B00C5DE523F1D378C8",
-              "outcome": "FAIL",
-              "run_id": "20261024T005133Z-g2e",
               "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2"
             }
           ]
@@ -44105,19 +44105,27 @@
           ]
         },
         "8/disk/caw/mpath": {
-          "status": "PASS",
-          "measured": "victim=test28 injected=40 landed=15 unresolved=25 stall_a_ms=6559 stall_b_ms=6257 acked=2567 elapsed=178s fails=0 max_stall_ms=6559",
-          "reason": " (evidence tests/evidence/board_20261025T005141Z-g8b_path_answer_lost)",
-          "iso": "2026-10-25T00:55:35Z",
+          "status": "PENDING",
+          "measured": "",
+          "reason": "executing 20261025T005854Z-g8b",
+          "iso": "2026-10-25T00:59:42Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 187,
           "build": "A7E90BC5313192108E35B80",
-          "outcome": "PASS",
-          "budget_s": 300,
-          "run_id": "20261025T005141Z-g8b",
           "candidate": "0.90.134",
           "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
+          "run_id": "20261025T005854Z-g8b",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T00:55:35Z",
+              "measured": "victim=test28 injected=40 landed=15 unresolved=25 stall_a_ms=6559 stall_b_ms=6257 acked=2567 elapsed=178s fails=0 max_stall_ms=6559",
+              "reason": " (evidence tests/evidence/board_20261025T005141Z-g8b_path_answer_lost)",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T005141Z-g8b",
+              "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-25T00:48:14Z",
@@ -44216,17 +44224,6 @@
               "candidate": "0.90.134",
               "run_id": "20261024T234615Z-g8b",
               "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T23:42:59Z",
-              "measured": "victim=test28 injected=40 landed=20 unresolved=20 stall_a_ms=7176 stall_b_ms=7536 acked=3091 elapsed=177s fails=0 max_stall_ms=7536",
-              "reason": " (evidence tests/evidence/board_20261024T233903Z-g8b_path_answer_lost)",
-              "build": "A7E90BC5313192108E35B80",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T233903Z-g8b",
-              "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
             }
           ]
         },
@@ -44316,15 +44313,30 @@
       "detector": "tests/tooling/alloc_witness.sh (kernel counters /sys/kernel/debug/mxfs/<dev>/alloc_witness; record tests/evidence/alloc_witness/<run id>/witness.txt sealed by witness.sha; verdict half tests/tooling/alloc_witness_verdict.py run by chk_clean)",
       "per_config": {
         "2/net/mesh/direct": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261025T005712Z-g2",
-          "iso": "2026-10-25T00:57:31Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=6.00 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261025T010009Z-g2 fsid=0b74a700-3fb6-4470-83bd-8c7fbe609d38 witness=tests/evidence/alloc_witness/20261025T010009Z-g2/witness.txt",
+          "reason": "",
+          "iso": "2026-10-25T01:01:53Z",
           "recorded": "2026-10-24",
+          "elapsed_s": 72,
           "build": "A7E90BC5313192108E35B80",
+          "outcome": "PASS",
+          "budget_s": 120,
+          "run_id": "20261025T010009Z-g2",
           "candidate": "0.90.134",
-          "run_id": "20261025T005712Z-g2",
+          "evidence": "tests/evidence/run_alloc_witness_20261025T010009Z-g2",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T00:58:53Z",
+              "measured": "nodes_pass=2/2 hostload=4.04 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261025T005712Z-g2 fsid=fe20bf83-3cc7-4aa7-a0d7-631ecabd79c9 witness=tests/evidence/alloc_witness/20261025T005712Z-g2/witness.txt",
+              "reason": "",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T005712Z-g2",
+              "evidence": "tests/evidence/run_alloc_witness_20261025T005712Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-25T00:55:53Z",
@@ -44421,16 +44433,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261021T233228Z-g2b"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-21T22:11:13Z",
-              "measured": "nodes_pass=2/2 hostload=2.19 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261021T215158Z-g2b fsid=741f6df4-8bf4-408b-a81a-4fd6551df054 witness=tests/evidence/alloc_witness/20261021T215158Z-g2b/witness.txt",
-              "reason": "",
-              "build": "0988C50EC610F82EE08D135",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261021T215158Z-g2b"
             }
           ]
         },
@@ -45225,19 +45227,27 @@
           ]
         },
         "8/disk/caw/mpath": {
-          "status": "PASS",
-          "measured": "nodes_pass=8/8 hostload=7.31 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261025T005141Z-g8b fsid=6d3c2294-8b06-45ef-87b3-026ad5dc7da1 witness=tests/evidence/alloc_witness/20261025T005141Z-g8b/witness.txt",
-          "reason": "",
-          "iso": "2026-10-25T00:56:38Z",
+          "status": "PENDING",
+          "measured": "",
+          "reason": "running 20261025T005854Z-g8b",
+          "iso": "2026-10-25T00:59:33Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 52,
           "build": "A7E90BC5313192108E35B80",
-          "outcome": "PASS",
-          "budget_s": 120,
-          "run_id": "20261025T005141Z-g8b",
           "candidate": "0.90.134",
           "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
+          "run_id": "20261025T005854Z-g8b",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T00:56:38Z",
+              "measured": "nodes_pass=8/8 hostload=7.31 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261025T005141Z-g8b fsid=6d3c2294-8b06-45ef-87b3-026ad5dc7da1 witness=tests/evidence/alloc_witness/20261025T005141Z-g8b/witness.txt",
+              "reason": "",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T005141Z-g8b",
+              "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-25T00:49:16Z",
@@ -45335,17 +45345,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T234615Z-g8b",
-              "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T23:43:59Z",
-              "measured": "nodes_pass=8/8 hostload=7.54 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261024T233903Z-g8b fsid=2e7deb3c-36be-493b-9e69-8f7812f70ca6 witness=tests/evidence/alloc_witness/20261024T233903Z-g8b/witness.txt",
-              "reason": "",
-              "build": "A7E90BC5313192108E35B80",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T233903Z-g8b",
               "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
             }
           ]
@@ -45861,15 +45860,30 @@
           "recorded": "2026-07-25"
         },
         "2/net/mesh/direct": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261025T005712Z-g2",
-          "iso": "2026-10-25T00:57:31Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=6.50 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=8896 ledger_holders=0 umount_ms=2144 remount_ms=5220 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_2node_20261025T010201Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261025T010009Z-g2/witness.txt",
+          "reason": "",
+          "iso": "2026-10-25T01:02:16Z",
           "recorded": "2026-10-24",
+          "elapsed_s": 10,
           "build": "A7E90BC5313192108E35B80",
+          "outcome": "PASS",
+          "budget_s": 180,
+          "run_id": "20261025T010009Z-g2",
           "candidate": "0.90.134",
-          "run_id": "20261025T005712Z-g2",
+          "evidence": "tests/evidence/run_chk_clean_20261025T010009Z-g2",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T00:59:18Z",
+              "measured": "nodes_pass=2/2 hostload=4.18 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=9088 ledger_holders=4 umount_ms=2552 remount_ms=5272 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_2node_20261025T005903Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261025T005712Z-g2/witness.txt",
+              "reason": "",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T005712Z-g2",
+              "evidence": "tests/evidence/run_chk_clean_20261025T005712Z-g2"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-25T00:56:19Z",
@@ -45960,12 +45974,6 @@
               "measured": "nodes_pass=2/2 hostload=7.76 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=15680 ledger_holders=288 umount_ms=5064 remount_ms=5385 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_2node_20261021T101150Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261021T093852Z-g2c/witness.txt",
               "reason": "",
               "build": "71AC6107043DD5BE3D9181A"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-21T05:03:19Z",
-              "measured": "nodes_pass=2/2 hostload=13.23 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=33024 ledger_holders=1706 umount_ms=5525 remount_ms=5172 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_2node_20261021T050307Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261021T043349Z-g2c/witness.txt",
-              "reason": ""
             }
           ]
         },
@@ -46772,20 +46780,28 @@
           ]
         },
         "8/disk/caw/mpath": {
-          "status": "PASS",
-          "measured": "nodes_pass=8/8 hostload=5.70 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=9728 ledger_holders=0 umount_ms=586 remount_ms=6761 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_8node_20261025T005645Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261025T005141Z-g8b/witness.txt exposure=75",
-          "reason": "",
-          "iso": "2026-10-25T00:57:25Z",
+          "status": "PENDING",
+          "measured": "",
+          "reason": "running 20261025T005854Z-g8b",
+          "iso": "2026-10-25T00:59:33Z",
           "recorded": "2026-10-24",
-          "elapsed_s": 15,
           "build": "A7E90BC5313192108E35B80",
-          "outcome": "PASS",
-          "budget_s": 180,
-          "run_id": "20261025T005141Z-g8b",
           "candidate": "0.90.134",
-          "batch": "b20261024-802114",
           "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
+          "run_id": "20261025T005854Z-g8b",
           "history": [
+            {
+              "status": "PASS",
+              "iso": "2026-10-25T00:57:25Z",
+              "measured": "nodes_pass=8/8 hostload=5.70 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=9728 ledger_holders=0 umount_ms=586 remount_ms=6761 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_8node_20261025T005645Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261025T005141Z-g8b/witness.txt exposure=75",
+              "reason": "",
+              "build": "A7E90BC5313192108E35B80",
+              "outcome": "PASS",
+              "candidate": "0.90.134",
+              "run_id": "20261025T005141Z-g8b",
+              "batch": "b20261024-802114",
+              "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
+            },
             {
               "status": "PASS",
               "iso": "2026-10-25T00:50:06Z",
@@ -46891,18 +46907,6 @@
               "outcome": "PASS",
               "candidate": "0.90.134",
               "run_id": "20261024T234615Z-g8b",
-              "batch": "b20261024-802114",
-              "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
-            },
-            {
-              "status": "PASS",
-              "iso": "2026-10-24T23:44:44Z",
-              "measured": "nodes_pass=8/8 hostload=8.24 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=10368 ledger_holders=0 umount_ms=1190 remount_ms=6765 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_8node_20261024T234407Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261024T233903Z-g8b/witness.txt exposure=91",
-              "reason": "",
-              "build": "A7E90BC5313192108E35B80",
-              "outcome": "PASS",
-              "candidate": "0.90.134",
-              "run_id": "20261024T233903Z-g8b",
               "batch": "b20261024-802114",
               "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1"
             }
