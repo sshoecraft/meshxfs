@@ -10593,6 +10593,26 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-137079",
+      "kind": "verify",
+      "record": "D-LAST-MEMBER-UMOUNT-AFTER-A-15K-PAGE-HANDBACK-TAKES-31S-OVER-THE-STALL-LIMIT",
+      "change": {
+        "batch": "b20261024-5e5265"
+      },
+      "argument": "Verification b20261024-5e5265 of row lap:lmu (tests/last_member_umount_lap.sh) at 2/net/mesh/mpath on candidate 0.90.134 attempt 22 (build A7E90BC5313192108E35B80; release_candidate.py check output in the lane's step logs' run and in this proposal's check below; the attempt is RUNNING and was never marked INVALID). Declared in lane g2b_a22y step 4 right after control b20261024-1f0178 (dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep, the serial release-all as before the fix) failed 10 of 10 exposed laps on the same lane, pair (test15/test16), module and configuration, A's last-member unmount 45.6-66.7 s with threads=1 (step3.log); N=6 from 10/10 at delta=alpha=0.005. All 6 laps PASS with exposure=1, A's unmount 10.9-16.3 s of 30 s with threads=8, and no MXFS_EXTRA_MODARGS on the verification laps; 'verify b20261024-5e5265: 6 PASS, 0 FAIL of 6 planned'. This is the record's third configuration verified this attempt, after 2/net/mesh/direct and 2/net/mesh/direct4k (b20261024-6ef515).",
+      "evidence": [
+        "tests/evidence/lanes/g2b_a22y_20261024T230148Z/step3.log",
+        "tests/evidence/lanes/g2b_a22y_20261024T230148Z/step4.log",
+        "tests/evidence/lanes/g2b_a22y_20261024T230148Z/queue",
+        "tests/evidence/lanes/g2b_a22y_20261024T230148Z/summary.log",
+        "tests/evidence/batch_laps/b20261024-5e5265",
+        "tests/evidence/batch_laps/b20261024-1f0178",
+        "data/criteria.runs.jsonl"
+      ],
+      "state": "pending",
+      "created": "2026-10-24"
     }
   ]
 }
