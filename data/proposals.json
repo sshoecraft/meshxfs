@@ -10566,6 +10566,33 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-01be9e",
+      "kind": "verify",
+      "record": "D-LAST-MEMBER-UMOUNT-AFTER-A-15K-PAGE-HANDBACK-TAKES-31S-OVER-THE-STALL-LIMIT",
+      "change": {
+        "batch": "b20261024-6ef515"
+      },
+      "argument": "Verification b20261024-6ef515 of row lap:lmu (tests/last_member_umount_lap.sh, NFILES=40000) at 2/net/mesh/direct4k, the 4096-byte pool LUN, on candidate 0.90.134 attempt 22 (build A7E90BC5313192108E35B80; release_candidate.py check: every frozen file as frozen; the attempt is RUNNING and was never marked INVALID). Declared in lane g2d_a22x step 4 right after control b20261024-5b7407 (dl_relall_threads=1 through MXFS_EXTRA_MODARGS on the lap's own prep, the serial release-all as before the fix) failed 10 of 10 exposed laps on the same lane, pair (test31/test32), module and configuration, A's last-member unmount 47.6-69.6 s (step3.log); N=6 from 10/10 at delta=alpha=0.005. All 6 laps PASS with exposure=1 (P-RELALL-WALL over at least 90% of NFILES grants), A's unmount under 30 s with threads=8, and no MXFS_EXTRA_MODARGS on the verification laps; 'verify b20261024-6ef515: 6 PASS, 0 FAIL of 6 planned'.",
+      "evidence": [
+        "tests/evidence/lanes/g2d_a22x_20261024T225156Z/step3.log",
+        "tests/evidence/lanes/g2d_a22x_20261024T225156Z/step4.log",
+        "tests/evidence/lanes/g2d_a22x_20261024T225156Z/queue",
+        "tests/evidence/lanes/g2d_a22x_20261024T225156Z/summary.log",
+        "tests/evidence/batch_laps/b20261024-6ef515",
+        "tests/evidence/batch_laps/b20261024-5b7407",
+        "data/criteria.runs.jsonl"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-01be9e.md",
+        "sha256": "896fa43eea163fa5f3ba8757325b7e8c616bb4f19436d5602b0e3b7c081fafc5",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }

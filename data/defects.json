@@ -4788,7 +4788,7 @@
           "candidate": "0.90.134",
           "build": "A7E90BC5313192108E35B80",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -5118,6 +5118,16 @@
           "batch": "b20261023-dff6ea",
           "approval": "P20261023-8226ea",
           "date": "2026-10-23"
+        },
+        {
+          "config": "2/net/mesh/direct4k",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T20:46:20Z",
+          "build": "A7E90BC5313192108E35B80",
+          "batch": "b20261024-6ef515",
+          "approval": "P20261024-01be9e",
+          "date": "2026-10-24"
         }
       ]
     },
@@ -9084,11 +9094,44 @@
           "candidate": "",
           "build": "A7E90BC5313192108E35B80",
           "variant": "LAP_LOAD_CLEAN=0 (lap_load_end removes nothing from the nodes' /run, as the noino lap's exit did before the fix)",
-          "state": "open",
+          "state": "closed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
           "why": "the fix taken out: a noino lap leaves its load directory and logs in each node's /run"
+        },
+        {
+          "id": "b20261024-c79a08",
+          "kind": "verify",
+          "row": "lap:lap_load_clean_noino",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "planned": 6,
+          "probe": "^EXPOSED: ",
+          "candidate": "0.90.134",
+          "build": "A7E90BC5313192108E35B80",
+          "variant": "",
+          "state": "open",
+          "leaves_cluster": false,
+          "support": [],
+          "created": "2026-10-24",
+          "rate": {
+            "row": "lap:lap_load_clean_noino",
+            "config": "2/net/mesh/direct",
+            "platform": "any",
+            "kind": "control",
+            "batch": "b20261024-740d1d",
+            "k": 10,
+            "n": 10,
+            "candidate": "",
+            "variant": "LAP_LOAD_CLEAN=0 (lap_load_end removes nothing from the nodes' /run, as the noino lap's exit did before the fix)",
+            "builds": [
+              "A7E90BC5313192108E35B80"
+            ],
+            "date": "2026-10-24"
+          },
+          "transfer": "",
+          "lower_bound": 0.5887040186524746
         }
       ],
       "cells": [
@@ -9341,6 +9384,56 @@
           "config": "2/net/mesh/direct",
           "row": "lap:lap_load_clean_fledger",
           "iso": "2026-10-24T22:57:38Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T23:57:34Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T23:54:50Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T23:52:14Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T23:49:39Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T23:46:54Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T23:44:21Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T23:41:48Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T23:39:15Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T23:36:40Z"
+        },
+        {
+          "config": "2/net/mesh/direct",
+          "row": "lap:lap_load_clean_noino",
+          "iso": "2026-10-24T23:34:06Z"
         }
       ],
       "rates": [
@@ -9384,6 +9477,21 @@
           "n": 10,
           "candidate": "",
           "variant": "LAP_LOAD_CLEAN=0 (lap_load_end removes nothing from the nodes' /run, as the fenced-ledger lap's exit did before the fix)",
+          "builds": [
+            "A7E90BC5313192108E35B80"
+          ],
+          "date": "2026-10-24"
+        },
+        {
+          "row": "lap:lap_load_clean_noino",
+          "config": "2/net/mesh/direct",
+          "platform": "any",
+          "kind": "control",
+          "batch": "b20261024-740d1d",
+          "k": 10,
+          "n": 10,
+          "candidate": "",
+          "variant": "LAP_LOAD_CLEAN=0 (lap_load_end removes nothing from the nodes' /run, as the noino lap's exit did before the fix)",
           "builds": [
             "A7E90BC5313192108E35B80"
           ],
@@ -10050,7 +10158,8 @@
       "opened": "2026-10-24",
       "summary": "A joining node's mount has no bound while the incumbent cannot install the two-node view: the joiner's settle gate refuses its AG0 acquire after 60 s with -EAGAIN, and the mount then waits on the AG (P1-AGWAIT) until the incumbent installs the view, however long that takes. Seen with the incumbent's takeover pass held (join_during_takeover ARM=stall: dl_no_ondemand_takeover=1, dl_takeover_pause_ms=45000), where B's mount took 86.5 s and returned mounted only after the knobs were cleared.",
       "evidence": "tests/join_during_takeover.sh lap jsp191 (lane tests/evidence/lanes/g2_a19_20261024T143259Z step 14, 2/net/mesh/direct test1/test2, module A27A67A3E501890BE9985E0, NFILES=4000 JDT_PASS_PACE_MS=30 EXPECT=clean ARM=stall; inner runs on the lap's scratch ledger). Lap output: 'max_stall_ms=90007 (worst timed operation so far: B's mount inside the pass)', 'B's mount did not return inside 90s', 'B settle gate: lines=2 refused=1 pending_live=1 confirmed=1', 'A worker: transition_wait=3 stalled=2'; graded 'RESULT: VACUOUS ... stage=no-transition' over three FAILs. B (tests/evidence/20261024T161418Z_jointk_jsp191/dmesg_B_followed_1.txt): :1326 [11911.418877] 'Mounting V5 Filesystem'; :1349-1350 [11973.857147] 'P-SETTLE-GATE-REFUSED type=3 ino=0 ag=0 mode=EX ... waited_ms=60000 ... pending_live=1 comm=mount -- a live member still reports another view; the acquire is refused with -EAGAIN'; :1351 'P1-AGWAIT ag=0 comm=mount ... blocking on peer-held AG'; :1616 [11997.880825] settle gate confirmed=1 waited=23100ms; :1769 [11997.923281] 'Ending clean mount' (86.5 s after the mount began). A (dmesg_A_followed_1.txt): :1330-1333 [11908.698] P-JOIN-QUEUED, P-JOIN-FREEZE, P960-AUTH-TRANSITION-WAIT ino=180355073 (the SB summary lock) comm=mxfs-worker; :1583-1624 [11938.8] P960-AUTH-TRANSITION-STALLED stalled_ms=30091 on page 9663, P960-AUTH-TRANSITION-FAIL-SB rc=-78, P-JOIN-FREEZE-FAIL, P-JOIN-PREPARE-RETRY attempt=1; again at :1743-1782 [11980.16]; :1917 [11996.661400] 'P-JOIN-INSTALLED ... attempts=3 ms=87964'. So the no-progress watchdog failed each of A's join prepares (as designed) and A retried, and nothing bounded B's mount. The settle gate's -EAGAIN (dlm/dlm.c:10226) did not fail the mount.",
-      "next": "Establish from the code where the mount path turns the settle gate's -EAGAIN on AG0 into a P1-AGWAIT wait, and whether any bound applies to a joiner whose incumbent keeps failing its join prepare; then a lap that holds the incumbent's join install (the stall arm's knobs, or a TEST ONLY delay in the join prepare) and grades B's mount against stall_limit_s, with B's kernel log followed. Whether the default build (on-demand takeover on) can reach a held install by another path is part of that."
+      "next": "Establish from the code where the mount path turns the settle gate's -EAGAIN on AG0 into a P1-AGWAIT wait, and whether any bound applies to a joiner whose incumbent keeps failing its join prepare; then a lap that holds the incumbent's join install (the stall arm's knobs, or a TEST ONLY delay in the join prepare) and grades B's mount against stall_limit_s, with B's kernel log followed. Whether the default build (on-demand takeover on) can reach a held install by another path is part of that. ===== Code read for the bound (xfs/xfs_mxfs_ag_lock.c:764-880): the settle gate's -EAGAIN came back from the non-blocking probe mxfs_v5_dlm_ag_lock_nb (:764), which the path reads as a peer holding the AG (P1-AGWAIT, :779) and follows with the blocking mxfs_v5_dlm_ag_lock (:876); in jsp191 that second acquire met the settle gate again (B :1616 waited=23100ms confirmed=1) and was granted once A installed the view. Whether the blocking acquire's gate refuses again after its own 60 s, and what the mount does then, is not measured. The other evidence on the length: lap jsp192 of the same lane (step 15, JDT_STALL_PROBE=0, B's mount issued detached and polled every 3 s for 'Failed to read root inode' or its result file) printed nothing from 'A knobs for the arm: knobs=1/45000 at +29s' until the lane's timeout -k 5 600 killed it (rc=124 at 600 s), so B's mount neither failed nor returned in about 570 s with the pass held; its nodes' kernel logs were not kept (tests/evidence/20261024T161638Z_jointk_jsp192 holds only create_1.txt and rv_mine_at_issue_1.txt).",
+      "updated": "2026-10-24"
     }
   ]
 }
