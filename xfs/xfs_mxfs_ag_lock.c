@@ -24,6 +24,19 @@ module_param_named(false_fresh_enforce, mxfs_false_fresh_enforce, int, 0644);
  */
 int mxfs_single_era_hint_keep = 1;
 module_param_named(single_era_hint_keep, mxfs_single_era_hint_keep, int, 0644);
+/*
+ * Instrument, no behaviour (D-FOREIGN-REPLAY-WRITES-AG-HEADERS-WITHOUT-THE-AG-LOCK):
+ * 1 prints P-AG-FRESH-GRANT for every fresh cluster grant of an AG, the moment
+ * the acquire returns it, with how long the acquire waited.  The line's kernel
+ * timestamp is the node's own clock, so a lap can place a live node's grant of
+ * an AG a peer's death left to replay against the replayer's ladder entry; a
+ * truncate's return time cannot tell that wait from the stall every survivor
+ * has across a silent death.  0 (default) prints nothing; capped per boot.
+ */
+int mxfs_dbg_ag_grant_trace;
+module_param_named(dbg_ag_grant_trace, mxfs_dbg_ag_grant_trace, int, 0644);
+MODULE_PARM_DESC(dbg_ag_grant_trace,
+		 "instrument: 1 prints P-AG-FRESH-GRANT at each fresh cluster grant of an AG (0, default: none)");
 /* v0.5.5: adaptive-cap default raised 32 ->
  * 512.  With the lazy path async-submitting dirty AG bufs on EVERY
  * skipped drain (v0.3.133/134), accumulated debt at BAST time is
@@ -890,6 +903,15 @@ __mxfs_ag_dlm_lock(
 			mutex_unlock(&pag->pag_dlm_acquire_lock);
 			return error;
 		}
+	}
+	if (unlikely(READ_ONCE(mxfs_dbg_ag_grant_trace))) {
+		static atomic_t p_agfg_n = ATOMIC_INIT(0);
+
+		if (atomic_inc_return(&p_agfg_n) <= 20000)
+			pr_info("mxfs: P-AG-FRESH-GRANT ag=%u wait_ms=%llu nonblock=%d comm=%s pid=%d -- a fresh cluster grant of this AG\n",
+				pag_agno(pag),
+				(unsigned long long)((ktime_get_ns() - acq_t0) / 1000000),
+				nonblock ? 1 : 0, current->comm, current->pid);
 	}
 
 	/*

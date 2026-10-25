@@ -30,14 +30,34 @@
 # victim's key on both paths, and unmounts and mounts the victim on both paths,
 # so the next lap starts from the same pair.
 #
-#   EXPOSED  the fill's REGISTER was held unresolved OUT_MS while the victim's
-#            load completed operations through the map (requests had a path to
-#            take), for longer than multipathd needs to reinstate a path
-#   PASS     held=1, writes_done=0 and requests_sent=0, the victim's key on
-#            both paths afterwards, the load clean and within the stall bound
-#   FAIL     writes_done > 0 (writes the node sent down the late path while
-#            its REGISTER was unresolved: the hazard), or requests_sent > 0
-#            (any command, a path checker's TEST UNIT READY included)
+# THE LATE PATH MUST BE THE ONLY WAY.  With the map's other path up, multipath
+# sent nothing down the returning path in the window, fix on or off: on attempt
+# 22 its data counters did not move in a single control or verification lap
+# (data/reviews/P20261024-229ee1.md), so the hazard was never reached.  Once the
+# module prints P-DBG-PR-FILL-OUTSTANDING-BEGIN (the REGISTER's unresolved
+# window has started) the lap takes the victim's path b down, and brings it back
+# after the window's end line.  The node's I/O then has the late path or nothing:
+# with the fix out multipathd reinstates the late path on its next check and the
+# node's writes go down it behind the unresolved REGISTER; with the fix the
+# path is held, the check cannot reinstate it, and the I/O waits out the window.
+# LRH_FORCE_LATE=0 leaves path b up, as before.
+#
+# The window: over twice multipathd's checker interval (the late path must be
+# reinstatable inside it, so the lane runs with 2 s path timeouts,
+# MXFS_MPATH_TMO=2), and well inside the death window, since the hold stops the
+# node's heartbeat beats on that path too and path b is down: 8000 ms against
+# the 12 s window (6 checks).
+#
+#   EXPOSED  path b was down from the window's start to its end while the
+#            victim's load was running (its last operation before the window
+#            within 2 s of its start), so the late path was the node's only way
+#   PASS     writes_done=0, the victim's key on both paths afterwards, the
+#            load within the stall bound
+#   FAIL     writes_done > 0: writes the node sent down the late path while
+#            its REGISTER was unresolved, the hazard.  held and requests_sent
+#            (every command dispatched down the path, a path checker's TEST
+#            UNIT READY included) are printed, not graded: held is the fix's
+#            own switch, and the checker is not the node's data.
 # The module prints writes_done from the path's disk statistics, which count
 # what multipath clones onto it; a lap that cannot read them is UNMEASURED.
 #
@@ -53,7 +73,8 @@
 # Exit: 0 PASS, 1 FAIL, 2 the lap could not measure.
 set -u
 cd "$(dirname "$0")/.." || { echo "UNMEASURED: no tree"; exit 2; }
-OUT_MS=${LRH_OUT_MS:-15000}
+OUT_MS=${LRH_OUT_MS:-8000}
+FORCE_LATE=${LRH_FORCE_LATE:-1}
 FILL_S=${LRH_FILL_S:-20}
 if [ "${1:-}" = --row ]; then
     ROW=late_register_hold
@@ -105,8 +126,23 @@ if [ "${1:-}" = --row ]; then
     [ "$fails" = 0 ] || { link "$V" a up; finish FAIL "stage=knob"; exit 1; }
 
     link "$V" a up
-    # the session's relogin (up to 20 s at the 5 s path timescale), the fill's
-    # next tick (0.5 s), the window, and 10 s of slack
+    bdown=0
+    if [ "$FORCE_LATE" != 0 ]; then
+        # the window's start: the session's relogin (up to 20 s at the 5 s path
+        # timescale), the fill's next tick (0.5 s), and 10 s of slack
+        s=$SECONDS; begin=""
+        while [ $((SECONDS - s)) -le 30 ]; do
+            begin=$(rs 15 "$V" "sed -n '/$PFMARK/,\$p' $KFILE | grep -a 'P-DBG-PR-FILL-OUTSTANDING-BEGIN' | tail -1" 2>/dev/null)
+            [ -n "$begin" ] && break
+            sleep 0.5
+        done
+        [ -n "$begin" ] || { echo "UNMEASURED: no P-DBG-PR-FILL-OUTSTANDING-BEGIN line in 30 s after path a came back"; exit 2; }
+        tb=$(now_ms)
+        link "$V" b down; bdown=1
+        echo "  INFO path b down $(( $(now_ms) - tb )) ms after the window's start was read: $(sed 's/.*mxfs: //' <<<"$begin" | cut -c1-160)"
+    fi
+    # the window's end: the session's relogin, the fill's next tick, the window,
+    # and 10 s of slack
     s=$SECONDS; line=""
     while [ $((SECONDS - s)) -le $(( 30 + OUT_MS / 1000 )) ]; do
         line=$(rs 15 "$V" "sed -n '/$PFMARK/,\$p' $KFILE | grep -a 'P-DBG-PR-FILL-OUTSTANDING' | tail -1" 2>/dev/null)
@@ -114,6 +150,7 @@ if [ "${1:-}" = --row ]; then
         sleep 1
     done
     t1=$(now_ms)
+    [ "$bdown" = 1 ] && link "$V" b up
     [ -n "$line" ] || { echo "UNMEASURED: no P-DBG-PR-FILL-OUTSTANDING line in $(( 30 + OUT_MS / 1000 )) s after path a came back"; exit 2; }
     echo "  KMSG $(sed 's/.*mxfs: //' <<<"$line" | cut -c1-240)"
     sent=$(sed -n 's/.* requests_sent=\(-\?[0-9]*\).*/\1/p' <<<"$line")
@@ -125,12 +162,22 @@ if [ "${1:-}" = --row ]; then
     # the window ended at most 1 s before the line was read
     pf_window outstanding $(( t1 - 1000 - OUT_MS )) $(( t1 - 1000 )) "$V"
     win=$(awk '$1 == "outstanding"' "$OUT/stalls.txt" | sed -n 's/.*completed_in_window=\([0-9]*\).*/\1/p' | tail -1)
-    [ "${win:-0}" -gt 0 ] && [ "$rrc" = 0 ] \
-        || { echo "UNMEASURED: the window held no load to route (completed_in_window=${win:-?}) or the REGISTER did not answer GOOD (register_rc=${rrc:-?})"; exit 2; }
-    echo "EXPOSED: the fill's REGISTER was held unresolved ${OUT_MS} ms (over twice the ${pi} s checker interval) while $V's load completed $win operations through the map"
+    if [ "$FORCE_LATE" != 0 ]; then
+        # the load ran into the window (its last operation before it within 2 s
+        # of its start) and path b went down within 2 s of the start read
+        lb=$(awk '$1 == "outstanding"' "$OUT/stalls.txt" | sed -n 's/.*last_before_ms=\([0-9]*\).*/\1/p' | tail -1)
+        w0=$(( t1 - 1000 - OUT_MS ))
+        [ -n "$lb" ] && [ $(( w0 - lb )) -le 2000 ] && [ $(( $(now_ms) - tb )) -gt 0 ] && [ "$rrc" = 0 ] \
+            || { echo "UNMEASURED: the load was not running at the window's start (last_before_ms=${lb:-?}, window start ${w0}) or the REGISTER did not answer GOOD (register_rc=${rrc:-?})"; exit 2; }
+        echo "EXPOSED: the fill's REGISTER was held unresolved ${OUT_MS} ms (over twice the ${pi} s checker interval) with $V's path b down, so its load (running $(( w0 - lb )) ms before the window) had the late path or nothing; $win operations completed in the window"
+    else
+        [ "${win:-0}" -gt 0 ] && [ "$rrc" = 0 ] \
+            || { echo "UNMEASURED: the window held no load to route (completed_in_window=${win:-?}) or the REGISTER did not answer GOOD (register_rc=${rrc:-?})"; exit 2; }
+        echo "EXPOSED: the fill's REGISTER was held unresolved ${OUT_MS} ms (over twice the ${pi} s checker interval) while $V's load completed $win operations through the map"
+    fi
 
     ra=$(wait_usable "$V" a_back)
-    [ "$ra" != 999 ] || echo "  INFO multipathd did not reinstate path a in 60 s after the window"
+    [ "$ra" != 999 ] || echo "  INFO multipathd did not have both paths usable in 60 s after the window"
     pf_load_stop "$V"
     s=$SECONDS; filled=""
     while [ $((SECONDS - s)) -le "$FILL_S" ]; do
@@ -139,9 +186,8 @@ if [ "${1:-}" = --row ]; then
         sleep 1
     done
     ck "the target holds the victim's key on both paths after the window" "$([ -n "$filled" ] && echo yes || echo no)" yes
-    ck "the late path was held while its REGISTER was unresolved (held)" "${held:-?}" 1
     ck "no write of the node completed on the late path while its REGISTER was unresolved (writes_done)" "$wdone" 0
-    ck "the node dispatched nothing down the late path while its REGISTER was unresolved (requests_sent)" "${sent:-?}" 0
+    echo "  INFO held=${held:-?} requests_sent=${sent:-?} (the fix's switch, and every command down the path, checker TURs included: printed, not graded)"
 
     um leave_after
     mo rejoin_two_paths
@@ -149,7 +195,7 @@ if [ "${1:-}" = --row ]; then
     echo "  INFO keys after the victim's remount on two paths: $(grep -c . "$OUT/keys_rejoined.txt") (want $(( 2 * N )))"
     if [ "$fails" = 0 ]; then
         trap kmsg_stop EXIT
-        echo "LAP late_register_hold PASS nothing was dispatched down the late path in the ${OUT_MS} ms its REGISTER was held unresolved"
+        echo "LAP late_register_hold PASS no write of the node landed on the late path in the ${OUT_MS} ms its REGISTER was held unresolved"
         exit 0
     fi
     echo "LAP late_register_hold FAIL $fails check(s): writes_done=$wdone requests_sent=${sent:-?} held=${held:-?} ($why)"
@@ -165,7 +211,7 @@ arm=${2:?usage: tests/late_register_hold_lap.sh <label> <arm>}
 # FILL_S; the unmount and the two-path mount ~10 s; the EXIT trap's copies
 # ~2 s.  About 110 s plus the window at 2 nodes: twice that, plus 12 s for
 # each node past two at the gate.
-BOUND_S=$(( 2 * (110 + ${LRH_OUT_MS:-15000} / 1000) + FILL_S + 12 * (MXFS_NODES - 2) ))
+BOUND_S=$(( 2 * (110 + ${LRH_OUT_MS:-8000} / 1000) + FILL_S + 12 * (MXFS_NODES - 2) ))
 run_id="${label}_$(date -u +%Y%m%dT%H%M%SZ)"
 LRH_ARM=$arm MXFS_RUN_ID=$run_id timeout "$BOUND_S" "$0" --row
 rc=$?

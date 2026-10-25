@@ -23,3 +23,21 @@ fuser_mounted_cmd() {
         printf 'mountpoint -q %s && { fuser -km %s >/dev/null 2>&1; sleep %s; };' "$mnt" "$mnt" "$settle"
     fi
 }
+
+# fuser_inmounts_cmd <mnt>
+#   prints the kill of every process using <mnt>, ending in ';', run only while
+#   <mnt> is in /proc/mounts.  run.sh's kill of a timed-out row's leftovers
+#   sends this: it ran 'fuser -k -m $MNT' on every node whether the volume was
+#   mounted or not (D-RUN-SH-TIMEOUT-KILL-FUSER-ON-AN-UNMOUNTED-MNT-KILLS-ROOT-FS-USERS).
+#   /proc/mounts and not mountpoint -q, as run.sh's teardown reads it: a stat
+#   of a quarantined mount's root answers ESTALE.
+#   MXFS_TIMEOUT_KILL_MOUNT_GUARD=0 prints the unguarded kill, as before: the
+#   control, never set outside a control lap.
+fuser_inmounts_cmd() {
+    local mnt=${1:?fuser_inmounts_cmd: mount point}
+    if [ "${MXFS_TIMEOUT_KILL_MOUNT_GUARD:-1}" = 0 ]; then
+        printf 'fuser -k -m %s >/dev/null 2>&1;' "$mnt"
+    else
+        printf "grep -q ' %s ' /proc/mounts && fuser -k -m %s >/dev/null 2>&1;" "$mnt" "$mnt"
+    fi
+}

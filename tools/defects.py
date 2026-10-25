@@ -1196,6 +1196,18 @@ def cmd_batch_check(data: dict, args) -> int:
                          % (args.batch, r))
         row = batch["row"]
     check_batch_lap(args.batch, row, config, args.candidate or "")
+    # A calibration or verification declared with no variant counts no lap that runs as one
+    # (unplanned_variant), so such a lap is refused before it runs rather than recorded and
+    # dropped: attempt 22's 8-node verification b20261024-802114 ran 25 laps under its lane's
+    # MXFS_TEST_ENV=PF_KEEP_KMSG=1 and none could count
+    # (D-VERIFY-LAPS-UNDER-A-LANE-WIDE-TEST-ENV-RUN-AS-VARIANTS-AND-COUNT-NOTHING).
+    # MXFS_BATCH_VARIANT_REFUSE=0 admits the lap, as before: the same-build control.
+    if args.variant and not batch.get("variant") \
+            and batch.get("kind") in ("calibrate", "verify") \
+            and os.environ.get("MXFS_BATCH_VARIANT_REFUSE", "1") != "0":
+        sys.exit("defects: batch %s is a %s declared with no variant, and this lap runs as one "
+                 "(%s): it would count nothing; run it without that, or declare the batch with "
+                 "--variant" % (args.batch, batch["kind"], args.variant))
     print("ROW=%s" % row)
     print("PROBE=%s" % batch.get("probe", ""))
     print("LEAVES_CLUSTER=%d" % (1 if batch.get("leaves_cluster") else 0))
@@ -2053,6 +2065,8 @@ def main() -> int:
                             "runs (the batch's --support)")
     check.add_argument("--at", dest="batch_at", metavar="CONFIGURATION", required=True)
     check.add_argument("--candidate")
+    check.add_argument("--variant", default="",
+                       help="the lap's own variant, as run.sh or tools/batch_lap.py derive it")
 
     propose = subs.add_parser("propose", help="ask for a decision that stops something blocking")
     propose.add_argument("kind", choices=PROPOSAL_KINDS)

@@ -50,13 +50,19 @@
 # Bounds (derived): prep on a pair measured 53-104 s, bound 120; F's write 30;
 # the load start 30 a node; WARM_S 10; the hold start 15; the run
 # HOLD_MS/1000 + 30; the load's stop 45 (tests/mpath/lib.sh's bound on its
-# report); reads 6 x 30.  Caller bound 2 x the precheck's wall.
+# report); reads 6 x 30; the forced reuse 2 x 40, inside the run.  An exit that cannot see a node's load end waits out the
+# load's deadline (372 s from its start at the defaults, tests/lib/lap_load.sh).
+# Caller bound 2 x the precheck's wall.
 #
 # Usage: noino_fence_efd_hold_lap.sh <label>
 # Env:   MXFS_NODE_LIST (test29,test30), MXFS_CONFIG (2/disk/caw/direct), MXFS_GROUP,
 #        HOLD_MS (26000), WARM_S (10), NOINO_RING_ROTATE (0; 1 fills S's ring past the mark
-#        before the hold, at most 60 s more), LAP_LOAD_STOP and LAP_LOAD_CLEAN (1; 0 the
-#        controls of tests/lib/lap_load.sh), LAP_ABORT_AFTER_LOAD (0; 1 ABORTs after the warm-up)
+#        before the hold, at most 60 s more), LAP_LOAD_STOP, LAP_LOAD_CLEAN and
+#        LAP_LOAD_DEADLINE (1; 0 the controls of tests/lib/lap_load.sh), LAP_LOAD_DEADLINE_S
+#        (2 x the load's planned life, 372 at the defaults), LAP_ABORT_AFTER_LOAD (0; 1 ABORTs
+#        after the warm-up), LAP_UNREACH_S (0; test only: S drops its ssh port that long first),
+#        NOINO_FORCE_REUSE (1; 0 leaves exposure to the loads' churn), REUSE_N (64),
+#        NOINO_CONVOY_CHAIN (unset; 0 or 1 is written to S's noino_convoy_chain at run time)
 # Exit 0 PASS, 1 FAIL, 2 ABORT, 3 VACUOUS.
 set -u
 LABEL=${1:?label}
@@ -137,6 +143,15 @@ measure "$S" 30 "$OUT/S_setup.txt" '^SETUP_RC=[0-9]+$' "S's file F" \
     "test -w $PARM/dbg_efd_hold_ms || { echo SETUP_RC=90; exit 0; }; mkdir -p $D || { echo SETUP_RC=91; exit 0; }; dd if=/dev/urandom of=$D/F bs=1M count=4 conv=fsync status=none || { echo SETUP_RC=93; exit 0; }; echo $MARK > /dev/kmsg; echo SETUP_RC=0"
 ck "S's file written" "$(field "$OUT/S_setup.txt" SETUP_RC)" 0
 [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=setup wall=$(el)s evidence=$OUT"; exit 2; }
+# NOINO_CONVOY_CHAIN set: written to S's noino_convoy_chain at run time, an injection for laps
+# that need S to shut down (the row lap:noino_noreport) on the module as frozen; a module
+# argument would make the lap a variant that no verification counts.
+if [ -n "${NOINO_CONVOY_CHAIN:-}" ]; then
+    measure "$S" 20 "$OUT/S_convoy_chain.txt" '^CONVOY_CHAIN=' "S's noino_convoy_chain" \
+        "echo $NOINO_CONVOY_CHAIN > $PARM/noino_convoy_chain; echo CONVOY_CHAIN=\$(cat $PARM/noino_convoy_chain)"
+    ck "S's noino_convoy_chain reads back" "$(field "$OUT/S_convoy_chain.txt" CONVOY_CHAIN)" "$NOINO_CONVOY_CHAIN"
+    [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=convoy-chain wall=$(el)s evidence=$OUT"; exit 2; }
+fi
 rs 15 "$R" "echo $MARK > /dev/kmsg" > /dev/null 2>&1
 # a follower that never started reads nothing: each node's file must hold the mark
 if [ "$FOLLOW" = 1 ]; then
@@ -148,14 +163,25 @@ if [ "$FOLLOW" = 1 ]; then
     [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=follow wall=$(el)s evidence=$OUT"; exit 2; }
 fi
 
-# ---- 2. the load on both nodes
+# ---- 2. the load on both nodes, each under a deadline on its own node (tests/lib/lap_load.sh):
+# twice its planned life, the warm-up, the hold's start, the run, the ring fill and the stop
 LOADS=1
+lap_load_prefix "${LAP_LOAD_DEADLINE_S:-$(( 2 * (WARM_S + 15 + HOLD_MS / 1000 + 30 + 60 + 45) ))}"
+echo "STAGE load deadline=${LAP_LOAD_PFX:-none}"
 for n in "$S" "$R"; do
     measure "$n" 30 "$OUT/${n}_load_start.txt" '^LOAD_STARTED$' "$n's load started" \
-        "rm -rf $LD; mkdir -p $LD; rm -f $LD.stop; nohup setsid python3 $NREPO/tests/mpath/pathload.py run $n $MNT $LD $LD.stop > $LD.out 2>&1 < /dev/null & echo LOAD_STARTED"
+        "rm -rf $LD; mkdir -p $LD; rm -f $LD.stop; nohup setsid $LAP_LOAD_PFX python3 $NREPO/tests/mpath/pathload.py run $n $MNT $LD $LD.stop > $LD.out 2>&1 < /dev/null & echo LOAD_STARTED"
 done
 [ $fails = 0 ] || { echo "RESULT: ABORT label=$LABEL stage=load wall=$(el)s evidence=$OUT"; exit 2; }
 sleep "$WARM_S"
+# TEST ONLY: LAP_UNREACH_S=<s> makes S drop every packet to its ssh port for <s> seconds
+# (tests/lib/ssh_block.sh), so the exit cannot reach S, as the abort the record was filed on
+# could not (tests/lap_load_end_lap.sh MODE=unreach)
+if [ "${LAP_UNREACH_S:-0}" -gt 0 ]; then
+    rs 15 "$S" "nohup setsid bash $NREPO/tests/lib/ssh_block.sh $LAP_UNREACH_S > /root/ssh_block.$LABEL.log 2>&1 < /dev/null & echo BLOCK_STARTED" > "$OUT/S_unreach.txt" 2>&1
+    echo "STAGE S unreachable for ${LAP_UNREACH_S}s: $(tr '\n' ' ' < "$OUT/S_unreach.txt" | cut -c1-80)"
+    sleep 4
+fi
 # TEST ONLY: LAP_ABORT_AFTER_LOAD=1 ends the lap here with its loads running, as an ABORT after
 # the loads start does (tests/lap_load_end_lap.sh)
 [ "${LAP_ABORT_AFTER_LOAD:-0}" = 1 ] && { echo "RESULT: ABORT label=$LABEL stage=forced wall=$(el)s evidence=$OUT"; exit 2; }
@@ -193,6 +219,24 @@ HOLD_SEEN=$(field "$OUT/S_hold.txt" HOLD_SEEN)
 echo "STAGE hold seen=$HOLD_SEEN at +$(el)s"
 # the hold read's own exposure: the ring had lost the mark by the time the hold was looked for
 [ "$(field "$OUT/S_hold.txt" HOLD_RING_MARK)" = 0 ] && echo "HOLD-RING-ROTATED: $S's kernel ring no longer held the lap's mark when the hold was looked for"
+
+# ---- 3b. inode numbers S frees during the hold, reused by R at once
+# The fence is exposed only when a peer's acquire meets a grant S still holds for an inode it no
+# longer has (a BAST for a reclaimable inode, P-NOINO-RECLAIMABLE) while the hold freezes S's AIL
+# minimum.  The loads' churn in their shared directory makes that a chance: in attempt 22's
+# verification at 2/net/mesh/direct (b20261024-c68d9b) 10 of 23 laps saw no such release inside
+# the hold and were VACUOUS stage=no-fence, every exposed one had one (lane g2d_a22 step5.log).
+# So S creates and unlinks REUSE_N empty files in a directory both nodes allocate in, keeping
+# their grants as it frees them, and R then creates REUSE_N there, which takes the numbers S
+# freed.  NOINO_FORCE_REUSE=0 leaves exposure to the loads' churn, as before.
+if [ "${NOINO_FORCE_REUSE:-1}" = 1 ]; then
+    REUSE_N=${REUSE_N:-64}
+    measure "$S" 40 "$OUT/S_reuse.txt" '^REUSE_S=[0-9]+$' "S's freed numbers" \
+        "mkdir -p $D/reuse; for i in \$(seq 1 $REUSE_N); do : > $D/reuse/s\$i; done; sync -f $MNT; for i in \$(seq 1 $REUSE_N); do rm -f $D/reuse/s\$i; done; sleep 2; echo REUSE_S=\$(ls $D/reuse | wc -l)"
+    measure "$R" 40 "$OUT/R_reuse.txt" '^REUSE_R=[0-9]+$' "R's creates over them" \
+        "for i in \$(seq 1 $REUSE_N); do : > $D/reuse/r\$i; done; echo REUSE_R=\$(ls $D/reuse | wc -l)"
+    echo "STAGE reuse S left $(field "$OUT/S_reuse.txt" REUSE_S), R created to $(field "$OUT/R_reuse.txt" REUSE_R) at +$(el)s"
+fi
 
 # ---- 4. the run, then both loads stopped
 sleep $(( HOLD_MS / 1000 + 30 ))
@@ -255,7 +299,9 @@ for n in "$S" "$R"; do
     # A load that printed no report has no double_grant field: the check above has already
     # failed it, and judging the empty field ABORTed the lap, which lost the verdict of every
     # lap whose S shut down (D-NOINO-LAP-ABORTS-ON-AN-EMPTY-FIELD-WHEN-S-SHUTS-DOWN).
-    # NOINO_LAP_JUDGE_MISSING=1 judges it anyway, as before: the control.
+    # NOINO_LAP_JUDGE_MISSING=1 judges it anyway, as before: the control.  The missing report is
+    # printed in both arms (EXPOSED-NOREPORT, the trigger of that record's row lap:noino_noreport).
+    [ "$(cnt "$OUT/${n}_load.txt" '^PATHLOAD ')" = 1 ] || echo "EXPOSED-NOREPORT: $n's load printed no report"
     if [ "$(cnt "$OUT/${n}_load.txt" '^PATHLOAD ')" = 1 ] || [ "${NOINO_LAP_JUDGE_MISSING:-0}" = 1 ]; then
         ck "$n's load: no double grant" "$(field "$OUT/${n}_load.txt" double_grant)" 0
     else

@@ -523,8 +523,11 @@ subst() {  # <snippet> <id>
 }
 
 release() {  # <id>: log the owner's nodes out, empty the group, drop the owner file
-    local id=$1 nodes n td snippet bad=""
+    local id=$1 nodes n td snippet bad="" t0=$SECONDS tl=$SECONDS
     nodes=$(owner_field "$id" 3 | tr ',' ' ')
+    # Each part's seconds go to stderr and, under the pool lock, to lock.log, so
+    # a long hold names the part that took it
+    # (D-LUN-POOL-LOCK-WAIT-OVER-60S-REFUSES-A-PREP-WHILE-ANOTHER-LANE-HOLDS-IT).
     if [ -n "$nodes" ]; then
         snippet=$(subst "$NODE_LOGOUT" "$id")
         td=$(mktemp -d)
@@ -534,13 +537,23 @@ release() {  # <id>: log the owner's nodes out, empty the group, drop the owner 
         rm -rf "$td"
         [ -z "$bad" ] || echo "lun_pool: lun$id: no clean logout from:$bad (its group is emptied anyway; the node sees no disk)" >&2
     fi
+    tl=$SECONDS
     if [ -d "$T/$(tgt_of "$id")" ]; then
-        set_initiators "$id" || { echo "lun_pool: lun$id: could not empty its initiator group" >&2; return 1; }
+        set_initiators "$id" || { echo "lun_pool: lun$id: could not empty its initiator group" >&2; release_times "$id" "$nodes" "$t0" "$tl"; return 1; }
     fi
     : > "$(owner_of "$id")"
     unlink "$POOL/lun$id.paths" 2>/dev/null
     unlink "$POOL/lun$id.tmo" 2>/dev/null
     unlink "$POOL/lun$id.also" 2>/dev/null
+    release_times "$id" "$nodes" "$t0" "$tl"
+    return 0
+}
+release_times() {  # <id> <nodes> <start s> <logouts end s>: say what a release spent where
+    local total=$(( SECONDS - $3 )) logout=$(( $4 - $3 ))
+    [ "$total" -gt 0 ] || return 0
+    local line="release of lun$1 took $total s: logout of [$2] $logout s, initiator group and owner files $(( total - logout )) s"
+    echo "lun_pool: $line" >&2
+    [ -n "$LOCK_T0" ] && echo "$(date -u +%FT%TZ) inside the pool lock (pid $$): $line" >> "$LOCKLOG"
     return 0
 }
 

@@ -11,10 +11,17 @@
 # runs one of them once and reads every node SETTLE_S after it returned.
 #
 #   LAP=noino|fledger  which lap (noino); its own environment passes through to it
-#   MODE=abort|full    abort: the lap ABORTs right after its warm-up with its loads running
+#   MODE=abort|full|unreach
+#                      abort: the lap ABORTs right after its warm-up with its loads running
 #                      (its own test-only LAP_ABORT_AFTER_LOAD=1); full: the lap runs to its
-#                      own verdict, whatever that verdict is
-#   LAP_LOAD_STOP=0, LAP_LOAD_CLEAN=0 reach the lap: the controls of the two parts.
+#                      own verdict, whatever that verdict is; unreach (LAP=noino): as abort, but S
+#                      first drops its ssh port for UNREACH_S (90) s (the lap's test-only
+#                      LAP_UNREACH_S, tests/lib/ssh_block.sh), so the lap's exit cannot reach S,
+#                      as the abort the record was filed on could not; S is read once it answers
+#                      again, and only a load still running is graded (a /run path left on a
+#                      node the exit could not reach is printed)
+#   LAP_LOAD_STOP=0, LAP_LOAD_CLEAN=0, LAP_LOAD_DEADLINE=0 reach the lap: the controls of the
+#   three parts.
 #
 #   EXPOSED  the lap started its loads (its <node>_load_start.txt reads LOAD_STARTED on every
 #            node) and returned
@@ -28,9 +35,13 @@
 # follower and load starts (30 + 2 x 20 + 2 x 30), the warm-up (WARM_S, 10) and the exit's
 # lap_load_end (60) and follower stop (2 x 15): 340 for noino; fledger's keys read and two
 # 30 s follower starts make it 370.  MODE=full: the lane bounds of each lap at its defaults
-# (noino 591, the fenced reason arm 260) plus the exit's 60: 651 and 320.  INNER_BOUND
-# overrides.  Then the settle 10, the reads 20 a node, the cleanup 60 a node; a caller bounds
-# the lap at INNER_BOUND + 10 + 80 x nodes.
+# (noino 591, the fenced reason arm 260) plus the exit's 60: 651 and 320.  MODE=unreach (noino):
+# the abort's prep, follower, setup, load starts and warm-up (120 + 30 + 2 x 20 + 2 x 30 + 10),
+# the block's start 15 + 2, the exit's lap_load_end against an S that does not answer (60) and
+# its wait for the load's deadline (372 + 5 from the load's start), the followers' stop 2 x 15:
+# 750.  INNER_BOUND overrides.  Then (unreach) the wait for S to answer again, 120; the settle
+# 10, the reads 20 a node, the cleanup 60 a node; a caller bounds the lap at INNER_BOUND + 10 +
+# 80 x nodes, + 120 for unreach.
 #
 # Usage: tests/lap_load_end_lap.sh <label>
 # Env:   MXFS_NODE_LIST, MXFS_CONFIG, MXFS_GROUP (passed to the lap), LAP (noino), MODE (abort),
@@ -49,6 +60,7 @@ SETTLE_S=${SETTLE_S:-10}
 case $LAP:$MODE in
     noino:abort) SCRIPT=noino_fence_efd_hold_lap.sh; LD=/run/noinoefd_$LABEL; DEFB=340 ;;
     noino:full) SCRIPT=noino_fence_efd_hold_lap.sh; LD=/run/noinoefd_$LABEL; DEFB=651 ;;
+    noino:unreach) SCRIPT=noino_fence_efd_hold_lap.sh; LD=/run/noinoefd_$LABEL; DEFB=750 ;;
     fledger:abort) SCRIPT=fenced_ledger_rig_lap.sh; LD=/run/fledger_$LABEL; DEFB=370 ;;
     fledger:full) SCRIPT=fenced_ledger_rig_lap.sh; LD=/run/fledger_$LABEL; DEFB=320 ;;
     *) echo "LAP must be noino or fledger, MODE abort or full"; exit 2 ;;
@@ -59,8 +71,10 @@ OUT=tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_lapload_$LABEL
 mkdir -p "$OUT"
 echo "LAP lap_load_end start $(date -u +%FT%TZ) label=$LABEL lap=$LAP mode=$MODE nodes=$MXFS_NODE_LIST ld=$LD inner_bound=${INNER_BOUND}s LAP_LOAD_STOP=${LAP_LOAD_STOP:-(unset)} LAP_LOAD_CLEAN=${LAP_LOAD_CLEAN:-(unset)} out=$OUT"
 
+UNREACH_S=${UNREACH_S:-90}
 ABORTARG=()
 [ "$MODE" = abort ] && ABORTARG=(env LAP_ABORT_AFTER_LOAD=1)
+[ "$MODE" = unreach ] && ABORTARG=(env LAP_ABORT_AFTER_LOAD=1 LAP_UNREACH_S="$UNREACH_S")
 timeout -k 5 "$INNER_BOUND" "${ABORTARG[@]}" bash "$HERE/$SCRIPT" "$LABEL" > "$OUT/lap.txt" 2>&1
 lrc=$?
 res=$(grep -a '^RESULT:' "$OUT/lap.txt" | tail -1)
@@ -74,6 +88,23 @@ done
 if [ "$started" != "${#NODES[@]}" ]; then
     echo "LAP lap_load_end ABORT: the lap's loads started on $started of ${#NODES[@]} node(s) (evidence ${ev:-none}), so nothing here measures how it ends them"
     exit 2
+fi
+if [ "$MODE" = unreach ]; then
+    S=${NODES[0]}
+    grep -aq "SSH-BLOCK-STARTED\|BLOCK_STARTED" "$ev/S_unreach.txt" 2>/dev/null \
+        || { echo "LAP lap_load_end ABORT: the lap never started S's ssh block ($(tr '\n' ' ' < "$ev/S_unreach.txt" 2>/dev/null | cut -c1-120))"; exit 2; }
+    grep -a '^LOAD-END ' "$OUT/lap.txt" | grep -q "^LOAD-END $S rc=0 " \
+        && { echo "LAP lap_load_end ABORT: the lap's exit reached $S, so nothing here measures an exit that cannot reach it"; exit 2; }
+    ans=""
+    for t in $(seq 1 24); do
+        ans=$(rs 5 "$S" "echo ANSWERS")
+        [ "$ans" = ANSWERS ] && break
+        sleep 5
+    done
+    [ "$ans" = ANSWERS ] || { echo "LAP lap_load_end ABORT: $S did not answer again within 120 s of the lap's return"; exit 2; }
+    echo "  $S answers again $(rs 10 "$S" "cat /root/ssh_block.$LABEL.log 2>/dev/null" | tr '\n' ' ' | cut -c1-120)"
+    # the lap's exit could not stop S's kernel-log follower either
+    rs 15 "$S" "for p in /root/noinoefd.$LABEL.*.kmsg.pid; do [ -f \$p ] && kill \$(cat \$p) 2>/dev/null; done; rm -f /root/noinoefd.$LABEL.*.kmsg /root/noinoefd.$LABEL.*.kmsg.pid /root/ssh_block.$LABEL.log" > /dev/null 2>&1
 fi
 echo "EXPOSED: the lap started its loads on all ${#NODES[@]} node(s) and returned rc=$lrc"
 
@@ -95,6 +126,14 @@ for n in "${NODES[@]}"; do
     echo "  $n: cleanup $(tr '\n' ' ' < "$OUT/cleanup_$n.txt")"
 done
 [ -z "$bad" ] || { echo "LAP lap_load_end ABORT: unreadable count on$bad"; exit 2; }
+if [ "$MODE" = unreach ]; then
+    if [ "$running" = 0 ]; then
+        echo "LAP lap_load_end PASS: no load of the lap ran on any node $SETTLE_S s after it returned and S answered again, though its exit could not reach S (/run paths left on $left node(s))"
+        exit 0
+    fi
+    echo "LAP lap_load_end FAIL: a load of the lap still ran on $running node(s) $SETTLE_S s after it returned and S answered again (/run paths left on $left node(s))"
+    exit 1
+fi
 if [ "$running" = 0 ] && [ "$left" = 0 ]; then
     echo "LAP lap_load_end PASS: no load of the lap ran and none of its /run paths was left on any node $SETTLE_S s after it returned"
     exit 0

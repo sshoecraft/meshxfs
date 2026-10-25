@@ -7368,6 +7368,12 @@ int mxfs_pal_scsi_pr_fill_paths(mxfs_bdev_t *dev, uint64_t key,
 			int sent = atomic_read(&p->iorequest_cnt);
 			long w0 = mxfs_pr_path_writes(p), w1;
 
+			/* the window's start, so a lap can act inside it (take the map's
+			 * other path down, leaving this one the only way for the node's I/O) */
+			pr_warn("mxfs: P-DBG-PR-FILL-OUTSTANDING-BEGIN %s path %d:%d:%d:%llu key=0x%llx register_rc=%d ms=%d held=%d -- TEST: the late REGISTER is treated as unresolved from now\n",
+				dev->bdev->bd_disk->disk_name, p->host->host_no,
+				p->channel, p->id, (unsigned long long)p->lun,
+				(unsigned long long)key, r, ms, held ? 1 : 0);
 			msleep(ms);
 			sent = atomic_read(&p->iorequest_cnt) - sent;
 			w1 = mxfs_pr_path_writes(p);

@@ -48,10 +48,21 @@
 # ~180 MiB/s in ~6 s, 60 s; the cut 5 s plus fio's 30 s, watched 60 s; a guest
 # that panicked reboots after 25 s and answers ssh in 20-120 s, 240 s (BOOT_S).
 #
+# CUT_ORDER=quiet cuts with nothing reading the DRBD device, waits (up to 20 s) for the backing
+# block device to go, and only then has lvm scan it: the order of the two field instances, an
+# 'lvm' read failed inside its own submission (submit_bio_noacct -> bio_endio ->
+# drbd_request_endio), where CUT_ORDER=reads (the default) fails reads already queued, at
+# dispatch, in a kblockd worker (review data/reviews/P20261024-0dde63.md).  The verdict line
+# then also says whether the oops was the inline one: INLINE=1 when its trace holds
+# submit_bio_noacct and drbd_submit_bio.
+#
 # Usage: tests/drbd_backing_cut_repro.sh <label> <node1> <node2>
+# Env:   CUT_ORDER (reads|quiet, reads)
 # Exit 0 REPRODUCED, 1 NOT-REPRODUCED, 2 ABORT.
 set -u
 LABEL=${1:?label}; N1=${2:?node1}; N2=${3:?node2}
+CUT_ORDER=${CUT_ORDER:-reads}
+case $CUT_ORDER in reads|quiet) ;; *) echo "RESULT: ABORT label=$LABEL stage=args (CUT_ORDER must be reads or quiet)"; exit 2;; esac
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$HERE
 while [ "$REPO" != / ] && [ ! -f "$REPO/tools/mxfs_lab.sh" ]; do REPO=$(dirname "$REPO"); done
@@ -174,7 +185,16 @@ say "DRBD $RES Primary/Primary, UpToDate/UpToDate, on lun${ID[$N1]} and lun${ID[
 STAGE=cut
 SER=/var/log/libvirt/qemu/$N1-serial.log
 OFF=$(sudo -n stat -c %s "$SER" 2>/dev/null) || abort "cannot read the size of $SER"
+if [ "$CUT_ORDER" = quiet ]; then
+    # The field instances' order: the backing disk already gone when a read is sent.  Nothing
+    # reads the DRBD device across the logout, so DRBD has seen no I/O error and still holds the
+    # disk attached; once the backing block device has gone, lvm's own scan (an O_DIRECT aio read
+    # at sector 0, as both oopses' 'lvm' tasks) is the first read, and its bio meets a dead disk
+    # inside its own submission.
+    on "$N1" "dmesg -n 8; echo CUT-REPRO-$LABEL > /dev/kmsg; echo FIO_RUNNING=0; echo DEV_BEFORE=\$([ -b ${DEV[$N1]} ] && echo present || echo gone); iscsiadm -m node -T ${TGT[$N1]} -p $PORTAL -u > /dev/null 2>&1; echo LOGOUT_RC=\$?; for i in \$(seq 1 20); do [ -b ${DEV[$N1]} ] || break; sleep 1; done; echo DEV_AFTER=\$([ -b ${DEV[$N1]} ] && echo present || echo gone); echo DSTATE_BEFORE_READ=\$(drbdadm dstate $RES); nohup setsid sh -c 'for i in \$(seq 1 20); do lvm pvscan --cache /dev/drbd$MINOR > /dev/null 2>&1; sleep 0.5; done' > /dev/null 2>&1 < /dev/null & sleep 3; echo DSTATE=\$(drbdadm dstate $RES)" 40 > "$OUT/cut.txt"
+else
 on "$N1" "dmesg -n 8; echo CUT-REPRO-$LABEL > /dev/kmsg; nohup setsid fio --name=cut --filename=/dev/drbd$MINOR --ioengine=libaio --direct=1 --rw=randread --bs=4k --iodepth=32 --time_based --runtime=30 --output=/root/cutrepro_fio.txt > /dev/null 2>&1 < /dev/null & nohup setsid sh -c 'for i in \$(seq 1 300); do lvm pvscan --cache /dev/drbd$MINOR > /dev/null 2>&1; sleep 0.1; done' > /dev/null 2>&1 < /dev/null & sleep 5; echo FIO_RUNNING=\$(ps -o pid= -C fio | grep -c .); echo DEV_BEFORE=\$([ -b ${DEV[$N1]} ] && echo present || echo gone); iscsiadm -m node -T ${TGT[$N1]} -p $PORTAL -u > /dev/null 2>&1; echo LOGOUT_RC=\$?; sleep 3; echo DEV_AFTER=\$([ -b ${DEV[$N1]} ] && echo present || echo gone); echo DSTATE=\$(drbdadm dstate $RES)" 30 > "$OUT/cut.txt"
+fi
 say "cut: $(tr '\n' ' ' < "$OUT/cut.txt")"
 sleep 60
 on "$N1" "echo BOOT_ID=\$(cat /proc/sys/kernel/random/boot_id); echo DSTATE=\$(drbdadm dstate $RES); echo TAINT=\$(cat /proc/sys/kernel/tainted); echo MXFS_MOD=\$(grep -c '^mxfs ' /proc/modules); dmesg | sed -n '/CUT-REPRO-$LABEL/,\$p' | tail -60" 20 > "$OUT/after.txt"
@@ -196,7 +216,11 @@ STAGE=verdict
 bug=$(grep -ac 'BUG: kernel NULL pointer dereference' "$OUT/console_$N1.txt")
 chg=$(grep -ac '__drbd_change_sync' "$OUT/console_$N1.txt")
 grep -a 'BUG:\|RIP:\|Comm:\|Tainted\|Modules linked in\|__drbd_change_sync\|__req_mod\|drbd_request_endio\|submit_bio_noacct\|Kernel panic' "$OUT/console_$N1.txt" | head -20 | cut -c1-200
-if [ "$bug" -ge 1 ] || grep -q '^DEV_AFTER=gone$' "$OUT/cut.txt"; then
+if [ "$CUT_ORDER" = quiet ]; then
+    if grep -q '^DEV_AFTER=gone$' "$OUT/cut.txt" && grep -q '^DSTATE_BEFORE_READ=UpToDate' "$OUT/cut.txt"; then
+        echo "EXPOSED: $N1's backing device was gone, and DRBD still held its disk UpToDate, when lvm read /dev/drbd$MINOR ($(grep '^DEV_AFTER=\|^DSTATE_BEFORE_READ=' "$OUT/cut.txt" | tr '\n' ' '))"
+    fi
+elif [ "$bug" -ge 1 ] || grep -q '^DEV_AFTER=gone$' "$OUT/cut.txt"; then
     echo "EXPOSED: $N1's backing device was cut while direct aio reads ran on /dev/drbd$MINOR ($(grep '^FIO_RUNNING=\|^DEV_AFTER=' "$OUT/cut.txt" | tr '\n' ' '))"
 fi
 if [ "$bug" -ge 1 ] && [ "$chg" -ge 1 ]; then
@@ -205,7 +229,9 @@ if [ "$bug" -ge 1 ] && [ "$chg" -ge 1 ]; then
     case "$tainted $modules" in
         *mxfs*) echo "RESULT: ABORT label=$LABEL stage=verdict (the oops names mxfs: $modules) evidence=$OUT"; exit 2 ;;
     esac
-    echo "RESULT: REPRODUCED label=$LABEL oops=__drbd_change_sync tainted=[$tainted] wall=$(el)s evidence=$OUT"
+    inline=0
+    grep -aq 'submit_bio_noacct' "$OUT/console_$N1.txt" && grep -aq 'drbd_submit_bio' "$OUT/console_$N1.txt" && inline=1
+    echo "RESULT: REPRODUCED label=$LABEL oops=__drbd_change_sync order=$CUT_ORDER INLINE=$inline tainted=[$tainted] wall=$(el)s evidence=$OUT"
     exit 0
 fi
 echo "RESULT: NOT-REPRODUCED label=$LABEL bug_lines=$bug change_sync_lines=$chg boot_changed=$([ "$BOOT1" != "$BOOT2" ] && echo yes || echo no) wall=$(el)s evidence=$OUT"

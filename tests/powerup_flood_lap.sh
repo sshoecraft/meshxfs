@@ -26,14 +26,31 @@
 #   ABORT    the power-down or power-up failed, or a preflight printed no
 #            log-rate line
 #
+# MODE=teardown starts the group the way run.sh's own power cycles do (a wedged node's
+# recovery, a prep's leftover nodes): tests/lib/guest_start.sh guest_start_held, which takes
+# the same lock exclusive and leaves a child holding it until the guests answer ssh.  Before
+# that fix those starts took no lock, and one lane's teardown power cycle of seven guests
+# refused another lane's prep (attempt 22, lap lcnv225).  MXFS_TEARDOWN_POWER_LOCK=0 starts them
+# without it, as before: the control of that part.  MODE=up (the default) is the lap as before.
+#
+# MODE=down measures the power-down instead: the group is powered up first (not sampled),
+# then the host kernel log is followed and the preflights started while scripts/lab_power.sh
+# down runs.  With the fix the down holds the same lock exclusive until every domain is off;
+# LAB_POWER_DOWN_LOCK=0 powers down without it, as before: the control of that part.  Nine
+# preps of another lane were refused at ~114 lines/s in the 3 s after such a down began
+# (2026-10-24, 20:15-20:20Z), the lines the down's own (SCST threads finishing, logouts, the
+# bridges' ports removed).  EXPOSED, PASS and FAIL read as below, of the down.
+#
 # Run it with no other lane up: its flood is what other lanes' preps would meet.
-# The group is left up; the lane powers it down.
+# The group is left up (MODE=down: off); the lane powers it down.
 #
 # Bound, derived from lane summaries of group g8b on 2026-10-24 (scripts/lab_power.sh
 # down 3-5 s with nothing mounted, up 29-51 s): a preflight after the power-up's lock
 # is released takes 7 s (median, run.sh's 'preflight starts' to 'passed' over 117
 # preps), so down 5 + up 51 + preflight 7 = 63 s, twice that 126 s; 130 s.  The
 # power-up itself is bounded by its own BOOT_S (240 s) inside the lap's bound.
+# MODE=down: up 51 + down 5 + a preflight waiting the down out and sampling 7 + its 3 s
+# window = 66 s, twice that 132 s; 140 s.
 #
 # Usage: tests/powerup_flood_lap.sh <label> [group, default g8b]
 #        LAB_POWER_LOCK=0 tests/powerup_flood_lap.sh <label> [group]   (control)
@@ -52,19 +69,56 @@ REPO=$(cd "$REPO" && pwd)
 OUT="$REPO/tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_powerupflood_$LABEL"
 mkdir -p "$OUT" || exit 2
 STEP_S=${STEP_S:-5}
+MODE=${MODE:-up}
 KMSG_MAX=40
 log() { echo "$*" | tee -a "$OUT/lap.log"; }
 abort() { log "LAP powerup_flood ABORT label=$LABEL: $*"; exit 2; }
-log "LAP powerup_flood start $(date -u +%FT%TZ) group=$G LAB_POWER_LOCK=${LAB_POWER_LOCK:-unset} step_s=$STEP_S out=$OUT"
+case $MODE in up|teardown|down) ;; *) abort "MODE must be up, teardown or down";; esac
+PHASE=power-up
+[ "$MODE" = down ] && PHASE=power-down
+log "LAP powerup_flood start $(date -u +%FT%TZ) group=$G mode=$MODE LAB_POWER_LOCK=${LAB_POWER_LOCK:-unset} MXFS_TEARDOWN_POWER_LOCK=${MXFS_TEARDOWN_POWER_LOCK:-unset} LAB_POWER_DOWN_LOCK=${LAB_POWER_DOWN_LOCK:-unset} step_s=$STEP_S out=$OUT"
+# MODE=teardown: the start run.sh's power cycles make, then each guest waited for as
+# lab_power's up waits (its own 240 s bound), so the preflights below run through the boot
+teardown_up() {
+    local n nodes ok=0
+    . "$REPO/tools/mxfs_lab.sh"
+    . "$REPO/tests/lib/guest_start.sh"
+    SSH="$REPO/tools/mxfs_sshpass.sh"
+    PASS="${MXFS_PASS:-$("$REPO/tools/mxfs_secrets.sh" passfile 2>/dev/null)}"
+    nodes=$(lab_group "$G") || return 2
+    guest_start_held $nodes || return 1
+    dl=$(( SECONDS + 240 ))
+    for n in $nodes; do
+        while [ "$SECONDS" -lt "$dl" ]; do
+            timeout 8 "$SSH" "$n" "$PASS" "test -e /run/nologin || echo SSH_UP" 2>/dev/null | grep -q SSH_UP && { ok=$((ok + 1)); break; }
+            sleep 3
+        done
+    done
+    echo "teardown start: $ok of $(echo $nodes | wc -w) guest(s) answer ssh"
+    [ "$ok" = "$(echo $nodes | wc -w)" ]
+}
 
-timeout 100 "$REPO/scripts/lab_power.sh" down "group:$G" > "$OUT/down.log" 2>&1 \
-    || abort "power-down of group:$G failed: $(tail -1 "$OUT/down.log")"
+if [ "$MODE" = down ]; then
+    timeout 260 "$REPO/scripts/lab_power.sh" up "group:$G" > "$OUT/up_before.log" 2>&1 \
+        || abort "power-up of group:$G before the down failed: $(tail -1 "$OUT/up_before.log")"
+else
+    timeout 100 "$REPO/scripts/lab_power.sh" down "group:$G" > "$OUT/down.log" 2>&1 \
+        || abort "power-down of group:$G failed: $(tail -1 "$OUT/down.log")"
+fi
 
-# the host kernel log, one ISO-stamped line each, from before the power-up to its end
+# the host kernel log, one ISO-stamped line each, from before the power-up (or down) to its end
 sudo -n timeout 300 dmesg --follow-new --time-format iso > "$OUT/kmsg.txt" 2>&1 & kp=$!
 sleep 1
 t0=$(date +%s)
-timeout 260 "$REPO/scripts/lab_power.sh" up "group:$G" > "$OUT/up.log" 2>&1 & pu=$!
+if [ "$MODE" = up ]; then
+    timeout 260 "$REPO/scripts/lab_power.sh" up "group:$G" > "$OUT/up.log" 2>&1 & pu=$!
+elif [ "$MODE" = down ]; then
+    timeout 100 "$REPO/scripts/lab_power.sh" down "group:$G" > "$OUT/down.log" 2>&1 & pu=$!
+else
+    ( teardown_up ) > "$OUT/up.log" 2>&1 & pu=$!
+fi
+PLOG=$OUT/up.log
+[ "$MODE" = down ] && PLOG=$OUT/down.log
 k=0
 pids=()
 while kill -0 "$pu" 2>/dev/null && [ "$k" -lt 48 ]; do
@@ -77,9 +131,9 @@ done
 wait "$pu"; rc_up=$?
 for p in "${pids[@]}"; do wait "$p"; done
 kill "$kp" 2>/dev/null; wait "$kp" 2>/dev/null
-log "STEP power-up rc=$rc_up wall=$(( $(date +%s) - t0 )) s, $k preflight(s) started every ${STEP_S} s"
-[ "$rc_up" = 0 ] || abort "power-up of group:$G failed rc=$rc_up: $(tail -1 "$OUT/up.log")"
-[ "$k" -ge 1 ] || abort "no preflight started inside the power-up"
+log "STEP $PHASE rc=$rc_up wall=$(( $(date +%s) - t0 )) s, $k preflight(s) started every ${STEP_S} s"
+[ "$rc_up" = 0 ] || abort "$PHASE of group:$G failed rc=$rc_up: $(tail -1 "$PLOG")"
+[ "$k" -ge 1 ] || abort "no preflight started inside the $PHASE"
 
 # the busiest 3 s of the host log, and whether a preflight was running then
 read -r peak pstart <<<"$(awk '{ t = substr($1, 1, 19); n[t]++ } END {
@@ -93,9 +147,9 @@ for f in "$OUT"/pf_*.log; do
     [ -n "${s:-}" ] || continue
     awk -v s="$s" -v e="$e" -v ws="$pstart" 'BEGIN { exit !(s < ws + 3 && e > ws) }' && overlap=$((overlap + 1))
 done
-log "STEP host kernel log: $(wc -l < "$OUT/kmsg.txt") lines over the power-up, busiest 3 s from $(date -u -d "@$pstart" +%T) held $peak ($(( peak / 3 )) lines/s); $overlap preflight(s) running then"
+log "STEP host kernel log: $(wc -l < "$OUT/kmsg.txt") lines over the $PHASE, busiest 3 s from $(date -u -d "@$pstart" +%T) held $peak ($(( peak / 3 )) lines/s); $overlap preflight(s) running then"
 [ "$over" = 1 ] && [ "$overlap" -ge 1 ] \
-    && log "EXPOSED: the power-up's kernel log held $(( peak / 3 )) lines/s over 3 s (limit $KMSG_MAX) while $overlap preflight(s) ran"
+    && log "EXPOSED: the $PHASE's kernel log held $(( peak / 3 )) lines/s over 3 s (limit $KMSG_MAX) while $overlap preflight(s) ran"
 
 refused=0; sampled=0
 for f in "$OUT"/pf_*.log; do
@@ -109,8 +163,8 @@ for f in "$OUT"/pf_*.log; do
 done
 grep -h 'waited .* for a power-up' "$OUT"/pf_*.log | sort | uniq -c | sed 's/^/  /' | tee -a "$OUT/lap.log"
 if [ "$refused" = 0 ]; then
-    log "LAP powerup_flood PASS label=$LABEL: none of $k preflight(s) started inside group:$G's power-up was refused for the log rate ($sampled sampled under the limit)"
+    log "LAP powerup_flood PASS label=$LABEL: none of $k preflight(s) started inside group:$G's $PHASE was refused for the log rate ($sampled sampled under the limit)"
     exit 0
 fi
-log "LAP powerup_flood FAIL label=$LABEL: $refused of $k preflight(s) started inside group:$G's power-up refused for the log rate"
+log "LAP powerup_flood FAIL label=$LABEL: $refused of $k preflight(s) started inside group:$G's $PHASE refused for the log rate"
 exit 1

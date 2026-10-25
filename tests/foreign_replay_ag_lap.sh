@@ -43,6 +43,21 @@
 #      had finished, a truncate failed, a survivor shut down, or chk_mxfs found
 #      damage.
 #
+# THE GRANT, NOT THE RETURN (FRAG_GRANT_TRACE=1, the default).  A truncate
+# returns late whether its AG was kept from it or every operation stalled
+# across the silent death, so its return time does not show the exclusion: in
+# lap frx18t10 truncates of files wholly in AGs the replay never wrote waited as
+# long (data/reviews/P20261024-b9e4be.md).  Each survivor's module prints
+# P-AG-FRESH-GRANT at each fresh cluster grant of an AG (mxfs.dbg_ag_grant_trace,
+# written at run time from before V's load and cleared on every exit), stamped
+# on that node's own clock.  A non-replayer's first grant after the kill of an
+# AG the replay wrote must come at or after the ladder entry (less ERR_MS); the
+# first grants of AGs the replay did not write, between the death's declaration
+# and the ladder entry, are printed beside them as the comparison.  An exposed
+# truncate whose AG shows no fresh grant after the kill on its node is an
+# ABORT: the instrument measured nothing.  FRAG_GRANT_TRACE=0 times nothing but
+# the truncates, as before.
+#
 # Times across nodes: each node's kernel time is turned into its wall clock
 # from /proc/uptime and date read together, and every node's wall clock into
 # this host's with tests/lib/rig.sh clock_measure (ssh round trip, best of 3).
@@ -56,7 +71,10 @@
 # 3 x 30 + unmounts 3 x 70 + chk_mxfs of the volume, bound 180 + V back up
 # (lab_power, BOOT_S 240) = about 1290 s, plus the wait for the recovery's
 # line when the truncates return before it (4b, at most 53 s from the kill) =
-# about 1343 s.  Caller bound 1350 s.
+# about 1343 s, plus the survivors' kernel-log followers (FRAG_KEEP_KMSG): each
+# started and its mark seen within 30 s, the three copied at once within 60 s and
+# stopped within 15 s each, 3 x 30 + 60 + 3 x 15 = 195 s, about 1538 s.  The
+# measured lap is 155 s, inside a batch's 420 s bound with or without them.
 #
 # Usage: tests/foreign_replay_ag_lap.sh <label>
 # Env:   MXFS_NODE_LIST (four nodes, the last the victim), MXFS_CONFIG
@@ -91,7 +109,33 @@ echo "=== foreign_replay_ag_lap label=$LABEL config=$MXFS_CONFIG victim=$V survi
 s0=$(date +%s)
 el() { echo $(( $(date +%s) - s0 )); }
 field(){ grep -aoE "(^| )$2=[^ ]*" "$1" | head -1 | cut -d= -f2; }
-abort() { echo "ABORT: $2"; echo "RESULT: ABORT label=$LABEL stage=$1 evidence=$OUT"; exit 2; }
+# the survivors' whole kernel logs (FRAG_KEEP_KMSG=1, the default): the
+# filtered extract of step 5 keeps none of the phases between the death's
+# declaration and the recovery's publication (the fence, the certificate, the
+# seal, the election, the stability proof, the replay, the TCP takeover), and
+# on 4/net/mesh/direct those took 16.3 s of a 30.9 s stall that nothing could
+# then divide.  A follower per survivor from before V's load, copied gzipped
+# into the evidence as kmsg_<node>_fromnode.gz and stopped on every exit path
+# so none runs on into the next lap.  FRAG_KEEP_KMSG=0 follows nothing, as
+# before.
+KFILE=/root/fragag_$LABEL.kmsg
+FOLLOWING=()
+follow_stop() {
+    local n
+    for n in "${FOLLOWING[@]}"; do
+        rs 15 "$n" "[ -s $KFILE.pid ] && kill \$(cat $KFILE.pid) 2>/dev/null; rm -f $KFILE $KFILE.pid" >/dev/null
+    done
+    FOLLOWING=()
+}
+TRACING=()
+trace_off() {
+    local n
+    for n in "${TRACING[@]}"; do
+        rs 15 "$n" "echo 0 > /sys/module/mxfs/parameters/dbg_ag_grant_trace" >/dev/null
+    done
+    TRACING=()
+}
+abort() { follow_stop; trace_off; echo "ABORT: $2"; echo "RESULT: ABORT label=$LABEL stage=$1 evidence=$OUT"; exit 2; }
 
 # ---- 1. the group, the device, each node's slot
 GROUPARG=()
@@ -172,6 +216,21 @@ done
 [ $fails = 0 ] || abort take "a survivor could not take its share"
 
 # ---- 3. V's unsynced load, and V's death
+if [ "${FRAG_KEEP_KMSG:-1}" != 0 ]; then
+    for n in "${SURV[@]}"; do
+        FOLLOWING+=("$n")
+        kmsg_follow_start "$n" "$MARK-FOLLOW" "$KFILE"
+    done
+fi
+if [ "${FRAG_GRANT_TRACE:-1}" != 0 ]; then
+    for n in "${SURV[@]}"; do
+        TRACING+=("$n")
+        measure "$n" 15 "$OUT/${n}_grant_trace.txt" '^TRACE=' "$n's AG grant trace" \
+            "echo 1 > /sys/module/mxfs/parameters/dbg_ag_grant_trace; echo TRACE=\$(cat /sys/module/mxfs/parameters/dbg_ag_grant_trace)"
+        [ "$(field "$OUT/${n}_grant_trace.txt" TRACE)" = 1 ] || abort trace "$n did not take dbg_ag_grant_trace=1 ($(cat "$OUT/${n}_grant_trace.txt"))"
+    done
+    echo "STAGE AG grant trace on: ${SURV[*]}"
+fi
 measure "$V" 30 "$OUT/V_load.txt" '^LOAD_STARTED$' "V's load" \
     "nohup setsid bash -c 'i=0; while :; do fallocate -l 1M $D/v/l\$i; i=\$((i+1)); done' </dev/null >/dev/null 2>&1 & echo LOAD_STARTED"
 sleep 4
@@ -226,8 +285,20 @@ fi
 # ---- 5. each survivor's kernel log since the mark, on its own clock
 for n in "${SURV[@]}"; do
     measure "$n" 30 "$OUT/${n}_kmsg.txt" '^KMSG_END$' "$n's kernel log since the mark" \
-        "echo CLK \$(date +%s%3N) \$(cut -d' ' -f1 /proc/uptime); dmesg | sed -n '/$MARK/,\$p' | grep -a 'P163-RECOVERY-COMPLETE\|PROBE-A AG-META-WRITE-NOT-HELD\|PROBE-A-REPLAY\|no longer responding\|Filesystem has been shut down\|Corruption\|BUG:\|Oops' | cut -c1-500; echo KMSG_END"
+        "echo CLK \$(date +%s%3N) \$(cut -d' ' -f1 /proc/uptime); dmesg | sed -n '/$MARK/,\$p' | grep -a 'P163-RECOVERY-COMPLETE\|PROBE-A AG-META-WRITE-NOT-HELD\|PROBE-A-REPLAY\|P-AG-FRESH-GRANT\|heartbeat expired after\|no longer responding\|Filesystem has been shut down\|Corruption\|BUG:\|Oops' | cut -c1-500; echo KMSG_END"
 done
+trace_off
+if [ "${#FOLLOWING[@]}" -gt 0 ]; then
+    for n in "${FOLLOWING[@]}"; do
+        ( rs 60 "$n" "gzip -c $KFILE > /src/$(basename "$PWD")/$OUT/kmsg_${n}_fromnode.gz" >/dev/null 2>&1 ) &
+    done
+    wait
+    for n in "${FOLLOWING[@]}"; do
+        [ -s "$OUT/kmsg_${n}_fromnode.gz" ] && echo "  INFO $n's whole kernel log from before V's load is in $OUT/kmsg_${n}_fromnode.gz" \
+            || echo "  WARN $n's whole kernel log was not copied into $OUT"
+    done
+    follow_stop
+fi
 # host ms of a kernel line of node n: its [uptime] through the node's CLK line,
 # then the node's clock offset
 kms() {  # kms <node> <kernel seconds>
@@ -256,8 +327,38 @@ if [ -n "$R" ]; then
     echo "STAGE AGs the replay wrote (PROBE-A on $R): [${REPLAY_AGS}]; its PROBE-A lines recov=1 $(cnt "$OUT/${R}_kmsg.txt" 'PROBE-A AG-META-WRITE-NOT-HELD.* recov=1') recov=0 $(cnt "$OUT/${R}_kmsg.txt" 'PROBE-A AG-META-WRITE-NOT-HELD.* recov=0') replay $(cnt "$OUT/${R}_kmsg.txt" 'PROBE-A-REPLAY')"
 fi
 
+# ---- 5b. the grants (FRAG_GRANT_TRACE): each non-replayer's first fresh grant
+# of each AG after the kill, on its own clock, against the ladder entry
+declare -A GFIRST
+early_grant=0
+if [ -n "$R" ] && [ "${FRAG_GRANT_TRACE:-1}" != 0 ]; then
+    for n in "${SURV[@]}"; do
+        [ "$n" = "$R" ] && continue
+        decl=""
+        l=$(grep -a 'heartbeat expired after' "$OUT/${n}_kmsg.txt" | head -1)
+        [ -n "$l" ] && decl=$(kms "$n" "$(sed -n 's/^\[ *\([0-9.]*\)\].*/\1/p' <<<"$l")")
+        while read -r line; do
+            k=$(sed -n 's/^\[ *\([0-9.]*\)\].*/\1/p' <<<"$line"); t=$(kms "$n" "$k")
+            [ "$t" -ge "$T_KILL" ] || continue
+            a=$(grep -aoE ' ag=[0-9]+' <<<"$line" | head -1 | cut -d= -f2)
+            [ -n "$a" ] && [ -z "${GFIRST[$n:$a]:-}" ] && GFIRST[$n:$a]=$t
+        done < <(grep -a 'P-AG-FRESH-GRANT' "$OUT/${n}_kmsg.txt")
+        for key in "${!GFIRST[@]}"; do
+            [ "${key%%:*}" = "$n" ] || continue
+            a=${key#*:}; t=${GFIRST[$key]}
+            case " $REPLAY_AGS " in
+            *" $a "*)
+                echo "  GRANT $n AG$a (replayed): +$(( t - T_KILL )) ms after the kill, $(( t - T_ENTRY )) ms from the ladder entry"
+                [ "$t" -lt $(( T_ENTRY - ERR_MS )) ] && early_grant=$((early_grant+1)) ;;
+            *)
+                echo "  GRANT $n AG$a (not replayed, comparison): +$(( t - T_KILL )) ms after the kill, $(( t - T_ENTRY )) ms from the ladder entry${decl:+, $(( t - decl )) ms after $n declared the death}" ;;
+            esac
+        done
+    done
+fi
+
 # ---- 6. the verdict
-exposed=0; early=0; bad=0; tot=0; maxms=0
+exposed=0; early=0; bad=0; tot=0; maxms=0; nogrant=0
 for j in 0 1 2; do
     n=${SURV[$j]}
     off=$(clock_off "$n")
@@ -273,6 +374,11 @@ for j in 0 1 2; do
         [ -n "$inrep" ] || continue
         if [ "$h0" -lt "$T_ENTRY" ]; then
             exposed=$((exposed+1))
+            if [ "${FRAG_GRANT_TRACE:-1}" != 0 ]; then
+                for a in $inrep; do
+                    [ -n "${GFIRST[$n:$a]:-}" ] || nogrant=$((nogrant+1))
+                done
+            fi
             if [ "$h1" -lt $(( T_ENTRY - ERR_MS )) ]; then
                 early=$((early+1))
                 echo "  EARLY $n truncated f$i (AG${inrep}) by host ms $h1, $(( T_ENTRY - h1 )) ms before the replay's ladder entry"
@@ -282,6 +388,7 @@ for j in 0 1 2; do
 done
 echo "STAGE truncates: $tot of $NF, failed=$bad, in a replayed AG issued during the replay by a non-replayer: $exposed, completed before it ended: $early"
 echo "max_stall_ms=$maxms"
+[ "$nogrant" = 0 ] || abort grant-trace "$nogrant exposed truncate/AG pair(s) show no fresh grant of that AG after the kill on the truncating node: the grant trace measured nothing"
 if [ -n "$R" ] && [ "$exposed" = 0 ]; then
     echo "  no survivor other than the replayer changed an AG the replay was writing, so nothing here tests the exclusion"
     echo "RESULT: VACUOUS label=$LABEL stage=no-overlap wall=$(el)s evidence=$OUT"
@@ -293,6 +400,8 @@ fi
 ck "every survivor truncate was captured" "$tot" "$NF"
 ck "every truncate returned 0" "$bad" 0
 ck "no live survivor changed a replayed AG before the replay ended" "$early" 0
+[ "${FRAG_GRANT_TRACE:-1}" != 0 ] && [ -n "$R" ] && \
+    ck "no live survivor was granted a replayed AG before the replay ended (P-AG-FRESH-GRANT)" "$early_grant" 0
 [ -n "$R" ] && ck "$R reported its replay's AG header images apart (PROBE-A-REPLAY), none as an unheld write" \
     "$(cnt "$OUT/${R}_kmsg.txt" 'PROBE-A AG-META-WRITE-NOT-HELD.* recov=1')" 0
 for n in "${SURV[@]}"; do

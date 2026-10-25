@@ -1748,7 +1748,7 @@ int mxfs_slife_claim_init(mxfs_bdev_t *dev, uint64_t region_off,
 			  uint32_t *after, uint32_t *zero_ms)
 {
 	struct mxfs_slife_record rec;
-	uint64_t off, done, t0;
+	uint64_t off, done, t0, t_written, t_flushed;
 	uint8_t *zb = NULL, *rb = NULL;
 	int rc;
 
@@ -1818,6 +1818,7 @@ int mxfs_slife_claim_init(mxfs_bdev_t *dev, uint64_t region_off,
 		}
 	}
 	/* 3. flush barrier, then prove it: read every byte back */
+	t_written = mxfs_pal_time_ms();
 	rc = mxfs_pal_bdev_flush(dev);
 	if (rc) {
 		mxfs_pal_log(MXFS_LOG_ERR,
@@ -1825,6 +1826,7 @@ int mxfs_slife_claim_init(mxfs_bdev_t *dev, uint64_t region_off,
 			     "the zero failed; record left ZEROING", slice, rc);
 		goto out;
 	}
+	t_flushed = mxfs_pal_time_ms();
 	for (done = 0; done < payload_len; done += MXFS_SLIFE_ZERO_CHUNK) {
 		uint32_t len = (uint32_t)((payload_len - done) < MXFS_SLIFE_ZERO_CHUNK ?
 					  (payload_len - done) : MXFS_SLIFE_ZERO_CHUNK);
@@ -1845,6 +1847,29 @@ int mxfs_slife_claim_init(mxfs_bdev_t *dev, uint64_t region_off,
 	}
 	if (zero_ms)
 		*zero_ms = (uint32_t)(mxfs_pal_time_ms() - t0);
+	/*
+	 * Instrument, no behaviour (D-FIRST-MOUNT-SLICE-ZERO-SERIAL-FUA-TAKES-
+	 * 16S-UNDER-TARGET-LOAD-PREP-OVERRAN): the zero's time split into its
+	 * serial FUA writes, the flush and the serial read-back, so a slow claim
+	 * names the phase that took it.  One line per claim-time zero, which a
+	 * node runs once per slice per mkfs.
+	 */
+	{
+		uint64_t t_read = mxfs_pal_time_ms();
+
+		mxfs_pal_log(MXFS_LOG_INFO,
+			     "mxfs: P-SLIFE-ZERO-PHASES slice=%u chunks=%llu chunk_bytes=%u "
+			     "write_ms=%llu flush_ms=%llu read_ms=%llu total_ms=%llu -- the "
+			     "claim-time zero's serial FUA writes, flush and read-back",
+			     slice,
+			     (unsigned long long)((payload_len + MXFS_SLIFE_ZERO_CHUNK - 1) /
+						  MXFS_SLIFE_ZERO_CHUNK),
+			     (uint32_t)MXFS_SLIFE_ZERO_CHUNK,
+			     (unsigned long long)(t_written - t0),
+			     (unsigned long long)(t_flushed - t_written),
+			     (unsigned long long)(t_read - t_flushed),
+			     (unsigned long long)(t_read - t0));
+	}
 
 	/* 4. READY, durable, only now */
 	rec.state = MXFS_SLIFE_READY;

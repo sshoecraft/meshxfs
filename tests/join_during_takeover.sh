@@ -91,7 +91,16 @@
 #        arm cannot make one, because B's root request meets no transition
 #        (D-JDT-STALL-ARM-GRADES-A-JOIN-THAT-MET-NO-TRANSITION-AS-A-FAILED-REFUSAL).
 #        JDT_STALL_PROBE=0 (stall arm): no probe; B's mount is issued detached
-#        and graded as the refusal, the arm as it was (a control).
+#        and graded as the refusal, the arm as it was (a control).  The
+#        refused mount is held to the release policy's stall limit (30 s):
+#        its root lookup's AG acquire waits at most mxfs.dl_settle_fallible_wait_ms
+#        in the settle gate each attempt
+#        (D-JOINER-MOUNT-RETRIES-AG0-WITHOUT-BOUND-WHILE-THE-INCUMBENT-CANNOT-JOIN).
+#        JDT_SETTLE_FALLIBLE_WAIT_MS (unset: B's value is left as loaded): B's
+#        dl_settle_fallible_wait_ms is written at run time before the
+#        iteration and put back at the end; 0 is the control (each attempt
+#        waits out the gate's 60 s backstop twice).  Written at run time so the
+#        module is loaded as frozen.
 #        JDT_STALL_VACUOUS=0 (stall arm): a lap in which B met no transition is
 #        graded by the arm's checks instead of VACUOUS, as before (a control).
 #        JDT_PASS_PACE_MS (default 0, none; clean only): A's takeover pass
@@ -173,6 +182,21 @@ if [ "$EXPECT" = "clean" ]; then
     kn=$(knobs 0 0); echo "  INFO A knobs cleared: ${kn:-no result}"
     [[ "$kn" == *"knobs=0/0"* ]] || { echo "ABORT: A does not expose the test knobs ($kn) — is the fleet on 0.84.5+?"; exit 2; }
 fi
+# B's settle-gate cap for its root lookup: read as loaded, and written for the
+# lap only when JDT_SETTLE_FALLIBLE_WAIT_MS asks; put back on every exit below
+SFW_KNOB=$P/dl_settle_fallible_wait_ms
+SFW_LOADED=$(rs 15 "$B" "cat $SFW_KNOB 2>/dev/null" | grep -ao '^[0-9-]*$' | head -1)
+sfw_restore() {
+    [ -n "${JDT_SETTLE_FALLIBLE_WAIT_MS:-}" ] && [ -n "$SFW_LOADED" ] && \
+        rs 15 "$B" "echo $SFW_LOADED > $SFW_KNOB" >/dev/null
+}
+trap sfw_restore EXIT
+if [ -n "${JDT_SETTLE_FALLIBLE_WAIT_MS:-}" ]; then
+    [ -n "$SFW_LOADED" ] || { echo "ABORT: $B does not expose $SFW_KNOB"; exit 2; }
+    sfw=$(rs 15 "$B" "echo $JDT_SETTLE_FALLIBLE_WAIT_MS > $SFW_KNOB; cat $SFW_KNOB")
+    [ "$sfw" = "$JDT_SETTLE_FALLIBLE_WAIT_MS" ] || { echo "ABORT: $B did not take dl_settle_fallible_wait_ms=$JDT_SETTLE_FALLIBLE_WAIT_MS ($sfw)"; exit 2; }
+fi
+echo "  INFO B dl_settle_fallible_wait_ms: loaded=${SFW_LOADED:-absent} lap=$(rs 15 "$B" "cat $SFW_KNOB 2>/dev/null")"
 abort_reform() {
     echo "ABORT: $1"
     knobs 0 0 >/dev/null
@@ -505,6 +529,9 @@ iteration() {
     echo "  INFO B: unrecoverable=$unrec withdraw=$withdraw poison=$poison corrupt=$corrupt budget_exhausted=$budget remaster_rx=$remaster_rx parked=$parked"
     echo "  INFO B parks: not_transition=$park_nt not_owner=$park_no import_stale=$park_is first=[${park_nt_first:-none}]"
     echo "  INFO B settle gate: lines=$gate_n refused=$gate_refused pending_live=$gate_pending confirmed=$gate_confirmed first=[${gate_first:-none}]"
+    # the hazard of the arm without the probe: B's root lookup held at the
+    # settle gate on a view the incumbent has not installed
+    [ "$gate_pending" -ge 1 ] && echo "EXPOSED: B's root lookup met the settle gate on an unconfirmed view (pending_live=$gate_pending refused=$gate_refused) iteration=$it"
     echo "  INFO A worker: transition_wait=$a_worker_wait stalled=$a_worker_stalled"
     echo "  INFO B: transition rx=$trans_rx wait=$trans_wait noqueue=$noqueue stalled=$trans_stalled fail=$trans_fail park=$trans_park root_refused=$rootfail nocover=$nocover summary_lock_at_quiesce=$sumlock_q rebooted=$([ "$(rs 15 "$B" "cat /proc/sys/kernel/random/boot_id")" = "$BOOT_B" ] && echo 0 || echo 1)"
     echo "  INFO A: ondemand=$ondemand served_root=$served_root parked_root=$parked_root transition_tx=$trans_tx (root/AG0 $trans_tx_root) decline/takeover-request=$decline defer=$defer recovery_of_peer=$recov_a activations_total=$mine_total"
@@ -615,6 +642,9 @@ clean)
       else
         ck "B's mount inside the stalled pass was REFUSED (rc != 0)" "$([ "${bm_rc:-0}" != "0" ] && echo 1 || echo 0)" "1"
         ck "the refusal was logged inside ${MB} s of the mount being issued" "$([ -n "$refused_s" ] && [ "$refused_s" -le "$MB" ] && echo 1 || echo 0)" "1"
+        # the refused mount is an operation like any other: held to the
+        # policy's stall limit, measured by its own command
+        ck "B's refused mount returned inside the 30 s stall limit (ms=${bm_ms:-none})" "$([ -n "$bm_ms" ] && [ "$bm_ms" -le 30000 ] && echo 1 || echo 0)" "1"
         ck "the refused mount's command returned inside 30 s of the refusal (its unwind took no cluster acquire)" "$([ -n "$unwind_s" ] && [ "$unwind_s" -le 30 ] && echo 1 || echo 0)" "1"
         ck "the refused mount's quiesce wrote no SB summary (P960-REFUSED-MOUNT-NOCOVER >= 1)" "$([ "$nocover" -ge 1 ] && echo 1 || echo 0)" "1"
         ck "the refused mount took no SB summary lock at quiesce" "$sumlock_q" "0"
@@ -624,7 +654,14 @@ clean)
         # paused pass) beacons no two-node view — so the refusal comes from
         # the gate's backstop; the watchdog fires on the incumbent's worker
         ck "the refusal came from the settle gate's backstop or the no-progress watchdog (REFUSED >= 1 or STALLED >= 1)" "$([ $(( gate_refused + trans_stalled )) -ge 1 ] && echo 1 || echo 0)" "1"
-        ck "the incumbent's own wait on the paused pass was named and never failed it (A's worker STALLED >= 1, no shutdown)" "$([ "$a_worker_stalled" -ge 1 ] && echo 1 || echo 0)" "1"
+        # A's worker reaches its 30 s watchdog only while the pass is still
+        # held, and the knobs are cleared once B's refused mount returns: a
+        # refusal inside 30 s can end the hold first
+        if [ -n "$bm_ms" ] && [ "$bm_ms" -lt 30000 ]; then
+            echo "  INFO A's worker STALLED=$a_worker_stalled (B was refused in ${bm_ms} ms, before A's watchdog could be reached; not graded)"
+        else
+            ck "the incumbent's own wait on the paused pass was named and never failed it (A's worker STALLED >= 1, no shutdown)" "$([ "$a_worker_stalled" -ge 1 ] && echo 1 || echo 0)" "1"
+        fi
         ck "the mount was refused at the root lookup, not shut down ('Failed to read root inode')" "$([ "$rootfail_any" -ge 1 ] && echo 1 || echo 0)" "1"
         ck "the pass finished once the knobs were cleared" "$([ -n "$stall_summary" ] && echo 1 || echo 0)" "1"
         ck "A installed no view with a third member (the refused mount's departed identity, D-0961)" "$stale_view" "0"
@@ -638,8 +675,14 @@ esac
 echo "  INFO figures: iterations=$iters locality=$locality B mount rc=${bm_rc:-?} ms=${bm_ms:-?} refused_s=${refused_s:-n/a} unwind_s=${unwind_s:-n/a} (second: rc=${bm2_rc:-n/a} ms=${bm2_ms:-n/a}) pass activations at issue=$mine_at_issue return=$mine_at_return total=$mine_total ondemand=$ondemand served_root=$served_root transition tx=$trans_tx rx=$trans_rx wait=$trans_wait stalled=$trans_stalled fail=$trans_fail park=$trans_park remaster_rx=$remaster_rx parked=$parked"
 echo "=== join_during_takeover $LABEL: fails=$fails wall=$(el)s out=$OUT $(date -u +%FT%TZ) ==="
 # the stall arm measures the watchdog only on a request of B's that met the
-# transition by name; one that met none graded a refusal that could not happen
+# transition by name; one that met none graded a refusal that could not happen.
+# Without the probe the refusal graded is B's mount, which the settle gate
+# holds on the incumbent's unconfirmed view: a gate line with pending_live=1
+# is that arm's exposure as much as a transition is.
+gate_exposed=0
+[ "$STALL_PROBE" = 0 ] && [ "${gate_pending:-0}" -ge 1 ] && gate_exposed=1
 if [ "$EXPECT:$ARM" = clean:stall ] && [ "${JDT_STALL_VACUOUS:-1}" != 0 ] && \
+   [ "$gate_exposed" = 0 ] && \
    [ $(( trans_rx + trans_wait + trans_stalled + trans_fail )) = 0 ]; then
     echo "RESULT: VACUOUS label=$LABEL stage=no-transition: no request of B's met the transition (B: rx=$trans_rx wait=$trans_wait stalled=$trans_stalled fail=$trans_fail; probe stats_ok=${probe_ok:-n/a})"
     exit 3

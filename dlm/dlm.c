@@ -208,6 +208,25 @@ module_param_named(dl_noqueue_unanswered_wouldblock, mxfs_dl_noqueue_unanswered_
 MODULE_PARM_DESC(dl_noqueue_unanswered_wouldblock,
 		 "a no-queue request with no answer in one attempt answers would-block (1, default); 0 = it re-sends for the whole budget (test control)");
 /*
+ * How long an AG acquire the caller registered as fallible may wait in the
+ * membership-settle gate: the untrusted iget of a joining mount's root inode,
+ * the only AG registration there is.  That iget gives up after five failed
+ * attempts, a bound derived as five ~6 s retry budgets, about 30 s; but every
+ * attempt is a no-queue probe and then a blocking acquire, and each waited out
+ * the gate's whole 60 s backstop while the incumbent had not installed the
+ * joined view, so the mount was refused only after about 600 s.  Measured on
+ * 2/net/mesh/direct with the incumbent's takeover pass held (lap jsp192): no
+ * return in 570 s.  The probe of such an acquire now does not wait in the gate
+ * and its blocking acquire waits at most this long, one budget, so the five
+ * attempts refuse the mount in about 25 s.  The gate still refuses rather than
+ * grant on a view nobody has confirmed.  0 = both wait out the backstop, as
+ * before: the same-build control.
+ */
+int mxfs_dl_settle_fallible_wait_ms = 5000;
+module_param_named(dl_settle_fallible_wait_ms, mxfs_dl_settle_fallible_wait_ms, int, 0644);
+MODULE_PARM_DESC(dl_settle_fallible_wait_ms,
+		 "the longest a fallible AG acquire (a joining mount's root lookup) waits in the membership-settle gate, ms; its no-queue probe waits none (5000, default); 0 = both wait the 60 s backstop (test control)");
+/*
  * An acquire answered RETRY (a remaster to the view's master, a page parked
  * for its hand-off, a pending request purged) when the view has changed since
  * its previous answer is waiting for the view to settle, and the view is
@@ -10130,6 +10149,27 @@ static bool dlm_own_wait_decided(struct mxfs_dlm_ctx *ctx, uint32_t bucket,
 	return decided;
 }
 
+/*
+ * The longest this acquire waits in the membership-settle gate before it is
+ * refused: the backstop, or for an AG acquire at a fallible boundary
+ * (mxfs_dl_settle_fallible_wait_ms) none for its no-queue probe and one budget
+ * for its blocking acquire.
+ */
+static int dlm_settle_max_wait_ms(struct mxfs_dlm_ctx *ctx,
+				  const struct mxfs_resource_id *resource,
+				  uint32_t flags)
+{
+	int cap = READ_ONCE(mxfs_dl_settle_fallible_wait_ms);
+
+	if (cap <= 0 || resource->type != MXFS_LTYPE_AG ||
+	    !ctx->acq_fallible_cb ||
+	    !ctx->acq_fallible_cb(ctx->cb_data, resource))
+		return MXFS_DLM_SETTLE_MAX_WAIT_MS;
+	if (flags & MXFS_LKF_NOQUEUE)
+		return 0;
+	return cap < MXFS_DLM_SETTLE_MAX_WAIT_MS ? cap : MXFS_DLM_SETTLE_MAX_WAIT_MS;
+}
+
 static int dlm_lock_impl(struct mxfs_dlm_ctx *ctx,
 			  const struct mxfs_resource_id *resource,
 			  uint8_t mode, uint32_t flags,
@@ -10185,6 +10225,7 @@ static int dlm_lock_impl(struct mxfs_dlm_ctx *ctx,
 	 */
 	if (mode != MXFS_LOCK_NL && dlm_membership_settling(ctx)) {
 		int waited = 0;
+		int max_wait = dlm_settle_max_wait_ms(ctx, resource, flags);
 		/* D7 instrumented probe: quantify the settle-gate share of slow EX
 		 * acquires (joiner root-EX stall 4.7-20s).  Entry logs how long
 		 * ago the view changed; exit logs the wall actually spent here. */
@@ -10193,7 +10234,7 @@ static int dlm_lock_impl(struct mxfs_dlm_ctx *ctx,
 
 		while (dlm_membership_settling(ctx) && !ctx->shutting_down &&
 		       !dlm_authority_lost(ctx) &&
-		       waited < MXFS_DLM_SETTLE_MAX_WAIT_MS) {
+		       waited < max_wait) {
 			mxfs_pal_sleep_ms(100);
 			waited += 100;
 		}
@@ -10223,9 +10264,10 @@ static int dlm_lock_impl(struct mxfs_dlm_ctx *ctx,
 			 * queue says which of the two sources it was.
 			 */
 			pr_warn_ratelimited(
-			    "mxfs: P-SETTLE-GATE-REFUSED type=%u ino=%llu ag=%u mode=%s flags=%#x waited_ms=%d since_change_ms=%llu confirmed=%d pending_live=%d comm=%s -- a live member still reports another view; the acquire is refused with -EAGAIN\n",
+			    "mxfs: P-SETTLE-GATE-REFUSED type=%u ino=%llu ag=%u mode=%s flags=%#x waited_ms=%d max_wait_ms=%d since_change_ms=%llu confirmed=%d pending_live=%d comm=%s -- a live member still reports another view; the acquire is refused with -EAGAIN\n",
 			    resource->type, (unsigned long long)resource->ino,
 			    resource->ag_number, mode_name(mode), flags, waited,
+			    max_wait,
 			    (unsigned long long)d7_since,
 			    dlm_view_confirmed(ctx) ? 1 : 0,
 			    dlm_view_pending_live(ctx) ? 1 : 0, dlm_cur_comm());

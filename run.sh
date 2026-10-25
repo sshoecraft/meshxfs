@@ -424,6 +424,8 @@ RUNLOCK=/tmp/mxfs_run.lock
 # lock — its ancestor holds it for the same logical run.  A stale/dead owner
 # pid falls through to the normal lock path.
 . "$REPO/tests/lib/runlock.sh"
+. "$REPO/tests/lib/fuser_guard.sh"
+. "$REPO/tests/lib/guest_start.sh"
 # A batch lap's bound counts everything this run does before its prep, and three
 # laps spent ~95 s there with nothing logged about where
 # (D-BATCH-LAP-BOUND-SPENDS-95S-BEFORE-PREP-UNLOGGED-IN-POOL-LOCK-OR-PREFLIGHT):
@@ -731,8 +733,10 @@ if [ -n "$BATCH" ]; then
     BATCH_LAP_ROWS=" ${batch_rows[*]} "
     batch_row_args=()
     for x in "${batch_rows[@]}"; do batch_row_args+=(--row "$x"); done
+    # The lap's own variant goes with the question, so a calibration or verification
+    # declared with none refuses a lap that would count nothing, before it runs.
     batch_out=$(python3 "$REPO/tools/defects.py" batch-check "$BATCH" "${batch_row_args[@]}" --at "$CONFIG" \
-                ${CANDIDATE:+--candidate "$CANDIDATE"}) || { echo "ERROR: batch $BATCH refused this lap (above)"; exit 2; }
+                ${CANDIDATE:+--candidate "$CANDIDATE"} ${VARIANT:+--variant "$VARIANT"}) || { echo "ERROR: batch $BATCH refused this lap (above)"; exit 2; }
     BATCH_ROW=$(sed -n 's/^ROW=//p' <<<"$batch_out")
     [ -n "$BATCH_ROW" ] || { echo "ERROR: batch $BATCH: batch-check named no row"; exit 2; }
     BATCH_PROBE=$(sed -n 's/^PROBE=//p' <<<"$batch_out")
@@ -1119,7 +1123,7 @@ power_cycle_node() {  # <node>  -> 0 once node is reachable and DEV present
     timeout 60 virsh -c qemu:///system destroy "$n" >/dev/null 2>&1 \
         || echo "    WARN: virsh destroy $n did not complete in 60s (libvirtd may be stuck on this domain)"
     sleep 2
-    timeout 60 virsh -c qemu:///system start "$n" >/dev/null 2>&1 \
+    guest_start_held "$n" \
         || echo "    WARN: virsh start $n did not complete in 60s"
     dl=$(( SECONDS + 180 ))
     while [ "$SECONDS" -lt "$dl" ]; do
@@ -1272,12 +1276,12 @@ prep_cluster() {
             echo "--- prep: leftover node(s) still hold mxfs:$dirty — power-cycling ---"
             epids=()
             for v in $dirty; do
-                ( timeout 60 virsh -c qemu:///system destroy "$v" >/dev/null 2>&1
-                  sleep 1
-                  timeout 60 virsh -c qemu:///system start "$v" >/dev/null 2>&1 ) &
+                timeout 60 virsh -c qemu:///system destroy "$v" >/dev/null 2>&1 &
                 epids+=($!)
             done
             for v in "${epids[@]}"; do wait "$v"; done
+            sleep 1
+            guest_start_held $dirty
         fi
     fi
     fi
@@ -2264,7 +2268,18 @@ run_coord() {  # name cat budget scale
             # dmesg ran — every .ccph came back empty and /tmp/ccph_last was
             # never created (proven on test1 after the 0.51.0 board).  The
             # bracketed first character makes the pattern not match itself.
-            ( ssh_node "$kn" "pkill -f -- '[${script:0:1}]${script:1}' 2>/dev/null; $ccsel > /tmp/ccph_last 2>/dev/null; sleep 1; fuser -k -m $MNT >/dev/null 2>&1; cat /tmp/ccph_last 2>/dev/null; true" 2>/dev/null | tail -1 > "$tmpd/$kn.ccph" ) &
+            # The kill runs only while $MNT is in /proc/mounts: on a node whose
+            # volume is already gone (unmounted by the row, or shut down and
+            # torn down) fuser -m names every user of the root filesystem and
+            # SIGKILLs sshd with them
+            # (D-RUN-SH-TIMEOUT-KILL-FUSER-ON-AN-UNMOUNTED-MNT-KILLS-ROOT-FS-USERS).
+            # /proc/mounts and not mountpoint -q, as the teardown above reads it:
+            # a stat of a quarantined mount's root answers ESTALE.  The text is
+            # tests/lib/fuser_guard.sh fuser_inmounts_cmd's, so
+            # tests/fuser_guard_lap.sh HELPER=inmounts exercises what is sent here.
+            # MXFS_TIMEOUT_KILL_MOUNT_GUARD=0 kills unguarded, as before: the control.
+            tkill=$(fuser_inmounts_cmd "$MNT")
+            ( ssh_node "$kn" "pkill -f -- '[${script:0:1}]${script:1}' 2>/dev/null; $ccsel > /tmp/ccph_last 2>/dev/null; sleep 1; $tkill cat /tmp/ccph_last 2>/dev/null; true" 2>/dev/null | tail -1 > "$tmpd/$kn.ccph" ) &
         done
         wait
         echo "    (killed leftover $name processes on all nodes after timeout)"

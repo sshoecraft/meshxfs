@@ -1,7 +1,7 @@
 {
   "candidate": "0.90.134",
   "version": "0.90.134",
-  "created": "2026-10-24T20:46:20Z",
+  "created": "2026-10-25T01:29:55Z",
   "state": "RUNNING",
   "attempts": [
     {
@@ -522,14 +522,36 @@
       "dist": "",
       "packages": {},
       "steps": {}
+    },
+    {
+      "created": "2026-10-24T20:46:20Z",
+      "state": "ABANDONED",
+      "dry_run": false,
+      "srcversion": "A7E90BC5313192108E35B80",
+      "files": "tests/evidence/candidates/0.90.134_20261024T204620Z.files.json",
+      "history": [
+        {
+          "state": "RUNNING",
+          "at": "2026-10-24T20:46:20Z",
+          "why": "created"
+        },
+        {
+          "state": "ABANDONED",
+          "at": "2026-10-25T01:29:02Z",
+          "why": "end the attempt frozen 2026-10-24T20:46:20Z so the drafted fixes and instruments go into the next attempt: the clustered log cover's superblock-buffer release (sb_cover_hold), the joiner's bounded settle-gate wait (dl_settle_fallible_wait_ms), the AG fresh-grant trace, the slice-zero phase log, the late-REGISTER lap's forced late path, run.sh's guarded timeout kill and held guest starts, the power-down lock, the lap load deadline, the fenced-ledger lap's end release, the no-inode lap's forced reuse, and batch-check's refusal of a lap whose variant counts nothing"
+        }
+      ],
+      "dist": "",
+      "packages": {},
+      "steps": {}
     }
   ],
   "dry_run": false,
-  "srcversion": "A7E90BC5313192108E35B80",
-  "module_sha256": "a22e2a123f42b8ccd7576900aabaafb90e93525dad7d7146bee5b8909416082c",
-  "files": "tests/evidence/candidates/0.90.134_20261024T204620Z.files.json",
-  "files_count": 2656,
-  "files_digest": "e35eba54c6d2872fe89d9c8b346e4c11170bf29daadfe8564329181d64de1a36",
+  "srcversion": "77AF53CDA9D2951F650C9CA",
+  "module_sha256": "66dd510705a480e5c65ee75b2265afa0c20b31124581208ea93a13631c9a1c23",
+  "files": "tests/evidence/candidates/0.90.134_20261025T012955Z.files.json",
+  "files_count": 2660,
+  "files_digest": "96b8650c34cc3efb0b6482786a4dee6d5385856399af6a25fabda5dbd1de8693",
   "spec": "ec57ce06eb09c644b368cde523dfd4fa03e87d54b80a4bee31602c59f3ec175b",
   "platforms": "26b4ffee6d27dc3fc165abe74677c61e647ad079090f241107ecbbbaa255e599",
   "kernels": {},
@@ -539,7 +561,7 @@
   "history": [
     {
       "state": "RUNNING",
-      "at": "2026-10-24T20:46:20Z",
+      "at": "2026-10-25T01:29:56Z",
       "why": "created"
     }
   ]

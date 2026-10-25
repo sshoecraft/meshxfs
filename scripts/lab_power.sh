@@ -47,6 +47,13 @@ SHUTDOWN_S=90
 # it started answers ssh; scripts/clyde_preflight.sh takes it shared before it
 # samples the log rate.  Two power-ups wait for each other at most BOOT_S.
 # LAB_POWER_LOCK=0 takes no lock here or in the preflight, as before: the control.
+# A power-down floods it too: on 2026-10-24 a lap power-cycling g8b (eight guests)
+# every 37 s had nine of another lane's preps refused at ~114 lines/s, each in
+# the 3 s after the down began, after the prep's preflight had waited out the
+# previous power-up on this lock; the lines were the down's (SCST command threads
+# finishing, iSCSI logouts, the bridges' ports removed).  So `down` holds the same
+# lock exclusive from its first unmount until every domain is off.
+# LAB_POWER_DOWN_LOCK=0 powers down without it, as before: the control of that part.
 POWER_LOCK=/tmp/mxfs_host_powerup.lock
 
 say() { echo "[$(date -u +%T)] $*"; }
@@ -156,13 +163,14 @@ if [ "$verb" = state ]; then
     exit 0
 fi
 
-if [ "$verb" = up ] && [ "${LAB_POWER_LOCK:-1}" != 0 ]; then
+if [ "${LAB_POWER_LOCK:-1}" != 0 ] && { [ "$verb" = up ] || [ "${LAB_POWER_DOWN_LOCK:-1}" != 0 ]; }; then
     exec 9>>"$POWER_LOCK"
     t0=$SECONDS
+    # a down waits out at most one power-up (BOOT_S), as a power-up does
     if flock -x -w "$BOOT_S" 9; then
-        say "host power-up lock held (waited $(( SECONDS - t0 )) s)"
+        say "host power lock held for $verb (waited $(( SECONDS - t0 )) s)"
     else
-        say "host power-up lock not taken in $BOOT_S s; powering up without it"
+        say "host power lock not taken in $BOOT_S s; powering $verb without it"
     fi
 fi
 

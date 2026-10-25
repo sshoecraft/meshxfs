@@ -10,6 +10,14 @@
 # the directory is a mount point.  FUSER_MOUNT_GUARD=0 prints the unguarded kill, as before:
 # the control (set it for the whole lap).
 #
+# HELPER=inmounts measures the same for run.sh's kill of a timed-out row's leftovers
+# (D-RUN-SH-TIMEOUT-KILL-FUSER-ON-AN-UNMOUNTED-MNT-KILLS-ROOT-FS-USERS): it sent
+# 'fuser -k -m $MNT' to every node whether the volume was mounted or not, and now sends
+# tests/lib/fuser_guard.sh fuser_inmounts_cmd's text, guarded on /proc/mounts.  Step 1 then
+# reads run.sh for its timeout kill taking its text from that helper, and step 3 sends that
+# helper's text.  MXFS_TIMEOUT_KILL_MOUNT_GUARD=0 prints the unguarded kill, as before: the
+# control.  HELPER=mounted (the default) is the lap as before.
+#
 # SHAPE, on one lab node with nothing of the lap's mounted:
 #   1. both harnesses are read for any 'fuser -k' left outside fuser_mounted_cmd (a static
 #      check: the lap exercises the helper's text, so a site that kept its own command would
@@ -44,15 +52,29 @@ HERE="$(cd "$(dirname "$0")" && while { [ ! -f run.sh ] || [ ! -f tools/mxfs_lab
 SSH="$HERE/tools/mxfs_sshpass.sh"
 DIR=/mnt/fuserlap.$LABEL
 on() { timeout "$3" "$SSH" "$(lab_addr "$1")" "$2" </dev/null 2>&1 | grep -avE '^Warning:|^Unauthorized|^If you|^$'; }
-echo "LAP fuser_guard start $(date -u +%FT%TZ) label=$LABEL node=$NODE dir=$DIR FUSER_MOUNT_GUARD=${FUSER_MOUNT_GUARD:-(unset)}"
+HELPER=${HELPER:-mounted}
+case $HELPER in mounted|inmounts) ;; *) echo "LAP fuser_guard ABORT: HELPER must be mounted or inmounts"; exit 2;; esac
+echo "LAP fuser_guard start $(date -u +%FT%TZ) label=$LABEL node=$NODE dir=$DIR helper=$HELPER FUSER_MOUNT_GUARD=${FUSER_MOUNT_GUARD:-(unset)} MXFS_TIMEOUT_KILL_MOUNT_GUARD=${MXFS_TIMEOUT_KILL_MOUNT_GUARD:-(unset)}"
 
 # 1. no harness keeps a kill of its own
-left=$(grep -n 'fuser -k' "$HERE/tests/closure_mount_race.sh" "$HERE/scripts/drbd_rig.sh" | grep -v '^\s*#' | grep -v ':[0-9]*:\s*#')
-if [ -n "$left" ]; then
-    echo "LAP fuser_guard ABORT: a harness still runs a kill of its own: $(tr '\n' '|' <<<"$left" | cut -c1-300)"
-    exit 2
+if [ "$HELPER" = mounted ]; then
+    left=$(grep -n 'fuser -k' "$HERE/tests/closure_mount_race.sh" "$HERE/scripts/drbd_rig.sh" | grep -v '^\s*#' | grep -v ':[0-9]*:\s*#')
+    if [ -n "$left" ]; then
+        echo "LAP fuser_guard ABORT: a harness still runs a kill of its own: $(tr '\n' '|' <<<"$left" | cut -c1-300)"
+        exit 2
+    fi
+    echo "STAGE harnesses: no 'fuser -k' outside fuser_mounted_cmd in tests/closure_mount_race.sh, scripts/drbd_rig.sh"
+else
+    # run.sh's timeout kill: its command assigned from the helper, and no 'fuser -k -m' text of
+    # its own left on a line that is not a comment
+    uses=$(grep -c 'tkill=$(fuser_inmounts_cmd ' "$HERE/run.sh")
+    left=$(grep -n 'fuser -k -m' "$HERE/run.sh" | grep -v ':[0-9]*:\s*#')
+    if [ "$uses" != 1 ] || [ -n "$left" ]; then
+        echo "LAP fuser_guard ABORT: run.sh's timeout kill does not take its text from fuser_inmounts_cmd alone (uses=$uses; own kills: $(tr '\n' '|' <<<"$left" | cut -c1-300))"
+        exit 2
+    fi
+    echo "STAGE run.sh: the timeout kill takes its text from fuser_inmounts_cmd, and no 'fuser -k -m' of its own is left"
 fi
-echo "STAGE harnesses: no 'fuser -k' outside fuser_mounted_cmd in tests/closure_mount_race.sh, scripts/drbd_rig.sh"
 
 # 2. the directory, the sentinel and the main pids
 SVCS="ssh systemd-journald systemd-udevd iscsid"
@@ -65,7 +87,11 @@ b_pids=$(grep -a '^SVCPIDS ' <<<"$before" | tail -1); b_sent=$(grep -a '^SENTINE
 echo "EXPOSED: $DIR is not a mount point on $NODE when the cleanup's command runs"
 
 # 3. the command, as the harnesses send it
-CMD="$(fuser_mounted_cmd "$DIR" 1) echo CMD_DONE"
+if [ "$HELPER" = mounted ]; then
+    CMD="$(fuser_mounted_cmd "$DIR" 1) echo CMD_DONE"
+else
+    CMD="$(fuser_inmounts_cmd "$DIR") sleep 1; echo CMD_DONE"
+fi
 echo "  command: $CMD"
 on "$NODE" "$CMD" 30 | tail -2 | sed 's/^/  node: /'
 sleep 2

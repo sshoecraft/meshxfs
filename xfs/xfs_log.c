@@ -2218,7 +2218,28 @@ out_unlock:
  *   unlock.
  * Every failure skips the cover: the log stays uncovered until the next
  * period, which costs nothing, and there is never an unlocked SB write.
+ *
+ * The superblock buffer is NOT held locked across the synchronous commit
+ * (D-SELF-FENCED-VICTIM-HOLDS-SB-BUFFER-AND-ITS-MXFS-NEVER-RELEASES-AT-
+ * TEARDOWN).  Held (xfs_trans_bhold), the commit sleeps in
+ * xlog_wait_on_iclog with the buffer locked; if that iclog's write fails (a
+ * fenced node's RESERVATION CONFLICT), the shutdown runs the iclog's
+ * callbacks before it wakes the iclog's force waiters
+ * (xlog_state_shutdown_callbacks), the aborted checkpoint's
+ * xfs_buf_item_unpin(remove) waits for the buffer lock this cover holds, and
+ * neither ever runs again: the log worker never returns and unmount waits on
+ * it for ever.  So the commit releases the buffer like any other, and the
+ * home write re-locks it afterwards, as upstream's xfs_sync_sb_buf does
+ * (fs/xfs/xfs_ioctl.c).  The write is still inside the summary section, so
+ * whatever the AIL writes between the commit and the re-lock is too.
+ * Module parameter sb_cover_hold=1 keeps the buffer held across the commit,
+ * as before: the same-build control.
  */
+static int mxfs_sb_cover_hold;
+module_param_named(sb_cover_hold, mxfs_sb_cover_hold, int, 0644);
+MODULE_PARM_DESC(sb_cover_hold,
+	"clustered log cover: 1 holds the superblock buffer locked across its synchronous commit, as before (a log shutdown during that commit deadlocks the cover against the aborted checkpoint's unpin); 0 (default) commits it unheld and re-locks it for the home write");
+
 static void
 mxfs_sb_runtime_cover(
 	struct xfs_mount	*mp)
@@ -2231,6 +2252,7 @@ mxfs_sb_runtime_cover(
 	struct xfs_buf		*bp;
 	uint64_t		d_ic = 0, d_if = 0, d_fd = 0, epoch = 0;
 	int			lk, derr, error;
+	bool			hold = READ_ONCE(mxfs_sb_cover_hold) != 0;
 
 	if (!mutex_trylock(&mp->m_mxfs_sb_summary_mutex)) {
 		mxfs_probe_ratelimited("mxfs: P-SB-RUNTIME-COVER-BUSY slot=%u -- the summary section is held by this node's final sync or freeze cover; skipping this period's cover\n",
@@ -2274,13 +2296,23 @@ mxfs_sb_runtime_cover(
 	}
 	bp = xfs_trans_getsb(tp);
 	xfs_log_sb(tp);
-	xfs_trans_bhold(tp, bp);
+	if (hold)
+		xfs_trans_bhold(tp, bp);
 	xfs_trans_set_sync(tp);
+	mxfs_probe("mxfs: P-SB-RUNTIME-COVER-BEGIN slot=%u epoch=%llu hold=%d -- the cover's synchronous commit starts\n",
+		mp->m_mxfs_node_slot, (unsigned long long)epoch, hold ? 1 : 0);
 	error = xfs_trans_commit(tp);
 	WRITE_ONCE(mp->m_mxfs_sb_cover_durable, false);
-	if (!error)
-		error = xfs_bwrite(bp);	/* the home write, inside the section */
-	xfs_buf_relse(bp);
+	if (hold) {
+		if (!error)
+			error = xfs_bwrite(bp);	/* the home write, inside the section */
+		xfs_buf_relse(bp);
+	} else if (!error) {
+		/* the home write, inside the section; the commit released bp */
+		xfs_buf_lock(mp->m_sb_bp);
+		error = xfs_bwrite(mp->m_sb_bp);
+		xfs_buf_unlock(mp->m_sb_bp);
+	}
 	if (!error) {
 		xfs_buftarg_wait(mp->m_ddev_targp);
 		blkdev_issue_flush(mp->m_ddev_targp->bt_bdev);

@@ -83,6 +83,11 @@ def batch_check(args) -> dict:
            "--row", args.row, "--at", args.at]
     if os.environ.get("MXFS_CANDIDATE"):
         cmd += ["--candidate", os.environ["MXFS_CANDIDATE"]]
+    # the lap's environment as its variant, so the queue refuses a lap that would count nothing;
+    # the marker's module arguments are left out, since the lap's own prep may replace them
+    pre = [p for p in env_variant() if not p.startswith("marker_modargs=")]
+    if pre:
+        cmd += ["--variant", ";".join(pre)[:300]]
     out = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
     if out.returncode != 0:
         print(out.stdout + out.stderr, end="")

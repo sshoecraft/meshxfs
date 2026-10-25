@@ -37,6 +37,16 @@
 # poll stays as the backstop for a lane killed outright. LANE_HOLD_RELEASE=0
 # leaves the release to that poll alone, as before: the control of that fix.
 #
+# A lane whose queue exports MXFS_CONFIG_LOCK_WAIT_S above 0 holds its
+# configurations SHARED. Its run.sh calls wait their turn on run.sh's own
+# configuration lock instead of being refused by it (tests/lib/runlock.sh
+# runlock_config), and the wait is written to MXFS_LAP_WAIT_FILE, which
+# tools/batch_lap.py and tools/lap_bounded.py add to a lap's bound. So two such
+# lanes on different groups can run one configuration, taking turns at each
+# run.sh call. A lane that does not wait still holds a configuration alone,
+# and is refused while a sharing lane holds it. Every 2/net/mesh/direct batch
+# ran on one pair before, one after another.
+#
 # Output, under tests/evidence/lanes/<name>_<stamp>/:
 #   summary.log    one line as each step starts and one as it ends: its number,
 #                  rc, seconds and the command
@@ -70,19 +80,27 @@ trap release_holds EXIT
 held=""
 [ "${LANE_CONFIG_HOLD:-1}" = 0 ] || held=$(grep -v '^[[:space:]]*#' "$OUT/queue" \
     | grep -oE '(run\.sh|--at)[[:space:]]+[0-9]+/[^[:space:]]+' | awk '{print $2}' | sort -u)
+# LANE_CONFIG_SHARE=0 holds every configuration alone whatever the queue waits, as before:
+# the control of the shared hold.
+share=0
+wait_s=$(grep -E '^export MXFS_CONFIG_LOCK_WAIT_S=[0-9]+$' "$OUT/queue" | tail -1 | cut -d= -f2)
+[ "${LANE_CONFIG_SHARE:-1}" != 0 ] && [ -n "$wait_s" ] && [ "$wait_s" -gt 0 ] && share=1
 for cfg in $held; do
     lock=/tmp/mxfs_lane.${cfg//\//-}.lock
     exec {fd}>>"$lock"
-    if ! flock -n "$fd"; then
+    if [ "$share" = 1 ]; then flock -n -s "$fd"; else flock -n "$fd"; fi
+    if [ "$?" != 0 ]; then
         echo "$(date -u +%FT%TZ) lane $NAME refused: configuration $cfg is held by another lane ($(head -c 200 "$lock"))" >> "$SUM"
         date -u +%FT%TZ > "$OUT/DONE"
         exit 3
     fi
-    echo "$$ $(date -u +%FT%TZ) lane $NAME" > "$lock"
+    # sharing holders append, so the file names every lane holding it
+    if [ "$share" = 1 ]; then echo "$$ $(date -u +%FT%TZ) lane $NAME (shared)" >> "$lock"
+    else echo "$$ $(date -u +%FT%TZ) lane $NAME" > "$lock"; fi
     tail --pid=$$ -f /dev/null < /dev/null > /dev/null 2>&1 &
     HOLDERS+=("$!")
     exec {fd}>&-
-    echo "$(date -u +%FT%TZ) holds configuration $cfg" >> "$SUM"
+    echo "$(date -u +%FT%TZ) holds configuration $cfg$([ "$share" = 1 ] && echo " shared (run.sh waits up to ${wait_s} s for its configuration lock)")" >> "$SUM"
 done
 n=0
 while IFS= read -r line || [ -n "$line" ]; do

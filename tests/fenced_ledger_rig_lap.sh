@@ -107,8 +107,30 @@
 # Bounds (derived): prep on a pair measured 53-104 s, bound 120; the load start
 # 30 a node; WARM_S 10; the injection 30 (ssh) or the pause's arm 12; OBS_S 40
 # (hbpause: the 12 s death window, the fence and replay, measured under 25 s on a
-# pair, then 15 s of P's load on); the loads' stop 60; reads 30 each.  Caller
+# pair, then 15 s of P's load on); the loads' stop 60; reads 30 each; the
+# release of every node at the end (below) 30 a node at once, and for a node that
+# does not release its stacks 30 and a power cycle 112 (destroy, then
+# lab_power's up, measured 45-56 s inside run.sh's teardown, doubled).  Caller
 # bound 2 x the precheck's wall.
+#
+# EVERY NODE RELEASED AT THE END.  This lap's faults can leave a node whose mxfs
+# will not let go: the self-fenced victim (P-BUFLOCK-STUCK on its superblock
+# buffer, D-SELF-FENCED-VICTIM-HOLDS-SB-BUFFER-AND-ITS-MXFS-NEVER-RELEASES-AT-TEARDOWN)
+# or survivors the recovery-blocked control arm parks.  Left to the next lap's
+# prep, run.sh's teardown power-cycled them inside that prep's 120 s bound and
+# the next lap ended INCOMPLETE
+# (D-FLEDGER-LAP-PREP-BOUND-LEAVES-NO-ROOM-FOR-THE-PREVIOUS-LAPS-WEDGED-NODES).
+# So every exit unmounts each node, and a node whose mount is still in
+# /proc/mounts afterwards (or that does not answer) is reported EXPOSED-WEDGE and
+# LEFT-WEDGED, its D-state tasks' stacks and its umount's stack are kept as
+# <node>_wedged_stacks.txt, and it is power-cycled here.  FLEDGER_RELEASE_END=0
+# makes the same release attempt and keeps the same stacks but leaves a node it
+# could not free for the next prep, as before: the control.  FLEDGER_END_PREP=1
+# (row lap:fledger_release) then runs the next lap's prep at the lap's end under
+# the same 120 s bound and grades it: 'LAP fledger_release PASS|FAIL'; exposure
+# is an EXPOSED-WEDGE line.  After a failed end prep, graded, the lap forms the
+# cluster again under 300 s so the batch's next lap starts on a formed cluster.
+# That adds 120 s to the bound, and 300 more after a failed end prep.
 #
 # Usage: fenced_ledger_rig_lap.sh <label>
 # Env:   MXFS_NODE_LIST (test17,test18), MXFS_CONFIG (2/net/mesh/direct), MXFS_GROUP,
@@ -116,7 +138,8 @@
 #        HB_PAUSE_MS (45000), GRACE_S (5), LATE_S (15), GRADE (ledger|reason|
 #        survivors, ledger), FENCED_ERRNO (unset), RESEND_REDECIDE (unset),
 #        RBLK_DENY_RESEND (unset), VERDICT_S (200), SURRENDER (unset; GRADE=certify), LAP_LOAD_STOP and LAP_LOAD_CLEAN (1; 0 the
-#        controls of tests/lib/lap_load.sh), LAP_ABORT_AFTER_LOAD (0; 1 ABORTs after the warm-up)
+#        controls of tests/lib/lap_load.sh), LAP_ABORT_AFTER_LOAD (0; 1 ABORTs after the warm-up),
+#        FLEDGER_RELEASE_END (1; 0 the control), FLEDGER_END_PREP (0; 1 grades the next prep)
 # Exit 0 PASS, 1 FAIL, 2 ABORT, 3 VACUOUS.
 set -u
 LABEL=${1:?label}
@@ -202,6 +225,55 @@ stop_all() {
         rs 15 "$n" "touch $LD.stop; kill \$(cat $KL.pid 2>/dev/null) 2>/dev/null; rm -f $KL.pid; echo 1 > $PARM/dl_auth_closed_park 2>/dev/null; echo 0 > $PARM/dl_inject_hb_pause_ms 2>/dev/null" > /dev/null 2>&1
     done
     [ "$LOADS" = 1 ] && lap_load_end "$LD" "$OUT" "${NODES[@]}"
+    release_all
+    [ "${FLEDGER_END_PREP:-0}" = 1 ] && end_prep
+}
+# Every node's mount released (fuser -km, umount, umount -f: what run.sh's teardown does first),
+# and with the fix a node that still holds it captured and power-cycled (header).  The release
+# attempt runs in both arms, so a node it cannot free is the same measurement in each: printed
+# EXPOSED-WEDGE.  FLEDGER_RELEASE_END=0 leaves such a node for the next prep, as before.
+release_all() {
+    local n wedged=()
+    for n in "${NODES[@]}"; do
+        ( rs 30 "$n" "if grep -q ' $MNT ' /proc/mounts; then fuser -km $MNT >/dev/null 2>&1; sleep 1; umount $MNT 2>/dev/null || timeout 20 umount -f $MNT 2>/dev/null; fi; grep -q ' $MNT ' /proc/mounts && echo REL_HELD || echo REL_OK" > "$OUT/${n}_release.txt" 2>&1 ) &
+    done
+    wait
+    for n in "${NODES[@]}"; do
+        grep -q '^REL_OK$' "$OUT/${n}_release.txt" 2>/dev/null || wedged+=("$n")
+    done
+    [ "${#wedged[@]}" = 0 ] && { echo "  INFO every node released its mount at the lap's end"; return 0; }
+    for n in "${wedged[@]}"; do
+        echo "EXPOSED-WEDGE: $n did not release $MNT at the lap's end ($(tr '\n' ' ' < "$OUT/${n}_release.txt" | cut -c1-120))"
+    done
+    # the wedged node's stacks, read-only, in both arms (the instrument of H-SFV1/H-SFV2)
+    for n in "${wedged[@]}"; do
+        rs 30 "$n" "echo w > /proc/sysrq-trigger 2>/dev/null; for p in /proc/[0-9]*; do s=\$(awk '{print \$3}' \$p/stat 2>/dev/null); [ \"\$s\" = D ] || [ \"\$(cat \$p/comm 2>/dev/null)\" = umount ] || continue; echo \"== \${p#/proc/} \$(cat \$p/comm 2>/dev/null) state=\$s\"; cat \$p/stack 2>/dev/null; done; dmesg | tail -150" > "$OUT/${n}_wedged_stacks.txt" 2>&1
+    done
+    [ "${FLEDGER_RELEASE_END:-1}" = 0 ] && { echo "  INFO left for the next prep (FLEDGER_RELEASE_END=0): ${wedged[*]}"; return 0; }
+    for n in "${wedged[@]}"; do
+        echo "  LEFT-WEDGED: $n did not release $MNT at the lap's end ($(tr '\n' ' ' < "$OUT/${n}_release.txt" | cut -c1-120))"
+        ( timeout 20 virsh -c qemu:///system destroy "$n" > /dev/null 2>&1; timeout 92 scripts/lab_power.sh up "$n" > "$OUT/${n}_power_cycle.txt" 2>&1; echo "  INFO $n power-cycled at the lap's end rc=$?" ) &
+    done
+    wait
+}
+# FLEDGER_END_PREP=1 (the row lap:fledger_release): the next lap's prep, run here under the same
+# 120 s bound as every lap's own, so the lap grades what the record's failure was, a prep that a
+# previous lap's wedged node made overrun.  It runs after the release (and, with the fix, after
+# the power cycle), so in the control arm its teardown meets the node the lap left.
+end_prep() {
+    local rc t
+    t=$(date +%s)
+    MXFS_FORCE_PREP=1 python3 "$LB" 120 -- ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster > "$OUT/end_prep.log" 2>&1
+    rc=$?
+    if [ "$rc" = 0 ]; then
+        echo "LAP fledger_release PASS: the next prep formed the cluster in $(( $(date +%s) - t )) s of its 120 s bound"
+    else
+        echo "LAP fledger_release FAIL: the next prep rc=$rc after $(( $(date +%s) - t )) s of its 120 s bound ($(tail -2 "$OUT/end_prep.log" | tr '\n' ' ' | cut -c1-160))"
+        # graded; now form the cluster again under the 300 s a forced prep is given elsewhere, so
+        # the batch's next lap does not start on what the overrun left
+        MXFS_FORCE_PREP=1 python3 "$LB" 300 -- ./run.sh "$MXFS_CONFIG" "${GROUPARG[@]}" prep_cluster > "$OUT/end_prep_repair.log" 2>&1
+        echo "  INFO the cluster formed again after the graded prep: rc=$? ($(tail -1 "$OUT/end_prep_repair.log" | cut -c1-120))"
+    fi
 }
 trap stop_all EXIT
 

@@ -43,8 +43,13 @@ OUT=$HERE/tests/evidence/$(date -u +%Y%m%dT%H%M%SZ)_fsxfail_$LABEL
 mkdir -p "$OUT"
 exec > >(tee -a "$OUT/lap.log") 2>&1
 
-echo "LAP fsx_fail_files start $(date -u +%FT%TZ) node=$NODE mount=$MNT tree=$NREPO FSX_KEEP_FAIL_FILES=${FSX_KEEP_FAIL_FILES:-unset} out=$OUT"
+echo "LAP fsx_fail_files start $(date -u +%FT%TZ) node=$NODE mount=$MNT tree=$NREPO FSX_KEEP_FAIL_FILES=${FSX_KEEP_FAIL_FILES:-unset} FSX_WRITER_NOCREAT=${FSX_WRITER_NOCREAT:-unset} out=$OUT"
 keep=""; [ -n "${FSX_KEEP_FAIL_FILES:-}" ] && keep="FSX_KEEP_FAIL_FILES=$FSX_KEEP_FAIL_FILES "
+# The writer's switch goes to the node like the row's: the node body reads it
+# there, and a control lap whose FSX_WRITER_NOCREAT=0 stayed on the host ran the
+# node with the fix in (control b20261024-3be786: every lap's node start line
+# reads FSX_WRITER_NOCREAT=unset).
+[ -n "${FSX_WRITER_NOCREAT:-}" ] && keep="${keep}FSX_WRITER_NOCREAT=$FSX_WRITER_NOCREAT "
 timeout "$BOUND" "$SSH" "$(lab_addr "$NODE")" "${keep}$NREPO/tests/fsx_fail_files_node.sh $MNT $LABEL; echo node_rc=\$?" \
     </dev/null 2>&1 | grep -avE '^Warning:|^Unauthorized|^If you|^$' > "$OUT/node.txt"
 rc=${PIPESTATUS[0]}

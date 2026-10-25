@@ -80,7 +80,8 @@
 # Usage: tests/live_holder_shard_lap.sh <label> [H] [W]
 # Env:   MXFS_NODE_LIST (test1,test2), MXFS_CONFIG (2/net/mesh/direct),
 #        MXFS_GROUP (passed to run.sh), LHS_REFORM (1; 0 = the pair is formed),
-#        LH_SHARD_SELECT (passed through; 0 = the control)
+#        LH_SHARD_SELECT (passed through; 0 = the control), LHS_POWER_FIRST (1; 0 = the
+#        prep bound's control), LHS_PREP_ONLY (0; 1 grades the first prep and ends there)
 # Exit: 0 PASS, 1 FAIL, 2 ABORT (measured nothing).
 set -u
 LABEL=${1:?label}
@@ -117,6 +118,33 @@ HB=$(( (2 * (63 + 54 * P) + 9) / 10 ))
 
 echo "LAP lh_master start $(date -u +%FT%TZ) label=$LABEL H=$H W=$W hold=${HOLD:-none} members=$NMEM shard_select=$SEL reform=$LHS_REFORM tries=$TRIES harness_bound=${HB}s out=$OUT"
 
+# 0. the members are up before the bounded prep.  The prep's 88 s is twice what a
+# prep measured on nodes already up; run.sh powers off nodes up inside it, and
+# lhmv201's prep spent 32 s of its 88 on its own nodes' power-up and was ended
+# after it printed OK (D-LH-SHARD-LAP-PREP-BOUND-OMITS-A-POWER-UP-OF-ITS-OWN-NODES).
+# So the lap powers them up first, under a bound of its own: a group's power-up
+# measured 15-51 s in the lanes of 2026-10-24 (summary lines of g2c, g4b, g4, g8b,
+# g8), twice that is 102 s.  Nodes already up return at once.  LHS_POWER_FIRST=0
+# leaves the power-up to run.sh inside the prep's bound, as before: the control.
+# LHS_PREP_ONLY=1 (row lap:lh_prep) grades that first prep alone and ends there: EXPOSED-OFF
+# names the members that were powered off when the lap started (the case the bound omitted),
+# then 'LAP lh_prep PASS' when the prep returned 0 inside its 88 s, 'LAP lh_prep FAIL' when it
+# overran.
+if [ "${LHS_PREP_ONLY:-0}" = 1 ]; then
+    off=""
+    for n in $MEMBERS; do
+        st=$(timeout 15 virsh -c qemu:///system domstate "$n" 2>/dev/null | head -1)
+        [ "$st" = running ] || off="$off $n"
+    done
+    [ -n "$off" ] && echo "EXPOSED-OFF: members powered off at the lap's start:$off"
+fi
+if [ "$LHS_REFORM" = 1 ] && [ "${LHS_POWER_FIRST:-1}" != 0 ]; then
+    timeout 102 scripts/lab_power.sh up $MEMBERS < /dev/null > "$OUT/power_up.log" 2>&1
+    urc=$?
+    echo "STAGE power-up rc=$urc wall=$(el)s $(tail -1 "$OUT/power_up.log" | cut -c1-140)"
+    [ "$urc" = 0 ] || { echo "LAP lh_master ABORT: power-up of $MEMBERS rc=$urc (evidence $OUT/power_up.log)"; exit 2; }
+fi
+
 for t in $(seq 1 "$TRIES"); do
 echo "TRY $t of $TRIES at +$(el)s"
 
@@ -128,6 +156,10 @@ if [ "$LHS_REFORM" = 1 ]; then
     prc=$?
     echo "STAGE prep rc=$prc wall=$(el)s $(grep -am1 'prep OK\|FAIL' "$OUT/prep_$t.log" | cut -c1-140)"
     [ "$prc" = 124 ] && echo "LAP lh_master: prep_cluster overran its 88 s bound (rc 124)"
+    if [ "${LHS_PREP_ONLY:-0}" = 1 ]; then
+        [ "$prc" = 0 ] && { echo "LAP lh_prep PASS: the prep formed the cluster inside its 88 s bound (power_first=${LHS_POWER_FIRST:-1}, +$(el)s, evidence $OUT/prep_$t.log)"; exit 0; }
+        [ "$prc" = 124 ] && { echo "LAP lh_prep FAIL: the prep overran its 88 s bound (power_first=${LHS_POWER_FIRST:-1}, evidence $OUT/prep_$t.log)"; exit 1; }
+    fi
     [ "$prc" = 0 ] || { echo "LAP lh_master ABORT: prep_cluster rc=$prc (evidence $OUT/prep_$t.log)"; exit 2; }
 fi
 
