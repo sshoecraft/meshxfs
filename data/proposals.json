@@ -10620,6 +10620,33 @@
         "date": "2026-10-24"
       },
       "applied": "2026-10-24"
+    },
+    {
+      "id": "P20261024-103f1b",
+      "kind": "verify",
+      "record": "D-RIG-LAPS-LEAVE-LOAD-LOGS-IN-NODE-RUN-AND-A-FULL-RUN-KILLS-THE-NEXT-LOAD",
+      "change": {
+        "batch": "b20261024-c79a08"
+      },
+      "argument": "Verification b20261024-c79a08 of row lap:lap_load_clean_noino (the noino lap's own /run cleanup) at 2/net/mesh/direct on candidate 0.90.134, the attempt frozen 2026-10-24T20:46:20Z (build A7E90BC5313192108E35B80, RUNNING, never marked INVALID; release_candidate.py check 0.90.134 at 2026-10-25T00:09Z: 'every frozen file is as it was frozen'). Declared in lane g2_a22x step 7 right after control b20261024-740d1d (the cleanup taken out by its knob, as the lap was before the fix) failed 10 of 10 exposed laps on the same lane, pair (test1/test2), module and configuration: each 'LAP lap_load_end FAIL: ... its /run paths were left on 2 node(s) 10 s after it returned' (step6.log); N=6 from 10/10 at delta=alpha=0.005. All 6 laps PASS with exposure=1: 'no load of the lap ran and none of its /run paths was left on any node 10 s after it returned'; 'verify b20261024-c79a08: 6 PASS, 0 FAIL of 6 planned' (step7.log). The record's other fix site at this configuration, the fenced-ledger lap, was verified on the same attempt by b20261024-017918 (P20261024-dc2a8a); this batch is the noino lap's, which a removal needs as its own site. The ten noino control runs at 2/net/mesh/direct (23:34:06Z-23:57:34Z) are this batch's control and fail on this record's cause in their own lap lines.",
+      "evidence": [
+        "tests/evidence/lanes/g2_a22x_20261024T225204Z/step6.log",
+        "tests/evidence/lanes/g2_a22x_20261024T225204Z/step7.log",
+        "tests/evidence/lanes/g2_a22x_20261024T225204Z/queue",
+        "tests/evidence/lanes/g2_a22x_20261024T225204Z/summary.log",
+        "tests/evidence/batch_laps/b20261024-c79a08",
+        "tests/evidence/batch_laps/b20261024-740d1d",
+        "data/criteria.runs.jsonl"
+      ],
+      "state": "applied",
+      "created": "2026-10-24",
+      "review": {
+        "file": "data/reviews/P20261024-103f1b.md",
+        "sha256": "59f97b920b9fcc44849fc7df0c62526da9808485a0263047388f9768d6eb59c1",
+        "verdict": "approved",
+        "date": "2026-10-24"
+      },
+      "applied": "2026-10-24"
     }
   ]
 }
