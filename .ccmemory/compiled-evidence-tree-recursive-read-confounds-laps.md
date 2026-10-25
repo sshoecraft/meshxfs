@@ -24,7 +24,7 @@ The release-reviewer REJECTED the infra-proven claim for lap 12 (P20261024-a96a9
 ## How to apply
 - Never `grep -r`, `du`, `find` or any recursive read over `tests/evidence` while any rig lane runs. Locate a batch's laps through the ledger (`grep -n <batch> data/criteria.runs.jsonl`): lap logs are `tests/evidence/batch_laps/<batch>/*.log`, lap evidence directories are `tests/evidence/<stamp>_<tag>_<label>`, or `ls -d` a known stamp prefix.
 - When a lap is slow or overruns, check sda (`sadf -t -d /var/log/sysstat/saDD -s HH:MM:00 -e HH:MM:00 -- -d -p | awk -F';' '$4=="sda"'`, 1-minute samples in CDT) and the session's own commands at that time. An infra claim still needs the nodes' kernel logs for the window.
-- Related: [[compiled-scst-shared-target-caw-latency-lap-bounds]].
+- Related: `compiled-scst-shared-target-caw-latency-lap-bounds`.
 
 # Part two: code-level and harness traps
 (Absorbed from `compiled-code-and-harness-traps-vfs-helper-recursion-identity-crc-guard-symmetry-and-loop-stdin`; the `trap-...` names below are the raw notes it had folded.)
