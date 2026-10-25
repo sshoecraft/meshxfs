@@ -10360,14 +10360,15 @@
         "tests/evidence/batch_laps/b20261024-655b70",
         "tests/late_register_hold_lap.sh"
       ],
-      "state": "approved",
+      "state": "applied",
       "created": "2026-10-24",
       "review": {
         "file": "data/reviews/P20261024-cb280d.md",
         "sha256": "e93107b2b7d5b6bde378bc583a59eb9a155117b130cfad801ab8669994acc256",
         "verdict": "approved",
         "date": "2026-10-24"
-      }
+      },
+      "applied": "2026-10-24"
     },
     {
       "id": "P20261024-e7d188",

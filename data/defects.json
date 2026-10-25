@@ -9834,7 +9834,7 @@
           "candidate": "0.90.134",
           "build": "A7E90BC5313192108E35B80",
           "variant": "",
-          "state": "open",
+          "state": "passed",
           "leaves_cluster": false,
           "support": [],
           "created": "2026-10-24",
@@ -9991,7 +9991,19 @@
           "iso": "2026-10-24T21:40:47Z"
         }
       ],
-      "reproducer": "MXFS_BATCH=<bid> ./run.sh 2/disk/caw/mpath lap:late_register_hold (or 2/net/mesh/mpath): tests/late_register_hold_lap.sh <label> <arm> runs path_mount_degraded's steps 1-3 with a load on the victim, so one path of its map returns late and the late-path fill registers the node on it; TEST ONLY dbg_pr_fill_outstanding_ms keeps the fill's REGISTER unresolved 15000 ms after it returns while the load runs through the map, and P-DBG-PR-FILL-OUTSTANDING prints requests_sent (the late path's iorequest_cnt delta) and writes_done in that window; arm 0 sets pr_fill_hold=0, as before the fix"
+      "reproducer": "MXFS_BATCH=<bid> ./run.sh 2/disk/caw/mpath lap:late_register_hold (or 2/net/mesh/mpath): tests/late_register_hold_lap.sh <label> <arm> runs path_mount_degraded's steps 1-3 with a load on the victim, so one path of its map returns late and the late-path fill registers the node on it; TEST ONLY dbg_pr_fill_outstanding_ms keeps the fill's REGISTER unresolved 15000 ms after it returns while the load runs through the map, and P-DBG-PR-FILL-OUTSTANDING prints requests_sent (the late path's iorequest_cnt delta) and writes_done in that window; arm 0 sets pr_fill_hold=0, as before the fix",
+      "verified_at": [
+        {
+          "config": "2/net/mesh/mpath",
+          "platform": "any",
+          "candidate": "0.90.134",
+          "attempt": "2026-10-24T20:46:20Z",
+          "build": "A7E90BC5313192108E35B80",
+          "batch": "b20261024-655b70",
+          "approval": "P20261024-cb280d",
+          "date": "2026-10-24"
+        }
+      ]
     },
     {
       "id": "D-FOURKN-MERGE-CONTROL-LAPS-OVERRAN-130S-SLOW-MOUNTS-AND-BUSY-UNMOUNTS",
