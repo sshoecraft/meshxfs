@@ -39540,15 +39540,18 @@
           ]
         },
         "2/net/mesh/mpath": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261025T010142Z-g2e",
-          "iso": "2026-10-25T01:02:02Z",
+          "status": "PASS",
+          "measured": "victim=test18 flaps=10 flap_s=4 stall_ms=4147 settle_s=0 acked=4899 elapsed=161s fails=0 max_stall_ms=4501",
+          "reason": " (evidence tests/evidence/board_20261025T010142Z-g2e_path_flap)",
+          "iso": "2026-10-25T01:04:46Z",
           "recorded": "2026-10-24",
+          "elapsed_s": 164,
           "build": "A7E90BC5313192108E35B80",
+          "outcome": "PASS",
+          "budget_s": 240,
+          "run_id": "20261025T010142Z-g2e",
           "candidate": "0.90.134",
           "variant": "MXFS_EXTRA_MODARGS=dead_timeout_ms=12000;MXFS_TEST_ENV=PF_KEEP_KMSG=1;MXFS_MPATH_TMO=2",
-          "run_id": "20261025T010142Z-g2e",
           "history": [
             {
               "status": "PASS",
@@ -44316,14 +44319,18 @@
       "detector": "tests/tooling/alloc_witness.sh (kernel counters /sys/kernel/debug/mxfs/<dev>/alloc_witness; record tests/evidence/alloc_witness/<run id>/witness.txt sealed by witness.sha; verdict half tests/tooling/alloc_witness_verdict.py run by chk_clean)",
       "per_config": {
         "2/net/mesh/direct": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261025T010310Z-g2",
-          "iso": "2026-10-25T01:03:30Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=7.29 coverage=PASS floors=partition:PASS,own_ag:PASS,overlap:PASS,breadth:PASS,relaxed:PASS,release:PASS,reuse:PASS,finobt:PASS,cohort:PASS run=20261025T010310Z-g2 fsid=4efbfbbc-4b10-4c01-9298-461d898f434e witness=tests/evidence/alloc_witness/20261025T010310Z-g2/witness.txt",
+          "reason": "",
+          "iso": "2026-10-25T01:04:45Z",
           "recorded": "2026-10-24",
+          "elapsed_s": 63,
           "build": "A7E90BC5313192108E35B80",
-          "candidate": "0.90.134",
+          "outcome": "PASS",
+          "budget_s": 120,
           "run_id": "20261025T010310Z-g2",
+          "candidate": "0.90.134",
+          "evidence": "tests/evidence/run_alloc_witness_20261025T010310Z-g2",
           "history": [
             {
               "status": "PASS",
@@ -45863,14 +45870,18 @@
           "recorded": "2026-07-25"
         },
         "2/net/mesh/direct": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "running 20261025T010310Z-g2",
-          "iso": "2026-10-25T01:03:30Z",
+          "status": "PASS",
+          "measured": "nodes_pass=2/2 hostload=6.02 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=7296 ledger_holders=0 umount_ms=3752 remount_ms=6097 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_2node_20261025T010454Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261025T010310Z-g2/witness.txt",
+          "reason": "",
+          "iso": "2026-10-25T01:05:09Z",
           "recorded": "2026-10-24",
+          "elapsed_s": 11,
           "build": "A7E90BC5313192108E35B80",
-          "candidate": "0.90.134",
+          "outcome": "PASS",
+          "budget_s": 180,
           "run_id": "20261025T010310Z-g2",
+          "candidate": "0.90.134",
+          "evidence": "tests/evidence/run_chk_clean_20261025T010310Z-g2",
           "history": [
             {
               "status": "PASS",
@@ -46783,15 +46794,19 @@
           ]
         },
         "8/disk/caw/mpath": {
-          "status": "PENDING",
-          "measured": "",
-          "reason": "executing 20261025T005854Z-g8b",
-          "iso": "2026-10-25T01:03:54Z",
+          "status": "PASS",
+          "measured": "nodes_pass=8/8 hostload=7.29 verdict=CLEAN release=CLEAN rc=0 errors=0 remounted=1 icount=10112 ledger_holders=0 umount_ms=1080 remount_ms=8392 Chunk/free-space aliasing . OK (no inode-chunk block is also free) evidence=/src/mxfs/tests/evidence/chk_clean_8node_20261025T010401Z.log release=CLEAN coverage=PASS cohort=PASS finobt=PASS targets=PASS accounting=PASS witness=/src/mxfs/tests/evidence/alloc_witness/20261025T005854Z-g8b/witness.txt exposure=94",
+          "reason": "",
+          "iso": "2026-10-25T01:04:40Z",
           "recorded": "2026-10-24",
+          "elapsed_s": 14,
           "build": "A7E90BC5313192108E35B80",
-          "candidate": "0.90.134",
-          "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
+          "outcome": "PASS",
+          "budget_s": 180,
           "run_id": "20261025T005854Z-g8b",
+          "candidate": "0.90.134",
+          "batch": "b20261024-802114",
+          "variant": "MXFS_TEST_ENV=PF_KEEP_KMSG=1",
           "history": [
             {
               "status": "PASS",
